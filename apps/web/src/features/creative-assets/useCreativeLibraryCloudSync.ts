@@ -1,5 +1,9 @@
-import { sanitizeCreativeAssetStore, type CreativeAssetStore } from '@studio/domain';
+import type { CreativeAssetStore } from '@studio/domain';
 import { useEffect } from 'react';
+import {
+  readCreativeLibrary,
+  replaceCreativeLibrary,
+} from '../../adapters/api-client/creativeLibraryApi';
 import type { CreativeAssetRepository } from './types';
 
 const itemCount = (store: CreativeAssetStore): number =>
@@ -8,52 +12,11 @@ const itemCount = (store: CreativeAssetStore): number =>
   store.savedCharacterPrompts.length +
   store.savedCharacterVariants.length;
 
-const readRemote = async (signal: AbortSignal) => {
-  const response = await fetch('/api/creative-library', {
-    credentials: 'same-origin',
-    signal,
-  });
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error('Creative library cloud read failed.');
-  const body = (await response.json()) as unknown;
-  if (
-    typeof body !== 'object' ||
-    body === null ||
-    !('revision' in body) ||
-    typeof body.revision !== 'number' ||
-    !Number.isInteger(body.revision) ||
-    body.revision < 0 ||
-    !('store' in body)
-  ) {
-    throw new Error('Creative library cloud response is invalid.');
-  }
-  const parsed = sanitizeCreativeAssetStore(body.store);
-  if (parsed.recovered || parsed.droppedRecords > 0) {
-    throw new Error('Creative library cloud response contains invalid records.');
-  }
-  return { revision: body.revision, store: parsed.store };
-};
-
 const replaceRemote = async (
   expectedRevision: number,
   repository: CreativeAssetRepository,
   signal: AbortSignal,
-) => {
-  const response = await fetch('/api/creative-library', {
-    method: 'PUT',
-    credentials: 'same-origin',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ expectedRevision, store: repository.getSnapshot().store }),
-    signal,
-  });
-  if (response.status === 409) return 'conflict' as const;
-  if (!response.ok) throw new Error('Creative library cloud write failed.');
-  const body = (await response.json()) as { readonly revision?: unknown };
-  if (typeof body.revision !== 'number' || !Number.isInteger(body.revision)) {
-    throw new Error('Creative library cloud write response is invalid.');
-  }
-  return body.revision;
-};
+) => replaceCreativeLibrary(expectedRevision, repository.getSnapshot().store, signal);
 
 export interface CreativeLibraryCloudSyncOptions {
   readonly initializeEmptyRemoteFromLocal?: boolean;
@@ -114,7 +77,7 @@ export const useCreativeLibraryCloudSync = (
       try {
         await repository.ready();
         if (!active) return;
-        const remote = await readRemote(controller.signal);
+        const remote = await readCreativeLibrary(controller.signal);
         if (!active || remote === null) return;
         revision = remote.revision;
         const localStore = repository.getSnapshot().store;

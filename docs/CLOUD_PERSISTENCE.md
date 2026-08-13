@@ -1,7 +1,7 @@
 # PostgreSQL, Neon, Drizzle, and Cloudflare R2
 
 **Status:** implemented, configuration-gated infrastructure; local remains the default  
-**Reviewed:** 2026-08-11
+**Reviewed:** 2026-08-12
 
 This is the canonical setup, migration, rollback, and limitation guide for cloud persistence. It
 does not authorize public exposure: Elysia on Bun still binds only to `127.0.0.1`, and the seeded demo
@@ -18,6 +18,8 @@ account is not production identity or tenancy.
   Docker-hosted PostgreSQL through `node-postgres`; production uses Neon through the same Drizzle
   boundary. Password credentials are separate from public user rows. Saved-video version append
   and creative-library replacement use database transactions and optimistic concurrency.
+  `@neondatabase/serverless` remains an intentional production-integration dependency even though
+  the current repository connection is the shared Drizzle/`node-postgres` adapter.
 - An authoritative `postgres`/`neon` Project repository with a Project-version CAS, monotonic
   immutable revision history, validated snapshot V1, same-owner composite foreign keys, and
   normalized revision-scoped asset/used-Version links plus one initiating revision per job and one
@@ -54,7 +56,14 @@ account is not production identity or tenancy.
   downloads through a protected bounded temporary file, computes SHA-256, runs MediaBunny
   inspection, registers the asset, and transactionally attaches it before the row becomes ready.
   Stages expire after one hour; abandoned parts and untrusted completed objects are aborted or
-  removed. A completed idempotency receipt wins over expiry cleanup after a restart.
+  removed. A completed idempotency receipt wins over expiry cleanup after a restart. Expiry cleanup
+  transactionally claims a bounded oldest-retry page with `FOR UPDATE SKIP LOCKED` and advances the
+  claim timestamp before object cleanup, so one persistent failure cannot starve later stages.
+- Saved Video gallery pages select only the parent/current Version projection and one grouped
+  Version count for the bounded page; they do not load every historical Version to form summaries.
+- Additive migration `0017` adds only `processing_jobs(status, expires_at)` and
+  `reference_images(updated_at)` indexes for expiry/activity scans. It rewrites no application
+  records and is not applied automatically to production.
 - Restart recovery for provider jobs that already have a durable provider job ID. A restart never
   repeats an initial billable submission. Interrupted submissions without a durable provider ID
   become ambiguous; pre-submission work becomes failed and requires another explicit request.

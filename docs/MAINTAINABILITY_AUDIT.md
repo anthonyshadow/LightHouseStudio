@@ -1,10 +1,66 @@
 # Maintainability audit
 
-**Current as of:** 2026-08-09
+**Current as of:** 2026-08-12
 
 This document records the repository-wide behavior-preserving cleanup and the placement rules that
 follow from it. Product behavior remains defined by the [project README](../README.md),
 [Architecture](ARCHITECTURE.md), and the [user stories](userStories/README.md).
+
+## 2026-08-12 architecture and performance cleanup
+
+The approved repository audit cleanup has been implemented without changing product workflows,
+HTTP contracts, persistence authority, provider selection, or media ownership.
+
+- Existing Video now separates reducer/state policy, source adoption, accepted-job lifetime,
+  result finalization, Voice composition, recipe hydration, recent-outfit presentation, and
+  confirmation UI. The public workflow hook remains the feature coordinator rather than a second
+  media owner.
+- Character Wardrobe now has one temporary variant-draft owner and separate library, default-voice,
+  and variant-editor views. Uncommitted reference cleanup and cancellation remain draft-owned.
+- Studio activity locks are pure policy. `StudioWorkspace` receives grouped route, controller,
+  stage, activity, and action models, while Existing Video, Outfit, and Character overlay families
+  are independently mounted presentation boundaries. `StudioApp` remains the sole composition
+  root and `MediaStage` remains persistent.
+- Project and Campaign dialogs are route-adjacent modules, and both Project-location workflows use
+  one paginated Campaign picker. Drizzle Project row mapping and file-backed Project validation/
+  migration schemas are separated from repository transaction and filesystem mechanics.
+- Browser API transport, capabilities, realtime credentials, reference images, and creative-library
+  synchronization are focused adapters behind one compatibility barrel. Creative-library 404 and
+  revision-conflict 409 handling still use the centralized authentication/error transport.
+- Saved Video list reads select the current Version plus one grouped Version count for the bounded
+  page instead of materializing every Version. Expired direct uploads are claimed in stable retry
+  order with `FOR UPDATE SKIP LOCKED`, preventing one persistent cleanup failure from starving later
+  rows. Additive migration `0017` adds only the supporting processing-expiry and reference-activity
+  indexes.
+- Unreferenced generic media/processing barrels, one unused Saved Video predicate, one unused schema
+  aggregate, and the duplicate Studio visual-matrix wrapper were removed. No dependency was
+  removed. In particular, `@neondatabase/serverless` is intentionally retained: development uses
+  local PostgreSQL, production uses Neon PostgreSQL, and both remain behind the documented Drizzle
+  persistence boundary.
+
+The cleanup reused and strengthened existing tests; it added no test case solely to improve a
+coverage number.
+
+### 2026-08-12 validation
+
+- Focused domain, contract, API repository/service, Project persistence, browser-adapter, route,
+  Existing Video, Wardrobe, and Studio component suites passed. The complete Vitest rerun passed
+  210 files with 1,492 cases passing and six intentionally skipped cases.
+- Application, package, API, Storybook, and E2E types; ESLint; Prettier; normal Knip; module,
+  script-reference, documentation, retired-program, Drizzle-generation, and diff checks passed.
+- Production application/package builds, build-manifest budgets, and the Storybook static build
+  passed. The provider-free entry measured 318,756 of 345,000 bytes and the authenticated Studio
+  closure measured 930,505 of 1,000,000 bytes.
+- Twenty-two targeted Chromium journeys passed across application routing, Projects and Campaigns,
+  Existing Video upload/editing, exact Wardrobe variants, persisted character updates, and
+  reference-image recovery. No external provider was contacted.
+- The curated visual run matched 23 of 31 scenarios, including the changed desktop Campaign,
+  Existing Video upload, processing, result, and editor surfaces. Eight narrow-viewport images
+  retain known baseline drift from earlier committed Campaign-navigation and 320px header-layout
+  work; an unchanged rerun reproduced only those header pixels. Those unrelated baselines were not
+  overwritten as part of this cleanup.
+- No production migration, production database connection, paid provider call, or live/device
+  smoke was run. Migration `0017` was generated and inspected locally only.
 
 ## 2026-08-09 test, quality, and performance audit
 

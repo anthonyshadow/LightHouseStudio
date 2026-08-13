@@ -1,11 +1,6 @@
 import {
   type CapabilitiesResponse,
-  type InspectedVideo,
-  type VideoJobStatusResponse,
-  type VideoCharacterSwapProviderId,
-  type VideoOutputResolution,
   type VideoTransformModelId,
-  type VideoTransformOperationId,
   type VideoTransformRecipe,
 } from '@studio/contracts';
 import {
@@ -14,208 +9,49 @@ import {
   validateUploadedVideoFacts,
   validateVideoTransformPlan,
 } from '@studio/domain';
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  downloadVideoJobResult,
-  releaseVideoJob,
-  submitVideoJob,
-} from '../../adapters/api-client/videoJobsApi';
-import { ApiClientError } from '../../adapters/api-client/apiClient';
-import {
-  replaceRecordingAudio,
-  stripRecordingAudio,
-} from '../../adapters/media-processing/replaceAudioTrack';
+import { submitVideoJob } from '../../adapters/api-client/videoJobsApi';
 import { transcodeRecordingToMp4 } from '../../adapters/media-processing/transcodeRecording';
-import { createProcessedRecordingArtifact } from '../../orchestration/recording/recordingArtifacts';
-import { revokeArtifactUrl } from '../recording/recordingHelpers';
-import type {
-  RecordingArtifact,
-  RecordingController,
-  VideoCharacterAttribution,
-} from '../recording/types';
-import type {
-  LocalVoiceEffectId,
-  VoiceProcessingController,
-  VoiceProcessingOutcome,
-} from '../voice-effects/types';
+import type { RecordingArtifact, RecordingController } from '../recording/types';
+import type { LocalVoiceEffectId, VoiceProcessingController } from '../voice-effects/types';
+import { validateExistingVideo } from './videoValidation';
 import {
-  isTerminalVideoJobStatus,
-  pollVideoJobStatus,
-  removeVideoJobStatus,
-} from './videoJobStatusQuery';
-import { validateExistingVideo, type ValidatedExistingVideo } from './videoValidation';
+  capabilityForExistingVideoStep,
+  capabilityForModel,
+  defaultVideoProcessingCapabilities,
+  operationForModel,
+  RetryExistingVideoJobError,
+  stepLabel,
+  submissionAcceptanceIsUnknown,
+} from './existingVideoWorkflowPolicy';
+import {
+  createWorkflowStateSetters,
+  existingVideoWorkflowReducer,
+  initialExistingVideoWorkflowState,
+} from './existingVideoWorkflowState';
+import { useExistingVideoSourceCoordinator } from './useExistingVideoSourceCoordinator';
+import { useExistingVideoVoicePipeline } from './useExistingVideoVoicePipeline';
+import { useExistingVideoJobLifecycle, useRetainedVideoJob } from './useExistingVideoJobLifecycle';
+import { useExistingVideoFinalization } from './useExistingVideoFinalization';
+import type {
+  ExistingVideoBaseProvenance,
+  ExistingVideoStep,
+  ExistingVideoSubmissionOperation,
+} from './existingVideoWorkflowTypes';
 
-export type ExistingVideoStep = Readonly<{
-  id: string;
-  modelId: VideoTransformModelId;
-  savedRecipeId: string | null;
-  prompt: string;
-  enhancePrompt: boolean;
-  referenceImage: File | null;
-  inputKind: 'character' | 'saved-outfit' | 'reference-image' | 'prompt';
-  provider?: VideoCharacterSwapProviderId;
-  outputResolution?: VideoOutputResolution;
-  characterName?: string | null;
-  characterVariantName?: string | null;
-}>;
-
-export type ExistingVideoVoiceSelection =
-  | Readonly<{
-      kind: 'local';
-      effect: LocalVoiceEffectId;
-      voiceName: string;
-    }>
-  | Readonly<{
-      kind: 'elevenlabs';
-      voiceId: string;
-      voiceName: string;
-    }>;
-
-export type ExistingVideoWorkflowPhase =
-  | 'empty'
-  | 'validating'
-  | 'ready'
-  | 'uploading'
-  | 'processing'
-  | 'retrieving'
-  | 'finalizing'
-  | 'voice-processing'
-  | 'transcoding'
-  | 'complete'
-  | 'error';
+export type {
+  ExistingVideoStep,
+  ExistingVideoSubmissionOperation,
+  ExistingVideoVoiceSelection,
+  ExistingVideoWorkflowPhase,
+} from './existingVideoWorkflowTypes';
+export {
+  capabilityForExistingVideoStep,
+  savedCharacterStepInput,
+} from './existingVideoWorkflowPolicy';
 
 export type ExistingVideoWorkflow = ReturnType<typeof useExistingVideoWorkflow>;
-
-type FinalizedVisual = Readonly<{
-  blob: Blob;
-  mimeType: string;
-  label: string;
-  source: RecordingArtifact;
-  metadata: ValidatedExistingVideo['metadata'];
-  generation: number;
-  characterAttribution: VideoCharacterAttribution | null;
-}>;
-
-type ExistingVideoBaseProvenance = 'source' | 'server-approved-result';
-
-export type ExistingVideoSubmissionOperation = Readonly<{
-  jobId: string;
-  stepIndex: number;
-  state: 'submitting' | 'acceptance-unknown' | 'accepted';
-}>;
-
-type PendingVisual = Readonly<{
-  blob: Blob;
-  mimeType: string;
-  stepIndex: number;
-  expectedResult: InspectedVideo;
-}>;
-
-type RetryJob = Readonly<{ jobId: string; stepIndex: number }>;
-
-interface ExistingVideoWorkflowState {
-  selection: ValidatedExistingVideo | null;
-  step: ExistingVideoStep | null;
-  phase: ExistingVideoWorkflowPhase;
-  message: string | null;
-  status: VideoJobStatusResponse | null;
-  completedStepCount: number;
-  submissionOperation: ExistingVideoSubmissionOperation | null;
-  pendingVisual: PendingVisual | null;
-  retryJob: RetryJob | null;
-  comparison: 'original' | 'result';
-  editBase: RecordingArtifact | null;
-  editBaseMetadata: ValidatedExistingVideo['metadata'] | null;
-  editBaseProvenance: ExistingVideoBaseProvenance;
-  resultMetadata: ValidatedExistingVideo['metadata'] | null;
-  resultHasServerApprovedVisual: boolean;
-  voiceSelection: ExistingVideoVoiceSelection | null;
-  elapsedSeconds: number;
-}
-
-type ExistingVideoWorkflowStateAction = {
-  [Key in keyof ExistingVideoWorkflowState]: Readonly<{
-    key: Key;
-    value: SetStateAction<ExistingVideoWorkflowState[Key]>;
-  }>;
-}[keyof ExistingVideoWorkflowState];
-
-const initialExistingVideoWorkflowState: ExistingVideoWorkflowState = {
-  selection: null,
-  step: null,
-  phase: 'empty',
-  message: null,
-  status: null,
-  completedStepCount: 0,
-  submissionOperation: null,
-  pendingVisual: null,
-  retryJob: null,
-  comparison: 'result',
-  editBase: null,
-  editBaseMetadata: null,
-  editBaseProvenance: 'source',
-  resultMetadata: null,
-  resultHasServerApprovedVisual: false,
-  voiceSelection: null,
-  elapsedSeconds: 0,
-};
-
-const existingVideoWorkflowReducer = (
-  state: ExistingVideoWorkflowState,
-  action: ExistingVideoWorkflowStateAction,
-): ExistingVideoWorkflowState => {
-  const current = state[action.key];
-  const next =
-    typeof action.value === 'function'
-      ? (action.value as (value: typeof current) => typeof current)(current)
-      : action.value;
-  return Object.is(current, next) ? state : { ...state, [action.key]: next };
-};
-
-const stateSetter =
-  <Key extends keyof ExistingVideoWorkflowState>(
-    dispatch: Dispatch<ExistingVideoWorkflowStateAction>,
-    key: Key,
-  ): Dispatch<SetStateAction<ExistingVideoWorkflowState[Key]>> =>
-  (value) =>
-    dispatch({ key, value } as ExistingVideoWorkflowStateAction);
-
-const createWorkflowStateSetters = (dispatch: Dispatch<ExistingVideoWorkflowStateAction>) => ({
-  setSelection: stateSetter(dispatch, 'selection'),
-  setStep: stateSetter(dispatch, 'step'),
-  setPhase: stateSetter(dispatch, 'phase'),
-  setMessage: stateSetter(dispatch, 'message'),
-  setStatus: stateSetter(dispatch, 'status'),
-  setCompletedStepCount: stateSetter(dispatch, 'completedStepCount'),
-  setSubmissionOperation: stateSetter(dispatch, 'submissionOperation'),
-  setPendingVisual: stateSetter(dispatch, 'pendingVisual'),
-  setRetryJob: stateSetter(dispatch, 'retryJob'),
-  setComparison: stateSetter(dispatch, 'comparison'),
-  setEditBase: stateSetter(dispatch, 'editBase'),
-  setEditBaseMetadata: stateSetter(dispatch, 'editBaseMetadata'),
-  setEditBaseProvenance: stateSetter(dispatch, 'editBaseProvenance'),
-  setResultMetadata: stateSetter(dispatch, 'resultMetadata'),
-  setResultHasServerApprovedVisual: stateSetter(dispatch, 'resultHasServerApprovedVisual'),
-  setVoiceSelection: stateSetter(dispatch, 'voiceSelection'),
-  setElapsedSeconds: stateSetter(dispatch, 'elapsedSeconds'),
-});
-
-export const savedCharacterStepInput = (
-  prompt: string,
-  referenceImage: File | null,
-): Pick<ExistingVideoStep, 'prompt' | 'referenceImage'> => ({
-  prompt: referenceImage ? '' : prompt,
-  referenceImage,
-});
 
 type UseExistingVideoWorkflowOptions = {
   readonly recording: RecordingController;
@@ -226,79 +62,6 @@ type UseExistingVideoWorkflowOptions = {
   readonly onSubmissionAccepted?: (step: ExistingVideoStep) => void;
   readonly videoProcessingCapabilities?: CapabilitiesResponse['videoProcessing'];
 };
-
-const operationForModel = (modelId: VideoTransformModelId): VideoTransformOperationId =>
-  modelId === 'lucy-latest' ? 'character-swap' : 'virtual-try-on';
-
-const capabilityForModel = (
-  modelId: VideoTransformModelId,
-  capabilities: CapabilitiesResponse['videoProcessing'],
-) => (modelId === 'lucy-latest' ? capabilities.characterSwap : capabilities.virtualTryOn);
-
-export const capabilityForExistingVideoStep = (
-  step: Pick<ExistingVideoStep, 'modelId' | 'provider'>,
-  capabilities: CapabilitiesResponse['videoProcessing'],
-): CapabilitiesResponse['videoProcessing']['virtualTryOn'] => {
-  if (step.modelId !== 'lucy-latest') return capabilities.virtualTryOn;
-  const selected = capabilities.characterSwap.providers?.find(
-    (provider) => provider.providerId === step.provider,
-  );
-  return selected ? { ...selected, available: true } : capabilities.characterSwap;
-};
-
-const stepLabel = (modelId: VideoTransformModelId): string =>
-  modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try-On';
-
-const defaultVideoProcessingCapabilities: CapabilitiesResponse['videoProcessing'] = {
-  characterSwap: {
-    available: true,
-    inputPreparation: 'none',
-    referencePolicy: 'optional',
-    promptInput: 'editable',
-    promptEnhancement: true,
-    terminalFailureRelease: 'automatic',
-    outputResolutions: ['720p'],
-  },
-  virtualTryOn: {
-    available: true,
-    inputPreparation: 'none',
-    referencePolicy: 'optional',
-    promptInput: 'editable',
-    promptEnhancement: true,
-    terminalFailureRelease: 'automatic',
-    outputResolutions: ['720p'],
-  },
-};
-
-class RetryExistingVideoJobError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'RetryExistingVideoJobError';
-  }
-}
-
-const explicitResubmissionNotice =
-  'The previous video is safe. Starting again requires a new explicit provider submission and may incur additional provider usage.';
-
-const terminalJobMessage = (code: string | undefined): string | null => {
-  if (code === 'job_expired') {
-    return `This temporary video job expired. ${explicitResubmissionNotice}`;
-  }
-  if (code === 'not_found') {
-    return `This temporary video job is no longer available. ${explicitResubmissionNotice}`;
-  }
-  return null;
-};
-
-const acceptedJobInterruptionMessage = (error: unknown, fallback: string): string => {
-  if (error instanceof ApiClientError) {
-    return `${error.message} Visual processing already accepted this job; resuming it does not create another submission.`;
-  }
-  return fallback;
-};
-
-const submissionAcceptanceIsUnknown = (error: unknown): boolean =>
-  !(error instanceof ApiClientError) || (error.status === 502 && error.code === 'invalid-response');
 
 export const useExistingVideoWorkflow = ({
   recording,
@@ -333,7 +96,6 @@ export const useExistingVideoWorkflow = ({
     elapsedSeconds,
   } = workflowState;
   const {
-    setSelection,
     setStep,
     setPhase,
     setMessage,
@@ -353,9 +115,10 @@ export const useExistingVideoWorkflow = ({
   } = workflowStateSetters;
   const controllerRef = useRef<AbortController | null>(null);
   const submissionOperationRef = useRef<ExistingVideoSubmissionOperation | null>(null);
-  const retainedJobIdRef = useRef<string | null>(null);
   const generationRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
+  const { retainedJobIdRef, releaseRetainedJobAndWait, releaseRetainedJob } =
+    useRetainedVideoJob(queryClient);
   const steps = useMemo<readonly ExistingVideoStep[]>(() => (step ? [step] : []), [step]);
   const acceptedSubmission =
     submissionOperation?.state === 'accepted' ||
@@ -400,58 +163,17 @@ export const useExistingVideoWorkflow = ({
     controllerRef.current = null;
     generationRef.current += 1;
     startedAtRef.current = null;
-    setElapsedSeconds(0);
-    setStatus(null);
-    updateSubmissionOperation(null);
-    setPendingVisual(null);
-    setRetryJob(null);
-  }, [setElapsedSeconds, setPendingVisual, setRetryJob, setStatus, updateSubmissionOperation]);
-
-  const releaseRetainedJobAndWait = useCallback(async () => {
-    const jobId = retainedJobIdRef.current;
-    if (!jobId) return;
-    retainedJobIdRef.current = null;
-    await releaseVideoJob(jobId).catch(() => undefined);
-    removeVideoJobStatus(queryClient, jobId);
-  }, [queryClient]);
-
-  const releaseRetainedJob = useCallback(() => {
-    void releaseRetainedJobAndWait();
-  }, [releaseRetainedJobAndWait]);
+    submissionOperationRef.current = null;
+    dispatchWorkflowState({ type: 'clear-operation' });
+  }, []);
 
   const resetWorkflowState = useCallback(
     (discardTake = false) => {
       clearOperation();
       if (discardTake) recording.discard();
-      setSelection(null);
-      setStep(null);
-      setPhase('empty');
-      setMessage(null);
-      setCompletedStepCount(0);
-      setComparison('result');
-      setEditBase(null);
-      setEditBaseMetadata(null);
-      setEditBaseProvenance('source');
-      setResultMetadata(null);
-      setResultHasServerApprovedVisual(false);
-      setVoiceSelection(null);
+      dispatchWorkflowState({ type: 'reset' });
     },
-    [
-      clearOperation,
-      recording,
-      setComparison,
-      setCompletedStepCount,
-      setEditBase,
-      setEditBaseMetadata,
-      setEditBaseProvenance,
-      setMessage,
-      setPhase,
-      setResultHasServerApprovedVisual,
-      setResultMetadata,
-      setSelection,
-      setStep,
-      setVoiceSelection,
-    ],
+    [clearOperation, recording],
   );
 
   const reset = useCallback(
@@ -468,176 +190,18 @@ export const useExistingVideoWorkflow = ({
     await release;
   }, [releaseRetainedJobAndWait, resetWorkflowState]);
 
-  const selectFile = useCallback(
-    async (file: File) => {
-      if (submissionLocked) return;
-      releaseRetainedJob();
-      clearOperation();
-      const generation = generationRef.current;
-      const controller = new AbortController();
-      controllerRef.current = controller;
-      setPhase('validating');
-      setMessage(null);
-      recording.beginProcessing({
-        kind: 'source-validation',
-        title: 'Checking source video…',
-        detail: 'Validating playback, duration, orientation, tracks, and codec locally.',
-      });
-      try {
-        const validated = await validateExistingVideo(file, false, controller.signal);
-        if (controller.signal.aborted) {
-          if (generation === generationRef.current) recording.cancelProcessing();
-          return;
-        }
-        if (generation !== generationRef.current) return;
-        const artifactId = `video-${crypto.randomUUID()}`;
-        const sourceArtifact = publishUploadedVideo({
-          blob: validated.file,
-          artifactMetadata: {
-            id: artifactId,
-            name: `Uploaded video · ${validated.metadata.selectedAt} · ${artifactId.slice(-8)}`,
-            createdAt: validated.metadata.selectedAt,
-            kind: 'uploaded',
-            parentArtifactId: null,
-            mimeType: validated.mimeType,
-            filename: validated.file.name,
-            sourceModeId: 'local',
-            startedAt: validated.metadata.selectedAt,
-            durationMs: validated.metadata.durationMs,
-          },
-          takeMetadata: validated.metadata,
-          audioSidecar: validated.audioSidecar,
-        });
-        setSelection(validated);
-        setEditBase(sourceArtifact);
-        setEditBaseMetadata(validated.metadata);
-        setEditBaseProvenance('source');
-        setResultMetadata(null);
-        setResultHasServerApprovedVisual(false);
-        setStep(null);
-        setVoiceSelection(null);
-        setCompletedStepCount(0);
-        setComparison('original');
-        setPhase('ready');
-        setMessage(validated.audioUnavailableReason);
-        return sourceArtifact;
-      } catch (error) {
-        if (controller.signal.aborted) {
-          if (generation === generationRef.current) recording.cancelProcessing();
-          return;
-        }
-        recording.cancelProcessing();
-        setPhase('error');
-        setMessage(error instanceof Error ? error.message : 'The selected video is not supported.');
-      } finally {
-        if (controllerRef.current === controller) controllerRef.current = null;
-      }
-    },
-    [
-      clearOperation,
-      publishUploadedVideo,
-      recording,
-      releaseRetainedJob,
-      setComparison,
-      setCompletedStepCount,
-      setEditBase,
-      setEditBaseMetadata,
-      setEditBaseProvenance,
-      setMessage,
-      setPhase,
-      setResultHasServerApprovedVisual,
-      setResultMetadata,
-      setSelection,
-      setStep,
-      setVoiceSelection,
-      submissionLocked,
-    ],
-  );
-
-  const adoptRecordedArtifact = useCallback(async () => {
-    const draft = recording.original;
-    if (!draft || recording.lifecycle !== 'recorded' || submissionLocked) return;
-    releaseRetainedJob();
-    clearOperation();
-    const generation = generationRef.current;
-    const controller = new AbortController();
-    controllerRef.current = controller;
-    setPhase('validating');
-    setMessage(null);
-    recording.beginProcessing({
-      kind: 'source-validation',
-      title: 'Checking local recording…',
-      detail: 'Validating the finalized on-device recording before using it as the source.',
-    });
-    try {
-      const file = new File([draft.media], draft.filename, { type: draft.mimeType });
-      const validated = await validateExistingVideo(file, false, controller.signal);
-      if (controller.signal.aborted || generation !== generationRef.current) return;
-      const sourceArtifact = publishUploadedVideo({
-        blob: draft.media,
-        artifactMetadata: {
-          id: draft.id,
-          ...(draft.name ? { name: draft.name } : {}),
-          ...(draft.createdAt ? { createdAt: draft.createdAt } : {}),
-          kind: 'recorded',
-          parentArtifactId: null,
-          mimeType: draft.mimeType,
-          filename: draft.filename,
-          sourceModeId: draft.sourceModeId,
-          startedAt: draft.startedAt,
-          durationMs: draft.durationMs,
-        },
-        takeMetadata: validated.metadata,
-        audioSidecar:
-          recording.sidecar.state === 'ready' && recording.sidecar.blob
-            ? {
-                blob: recording.sidecar.blob,
-                mimeType: recording.sidecar.mimeType ?? recording.sidecar.blob.type,
-              }
-            : validated.audioSidecar,
-      });
-      setSelection(validated);
-      setEditBase(sourceArtifact);
-      setEditBaseMetadata(validated.metadata);
-      setEditBaseProvenance('source');
-      setResultMetadata(null);
-      setResultHasServerApprovedVisual(false);
-      setStep(null);
-      setVoiceSelection(null);
-      setCompletedStepCount(0);
-      setComparison('original');
-      setPhase('ready');
-      recording.cancelProcessing();
-      setMessage(validated.audioUnavailableReason);
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      const safeMessage =
-        error instanceof Error ? error.message : 'The local recording could not be adopted.';
-      recording.failProcessing(safeMessage);
-      setPhase('error');
-      setMessage(safeMessage);
-    } finally {
-      if (controllerRef.current === controller) controllerRef.current = null;
-    }
-  }, [
-    clearOperation,
-    publishUploadedVideo,
+  const { selectFile, adoptRecordedArtifact, replaceSource } = useExistingVideoSourceCoordinator({
     recording,
-    releaseRetainedJob,
-    setComparison,
-    setCompletedStepCount,
-    setEditBase,
-    setEditBaseMetadata,
-    setEditBaseProvenance,
-    setMessage,
-    setPhase,
-    setResultHasServerApprovedVisual,
-    setResultMetadata,
-    setSelection,
-    setStep,
-    setVoiceSelection,
+    publishUploadedVideo,
     submissionLocked,
-  ]);
+    controllerRef,
+    generationRef,
+    clearOperation,
+    releaseRetainedJob,
+    dispatch: dispatchWorkflowState,
+    setPhase,
+    setMessage,
+  });
 
   const addStep = useCallback(
     (modelId: VideoTransformModelId): boolean => {
@@ -693,41 +257,6 @@ export const useExistingVideoWorkflow = ({
     ],
   );
 
-  const replaceSource = useCallback(
-    (validated: ValidatedExistingVideo, artifact: RecordingArtifact) => {
-      releaseRetainedJob();
-      clearOperation();
-      setSelection(validated);
-      setStep(null);
-      setPhase('ready');
-      setMessage(validated.audioUnavailableReason);
-      setCompletedStepCount(0);
-      setComparison('original');
-      setEditBase(artifact);
-      setEditBaseMetadata(validated.metadata);
-      setEditBaseProvenance('source');
-      setResultMetadata(null);
-      setResultHasServerApprovedVisual(false);
-      setVoiceSelection(null);
-    },
-    [
-      clearOperation,
-      releaseRetainedJob,
-      setComparison,
-      setCompletedStepCount,
-      setEditBase,
-      setEditBaseMetadata,
-      setEditBaseProvenance,
-      setMessage,
-      setPhase,
-      setResultHasServerApprovedVisual,
-      setResultMetadata,
-      setSelection,
-      setStep,
-      setVoiceSelection,
-    ],
-  );
-
   const updateStep = useCallback(
     (id: string, patch: Partial<Omit<ExistingVideoStep, 'id' | 'modelId'>>) => {
       if (submissionLocked) return;
@@ -771,385 +300,46 @@ export const useExistingVideoWorkflow = ({
     [setStep, submissionLocked],
   );
 
-  const finalizeVisual = useCallback(
-    async (
-      resultBlob: Blob,
-      mimeType: string,
-      stepIndex: number,
-      controller: AbortController,
-      generation: number,
-      expectedResult: InspectedVideo,
-    ): Promise<FinalizedVisual | null> => {
-      if (!selection) throw new Error('The immutable source video is unavailable.');
-      const baseMetadata = editBaseMetadata ?? selection.metadata;
-      setPhase('finalizing');
-      recording.beginProcessing({
-        kind: 'visual-retrieval',
-        title: 'Validating visual result…',
-        detail: 'Checking the retrieved video before it can replace the current result.',
-      });
-      let validatedResult: Awaited<ReturnType<typeof validateExistingVideo>>;
-      try {
-        validatedResult = await validateExistingVideo(
-          new File([resultBlob], 'result.mp4', {
-            type: mimeType || resultBlob.type || 'video/mp4',
-          }),
-          false,
-          controller.signal,
-          'server-approved-result',
-        );
-      } catch (error) {
-        controller.signal.throwIfAborted();
-        throw new Error(
-          'The downloaded visual result did not meet the app-owned media requirements.',
-          { cause: error },
-        );
-      }
-      if (
-        Math.abs(validatedResult.metadata.durationMs - baseMetadata.durationMs) > 500 ||
-        validatedResult.metadata.width !== expectedResult.width ||
-        validatedResult.metadata.height !== expectedResult.height ||
-        Math.abs(validatedResult.metadata.durationMs - expectedResult.durationMs) > 1 ||
-        validatedResult.metadata.width > validatedResult.metadata.height !==
-          baseMetadata.width > baseMetadata.height
-      ) {
-        throw new Error(
-          'The visual result could not be synchronized safely with the immutable source.',
-        );
-      }
-      const resultCanCommitDirectly =
-        !selection.metadata.hasAudio &&
-        !validatedResult.metadata.hasAudio &&
-        validatedResult.metadata.container === 'mp4' &&
-        validatedResult.metadata.videoCodec === 'avc';
-      let normalized: { blob: Blob; mimeType: string };
-      if (resultCanCommitDirectly) {
-        normalized = { blob: resultBlob, mimeType: 'video/mp4' };
-      } else {
-        recording.beginProcessing({
-          kind: 'audio-restoration',
-          title: 'Restoring source audio…',
-          detail: 'Combining the visual result with the immutable original audio.',
-        });
-        let composed;
-        try {
-          if (selection.metadata.hasAudio) {
-            if (!recording.sidecar.blob) {
-              setPendingVisual({ blob: resultBlob, mimeType, stepIndex, expectedResult });
-              throw new Error(
-                'The visual result is retained for a local retry, but source audio was unavailable.',
-              );
-            }
-            composed = await replaceRecordingAudio(
-              resultBlob,
-              recording.sidecar.blob,
-              controller.signal,
-            );
-          } else {
-            composed = await stripRecordingAudio(resultBlob, controller.signal);
-          }
-        } catch (error) {
-          setPendingVisual({ blob: resultBlob, mimeType, stepIndex, expectedResult });
-          throw error;
-        }
-        controller.signal.throwIfAborted();
-        if (generation !== generationRef.current) return null;
-        setPhase('transcoding');
-        recording.beginProcessing({
-          kind: 'transcoding',
-          title: 'Transcoding visual result…',
-          detail: 'Normalizing the generated video to H.264/AAC MP4.',
-        });
-        normalized = await transcodeRecordingToMp4(composed.blob, {
-          requireAudio: selection.metadata.hasAudio,
-          signal: controller.signal,
-        });
-      }
-      controller.signal.throwIfAborted();
-      if (generation !== generationRef.current) return null;
-      const step = steps[stepIndex];
-      if (!step) throw new Error('The completed visual recipe is unavailable.');
-      setComparison('result');
-      setPendingVisual(null);
-      setRetryJob(null);
-      setCompletedStepCount(stepIndex + 1);
-      updateSubmissionOperation(null);
-      const source = editBase ?? recording.original;
-      if (!source) throw new Error('The immutable source video is unavailable.');
-      return {
-        blob: normalized.blob,
-        mimeType: normalized.mimeType,
-        label: `${operationForModel(step.modelId)}-${stepIndex + 1}`,
-        source,
-        metadata: {
-          ...validatedResult.metadata,
-          container: 'mp4',
-          videoCodec: 'avc',
-          audioCodec: selection.metadata.hasAudio ? 'aac' : null,
-          sizeBytes: normalized.blob.size,
-          hasAudio: selection.metadata.hasAudio,
-        },
-        generation,
-        characterAttribution:
-          step.modelId === 'lucy-latest' && step.characterName
-            ? {
-                characterName: step.characterName,
-                characterVariantName: step.characterVariantName ?? null,
-              }
-            : null,
-      };
-    },
-    [
-      editBase,
-      editBaseMetadata,
-      recording,
-      selection,
-      setComparison,
-      setCompletedStepCount,
-      setPendingVisual,
-      setPhase,
-      setRetryJob,
-      steps,
-      updateSubmissionOperation,
-    ],
-  );
+  const finalizeVisual = useExistingVideoFinalization({
+    recording,
+    selection,
+    editBase,
+    editBaseMetadata,
+    steps,
+    generationRef,
+    updateSubmissionOperation,
+    setPhase,
+    setComparison,
+    setPendingVisual,
+    setRetryJob,
+    setCompletedStepCount,
+  });
 
-  const jobInterruption = useCallback(
-    (error: unknown, jobId: string, stepIndex: number, fallback: string): Error => {
-      const terminalMessage =
-        error instanceof ApiClientError ? terminalJobMessage(error.code) : null;
-      if (terminalMessage) {
-        removeVideoJobStatus(queryClient, jobId);
-        setRetryJob(null);
-        updateSubmissionOperation(null);
-        return new Error(terminalMessage);
-      }
-      setRetryJob({ jobId, stepIndex });
-      return new RetryExistingVideoJobError(acceptedJobInterruptionMessage(error, fallback));
-    },
-    [queryClient, setRetryJob, updateSubmissionOperation],
-  );
+  const { pollAndFinalize } = useExistingVideoJobLifecycle({
+    queryClient,
+    recording,
+    steps,
+    videoProcessingCapabilities,
+    generationRef,
+    retainedJobIdRef,
+    submissionOperationRef,
+    updateSubmissionOperation,
+    finalizeVisual,
+    setPhase,
+    setRetryJob,
+    setStatus,
+  });
 
-  const pollAndFinalize = useCallback(
-    async (
-      jobId: string,
-      stepIndex: number,
-      controller: AbortController,
-      generation: number,
-      initialStatus: VideoJobStatusResponse | null = null,
-    ): Promise<FinalizedVisual | null> => {
-      let current: VideoJobStatusResponse;
-      try {
-        current = await pollVideoJobStatus({
-          queryClient,
-          jobId,
-          initialStatus,
-          signal: controller.signal,
-          onStatus: (nextStatus) => {
-            if (generation !== generationRef.current) return;
-            setStatus(nextStatus);
-            const operation = submissionOperationRef.current;
-            if (operation?.jobId === jobId && operation.state === 'acceptance-unknown') {
-              updateSubmissionOperation({ ...operation, state: 'accepted' });
-            }
-            if (isTerminalVideoJobStatus(nextStatus)) return;
-            setPhase(nextStatus.status === 'retrieving' ? 'retrieving' : 'processing');
-            const currentStep = steps[stepIndex];
-            recording.beginProcessing({
-              kind: nextStatus.status === 'retrieving' ? 'visual-retrieval' : 'visual-generation',
-              title:
-                nextStatus.status === 'retrieving'
-                  ? 'Retrieving visual result…'
-                  : `Generating ${currentStep ? stepLabel(currentStep.modelId).toLowerCase() : 'visual edit'}…`,
-              detail: 'Visual processing is running for the single accepted job.',
-            });
-          },
-        });
-      } catch (error) {
-        if (controller.signal.aborted) throw error;
-        throw jobInterruption(
-          error,
-          jobId,
-          stepIndex,
-          'The status check was interrupted. Retry status without creating another visual-processing submission.',
-        );
-      }
-      if (generation !== generationRef.current) return null;
-      if (current.status !== 'ready') {
-        setRetryJob(null);
-        const currentStep = steps[stepIndex];
-        const terminalFailureRelease = currentStep
-          ? capabilityForExistingVideoStep(currentStep, videoProcessingCapabilities)
-              .terminalFailureRelease
-          : 'automatic';
-        if (terminalFailureRelease === 'explicit-user') {
-          retainedJobIdRef.current = jobId;
-        } else {
-          await releaseVideoJob(jobId).catch(() => undefined);
-          removeVideoJobStatus(queryClient, jobId);
-        }
-        throw new Error(
-          terminalJobMessage(current.error?.code) ??
-            current.error?.message ??
-            'The visual provider could not complete this request. The previous video is safe.',
-        );
-      }
-      setPhase('retrieving');
-      recording.beginProcessing({
-        kind: 'visual-retrieval',
-        title: 'Retrieving visual result…',
-        detail: 'Downloading and validating the accepted visual result.',
-      });
-      let blob: Blob;
-      try {
-        blob = await downloadVideoJobResult(jobId, controller.signal);
-      } catch (error) {
-        if (controller.signal.aborted) throw error;
-        throw jobInterruption(
-          error,
-          jobId,
-          stepIndex,
-          'The result download was interrupted. Retry it without creating another visual-processing submission.',
-        );
-      }
-      setRetryJob(null);
-      setStatus(null);
-      if (!current.result) {
-        throw new Error('The accepted visual result metadata was unavailable.');
-      }
-      removeVideoJobStatus(queryClient, jobId);
-      return finalizeVisual(
-        blob,
-        blob.type || current.result?.mimeType || 'video/mp4',
-        stepIndex,
-        controller,
-        generation,
-        current.result,
-      );
-    },
-    [
-      finalizeVisual,
-      jobInterruption,
-      queryClient,
-      recording,
-      setPhase,
-      setRetryJob,
-      setStatus,
-      steps,
-      updateSubmissionOperation,
-      videoProcessingCapabilities,
-    ],
-  );
-
-  const applySelectedVoice = useCallback(
-    async (
-      videoArtifact: RecordingArtifact,
-      selectedVoice: ExistingVideoVoiceSelection,
-      metadata: ValidatedExistingVideo['metadata'],
-      hasServerApprovedVisual: boolean,
-    ): Promise<VoiceProcessingOutcome> => {
-      setPhase('voice-processing');
-      const outcome =
-        selectedVoice.kind === 'local'
-          ? await processing.applyLocalTo(videoArtifact, selectedVoice.effect, {
-              replaceExistingResult: true,
-            })
-          : await processing.applyElevenLabsTo(
-              videoArtifact,
-              selectedVoice.voiceId,
-              selectedVoice.voiceName,
-              { replaceExistingResult: true },
-            );
-      if (outcome.status === 'ready') {
-        setResultMetadata(metadata);
-        setResultHasServerApprovedVisual(hasServerApprovedVisual);
-        setComparison('result');
-        setPhase('complete');
-        setMessage(`${selectedVoice.voiceName} is ready on the generated result.`);
-        return outcome;
-      }
-      if (outcome.status === 'error') {
-        setPhase('error');
-        setMessage(outcome.message);
-      }
-      return outcome;
-    },
-    [
-      processing,
-      setComparison,
-      setMessage,
-      setPhase,
-      setResultHasServerApprovedVisual,
-      setResultMetadata,
-    ],
-  );
-
-  const completeVisualPlan = useCallback(() => {
-    setPhase('complete');
-    setMessage('Visual processing is complete. The result is ready to compare and save.');
-  }, [setMessage, setPhase]);
-
-  const completeVisualArtifact = useCallback(
-    async (
-      finalized: FinalizedVisual | null,
-      selectedVoice: ExistingVideoVoiceSelection | null,
-    ) => {
-      if (!finalized) return;
-      setResultMetadata(finalized.metadata);
-      setResultHasServerApprovedVisual(true);
-      if (!selectedVoice) {
-        recording.completeVisualProcessing(
-          finalized.blob,
-          finalized.mimeType,
-          finalized.label,
-          finalized.source,
-          finalized.characterAttribution,
-        );
-        completeVisualPlan();
-        return;
-      }
-      const stagedVisual = createProcessedRecordingArtifact(
-        finalized.source,
-        finalized.blob,
-        finalized.mimeType,
-        finalized.label,
-        finalized.characterAttribution,
-      );
-      try {
-        const outcome = await applySelectedVoice(
-          stagedVisual,
-          selectedVoice,
-          finalized.metadata,
-          true,
-        );
-        if (outcome.status === 'ready' || finalized.generation !== generationRef.current) return;
-        recording.completeVisualProcessing(
-          finalized.blob,
-          finalized.mimeType,
-          finalized.label,
-          finalized.source,
-          finalized.characterAttribution,
-        );
-        setComparison('result');
-        if (outcome.status === 'canceled') {
-          setPhase('complete');
-          setMessage('Voice processing was canceled. The healthy visual result is ready.');
-        }
-      } finally {
-        revokeArtifactUrl(stagedVisual, 'replacement');
-      }
-    },
-    [
-      applySelectedVoice,
-      completeVisualPlan,
-      recording,
-      setComparison,
-      setMessage,
-      setPhase,
-      setResultHasServerApprovedVisual,
-      setResultMetadata,
-    ],
-  );
+  const { applySelectedVoice, completeVisualArtifact } = useExistingVideoVoicePipeline({
+    recording,
+    processing,
+    generationRef,
+    setPhase,
+    setMessage,
+    setComparison,
+    setResultMetadata,
+    setResultHasServerApprovedVisual,
+  });
 
   const submitStep = useCallback(
     async (stepIndex: number) => {
@@ -1494,37 +684,16 @@ export const useExistingVideoWorkflow = ({
   }, [acceptedSubmission, phase, processing, recording, selection, setMessage, setPhase]);
 
   const startOver = useCallback(() => {
-    if (!selection || phase !== 'complete') return;
+    if (!selection || phase !== 'complete' || !recording.original) return;
     clearOperation();
     recording.clearVisualProcessing();
-    setStep(null);
-    setPhase('ready');
-    setMessage(selection.audioUnavailableReason);
-    setCompletedStepCount(0);
-    setComparison('original');
-    setEditBase(recording.original);
-    setEditBaseMetadata(selection.metadata);
-    setEditBaseProvenance('source');
-    setResultMetadata(null);
-    setResultHasServerApprovedVisual(false);
-    setVoiceSelection(null);
-  }, [
-    clearOperation,
-    phase,
-    recording,
-    selection,
-    setComparison,
-    setCompletedStepCount,
-    setEditBase,
-    setEditBaseMetadata,
-    setEditBaseProvenance,
-    setMessage,
-    setPhase,
-    setResultHasServerApprovedVisual,
-    setResultMetadata,
-    setStep,
-    setVoiceSelection,
-  ]);
+    dispatchWorkflowState({
+      type: 'start-over',
+      editBase: recording.original,
+      metadata: selection.metadata,
+      message: selection.audioUnavailableReason,
+    });
+  }, [clearOperation, phase, recording, selection]);
 
   const setVtonInputKind = useCallback(
     (

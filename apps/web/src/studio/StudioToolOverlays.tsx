@@ -1,5 +1,4 @@
-import { resolveCharacterVersion } from '@studio/domain';
-import { lazy, Suspense, type RefObject } from 'react';
+import type { RefObject } from 'react';
 import type { BrowserCapabilities, ModelMode } from '../application/types';
 import type {
   CreativeAssetRepository,
@@ -14,7 +13,9 @@ import type { SaveVideoState } from '../features/saved-videos/useSaveVideo';
 import type { useStudioSession } from '../orchestration/session';
 import { OverlayPanel } from '../ui';
 import { AIExperienceChooser } from './AIExperienceChooser';
-import { StudioCharacterSelectorOverlay } from './StudioCharacterSelectorOverlay';
+import { StudioCharacterOverlays } from './StudioCharacterOverlays';
+import { StudioExistingVideoOverlay } from './StudioExistingVideoOverlay';
+import { StudioOutfitOverlays } from './StudioOutfitOverlays';
 import { StudioTakeOverlays } from './StudioTakeOverlays';
 import type { useProviderAvailability } from './useProviderAvailability';
 import type { useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
@@ -24,39 +25,6 @@ import type { ActiveOverlay } from './useStudioOverlayController';
 import type { useStudioSavedVideoController } from './useStudioSavedVideoController';
 import type { useTakeReviewFlow } from './useTakeReviewFlow';
 import { REVIEW_LOCK_REASON } from './studioPolicies';
-
-const CharacterBuilderCoordinator = lazy(() =>
-  import('../features/character-builder/CharacterBuilderCoordinator').then((module) => ({
-    default: module.CharacterBuilderCoordinator,
-  })),
-);
-const CharacterWardrobePanel = lazy(() =>
-  import('../features/character-wardrobe/CharacterWardrobePanel').then((module) => ({
-    default: module.CharacterWardrobePanel,
-  })),
-);
-const ExistingVideoPanel = lazy(() =>
-  import('../features/existing-video/ExistingVideoPanel').then((module) => ({
-    default: module.ExistingVideoPanel,
-  })),
-);
-const OutfitBuilder = lazy(() =>
-  import('../features/creative-assets/OutfitBuilder').then((module) => ({
-    default: module.OutfitBuilder,
-  })),
-);
-const OutfitSelector = lazy(() =>
-  import('../features/creative-assets/OutfitSelector').then((module) => ({
-    default: module.OutfitSelector,
-  })),
-);
-const ConfirmationDialog = lazy(() =>
-  import('../ui/primitives/ConfirmationDialog').then((module) => ({
-    default: module.ConfirmationDialog,
-  })),
-);
-
-const deferredToolFallback = <p role="status">Loading studio tool…</p>;
 
 interface StudioToolOverlaysProps {
   readonly ownerUserId: string;
@@ -145,188 +113,61 @@ export const StudioToolOverlays = ({
 }: StudioToolOverlaysProps) => {
   const { availability, state: capabilityState } = provider;
   const { recording, processing, recordingActive, mediaLocked } = takeReview;
-  const { activeCharacterName, activeRecipeLabel, referenceUsePending, recipeInsertionBlocked } =
-    handoff.state;
-  const applyRecipeSelection = handoff.actions.useRecipe;
+  const { activeCharacterName } = handoff.state;
 
   return (
     <>
-      <OverlayPanel
+      <StudioExistingVideoOverlay
         open={activeOverlay === 'video-upload'}
+        existingVideo={existingVideo}
+        provider={provider}
+        browser={browser}
+        savedRecipes={savedRecipes}
+        character={character}
+        takeReview={takeReview}
+        savedVideo={savedVideo}
+        saveVideoState={saveVideoState}
+        editVideoToggleRef={editVideoToggleRef}
+        uploadToggleRef={uploadToggleRef}
         onClose={onCloseExistingVideo}
-        title="Use existing video"
-        description="Add a source, choose optional edits, then compare and save the result."
-        placement="right"
-        size="workspace"
-        bodyMode="contained"
-        closeDisabled={existingVideo.providerActive}
-        closeOnBackdrop={!existingVideo.selection}
-        returnFocusRef={recording.presented ? editVideoToggleRef : uploadToggleRef}
-      >
-        <Suspense fallback={deferredToolFallback}>
-          <ExistingVideoPanel
-            key={existingVideo.selection?.metadata.selectedAt ?? 'empty-existing-video'}
-            workflow={existingVideo}
-            videoProcessingAvailable={Boolean(
-              availability.videoProcessing?.characterSwap.available ||
-              availability.videoProcessing?.virtualTryOn.available,
-            )}
-            {...(availability.videoProcessing
-              ? { videoProcessingCapabilities: availability.videoProcessing }
-              : {})}
-            elevenLabsAvailable={availability.elevenLabs}
-            elevenLabsModel={availability.elevenLabsModel}
-            browserCapabilities={browser}
-            savedRecipes={savedRecipes}
-            onCreateCharacter={character.createForExistingVideo}
-            onCreateWardrobeVariant={character.openWardrobeForExistingVideo}
-            onFinish={onFinishExistingVideo}
-            {...(recording.presented ? { onSaveVideo: savedVideo.requestSavePresentedVideo } : {})}
-            saveVideoState={saveVideoState}
-            onAdjustVideo={savedVideo.openVideoAdjust}
-            recordingSupported={
-              browser.mediaRecorder && browser.mediaDevices && browser.secureContext
-            }
-            onRecordVideo={onStartExistingVideoRecording}
-          />
-        </Suspense>
-      </OverlayPanel>
-
-      <OverlayPanel
-        open={activeOverlay === 'outfit-selector'}
-        onClose={onCloseOverlay}
-        title="Outfit"
-        description="Create an outfit, or select a saved or recently used Virtual Try-On recipe."
-        placement="right"
-        bodyMode="scroll"
-        returnFocusRef={desktopStudioLayout ? outfitToggleRef : shelfToggleRef}
-      >
-        {activeOverlay === 'outfit-selector' ? (
-          <Suspense fallback={deferredToolFallback}>
-            <OutfitSelector
-              repository={repository}
-              activeOutfitLabel={
-                session.draft.mode === 'lucy-vton-latest' && hasDraftContent(session.draft)
-                  ? (activeRecipeLabel ?? 'Configured VTO')
-                  : undefined
-              }
-              onClear={onUnselectAi}
-              disabledReason={
-                recipeInsertionBlocked
-                  ? 'Release the active media session before selecting another outfit.'
-                  : characterOpenBlockedReason
-              }
-              onCreate={() => outfit.openNew(true, 'selector')}
-              onEdit={(savedOutfit) => outfit.openEditor(savedOutfit, false, 'selector')}
-              onSaveCopy={(savedOutfit) => outfit.openEditor(savedOutfit, true, 'selector')}
-              onSelect={applyRecipeSelection}
-            />
-          </Suspense>
-        ) : null}
-      </OverlayPanel>
-
-      <OverlayPanel
-        open={activeOverlay === 'outfit-builder'}
-        onClose={outfit.close}
-        title={outfit.launch.outfit ? 'Edit outfit' : 'Create a new outfit'}
-        description="Choose Prompt or Reference image, then name and save the reusable outfit."
-        placement="right"
-        bodyMode="scroll"
-        closeOnBackdrop={false}
-        returnFocusRef={
-          outfit.launch.destination === 'shelf'
-            ? shelfToggleRef
-            : desktopStudioLayout
-              ? outfitToggleRef
-              : shelfToggleRef
-        }
-      >
-        {activeOverlay === 'outfit-builder' ? (
-          <Suspense fallback={deferredToolFallback}>
-            <OutfitBuilder
-              key={`${outfit.launch.outfit?.id ?? 'new'}:${outfit.launch.saveAsCopy ? 'copy' : 'edit'}`}
-              repository={repository}
-              {...(outfit.launch.outfit ? { initialOutfit: outfit.launch.outfit } : {})}
-              saveAsCopy={outfit.launch.saveAsCopy}
-              saveAndSelect={outfit.launch.saveAndSelect}
-              disabledReason={characterOpenBlockedReason}
-              onDirtyChange={outfit.updateDirty}
-              onCancel={outfit.close}
-              onSaved={outfit.completeSave}
-            />
-          </Suspense>
-        ) : null}
-      </OverlayPanel>
-
-      <StudioCharacterSelectorOverlay
-        open={activeOverlay === 'character-selector'}
-        returnFocusRef={desktopStudioLayout ? characterSelectorRef : shelfToggleRef}
-        activeCharacterName={activeCharacterName}
-        activeCharacter={activeCharacterRecord}
-        editBlockedReason={characterOpenBlockedReason}
-        removalBlockedReason={characterRemovalBlockedReason}
-        recordingActive={recordingActive}
-        onClose={onCloseOverlay}
-        onEdit={character.edit}
-        onOpenWardrobe={character.openWardrobe}
-        onUnselect={onUnselectCharacter}
-        onCreate={character.openNew}
-        onChooseSaved={() => onOpenSavedRecipesFor('lucy-latest')}
+        onFinish={onFinishExistingVideo}
+        onStartRecording={onStartExistingVideoRecording}
       />
 
-      <OverlayPanel
-        open={activeOverlay === 'character-wardrobe' && Boolean(character.wardrobeCharacter)}
-        onClose={character.closeWardrobe}
-        title={
-          character.wardrobeCharacter
-            ? `${character.wardrobeCharacter.name} wardrobe`
-            : 'Character wardrobe'
-        }
-        description="Browse the original and saved variants, or create a new version without changing the parent character."
-        placement={desktopStudioLayout ? 'right' : 'fullscreen'}
-        size="wide"
-        bodyMode="contained"
-        closeOnBackdrop={!character.wardrobeDirty}
-        returnFocusRef={desktopStudioLayout ? characterSelectorRef : shelfToggleRef}
-      >
-        {character.wardrobeCharacter ? (
-          <Suspense fallback={deferredToolFallback}>
-            <CharacterWardrobePanel
-              repository={repository}
-              store={store}
-              character={character.wardrobeCharacter}
-              addOutfitAvailable={Boolean(availability.wardrobeAddOutfitAvailable)}
-              changeFeaturesAvailable={Boolean(availability.referenceImageEditAvailable)}
-              elevenLabsAvailable={availability.elevenLabs}
-              savedOutfits={store.savedPrompts.filter(
-                (savedOutfit) => savedOutfit.modelModeId === 'lucy-vton-latest',
-              )}
-              useDisabled={recipeInsertionBlocked || referenceUsePending}
-              onDirtyChange={character.setWardrobeDirty}
-              onClose={character.closeWardrobe}
-              {...(character.wardrobeExistingVideoStepId
-                ? { onSaved: character.finishWardrobeVariantForExistingVideo }
-                : {})}
-              onUse={(selection) => {
-                const resolved = resolveCharacterVersion(repository.getSnapshot().store, selection);
-                if (!resolved) return;
-                applyRecipeSelection({
-                  origin: 'character-prompt',
-                  prompt: resolved.prompt,
-                  modelModeId: 'lucy-latest',
-                  assetId: resolved.character.id,
-                  characterName: resolved.displayLabel,
-                  referenceImageAssetId: resolved.referenceImageAssetId,
-                  ...(resolved.variant ? { savedCharacterVariantId: resolved.variant.id } : {}),
-                  ...(resolved.character.builderDraft
-                    ? { builderDraft: resolved.character.builderDraft }
-                    : {}),
-                });
-              }}
-            />
-          </Suspense>
-        ) : null}
-      </OverlayPanel>
+      <StudioOutfitOverlays
+        activeOverlay={activeOverlay}
+        desktopStudioLayout={desktopStudioLayout}
+        repository={repository}
+        session={session}
+        handoff={handoff}
+        outfit={outfit}
+        characterOpenBlockedReason={characterOpenBlockedReason}
+        outfitToggleRef={outfitToggleRef}
+        shelfToggleRef={shelfToggleRef}
+        onClose={onCloseOverlay}
+        onUnselectAi={onUnselectAi}
+      />
+
+      <StudioCharacterOverlays
+        ownerUserId={ownerUserId}
+        activeOverlay={activeOverlay}
+        desktopStudioLayout={desktopStudioLayout}
+        repository={repository}
+        store={store}
+        provider={provider}
+        handoff={handoff}
+        character={character}
+        activeCharacterRecord={activeCharacterRecord}
+        characterOpenBlockedReason={characterOpenBlockedReason}
+        characterRemovalBlockedReason={characterRemovalBlockedReason}
+        recordingActive={recordingActive}
+        characterSelectorRef={characterSelectorRef}
+        shelfToggleRef={shelfToggleRef}
+        editVideoToggleRef={editVideoToggleRef}
+        onClose={onCloseOverlay}
+        onOpenSavedCharacters={() => onOpenSavedRecipesFor('lucy-latest')}
+        onUnselectCharacter={onUnselectCharacter}
+      />
 
       <AIExperienceChooser
         open={activeOverlay === 'ai-experience'}
@@ -414,59 +255,6 @@ export const StudioToolOverlays = ({
           ? { onReplaceSavedVideo: () => void savedVideo.replaceLoadedSavedVideo() }
           : {})}
       />
-
-      {activeOverlay === 'character-builder' ? (
-        <Suspense fallback={deferredToolFallback}>
-          <CharacterBuilderCoordinator
-            open
-            ownerUserId={ownerUserId}
-            target={character.launch.target}
-            {...(character.launch.initialValue
-              ? { initialValue: character.launch.initialValue }
-              : {})}
-            returnFocusRef={
-              character.destination.kind === 'existing-video'
-                ? editVideoToggleRef
-                : desktopStudioLayout
-                  ? characterSelectorRef
-                  : shelfToggleRef
-            }
-            generationAvailable={Boolean(availability.referenceImages)}
-            optimizationAvailable={Boolean(availability.referenceImageOptimizerAvailable)}
-            editAvailable={Boolean(availability.referenceImageEditAvailable)}
-            {...(availability.referenceImageProvider !== undefined
-              ? { referenceImageProvider: availability.referenceImageProvider }
-              : {})}
-            {...(availability.referenceImageModel !== undefined
-              ? { referenceImageModel: availability.referenceImageModel }
-              : {})}
-            {...(availability.referenceImageOptimizerModel !== undefined
-              ? { referenceImageOptimizerModel: availability.referenceImageOptimizerModel }
-              : {})}
-            {...(character.saveBlockedReason
-              ? { saveBlockedReason: character.saveBlockedReason }
-              : {})}
-            onSaveCharacter={character.saveCharacter}
-            onDismiss={character.dismissBuilder}
-          />
-        </Suspense>
-      ) : null}
-
-      <Suspense fallback={null}>
-        <ConfirmationDialog
-          open={character.discardPrompt !== null}
-          title="Unfinished character draft"
-          description={
-            character.discardPrompt ??
-            'An unfinished character draft exists. Continue and discard it?'
-          }
-          confirmLabel="Continue"
-          cancelLabel="Cancel"
-          danger
-          onCancel={() => character.resolveDiscard(false)}
-          onConfirm={() => character.resolveDiscard(true)}
-        />
-      </Suspense>
     </>
   );
 };

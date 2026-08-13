@@ -14,6 +14,7 @@ import type {
   SavedVideoRepository,
   SavedVideoRepositoryPage,
   StoredSavedVideoAggregate,
+  StoredSavedVideoSummary,
   StoredVideoVersion,
   StoredVideoVersionRead,
 } from '../../features/saved-videos/saved-video-repository.js';
@@ -395,7 +396,7 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
 
     const [pageRows, countRows, characterRows, formatRows] = await Promise.all([
       this.db
-        .select({ video: savedVideos })
+        .select({ video: savedVideos, currentVersion: videoVersions })
         .from(savedVideos)
         .innerJoin(videoVersions, currentVersion)
         .where(filters)
@@ -425,7 +426,6 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
         .innerJoin(videoVersions, currentVersion)
         .where(and(eq(savedVideos.ownerUserId, ownerUserId), isNull(savedVideos.deletedAt))),
     ]);
-    const videos = pageRows.map((row) => row.video);
     const total = countRows[0]?.count ?? 0;
     const characterNames = characterRows.flatMap(({ characterName }) =>
       characterName === null ? [] : [characterName],
@@ -433,25 +433,34 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
     const formats = SAVED_VIDEO_FORMATS.filter((item) =>
       formatRows.some((row) => row.format === item),
     );
-    if (videos.length === 0) {
+    if (pageRows.length === 0) {
       return { videos: [], total, characterNames, formats };
     }
-    const versions = await this.db
-      .select()
+    const versionCounts = await this.db
+      .select({
+        videoId: videoVersions.videoId,
+        count: sql<number>`count(*)::int`.mapWith(Number),
+      })
       .from(videoVersions)
       .where(
         and(
           eq(videoVersions.ownerUserId, ownerUserId),
           inArray(
             videoVersions.videoId,
-            videos.map((video) => video.id),
+            pageRows.map(({ video }) => video.id),
           ),
         ),
       )
-      .orderBy(asc(videoVersions.videoId), asc(videoVersions.ordinal));
-    const grouped = groupVersions(versions);
+      .groupBy(videoVersions.videoId);
+    const versionCountByVideoId = new Map(
+      versionCounts.map(({ videoId, count }) => [videoId, count]),
+    );
     return {
-      videos: videos.map((video) => toAggregate(video, grouped.get(video.id) ?? [])),
+      videos: pageRows.map(({ video, currentVersion }): StoredSavedVideoSummary => ({
+        video: toVideo(video),
+        currentVersion: toVersion(currentVersion),
+        versionCount: versionCountByVideoId.get(video.id) ?? 1,
+      })),
       total,
       characterNames,
       formats,

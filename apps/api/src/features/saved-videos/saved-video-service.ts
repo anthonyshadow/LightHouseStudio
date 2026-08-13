@@ -23,6 +23,7 @@ import type {
   SavedVideoReceiptLookup,
   SavedVideoRepository,
   StoredSavedVideoAggregate,
+  StoredSavedVideoSummary,
   StoredVideoVersion,
 } from './saved-video-repository.js';
 
@@ -62,26 +63,32 @@ const publicVersion = (version: StoredVideoVersion) => ({
   createdAt: version.createdAt,
 });
 
-const publicSummary = (
+const aggregateSummary = (
   aggregate: StoredSavedVideoAggregate,
   version = currentVersion(aggregate),
-): SavedVideoSummary =>
+): StoredSavedVideoSummary => ({
+  video: aggregate.video,
+  currentVersion: version,
+  versionCount: aggregate.versions.length,
+});
+
+const publicSummary = (summary: StoredSavedVideoSummary): SavedVideoSummary =>
   savedVideoSummarySchema.parse({
-    id: aggregate.video.id,
-    title: aggregate.video.title,
-    status: aggregate.video.status,
-    currentVersion: publicVersion(version),
-    sourceVideoId: aggregate.video.sourceVideoId,
-    versionCount: aggregate.versions.length,
-    thumbnailAvailable: version.thumbnailAssetId !== null,
-    createdAt: aggregate.video.createdAt,
-    updatedAt: aggregate.video.updatedAt,
+    id: summary.video.id,
+    title: summary.video.title,
+    status: summary.video.status,
+    currentVersion: publicVersion(summary.currentVersion),
+    sourceVideoId: summary.video.sourceVideoId,
+    versionCount: summary.versionCount,
+    thumbnailAvailable: summary.currentVersion.thumbnailAssetId !== null,
+    createdAt: summary.video.createdAt,
+    updatedAt: summary.video.updatedAt,
   });
 
 const publicDetail = (aggregate: StoredSavedVideoAggregate): SavedVideoDetail => {
   const version = currentVersion(aggregate);
   return savedVideoDetailSchema.parse({
-    ...publicSummary(aggregate, version),
+    ...publicSummary(aggregateSummary(aggregate, version)),
     versions: aggregate.versions.map(publicVersion),
   });
 };
@@ -522,7 +529,7 @@ export class SavedVideoService {
     if (this.#repository.listPage !== undefined) {
       const page = await this.#repository.listPage(ownerUserId, query, offset);
       return {
-        videos: page.videos.map((aggregate) => publicSummary(aggregate)),
+        videos: page.videos.map(publicSummary),
         nextCursor:
           offset + page.videos.length < page.total
             ? encodeCursor(offset + page.videos.length, query)
@@ -564,7 +571,9 @@ export class SavedVideoService {
     });
     const page = filtered.slice(offset, offset + query.pageSize);
     return {
-      videos: page.map(({ aggregate, version }) => publicSummary(aggregate, version)),
+      videos: page.map(({ aggregate, version }) =>
+        publicSummary(aggregateSummary(aggregate, version)),
+      ),
       nextCursor:
         offset + page.length < filtered.length ? encodeCursor(offset + page.length, query) : null,
       total: filtered.length,
