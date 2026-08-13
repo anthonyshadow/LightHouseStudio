@@ -96,14 +96,17 @@ provider work.
     not make the Project `completed`. Saving setup, temporary rendering, and durable working-media
     readiness use distinct status copy.
 22. Project Character/VTO/ElevenLabs provider-backed Start actions remain gated with explanatory
-    UI. Configuration and the local render/adoption path make no provider call. Rendering or
-    working-media adoption blocks Project switching/exit until it completes or returns to a safe
-    cancellable checkpoint.
+    UI. Configuration and the local render/adoption path make no provider call. Backend authority
+    now pre-links a direct Project processing command, reconnects durable visual-provider jobs,
+    exposes ambiguity/explicit retry truth, and retains current or stale results safely, but Prompt
+    10 owns the visible integration. Provider-backed Voice remains unavailable there because its
+    synchronous response has no durable reconnect identity. Rendering or working-media adoption
+    blocks Project switching/exit until it completes or returns to a safe cancellable checkpoint.
 
 ## Boundaries
 
 This story includes bounded semantic creative/edit checkpoints and working-media adoption, but no
-Campaign expansion, Project provider processing/reconnect/retry UI, output save, Version-history
+Campaign expansion, Project provider processing/reconnect/retry UI, Saved Video output save, Version-history
 UI, browser Project authority, or IndexedDB Project data. Project source selection, session
 hydration, configuration, and local adoption start no provider. Standalone existing-video behavior
 retains its separate save/replace contract. Project server/repository authority, retention, and

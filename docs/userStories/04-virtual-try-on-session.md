@@ -46,7 +46,9 @@ VTO. A saved-outfit checkpoint keeps the exact Outfit ID, label, revision, immut
 input kind, enhancement setting, applied prompt, provider binding, and resolution; a prompt-only or
 reference-image checkpoint does not fabricate an Outfit. Missing or changed owner-scoped resources
 retain historical labels and **Choose another**. Project provider-backed **Start Virtual Try-On**
-remains gated; the standalone live and existing-video journeys retain their current explicit Start.
+remains gated; the backend can now pre-link and recover an exact-revision queued attempt for Prompt
+10 to integrate, but configuration alone never invokes it. The standalone live and existing-video
+journeys retain their current explicit Start.
 
 ## Guards and recovery
 

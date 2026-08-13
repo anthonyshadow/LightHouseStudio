@@ -11,6 +11,7 @@ import {
   deriveProjectStatus,
   isProjectResumable,
   moveProjectToCampaign,
+  promoteProjectJobResult,
   ProjectRuleError,
   renameProject,
   restoreProject,
@@ -481,5 +482,58 @@ describe('Project aggregate rules', () => {
       ok: true,
       value: { campaignId: null, version: 3 },
     });
+  });
+
+  it('promotes only the latest result for the exact initiating revision', () => {
+    const initial = emptyProject();
+    const assetId = 'e5029fb5-d0a1-4cc0-ad4f-f0ce43b0e0b2';
+    const promoted = promoteProjectJobResult(
+      initial,
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        initiatingRevisionId: firstRevisionId,
+        initiatingRevisionNumber: 1,
+        operationIsCurrent: true,
+        operationId: 'op-1',
+        assetId,
+        author: { kind: 'system', authorId: 'project-processing' },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    expect(promoted).toMatchObject({
+      kind: 'promoted',
+      value: {
+        project: { status: 'draft', currentRevisionId: secondRevisionId },
+        revisions: [
+          {},
+          {
+            source: 'job-result',
+            snapshot: {
+              workingMedia: { kind: 'asset', assetId },
+              presentedMedia: { kind: 'asset', assetId },
+              workflowPhase: 'review',
+            },
+          },
+        ],
+      },
+    });
+
+    expect(
+      promoteProjectJobResult(
+        initial,
+        {
+          expectedProjectVersion: 1,
+          expectedRevisionNumber: 1,
+          initiatingRevisionId: firstRevisionId,
+          initiatingRevisionNumber: 1,
+          operationIsCurrent: false,
+          operationId: 'op-1',
+          assetId,
+          author: { kind: 'system', authorId: 'project-processing' },
+        },
+        { now: later, createId: () => secondRevisionId },
+      ),
+    ).toEqual({ kind: 'stale' });
   });
 });

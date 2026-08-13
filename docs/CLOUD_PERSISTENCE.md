@@ -47,10 +47,11 @@ account is not production identity or tenancy.
   attached in the revision transaction. Exact retained media is reused without copying bytes.
   Exact replay returns the original revision; changed media/edit/base tokens conflict. The source
   row and source asset remain unchanged, and no output or Add Version relation is created.
-- A schema-version-4 local Campaign/Project repository is authoritative in `local` and `shadow`.
-  It uses one owner namespace/lock/journal, atomic primary/backup replacement, strict v1/v2/v3→v4
-  startup migration, durable operation receipts, and prepared source-acceptance/working-media
-  envelopes that reconcile metadata after interruption. `shadow` does not make Drizzle
+- A schema-version-5 local Campaign/Project repository is authoritative in `local` and `shadow`.
+  It uses one owner namespace/lock/journal, atomic primary/backup replacement, strict
+  v1/v2/v3/v4→v5 startup migration, durable operation receipts, and prepared source-acceptance,
+  working-media, Project-job admission, and result-retention envelopes that reconcile metadata
+  after interruption. `shadow` does not make Drizzle
   Campaign/Project tables authoritative or claim their replication.
 - A private R2 `AssetByteStore` with opaque keys, streaming/multipart upload, app-owned SHA-256,
   byte-range reads, owner checks, database lifecycle states, multipart abort/cleanup, and deletion
@@ -73,9 +74,16 @@ account is not production identity or tenancy.
 - Additive migration `0018` changes the Project snapshot-version check from V1-only to V1/V2 and
   creates the working-media adoption authority. It does not rewrite existing Project snapshots or
   copy media bytes and is not applied automatically to production.
-- Restart recovery for provider jobs that already have a durable provider job ID. A restart never
-  repeats an initial billable submission. Interrupted submissions without a durable provider ID
-  become ambiguous; pre-submission work becomes failed and requires another explicit request.
+- Additive migration `0019` adds processing-job result-asset/retry identity and Project-job
+  result-revision fields, restrictive result relations, and recovery/history indexes. It does not
+  assign legacy jobs to Projects, rewrite existing content, or apply automatically to production.
+- Project processing admission commits the exact Project/revision link and app-owned operation
+  before provider submission in every persistence mode. Restart recovery reconnects status or
+  retrieval only for jobs with a durable provider identity and never repeats an initial billable
+  submission. Interrupted `submitting` operations without that identity become ambiguous;
+  pre-submission work becomes failed and requires another explicit request. Current successful
+  results are retained as Media Assets and `job-result` revisions; obsolete paid successes remain
+  owner-bound historical `job-output` assets. Neither path creates a Saved Video/Version.
 - Global and per-provider admission limits in addition to the existing one-active-job-per-owner
   rule. Durable rows enforce one active job per owner across server instances. Limits are set by
   `VIDEO_JOB_MAX_ACTIVE` and `VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER`.
@@ -101,12 +109,12 @@ account is not production identity or tenancy.
 
 ## Runtime modes
 
-| `DATABASE_MODE` | Metadata authority                                             | Sessions/jobs                                      | Bytes                                                                                      |
-| --------------- | -------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `local`         | Local files, including Campaign/Project authority              | Process-local sessions/jobs plus safe file traces  | Existing private local store                                                               |
-| `shadow`        | Local files remain authoritative, including Campaigns/Projects | Neon safe job traces and restart records           | `local`, or new saved-video writes to both R2 and local with R2-first/local-fallback reads |
-| `postgres`      | Local PostgreSQL Drizzle repositories                          | Durable local sessions and resumable accepted jobs | Registered local objects or the isolated development R2 bucket                             |
-| `neon`          | Neon Drizzle repositories                                      | Durable Neon sessions and resumable accepted jobs  | Registered local objects or private R2, selected at startup                                |
+| `DATABASE_MODE` | Metadata authority                                             | Sessions/jobs                                                                                 | Bytes                                                                                      |
+| --------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `local`         | Local files, including Campaign/Project authority              | Process-local sessions plus durable Project-job admission/recovery and safe standalone traces | Existing private local store                                                               |
+| `shadow`        | Local files remain authoritative, including Campaigns/Projects | Local-authority Project jobs; Neon trace writes are best-effort side effects                  | `local`, or new saved-video writes to both R2 and local with R2-first/local-fallback reads |
+| `postgres`      | Local PostgreSQL Drizzle repositories                          | Durable local sessions and resumable accepted jobs                                            | Registered local objects or the isolated development R2 bucket                             |
+| `neon`          | Neon Drizzle repositories                                      | Durable Neon sessions and resumable accepted jobs                                             | Registered local objects or private R2, selected at startup                                |
 
 `ASSET_STORE_PROVIDER=r2` requires `DATABASE_MODE=shadow`, `postgres`, or `neon`. Reference-image
 and creative metadata stay local in `shadow`; their database adapters become authoritative in
@@ -240,10 +248,11 @@ verification, lifecycle, or cleanup contracts above.
   Older compatible code ignores the new tables/column, but dropping Campaign receipts loses
   replay history and dropping membership requires every Project to be detached first. Do not
   remove these objects as an automatic rollback. Additive migration `0016` owns immutable Project
-  source rows; `0018` owns snapshot-v2 admission and working-media adoption receipts. Dropping
-  either would discard replay/lineage authority and is not an automatic rollback. Local schema v4
-  is not readable by older parsers; downgrade requires restoring a verified pre-upgrade metadata
-  backup or deploying compatible reader code, never ad hoc field stripping.
+  source rows; `0018` owns snapshot-v2 admission and working-media adoption receipts. Additive
+  `0019` owns Project-processing retry/result identity and exact retained-result relations. Dropping
+  any of these would discard replay/lineage authority and is not an automatic rollback. Local
+  schema v5 is not readable by older parsers; downgrade requires restoring a verified pre-upgrade
+  metadata backup or deploying compatible reader code, never ad hoc field stripping.
 
 ## Operational checks before any non-loopback deployment
 

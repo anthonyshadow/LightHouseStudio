@@ -8,6 +8,7 @@ describe('createConfiguredPersistence', () => {
   it('composes file-backed Project authority without opening a database in local mode', async () => {
     const persistence = await createConfiguredPersistence(testConfig());
     expect(persistence?.projects).toBeInstanceOf(FileProjectRepository);
+    expect(persistence?.projectProcessing).toBe(persistence?.projects);
     expect(persistence?.projectRetention).toBe(persistence?.projects);
     expect(persistence?.savedVideos).toBeInstanceOf(FileSavedVideoRepository);
   });

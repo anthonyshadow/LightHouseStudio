@@ -23,12 +23,13 @@ const createLocalMetadataPersistence = (
   dataDirectory: string,
 ): Pick<
   AppPersistenceDependencies,
-  'savedVideos' | 'projects' | 'campaigns' | 'projectRetention'
+  'savedVideos' | 'projects' | 'projectProcessing' | 'campaigns' | 'projectRetention'
 > => {
   const projects = new FileProjectRepository(dataDirectory);
   return {
     savedVideos: new FileSavedVideoRepository(dataDirectory),
     projects,
+    projectProcessing: projects,
     campaigns: projects,
     projectRetention: projects,
   };
@@ -91,14 +92,15 @@ export const createConfiguredPersistence = async (
     } else {
       assetBytes = new ManagedLocalAssetByteStore(localBytes, lifecycle);
     }
-    const processingJobTraces = new DrizzleProcessingJobTraceWriter(connection.db);
+    const processingJobTraces = new DrizzleProcessingJobTraceWriter(connection.db, {
+      excludeProjectLinkedJobs: config.databaseMode !== 'shadow',
+    });
 
     if (config.databaseMode === 'shadow') {
       return {
         ...createLocalMetadataPersistence(config.lightframeDataDir),
         ...(config.assetStoreProvider === 'r2' ? { assetBytes } : {}),
         processingJobTraces,
-        processingJobs: processingJobTraces,
         close: () => connection.close(),
       };
     }
@@ -109,6 +111,7 @@ export const createConfiguredPersistence = async (
       undefined,
       projectRetention,
     );
+    const projects = new DrizzleProjectRepository(connection.db);
     return {
       users,
       sessions: new DrizzleSessionRepository(connection.db),
@@ -118,7 +121,8 @@ export const createConfiguredPersistence = async (
       referenceImages,
       processingJobTraces,
       processingJobs: processingJobTraces,
-      projects: new DrizzleProjectRepository(connection.db),
+      projects,
+      projectProcessing: projects,
       campaigns: new DrizzleCampaignRepository(connection.db),
       projectRetention,
       creativeLibraries: new DrizzleCreativeLibraryRepository(

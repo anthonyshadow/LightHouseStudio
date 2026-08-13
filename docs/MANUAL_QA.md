@@ -242,6 +242,23 @@ focus return, reduced motion, and overlay stacking at every canonical viewport a
 - Repeated Start/Stop/Reset/processing cycles leave no owned track/client/listener/timer/context or
   stale object URL.
 
+## Project processing integration boundary
+
+Prompt 09 adds server authority, not visible Project processing controls. In ordinary manual QA:
+
+- open a source-bearing Project, configure Character Swap, VTO, and Voice, and confirm every
+  provider-backed Project Start remains disabled with truthful explanatory copy;
+- save/refresh the creative setup and confirm there is no processing submit/reconcile request,
+  provider SDK load, external request, new Saved Video, or automatic result presentation; and
+- confirm local Render preview and explicit working-media adoption retain their existing lifecycle
+  and do not create a Project processing attempt.
+
+The route-level pre-link, restart, ambiguity, explicit retry, archive blocking, stale-result
+retention, and current `job-result` behavior are deterministic fake-provider/database evidence.
+Do not turn them into paid manual work during ordinary QA. If a release specifically authorizes a
+live API-only Project attempt before Prompt 10 provides UI, use the additional gated procedure in
+[Live provider smoke](LIVE_PROVIDER_SMOKE.md) and record that the visible Project gate stayed intact.
+
 ## Accessibility
 
 Using keyboard and a screen reader:

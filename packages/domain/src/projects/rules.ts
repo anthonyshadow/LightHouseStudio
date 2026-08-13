@@ -1,6 +1,7 @@
 import type {
   Project,
   ProjectAggregate,
+  ProjectConflict,
   ProjectMutationContext,
   ProjectMutationResult,
   ProjectRevision,
@@ -752,4 +753,72 @@ export const adoptProjectWorkingMedia = (
     },
     { ...context, now },
   );
+};
+
+export interface PromoteProjectJobResultInput {
+  readonly expectedProjectVersion: number;
+  readonly expectedRevisionNumber: number;
+  readonly initiatingRevisionId: string;
+  readonly initiatingRevisionNumber: number;
+  readonly operationIsCurrent: boolean;
+  readonly operationId: string;
+  readonly assetId: string;
+  readonly author: ProjectRevisionAuthor;
+}
+
+export type PromoteProjectJobResult =
+  | { readonly kind: 'promoted'; readonly value: ProjectAggregate }
+  | { readonly kind: 'stale' }
+  | { readonly kind: 'conflict'; readonly conflict: ProjectConflict };
+
+/**
+ * Advances current working media only for the exact initiating revision and latest accepted
+ * operation. Persistence still retains a valid stale result against its initiating revision.
+ */
+export const promoteProjectJobResult = (
+  aggregate: ProjectAggregate,
+  input: PromoteProjectJobResultInput,
+  context: ProjectMutationContext,
+): PromoteProjectJobResult => {
+  const currentRevision = aggregate.revisions.find(
+    ({ id }) => id === aggregate.project.currentRevisionId,
+  );
+  if (currentRevision === undefined) {
+    throw new ProjectRuleError('invalid-snapshot', 'The current project revision is missing.');
+  }
+  if (
+    !input.operationIsCurrent ||
+    currentRevision.id !== input.initiatingRevisionId ||
+    currentRevision.revisionNumber !== input.initiatingRevisionNumber
+  ) {
+    return { kind: 'stale' };
+  }
+  const now = requireTimestamp(context.now);
+  const assetId = requireId(input.assetId, 'Job result asset');
+  const appended = appendProjectRevision(
+    aggregate,
+    {
+      expectedProjectVersion: input.expectedProjectVersion,
+      expectedRevisionNumber: input.expectedRevisionNumber,
+      snapshot: {
+        ...currentRevision.snapshot,
+        workingMedia: { kind: 'asset', assetId },
+        presentedMedia: { kind: 'asset', assetId },
+        lastSuccessfulOutput: null,
+        workflowPhase: 'review',
+        updatedAt: now,
+      },
+      author: input.author,
+      source: 'job-result',
+      facts: {
+        sourceStatus: currentRevision.snapshot.sourceAssetId === null ? 'none' : 'ready',
+        currentAttempt: { status: 'succeeded', jobId: requireId(input.operationId, 'Operation') },
+        validatedLastSuccessfulOutput: null,
+      },
+    },
+    { ...context, now },
+  );
+  return appended.ok
+    ? { kind: 'promoted', value: appended.value }
+    : { kind: 'conflict', conflict: appended.conflict };
 };

@@ -258,9 +258,14 @@ owner for one visual treatment followed by optional Voice. The Project adapter c
 plan only when **Save creative setup** is chosen. Local **Adjust video** instead produces a
 temporary **Render preview**; explicit adoption is the only path that can make its inspected bytes
 current Project working/presented media. Character Swap, VTO, and ElevenLabs Start actions remain
-disabled in Project context until recoverable Project processing exists. Configuration and local
-rendering therefore create no provider request, Saved Video/Version, Add Version target, or output
-provenance.
+disabled in Project context until Prompt 10 integrates recoverable Project processing.
+Configuration and local rendering therefore create no provider request, Saved Video/Version, Add
+Version target, or output provenance. The server now has the integration authority: it commits the
+operation and exact initiating revision before provider submission, reconnects durable provider
+identities, treats an unknown submission response as needs-attention, and retains an inspected
+current or historical result before temporary cleanup. A current result is Project working media
+through a `job-result` revision, not a Saved Video; an obsolete paid success remains a historical
+`job-output` asset and cannot replace current media.
 
 ## Evidence boundary
 

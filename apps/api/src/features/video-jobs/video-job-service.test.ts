@@ -948,10 +948,11 @@ describe('VideoJobService', () => {
       referenceMimeType: null,
     });
 
-    const failed = await waitFor(service, jobId, 'owner-two', 'failed');
-    expect(failed.error).toEqual({
-      code: 'provider_rejected',
-      message: 'Visual processing could not complete this request.',
+    const ambiguous = await waitFor(service, jobId, 'owner-two', 'ambiguous');
+    expect(ambiguous.error).toEqual({
+      code: 'submission_ambiguous',
+      message:
+        'The provider may have accepted this operation, but no recovery identity was returned. Do not retry automatically.',
     });
     expect(provider.submit).toHaveBeenCalledOnce();
   });

@@ -59,11 +59,27 @@ describe.runIf(databaseUrl !== undefined)(
           const versionAssetId = randomUUID();
           const savedVideoId = randomUUID();
           const videoVersionId = randomUUID();
+          const legacyProcessingJobId = randomUUID();
           const now = '2026-08-11T12:00:00.000Z';
           const later = '2026-08-11T12:05:00.000Z';
+          const emptySnapshot = createEmptyProjectSnapshot(now);
           const firstSnapshot = {
-            ...createEmptyProjectSnapshot(now),
+            schemaVersion: 1 as const,
             sourceAssetId,
+            workingMedia: emptySnapshot.workingMedia,
+            presentedMedia: emptySnapshot.presentedMedia,
+            selectedCharacter: null,
+            selectedOutfit: null,
+            selectedVoice: null,
+            visualTreatment: { kind: 'none' as const },
+            liveMode: null,
+            creativeIntent: { promptId: null, recipeId: null, userIntent: '' },
+            localEdit: emptySnapshot.localEdit,
+            exportSpecification: emptySnapshot.exportSpecification,
+            lastSuccessfulOutput: emptySnapshot.lastSuccessfulOutput,
+            workflowPhase: emptySnapshot.workflowPhase,
+            createdAt: emptySnapshot.createdAt,
+            updatedAt: emptySnapshot.updatedAt,
           };
           const secondSnapshot = {
             ...firstSnapshot,
@@ -214,6 +230,53 @@ describe.runIf(databaseUrl !== undefined)(
           ).resolves.toMatchObject({
             rows: [{ producing_revision_id: firstRevisionId, producing_revision_number: 1 }],
           });
+
+          for (const filename of migrationFiles.filter(
+            (name) => name >= '0011_' && name < '0019_',
+          )) {
+            await applyMigration(client, filename);
+          }
+          await client.query(
+            `insert into processing_jobs
+              (id, owner_user_id, operation, provider, status, output_asset_id, expires_at)
+             values ($1, $2, 'character-swap', 'legacy-provider', 'ready', $3, $4)`,
+            [legacyProcessingJobId, ownerUserId, versionAssetId, '2026-08-11T13:00:00.000Z'],
+          );
+          await applyMigration(client, '0019_tearful_microchip.sql');
+          await expect(
+            client.query(
+              `select result_asset_id, result_metadata, retry_of_job_id
+               from processing_jobs where id = $1`,
+              [legacyProcessingJobId],
+            ),
+          ).resolves.toMatchObject({
+            rows: [{ result_asset_id: null, result_metadata: null, retry_of_job_id: null }],
+          });
+          await expect(
+            client.query(`select job_id from project_jobs where job_id = $1`, [
+              legacyProcessingJobId,
+            ]),
+          ).resolves.toMatchObject({ rows: [] });
+          await expect(
+            client.query(`update processing_jobs set result_metadata = '{}' where id = $1`, [
+              legacyProcessingJobId,
+            ]),
+          ).rejects.toThrow('processing_jobs_result_consistent');
+          await client.query(
+            `insert into project_jobs
+              (project_id, owner_user_id, job_id, initiating_revision_id,
+               initiating_revision_number, created_at)
+             values ($1, $2, $3, $4, 2, $5)`,
+            [projectId, ownerUserId, legacyProcessingJobId, secondRevisionId, later],
+          );
+          await expect(
+            client.query(
+              `update project_jobs
+               set result_revision_id = $2, result_revision_number = null
+               where job_id = $1`,
+              [legacyProcessingJobId, secondRevisionId],
+            ),
+          ).rejects.toThrow('project_jobs_result_revision_consistent');
         } finally {
           client.release();
           await target.end();

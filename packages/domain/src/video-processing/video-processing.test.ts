@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canPromoteProjectProcessingResult,
   canonicalVideoTransformInputGeometry,
+  currentProjectProcessingAttempt,
+  projectProcessingBlocksArchive,
+  projectProcessingNeedsAttention,
+  projectProcessingPhase,
+  projectProcessingRestartTransition,
+  projectProcessingRetryPolicy,
   validateUploadedVideoFacts,
   validateVideoTransformPlan,
   type UploadedVideoFacts,
@@ -120,5 +127,76 @@ describe('single visual policy', () => {
     expect(validateVideoTransformPlan([legacyVtoStep])).toEqual([
       'Choose a Virtual Try-On input type.',
     ]);
+  });
+
+  it('derives finite current-attempt, ambiguity, and stale-promotion policy', () => {
+    const attempt = {
+      operationId: 'op-1',
+      initiatingRevisionId: 'revision-1',
+      initiatingRevisionNumber: 1,
+      resultRevisionId: null,
+      resultRevisionNumber: null,
+      attemptNumber: 1,
+      status: 'submitting' as const,
+      providerJobId: null,
+      outputAssetId: null,
+      createdAt: '2026-08-13T12:00:00.000Z',
+    };
+    const retry = {
+      ...attempt,
+      operationId: 'op-2',
+      attemptNumber: 2,
+      status: 'ambiguous' as const,
+      createdAt: '2026-08-13T12:01:00.000Z',
+    };
+    expect(
+      currentProjectProcessingAttempt({ id: 'revision-1', revisionNumber: 1 }, [attempt, retry]),
+    ).toEqual(retry);
+    expect(projectProcessingPhase(retry)).toBe('needs-attention');
+    expect(projectProcessingRetryPolicy(retry.status)).toBe('explicit-cost-confirmation');
+    expect(projectProcessingBlocksArchive(retry.status)).toBe(true);
+    expect(projectProcessingNeedsAttention(retry.status)).toBe(true);
+    expect(
+      canPromoteProjectProcessingResult({
+        currentRevisionId: 'revision-1',
+        currentRevisionNumber: 1,
+        initiatingRevisionId: 'revision-1',
+        initiatingRevisionNumber: 1,
+        currentOperationId: 'op-2',
+        operationId: 'op-1',
+      }),
+    ).toBe(false);
+  });
+
+  it('normalizes interrupted attempts with one persistence-neutral restart policy', () => {
+    const attempt = {
+      status: 'submitting' as const,
+      providerJobId: null,
+      outputAssetId: null,
+      expiresAt: '2026-08-13T13:00:00.000Z',
+    };
+    const now = '2026-08-13T12:30:00.000Z';
+
+    expect(projectProcessingRestartTransition(attempt, now)).toEqual({
+      status: 'ambiguous',
+      safeErrorCode: 'submission_ambiguous',
+      completedAt: now,
+    });
+    expect(
+      projectProcessingRestartTransition({ ...attempt, providerJobId: 'provider-job' }, now),
+    ).toEqual({ status: 'queued', safeErrorCode: null, completedAt: null });
+    expect(
+      projectProcessingRestartTransition(
+        { ...attempt, status: 'ready', providerJobId: 'provider-job' },
+        now,
+      ),
+    ).toEqual({ status: 'retrieving', safeErrorCode: null, completedAt: null });
+    expect(
+      projectProcessingRestartTransition(
+        { ...attempt, status: 'processing', expiresAt: '2026-08-13T12:00:00.000Z' },
+        now,
+      ),
+    ).toEqual({ status: 'expired', safeErrorCode: 'job_expired', completedAt: now });
+    expect(projectProcessingRestartTransition({ ...attempt, status: 'ambiguous' }, now)).toBeNull();
   });
 });

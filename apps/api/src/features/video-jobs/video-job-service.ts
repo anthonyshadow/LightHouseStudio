@@ -104,10 +104,40 @@ type VideoJobDeadlineEntry = Readonly<{
 }>;
 
 const terminal = (status: VideoJobStatus): boolean =>
-  status === 'ready' || status === 'failed' || status === 'expired';
+  status === 'ready' ||
+  status === 'ambiguous' ||
+  status === 'failed' ||
+  status === 'expired' ||
+  status === 'cancelled';
 
 const PROVIDER_POLL_BACKOFF_MS = [2_000, 3_000, 5_000, 8_000, 10_000] as const;
 const DEFAULT_MAXIMUM_EXPIRED_TOMBSTONES = 500;
+
+export interface ResolvedVideoJobSubmission {
+  readonly providerId: string;
+  readonly outputResolution: VideoOutputResolution;
+  readonly inputPreparation: 'none' | 'h264-mp4';
+  readonly referencePolicy: 'optional' | 'required';
+  readonly cancellationSupported: false;
+}
+
+type NewVideoJob = Pick<
+  VideoJobRecord,
+  | 'jobId'
+  | 'ownerId'
+  | 'operation'
+  | 'providerId'
+  | 'binding'
+  | 'outputResolution'
+  | 'requestFingerprint'
+  | 'status'
+  | 'directory'
+  | 'inputPath'
+  | 'referencePath'
+  | 'referenceMimeType'
+  | 'sourceDurationMs'
+  | 'sourceOrientation'
+>;
 
 const recipeFingerprint = (recipe: VideoTransformRecipe): string =>
   createHash('sha256').update(JSON.stringify(recipe), 'utf8').digest('hex');
@@ -195,6 +225,10 @@ const safeProviderFailure = (
     message: 'Visual processing rejected or could not complete this request.',
   };
 };
+
+const submissionAcceptanceUnknown = (error: unknown): boolean =>
+  !(error instanceof VideoJobProviderError) ||
+  ['aborted', 'timeout', 'invalid-response', 'upstream'].includes(error.reason);
 
 export class VideoJobService {
   readonly #providers: ExistingVideoProviderRegistry;
@@ -361,6 +395,103 @@ export class VideoJobService {
     return recipe.operation === 'character-swap'
       ? (recipe.provider ?? this.#providers.defaultCharacterSwapProvider)
       : 'decart';
+  }
+
+  resolveSubmission(recipe: VideoTransformRecipe): ResolvedVideoJobSubmission {
+    const providerId = this.#providerIdForRecipe(recipe);
+    const binding = this.#bindingFor(recipe.operation, providerId);
+    if (this.#closed || !binding) {
+      throw new AppError(
+        503,
+        'provider_unavailable',
+        'This visual processing operation is unavailable until its server configuration is complete.',
+      );
+    }
+    if (binding.referencePolicy === 'required' && !recipe.hasReferenceImage) {
+      throw new AppError(
+        400,
+        'validation_error',
+        'Character Swap requires a reference image in this configuration.',
+      );
+    }
+    if (binding.promptInput === 'server-default' && recipe.prompt) {
+      throw new AppError(
+        400,
+        'validation_error',
+        'Prompt text is unavailable for Character Swap in this configuration.',
+      );
+    }
+    if (!binding.promptEnhancement && recipe.enhancePrompt) {
+      throw new AppError(
+        400,
+        'validation_error',
+        'Prompt enhancement is unavailable for Character Swap in this configuration.',
+      );
+    }
+    const outputResolution = recipe.outputResolution ?? binding.defaultOutputResolution;
+    if (!binding.outputResolutions.includes(outputResolution)) {
+      throw new AppError(
+        400,
+        'validation_error',
+        'Choose a supported output resolution for this visual processing operation.',
+      );
+    }
+    return {
+      providerId,
+      outputResolution,
+      inputPreparation: binding.inputPreparation,
+      referencePolicy: binding.referencePolicy,
+      cancellationSupported: false,
+    };
+  }
+
+  #atCapacity(providerId: string): boolean {
+    const activeJobs = [...this.#jobs.values()].filter((job) => !terminal(job.status));
+    return (
+      activeJobs.length >= this.#maximumActiveJobs ||
+      activeJobs.filter((job) => job.providerId === providerId).length >=
+        this.#maximumActiveJobsPerProvider
+    );
+  }
+
+  #createJob(input: NewVideoJob): VideoJobRecord {
+    const createdAtMs = this.#now();
+    const createdAt = new Date(createdAtMs).toISOString();
+    const expiresAtMs = createdAtMs + VIDEO_JOB_TTL_MS;
+    const job: VideoJobRecord = {
+      ...input,
+      createdAt,
+      updatedAt: createdAt,
+      expiresAt: new Date(expiresAtMs).toISOString(),
+      expiresAtMs,
+      deadlineGeneration: ++this.#deadlineGeneration,
+      providerJobId: null,
+      providerOutputLocation: null,
+      result: null,
+      error: null,
+      outputPath: path.join(input.directory, 'result.video'),
+      statusReadFailures: 0,
+      providerPollAttempt: 0,
+      nextProviderPollAtMs: 0,
+      hasPolledProvider: false,
+      retrievalAttempts: 0,
+      refreshPromise: null,
+      operationController: new AbortController(),
+      activeDeliveries: 0,
+      admissionsClosed: false,
+      cleanupPending: false,
+      deleteAfterCleanup: false,
+      cleanupFailureReported: false,
+    };
+    this.#jobs.set(job.jobId, job);
+    this.#activeJobByOwner.set(job.ownerId, job.jobId);
+    this.#pushDeadline({
+      jobId: job.jobId,
+      expiresAtMs: job.expiresAtMs,
+      generation: job.deadlineGeneration,
+    });
+    this.#scheduleNextDeadline();
+    return job;
   }
 
   async existing(jobId: string, ownerId: string): Promise<VideoJobStatusResponse | null> {
@@ -706,49 +837,16 @@ export class VideoJobService {
       await this.#admissions.get(input.jobId);
       return this.#snapshot(duplicate);
     }
-    const providerId = this.#providerIdForRecipe(input.recipe);
-    const binding = this.#bindingFor(input.recipe.operation, providerId);
-    if (this.#closed || !binding) {
+    let resolved: ResolvedVideoJobSubmission;
+    try {
+      resolved = this.resolveSubmission(input.recipe);
+    } catch (error) {
       await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
-      throw new AppError(
-        503,
-        'provider_unavailable',
-        'This visual processing operation is unavailable until its server configuration is complete.',
-      );
+      throw error;
     }
-    if (binding.referencePolicy === 'required' && !input.recipe.hasReferenceImage) {
-      await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
-      throw new AppError(
-        400,
-        'validation_error',
-        'Character Swap requires a reference image in this configuration.',
-      );
-    }
-    if (binding.promptInput === 'server-default' && input.recipe.prompt) {
-      await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
-      throw new AppError(
-        400,
-        'validation_error',
-        'Prompt text is unavailable for Character Swap in this configuration.',
-      );
-    }
-    if (!binding.promptEnhancement && input.recipe.enhancePrompt) {
-      await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
-      throw new AppError(
-        400,
-        'validation_error',
-        'Prompt enhancement is unavailable for Character Swap in this configuration.',
-      );
-    }
-    const outputResolution = input.recipe.outputResolution ?? binding.defaultOutputResolution;
-    if (!binding.outputResolutions.includes(outputResolution)) {
-      await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
-      throw new AppError(
-        400,
-        'validation_error',
-        'Choose a supported output resolution for this visual processing operation.',
-      );
-    }
+    const providerId = resolved.providerId;
+    const binding = this.#bindingFor(input.recipe.operation, providerId)!;
+    const outputResolution = resolved.outputResolution;
     const activeJobId = this.#activeJobByOwner.get(input.ownerId);
     const active = activeJobId ? this.#jobs.get(activeJobId) : undefined;
     if (activeJobId && (!active || terminal(active.status))) {
@@ -762,12 +860,7 @@ export class VideoJobService {
         'Finish the active video job before starting another.',
       );
     }
-    const activeJobs = [...this.#jobs.values()].filter((job) => !terminal(job.status));
-    if (
-      activeJobs.length >= this.#maximumActiveJobs ||
-      activeJobs.filter((job) => job.providerId === providerId).length >=
-        this.#maximumActiveJobsPerProvider
-    ) {
+    if (this.#atCapacity(providerId)) {
       await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
       throw new AppError(
         429,
@@ -775,10 +868,7 @@ export class VideoJobService {
         'Visual processing is at capacity. Wait for an active job to finish, then try again.',
       );
     }
-    const acceptedAt = this.#now();
-    const expiresAtMs = acceptedAt + VIDEO_JOB_TTL_MS;
-    const timestamp = new Date(acceptedAt).toISOString();
-    const job: VideoJobRecord = {
+    const job = this.#createJob({
       jobId: input.jobId,
       ownerId: input.ownerId,
       operation: input.recipe.operation,
@@ -787,43 +877,13 @@ export class VideoJobService {
       outputResolution,
       requestFingerprint,
       status: 'validating',
-      createdAt: timestamp,
-      updatedAt: timestamp,
-      expiresAt: new Date(expiresAtMs).toISOString(),
-      expiresAtMs,
-      deadlineGeneration: ++this.#deadlineGeneration,
-      providerJobId: null,
-      providerOutputLocation: null,
-      result: null,
-      error: null,
       directory: input.directory,
       inputPath: input.inputPath,
       referencePath: input.referencePath,
       referenceMimeType: input.referenceMimeType,
-      outputPath: path.join(input.directory, 'result.video'),
       sourceDurationMs: null,
       sourceOrientation: null,
-      statusReadFailures: 0,
-      providerPollAttempt: 0,
-      nextProviderPollAtMs: 0,
-      hasPolledProvider: false,
-      retrievalAttempts: 0,
-      refreshPromise: null,
-      operationController: new AbortController(),
-      activeDeliveries: 0,
-      admissionsClosed: false,
-      cleanupPending: false,
-      deleteAfterCleanup: false,
-      cleanupFailureReported: false,
-    };
-    this.#jobs.set(job.jobId, job);
-    this.#activeJobByOwner.set(job.ownerId, job.jobId);
-    this.#pushDeadline({
-      jobId: job.jobId,
-      expiresAtMs: job.expiresAtMs,
-      generation: job.deadlineGeneration,
     });
-    this.#scheduleNextDeadline();
     const admission = withWorkflowSpan(
       'job.admission',
       { 'lightframe.provider': job.providerId, 'lightframe.operation': job.operation },
@@ -844,6 +904,94 @@ export class VideoJobService {
       throw new AppError(503, 'provider_unavailable', 'Temporary video jobs are unavailable.');
     }
     this.#track(this.#submit(job, input.recipe));
+    return this.#snapshot(job);
+  }
+
+  async startPrelinked(input: {
+    readonly jobId: string;
+    readonly ownerId: string;
+    readonly requestFingerprint: string;
+    readonly recipe: VideoTransformRecipe;
+    readonly inspectedInput: InspectedVideo;
+    readonly directory: string;
+    readonly inputPath: string;
+    readonly referencePath: string | null;
+    readonly referenceMimeType: ImageMimeType | null;
+  }): Promise<VideoJobStatusResponse> {
+    await this.#ready;
+    await this.#expireDueJobs();
+    const duplicate = this.#jobs.get(input.jobId);
+    if (duplicate !== undefined) {
+      if (duplicate.ownerId !== input.ownerId) {
+        throw new AppError(404, 'not_found', 'That Project processing operation is unavailable.');
+      }
+      if (duplicate.requestFingerprint !== input.requestFingerprint) {
+        throw new AppError(
+          409,
+          'request_id_conflict',
+          'That Project operation ID belongs to different processing settings.',
+        );
+      }
+      if (input.directory !== duplicate.directory) {
+        await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
+      }
+      return this.#snapshot(duplicate);
+    }
+    const resolved = this.resolveSubmission(input.recipe);
+    const binding = this.#bindingFor(input.recipe.operation, resolved.providerId)!;
+    if (resolved.inputPreparation === 'h264-mp4' && input.inspectedInput.mimeType !== 'video/mp4') {
+      throw new AppError(
+        400,
+        'unsupported_container',
+        'Character Swap requires a durably prepared H.264 MP4 Project input in this configuration.',
+      );
+    }
+    const activeJobId = this.#activeJobByOwner.get(input.ownerId);
+    const active = activeJobId === undefined ? undefined : this.#jobs.get(activeJobId);
+    if (active !== undefined && !terminal(active.status)) {
+      throw new AppError(
+        409,
+        'generation_in_progress',
+        'Finish the active Project operation before starting another.',
+      );
+    }
+    if (this.#atCapacity(resolved.providerId)) {
+      throw new AppError(
+        429,
+        'rate_limited',
+        'Visual processing is at capacity. Wait for active work to finish, then retry explicitly.',
+      );
+    }
+    const job = this.#createJob({
+      jobId: input.jobId,
+      ownerId: input.ownerId,
+      operation: input.recipe.operation,
+      providerId: resolved.providerId,
+      binding,
+      outputResolution: resolved.outputResolution,
+      requestFingerprint: input.requestFingerprint,
+      status: 'submitting',
+      directory: input.directory,
+      inputPath: input.inputPath,
+      referencePath: input.referencePath,
+      referenceMimeType: input.referenceMimeType,
+      sourceDurationMs: input.inspectedInput.durationMs,
+      sourceOrientation:
+        input.inspectedInput.width > input.inspectedInput.height ? 'landscape' : 'portrait',
+    });
+    try {
+      await this.#trace(job, true);
+    } catch {
+      job.error = {
+        code: 'submission_ambiguous',
+        message:
+          'Submission state could not be confirmed. This operation will not be submitted automatically.',
+      };
+      void this.#touch(job, 'ambiguous');
+      await this.#cleanupFiles(job);
+      return this.#snapshot(job);
+    }
+    this.#track(this.#submitProvider(job, input.recipe, input.inspectedInput));
     return this.#snapshot(job);
   }
 
@@ -876,6 +1024,27 @@ export class VideoJobService {
         await this.#cleanupFiles(job);
         return;
       }
+      await this.#submitProvider(job, recipe, inspected);
+    } catch (error) {
+      if (!this.#ownsMutableJob(job)) {
+        await this.#cleanupFiles(job);
+        return;
+      }
+      job.error =
+        error instanceof AppError
+          ? { code: error.code as VideoJobErrorCode, message: error.message }
+          : safeProviderFailure(error);
+      void this.#touch(job, 'failed');
+      await this.#cleanupFiles(job);
+    }
+  }
+
+  async #submitProvider(
+    job: VideoJobRecord,
+    recipe: VideoTransformRecipe,
+    inspected: InspectedVideo,
+  ): Promise<void> {
+    try {
       const submitted = await withWorkflowSpan(
         'provider.video.submit',
         { 'lightframe.provider': job.providerId, 'lightframe.operation': job.operation },
@@ -897,10 +1066,33 @@ export class VideoJobService {
       }
       job.providerJobId = submitted.providerJobId;
       job.providerOutputLocation = submitted.outputLocation ?? null;
-      await this.#touch(job, submitted.status === 'processing' ? 'processing' : 'queued');
+      try {
+        await this.#touch(job, submitted.status === 'processing' ? 'processing' : 'queued', true);
+      } catch {
+        job.providerJobId = null;
+        job.providerOutputLocation = null;
+        job.error = {
+          code: 'submission_ambiguous',
+          message:
+            'The provider may have accepted this operation, but its recovery identity was not retained. Do not submit automatically.',
+        };
+        void this.#touch(job, 'ambiguous');
+        await this.#cleanupFiles(job);
+        return;
+      }
       await this.#cleanupFiles(job, true);
     } catch (error) {
       if (!this.#ownsMutableJob(job)) {
+        await this.#cleanupFiles(job);
+        return;
+      }
+      if (submissionAcceptanceUnknown(error)) {
+        job.error = {
+          code: 'submission_ambiguous',
+          message:
+            'The provider may have accepted this operation, but no recovery identity was returned. Do not retry automatically.',
+        };
+        await this.#touch(job, 'ambiguous', true).catch(() => undefined);
         await this.#cleanupFiles(job);
         return;
       }

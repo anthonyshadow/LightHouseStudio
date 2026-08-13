@@ -429,6 +429,9 @@ export const processingJobs = pgTable(
     outputAssetId: uuid('output_asset_id').references(() => mediaAssets.id, {
       onDelete: 'restrict',
     }),
+    resultAssetId: uuid('result_asset_id'),
+    resultMetadata: jsonb('result_metadata'),
+    retryOfJobId: uuid('retry_of_job_id'),
     leaseOwner: text('lease_owner'),
     leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true, mode: 'string' }),
     attempt: integer('attempt').notNull().default(0),
@@ -442,6 +445,16 @@ export const processingJobs = pgTable(
     index('processing_jobs_owner_status_idx').on(table.ownerUserId, table.status, table.createdAt),
     index('processing_jobs_lease_idx').on(table.status, table.leaseExpiresAt),
     index('processing_jobs_expiry_idx').on(table.status, table.expiresAt),
+    index('processing_jobs_retry_idx').on(table.ownerUserId, table.retryOfJobId),
+    foreignKey({
+      name: 'processing_jobs_retry_same_owner_fk',
+      columns: [table.retryOfJobId, table.ownerUserId],
+      foreignColumns: [table.id, table.ownerUserId],
+    }).onDelete('restrict'),
+    check(
+      'processing_jobs_result_consistent',
+      sql`(${table.resultAssetId} is null and ${table.resultMetadata} is null) or (${table.resultAssetId} is not null and ${table.outputAssetId} is null and ${table.resultMetadata} is null) or (${table.resultAssetId} is not null and ${table.outputAssetId} = ${table.resultAssetId} and ${table.resultMetadata} is not null)`,
+    ),
     uniqueIndex('processing_jobs_owner_active_unique')
       .on(table.ownerUserId)
       .where(
@@ -962,6 +975,8 @@ export const projectJobs = pgTable(
     jobId: uuid('job_id').notNull(),
     initiatingRevisionId: uuid('initiating_revision_id').notNull(),
     initiatingRevisionNumber: integer('initiating_revision_number').notNull(),
+    resultRevisionId: uuid('result_revision_id'),
+    resultRevisionNumber: integer('result_revision_number'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
       .notNull()
       .defaultNow(),
@@ -974,6 +989,11 @@ export const projectJobs = pgTable(
       table.jobId,
     ),
     index('project_jobs_job_idx').on(table.ownerUserId, table.jobId),
+    index('project_jobs_result_revision_idx').on(
+      table.projectId,
+      table.resultRevisionNumber,
+      table.jobId,
+    ),
     foreignKey({
       name: 'project_jobs_project_owner_fk',
       columns: [table.projectId, table.ownerUserId],
@@ -999,6 +1019,25 @@ export const projectJobs = pgTable(
         projectRevisions.revisionNumber,
       ],
     }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_jobs_result_revision_same_project_fk',
+      columns: [
+        table.projectId,
+        table.ownerUserId,
+        table.resultRevisionId,
+        table.resultRevisionNumber,
+      ],
+      foreignColumns: [
+        projectRevisions.projectId,
+        projectRevisions.ownerUserId,
+        projectRevisions.id,
+        projectRevisions.revisionNumber,
+      ],
+    }).onDelete('restrict'),
+    check(
+      'project_jobs_result_revision_consistent',
+      sql`(${table.resultRevisionId} is null and ${table.resultRevisionNumber} is null) or (${table.resultRevisionId} is not null and ${table.resultRevisionNumber} is not null and ${table.resultRevisionNumber} > 0)`,
+    ),
   ],
 );
 
