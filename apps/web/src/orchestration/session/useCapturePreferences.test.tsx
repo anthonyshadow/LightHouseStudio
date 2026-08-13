@@ -71,6 +71,32 @@ describe('useCapturePreferences', () => {
     },
   );
 
+  it('restores a checkpointed aspect ratio without starting media and refuses an active stream', () => {
+    const onApply = vi.fn().mockResolvedValue(undefined);
+    const { result, rerender } = renderHook(
+      ({ stream }: { stream: MediaStream | null }) => useCapturePreferences({ stream, onApply }),
+      { initialProps: { stream: null as MediaStream | null } },
+    );
+
+    let restored = false;
+    act(() => {
+      restored = result.current.restoreAspectRatio('9:16');
+    });
+    expect(restored).toBe(true);
+    expect(result.current.draft.aspectRatio).toBe('9:16');
+    expect(result.current.applied.aspectRatio).toBe('9:16');
+    expect(result.current.hasPendingChanges).toBe(false);
+    expect(onApply).not.toHaveBeenCalled();
+
+    rerender({ stream: streamWithLiveVideo });
+    act(() => {
+      restored = result.current.restoreAspectRatio('16:9');
+    });
+    expect(restored).toBe(false);
+    expect(result.current.applied.aspectRatio).toBe('9:16');
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
   it('refreshes on device changes without selecting a newly discovered phone', async () => {
     let devices = [device('videoinput', 'camera-1', 'Built-in Camera')];
     let deviceChangeListener: EventListener | null = null;

@@ -33,6 +33,15 @@ The Dock is also a direct path: choose **Character · Lucy 2.5**, provide text o
 optionally check camera/mic, then select **Start Character AI**. Empty input is rejected before
 camera, token, or provider work.
 
+Inside an open source-bearing Project, the same Character/Variant selectors configure the one
+Project session beside current working media. **Save creative setup** records the stable Character
+and Variant IDs plus exact applied labels, resource revisions, immutable reference ID, prompt, and
+treatment settings as one semantic checkpoint. It does not copy or take lifecycle ownership of the
+Character record. If that owner-scoped record later disappears or changes, the Project retains its
+historical applied explanation and offers **Choose another**. Project **Start** remains disabled;
+this configuration never requests a token, SDK connection, or provider job. The standalone live
+journey above is unchanged.
+
 ## Guards and recovery
 
 - Start can be cancelled while connecting.

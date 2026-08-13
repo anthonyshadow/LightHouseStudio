@@ -82,7 +82,7 @@ describe('reference recipe attribution', () => {
     ).toBe('Finish the current take.');
   });
 
-  it('publishes exact active identity only after a hydrated recipe commit', () => {
+  it('publishes exact active identity only after a hydrated recipe commit', async () => {
     const dispatchActiveRecipe = vi.fn();
     const repository = {
       getSnapshot: () => ({ store, health: 'ready', notice: null }),
@@ -117,8 +117,8 @@ describe('reference recipe attribution', () => {
       store,
     );
 
-    act(() => {
-      result.current.commitHydratedRecipe({
+    await act(async () => {
+      await result.current.commitHydratedRecipe({
         pending,
         referenceImage,
         storedReferenceMetadata: asset,
@@ -145,7 +145,7 @@ describe('reference recipe attribution', () => {
     });
   });
 
-  it('commits and persists an exact wardrobe version only after its image is hydrated', () => {
+  it('commits and persists an exact wardrobe version only after its image is hydrated', async () => {
     const character = {
       id: 'character-one',
       name: 'Field host',
@@ -200,7 +200,7 @@ describe('reference recipe attribution', () => {
       contentUrl: wardrobeAsset.contentUrl,
     };
     const dispatchActiveRecipe = vi.fn();
-    const selectCharacterVersion = vi.fn();
+    const selectCharacterVersion = vi.fn().mockResolvedValue(undefined);
     const repository = {
       getSnapshot: () => ({ store: wardrobeStore, health: 'ready', notice: null }),
       enrichNewestMatchingRecent: vi.fn(),
@@ -237,8 +237,8 @@ describe('reference recipe attribution', () => {
     );
 
     expect(selectCharacterVersion).not.toHaveBeenCalled();
-    act(() => {
-      result.current.commitHydratedRecipe({
+    await act(async () => {
+      await result.current.commitHydratedRecipe({
         pending,
         referenceImage: wardrobeReference,
         storedReferenceMetadata: wardrobeAsset,

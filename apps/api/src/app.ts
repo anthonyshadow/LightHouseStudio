@@ -56,6 +56,7 @@ import { FileProjectRepository } from './features/projects/file-project-reposito
 import { ProjectService } from './features/projects/project-service.js';
 import { registerProjectRoutes } from './features/projects/routes.js';
 import { ProjectSourceService } from './features/projects/project-source-service.js';
+import { ProjectWorkingMediaService } from './features/projects/project-working-media-service.js';
 import type { CampaignRepository } from './features/campaigns/campaign-repository.js';
 import { CampaignService } from './features/campaigns/campaign-service.js';
 import { registerCampaignRoutes } from './features/campaigns/routes.js';
@@ -211,6 +212,11 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
         ),
   );
 
+  const savedVoiceRepository =
+    dependencies.persistence?.savedVoices ??
+    (dependencies.config.nodeEnv === 'test'
+      ? new MemorySavedVoiceRepository()
+      : new FileSavedVoiceRepository(dependencies.config.lightframeDataDir));
   const voiceService =
     elevenLabsProvider === null
       ? null
@@ -218,10 +224,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
           elevenLabsProvider,
           dependencies.config.elevenLabsModelId,
           dependencies.config.elevenLabsEnableLogging,
-          dependencies.persistence?.savedVoices ??
-            (dependencies.config.nodeEnv === 'test'
-              ? new MemorySavedVoiceRepository()
-              : new FileSavedVoiceRepository(dependencies.config.lightframeDataDir)),
+          savedVoiceRepository,
         );
 
   const referenceImageProvider = resolveOptionalProvider(dependencies.referenceImageProvider, () =>
@@ -329,6 +332,12 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
       : new ProjectSourceService(projectRepository, savedVideoRepository, assetBytes, {
           ...(projectRetention === undefined ? {} : { projectRetention }),
         });
+  const projectWorkingMediaService =
+    projectRepository === undefined
+      ? undefined
+      : new ProjectWorkingMediaService(projectRepository, savedVideoRepository, assetBytes, {
+          ...(projectRetention === undefined ? {} : { projectRetention }),
+        });
   const directSavedVideoUploads = dependencies.persistence?.directVideoUploads;
   const directSavedVideoUploadService =
     directSavedVideoUploads === undefined
@@ -363,7 +372,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
   registerRealtimeRoutes(app, decartProvider);
   registerVideoJobRoutes(app, videoJobService);
   registerSavedVideoRoutes(app, savedVideoService, directSavedVideoUploadService);
-  registerProjectRoutes(app, projectService, projectSourceService);
+  registerProjectRoutes(app, projectService, projectSourceService, projectWorkingMediaService);
   registerCampaignRoutes(app, campaignService);
   registerCreativeLibraryRoutes(
     app,
@@ -376,7 +385,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
       : {}),
     outfitTryOnService,
   });
-  registerVoiceRoutes(app, voiceService);
+  registerVoiceRoutes(app, voiceService, savedVoiceRepository);
   app.addHook('onClose', async () => {
     await directSavedVideoUploadService?.close();
     await videoJobService.close();

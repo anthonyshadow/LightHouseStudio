@@ -18,9 +18,7 @@ import {
   moveProjectToCampaign,
   type Project,
   type ProjectAggregate,
-  type ProjectAssetLink,
   type ProjectConflict,
-  type ProjectRevision,
 } from '@studio/domain';
 import { AppError } from '../../http/app-error.js';
 import type {
@@ -28,6 +26,7 @@ import type {
   ProjectRepository,
   ProjectSummaryCursor,
 } from './project-repository.js';
+import { projectAssetLinksForRevision } from './project-snapshot-relations.js';
 
 const emptyFacts = {
   sourceStatus: 'none' as const,
@@ -44,36 +43,20 @@ const currentAggregate = (current: ProjectCurrentRead): ProjectAggregate => ({
   outputLinks: [],
 });
 
-export const projectAssetLinksForRevision = (
-  revision: ProjectRevision,
-): readonly ProjectAssetLink[] => {
-  const references: Array<Pick<ProjectAssetLink, 'assetId' | 'role'>> = [];
-  if (revision.snapshot.sourceAssetId !== null) {
-    references.push({ assetId: revision.snapshot.sourceAssetId, role: 'source' });
-  }
-  if (revision.snapshot.workingMedia?.kind === 'asset') {
-    references.push({ assetId: revision.snapshot.workingMedia.assetId, role: 'working' });
-  }
-  if (revision.snapshot.presentedMedia?.kind === 'asset') {
-    references.push({ assetId: revision.snapshot.presentedMedia.assetId, role: 'presented' });
-  }
-  return references.map(({ assetId, role }) => ({
-    projectId: revision.projectId,
-    ownerUserId: revision.ownerUserId,
-    assetId,
-    role,
-    revisionId: revision.id,
-    revisionNumber: revision.revisionNumber,
-    createdAt: revision.createdAt,
-  }));
-};
-
 const sessionProposalMatches = (
   current: ProjectCurrentRead,
   proposal: AppendProjectRevisionRequest['proposal'],
 ): boolean =>
-  current.revision.snapshot.workflowPhase === proposal.workflowPhase &&
-  JSON.stringify(current.revision.snapshot.liveMode) === JSON.stringify(proposal.liveMode);
+  JSON.stringify({
+    workflowPhase: current.revision.snapshot.workflowPhase,
+    liveMode: current.revision.snapshot.liveMode,
+    selectedCharacter: current.revision.snapshot.selectedCharacter,
+    selectedOutfit: current.revision.snapshot.selectedOutfit,
+    selectedVoice: current.revision.snapshot.selectedVoice,
+    visualTreatment: current.revision.snapshot.visualTreatment,
+    creativeIntent: current.revision.snapshot.creativeIntent,
+    localEdit: current.revision.snapshot.localEdit,
+  }) === JSON.stringify(proposal);
 
 const publicProject = (project: Project): ProjectContract => ({
   id: project.id,
@@ -259,8 +242,7 @@ export class ProjectService {
           expectedRevisionNumber: input.expectedRevisionNumber,
           snapshot: {
             ...current.revision.snapshot,
-            workflowPhase: input.proposal.workflowPhase,
-            liveMode: input.proposal.liveMode,
+            ...input.proposal,
             updatedAt: now,
           },
           author: { kind: 'user', authorId: ownerUserId },

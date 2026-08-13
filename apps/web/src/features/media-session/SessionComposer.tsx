@@ -21,6 +21,7 @@ export interface SessionComposerProps {
   session: StudioSessionController;
   recording: boolean;
   lockReason?: string | undefined;
+  modelStartBlockedReason?: string | undefined;
   onOpenWorkshop: () => void;
   embedded?: boolean;
   activeCharacterName?: string | undefined;
@@ -30,6 +31,7 @@ export const SessionComposer = ({
   session,
   recording,
   lockReason,
+  modelStartBlockedReason,
   onOpenWorkshop,
   embedded = false,
   activeCharacterName,
@@ -153,6 +155,7 @@ export const SessionComposer = ({
             session={session}
             recording={recording}
             lockReason={lockReason}
+            {...(modelStartBlockedReason ? { modelStartBlockedReason } : {})}
             onReset={resetDraft}
           />
         </footer>

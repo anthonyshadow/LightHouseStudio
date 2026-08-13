@@ -19,6 +19,7 @@ const videoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
 const versionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
 const secondVideoId = '4a3e43b7-c237-4f07-9ff7-eb5ab6a14d12';
 const secondVersionId = 'cc6b6098-c83b-42cd-b435-d3542e584f9c';
+const workingMediaOperationKey = '0264e60f-2dc5-4d4b-a9f6-25c91a66285c';
 const now = '2026-08-11T12:00:00.000Z';
 const postgresNow = '2026-08-11 12:00:00+00';
 
@@ -56,6 +57,51 @@ const sourceAggregate = () => {
   return { ...aggregate, assetLinks };
 };
 
+const workingMediaReadRow = () => {
+  const aggregate = sourceAggregate();
+  return {
+    project: {
+      ...aggregate.project,
+      archivedAt: null,
+      deletedAt: null,
+      createdAt: postgresNow,
+      updatedAt: postgresNow,
+    },
+    revision: {
+      ...aggregate.revisions[0]!,
+      snapshotSchemaVersion: 2,
+      snapshot: aggregate.revisions[0]!.snapshot,
+      authorKind: 'user' as const,
+      authorId: ownerUserId,
+      createdAt: postgresNow,
+    },
+    media: {
+      projectId,
+      ownerUserId,
+      kind: 'media-asset',
+      assetId,
+      savedVideoId: null,
+      videoVersionId: null,
+      adoptedRevisionId: revisionId,
+      adoptedRevisionNumber: 1,
+      operationKey: workingMediaOperationKey,
+      requestFingerprint: 'a'.repeat(64),
+      mimeType: 'video/mp4',
+      filename: 'working-media.mp4',
+      sizeBytes: 1_024,
+      checksumSha256: 'b'.repeat(64),
+      container: 'mp4',
+      videoCodec: 'avc',
+      audioCodec: 'aac',
+      durationMs: 12_000,
+      width: 1_280,
+      height: 720,
+      hasAudio: true,
+      adoptedAt: postgresNow,
+    },
+  };
+};
+
 describe('Project persistence mapping and transactions', () => {
   it('maps validated snapshots and any number of normalized output links', () => {
     const aggregate = sourceAggregate();
@@ -73,7 +119,7 @@ describe('Project persistence mapping and transactions', () => {
       revisionNumber: 1,
       parentRevisionId: null,
       parentRevisionNumber: null,
-      snapshotSchemaVersion: 1,
+      snapshotSchemaVersion: 2,
       snapshot: aggregate.revisions[0]!.snapshot,
       authorKind: 'user' as const,
       authorId: ownerUserId,
@@ -122,7 +168,7 @@ describe('Project persistence mapping and transactions', () => {
         },
         revision: {
           ...aggregate.revisions[0]!,
-          snapshotSchemaVersion: 1,
+          snapshotSchemaVersion: 2,
           snapshot: aggregate.revisions[0]!.snapshot,
           authorKind: 'user',
           authorId: ownerUserId,
@@ -153,7 +199,7 @@ describe('Project persistence mapping and transactions', () => {
         },
         revision: {
           ...aggregate.revisions[0]!,
-          snapshotSchemaVersion: 1,
+          snapshotSchemaVersion: 2,
           snapshot: aggregate.revisions[0]!.snapshot,
           authorKind: 'user',
           authorId: ownerUserId,
@@ -193,6 +239,38 @@ describe('Project persistence mapping and transactions', () => {
         revision: { id: revisionId, revisionNumber: 1 },
       },
       source: { projectId, assetId, kind: 'uploaded' },
+    });
+    expect(scripted.calls.filter(({ operation }) => operation === 'select')).toHaveLength(1);
+    expect(scripted.remaining()).toBe(0);
+  });
+
+  it.each([
+    [
+      'current snapshot pointer',
+      (repository: DrizzleProjectRepository) => repository.getWorkingMedia(ownerUserId, projectId),
+    ],
+    [
+      'adoption revision',
+      (repository: DrizzleProjectRepository) =>
+        repository.getWorkingMedia(ownerUserId, projectId, revisionId),
+    ],
+    [
+      'operation key',
+      (repository: DrizzleProjectRepository) =>
+        repository.getWorkingMediaByOperationKey(ownerUserId, workingMediaOperationKey),
+    ],
+  ])('loads Project working media by %s in one query', async (_label, load) => {
+    const scripted = scriptedDatabase([workingMediaReadRow()]);
+    const repository = new DrizzleProjectRepository(scripted.db);
+
+    await expect(load(repository)).resolves.toMatchObject({
+      project: { id: projectId, currentRevisionNumber: 1 },
+      revision: { id: revisionId, revisionNumber: 1 },
+      media: {
+        assetId,
+        operationKey: workingMediaOperationKey,
+        mediaReference: { kind: 'asset', assetId },
+      },
     });
     expect(scripted.calls.filter(({ operation }) => operation === 'select')).toHaveLength(1);
     expect(scripted.remaining()).toBe(0);
@@ -269,7 +347,7 @@ describe('Project persistence mapping and transactions', () => {
           },
           revision: {
             ...aggregate.revisions[0]!,
-            snapshotSchemaVersion: 1,
+            snapshotSchemaVersion: 2,
             snapshot: aggregate.revisions[0]!.snapshot,
             authorKind: 'user',
             authorId: ownerUserId,

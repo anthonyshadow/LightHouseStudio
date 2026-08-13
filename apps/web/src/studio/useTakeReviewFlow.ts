@@ -147,6 +147,17 @@ export const useTakeReviewFlow = ({ session, onReviewCleared }: UseTakeReviewFlo
     },
     [recording],
   );
+  const publishValidatedVideo = useCallback(
+    (input: RestorePersistedOriginalInput) => {
+      const artifact = recording.completeSourceValidation(input);
+      setAutomaticRecordingStopEvent(null);
+      setFinalizingStartedAt(null);
+      setFinalizingStream(null);
+      setReviewReady(true);
+      return artifact;
+    },
+    [recording],
+  );
 
   useEffect(() => {
     if (recording.presented) return;
@@ -249,6 +260,7 @@ export const useTakeReviewFlow = ({ session, onReviewCleared }: UseTakeReviewFlo
     automaticRecordingStopEvent,
     finishTake,
     publishUploadedVideo,
+    publishValidatedVideo,
     stagePresentation,
   } as const;
 };

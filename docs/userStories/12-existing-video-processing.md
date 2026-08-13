@@ -253,6 +253,15 @@ and retains the existing bytes as the Project's immutable source without copying
 provider, or selecting an Add Version output target. That accepted Project source is durable and
 rehydrates through the Project content route; this standalone workflow remains temporary.
 
+For a source-bearing Project, the existing-video controls remain the feature-local configuration
+owner for one visual treatment followed by optional Voice. The Project adapter captures that exact
+plan only when **Save creative setup** is chosen. Local **Adjust video** instead produces a
+temporary **Render preview**; explicit adoption is the only path that can make its inspected bytes
+current Project working/presented media. Character Swap, VTO, and ElevenLabs Start actions remain
+disabled in Project context until recoverable Project processing exists. Configuration and local
+rendering therefore create no provider request, Saved Video/Version, Add Version target, or output
+provenance.
+
 ## Evidence boundary
 
 Automated tests use deterministic local media and fake provider responses. They prove contract,

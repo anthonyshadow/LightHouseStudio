@@ -1,4 +1,4 @@
-import type { ProjectSessionProposalContract } from '@studio/contracts';
+import type { ProjectCurrentResponse, ProjectSessionProposalContract } from '@studio/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { checkpointProject, getProject } from './projectsApi';
@@ -8,12 +8,16 @@ import { projectQueryKeys } from './useProjectsController';
 export interface ProjectSessionPort {
   readonly projectId: string;
   readonly phase: ProjectSessionPhase;
+  readonly current: ProjectCurrentResponse | null;
+  readonly proposal: ProjectSessionProposalContract | null;
   readonly hasLocalProposal: boolean;
   readonly message: string | null;
   readonly propose: (proposal: Partial<ProjectSessionProposalContract>) => boolean;
   readonly flush: () => Promise<boolean>;
   readonly retry: () => Promise<boolean>;
   readonly discard: () => boolean;
+  readonly getCurrent: () => ProjectCurrentResponse | null;
+  readonly acceptCurrent: (current: ProjectCurrentResponse) => void;
 }
 
 export const useProjectSession = (projectId: string) => {
@@ -64,18 +68,23 @@ export const useProjectSession = (projectId: string) => {
     };
   }, [controller]);
 
+  const { phase, current: currentProject, proposal, hasLocalProposal, message } = snapshot;
   const port = useMemo<ProjectSessionPort>(
     () => ({
       projectId,
-      phase: snapshot.phase,
-      hasLocalProposal: snapshot.hasLocalProposal,
-      message: snapshot.message,
+      phase,
+      current: currentProject,
+      proposal,
+      hasLocalProposal,
+      message,
       propose: controller.propose,
       flush: controller.flush,
       retry: controller.retry,
       discard: controller.discard,
+      getCurrent: () => controller.getSnapshot().current,
+      acceptCurrent: controller.acceptCurrent,
     }),
-    [controller, projectId, snapshot.hasLocalProposal, snapshot.message, snapshot.phase],
+    [controller, currentProject, hasLocalProposal, message, phase, projectId, proposal],
   );
 
   return {

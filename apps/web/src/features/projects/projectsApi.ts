@@ -2,11 +2,13 @@ import {
   projectConflictResponseSchema,
   projectCurrentResponseSchema,
   projectSourceResponseSchema,
+  projectWorkingMediaResponseSchema,
   projectsResponseSchema,
   type AppendProjectRevisionRequest,
   type ProjectConflictContract,
   type ProjectCurrentResponse,
   type ProjectSourceResponse,
+  type ProjectWorkingMediaResponse,
   type ProjectsQuery,
 } from '@studio/contracts';
 import {
@@ -270,6 +272,90 @@ export const reuseSavedVideoAsProjectSource = (input: {
       ...(input.signal ? { signal: input.signal } : {}),
     },
     projectSourceResponseSchema,
+    invalidProjectResponse,
+    parseProjectConflict,
+  );
+
+export const getProjectWorkingMedia = (
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<ProjectWorkingMediaResponse> =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(projectId)}/working-media`,
+    {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+      ...(signal ? { signal } : {}),
+    },
+    projectWorkingMediaResponseSchema,
+    invalidProjectResponse,
+  );
+
+export const uploadProjectWorkingMedia = (input: {
+  readonly projectId: string;
+  readonly file: File;
+  readonly operationKey: string;
+  readonly expectedVersion: number;
+  readonly expectedRevisionNumber: number;
+  readonly localEdit: NonNullable<ProjectCurrentResponse['revision']['snapshot']['localEdit']>;
+  readonly signal?: AbortSignal;
+}): Promise<ProjectWorkingMediaResponse> =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(input.projectId)}/working-media`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': input.file.type,
+        'Idempotency-Key': input.operationKey,
+        'X-Lightframe-Project-Working-Media': encodeURIComponent(
+          JSON.stringify({
+            expectedVersion: input.expectedVersion,
+            expectedRevisionNumber: input.expectedRevisionNumber,
+            filename: input.file.name,
+            localEdit: input.localEdit,
+          }),
+        ),
+      },
+      body: input.file,
+      ...(input.signal ? { signal: input.signal } : {}),
+    },
+    projectWorkingMediaResponseSchema,
+    invalidProjectResponse,
+    parseProjectConflict,
+  );
+
+export const reuseProjectWorkingMedia = (input: {
+  readonly projectId: string;
+  readonly operationKey: string;
+  readonly expectedVersion: number;
+  readonly expectedRevisionNumber: number;
+  readonly media:
+    | { readonly kind: 'asset'; readonly assetId: string }
+    | {
+        readonly kind: 'saved-video-version';
+        readonly savedVideoId: string;
+        readonly videoVersionId: string;
+      };
+  readonly localEdit: ProjectCurrentResponse['revision']['snapshot']['localEdit'];
+  readonly signal?: AbortSignal;
+}): Promise<ProjectWorkingMediaResponse> =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(input.projectId)}/working-media/reuse`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { ...jsonHeaders, 'Idempotency-Key': input.operationKey },
+      body: JSON.stringify({
+        expectedVersion: input.expectedVersion,
+        expectedRevisionNumber: input.expectedRevisionNumber,
+        media: input.media,
+        localEdit: input.localEdit,
+      }),
+      ...(input.signal ? { signal: input.signal } : {}),
+    },
+    projectWorkingMediaResponseSchema,
     invalidProjectResponse,
     parseProjectConflict,
   );

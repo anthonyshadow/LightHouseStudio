@@ -98,10 +98,17 @@ const expectStandardStudioLayout = async (
   const capture = page.locator('[data-capture-controls]');
   const projectContextActive = (await page.locator('[data-project-context="true"]').count()) > 0;
   if (projectContextActive) {
-    const [stageBox, frameBox] = await Promise.all([stage.boundingBox(), frame.boundingBox()]);
+    const [stageBox, frameBox, toolRailBox] = await Promise.all([
+      stage.boundingBox(),
+      frame.boundingBox(),
+      toolRail.boundingBox(),
+    ]);
     expect(stageBox).not.toBeNull();
     expect(frameBox).not.toBeNull();
-    await expect(toolRail).toHaveCount(0);
+    expect(toolRailBox).not.toBeNull();
+    if (stageBox && toolRailBox) {
+      expect(toolRailBox.y).toBeGreaterThanOrEqual(stageBox.y + stageBox.height - 1);
+    }
     await expect(capture).toHaveCount(0);
     return;
   }

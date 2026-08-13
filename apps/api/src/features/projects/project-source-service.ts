@@ -1,9 +1,4 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { createWriteStream } from 'node:fs';
-import { chmod, mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import path from 'node:path';
-import { pipeline } from 'node:stream/promises';
 import {
   projectSourceResponseSchema,
   type InspectedVideo,
@@ -31,7 +26,9 @@ import type {
   ProjectRetentionPolicy,
   ProjectSourceRecord,
 } from './project-repository.js';
-import { projectAssetLinksForRevision, publicProjectCurrent } from './project-service.js';
+import { projectAssetLinksForRevision } from './project-snapshot-relations.js';
+import { publicProjectCurrent } from './project-service.js';
+import { inspectStoredProjectMedia } from './project-media-inspection.js';
 
 export type ProjectSourceMutationResult =
   | { readonly ok: true; readonly response: ProjectSourceResponse; readonly replayed: boolean }
@@ -89,21 +86,6 @@ const sourceResponse = (
       contentUrl: sourceContentUrl(source.projectId),
     },
   });
-
-const inspectStoredAsset = async (
-  asset: AssetReadHandle,
-  inspect: (filePath: string) => Promise<InspectedVideo>,
-): Promise<InspectedVideo> => {
-  const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-project-source-'));
-  await chmod(directory, 0o700);
-  const filePath = path.join(directory, 'source');
-  try {
-    await pipeline(asset.createReadStream(), createWriteStream(filePath, { mode: 0o600 }));
-    return await inspect(filePath);
-  } finally {
-    await rm(directory, { recursive: true, force: true }).catch(() => undefined);
-  }
-};
 
 const currentAggregate = (current: ProjectCurrentRead): ProjectAggregate => ({
   project: current.project,
@@ -260,7 +242,7 @@ export class ProjectSourceService {
       if (asset === null) {
         throw new AppError(404, 'asset_missing', 'That Saved Video source file is unavailable.');
       }
-      const inspected = await inspectStoredAsset(asset, this.#inspect);
+      const inspected = await inspectStoredProjectMedia(asset, this.#inspect);
       this.#assertVersionMatchesInspection(version, inspected, asset);
       return this.#accept({
         ownerUserId: input.ownerUserId,

@@ -87,7 +87,7 @@ export const useReferenceRecipeHandoff = ({
       (pending.mode === session.draft.mode ||
         confirmModeReplacement(session.draft, pending.mode, (message) => window.confirm(message))),
     currentReferenceImage: () => session.draft.referenceImage,
-    onCommit: (result) => {
+    onCommit: async (result) => {
       const committed = session.replaceRecipeDraft({
         mode: result.pending.mode,
         prompt: result.appliedPrompt,
@@ -96,7 +96,7 @@ export const useReferenceRecipeHandoff = ({
       });
       if (!committed) return false;
 
-      attribution.commitHydratedRecipe(result);
+      await attribution.commitHydratedRecipe(result);
       workshop.completeUse(result.pending);
       closeOverlay();
       return true;

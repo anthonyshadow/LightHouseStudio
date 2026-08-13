@@ -81,6 +81,36 @@ describe('useReferenceRecipeHydration', () => {
     expect(result.current).toMatchObject({ pending: false, failureMessage: null });
   });
 
+  it('keeps the handoff pending until the durable commit settles', async () => {
+    let resolveCommit: ((committed: boolean) => void) | undefined;
+    const onCommit = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveCommit = resolve;
+        }),
+    );
+    const { result } = renderHook(() =>
+      useReferenceRecipeHydration({
+        canStart: () => true,
+        currentReferenceImage: () => null,
+        onCommit,
+      }),
+    );
+
+    act(() => {
+      result.current.useRecipe(pending);
+    });
+    await waitFor(() => expect(onCommit).toHaveBeenCalledOnce());
+    expect(result.current.pending).toBe(true);
+
+    await act(async () => {
+      resolveCommit?.(true);
+      await Promise.resolve();
+    });
+
+    expect(result.current).toMatchObject({ pending: false, failureMessage: null });
+  });
+
   it('keeps the exact failed input for a text-only recovery without another read', async () => {
     fetchReferenceImageMetadata.mockRejectedValueOnce(new Error('unavailable'));
     const onCommit = vi.fn(() => true);

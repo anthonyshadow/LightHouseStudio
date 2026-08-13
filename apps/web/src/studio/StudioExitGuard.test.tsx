@@ -10,12 +10,16 @@ import { StudioExitGuard, type StudioExitGuardProps } from './StudioExitGuard';
 const projectSession = (overrides: Partial<ProjectSessionPort> = {}): ProjectSessionPort => ({
   projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
   phase: 'dirty',
+  current: null,
+  proposal: null,
   hasLocalProposal: true,
   message: null,
   propose: vi.fn(() => true),
   flush: vi.fn(() => Promise.resolve(true)),
   retry: vi.fn(() => Promise.resolve(true)),
   discard: vi.fn(() => true),
+  getCurrent: vi.fn(() => null),
+  acceptCurrent: vi.fn(),
   ...overrides,
 });
 
@@ -246,6 +250,18 @@ describe('StudioExitGuard', () => {
     expect(
       await screen.findByRole('heading', {
         name: 'Finish the take before switching Projects',
+      }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toContain('18b120ac');
+  });
+
+  it('keeps active Project rendering or working-media adoption scoped to its Project', async () => {
+    const { router } = renderProjectGuard({ videoRenderingActive: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Switch Project' }));
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Finish Project media work before switching Projects',
       }),
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toContain('18b120ac');

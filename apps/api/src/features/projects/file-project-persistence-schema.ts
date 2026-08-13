@@ -9,6 +9,7 @@ import {
 } from '@studio/contracts';
 import { z } from 'zod';
 import { persistedTimestampSchema } from '../../application/timestamps.js';
+import { projectMediaReferencesEqual } from './project-snapshot-relations.js';
 
 export const ownerIdSchema = z.uuid();
 const projectIdSchema = z.uuid();
@@ -129,6 +130,54 @@ export const storedProjectSourceSchema = z
     }
   });
 
+export const storedProjectWorkingMediaSchema = z
+  .object({
+    projectId: projectIdSchema,
+    ownerUserId: ownerIdSchema,
+    kind: z.enum(['local-render', 'media-asset', 'saved-video-version']),
+    mediaReference: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('asset'), assetId: z.uuid() }).strict(),
+      z
+        .object({
+          kind: z.literal('saved-video-version'),
+          savedVideoId: z.uuid(),
+          videoVersionId: z.uuid(),
+        })
+        .strict(),
+    ]),
+    assetId: z.uuid(),
+    savedVideoId: z.uuid().nullable(),
+    videoVersionId: z.uuid().nullable(),
+    adoptedRevisionId: z.uuid(),
+    adoptedRevisionNumber: z.number().int().positive(),
+    operationKey: z.uuid(),
+    requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+    mimeType: videoInputMimeTypeSchema,
+    filename: z.string().trim().min(1).max(180),
+    sizeBytes: z.number().int().positive().max(300_000_000),
+    checksumSha256: z.string().regex(/^[a-f0-9]{64}$/u),
+    container: z.enum(['mp4', 'quicktime', 'webm']),
+    videoCodec: z.enum(['avc', 'vp8']),
+    audioCodec: z.string().trim().min(1).max(32).nullable(),
+    durationMs: z.number().int().positive().max(300_000),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    hasAudio: z.boolean(),
+    adoptedAt: persistedTimestampSchema,
+  })
+  .strict()
+  .superRefine((media, context) => {
+    const saved = media.kind === 'saved-video-version';
+    if (
+      saved !== (media.savedVideoId !== null && media.videoVersionId !== null) ||
+      saved !== (media.mediaReference.kind === 'saved-video-version') ||
+      (!saved &&
+        (media.mediaReference.kind !== 'asset' || media.mediaReference.assetId !== media.assetId))
+    ) {
+      context.addIssue({ code: 'custom', message: 'Stored Project working media is invalid.' });
+    }
+  });
+
 export const storedAggregateSchema = z
   .object({
     project: storedProjectSchema,
@@ -138,6 +187,7 @@ export const storedAggregateSchema = z
     jobLinks: z.array(storedJobLinkSchema),
     outputLinks: z.array(storedOutputLinkSchema),
     source: storedProjectSourceSchema.nullable().default(null),
+    workingMediaAdoptions: z.array(storedProjectWorkingMediaSchema).default([]),
   })
   .strict()
   .superRefine((aggregate, context) => {
@@ -154,7 +204,8 @@ export const storedAggregateSchema = z
       !aggregate.assetLinks.every(owned) ||
       !aggregate.versionReferenceLinks.every(owned) ||
       !aggregate.jobLinks.every(owned) ||
-      !aggregate.outputLinks.every(owned)
+      !aggregate.outputLinks.every(owned) ||
+      !aggregate.workingMediaAdoptions.every(owned)
     ) {
       context.addIssue({
         code: 'custom',
@@ -169,6 +220,24 @@ export const storedAggregateSchema = z
             ?.snapshot.sourceAssetId)
     ) {
       context.addIssue({ code: 'custom', message: 'Stored Project source is inconsistent.' });
+    }
+    if (
+      aggregate.workingMediaAdoptions.some((media) => {
+        const revision = aggregate.revisions.find(
+          ({ id, revisionNumber }) =>
+            id === media.adoptedRevisionId && revisionNumber === media.adoptedRevisionNumber,
+        );
+        return (
+          revision === undefined ||
+          !projectMediaReferencesEqual(revision.snapshot.workingMedia, media.mediaReference) ||
+          !projectMediaReferencesEqual(revision.snapshot.presentedMedia, media.mediaReference)
+        );
+      })
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Stored working-media revision is inconsistent.',
+      });
     }
   });
 
@@ -207,7 +276,7 @@ export const createReceiptSchema = z
 
 export const librarySchema = z
   .object({
-    schemaVersion: z.literal(3),
+    schemaVersion: z.literal(4),
     ownerUserId: ownerIdSchema,
     revision: z.number().int().nonnegative(),
     campaigns: z.array(storedCampaignSchema),
@@ -246,7 +315,7 @@ export type ProjectLibrary = z.infer<typeof librarySchema>;
 
 const previousLibraryEnvelopeSchema = z
   .object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.union([z.literal(2), z.literal(3)]),
     ownerUserId: ownerIdSchema,
     revision: z.number().int().nonnegative(),
     campaigns: z.array(storedCampaignSchema),
@@ -277,7 +346,7 @@ export const parseLibrary = (
       migrated: true,
       library: librarySchema.parse({
         ...previous.data,
-        schemaVersion: 3,
+        schemaVersion: 4,
         projects: previous.data.projects.map((aggregate) => storedAggregateSchema.parse(aggregate)),
       }),
     };
@@ -296,7 +365,7 @@ export const parseLibrary = (
   return {
     migrated: true,
     library: librarySchema.parse({
-      schemaVersion: 3,
+      schemaVersion: 4,
       ownerUserId: legacy.ownerUserId,
       revision: legacy.revision,
       campaigns: [],
@@ -309,7 +378,7 @@ export const parseLibrary = (
 
 export const journalSchema = z
   .object({
-    schemaVersion: z.literal(3),
+    schemaVersion: z.literal(4),
     ownerUserId: ownerIdSchema,
     transactionId: z.uuid(),
     state: z.literal('prepared'),
@@ -328,6 +397,15 @@ export const journalSchema = z
           operationKey: z.uuid(),
           requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
           projectId: projectIdSchema,
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('project-working-media-adopt'),
+          operationKey: z.uuid(),
+          requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+          projectId: projectIdSchema,
+          revisionId: z.uuid(),
         })
         .strict(),
       z
@@ -361,12 +439,22 @@ export const journalSchema = z
                 receipt.campaignId === operation.campaignId &&
                 receipt.requestFingerprint === operation.requestFingerprint,
             )
-          : metadata.projects.some(
-              ({ source }) =>
-                source?.projectId === operation.projectId &&
-                source.operationKey === operation.operationKey &&
-                source.requestFingerprint === operation.requestFingerprint,
-            );
+          : operation.kind === 'project-source-accept'
+            ? metadata.projects.some(
+                ({ source }) =>
+                  source?.projectId === operation.projectId &&
+                  source.operationKey === operation.operationKey &&
+                  source.requestFingerprint === operation.requestFingerprint,
+              )
+            : metadata.projects.some(({ workingMediaAdoptions }) =>
+                workingMediaAdoptions.some(
+                  (media) =>
+                    media.projectId === operation.projectId &&
+                    media.adoptedRevisionId === operation.revisionId &&
+                    media.operationKey === operation.operationKey &&
+                    media.requestFingerprint === operation.requestFingerprint,
+                ),
+              );
     if (metadata.ownerUserId !== journal.ownerUserId || !consistent) {
       context.addIssue({ code: 'custom', message: 'Prepared Project journal is inconsistent.' });
     }
@@ -374,7 +462,7 @@ export const journalSchema = z
 
 const previousJournalSchema = z
   .object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.union([z.literal(2), z.literal(3)]),
     ownerUserId: ownerIdSchema,
     transactionId: z.uuid(),
     state: z.literal('prepared'),
@@ -410,14 +498,14 @@ export const parseJournal = (value: unknown): z.infer<typeof journalSchema> => {
   if (previous.success) {
     return journalSchema.parse({
       ...previous.data,
-      schemaVersion: 3,
+      schemaVersion: 4,
       writes: { metadata: parseLibrary(previous.data.writes.metadata).library },
     });
   }
   const legacy = legacyJournalSchema.parse(value);
   const metadata = parseLibrary(legacy.writes.projectMetadata).library;
   return journalSchema.parse({
-    schemaVersion: 3,
+    schemaVersion: 4,
     ownerUserId: legacy.ownerUserId,
     transactionId: legacy.transactionId,
     state: legacy.state,
@@ -428,7 +516,7 @@ export const parseJournal = (value: unknown): z.infer<typeof journalSchema> => {
 };
 
 export const emptyLibrary = (ownerUserId: string): ProjectLibrary => ({
-  schemaVersion: 3,
+  schemaVersion: 4,
   ownerUserId: ownerIdSchema.parse(ownerUserId),
   revision: 0,
   campaigns: [],

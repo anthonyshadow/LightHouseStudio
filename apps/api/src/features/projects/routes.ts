@@ -1,11 +1,15 @@
 import {
   appendProjectRevisionRequestSchema,
+  adoptProjectWorkingMediaRequestSchema,
   createProjectRequestSchema,
   projectConflictResponseSchema,
   projectLifecycleRequestSchema,
   projectOperationKeySchema,
   projectSourceResponseSchema,
   projectSourceUploadMetadataSchema,
+  projectWorkingMediaParamsSchema,
+  projectWorkingMediaResponseSchema,
+  projectWorkingMediaUploadMetadataSchema,
   reuseProjectSourceRequestSchema,
   moveProjectCampaignRequestSchema,
   projectParamsSchema,
@@ -29,6 +33,10 @@ import type {
   ProjectSourceMutationResult,
   ProjectSourceService,
 } from './project-source-service.js';
+import type {
+  ProjectWorkingMediaMutationResult,
+  ProjectWorkingMediaService,
+} from './project-working-media-service.js';
 
 const header = (request: HttpRequest, name: string): string | undefined => {
   const value = request.headers[name];
@@ -46,12 +54,20 @@ const requireService = (service: ProjectService | undefined): ProjectService => 
   return service;
 };
 
+const operationKeyConflictMessages = {
+  create: 'That Idempotency-Key was already used for a different Project create request.',
+  'source-accept': 'That source operation was already used for a different Project source request.',
+  'working-media-adopt':
+    'That working-media operation was already used for different media or edit settings.',
+} satisfies Record<
+  Extract<ProjectConflict, { readonly kind: 'operation-key' }>['operation'],
+  string
+>;
+
 const conflictMessage = (conflict: ProjectConflict): string => {
   switch (conflict.kind) {
     case 'operation-key':
-      return conflict.operation === 'create'
-        ? 'That Idempotency-Key was already used for a different Project create request.'
-        : 'That source operation was already used for a different Project source request.';
+      return operationKeyConflictMessages[conflict.operation];
     case 'project-version':
       return 'The Project changed in another session. Refresh it before retrying.';
     case 'revision':
@@ -77,7 +93,10 @@ const sendMutation = (reply: HttpReply, result: ProjectServiceMutationResult) =>
   );
 };
 
-const sendSourceMutation = (reply: HttpReply, result: ProjectSourceMutationResult) => {
+const sendReplayableMutation = (
+  reply: HttpReply,
+  result: ProjectSourceMutationResult | ProjectWorkingMediaMutationResult,
+) => {
   if (result.ok) {
     if (!result.replayed) reply.status(201);
     return result.response;
@@ -90,21 +109,41 @@ const sendSourceMutation = (reply: HttpReply, result: ProjectSourceMutationResul
   );
 };
 
-const sourceUploadMetadata = (request: HttpRequest) => {
-  const encoded = header(request, 'x-lightframe-project-source');
+const parseUploadMetadata = <Output>(
+  request: HttpRequest,
+  headerName: string,
+  schema: { readonly parse: (value: unknown) => Output },
+  message: string,
+): Output => {
+  const encoded = header(request, headerName);
   try {
-    return projectSourceUploadMetadataSchema.parse(
-      JSON.parse(decodeURIComponent(encoded ?? '')) as unknown,
-    );
+    return schema.parse(JSON.parse(decodeURIComponent(encoded ?? '')) as unknown);
   } catch {
-    throw new AppError(400, 'validation_error', 'Provide valid Project source metadata.');
+    throw new AppError(400, 'validation_error', message);
   }
 };
+
+const sourceUploadMetadata = (request: HttpRequest) =>
+  parseUploadMetadata(
+    request,
+    'x-lightframe-project-source',
+    projectSourceUploadMetadataSchema,
+    'Provide valid Project source metadata.',
+  );
+
+const workingMediaUploadMetadata = (request: HttpRequest) =>
+  parseUploadMetadata(
+    request,
+    'x-lightframe-project-working-media',
+    projectWorkingMediaUploadMetadataSchema,
+    'Provide valid Project working-media metadata.',
+  );
 
 export const registerProjectRoutes = (
   app: ApplicationRuntime,
   service: ProjectService | undefined,
   sourceService?: ProjectSourceService,
+  workingMediaService?: ProjectWorkingMediaService,
 ): void => {
   app.get('/api/projects', async (request) => {
     const query = projectsQuerySchema.safeParse(request.query);
@@ -184,7 +223,7 @@ export const registerProjectRoutes = (
           if (!params.success || !operationKey.success || upload === null) {
             throw new AppError(400, 'validation_error', 'Provide a valid Project source upload.');
           }
-          return sendSourceMutation(
+          return sendReplayableMutation(
             reply,
             await sourceService.upload({
               ownerUserId: ownerUserIdForRequest(request),
@@ -211,7 +250,7 @@ export const registerProjectRoutes = (
       if (!params.success || !operationKey.success || !body.success) {
         throw new AppError(400, 'validation_error', 'Choose a valid exact Saved Video Version.');
       }
-      return sendSourceMutation(
+      return sendReplayableMutation(
         reply,
         await sourceService.reuseSavedVideo({
           ownerUserId: ownerUserIdForRequest(request),
@@ -253,6 +292,111 @@ export const registerProjectRoutes = (
       reply.header('Content-Length', headers.contentLength);
       return reply.send(result.asset.createReadStream(range));
     });
+  }
+
+  if (workingMediaService !== undefined) {
+    app.post(
+      '/api/projects/:projectId/working-media',
+      {
+        bodyLimit: VIDEO_RESULT_MAX_BYTES,
+        bodyParser: 'spooled',
+        acceptedContentTypes: VIDEO_INPUT_MIME_TYPES,
+        unsupportedMediaType: {
+          statusCode: 400,
+          message: 'Adopt an MP4, QuickTime, or WebM validated local render.',
+        },
+        payloadTooLargeMessage: 'Project working media must be 300 MB or smaller.',
+      },
+      async (request, reply) => {
+        const params = projectParamsSchema.safeParse(request.params);
+        const operationKey = projectOperationKeySchema.safeParse(
+          header(request, 'idempotency-key'),
+        );
+        const upload = isSpooledAudioUpload(request.body) ? request.body : null;
+        try {
+          const metadata = workingMediaUploadMetadata(request);
+          if (!params.success || !operationKey.success || upload === null) {
+            throw new AppError(
+              400,
+              'validation_error',
+              'Provide a valid local Project render and Idempotency-Key.',
+            );
+          }
+          return sendReplayableMutation(
+            reply,
+            await workingMediaService.uploadLocalRender({
+              ownerUserId: ownerUserIdForRequest(request),
+              projectId: params.data.projectId,
+              operationKey: operationKey.data,
+              expectedVersion: metadata.expectedVersion,
+              expectedRevisionNumber: metadata.expectedRevisionNumber,
+              sourcePath: upload.path,
+              checksumSha256: upload.checksumSha256,
+              filename: metadata.filename,
+              localEdit: metadata.localEdit,
+            }),
+          );
+        } finally {
+          await upload?.cleanup().catch(() => undefined);
+        }
+      },
+    );
+
+    app.post('/api/projects/:projectId/working-media/reuse', async (request, reply) => {
+      const params = projectParamsSchema.safeParse(request.params);
+      const operationKey = projectOperationKeySchema.safeParse(header(request, 'idempotency-key'));
+      const body = adoptProjectWorkingMediaRequestSchema.safeParse(request.body);
+      if (!params.success || !operationKey.success || !body.success) {
+        throw new AppError(400, 'validation_error', 'Choose valid retained Project media.');
+      }
+      return sendReplayableMutation(
+        reply,
+        await workingMediaService.reuse({
+          ownerUserId: ownerUserIdForRequest(request),
+          projectId: params.data.projectId,
+          operationKey: operationKey.data,
+          ...body.data,
+        }),
+      );
+    });
+
+    app.get('/api/projects/:projectId/working-media', async (request) => {
+      const params = projectParamsSchema.safeParse(request.params);
+      if (!params.success) throw new AppError(400, 'validation_error', 'Choose a valid Project.');
+      return projectWorkingMediaResponseSchema.parse(
+        await workingMediaService.get(ownerUserIdForRequest(request), params.data.projectId),
+      );
+    });
+
+    app.get(
+      '/api/projects/:projectId/working-media/:revisionId/content',
+      async (request, reply) => {
+        const params = projectWorkingMediaParamsSchema.safeParse(request.params);
+        if (!params.success) {
+          throw new AppError(400, 'validation_error', 'Choose valid Project working media.');
+        }
+        const result = await workingMediaService.content(
+          ownerUserIdForRequest(request),
+          params.data.projectId,
+          params.data.revisionId,
+        );
+        const size = result.asset.manifest.sizeBytes;
+        const range = parseByteRange(header(request, 'range'), size);
+        const filename = result.media.filename.replaceAll(/["\\\r\n]/gu, '_');
+        reply.header('Accept-Ranges', 'bytes');
+        reply.header('Content-Type', result.media.mimeType);
+        reply.header('Content-Disposition', `inline; filename="${filename}"`);
+        if (range === null) {
+          reply.header('Content-Length', size);
+          return reply.send(result.asset.createReadStream());
+        }
+        const headers = contentRangeHeaders(range, size);
+        reply.status(206);
+        reply.header('Content-Range', headers.contentRange);
+        reply.header('Content-Length', headers.contentLength);
+        return reply.send(result.asset.createReadStream(range));
+      },
+    );
   }
 
   app.patch('/api/projects/:projectId', async (request, reply) => {

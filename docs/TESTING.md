@@ -111,6 +111,20 @@ The retained suite protects:
 - URL-owned Project-session hydration, bounded semantic coalescing, exact response-loss
   convergence, stale-CAS proposal preservation, explicit reapply/discard, cache publication,
   Project/global-library switch flushing, conflict stay behavior, and hard-unload protection;
+- Project snapshot-v2/V1-migration parity; exact applied Character/Variant, Outfit, Voice,
+  prompt/reference/treatment/live/edit mapping; prompt-only VTO without a fabricated Outfit;
+  owner-safe missing/changed creative-resource explanation, saved-Voice relationship validation
+  without provider intent/contact, and live mode/capture restoration without media acquisition;
+  explicit checkpoint coalescing; provider-Start gating; and one-stage configuration beside current
+  Project media;
+- local and relational Project working-media adoption for inspected/checksummed local renders and
+  exact same-owner retained Media Asset/Saved Video Versions; source immutability, used-by versus
+  produced-by lineage, output-pointer clearing, CAS/replay/fingerprint conflict, prepared-journal
+  restart, controlled range content, retention-aware cleanup, Project-switch guarding, and
+  response-loss reconciliation;
+- a no-provider Chromium journey from reusable Character selection through one Project semantic
+  checkpoint, local edit/Render preview, explicit working-media adoption, and refresh, including
+  denial of unexpected external HTTP and WebSocket traffic;
 - Campaign domain/contract parity, v1→v2 local migration, restart-safe receipts, owner/CAS and
   active-membership rules, relational same-owner/restrict constraints, authenticated routes,
   create/detail/New Project, move/detach, virtual No Campaign filtering, non-cascading lifecycle,

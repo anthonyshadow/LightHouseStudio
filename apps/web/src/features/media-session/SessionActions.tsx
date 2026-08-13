@@ -11,6 +11,7 @@ export interface SessionActionsProps {
   session: StudioSessionController;
   recording: boolean;
   lockReason?: string | undefined;
+  modelStartBlockedReason?: string | undefined;
   onReset: () => void;
 }
 
@@ -18,6 +19,7 @@ export const SessionActions = ({
   session,
   recording,
   lockReason,
+  modelStartBlockedReason,
   onReset,
 }: SessionActionsProps) => {
   const theme = useTheme();
@@ -136,6 +138,7 @@ export const SessionActions = ({
   let startReason: string | null = null;
   if (recording)
     startReason = lockReason ?? 'Finish the current take before starting an AI session.';
+  else if (modelStartBlockedReason) startReason = modelStartBlockedReason;
   else if (!hasStartContent) {
     startReason =
       session.draft.mode === 'lucy-latest'

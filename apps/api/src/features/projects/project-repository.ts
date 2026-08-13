@@ -4,6 +4,7 @@ import type {
   ProjectAssetLink,
   ProjectConflict,
   ProjectJobLink,
+  ProjectMediaReference,
   ProjectOutputLink,
   ProjectRevision,
   ProjectSourceKind,
@@ -75,6 +76,61 @@ export interface ProjectSourceRecord {
   readonly height: number;
   readonly hasAudio: boolean;
   readonly acceptedAt: string;
+}
+
+export type ProjectWorkingMediaKind = 'local-render' | 'media-asset' | 'saved-video-version';
+
+export interface ProjectWorkingMediaRecord {
+  readonly projectId: string;
+  readonly ownerUserId: string;
+  readonly kind: ProjectWorkingMediaKind;
+  readonly mediaReference: ProjectMediaReference;
+  readonly assetId: string;
+  readonly savedVideoId: string | null;
+  readonly videoVersionId: string | null;
+  readonly adoptedRevisionId: string;
+  readonly adoptedRevisionNumber: number;
+  readonly operationKey: string;
+  readonly requestFingerprint: string;
+  readonly mimeType: 'video/mp4' | 'video/quicktime' | 'video/webm';
+  readonly filename: string;
+  readonly sizeBytes: number;
+  readonly checksumSha256: string;
+  readonly container: 'mp4' | 'quicktime' | 'webm';
+  readonly videoCodec: 'avc' | 'vp8';
+  readonly audioCodec: string | null;
+  readonly durationMs: number;
+  readonly width: number;
+  readonly height: number;
+  readonly hasAudio: boolean;
+  readonly adoptedAt: string;
+}
+
+export interface ProjectWorkingMediaRead {
+  /** Current Project metadata and revision; media retains its original adoption revision. */
+  readonly project: Project;
+  readonly revision: ProjectRevision;
+  readonly media: ProjectWorkingMediaRecord;
+}
+
+export type ProjectWorkingMediaAdoptionResult =
+  | {
+      readonly kind: 'adopted' | 'replayed';
+      readonly value: ProjectWorkingMediaRead;
+    }
+  | { readonly kind: 'not-found' }
+  | {
+      readonly kind: 'conflict';
+      readonly conflict: Extract<
+        ProjectConflict,
+        | { readonly kind: 'operation-key' }
+        | { readonly kind: 'project-version' }
+        | { readonly kind: 'revision' }
+      >;
+    };
+
+export interface AdoptProjectWorkingMediaPersistenceInput extends AppendProjectRevisionPersistenceInput {
+  readonly media: ProjectWorkingMediaRecord;
 }
 
 export interface ProjectCurrentSourceRead {
@@ -188,6 +244,15 @@ export interface ProjectRepository {
     projectId: string,
   ): Promise<ProjectCurrentSourceRead | null>;
   getSource(ownerUserId: string, projectId: string): Promise<ProjectSourceRecord | null>;
+  getWorkingMedia(
+    ownerUserId: string,
+    projectId: string,
+    revisionId?: string,
+  ): Promise<ProjectWorkingMediaRead | null>;
+  getWorkingMediaByOperationKey(
+    ownerUserId: string,
+    operationKey: string,
+  ): Promise<ProjectWorkingMediaRead | null>;
   list(ownerUserId: string, input: ProjectSummaryPageInput): Promise<ProjectSummaryPage>;
   listRevisionHistory(
     ownerUserId: string,
@@ -207,6 +272,9 @@ export interface ProjectRepository {
     input: AppendProjectRevisionPersistenceInput,
   ): Promise<ProjectPersistenceMutationResult>;
   acceptSource(input: AcceptProjectSourcePersistenceInput): Promise<ProjectSourceAcceptanceResult>;
+  adoptWorkingMedia(
+    input: AdoptProjectWorkingMediaPersistenceInput,
+  ): Promise<ProjectWorkingMediaAdoptionResult>;
   updateMetadata(
     ownerUserId: string,
     expectedVersion: number,

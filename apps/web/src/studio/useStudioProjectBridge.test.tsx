@@ -33,12 +33,16 @@ const activity = (projectId: string): ProjectSourceActivity => ({
 const session = (projectId: string): ProjectSessionPort => ({
   projectId,
   phase: 'saved',
+  current: null,
+  proposal: null,
   hasLocalProposal: false,
   message: null,
   propose: vi.fn(),
   flush: vi.fn(),
   retry: vi.fn(),
   discard: vi.fn(),
+  getCurrent: vi.fn(() => null),
+  acceptCurrent: vi.fn(),
 });
 
 afterEach(cleanup);
@@ -63,16 +67,25 @@ describe('useStudioProjectBridge', () => {
     act(() => {
       runtime.present(firstProjectId, sourceInput);
       hook.result.current.handleSourceActivity(activity(firstProjectId));
+      hook.result.current.handleWorkingMediaActivity({
+        projectId: firstProjectId,
+        busy: true,
+      });
       hook.result.current.handleSession(session(firstProjectId));
     });
 
     expect(presentSource).toHaveBeenCalledWith(sourceInput);
     expect(hook.result.current.sourceActivity?.projectId).toBe(firstProjectId);
+    expect(hook.result.current.workingMediaActivity).toEqual({
+      projectId: firstProjectId,
+      busy: true,
+    });
     expect(hook.result.current.session?.projectId).toBe(firstProjectId);
 
     hook.rerender({ projectId: secondProjectId });
     expect(hook.result.current.sourceRuntime).toBe(runtime);
     expect(hook.result.current.sourceActivity).toBeNull();
+    expect(hook.result.current.workingMediaActivity).toBeNull();
     expect(hook.result.current.session).toBeNull();
 
     act(() => {

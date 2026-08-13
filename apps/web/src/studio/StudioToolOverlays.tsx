@@ -49,6 +49,7 @@ interface StudioToolOverlaysProps {
   readonly characterRemovalBlockedReason: string | undefined;
   readonly aiSessionActive: boolean;
   readonly captureSettingsDisabledReason: string | undefined;
+  readonly providerStartBlockedReason?: string | undefined;
   readonly characterSelectorRef: RefObject<HTMLButtonElement | null>;
   readonly outfitToggleRef: RefObject<HTMLButtonElement | null>;
   readonly shelfToggleRef: RefObject<HTMLButtonElement | null>;
@@ -92,6 +93,7 @@ export const StudioToolOverlays = ({
   characterRemovalBlockedReason,
   aiSessionActive,
   captureSettingsDisabledReason,
+  providerStartBlockedReason,
   characterSelectorRef,
   outfitToggleRef,
   shelfToggleRef,
@@ -132,6 +134,7 @@ export const StudioToolOverlays = ({
         onClose={onCloseExistingVideo}
         onFinish={onFinishExistingVideo}
         onStartRecording={onStartExistingVideoRecording}
+        {...(providerStartBlockedReason ? { providerStartBlockedReason } : {})}
       />
 
       <StudioOutfitOverlays
@@ -182,6 +185,7 @@ export const StudioToolOverlays = ({
         virtualTryOnReady={
           session.draft.mode === 'lucy-vton-latest' && hasDraftContent(session.draft)
         }
+        {...(providerStartBlockedReason ? { providerStartBlockedReason } : {})}
         onClose={onCloseOverlay}
         onStartCharacter={() => onStartPreparedAi('lucy-latest')}
         onCreateCharacter={character.openNew}
@@ -204,6 +208,9 @@ export const StudioToolOverlays = ({
           embedded
           session={advancedLiveSession}
           recording={mediaLocked}
+          {...(providerStartBlockedReason
+            ? { modelStartBlockedReason: providerStartBlockedReason }
+            : {})}
           {...(activeCharacterName ? { activeCharacterName } : {})}
           {...(takeReview.reviewLocked
             ? {

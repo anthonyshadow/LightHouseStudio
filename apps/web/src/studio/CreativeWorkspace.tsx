@@ -117,6 +117,7 @@ export type CreativeWorkspaceState = {
   panel: AuxiliaryPanel;
   activeTool: 'dock' | 'edit-video' | 'character' | 'outfit' | 'workshop' | 'shelf' | null;
   showDesktopAiTools: boolean;
+  projectMode?: boolean;
   activeCharacterLabel?: string | undefined;
   activeOutfitLabel?: string | undefined;
   activeSessionMode: StudioMode;
@@ -319,6 +320,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     panel,
     activeTool,
     showDesktopAiTools,
+    projectMode = false,
     activeCharacterLabel,
     activeOutfitLabel,
     activeSessionMode,
@@ -367,11 +369,12 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     outfitToggleRef,
   } = refs;
   const theme = useTheme();
+  const playbackBlocksLiveTools = hasPlaybackVideo && !projectMode;
   const characterWorkshopBlocked =
-    hasPlaybackVideo ||
+    playbackBlocksLiveTools ||
     recordingActive ||
     (activeSessionMode !== 'lucy-latest' && sessionModeLocked);
-  const liveVideoToolBlocked = hasPlaybackVideo || recordingActive;
+  const liveVideoToolBlocked = playbackBlocksLiveTools || recordingActive;
   const activePanel = panel === 'closed' ? null : panel;
   const shelfController = useRecipeShelfController({
     repository,

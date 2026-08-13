@@ -1,6 +1,7 @@
 import { lazy, Suspense, type RefObject } from 'react';
 import { SaveVideoDialog } from '../features/saved-videos/SaveVideoDialog';
 import { defaultSavedVideoName } from '../features/saved-videos/useSaveVideo';
+import type { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
 import type { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import { Button, OverlayPanel } from '../ui';
 import type { useStudioLogoutController } from './useStudioLogoutController';
@@ -17,6 +18,8 @@ interface StudioLifecycleDialogsProps {
   readonly logout: ReturnType<typeof useStudioLogoutController>;
   readonly savedVideo: ReturnType<typeof useStudioSavedVideoController>;
   readonly videoEditor: ReturnType<typeof useVideoEditSession>;
+  readonly projectContextActive: boolean;
+  readonly projectWorkingMedia: ReturnType<typeof useProjectWorkingMediaController>;
 }
 
 export const StudioLifecycleDialogs = ({
@@ -24,6 +27,8 @@ export const StudioLifecycleDialogs = ({
   logout,
   savedVideo,
   videoEditor,
+  projectContextActive,
+  projectWorkingMedia,
 }: StudioLifecycleDialogsProps) => (
   <>
     {savedVideo.pendingSave ? (
@@ -82,21 +87,40 @@ export const StudioLifecycleDialogs = ({
         onCancel={savedVideo.dismissVideoEditDiscard}
         onConfirm={savedVideo.returnFromVideoEditor}
       />
-      <ConfirmationDialog
-        open={videoEditor.phase === 'awaiting-replacement'}
-        title="Replace the current video?"
-        description="The validated edit will become the new immutable source for Voice and later video tools. You can save the current source to Saved Videos first."
-        confirmLabel="Replace and Save"
-        cancelLabel="Cancel"
-        busy={videoEditor.phase === 'committing'}
-        secondaryAction={{
-          label: 'Replace Without Saving',
-          onAction: () => void savedVideo.commitVideoEdit(false),
-        }}
-        returnFocusRef={mainRef}
-        onCancel={videoEditor.resumeEditing}
-        onConfirm={savedVideo.requestSaveAndCommitVideoEdit}
-      />
+      {projectContextActive ? (
+        <ConfirmationDialog
+          open={videoEditor.phase === 'awaiting-replacement'}
+          title="Adopt Render preview as Project working media?"
+          description={
+            projectWorkingMedia.message ??
+            'The validated render is temporary until adoption stores, inspects, and checksums it. Adoption advances working/presented media without replacing the immutable original or creating a Saved Video or Version.'
+          }
+          confirmLabel={
+            projectWorkingMedia.busy ? 'Adopting working media…' : 'Adopt as working media'
+          }
+          cancelLabel="Keep editing"
+          busy={projectWorkingMedia.busy}
+          returnFocusRef={mainRef}
+          onCancel={projectWorkingMedia.cancel}
+          onConfirm={() => void projectWorkingMedia.adoptRenderPreview()}
+        />
+      ) : (
+        <ConfirmationDialog
+          open={videoEditor.phase === 'awaiting-replacement'}
+          title="Replace the current video?"
+          description="The validated edit will become the new immutable source for Voice and later video tools. You can save the current source to Saved Videos first."
+          confirmLabel="Replace and Save"
+          cancelLabel="Cancel"
+          busy={videoEditor.phase === 'committing'}
+          secondaryAction={{
+            label: 'Replace Without Saving',
+            onAction: () => void savedVideo.commitVideoEdit(false),
+          }}
+          returnFocusRef={mainRef}
+          onCancel={videoEditor.resumeEditing}
+          onConfirm={savedVideo.requestSaveAndCommitVideoEdit}
+        />
+      )}
     </Suspense>
   </>
 );

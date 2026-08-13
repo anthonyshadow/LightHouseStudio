@@ -664,7 +664,9 @@ describe('creative asset CRUD and use', () => {
       referenceImageAssetId: 'host-features',
     });
 
-    store = selectCharacterVersion(store, 'host', null, timestamp(4));
+    const unchangedStore = selectCharacterVersion(store, 'host', null, timestamp(4));
+    expect(unchangedStore).toBe(store);
+    store = unchangedStore;
     expect(store.savedCharacterPrompts[0]?.selectedWardrobeVariantId).toBeNull();
     store = deleteSavedCharacterPrompt(store, 'host');
     expect(store.savedCharacterVariants).toEqual([]);

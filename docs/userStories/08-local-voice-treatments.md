@@ -34,6 +34,11 @@
 - Square, 4:5, and incompatible Freeform edited sources keep Voice available when their sidecar is
   valid even though Character Swap and Virtual Try On are disabled.
 - No local treatment contacts a provider.
+- A Project can checkpoint the selected local effect and built-in revision as optional Voice
+  configuration through **Save creative setup**. Selection alone does not process audio, create a
+  Project output, or append per-control revisions. Local Voice processing retains this story's
+  artifact owner; any later durable Project media change still requires the explicit working-media
+  command.
 
 ## Evidence status
 

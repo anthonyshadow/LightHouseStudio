@@ -7,8 +7,6 @@ import type {
   ProjectAggregate,
   ProjectJobLink,
   ProjectOutputLink,
-  ProjectRevision,
-  ProjectVersionReferenceLink,
 } from '@studio/domain';
 import type {
   CampaignCreatePersistenceResult,
@@ -20,6 +18,7 @@ import type {
   CampaignWithAttachedProjectCount,
 } from '../campaigns/campaign-repository.js';
 import type {
+  AdoptProjectWorkingMediaPersistenceInput,
   AppendProjectRevisionPersistenceInput,
   AcceptProjectSourcePersistenceInput,
   ProjectCreateReceipt,
@@ -38,6 +37,9 @@ import type {
   ProjectSummaryPageInput,
   ProjectSourceAcceptanceResult,
   ProjectSourceRecord,
+  ProjectWorkingMediaAdoptionResult,
+  ProjectWorkingMediaRead,
+  ProjectWorkingMediaRecord,
 } from './project-repository.js';
 import {
   campaignCreateReceiptSchema,
@@ -53,10 +55,15 @@ import {
   storedJobLinkSchema,
   storedOutputLinkSchema,
   storedProjectSourceSchema,
+  storedProjectWorkingMediaSchema,
   type ProjectJournal,
   type ProjectLibrary,
   type StoredProjectAggregate,
 } from './file-project-persistence-schema.js';
+import {
+  projectMediaReferencesEqual,
+  projectVersionReferenceLinksForRevision,
+} from './project-snapshot-relations.js';
 
 const isMissingFile = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === 'ENOENT';
@@ -73,25 +80,20 @@ const currentRead = (aggregate: StoredProjectAggregate): ProjectCurrentRead => {
   return { project: aggregate.project, revision };
 };
 
-const versionReferenceLinks = (revision: ProjectRevision): ProjectVersionReferenceLink[] => {
-  const links: ProjectVersionReferenceLink[] = [];
-  for (const [role, reference] of [
-    ['working', revision.snapshot.workingMedia],
-    ['presented', revision.snapshot.presentedMedia],
-  ] as const) {
-    if (reference?.kind !== 'saved-video-version') continue;
-    links.push({
-      projectId: revision.projectId,
-      ownerUserId: revision.ownerUserId,
-      savedVideoId: reference.savedVideoId,
-      videoVersionId: reference.videoVersionId,
-      role,
-      revisionId: revision.id,
-      revisionNumber: revision.revisionNumber,
-      createdAt: revision.createdAt,
-    });
+const workingMediaForOperation = (
+  library: ProjectLibrary,
+  operationKey: string,
+): {
+  readonly aggregate: StoredProjectAggregate;
+  readonly media: ProjectWorkingMediaRecord;
+} | null => {
+  for (const aggregate of library.projects) {
+    const media = aggregate.workingMediaAdoptions.find(
+      (candidate) => candidate.operationKey === operationKey,
+    );
+    if (media !== undefined) return { aggregate, media };
   }
-  return links;
+  return null;
 };
 
 export interface FileProjectRepositoryOptions {
@@ -313,7 +315,7 @@ export class FileProjectRepository
         createReceipts: [...library.createReceipts, receipt],
       });
       await this.#write(library, next, {
-        schemaVersion: 3,
+        schemaVersion: 4,
         ownerUserId: aggregate.project.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -359,6 +361,42 @@ export class FileProjectRepository
       ({ project }) => project.id === projectId && project.deletedAt === null,
     );
     return aggregate?.source ?? null;
+  }
+
+  async getWorkingMedia(
+    ownerUserId: string,
+    projectId: string,
+    revisionId?: string,
+  ): Promise<ProjectWorkingMediaRead | null> {
+    const aggregate = (await this.#read(ownerUserId)).projects.find(
+      ({ project }) => project.id === projectId && project.deletedAt === null,
+    );
+    if (aggregate === undefined) return null;
+    const revision = currentRead(aggregate).revision;
+    const media =
+      revisionId === undefined
+        ? aggregate.workingMediaAdoptions.findLast(
+            ({ mediaReference }) =>
+              projectMediaReferencesEqual(mediaReference, revision.snapshot.workingMedia) &&
+              projectMediaReferencesEqual(mediaReference, revision.snapshot.presentedMedia),
+          )
+        : aggregate.workingMediaAdoptions.find(
+            ({ adoptedRevisionId }) => adoptedRevisionId === revisionId,
+          );
+    return media === undefined ? null : { project: aggregate.project, revision, media };
+  }
+
+  async getWorkingMediaByOperationKey(
+    ownerUserId: string,
+    operationKey: string,
+  ): Promise<ProjectWorkingMediaRead | null> {
+    const match = workingMediaForOperation(await this.#read(ownerUserId), operationKey);
+    if (match === null || match.aggregate.project.deletedAt !== null) return null;
+    return {
+      project: match.aggregate.project,
+      revision: currentRead(match.aggregate).revision,
+      media: match.media,
+    };
   }
 
   async list(ownerUserId: string, input: ProjectSummaryPageInput): Promise<ProjectSummaryPage> {
@@ -532,7 +570,7 @@ export class FileProjectRepository
         assetLinks: [...aggregate.assetLinks, ...input.assetLinks],
         versionReferenceLinks: [
           ...aggregate.versionReferenceLinks,
-          ...versionReferenceLinks(input.revision),
+          ...projectVersionReferenceLinksForRevision(input.revision),
         ],
       });
       const projects = [...library.projects];
@@ -626,7 +664,7 @@ export class FileProjectRepository
         assetLinks: [...aggregate.assetLinks, ...input.assetLinks],
         versionReferenceLinks: [
           ...aggregate.versionReferenceLinks,
-          ...versionReferenceLinks(input.revision),
+          ...projectVersionReferenceLinksForRevision(input.revision),
         ],
         source,
       });
@@ -638,7 +676,7 @@ export class FileProjectRepository
         projects,
       });
       await this.#write(library, next, {
-        schemaVersion: 3,
+        schemaVersion: 4,
         ownerUserId: input.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -655,6 +693,106 @@ export class FileProjectRepository
         kind: 'accepted',
         current: { project: input.nextProject, revision: input.revision },
         source,
+      };
+    });
+  }
+
+  async adoptWorkingMedia(
+    input: AdoptProjectWorkingMediaPersistenceInput,
+  ): Promise<ProjectWorkingMediaAdoptionResult> {
+    const media = storedProjectWorkingMediaSchema.parse(input.media) as ProjectWorkingMediaRecord;
+    return this.#withOwnerLock(input.ownerUserId, async () => {
+      const library = await this.#read(input.ownerUserId);
+      const prior = workingMediaForOperation(library, media.operationKey);
+      if (prior !== null) {
+        if (
+          prior.media.projectId !== input.projectId ||
+          prior.media.requestFingerprint !== media.requestFingerprint
+        ) {
+          return {
+            kind: 'conflict',
+            conflict: { kind: 'operation-key', operation: 'working-media-adopt' },
+          };
+        }
+        const revision = currentRead(prior.aggregate).revision;
+        return {
+          kind: 'replayed',
+          value: { project: prior.aggregate.project, revision, media: prior.media },
+        };
+      }
+
+      const index = library.projects.findIndex(({ project }) => project.id === input.projectId);
+      const aggregate = library.projects[index];
+      if (aggregate === undefined || aggregate.project.deletedAt !== null) {
+        return { kind: 'not-found' };
+      }
+      if (aggregate.project.version !== input.expectedVersion) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'project-version',
+            projectId: input.projectId,
+            expectedVersion: input.expectedVersion,
+            actualVersion: aggregate.project.version,
+          },
+        };
+      }
+      if (aggregate.project.currentRevisionNumber !== input.expectedRevisionNumber) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'revision',
+            projectId: input.projectId,
+            expectedRevisionNumber: input.expectedRevisionNumber,
+            actualRevisionNumber: aggregate.project.currentRevisionNumber,
+          },
+        };
+      }
+      const validMedia =
+        media.projectId === input.projectId &&
+        media.ownerUserId === input.ownerUserId &&
+        media.adoptedRevisionId === input.revision.id &&
+        media.adoptedRevisionNumber === input.revision.revisionNumber &&
+        projectMediaReferencesEqual(media.mediaReference, input.revision.snapshot.workingMedia) &&
+        projectMediaReferencesEqual(media.mediaReference, input.revision.snapshot.presentedMedia);
+      if (!validMedia) throw new Error('Project working-media adoption is inconsistent.');
+
+      const nextAggregate = storedAggregateSchema.parse({
+        ...aggregate,
+        project: input.nextProject,
+        revisions: [...aggregate.revisions, input.revision],
+        assetLinks: [...aggregate.assetLinks, ...input.assetLinks],
+        versionReferenceLinks: [
+          ...aggregate.versionReferenceLinks,
+          ...projectVersionReferenceLinksForRevision(input.revision),
+        ],
+        workingMediaAdoptions: [...aggregate.workingMediaAdoptions, media],
+      });
+      const projects = [...library.projects];
+      projects[index] = nextAggregate;
+      const next = librarySchema.parse({
+        ...library,
+        revision: library.revision + 1,
+        projects,
+      });
+      await this.#write(library, next, {
+        schemaVersion: 4,
+        ownerUserId: input.ownerUserId,
+        transactionId: randomUUID(),
+        state: 'prepared',
+        operation: {
+          kind: 'project-working-media-adopt',
+          operationKey: media.operationKey,
+          requestFingerprint: media.requestFingerprint,
+          projectId: input.projectId,
+          revisionId: input.revision.id,
+        },
+        preparedAt: media.adoptedAt,
+        writes: { metadata: next },
+      });
+      return {
+        kind: 'adopted',
+        value: { project: input.nextProject, revision: input.revision, media },
       };
     });
   }
@@ -795,7 +933,7 @@ export class FileProjectRepository
         campaignCreateReceipts: [...library.campaignCreateReceipts, receipt],
       });
       await this.#write(library, next, {
-        schemaVersion: 3,
+        schemaVersion: 4,
         ownerUserId: campaign.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',

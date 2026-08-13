@@ -42,7 +42,7 @@ const currentProject = (overrides: Partial<ProjectCurrentResponse['project']> = 
       parentRevisionId: null,
       parentRevisionNumber: null,
       snapshot: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         sourceAssetId: null,
         workingMedia: null,
         presentedMedia: null,
@@ -51,7 +51,16 @@ const currentProject = (overrides: Partial<ProjectCurrentResponse['project']> = 
         selectedVoice: null,
         visualTreatment: { kind: 'none' },
         liveMode: null,
-        creativeIntent: { promptId: null, recipeId: null, userIntent: '' },
+        creativeIntent: {
+          promptId: null,
+          promptLabel: null,
+          recipeId: null,
+          recipeLabel: null,
+          userIntent: '',
+          appliedPrompt: null,
+          referenceAssetId: null,
+          resourceRevision: null,
+        },
         localEdit: null,
         exportSpecification: null,
         lastSuccessfulOutput: null,
@@ -165,18 +174,28 @@ describe('Projects API adapter', () => {
         observed.observe,
       ),
     );
+    const proposal = {
+      workflowPhase: 'creative',
+      liveMode: null,
+      selectedCharacter: null,
+      selectedOutfit: null,
+      selectedVoice: null,
+      visualTreatment: { kind: 'none' },
+      creativeIntent: base.revision.snapshot.creativeIntent,
+      localEdit: null,
+    } as const;
 
     await expect(
       checkpointProject(projectId, {
         expectedVersion: 1,
         expectedRevisionNumber: 1,
-        proposal: { workflowPhase: 'creative', liveMode: null },
+        proposal,
       }),
     ).resolves.toEqual(checkpointed);
     await expect(observed.requests[0]!.json()).resolves.toEqual({
       expectedVersion: 1,
       expectedRevisionNumber: 1,
-      proposal: { workflowPhase: 'creative', liveMode: null },
+      proposal,
     });
   });
 

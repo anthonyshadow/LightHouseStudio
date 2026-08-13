@@ -30,6 +30,7 @@ export const StudioExistingVideoOverlay = ({
   onClose,
   onFinish,
   onStartRecording,
+  providerStartBlockedReason,
 }: {
   readonly open: boolean;
   readonly existingVideo: ReturnType<typeof useExistingVideoWorkflow>;
@@ -45,6 +46,7 @@ export const StudioExistingVideoOverlay = ({
   readonly onClose: () => void;
   readonly onFinish: () => void;
   readonly onStartRecording: () => void;
+  readonly providerStartBlockedReason?: string;
 }) => {
   const { availability } = provider;
   const { recording } = takeReview;
@@ -87,6 +89,7 @@ export const StudioExistingVideoOverlay = ({
             browser.mediaRecorder && browser.mediaDevices && browser.secureContext
           }
           onRecordVideo={onStartRecording}
+          {...(providerStartBlockedReason ? { providerStartBlockedReason } : {})}
         />
       </Suspense>
     </OverlayPanel>

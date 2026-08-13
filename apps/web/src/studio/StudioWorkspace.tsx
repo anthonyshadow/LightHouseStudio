@@ -81,6 +81,7 @@ interface StudioWorkspaceProps {
     readonly aiSessionActive: boolean;
   };
   readonly creativeWorkspace: ReactNode;
+  readonly projectCreativeCheckpoint: ReactNode;
   readonly saveVideoState: SaveVideoState;
   readonly actions: {
     readonly startExistingVideoRecording: () => void;
@@ -103,6 +104,7 @@ export const StudioWorkspace = ({
   stage,
   activity,
   creativeWorkspace,
+  projectCreativeCheckpoint,
   saveVideoState,
   actions,
 }: StudioWorkspaceProps) => {
@@ -269,13 +271,17 @@ export const StudioWorkspace = ({
           fullscreenTargetRef={fullscreenWorkspaceRef}
           {...(videoEditPreview ? { editPreview: videoEditPreview } : {})}
         />
-        {projectContextActive ? null : videoEditing ? (
+        {videoEditing ? (
           <Suspense fallback={deferredWorkspaceFallback}>
             <VideoEditWorkspace
               session={videoEditor}
               onRequestDiscard={savedVideo.requestVideoEditDiscard}
+              projectMode={projectContextActive}
+              appliedProjectEdit={project.session?.current?.revision.snapshot.localEdit ?? null}
             />
           </Suspense>
+        ) : projectContextActive ? (
+          creativeWorkspace
         ) : (
           <>
             {creativeWorkspace}
@@ -320,6 +326,7 @@ export const StudioWorkspace = ({
       {projectRouteActive ? (
         <Suspense fallback={<p role="status">Loading Projects workspace…</p>}>
           <ProjectRouteSurface
+            creativeCheckpoint={projectCreativeCheckpoint}
             sourceRuntime={project.sourceRuntime}
             recordingCandidate={project.recordingCandidate}
             recordingActive={
@@ -327,6 +334,7 @@ export const StudioWorkspace = ({
             }
             onStartRecording={onStartProjectRecording}
             onSourceActivityChange={project.handleSourceActivity}
+            onWorkingMediaActivityChange={project.handleWorkingMediaActivity}
             onSessionChange={project.handleSession}
           />
         </Suspense>

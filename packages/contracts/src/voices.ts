@@ -108,6 +108,13 @@ export const sharedVoicesResponseSchema = z
 
 export const workspaceVoiceParamsSchema = z.object({ voiceId: providerIdSchema }).strict();
 
+export const workspaceVoiceRelationshipResponseSchema = z
+  .object({
+    voiceId: providerIdSchema,
+    saved: z.boolean(),
+  })
+  .strict();
+
 export const sharedVoiceParamsSchema = z
   .object({ publicOwnerId: providerIdSchema, voiceId: providerIdSchema })
   .strict();
@@ -153,5 +160,8 @@ export type SharedVoicesResponse = z.infer<typeof sharedVoicesResponseSchema>;
 export type SharedVoiceParams = z.infer<typeof sharedVoiceParamsSchema>;
 export type VoiceLibraryMutationResponse = z.infer<typeof voiceLibraryMutationResponseSchema>;
 export type WorkspaceVoiceParams = z.infer<typeof workspaceVoiceParamsSchema>;
+export type WorkspaceVoiceRelationshipResponse = z.infer<
+  typeof workspaceVoiceRelationshipResponseSchema
+>;
 export type VoiceChangerQuery = z.infer<typeof voiceChangerQuerySchema>;
 export type VoiceConversionContentType = z.infer<typeof voiceConversionContentTypeSchema>;
