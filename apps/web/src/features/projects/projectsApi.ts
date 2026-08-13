@@ -3,6 +3,7 @@ import {
   projectCurrentResponseSchema,
   projectSourceResponseSchema,
   projectsResponseSchema,
+  type AppendProjectRevisionRequest,
   type ProjectConflictContract,
   type ProjectCurrentResponse,
   type ProjectSourceResponse,
@@ -100,6 +101,25 @@ export const getProject = (
     },
     projectCurrentResponseSchema,
     invalidProjectResponse,
+  );
+
+export const checkpointProject = (
+  projectId: string,
+  input: AppendProjectRevisionRequest,
+  signal?: AbortSignal,
+): Promise<ProjectCurrentResponse> =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(projectId)}/revisions`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      headers: jsonHeaders,
+      body: JSON.stringify(input),
+      ...(signal ? { signal } : {}),
+    },
+    projectCurrentResponseSchema,
+    invalidProjectResponse,
+    parseProjectConflict,
   );
 
 export const renameProject = (

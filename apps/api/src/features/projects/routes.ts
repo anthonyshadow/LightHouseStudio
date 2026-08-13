@@ -1,4 +1,5 @@
 import {
+  appendProjectRevisionRequestSchema,
   createProjectRequestSchema,
   projectConflictResponseSchema,
   projectLifecycleRequestSchema,
@@ -141,6 +142,22 @@ export const registerProjectRoutes = (
       throw new AppError(400, 'validation_error', 'Choose a valid Project.');
     }
     return requireService(service).get(ownerUserIdForRequest(request), params.data.projectId);
+  });
+
+  app.post('/api/projects/:projectId/revisions', async (request, reply) => {
+    const params = projectParamsSchema.safeParse(request.params);
+    const body = appendProjectRevisionRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      throw new AppError(400, 'validation_error', 'Provide a valid semantic Project checkpoint.');
+    }
+    return sendMutation(
+      reply,
+      await requireService(service).checkpoint(
+        ownerUserIdForRequest(request),
+        params.data.projectId,
+        body.data,
+      ),
+    );
   });
 
   if (sourceService !== undefined) {

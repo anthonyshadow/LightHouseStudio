@@ -29,6 +29,7 @@ const alwaysRegisteredRoutes: readonly Route[] = [
   'POST /api/projects/:projectId/archive',
   'POST /api/projects/:projectId/restore',
   'POST /api/projects/:projectId/campaign',
+  'POST /api/projects/:projectId/revisions',
   'POST /api/realtime-token',
   'PUT /api/video-jobs/:jobId',
   'GET /api/video-jobs/:jobId',

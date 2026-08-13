@@ -64,6 +64,7 @@ import type {
   ProjectSourceActivity,
   ProjectSourceRuntime,
 } from '../features/projects/useProjectSourceController';
+import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 import { useStudioSession } from '../orchestration/session';
 import { Button, OverlayPanel } from '../ui';
 import {
@@ -286,9 +287,11 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const [logoutPromptOpen, setLogoutPromptOpen] = useState(false);
   const [logoutBlockedOpen, setLogoutBlockedOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const [logoutPreparing, setLogoutPreparing] = useState(false);
   const [projectSourceActivity, setProjectSourceActivity] = useState<ProjectSourceActivity | null>(
     null,
   );
+  const [projectSession, setProjectSession] = useState<ProjectSessionPort | null>(null);
   const repositoryStore = useCreativeAssetSelector(repository, (state) => state.store);
   const existingVideoSavedRecipes = useMemo<readonly ExistingVideoSavedRecipe[]>(() => {
     const variantsByCharacter = new Map<string, SavedCharacterVariant[]>();
@@ -501,6 +504,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   }, []);
   const activeProjectSourceActivity =
     projectSourceActivity?.projectId === activeProjectId ? projectSourceActivity : null;
+  const activeProjectSession =
+    projectSession?.projectId === activeProjectId ? projectSession : null;
   const activeLoadedSavedSource =
     !loadedSavedSource ||
     !recording.original ||
@@ -1168,42 +1173,64 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       }),
     [session, sessionCleanup],
   );
-  const logoutHasDiscardableWork =
+  const logoutHasTemporaryWork =
     Boolean(recording.presented) ||
     recording.processingState === 'processing' ||
     shelfDirty ||
     outfitBuilderDirty ||
     wardrobeDirty ||
-    videoEditor.dirty;
+    videoEditor.dirty ||
+    (activeProjectSourceActivity?.busy ?? false);
+  const logoutHasProjectProposal = activeProjectSession?.hasLocalProposal ?? false;
   const logoutHasActiveWork =
     recordingActive ||
     finalizingStartedAt !== null ||
     finalizingStream !== null ||
     existingVideo.providerActive ||
     isVideoEditBusy(videoEditor.phase);
-  const completeLogout = useCallback(async () => {
-    if (logoutBusy) return;
-    setLogoutBusy(true);
-    setLogoutPromptOpen(false);
-    try {
-      await sessionCleanup.run();
-      await auth.logout();
-      void navigate(APP_PATHS.entry, { replace: true });
-    } finally {
-      setLogoutBusy(false);
-    }
-  }, [auth, logoutBusy, navigate, sessionCleanup]);
-  const requestLogout = useCallback(() => {
+  const completeLogout = useCallback(
+    async (discardPendingWork = false) => {
+      if (logoutBusy) return;
+      setLogoutBusy(true);
+      setLogoutPromptOpen(false);
+      try {
+        if (discardPendingWork) {
+          activeProjectSourceActivity?.abort?.();
+          activeProjectSession?.discard();
+        }
+        await sessionCleanup.run();
+        await auth.logout();
+        void navigate(APP_PATHS.entry, { replace: true });
+      } finally {
+        setLogoutBusy(false);
+      }
+    },
+    [activeProjectSession, activeProjectSourceActivity, auth, logoutBusy, navigate, sessionCleanup],
+  );
+  const requestLogout = useCallback(async () => {
     if (logoutHasActiveWork) {
       setLogoutBlockedOpen(true);
       return;
     }
-    if (logoutHasDiscardableWork) {
+    if (activeProjectSession?.hasLocalProposal || activeProjectSession?.phase === 'saving') {
+      if (activeProjectSession.phase === 'conflict' || activeProjectSession.phase === 'error') {
+        setLogoutPromptOpen(true);
+        return;
+      }
+      setLogoutPreparing(true);
+      const saved = await activeProjectSession.flush();
+      setLogoutPreparing(false);
+      if (!saved) {
+        setLogoutPromptOpen(true);
+        return;
+      }
+    }
+    if (logoutHasTemporaryWork) {
       setLogoutPromptOpen(true);
       return;
     }
     void completeLogout();
-  }, [completeLogout, logoutHasActiveWork, logoutHasDiscardableWork]);
+  }, [activeProjectSession, completeLogout, logoutHasActiveWork, logoutHasTemporaryWork]);
   const discardExistingVideoSelection = useCallback(() => {
     if (existingVideo.selection) existingVideo.reset(false);
   }, [existingVideo]);
@@ -1618,7 +1645,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             browser={browser}
             capabilityState={capabilityState}
             user={auth.session!.user}
-            accountBusy={logoutBusy}
+            accountBusy={logoutBusy || logoutPreparing}
             activeDestination={
               campaignRouteActive ? 'campaigns' : projectRouteActive ? 'projects' : 'studio'
             }
@@ -1629,7 +1656,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             onOpenVideos={() => void navigate(APP_PATHS.videos)}
             onOpenCharacters={() => void navigate(APP_PATHS.characters)}
             onOpenOutfits={() => void navigate(APP_PATHS.outfits)}
-            onLogout={requestLogout}
+            onLogout={() => void requestLogout()}
           />
         </div>
 
@@ -1813,6 +1840,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                 }
                 onStartRecording={startProjectRecording}
                 onSourceActivityChange={handleProjectSourceActivity}
+                onSessionChange={setProjectSession}
               />
             </Suspense>
           ) : null}
@@ -1835,6 +1863,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           voiceProcessingActive={recording.processingState === 'processing'}
           shelfDirty={shelfDirty || outfitBuilderDirty || wardrobeDirty || videoEditor.dirty}
           projectSourceActivity={activeProjectSourceActivity}
+          projectSession={activeProjectSession}
           onDiscardTemporaryWork={discardTemporaryWork}
         />
 
@@ -1849,15 +1878,23 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         <Suspense fallback={null}>
           <ConfirmationDialog
             open={logoutPromptOpen}
-            title="Log out and discard temporary work?"
-            description="Logging out stops local media and discards the current temporary take, active Voice work, unsaved video edits, and unsaved library changes. Saved account items remain available."
+            title={
+              logoutHasProjectProposal
+                ? 'Log out and discard unsaved Project changes?'
+                : 'Log out and discard temporary work?'
+            }
+            description={
+              logoutHasProjectProposal
+                ? 'Project saving did not complete. Logging out now explicitly discards the preserved local proposal plus any temporary media or library work. Server-saved Project revisions remain available.'
+                : 'Logging out stops local media and discards the current temporary take, active source staging, active Voice work, unsaved video edits, and unsaved library changes. Saved account items remain available.'
+            }
             confirmLabel={logoutBusy ? 'Logging out…' : 'Log out and discard'}
             cancelLabel="Stay in Studio"
             danger
             busy={logoutBusy}
             returnFocusRef={mainRef}
             onCancel={() => setLogoutPromptOpen(false)}
-            onConfirm={() => void completeLogout()}
+            onConfirm={() => void completeLogout(true)}
           />
           <OverlayPanel
             open={logoutBlockedOpen}

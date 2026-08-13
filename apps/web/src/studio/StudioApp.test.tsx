@@ -13,6 +13,7 @@ import type {
 } from './CreativeWorkspace';
 import type { PersistedSessionReference } from '../features/media-session';
 import type { ProjectRouteSurfaceProps } from '../features/projects/ProjectRouteSurface';
+import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 
 type WorkspaceHarnessProps = {
   state: CreativeWorkspaceState;
@@ -196,6 +197,7 @@ const harness = vi.hoisted(() => {
     providerActive: false,
     adoptRecordedArtifact: vi.fn(() => Promise.resolve()),
     cancelBeforeAcceptance: vi.fn(),
+    cleanup: vi.fn(() => Promise.resolve()),
     reset: vi.fn(),
     showResult: vi.fn(),
     updateStep: vi.fn(),
@@ -418,12 +420,14 @@ vi.mock('./StudioHeader', () => ({
     onOpenVideos,
     onOpenCharacters,
     onOpenOutfits,
+    onLogout,
   }: {
     onOpenStudio: () => void;
     onOpenProjects: () => void;
     onOpenVideos: () => void;
     onOpenCharacters: () => void;
     onOpenOutfits: () => void;
+    onLogout: () => void;
   }) => (
     <div>
       Studio header
@@ -441,6 +445,9 @@ vi.mock('./StudioHeader', () => ({
       </button>
       <button type="button" onClick={onOpenOutfits}>
         Open saved outfits
+      </button>
+      <button type="button" onClick={onLogout}>
+        Log out
       </button>
     </div>
   ),
@@ -704,6 +711,28 @@ describe('StudioApp composition lifecycle', () => {
     expect(typeof harness.latestProjectSurfaceProps?.sourceRuntime?.clear).toBe('function');
     expect(typeof harness.latestProjectSurfaceProps?.onStartRecording).toBe('function');
     expect(typeof harness.latestProjectSurfaceProps?.onSourceActivityChange).toBe('function');
+    expect(typeof harness.latestProjectSurfaceProps?.onSessionChange).toBe('function');
+  });
+
+  it('flushes the active Project session before logout cleanup', async () => {
+    renderStudio(undefined, '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391');
+    await screen.findByText('Deferred Projects workspace');
+    const flush = vi.fn(() => Promise.resolve(true));
+    const sessionPort: ProjectSessionPort = {
+      projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
+      phase: 'dirty',
+      hasLocalProposal: true,
+      message: null,
+      propose: vi.fn(() => true),
+      flush,
+      retry: vi.fn(() => Promise.resolve(true)),
+      discard: vi.fn(() => true),
+    };
+    act(() => harness.latestProjectSurfaceProps?.onSessionChange?.(sessionPort));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+
+    await waitFor(() => expect(flush).toHaveBeenCalledOnce());
   });
 
   it('closes Use existing video and hands local recording to the persistent stage', async () => {

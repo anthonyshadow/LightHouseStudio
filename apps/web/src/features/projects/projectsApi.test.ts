@@ -6,6 +6,7 @@ import { captureRequests, jsonScenario, malformedContractScenario } from '../../
 import { mockApiServer } from '../../test/msw/server';
 import {
   archiveProject,
+  checkpointProject,
   createProject,
   getProject,
   listProjects,
@@ -134,6 +135,49 @@ describe('Projects API adapter', () => {
     await expect(renameProject(projectId, 'Launch final', 1)).resolves.toEqual(renamed);
     await expect(archiveProject(projectId, 2)).resolves.toEqual(archived);
     await expect(restoreProject(projectId, 3)).resolves.toEqual(restored);
+  });
+
+  it('sends a strict semantic checkpoint with both CAS tokens', async () => {
+    const observed = captureRequests();
+    const base = currentProject();
+    const nextRevisionId = '4a31b6c7-8a54-4878-b240-182652a34d31';
+    const checkpointed: ProjectCurrentResponse = {
+      project: {
+        ...base.project,
+        version: 2,
+        currentRevisionNumber: 2,
+        currentRevisionId: nextRevisionId,
+      },
+      revision: {
+        ...base.revision,
+        id: nextRevisionId,
+        revisionNumber: 2,
+        parentRevisionId: base.revision.id,
+        parentRevisionNumber: 1,
+        snapshot: { ...base.revision.snapshot, workflowPhase: 'creative' },
+      },
+    };
+    mockApiServer.use(
+      jsonScenario(
+        'POST',
+        `/api/projects/${projectId}/revisions`,
+        { body: checkpointed },
+        observed.observe,
+      ),
+    );
+
+    await expect(
+      checkpointProject(projectId, {
+        expectedVersion: 1,
+        expectedRevisionNumber: 1,
+        proposal: { workflowPhase: 'creative', liveMode: null },
+      }),
+    ).resolves.toEqual(checkpointed);
+    await expect(observed.requests[0]!.json()).resolves.toEqual({
+      expectedVersion: 1,
+      expectedRevisionNumber: 1,
+      proposal: { workflowPhase: 'creative', liveMode: null },
+    });
   });
 
   it('preserves typed CAS conflicts and normalizes malformed success payloads', async () => {

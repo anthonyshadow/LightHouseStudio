@@ -1,6 +1,15 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectContract, ProjectCurrentResponse } from '@studio/contracts';
-import { useLayoutEffect, useMemo, useRef, useState, type FormEvent, type RefObject } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type RefObject,
+} from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { ApiClientError } from '../../adapters/api-client/apiClient';
 import { APP_PATHS, projectIdFromPath, projectPath } from '../../app/paths';
@@ -21,8 +30,9 @@ import {
   workspaceInnerStyles,
   workspaceStyles,
 } from './ProjectRouteSurface.styles';
-import { useProjectDetail, useProjectList, useProjectsController } from './useProjectsController';
+import { useProjectList, useProjectsController } from './useProjectsController';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
+import { useProjectSession, type ProjectSessionPort } from './useProjectSession';
 import {
   useProjectSourceController,
   type ProjectSourceActivity,
@@ -609,6 +619,7 @@ export interface ProjectRouteSurfaceProps {
   readonly recordingActive?: boolean;
   readonly onStartRecording?: () => void;
   readonly onSourceActivityChange?: (activity: ProjectSourceActivity) => void;
+  readonly onSessionChange?: (session: ProjectSessionPort | null) => void;
 }
 
 const unavailableSourceRuntime: ProjectSourceRuntime = {
@@ -646,11 +657,7 @@ const projectSourceNotice = (
         body: 'Committing the immutable original and Project revision.',
       };
     case 'saved':
-      return {
-        title: 'All changes saved',
-        tone: 'success',
-        body: 'This original is durable, inspected, and ready to resume from this Project URL.',
-      };
+      return null;
     case 'conflict':
       return {
         title: 'Conflict',
@@ -675,6 +682,7 @@ const ProjectSourceSection = ({
   recordingActive = false,
   onStartRecording,
   onActivityChange,
+  onCurrentChange,
 }: {
   readonly current: ProjectCurrentResponse;
   readonly runtime: ProjectSourceRuntime;
@@ -682,6 +690,7 @@ const ProjectSourceSection = ({
   readonly recordingActive?: boolean | undefined;
   readonly onStartRecording?: (() => void) | undefined;
   readonly onActivityChange?: ((activity: ProjectSourceActivity) => void) | undefined;
+  readonly onCurrentChange?: ((current: ProjectCurrentResponse) => void) | undefined;
 }) => {
   const theme = useTheme();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -692,6 +701,7 @@ const ProjectSourceSection = ({
     current,
     runtime,
     onActivityChange,
+    onCurrentChange,
   );
   const archived = current.project.archivedAt !== null;
   const controlsDisabled = archived || controller.busy || controller.accepted;
@@ -804,6 +814,72 @@ const ProjectSourceSection = ({
   );
 };
 
+const ProjectSessionNotice = ({
+  session,
+  sourceBusy,
+}: {
+  readonly session: ReturnType<typeof useProjectSession>;
+  readonly sourceBusy: boolean;
+}) => {
+  const theme = useTheme();
+  if (sourceBusy || session.current === null) return null;
+  const actions = session.hasLocalProposal ? (
+    <div css={dialogActionsStyles(theme)}>
+      <Button onClick={() => void session.retry()}>Reapply changes</Button>
+      <Button variant="danger" onClick={session.discard}>
+        Discard local changes
+      </Button>
+    </div>
+  ) : null;
+
+  switch (session.phase) {
+    case 'hydrating':
+      return (
+        <StatusNotice role="status" tone="neutral" title="Opening Project">
+          Checking the current Project revision with server authority.
+        </StatusNotice>
+      );
+    case 'dirty':
+      return (
+        <StatusNotice role="status" tone="neutral" title="Saving changes">
+          A semantic Project checkpoint is queued for the bounded autosave interval.
+        </StatusNotice>
+      );
+    case 'saving':
+      return (
+        <StatusNotice role="status" tone="neutral" title="Saving changes">
+          Committing one coalesced semantic Project revision.
+        </StatusNotice>
+      );
+    case 'conflict':
+      return (
+        <StatusNotice role="alert" tone="warning" title="Conflict">
+          <p>
+            {session.message ??
+              'The Project changed in another session. Your local proposal was preserved.'}
+          </p>
+          {actions}
+        </StatusNotice>
+      );
+    case 'error':
+      return (
+        <StatusNotice role="alert" tone="danger" title="Changes not saved">
+          <p>
+            {session.message ?? 'Project authority is unavailable. Your proposal was preserved.'}
+          </p>
+          {actions}
+        </StatusNotice>
+      );
+    case 'saved':
+      return (
+        <StatusNotice role="status" tone="success" title="All changes saved">
+          Project identity, durable source references, workflow phase, and session metadata match
+          server authority.
+        </StatusNotice>
+      );
+  }
+};
+
 const ProjectDetail = ({
   projectId,
   sourceRuntime = unavailableSourceRuntime,
@@ -811,10 +887,11 @@ const ProjectDetail = ({
   recordingActive,
   onStartRecording,
   onSourceActivityChange,
+  onSessionChange,
 }: { readonly projectId: string } & ProjectRouteSurfaceProps) => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const query = useProjectDetail(projectId);
+  const session = useProjectSession(projectId);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const dialogReturnRef = useRef<HTMLElement | null>(null);
   const [renameTarget, setRenameTarget] = useState<ProjectContract | null>(null);
@@ -824,24 +901,43 @@ const ProjectDetail = ({
   } | null>(null);
   const [campaignDialog, setCampaignDialog] = useState(false);
   const [announcement, setAnnouncement] = useState<string | null>(null);
+  const [sourceActivity, setSourceActivity] = useState<ProjectSourceActivity | null>(null);
+  const handleSourceActivity = useCallback(
+    (activity: ProjectSourceActivity) => {
+      setSourceActivity(activity);
+      onSourceActivityChange?.(activity);
+    },
+    [onSourceActivityChange],
+  );
 
-  if (query.isPending) {
+  useEffect(() => {
+    onSessionChange?.(session.port);
+  }, [onSessionChange, session.port]);
+  useEffect(() => {
+    return () => {
+      onSessionChange?.(null);
+    };
+  }, [onSessionChange]);
+
+  if (session.current === null && session.phase === 'hydrating') {
     return (
       <div css={workspaceInnerStyles(theme)}>
         <p role="status">Loading Project…</p>
       </div>
     );
   }
-  if (query.isError) {
+  if (session.current === null) {
     return (
       <div css={workspaceInnerStyles(theme)}>
         <StatusNotice role="alert" tone="danger" title="Project unavailable">
-          <p>{safeProjectError(query.error)}</p>
+          <p>
+            {session.message ?? 'Projects could not be loaded. Check the local API and try again.'}
+          </p>
           <div css={dialogActionsStyles(theme)}>
             <Button variant="quiet" onClick={() => void navigate(APP_PATHS.projects)}>
               Back to Projects
             </Button>
-            <Button variant="primary" onClick={() => void query.refetch()}>
+            <Button variant="primary" onClick={() => void session.retry()}>
               Retry
             </Button>
           </div>
@@ -850,7 +946,7 @@ const ProjectDetail = ({
     );
   }
 
-  const current = query.data;
+  const current = session.current;
   const project = current.project;
   const archived = project.archivedAt !== null;
   const closeDialog = () => {
@@ -922,6 +1018,8 @@ const ProjectDetail = ({
         {announcement}
       </div>
 
+      <ProjectSessionNotice session={session} sourceBusy={sourceActivity?.busy ?? false} />
+
       <ProjectSourceSection
         key={current.project.id}
         current={current}
@@ -929,7 +1027,8 @@ const ProjectDetail = ({
         recordingCandidate={recordingCandidate}
         recordingActive={recordingActive}
         onStartRecording={onStartRecording}
-        onActivityChange={onSourceActivityChange}
+        onActivityChange={handleSourceActivity}
+        onCurrentChange={session.acceptCurrent}
       />
 
       {renameTarget ? (
@@ -938,6 +1037,7 @@ const ProjectDetail = ({
           returnFocusRef={dialogReturnRef}
           onClose={closeDialog}
           onRenamed={(updated) => {
+            session.acceptCurrent(updated);
             setAnnouncement(`Project renamed to ${updated.project.title}.`);
             closeDialog();
           }}
@@ -949,6 +1049,7 @@ const ProjectDetail = ({
           returnFocusRef={dialogReturnRef}
           onClose={closeDialog}
           onChanged={(updated, location) => {
+            session.acceptCurrent(updated);
             setAnnouncement(`${updated.project.title} moved to ${location}.`);
             closeDialog();
           }}
@@ -961,6 +1062,7 @@ const ProjectDetail = ({
           returnFocusRef={dialogReturnRef}
           onClose={closeDialog}
           onChanged={(updated, action) => {
+            session.acceptCurrent(updated);
             setAnnouncement(
               `${updated.project.title} ${action === 'archive' ? 'archived' : 'restored'}.`,
             );

@@ -108,6 +108,9 @@ The retained suite protects:
   cache invalidation, stale-rename preservation, focus/announcements, explicit library exit,
   accepted-source fresh hydration/object-URL delegation, cancellable staging, Project-switch and
   late-completion isolation, and no implicit provider start;
+- URL-owned Project-session hydration, bounded semantic coalescing, exact response-loss
+  convergence, stale-CAS proposal preservation, explicit reapply/discard, cache publication,
+  Project/global-library switch flushing, conflict stay behavior, and hard-unload protection;
 - Campaign domain/contract parity, v1→v2 local migration, restart-safe receipts, owner/CAS and
   active-membership rules, relational same-owner/restrict constraints, authenticated routes,
   create/detail/New Project, move/detach, virtual No Campaign filtering, non-cascading lifecycle,

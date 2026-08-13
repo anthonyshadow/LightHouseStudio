@@ -48,8 +48,8 @@ future features current.
   Virtual Try On, and/or Voice, then saves the result before download from Saved Videos. Live
   Character/VTO transformation and Workshop are advanced flows.
 - Campaign and Project lifecycle/source management is user-facing, including optional membership,
-  move/detach, and the virtual No Campaign group. Source resume, autosave, creative integration,
-  processing, and Project output history are not.
+  move/detach, the virtual No Campaign group, durable source resume, and guarded bounded session
+  autosave. Creative/edit producers, processing, and Project output history are not.
 - Character Builder owns true character creation and editing. Workshop owns only Add, Replace, and
   Restyle object recipes.
 - Saved Character Wardrobe owns normalized original/variant browsing and variant creation while

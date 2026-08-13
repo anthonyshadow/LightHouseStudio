@@ -4,7 +4,20 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { createMemoryRouter, RouterProvider, useNavigate } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../ui';
+import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 import { StudioExitGuard, type StudioExitGuardProps } from './StudioExitGuard';
+
+const projectSession = (overrides: Partial<ProjectSessionPort> = {}): ProjectSessionPort => ({
+  projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
+  phase: 'dirty',
+  hasLocalProposal: true,
+  message: null,
+  propose: vi.fn(() => true),
+  flush: vi.fn(() => Promise.resolve(true)),
+  retry: vi.fn(() => Promise.resolve(true)),
+  discard: vi.fn(() => true),
+  ...overrides,
+});
 
 const GuardHarness = (props: StudioExitGuardProps) => {
   const navigate = useNavigate();
@@ -156,6 +169,42 @@ describe('StudioExitGuard', () => {
 
   it('protects hard unloads during recording, voice work, or dirty Shelf work', () => {
     renderGuard({ voiceProcessingActive: true });
+    const event = new Event('beforeunload', { cancelable: true });
+
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('flushes a dirty Project session before switching URL-owned Project context', async () => {
+    const session = projectSession();
+    const { router } = renderProjectGuard({ projectSession: session });
+    fireEvent.click(screen.getByRole('button', { name: 'Switch Project' }));
+
+    await waitFor(() => expect(session.flush).toHaveBeenCalledOnce());
+    await waitFor(() => expect(router.state.location.pathname).toContain('730c73ca'));
+    expect(session.discard).not.toHaveBeenCalled();
+  });
+
+  it('stays on a Project conflict until the preserved proposal is retried or discarded', async () => {
+    const session = projectSession({
+      phase: 'conflict',
+      message: 'Another session changed this Project.',
+    });
+    const { router } = renderProjectGuard({ projectSession: session });
+    fireEvent.click(screen.getByRole('button', { name: 'Switch Project' }));
+
+    expect(await screen.findByRole('heading', { name: 'Project save conflict' })).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent('Another session changed this Project.');
+    expect(router.state.location.pathname).toContain('18b120ac');
+    fireEvent.click(screen.getByRole('button', { name: 'Discard and leave' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toContain('730c73ca'));
+    expect(session.discard).toHaveBeenCalledOnce();
+  });
+
+  it('protects hard unload while a Project proposal is pending', () => {
+    renderProjectGuard({ projectSession: projectSession() });
     const event = new Event('beforeunload', { cancelable: true });
 
     window.dispatchEvent(event);

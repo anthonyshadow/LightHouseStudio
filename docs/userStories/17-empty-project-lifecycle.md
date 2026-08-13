@@ -1,4 +1,4 @@
-# Project lifecycle and immutable source
+# Project lifecycle, immutable source, and session guards
 
 ## Story
 
@@ -53,11 +53,30 @@ metadata or source changes without unsafe overwrite or implicit provider work.
 12. Recording/finalization blocks Project switching until safe. Upload/inspection/acceptance and a
     finalized unaccepted take require explicit stay or abort/discard. Every operation remains bound
     to its initiating Project, and an old Project's late completion cannot replace the new stage.
+13. One feature-local Project session hydrates only from the Project ID in the canonical URL. It
+    publishes current server authority to the source controller without owning the Blob, object
+    URL, stage, recording, or render lifecycle. Leaving for a global library unmounts that session;
+    refreshing the library URL cannot recover a hidden Project identity.
+14. The session exposes one typed semantic-proposal port. Prompt 07 proposals contain only the
+    implemented workflow phase and explicit live-session metadata; the immutable source and
+    current media references are copied from server authority. Compatible proposals coalesce for
+    750 ms and append one revision rather than one revision per input event. **Saving changes** and
+    **All changes saved** describe this server checkpoint only.
+15. A stale Project/revision CAS or unavailable response preserves the current tab's proposal and
+    reloads server authority. If authority already contains the exact proposal, the lost response
+    converges without another revision. Otherwise **Conflict** requires explicit **Reapply
+    changes** or **Discard local changes**; Lightframe does not merge or overwrite automatically.
+16. Project-to-Project switches, Project-to-library exits, back/forward, and logout first flush the
+    Project session. Failed/conflicted saves stay on the source URL until retry or explicit discard.
+    Refresh/unload receives the browser warning while a proposal is dirty or saving. No Project
+    IndexedDB store is activated: a browser crash, forced unload, or confirmed reload can lose only
+    the pending in-memory proposal, never a server-accepted revision or source.
 
 ## Boundaries
 
-This story adds no Campaign expansion, Project autosave, creative integration, processing, output
-save, Version-history UI, browser Project authority, or IndexedDB Project data. Project source
-selection starts no provider. The standalone existing-video workflow remains tab-temporary unless
-its result is separately saved. Project server/repository authority, retention, and cleanup remain
-as documented in Architecture.
+This story adds bounded Project semantic autosave and guarded exit, but no Campaign expansion,
+creative-resource/edit proposal producer, working-media adoption, processing, output save,
+Version-history UI, browser Project authority, or IndexedDB Project data. Project source selection
+and session hydration start no provider. The standalone existing-video workflow remains
+tab-temporary unless its result is separately saved. Project server/repository authority,
+retention, and cleanup remain as documented in Architecture.
