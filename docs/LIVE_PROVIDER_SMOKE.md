@@ -144,19 +144,20 @@ temporary-root result. Local expiry still does not prove provider cancellation o
 Decart documents submit/poll/content retrieval but no qualified cancellation operation for this
 flow. Do not label browser abort, local cleanup, or DELETE as provider cancellation.
 
-## API-only Project processing authority
+## Project processing UI and authority
 
-This optional pass is separate from the standalone batch rows and must not be run merely because
-Prompt 09 is present. It is API-only until Prompt 10; Project Character Swap, VTO, and Voice Start
-controls must remain gated. Obtain explicit approval for each possible paid operation and use a
-disposable source-bearing Project whose creative setup is already durably checkpointed.
+This optional pass is separate from the standalone batch rows and must not run during ordinary QA.
+Obtain explicit approval for every possible paid visual operation and use a disposable
+source-bearing Project. Project Character Swap/VTO now use the visible Project command; provider
+Voice and live Project starts remain gated.
 
-1. Submit one queued visual operation with a new app-owned idempotency key. Confirm the exact
-   Project revision/job link exists before the first provider request and no raw provider identity,
-   URL, body, prompt, credential, or internal path appears in the public response or evidence.
-2. After a durable provider identity is recorded, restart the broker and reconcile the same
-   operation. Status/retrieval may continue, but provider submission count must remain one and the
-   original fixed deadline must not move.
+1. Configure and save one exact visual treatment, then use the Project **Start** action once.
+   Confirm the visible phase begins at submitting/accepted and the exact Project revision/job link
+   exists before the first provider request. No raw provider identity, URL, body, prompt,
+   credential, or internal path may appear in browser/public evidence.
+2. After a durable provider identity is recorded, close the editor, refresh or restart the broker,
+   reopen the Project, and observe the same operation. Status/retrieval may continue, but provider
+   submission count must remain one and the original fixed deadline must not move.
 3. Do not deliberately create an unknown-acceptance condition unless its possible duplicate cost
    is separately approved. If one occurs naturally before a provider identity is durable, confirm
    `needs-attention`/`submission_ambiguous`, no automatic submission, and an explicit new operation
@@ -166,14 +167,13 @@ disposable source-bearing Project whose creative setup is already durably checkp
    producer output relation was created. For a separately approved stale-result pass, checkpoint a
    newer Project revision while the admitted operation runs; its valid result must remain playable
    as historical `job-output` media without changing current working/presented media.
-5. Confirm cancel reports unsupported for the current queued adapters and never claims local abort
-   stopped provider cost. Active accepted work and unresolved ambiguity must block archive until
-   the persisted policy permits it. Voice must remain unavailable because the current synchronous
-   adapter has no durable reconnect identity.
+5. Confirm current adapters expose no Cancel control, Project-switch copy says accepted work may
+   continue/reconnect, and archive is blocked while persisted policy requires it. Voice must remain
+   unavailable because the current synchronous adapter has no durable reconnect identity.
 
 Record content-free operation counts and safe phases only. Never capture the private provider job
-identity. This pass does not authorize adding UI, automatic retry/fallback, a background worker, or
-a Saved Video output.
+identity. This pass does not authorize automatic retry/fallback, a background worker, or a Saved
+Video output.
 
 ## Pruna Character Swap
 

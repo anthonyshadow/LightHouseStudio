@@ -2,6 +2,7 @@ import { useTheme } from '@emotion/react';
 import type { AuthenticatedUser } from '@studio/contracts';
 import { useEffect, useRef } from 'react';
 import { Button } from '../../ui/primitives/Button';
+import { useDismissiblePopover } from '../../ui/primitives/useDismissiblePopover';
 
 interface AccountMenuProps {
   readonly user: AuthenticatedUser;
@@ -31,25 +32,7 @@ export const AccountMenu = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const closeOutside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
-        onOpenChange(false);
-      }
-    };
-    const closeWithEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      onOpenChange(false);
-      triggerRef.current?.focus();
-    };
-    document.addEventListener('pointerdown', closeOutside, true);
-    document.addEventListener('keydown', closeWithEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOutside, true);
-      document.removeEventListener('keydown', closeWithEscape);
-    };
-  }, [onOpenChange, open]);
+  useDismissiblePopover({ open, onOpenChange, rootRef, triggerRef });
 
   useEffect(() => {
     if (!open) return;

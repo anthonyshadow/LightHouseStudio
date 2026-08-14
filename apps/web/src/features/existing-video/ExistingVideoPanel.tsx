@@ -35,6 +35,7 @@ import {
 } from './existingVideoPresentation';
 import { ExistingVideoVisualEditor } from './ExistingVideoVisualEditor';
 import { ExistingVideoVoiceEditor } from './ExistingVideoVoiceEditor';
+import { defaultVideoProcessingCapabilities } from './existingVideoWorkflowPolicy';
 import {
   capabilityForExistingVideoStep,
   type ExistingVideoWorkflow,
@@ -43,6 +44,7 @@ import { useExistingVideoRecipeHydration } from './useExistingVideoRecipeHydrati
 import { useRecentExistingVideoOutfits } from './useRecentExistingVideoOutfits';
 import type { SaveVideoState } from '../saved-videos/useSaveVideo';
 import type { VoiceBrowserCapabilities } from '../voice-effects/voiceCapabilities';
+import type { ProjectProcessingController } from '../projects/useProjectProcessingController';
 
 type ExistingVideoPanelProps = {
   readonly workflow: ExistingVideoWorkflow;
@@ -61,6 +63,7 @@ type ExistingVideoPanelProps = {
   readonly onRecordVideo?: () => void;
   readonly onAdjustVideo?: () => void;
   readonly providerStartBlockedReason?: string;
+  readonly projectProcessing?: ProjectProcessingController;
 };
 
 const initialActiveTool = (workflow: ExistingVideoWorkflow): ExistingVideoToolId | null =>
@@ -83,27 +86,20 @@ export const ExistingVideoPanel = ({
   onRecordVideo,
   onAdjustVideo,
   providerStartBlockedReason,
+  projectProcessing,
 }: ExistingVideoPanelProps) => {
   const theme = useTheme();
   const visualCapabilities: CapabilitiesResponse['videoProcessing'] =
     videoProcessingCapabilities ?? {
       characterSwap: {
+        ...defaultVideoProcessingCapabilities.characterSwap,
         available: videoProcessingAvailable,
-        inputPreparation: 'none',
-        referencePolicy: 'optional',
-        promptInput: 'editable',
-        promptEnhancement: true,
-        terminalFailureRelease: 'automatic',
-        outputResolutions: ['720p'],
+        outputResolutions: [...defaultVideoProcessingCapabilities.characterSwap.outputResolutions],
       },
       virtualTryOn: {
+        ...defaultVideoProcessingCapabilities.virtualTryOn,
         available: videoProcessingAvailable,
-        inputPreparation: 'none',
-        referencePolicy: 'optional',
-        promptInput: 'editable',
-        promptEnhancement: true,
-        terminalFailureRelease: 'automatic',
-        outputResolutions: ['720p'],
+        outputResolutions: [...defaultVideoProcessingCapabilities.virtualTryOn.outputResolutions],
       },
     };
   const pickerRef = useRef<HTMLInputElement>(null);
@@ -491,6 +487,7 @@ export const ExistingVideoPanel = ({
         onRequestDiscard={() => setDiscardConfirmationOpen(true)}
         discardButtonRef={discardButtonRef}
         {...(providerStartBlockedReason ? { providerStartBlockedReason } : {})}
+        {...(projectProcessing ? { projectProcessing } : {})}
       />
 
       <input

@@ -12,6 +12,7 @@ import { isVideoEditBusy } from '../features/video-editor/types';
 import { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
 import { useProjectCreativeSessionAdapter } from '../features/projects/useProjectCreativeSessionAdapter';
+import { useProjectProcessingController } from '../features/projects/useProjectProcessingController';
 import {
   ProjectCreativeCheckpointPanel,
   PROJECT_PROVIDER_START_BLOCKED_REASON,
@@ -321,6 +322,11 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     repository,
     store: repositoryStore,
     existingVideo,
+  });
+  const projectProcessing = useProjectProcessingController({
+    projectId: activeProjectId,
+    session: activeProjectSession,
+    checkpointCreative: projectCreative.checkpoint,
   });
 
   useLayoutEffect(() => {
@@ -799,7 +805,14 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             visible: firstSuccessGuideVisible,
             dismiss: () => setFirstSuccessGuideVisible(false),
           }}
-          controllers={{ session, takeReview, videoEditor, savedVideo, project }}
+          controllers={{
+            session,
+            takeReview,
+            videoEditor,
+            savedVideo,
+            project,
+            projectProcessing,
+          }}
           environment={{ browser, desktopLayout: desktopStudioLayout }}
           stage={{
             presentation: stagePresentation,
@@ -914,6 +927,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           advancedLiveSession={advancedLiveSession}
           takeReview={takeReview}
           existingVideo={existingVideo}
+          {...(projectContextActive ? { projectProcessing } : {})}
           savedVideo={savedVideo}
           saveVideoState={savedVideoSave.state}
           savedRecipes={existingVideoSavedRecipes}

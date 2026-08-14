@@ -126,15 +126,21 @@ const attemptForOperation = (
   library.processingJobs.find((attempt) => attempt.operationId === operationId) ?? null;
 
 const currentAttemptForAggregate = (
-  library: ProjectLibrary,
   aggregate: StoredProjectAggregate,
+  attempts: readonly ProjectProcessingAttemptRecord[],
 ): ProjectProcessingAttemptRecord | null => {
   const current = currentRead(aggregate);
   return currentProjectProcessingAttempt(
     { id: current.revision.id, revisionNumber: current.revision.revisionNumber },
-    library.processingJobs.filter(({ projectId }) => projectId === aggregate.project.id),
+    attempts,
   );
 };
+
+const attemptsForProject = (
+  attempts: readonly ProjectProcessingAttemptRecord[],
+  projectId: string,
+): ProjectProcessingAttemptRecord[] =>
+  attempts.filter((attempt) => attempt.projectId === projectId);
 
 export interface FileProjectRepositoryOptions {
   /** Test seam for proving recovery after a durable journal is prepared. */
@@ -639,7 +645,12 @@ export class FileProjectRepository
     const aggregate = library.projects.find(
       ({ project }) => project.id === projectId && project.deletedAt === null,
     );
-    return aggregate === undefined ? null : currentAttemptForAggregate(library, aggregate);
+    return aggregate === undefined
+      ? null
+      : currentAttemptForAggregate(
+          aggregate,
+          attemptsForProject(library.processingJobs, projectId),
+        );
   }
 
   async hasProjectAttemptRetry(
@@ -689,7 +700,8 @@ export class FileProjectRepository
     );
     return {
       attempts: page,
-      currentOperationId: currentAttemptForAggregate(library, aggregate)?.operationId ?? null,
+      currentOperationId:
+        currentAttemptForAggregate(aggregate, projectAttempts)?.operationId ?? null,
       retriedOperationIds: [
         ...new Set(
           projectAttempts.flatMap(({ retryOfOperationId }) =>
@@ -740,7 +752,10 @@ export class FileProjectRepository
       );
       const aggregate = projects[projectIndex];
       if (aggregate !== undefined) {
-        const latest = currentAttemptForAggregate({ ...library, processingJobs }, aggregate);
+        const latest = currentAttemptForAggregate(
+          aggregate,
+          attemptsForProject(processingJobs, aggregate.project.id),
+        );
         if (latest?.operationId === current.operationId) {
           const nextStatus =
             trace.status === 'cancelled'
@@ -787,9 +802,17 @@ export class FileProjectRepository
             updatedAt: now,
           });
         });
-        const recoveredLibrary: ProjectLibrary = { ...library, processingJobs };
+        const attemptsByProject = new Map<string, ProjectProcessingAttemptRecord[]>();
+        for (const attempt of processingJobs) {
+          const attempts = attemptsByProject.get(attempt.projectId);
+          if (attempts === undefined) attemptsByProject.set(attempt.projectId, [attempt]);
+          else attempts.push(attempt);
+        }
         const projects = library.projects.map((aggregate) => {
-          const currentAttempt = currentAttemptForAggregate(recoveredLibrary, aggregate);
+          const currentAttempt = currentAttemptForAggregate(
+            aggregate,
+            attemptsByProject.get(aggregate.project.id) ?? [],
+          );
           if (
             currentAttempt === null ||
             !projectProcessingNeedsAttention(currentAttempt.status) ||
@@ -878,7 +901,10 @@ export class FileProjectRepository
         };
       }
 
-      const currentAttempt = currentAttemptForAggregate(library, aggregate);
+      const currentAttempt = currentAttemptForAggregate(
+        aggregate,
+        attemptsForProject(library.processingJobs, input.projectId),
+      );
       const promotion = input.currentPromotion;
       const promoteCurrent =
         promotion !== null &&
@@ -1115,15 +1141,15 @@ export class FileProjectRepository
         break;
     }
     keyed = keyed
-      .sort(
-        (left, right) =>
-          right.revisionNumber - left.revisionNumber || right.key.localeCompare(left.key),
-      )
       .filter((item) =>
         input.cursor === undefined
           ? true
           : item.revisionNumber < input.cursor.revisionNumber ||
             (item.revisionNumber === input.cursor.revisionNumber && item.key < input.cursor.key),
+      )
+      .sort(
+        (left, right) =>
+          right.revisionNumber - left.revisionNumber || right.key.localeCompare(left.key),
       );
     const page = keyed.slice(0, input.pageSize);
     const last = page.at(-1);

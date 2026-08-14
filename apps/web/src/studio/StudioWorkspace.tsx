@@ -10,6 +10,7 @@ import type {
 import { MediaStage, type MediaStageProps, type StagePresentation } from '../features/live-stage';
 import type { StudioMode } from '../features/media-session';
 import type { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
+import type { ProjectProcessingController } from '../features/projects/useProjectProcessingController';
 import type { useStudioSession } from '../orchestration/session';
 import { Button } from '../ui';
 import { firstSuccessGuideStyles, mainGridStyles, stageColumnStyles } from './StudioApp.styles';
@@ -59,6 +60,7 @@ interface StudioWorkspaceProps {
     readonly videoEditor: ReturnType<typeof useVideoEditSession>;
     readonly savedVideo: ReturnType<typeof useStudioSavedVideoController>;
     readonly project: ReturnType<typeof useStudioProjectBridge>;
+    readonly projectProcessing: ProjectProcessingController;
   };
   readonly environment: {
     readonly browser: BrowserCapabilities;
@@ -118,7 +120,7 @@ export const StudioWorkspace = ({
     projectRecordingAvailable,
   } = route;
   const { visible: showFirstSuccessGuide, dismiss: onDismissFirstSuccessGuide } = guide;
-  const { session, takeReview, videoEditor, savedVideo, project } = controllers;
+  const { session, takeReview, videoEditor, savedVideo, project, projectProcessing } = controllers;
   const { browser, desktopLayout: desktopStudioLayout } = environment;
   const {
     presentation: stagePresentation,
@@ -327,6 +329,7 @@ export const StudioWorkspace = ({
         <Suspense fallback={<p role="status">Loading Projects workspace…</p>}>
           <ProjectRouteSurface
             creativeCheckpoint={projectCreativeCheckpoint}
+            processing={projectProcessing}
             sourceRuntime={project.sourceRuntime}
             recordingCandidate={project.recordingCandidate}
             recordingActive={

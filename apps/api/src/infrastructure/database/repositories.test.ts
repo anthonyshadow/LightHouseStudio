@@ -5,71 +5,18 @@ import type { VideoProcessingJobTrace } from '../../features/processing-jobs/fil
 import type { AssetByteStore, StoredAssetManifest } from '../../storage/asset-byte-store.js';
 import { DrizzleAssetLifecycleRegistry } from './asset-lifecycle-registry.js';
 import { DrizzleSessionRepository, DrizzleUserRepository } from './auth-repositories.js';
-import type { LightframeDatabase } from './client.js';
 import { DrizzleCreativeLibraryRepository } from './creative-library-repository.js';
 import { DrizzleProcessingJobTraceWriter } from './processing-job-repository.js';
 import { DrizzleReferenceImageAssetStore } from './reference-image-asset-store.js';
 import { DrizzleSavedVideoRepository } from './saved-video-repository.js';
 import { DrizzleSavedVoiceRepository } from './saved-voice-repository.js';
 import { savedVideos } from './schema.js';
+import { scriptedDatabase } from './scripted-database.test-support.js';
 
 const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
 const assetId = '9826fc75-4759-47cc-b07d-d7325ce0ad14';
 const now = '2026-08-07T12:00:00.000Z';
 const postgresNow = '2026-08-07 12:00:00+00';
-
-const scriptedDatabase = (...script: readonly unknown[]) => {
-  const remaining = [...script];
-  const operations: string[] = [];
-  const calls: { operation: string; arguments: readonly unknown[] }[] = [];
-  const query = (): object => {
-    const target = {
-      then: (fulfilled?: (value: unknown) => unknown, rejected?: (reason: unknown) => unknown) => {
-        if (remaining.length === 0) return Promise.reject(new Error('Database script exhausted.'));
-        const value = remaining.shift();
-        return (value instanceof Error ? Promise.reject(value) : Promise.resolve(value)).then(
-          fulfilled,
-          rejected,
-        );
-      },
-    };
-    const proxy: object = new Proxy(target, {
-      get(current, property, receiver) {
-        if (property === 'then') return current.then.bind(receiver);
-        return (...arguments_: readonly unknown[]) => {
-          const operation = String(property);
-          operations.push(operation);
-          calls.push({ operation, arguments: arguments_ });
-          return proxy;
-        };
-      },
-    });
-    return proxy;
-  };
-  const database: object = new Proxy(
-    {},
-    {
-      get(_target, property) {
-        if (property === 'transaction') {
-          return (callback: (tx: LightframeDatabase) => unknown) =>
-            callback(database as LightframeDatabase);
-        }
-        return (...arguments_: readonly unknown[]) => {
-          const operation = String(property);
-          operations.push(operation);
-          calls.push({ operation, arguments: arguments_ });
-          return query();
-        };
-      },
-    },
-  );
-  return {
-    db: database as LightframeDatabase,
-    calls,
-    operations,
-    remaining: () => remaining.length,
-  };
-};
 
 const userRow = {
   id: ownerUserId,
@@ -232,7 +179,7 @@ describe('DrizzleAssetLifecycleRegistry', () => {
       ownerUserId,
       assetId,
     ]);
-    expect(scripted.operations).not.toContain('update');
+    expect(scripted.calls.map(({ operation }) => operation)).not.toContain('update');
     expect(scripted.remaining()).toBe(0);
   });
 });

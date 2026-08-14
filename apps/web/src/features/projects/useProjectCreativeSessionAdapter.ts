@@ -396,7 +396,7 @@ export const useProjectCreativeSessionAdapter = ({
     setPhase(saved ? 'saved' : 'error');
     setMessage(
       saved
-        ? 'Creative setup saved as one Project checkpoint. No provider work was submitted.'
+        ? 'Creative setup saved as one Project checkpoint. Saving setup alone submitted no provider work.'
         : 'The creative proposal remains preserved in the Project session. Resolve its save state before retrying.',
     );
     return saved;

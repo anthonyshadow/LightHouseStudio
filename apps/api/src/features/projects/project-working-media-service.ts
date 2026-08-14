@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import {
   projectWorkingMediaResponseSchema,
   type InspectedVideo,
@@ -7,7 +7,6 @@ import {
 import {
   adoptProjectWorkingMedia,
   ProjectRuleError,
-  type ProjectAggregate,
   type ProjectConflict,
   type ProjectMediaReference,
   type VideoEditSpec,
@@ -21,14 +20,16 @@ import type {
 import { inspectSavedVideoFile } from '../saved-videos/saved-video-inspection.js';
 import { safeSavedVideoFilename } from '../saved-videos/saved-video-service.js';
 import { inspectStoredProjectMedia } from './project-media-inspection.js';
-import type {
-  ProjectCurrentRead,
-  ProjectRepository,
-  ProjectRetentionPolicy,
-  ProjectWorkingMediaKind,
-  ProjectWorkingMediaRead,
-  ProjectWorkingMediaRecord,
+import {
+  projectAggregateForCurrent,
+  type ProjectCurrentRead,
+  type ProjectRepository,
+  type ProjectRetentionPolicy,
+  type ProjectWorkingMediaKind,
+  type ProjectWorkingMediaRead,
+  type ProjectWorkingMediaRecord,
 } from './project-repository.js';
+import { projectRequestFingerprint } from './project-request-fingerprint.js';
 import {
   projectAssetLinksForRevision,
   projectMediaReferencesEqual,
@@ -71,9 +72,6 @@ interface ReuseProjectWorkingMediaInput {
   readonly localEdit: VideoEditSpec | null;
 }
 
-const fingerprint = (value: unknown): string =>
-  createHash('sha256').update(JSON.stringify(value)).digest('hex');
-
 const workingMediaContentUrl = (projectId: string, revisionId: string): string =>
   `/api/projects/${encodeURIComponent(projectId)}/working-media/${encodeURIComponent(revisionId)}/content`;
 
@@ -106,15 +104,6 @@ const responseFor = (read: ProjectWorkingMediaRead): ProjectWorkingMediaResponse
       contentUrl: workingMediaContentUrl(read.project.id, read.media.adoptedRevisionId),
     },
   });
-
-const currentAggregate = (current: ProjectCurrentRead): ProjectAggregate => ({
-  project: current.project,
-  revisions: [current.revision],
-  assetLinks: [],
-  versionReferenceLinks: [],
-  jobLinks: [],
-  outputLinks: [],
-});
 
 export class ProjectWorkingMediaService {
   readonly #locks = new Map<string, Promise<unknown>>();
@@ -180,7 +169,7 @@ export class ProjectWorkingMediaService {
       const current = await this.#requireProject(input.ownerUserId, input.projectId);
       const inspected = await this.#inspect(input.sourcePath);
       const filename = safeSavedVideoFilename(input.filename, inspected.mimeType);
-      const requestFingerprint = fingerprint({
+      const requestFingerprint = projectRequestFingerprint({
         version: 1,
         operation: 'adopt-project-working-media',
         projectId: input.projectId,
@@ -323,7 +312,7 @@ export class ProjectWorkingMediaService {
         ownerUserId: input.ownerUserId,
         projectId: input.projectId,
         operationKey: input.operationKey,
-        requestFingerprint: fingerprint({
+        requestFingerprint: projectRequestFingerprint({
           version: 1,
           operation: 'adopt-project-working-media',
           projectId: input.projectId,
@@ -385,7 +374,7 @@ export class ProjectWorkingMediaService {
     let adopted;
     try {
       adopted = adoptProjectWorkingMedia(
-        currentAggregate(current),
+        projectAggregateForCurrent(current),
         {
           expectedProjectVersion: input.expectedVersion,
           expectedRevisionNumber: input.expectedRevisionNumber,

@@ -19,9 +19,9 @@ current-state qualifications:
 - Project has domain rules, contracts, local and relational authority, authenticated lifecycle and
   immutable-source/working-media APIs, and browser lifecycle/source UI. Snapshot v2 is
   video-oriented by design; durable source and current working-media resume plus explicit creative
-  checkpoints are implemented. Project-bound processing now has backend admission, recovery, and
-  durable result-retention authority, while its provider Start/status UI and Saved Video output
-  publication are not yet implemented.
+  checkpoints are implemented. Project-bound Character Swap/VTO now use the backend admission,
+  recovery, and durable result-retention authority through visible Start/status/retry UX. Project
+  provider Voice remains gated, and Saved Video output publication is not yet implemented.
 
 One Campaign may group multiple Projects, while a Project represents a focused resumable production
 effort and may remain independent. Campaign never owns Project/media processing state. Multi-format support
@@ -610,10 +610,17 @@ publishes a narrow proposal/flush/retry/discard port to `StudioApp` and delegate
 working-media Blobs to the existing recording-artifact owner. Active Project identity exists only
 in `/studio/projects/:projectId`; global-library URLs are explicit guarded exits. No dormant
 IndexedDB Project store is activated, so only the current tab retains an unsaved proposal and
-confirmed reload/crash may discard it. Project provider-backed Starts are composition-gated until
-recoverable processing UX exists; configuration makes no provider request. The server-side Project
-processing command is therefore an integration boundary for Prompt 10, not a second active browser
-submission path.
+confirmed reload/crash may discard it. A feature-local Project-processing controller reads current
+authority on Project hydration, routes Character Swap/VTO Start through one app-owned command,
+replays only the exact operation key after response loss, and polls/reconciles accepted work without
+resubmission. It asks the Project session to checkpoint exact creative intent before admission and
+asks server authority to refresh the existing source/working-media bridge only after a current
+result is durably retained. The browser never owns job truth or downloads result bytes through a
+second path. Ambiguity remains locked until status can be checked or the operator explicitly
+confirms a potentially duplicate-cost retry. Closing or switching Project context stops browser
+polling, not accepted provider work; reopen reconnects it. Configuration alone still makes no
+provider request. Provider-backed Voice and live Character/VTO starts remain composition-gated
+because they cannot satisfy this command's recovery contract.
 
 Project processing admits one app-owned operation against the exact current Project revision and
 durable working/source Media Asset before provider contact. The atomic local journal or relational
@@ -807,6 +814,7 @@ The creator of a resource owns idempotent cleanup.
 | Session draft         | Ephemeral files and preview object URLs                                                                                                                        |
 | Recording/review      | Recorders, chunks, conversion abort, immutable source/sidecar, edited/visual/voice artifact URLs, cap timer, unload protection                                 |
 | Existing-video flow   | Validation generations, one ephemeral visual draft, job-status observer, provider-result download                                                              |
+| Project processing UI | Exact-operation command continuity, bounded status timers, explicit retry/cost confirmation, and server-authority refresh; never job/result-byte authority     |
 | Video edit session    | Pinned source/draft/history, module worker generation, render candidate, chunk accumulator, validation abort                                                   |
 | Character Wardrobe    | Variant creation draft, generation abort, stale-result rejection, uncommitted reference discard, exact version handoff                                         |
 | Voice processing      | Abort controllers, Web Audio/Mediabunny resources, temporary processed URLs                                                                                    |
