@@ -383,7 +383,7 @@ export class ProjectOutputService {
       operationId,
       ...publicProjectCurrent({ project: transition.value.project, revision }),
       output: publicOutput(output),
-      savedVideo: publicSavedVideoDetail(nextSavedVideo),
+      savedVideo: publicSavedVideoDetail(nextSavedVideo, true),
       contentUrl: contentUrl(projectId, version.id),
     });
     const receipt: ProjectOutputOperationReceipt = {

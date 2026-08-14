@@ -63,13 +63,7 @@ interface ReuseProjectWorkingMediaInput {
   readonly operationKey: string;
   readonly expectedVersion: number;
   readonly expectedRevisionNumber: number;
-  readonly media:
-    | { readonly kind: 'asset'; readonly assetId: string }
-    | {
-        readonly kind: 'saved-video-version';
-        readonly savedVideoId: string;
-        readonly videoVersionId: string;
-      };
+  readonly media: ProjectMediaReference;
   readonly localEdit: VideoEditSpec | null;
 }
 
@@ -228,12 +222,29 @@ export class ProjectWorkingMediaService {
     return this.#lock.run(`${input.ownerUserId}:${input.operationKey}`, async () => {
       const current = await this.#requireProject(input.ownerUserId, input.projectId);
       if (input.media.kind === 'saved-video-version') {
-        const saved = await this.savedVideos.getVersion(
+        let saved = await this.savedVideos.getVersion(
           input.ownerUserId,
           input.media.savedVideoId,
           input.media.videoVersionId,
         );
-        if (saved === null || saved.video.status !== 'ready') {
+        if (saved === null) {
+          const retainedOutput = await this.projects.getOutput(
+            input.ownerUserId,
+            input.projectId,
+            input.media.videoVersionId,
+          );
+          if (retainedOutput?.savedVideoId === input.media.savedVideoId) {
+            saved = await this.savedVideos.getRetainedVersion(
+              input.ownerUserId,
+              input.media.savedVideoId,
+              input.media.videoVersionId,
+            );
+          }
+        }
+        if (
+          saved === null ||
+          (saved.video.status !== 'ready' && saved.video.status !== 'deleted')
+        ) {
           throw new AppError(404, 'not_found', 'That retained media is unavailable.');
         }
         const asset = await this.bytes.open(input.ownerUserId, saved.version.assetId);

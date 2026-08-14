@@ -64,6 +64,7 @@ export const savedVideoSummarySchema = z
     sourceVideoId: z.uuid().nullable(),
     versionCount: z.number().int().positive(),
     thumbnailAvailable: z.boolean(),
+    assignment: z.enum(['project-output', 'unassigned']).optional(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })

@@ -183,7 +183,7 @@ export const useProjectProcessingController = ({
         }
         let attempt = current.attempt;
         if (attempt === null) {
-          const history = await getProjectProcessingHistory(activeProjectId, signal);
+          const history = await getProjectProcessingHistory(activeProjectId, undefined, signal);
           attempt =
             history.attempts.find(isRecoverableHistoricalAttempt) ??
             history.attempts.find((candidate) => candidate.result?.historical === true) ??

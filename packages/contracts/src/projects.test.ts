@@ -4,6 +4,8 @@ import {
   createProjectRequestSchema,
   projectConflictResponseSchema,
   projectCurrentResponseSchema,
+  projectHistoryResponseSchema,
+  projectOutputHistoryResponseSchema,
   projectOutputLinkSchema,
   projectOutputSaveResultSchema,
   projectSourceResponseSchema,
@@ -543,5 +545,49 @@ describe('Project snapshot contract', () => {
         target: { kind: 'version', savedVideoId: videoId },
       }).success,
     ).toBe(false);
+    expect(
+      projectHistoryResponseSchema.parse({
+        revisions: [
+          {
+            kind: 'project-change',
+            revisionId: resultRevisionId,
+            revisionNumber: 3,
+            parentRevisionId: producingRevisionId,
+            parentRevisionNumber: 2,
+            source: 'output-save',
+            authorKind: 'user',
+            workflowPhase: 'complete',
+            outputReference: reference,
+            createdAt: now,
+          },
+        ],
+        nextCursor: null,
+      }),
+    ).not.toHaveProperty('revisions.0.snapshot');
+    expect(
+      projectOutputHistoryResponseSchema.parse({
+        outputs: [
+          {
+            kind: 'saved-video-version',
+            output: result.output,
+            savedVideo: {
+              id: videoId,
+              title: 'Saved output',
+              libraryStatus: 'removed',
+              currentVersionId: versionId,
+            },
+            version: result.savedVideo.currentVersion,
+            referenceRevision: {
+              revisionId: resultRevisionId,
+              revisionNumber: 3,
+              createdAt: now,
+            },
+            isCurrentForProject: true,
+            contentUrl: `/api/projects/${projectId}/outputs/${versionId}/content`,
+          },
+        ],
+        nextCursor: null,
+      }),
+    ).toMatchObject({ outputs: [{ savedVideo: { libraryStatus: 'removed' } }] });
   });
 });

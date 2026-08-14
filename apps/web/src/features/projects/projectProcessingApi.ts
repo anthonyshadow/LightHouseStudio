@@ -40,10 +40,13 @@ export const getCurrentProjectProcessing = (
 
 export const getProjectProcessingHistory = (
   projectId: string,
+  cursor?: string,
   signal?: AbortSignal,
-): Promise<ProjectProcessingHistoryResponse> =>
-  requestJson(
-    `${processingUrl(projectId)}/history?pageSize=20`,
+): Promise<ProjectProcessingHistoryResponse> => {
+  const query = new URLSearchParams({ pageSize: '20' });
+  if (cursor) query.set('cursor', cursor);
+  return requestJson(
+    `${processingUrl(projectId)}/history?${query.toString()}`,
     {
       cache: 'no-store',
       headers: { Accept: 'application/json' },
@@ -52,6 +55,7 @@ export const getProjectProcessingHistory = (
     projectProcessingHistoryResponseSchema,
     invalidResponse,
   );
+};
 
 export const submitProjectProcessing = (input: {
   readonly projectId: string;

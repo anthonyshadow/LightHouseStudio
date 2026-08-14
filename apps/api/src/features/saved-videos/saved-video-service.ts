@@ -14,7 +14,7 @@ import {
 } from '@studio/contracts';
 import { normalizeSavedVideoTitle } from '@studio/domain';
 import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
-import type { ProjectRetentionPolicy } from '../projects/project-repository.js';
+import type { ProjectRepository, ProjectRetentionPolicy } from '../projects/project-repository.js';
 import { AppError } from '../../http/app-error.js';
 import { withWorkflowSpan } from '../../observability/telemetry.js';
 import { inspectSavedVideoFile } from './saved-video-inspection.js';
@@ -46,7 +46,7 @@ const currentVersion = (aggregate: StoredSavedVideoAggregate): StoredVideoVersio
   return version;
 };
 
-const publicVersion = (version: StoredVideoVersion) => ({
+export const publicSavedVideoVersion = (version: StoredVideoVersion) => ({
   id: version.id,
   videoId: version.videoId,
   ordinal: version.ordinal,
@@ -72,24 +72,31 @@ const aggregateSummary = (
   versionCount: aggregate.versions.length,
 });
 
-const publicSummary = (summary: StoredSavedVideoSummary): SavedVideoSummary =>
+const publicSummary = (
+  summary: StoredSavedVideoSummary,
+  assignedToProject = false,
+): SavedVideoSummary =>
   savedVideoSummarySchema.parse({
     id: summary.video.id,
     title: summary.video.title,
     status: summary.video.status,
-    currentVersion: publicVersion(summary.currentVersion),
+    currentVersion: publicSavedVideoVersion(summary.currentVersion),
     sourceVideoId: summary.video.sourceVideoId,
     versionCount: summary.versionCount,
     thumbnailAvailable: summary.currentVersion.thumbnailAssetId !== null,
+    assignment: assignedToProject ? 'project-output' : 'unassigned',
     createdAt: summary.video.createdAt,
     updatedAt: summary.video.updatedAt,
   });
 
-export const publicSavedVideoDetail = (aggregate: StoredSavedVideoAggregate): SavedVideoDetail => {
+export const publicSavedVideoDetail = (
+  aggregate: StoredSavedVideoAggregate,
+  assignedToProject = false,
+): SavedVideoDetail => {
   const version = currentVersion(aggregate);
   return savedVideoDetailSchema.parse({
-    ...publicSummary(aggregateSummary(aggregate, version)),
-    versions: aggregate.versions.map(publicVersion),
+    ...publicSummary(aggregateSummary(aggregate, version), assignedToProject),
+    versions: aggregate.versions.map(publicSavedVideoVersion),
   });
 };
 
@@ -159,6 +166,7 @@ export interface SavedVideoServiceOptions {
   /** R2/shadow mode only. Local-only deletion retains its existing reconciliation policy. */
   readonly deleteStoredAssetsOnManualDelete?: boolean;
   readonly projectRetention?: ProjectRetentionPolicy;
+  readonly projectOutputs?: Pick<ProjectRepository, 'assignedSavedVideoIds'>;
 }
 
 const compareCreatedAt = (left: IndexedVideo, right: IndexedVideo): number =>
@@ -172,6 +180,7 @@ export class SavedVideoService {
   readonly #inspect: (filePath: string) => Promise<InspectedVideo>;
   readonly #deleteStoredAssetsOnManualDelete: boolean;
   readonly #projectRetention: ProjectRetentionPolicy | undefined;
+  readonly #projectOutputs: Pick<ProjectRepository, 'assignedSavedVideoIds'> | undefined;
 
   constructor(
     repository: SavedVideoRepository,
@@ -184,6 +193,7 @@ export class SavedVideoService {
     this.#inspect = options.inspect ?? inspectSavedVideoFile;
     this.#deleteStoredAssetsOnManualDelete = options.deleteStoredAssetsOnManualDelete ?? false;
     this.#projectRetention = options.projectRetention;
+    this.#projectOutputs = options.projectOutputs;
   }
 
   async #versionFromUpload(
@@ -528,8 +538,15 @@ export class SavedVideoService {
     const offset = decodeCursor(query.cursor, query);
     if (this.#repository.listPage !== undefined) {
       const page = await this.#repository.listPage(ownerUserId, query, offset);
+      const assigned =
+        (await this.#projectOutputs?.assignedSavedVideoIds(
+          ownerUserId,
+          page.videos.map(({ video }) => video.id),
+        )) ?? new Set<string>();
       return {
-        videos: page.videos.map(publicSummary),
+        videos: page.videos.map((summary) =>
+          publicSummary(summary, assigned.has(summary.video.id)),
+        ),
         nextCursor:
           offset + page.videos.length < page.total
             ? encodeCursor(offset + page.videos.length, query)
@@ -570,9 +587,14 @@ export class SavedVideoService {
       return query.sort === 'oldest' ? createdAtComparison : -createdAtComparison;
     });
     const page = filtered.slice(offset, offset + query.pageSize);
+    const assigned =
+      (await this.#projectOutputs?.assignedSavedVideoIds(
+        ownerUserId,
+        page.map(({ aggregate }) => aggregate.video.id),
+      )) ?? new Set<string>();
     return {
       videos: page.map(({ aggregate, version }) =>
-        publicSummary(aggregateSummary(aggregate, version)),
+        publicSummary(aggregateSummary(aggregate, version), assigned.has(aggregate.video.id)),
       ),
       nextCursor:
         offset + page.length < filtered.length ? encodeCursor(offset + page.length, query) : null,
@@ -585,7 +607,8 @@ export class SavedVideoService {
     const aggregate = await this.#repository.get(ownerUserId, videoId);
     if (aggregate === null)
       throw new AppError(404, 'not_found', 'That saved video is unavailable.');
-    return publicSavedVideoDetail(aggregate);
+    const assigned = await this.#projectOutputs?.assignedSavedVideoIds(ownerUserId, [videoId]);
+    return publicSavedVideoDetail(aggregate, assigned?.has(videoId) ?? false);
   }
 
   async findByIdempotencyKey(
@@ -610,7 +633,8 @@ export class SavedVideoService {
     );
     if (aggregate === null)
       throw new AppError(404, 'not_found', 'That saved video is unavailable.');
-    return publicSavedVideoDetail(aggregate);
+    const assigned = await this.#projectOutputs?.assignedSavedVideoIds(ownerUserId, [videoId]);
+    return publicSavedVideoDetail(aggregate, assigned?.has(videoId) ?? false);
   }
 
   async delete(ownerUserId: string, videoId: string): Promise<void> {

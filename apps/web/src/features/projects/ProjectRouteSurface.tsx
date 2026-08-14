@@ -47,6 +47,7 @@ import {
 import { ProjectProcessingStatusPanel } from './ProjectProcessingStatusPanel';
 import type { ProjectProcessingController } from './useProjectProcessingController';
 import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
+import { ProjectHistorySection } from './ProjectHistorySection';
 
 const projectStatusLabel = (status: ProjectContract['status']): string =>
   status === 'needs-attention'
@@ -779,6 +780,8 @@ const ProjectDetail = ({
         archived={archived}
         ownerUserId={ownerUserId}
       />
+
+      <ProjectHistorySection current={current} session={session.port} archived={archived} />
 
       {renameTarget ? (
         <RenameProjectDialog

@@ -75,6 +75,17 @@ const currentProject = (
 });
 
 const renderProjects = (path = '/studio/projects') => {
+  mockApiServer.use(
+    http.get('*/api/projects/:projectId/history', () =>
+      HttpResponse.json({ revisions: [], nextCursor: null }),
+    ),
+    http.get('*/api/projects/:projectId/outputs', () =>
+      HttpResponse.json({ outputs: [], nextCursor: null }),
+    ),
+    http.get('*/api/projects/:projectId/processing/history', () =>
+      HttpResponse.json({ attempts: [], nextCursor: null }),
+    ),
+  );
   const router = createMemoryRouter(
     [{ path: '/studio/projects/*', element: <ProjectRouteSurface /> }],
     { initialEntries: [path] },

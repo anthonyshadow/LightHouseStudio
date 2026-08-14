@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { savedVideoDetailSchema, savedVideoTitleSchema } from './saved-videos';
+import {
+  savedVideoDetailSchema,
+  savedVideoTitleSchema,
+  savedVideoVersionSchema,
+} from './saved-videos';
 
 export const PROJECT_SNAPSHOT_SCHEMA_VERSION = 2 as const;
 export const LEGACY_PROJECT_SNAPSHOT_SCHEMA_VERSION = 1 as const;
@@ -574,6 +578,65 @@ export const projectParamsSchema = z.object({ projectId: projectIdSchema }).stri
 export const projectOutputVersionParamsSchema = z
   .object({ projectId: projectIdSchema, videoVersionId: z.uuid() })
   .strict();
+export const projectHistoryQuerySchema = z
+  .object({
+    cursor: z.string().trim().min(1).max(1_000).optional(),
+    pageSize: z.coerce.number().int().min(1).max(40).default(20),
+  })
+  .strict();
+export const projectHistoryRevisionSchema = z
+  .object({
+    kind: z.literal('project-change'),
+    revisionId: projectRevisionIdSchema,
+    revisionNumber: z.number().int().positive(),
+    parentRevisionId: projectRevisionIdSchema.nullable(),
+    parentRevisionNumber: z.number().int().positive().nullable(),
+    source: projectRevisionSourceSchema,
+    authorKind: z.enum(['user', 'system', 'migration']),
+    workflowPhase: projectWorkflowPhaseSchema,
+    outputReference: projectOutputReferenceSchema.nullable(),
+    createdAt: z.iso.datetime(),
+  })
+  .strict();
+export const projectHistoryResponseSchema = z
+  .object({
+    revisions: z.array(projectHistoryRevisionSchema).max(40),
+    nextCursor: z.string().max(1_000).nullable(),
+  })
+  .strict();
+
+const projectOutputReferenceRevisionSchema = z
+  .object({
+    revisionId: projectRevisionIdSchema,
+    revisionNumber: z.number().int().positive(),
+    createdAt: z.iso.datetime(),
+  })
+  .strict();
+
+export const projectOutputHistoryItemSchema = z
+  .object({
+    kind: z.literal('saved-video-version'),
+    output: projectOutputLinkSchema,
+    savedVideo: z
+      .object({
+        id: z.uuid(),
+        title: savedVideoTitleSchema,
+        libraryStatus: z.enum(['ready', 'missing', 'removed']),
+        currentVersionId: z.uuid(),
+      })
+      .strict(),
+    version: savedVideoVersionSchema,
+    referenceRevision: projectOutputReferenceRevisionSchema.nullable(),
+    isCurrentForProject: z.boolean(),
+    contentUrl: z.string().startsWith('/api/projects/').max(500),
+  })
+  .strict();
+export const projectOutputHistoryResponseSchema = z
+  .object({
+    outputs: z.array(projectOutputHistoryItemSchema).max(40),
+    nextCursor: z.string().max(1_000).nullable(),
+  })
+  .strict();
 export const projectWorkingMediaParamsSchema = z
   .object({ projectId: projectIdSchema, revisionId: projectRevisionIdSchema })
   .strict();
@@ -676,16 +739,7 @@ export const adoptProjectWorkingMediaRequestSchema = z
   .object({
     expectedVersion: z.number().int().positive(),
     expectedRevisionNumber: z.number().int().positive(),
-    media: z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('asset'), assetId: z.uuid() }).strict(),
-      z
-        .object({
-          kind: z.literal('saved-video-version'),
-          savedVideoId: z.uuid(),
-          videoVersionId: z.uuid(),
-        })
-        .strict(),
-    ]),
+    media: projectMediaReferenceSchema,
     localEdit: projectVideoEditSpecSchema.nullable(),
   })
   .strict();
@@ -912,6 +966,11 @@ export type ProjectStatusFactsContract = z.infer<typeof projectStatusFactsSchema
 export type ProjectConflictContract = z.infer<typeof projectConflictSchema>;
 export type ProjectsQuery = z.infer<typeof projectsQuerySchema>;
 export type ProjectCurrentResponse = z.infer<typeof projectCurrentResponseSchema>;
+export type ProjectHistoryQuery = z.infer<typeof projectHistoryQuerySchema>;
+export type ProjectHistoryRevision = z.infer<typeof projectHistoryRevisionSchema>;
+export type ProjectHistoryResponse = z.infer<typeof projectHistoryResponseSchema>;
+export type ProjectOutputHistoryItem = z.infer<typeof projectOutputHistoryItemSchema>;
+export type ProjectOutputHistoryResponse = z.infer<typeof projectOutputHistoryResponseSchema>;
 export type ProjectSourceKindContract = z.infer<typeof projectSourceKindSchema>;
 export type ProjectSourceUploadMetadata = z.infer<typeof projectSourceUploadMetadataSchema>;
 export type ReuseProjectSourceRequest = z.infer<typeof reuseProjectSourceRequestSchema>;

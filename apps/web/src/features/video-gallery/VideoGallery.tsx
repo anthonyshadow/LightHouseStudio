@@ -3,12 +3,14 @@ import type {
   SavedVideoFormat,
   SavedVideoSort,
   SavedVideoSummary,
+  SavedVideoVersion,
   SavedVideosResponse,
 } from '@studio/contracts';
 import {
   keepPreviousData,
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
   type InfiniteData,
 } from '@tanstack/react-query';
@@ -16,6 +18,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   deleteSavedVideo,
   downloadSavedVideoUrl,
+  getSavedVideo,
   listSavedVideos,
   renameSavedVideo,
   savedVideoContentUrl,
@@ -88,8 +91,10 @@ const SORT_OPTIONS = [
   { value: 'longest', label: 'Longest' },
 ] satisfies ReadonlyArray<{ value: SavedVideoSort; label: string }>;
 
-const formatForVideo = (video: SavedVideoSummary): SavedVideoFormat => {
-  const { width, height } = video.currentVersion;
+const formatForDimensions = ({
+  width,
+  height,
+}: Pick<SavedVideoVersion, 'width' | 'height'>): SavedVideoFormat => {
   return width === height ? 'square' : width > height ? 'landscape' : 'portrait';
 };
 
@@ -173,7 +178,7 @@ const VideoGalleryGrid = ({
                   {video.versionCount} version{video.versionCount === 1 ? '' : 's'}
                 </span>
                 <span css={chipStyles(theme)}>{version.origin}</span>
-                <span css={chipStyles(theme)}>{FORMAT_LABELS[formatForVideo(video)]}</span>
+                <span css={chipStyles(theme)}>{FORMAT_LABELS[formatForDimensions(version)]}</span>
                 {version.characterName ? (
                   <span css={chipStyles(theme)}>{version.characterName}</span>
                 ) : null}
@@ -182,6 +187,9 @@ const VideoGalleryGrid = ({
                 ) : null}
                 {video.status !== 'ready' ? (
                   <span css={chipStyles(theme)}>{video.status}</span>
+                ) : null}
+                {video.assignment === 'unassigned' ? (
+                  <span css={chipStyles(theme)}>Unassigned Content</span>
                 ) : null}
               </div>
               <div css={actionsStyles(theme)}>
@@ -205,7 +213,10 @@ const VideoGalleryGrid = ({
                     >
                       Edit video
                     </button>
-                    <a href={downloadSavedVideoUrl(video.id)} download={version.filename}>
+                    <a
+                      href={downloadSavedVideoUrl(video.id, version.id)}
+                      download={version.filename}
+                    >
                       Download
                     </a>
                     <button type="button" disabled={busy} onClick={() => void onRename(video)}>
@@ -243,6 +254,7 @@ export const VideoGallery = ({
   const [message, setMessage] = useState<string | null>(null);
   const [useBusyId, setUseBusyId] = useState<string | null>(null);
   const [previewVideo, setPreviewVideo] = useState<SavedVideoSummary | null>(null);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState(false);
   const [brokenThumbnails, setBrokenThumbnails] = useState<ReadonlySet<string>>(() => new Set());
   const previewTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -268,6 +280,11 @@ export const VideoGallery = ({
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
     placeholderData: keepPreviousData,
+  });
+  const previewDetailQuery = useQuery({
+    queryKey: ['saved-videos', 'detail', previewVideo?.id ?? null],
+    queryFn: ({ signal }) => getSavedVideo(previewVideo!.id, signal),
+    enabled: previewVideo !== null,
   });
 
   const renameMutation = useMutation({
@@ -357,6 +374,7 @@ export const VideoGallery = ({
   const openPreview = (video: SavedVideoSummary, trigger: HTMLButtonElement) => {
     previewTriggerRef.current = trigger;
     setPreviewError(false);
+    setSelectedVersionId(video.currentVersion.id);
     setPreviewVideo(video);
   };
 
@@ -370,6 +388,7 @@ export const VideoGallery = ({
       // Some test environments do not implement media loading.
     }
     setPreviewVideo(null);
+    setSelectedVersionId(null);
     setPreviewError(false);
   };
 
@@ -388,6 +407,13 @@ export const VideoGallery = ({
   }
   const libraryHasVideos = availableFormats.length > 0;
   const filtersActive = Boolean(characterName || format);
+  const previewDetail = previewDetailQuery.data;
+  const selectedVersion: SavedVideoVersion | null =
+    previewDetail?.versions.find((version) => version.id === selectedVersionId) ??
+    previewVideo?.currentVersion ??
+    null;
+  const selectedIsCurrent =
+    selectedVersion?.id === (previewDetail?.currentVersion.id ?? previewVideo?.currentVersion.id);
 
   if (!libraryHasVideos) {
     return (
@@ -401,6 +427,13 @@ export const VideoGallery = ({
   return (
     <div css={galleryStyles(theme)}>
       {message ? <StatusNotice role="status">{message}</StatusNotice> : null}
+      {videos.some((video) => video.assignment === 'unassigned') ? (
+        <StatusNotice role="status" tone="neutral" title="Unassigned Content">
+          These legacy or independently saved videos have no trustworthy producing Project. They
+          remain fully usable; later source reuse records used-by lineage without inventing a
+          producer.
+        </StatusNotice>
+      ) : null}
       <div css={filterControlsStyles(theme)} aria-label="Filter and sort saved videos">
         <SelectField
           label="Character used"
@@ -481,7 +514,7 @@ export const VideoGallery = ({
         open={previewVideo !== null}
         onClose={closePreview}
         title={previewVideo?.title ?? 'Video preview'}
-        description="Preview this saved version before loading it into Studio."
+        description="Select and preview one exact immutable Version. Selection never changes the Saved Video current pointer."
         placement="fullscreen"
         size="wide"
         height="tall"
@@ -490,47 +523,94 @@ export const VideoGallery = ({
         returnFocusRef={previewTriggerRef}
         bodyMode="scroll"
         footer={
-          previewVideo ? (
+          previewVideo && selectedVersion ? (
             <div css={previewFooterStyles(theme)}>
               <a
-                href={downloadSavedVideoUrl(previewVideo.id)}
-                download={previewVideo.currentVersion.filename}
+                href={downloadSavedVideoUrl(previewVideo.id, selectedVersion.id)}
+                download={selectedVersion.filename}
               >
                 Download
               </a>
-              <Button
-                variant="secondary"
-                disabled={busyId === previewVideo.id}
-                onClick={() => void handleUseVideo(previewVideo, 'edit')}
-              >
-                Edit video
-              </Button>
-              <Button
-                variant="primary"
-                busy={busyId === previewVideo.id}
-                onClick={() => void handleUseVideo(previewVideo, 'play')}
-              >
-                Load in Studio
-              </Button>
+              {selectedIsCurrent ? (
+                <>
+                  <Button
+                    variant="secondary"
+                    disabled={busyId === previewVideo.id}
+                    onClick={() => void handleUseVideo(previewVideo, 'edit')}
+                  >
+                    Edit video
+                  </Button>
+                  <Button
+                    variant="primary"
+                    busy={busyId === previewVideo.id}
+                    onClick={() => void handleUseVideo(previewVideo, 'play')}
+                  >
+                    Load in Studio
+                  </Button>
+                </>
+              ) : null}
             </div>
           ) : null
         }
       >
         {previewVideo ? (
           <div css={previewContentStyles(theme)}>
+            {previewDetailQuery.isPending ? <p role="status">Loading Version history…</p> : null}
+            {previewDetailQuery.isError ? (
+              <StatusNotice tone="danger" role="alert">
+                Version history could not be loaded.{' '}
+                <Button size="small" onClick={() => void previewDetailQuery.refetch()}>
+                  Retry
+                </Button>
+              </StatusNotice>
+            ) : null}
+            {previewDetail ? (
+              <fieldset
+                css={{
+                  display: 'grid',
+                  gap: theme.space.sm,
+                  margin: 0,
+                  padding: theme.space.md,
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: theme.radii.medium,
+                }}
+              >
+                <legend>Versions</legend>
+                <div css={{ display: 'flex', flexWrap: 'wrap', gap: theme.space.sm }}>
+                  {previewDetail.versions.map((version) => (
+                    <Button
+                      key={version.id}
+                      size="small"
+                      variant={version.id === selectedVersion?.id ? 'primary' : 'secondary'}
+                      aria-pressed={version.id === selectedVersion?.id}
+                      onClick={() => {
+                        setPreviewError(false);
+                        setSelectedVersionId(version.id);
+                      }}
+                    >
+                      Version {version.ordinal}
+                      {version.id === previewDetail.currentVersion.id ? ' · Current' : ''}
+                    </Button>
+                  ))}
+                </div>
+              </fieldset>
+            ) : null}
             <div css={previewPlayerStyles(theme)}>
-              {/* Saved local videos may not include a captions track. */}
-              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-              <video
-                ref={previewPlayerRef}
-                src={savedVideoContentUrl(previewVideo.id)}
-                controls
-                playsInline
-                preload="metadata"
-                aria-label={`Preview of ${previewVideo.title}`}
-                onLoadedData={() => setPreviewError(false)}
-                onError={() => setPreviewError(true)}
-              />
+              {selectedVersion ? (
+                // Saved local videos may not include a captions track.
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <video
+                  key={selectedVersion.id}
+                  ref={previewPlayerRef}
+                  src={savedVideoContentUrl(previewVideo.id, selectedVersion.id)}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  aria-label={`Preview of ${previewVideo.title}, Version ${selectedVersion.ordinal}`}
+                  onLoadedData={() => setPreviewError(false)}
+                  onError={() => setPreviewError(true)}
+                />
+              ) : null}
             </div>
             {previewError ? (
               <StatusNotice tone="danger" role="alert">
@@ -538,24 +618,40 @@ export const VideoGallery = ({
                 it.
               </StatusNotice>
             ) : null}
-            <div css={previewMetadataStyles(theme)}>
-              <span>{duration(previewVideo.currentVersion.durationMs)} duration</span>
-              <span>
-                {previewVideo.currentVersion.width}×{previewVideo.currentVersion.height}
-              </span>
-              <span>{previewVideo.currentVersion.origin}</span>
-              <span>{FORMAT_LABELS[formatForVideo(previewVideo)]}</span>
-              {previewVideo.currentVersion.characterName ? (
-                <span>Character: {previewVideo.currentVersion.characterName}</span>
-              ) : null}
-              {previewVideo.currentVersion.characterVariantName ? (
-                <span>Variant: {previewVideo.currentVersion.characterVariantName}</span>
-              ) : null}
-              <span>
-                {previewVideo.versionCount} version
-                {previewVideo.versionCount === 1 ? '' : 's'}
-              </span>
-            </div>
+            {selectedVersion ? (
+              <div css={previewMetadataStyles(theme)}>
+                <span>Version {selectedVersion.ordinal}</span>
+                <span>{selectedIsCurrent ? 'Current Version' : 'Older Version'}</span>
+                <span>{previewVideo.status}</span>
+                <span>{duration(selectedVersion.durationMs)} duration</span>
+                <span>
+                  {selectedVersion.width}×{selectedVersion.height}
+                </span>
+                <span>{selectedVersion.origin}</span>
+                <span>{FORMAT_LABELS[formatForDimensions(selectedVersion)]}</span>
+                <span>
+                  <time dateTime={selectedVersion.createdAt}>
+                    {new Date(selectedVersion.createdAt).toLocaleString()}
+                  </time>
+                </span>
+                {selectedVersion.characterName ? (
+                  <span>Character: {selectedVersion.characterName}</span>
+                ) : null}
+                {selectedVersion.characterVariantName ? (
+                  <span>Variant: {selectedVersion.characterVariantName}</span>
+                ) : null}
+                <span>
+                  {previewVideo.versionCount} version
+                  {previewVideo.versionCount === 1 ? '' : 's'}
+                </span>
+              </div>
+            ) : null}
+            {!selectedIsCurrent && selectedVersion ? (
+              <p>
+                Use this older Version from a retaining Project&apos;s history. Viewing or Download
+                here does not select an Add Version target.
+              </p>
+            ) : null}
           </div>
         ) : null}
       </OverlayPanel>

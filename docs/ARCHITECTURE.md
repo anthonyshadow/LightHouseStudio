@@ -22,7 +22,8 @@ current-state qualifications:
   checkpoints are implemented. Project-bound Character Swap/VTO now use the backend admission,
   recovery, and durable result-retention authority through visible Start/status/retry UX. Project
   provider Voice remains gated. Explicit Saved Video output save and immutable Version append are
-  implemented; bounded history and Project delivery UI remain separate future work.
+  implemented. Bounded Project changes, processing attempts/results, and output-Version history
+  plus exact-Version preview/reuse/Download are implemented without a restore or Export aggregate.
 
 One Campaign may group multiple Projects, while a Project represents a focused resumable production
 effort and may remain independent. Campaign never owns Project/media processing state. Multi-format support
@@ -565,8 +566,12 @@ typed conflict. `lastSuccessfulOutput` must match an existing output relation re
 Project. Current status uses current-revision/current-attempt facts, and material changes clear a
 stale output pointer. Archive is rejected while a linked job remains active.
 
-Normal reads return only the Project summary and current revision. Revision and relation histories
-are separately cursor-paginated. The repository exposes a composite metadata unit-of-work seam for
+Normal reads return only the Project summary and current revision. Revision, processing, and output
+histories are separately cursor-paginated metadata projections; list responses never include full
+snapshot history or bytes. Output projection preserves both the producing revision and a verified
+later `output-save` reference revision. Exact Version metadata/content is owner-checked through the
+retaining Project relation, including when the Saved Video is tombstoned globally. The repository
+exposes a composite metadata unit-of-work seam for
 the owner-derived **Save Project Output** command. One PostgreSQL transaction commits the Saved
 Video/immutable Version mutation, producer output relation, post-save hydration record and
 revision, exact `lastSuccessfulOutput`, Project status/CAS, and durable operation receipt. The
@@ -812,6 +817,7 @@ provider path and never causes provider fallback.
 | Local status                | `GET /api/health`, authenticated `GET /api/capabilities`                                                                                                                                                                                                                                                                                                                                  |
 | Campaigns                   | `GET/POST /api/campaigns`, `GET/PATCH /api/campaigns/:campaignId`, and `POST` archive/restore/tombstone subroutes; create requires `Idempotency-Key`, mutations use Campaign-version CAS, lists are bounded, and tombstone is archived-empty only                                                                                                                                         |
 | Projects                    | `GET/POST /api/projects`, `GET/PATCH /api/projects/:projectId`, `POST /api/projects/:projectId/revisions`, archive/restore subroutes, and `POST /api/projects/:projectId/campaign`; create requires `Idempotency-Key`, semantic checkpoints use Project/revision CAS, metadata mutations use Project-version CAS, and lists support bounded lifecycle plus Campaign/No Campaign filtering |
+| Project history and output  | Cursor-bounded metadata-only `GET /api/projects/:projectId/history` and `/outputs`, exact output metadata at `/outputs/:videoVersionId`, and owner-checked range/HEAD/download content at `/outputs/:videoVersionId/content`; producing/reference revisions stay distinct and a tombstoned Saved Video is authorized only by its exact retaining Project relation                         |
 | Project processing          | `POST /api/projects/:projectId/processing/submit`, `GET` current/history and retained result content, and `POST` reconcile/retry/cancel; provider-contact routes require trusted Origin plus video intent, admission pre-links the exact revision, history/content are owner-checked, retry is explicit, and cancellation reports only verified support                                   |
 | Decart                      | `POST /api/realtime-token`                                                                                                                                                                                                                                                                                                                                                                |
 | Existing-video processing   | `PUT /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId/content`, `DELETE /api/video-jobs/:jobId`                                                                                                                                                                                                                                                         |

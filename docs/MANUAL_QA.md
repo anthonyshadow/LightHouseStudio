@@ -278,7 +278,28 @@ Using synthetic compatible media and no live provider:
   blind duplicate submission; and
 - delete the Saved Video from the global gallery, confirm the copy explains that Project history is
   preserved, and verify the Project-scoped current output still plays while the gallery record stays
-  hidden. Do not treat this as Prompt 12 history or Download coverage.
+  hidden.
+
+## Project history and exact-Version boundary
+
+Using synthetic compatible media and no live provider:
+
+- save two Versions, reopen the Project, and confirm **Project changes**, **Processing attempts and
+  results**, and **Saved video Versions** are separate bounded groups rather than one event feed;
+- verify an output names its producing revision separately from the later revision that made it
+  current, then select the older Version for preview and **Download** and confirm neither Saved
+  Video nor Project current pointer changes;
+- choose **Use in Project** for an old Version and for a valid stale processing result in separate
+  runs; confirm adoption is explicit, updates only working media, preserves the immutable original,
+  and never preselects an Add Version target;
+- remove the Saved Video globally and confirm only its exact retaining Project can still preview,
+  use, and download it with truthful retention copy; and
+- open a legacy/independently saved video without a Project output relation and confirm it is usable
+  and labeled **Unassigned Content**, not an error or an invented producing Project.
+
+At compact/mobile widths and 200% text, verify all three groups, load-more actions, old-Version
+selection, preview focus return/Escape, status announcements, and Download remain reachable. These
+checks exercise local authenticated routes only and must not be converted into paid-provider work.
 
 ## Accessibility
 

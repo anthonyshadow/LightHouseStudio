@@ -745,6 +745,33 @@ export class DrizzleProjectRepository
     return row === undefined ? null : toProjectCurrentRead(row);
   }
 
+  async getRevision(
+    ownerUserId: string,
+    projectId: string,
+    revisionNumber: number,
+  ): Promise<ProjectRevision | null> {
+    const [row] = await this.db
+      .select({ revision: projectRevisions })
+      .from(projectRevisions)
+      .innerJoin(
+        projects,
+        and(
+          eq(projects.id, projectRevisions.projectId),
+          eq(projects.ownerUserId, projectRevisions.ownerUserId),
+          isNull(projects.deletedAt),
+        ),
+      )
+      .where(
+        and(
+          eq(projectRevisions.ownerUserId, ownerUserId),
+          eq(projectRevisions.projectId, projectId),
+          eq(projectRevisions.revisionNumber, revisionNumber),
+        ),
+      )
+      .limit(1);
+    return row === undefined ? null : toRevision(row.revision);
+  }
+
   async getCurrentWithSource(
     ownerUserId: string,
     projectId: string,
@@ -3246,5 +3273,23 @@ export class DrizzleProjectRepository
           producingRevisionNumber: row.producingRevisionNumber,
           createdAt: toIsoTimestamp(row.createdAt),
         };
+  }
+
+  async assignedSavedVideoIds(
+    ownerUserId: string,
+    savedVideoIds: readonly string[],
+  ): Promise<ReadonlySet<string>> {
+    const candidates = [...new Set(savedVideoIds)];
+    if (candidates.length === 0) return new Set();
+    const rows = await this.db
+      .selectDistinct({ savedVideoId: projectOutputs.savedVideoId })
+      .from(projectOutputs)
+      .where(
+        and(
+          eq(projectOutputs.ownerUserId, ownerUserId),
+          inArray(projectOutputs.savedVideoId, candidates),
+        ),
+      );
+    return new Set(rows.map(({ savedVideoId }) => savedVideoId));
   }
 }

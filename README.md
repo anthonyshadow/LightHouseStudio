@@ -8,7 +8,7 @@ without stitching together disconnected creative tools.
 The implemented product is currently a local-first, single-operator browser studio centered on
 video. Its primary loop is:
 
-**Log in → Record or Upload → Review → optional Virtual Try On, Character Swap, and/or Voice → Save → Download from Saved Videos**
+**Log in → Record or Upload → Review → optional Virtual Try On, Character Swap, and/or Voice → Save → Download an exact Version**
 
 Live character transformation and Workshop remain advanced tools. The app binds to loopback. Phase
 1 provides one seeded local demo account, authenticated ownership, and durable local saved-media
@@ -29,9 +29,11 @@ provider Voice remains gated because its synchronous adapter has no durable reco
 the current exact ready Project media can now be saved explicitly as a new Saved Video or, after
 choosing and confirming one active target, appended as an immutable Video Version. The composite
 save records producing-revision provenance, advances one completed post-save Project revision, and
-reconciles the same durable operation after response loss or reload. Project history and delivery
-UI remain future work. Rich Campaign planning and multi-format content creation remain future
-product directions. The app is not approved for LAN, tunnel, proxy, or public exposure.
+reconciles the same durable operation after response loss or reload. Bounded Project history now
+separates revisions, processing attempts/stale results, and output Versions; one exact retained
+Version can be previewed, explicitly reused, or downloaded without changing either current
+pointer. Rich Campaign planning and multi-format content creation remain future product directions.
+The app is not approved for LAN, tunnel, proxy, or public exposure.
 
 ## Status
 
@@ -79,7 +81,8 @@ Neither document changes the current loopback, account, provider, privacy, or de
    Save and Voice but disables Character Swap/VTO before provider contact.
 6. Preview **Original** and **Result**, revise the plan or edit base, then **Save Video**. Save is
    idempotent. An edit saves as a new, source-linked video by default; explicit replacement
-   confirms before appending an immutable version. Download is available only from Saved Videos.
+   confirms before appending an immutable version. Download is available for one exact ready
+   Version from Saved Videos or its retaining Project history.
 7. Prepare advanced live work without starting media: desktop places **Select Character** and
    **Select Outfit** immediately before **Workshop** in the creative-tool rail. Phones and tablets
    use **Dock** for direct Character/VTO recipes and **Shelf** for saved characters, outfits, and
@@ -102,13 +105,18 @@ original cannot be replaced; another original requires another Project. A source
 review surface keeps **All changes saved**, **Render preview**, **Save as New Video**, and **Add
 Version** distinct. Add Version never follows source lineage implicitly: the user chooses an active
 Saved Video and confirms its current Version, then the server applies Saved Video and Project CAS in
-one replay-safe metadata operation. The full-screen library surfaces likewise never create another
-media session. The gallery
+one replay-safe metadata operation. Project history separately pages Project changes, processing
+attempts/results, and immutable output Versions. A valid stale processing result or old output is
+adopted only through explicit **Use in Project**; preview, use, and **Download** never change the
+Saved Video current pointer or infer an Add Version target. The full-screen library surfaces
+likewise never create another media session. The gallery
 loads metadata and lazy thumbnails first, then fetches video bytes only for an explicit Preview,
 Studio, Edit, or Download action. Saved Videos can be filtered by attributed parent character and
 Landscape, Portrait, or Square format, then ordered by Latest, Oldest, Shortest, or Longest. When
 a Wardrobe variant was used, the card and preview also show that exact variant without splitting
-the parent character's filter group. A thumbnail Preview opens a centered, focus-managed player over
+the parent character's filter group. Preview can select an exact immutable Version and marks the
+current one. Legacy or independently saved records without a trustworthy Project output relation
+are shown as **Unassigned Content** without inventing producer lineage. A thumbnail Preview opens a centered, focus-managed player over
 the darkened gallery; that scoped player owns no tracks, object URL, recorder, or provider session
 and detaches its authenticated content URL on close. Any saved video can be deleted independently;
 a retained derived video remains usable when its source record is deleted. Removing a Saved Video
