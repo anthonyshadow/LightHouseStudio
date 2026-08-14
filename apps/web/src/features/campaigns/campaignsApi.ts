@@ -116,7 +116,6 @@ const changeCampaignLifecycle = (
   campaignId: string,
   operation: 'archive' | 'restore',
   expectedVersion: number,
-  signal?: AbortSignal,
 ): Promise<CampaignContract> =>
   requestJson(
     `/api/campaigns/${encodeURIComponent(campaignId)}/${operation}`,
@@ -125,7 +124,6 @@ const changeCampaignLifecycle = (
       cache: 'no-store',
       headers: jsonHeaders,
       body: JSON.stringify({ expectedVersion }),
-      ...(signal ? { signal } : {}),
     },
     campaignSchema,
     invalidCampaignResponse,

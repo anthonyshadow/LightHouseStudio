@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import {
   projectCurrentResponseSchema,
   projectsResponseSchema,
@@ -17,15 +17,16 @@ import {
   restoreProject,
   moveProjectToCampaign,
   type Project,
-  type ProjectAggregate,
   type ProjectConflict,
 } from '@studio/domain';
 import { AppError } from '../../http/app-error.js';
-import type {
-  ProjectCurrentRead,
-  ProjectRepository,
-  ProjectSummaryCursor,
+import {
+  projectAggregateForCurrent,
+  type ProjectCurrentRead,
+  type ProjectRepository,
+  type ProjectSummaryCursor,
 } from './project-repository.js';
+import { projectRequestFingerprint } from './project-request-fingerprint.js';
 import { projectAssetLinksForRevision } from './project-snapshot-relations.js';
 
 const emptyFacts = {
@@ -33,15 +34,6 @@ const emptyFacts = {
   currentAttempt: { status: 'none' as const },
   validatedLastSuccessfulOutput: null,
 };
-
-const currentAggregate = (current: ProjectCurrentRead): ProjectAggregate => ({
-  project: current.project,
-  revisions: [current.revision],
-  assetLinks: [],
-  versionReferenceLinks: [],
-  jobLinks: [],
-  outputLinks: [],
-});
 
 const sessionProposalMatches = (
   current: ProjectCurrentRead,
@@ -181,15 +173,11 @@ export class ProjectService {
       },
       { now, createId: this.#createId },
     );
-    const requestFingerprint = createHash('sha256')
-      .update(
-        JSON.stringify(
-          campaignId === null
-            ? { version: 1, operation: 'create', title }
-            : { version: 2, operation: 'create', title, campaignId },
-        ),
-      )
-      .digest('hex');
+    const requestFingerprint = projectRequestFingerprint(
+      campaignId === null
+        ? { version: 1, operation: 'create', title }
+        : { version: 2, operation: 'create', title, campaignId },
+    );
     const result = await this.#repository.createIdempotent({
       aggregate,
       receipt: { operationKey, requestFingerprint, projectId, createdAt: now },
@@ -236,7 +224,7 @@ export class ProjectService {
     let next;
     try {
       next = appendProjectRevision(
-        currentAggregate(current),
+        projectAggregateForCurrent(current),
         {
           expectedProjectVersion: input.expectedVersion,
           expectedRevisionNumber: input.expectedRevisionNumber,

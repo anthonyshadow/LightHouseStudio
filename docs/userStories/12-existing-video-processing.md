@@ -254,18 +254,26 @@ provider, or selecting an Add Version output target. That accepted Project sourc
 rehydrates through the Project content route; this standalone workflow remains temporary.
 
 For a source-bearing Project, the existing-video controls remain the feature-local configuration
-owner for one visual treatment followed by optional Voice. The Project adapter captures that exact
-plan only when **Save creative setup** is chosen. Local **Adjust video** instead produces a
-temporary **Render preview**; explicit adoption is the only path that can make its inspected bytes
-current Project working/presented media. Character Swap, VTO, and ElevenLabs Start actions remain
-disabled in Project context until Prompt 10 integrates recoverable Project processing.
-Configuration and local rendering therefore create no provider request, Saved Video/Version, Add
-Version target, or output provenance. The server now has the integration authority: it commits the
-operation and exact initiating revision before provider submission, reconnects durable provider
-identities, treats an unknown submission response as needs-attention, and retains an inspected
-current or historical result before temporary cleanup. A current result is Project working media
-through a `job-result` revision, not a Saved Video; an obsolete paid success remains a historical
-`job-output` asset and cannot replace current media.
+owner for one visual treatment followed by optional Voice. **Save creative setup** checkpoints the
+plan without provider contact. Project **Start Character Swap** and **Start Virtual Try On** first
+save that exact setup, then use one app-owned operation command that commits the exact initiating
+revision before provider submission. Refresh/reopen reads current authority and resumes bounded
+status/retrieval for the same durable provider identity; a lost response replays only the same
+operation key. It never falls through to the standalone `video-jobs` submit path. Local **Adjust
+video** still produces a temporary **Render preview** whose explicit adoption remains separately
+owned.
+
+The Project action presents submitting, accepted/queued, processing, retrieving, retaining-result,
+result-ready, needs-attention, and verified-cancelled states. Current Decart/Pruna visual adapters
+do not expose verified cancellation, so closing or switching stops browser status checks but never
+claims provider work or cost stopped. Failure retry is a new explicit potentially billable attempt;
+ambiguous submission requires an additional possible-duplicate-cost acknowledgement and never
+auto-resubmits. A current result is stored and inspected before a `job-result` revision makes it
+Project working/presented media. It is **Result ready**, not Project `completed`, a Saved Video, or a
+Video Version. A valid obsolete success is **Retained in this Project** as historical `job-output`
+media and never replaces the current stage. Project ElevenLabs Start remains disabled because the
+synchronous adapter has no durable reconnect identity. Local Voice keeps its existing temporary
+artifact owner; neither Voice path fabricates durable Project-processing guarantees.
 
 ## Evidence boundary
 

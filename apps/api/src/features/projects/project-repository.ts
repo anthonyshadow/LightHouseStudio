@@ -53,6 +53,15 @@ export interface ProjectCurrentRead {
   readonly revision: ProjectRevision;
 }
 
+export const projectAggregateForCurrent = (current: ProjectCurrentRead): ProjectAggregate => ({
+  project: current.project,
+  revisions: [current.revision],
+  assetLinks: [],
+  versionReferenceLinks: [],
+  jobLinks: [],
+  outputLinks: [],
+});
+
 export interface ProjectSourceRecord {
   readonly projectId: string;
   readonly ownerUserId: string;

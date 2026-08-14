@@ -124,12 +124,14 @@ export const RenameProjectDialog = ({
 export const ProjectLifecycleDialog = ({
   action,
   project,
+  archiveBlockedReason,
   returnFocusRef,
   onClose,
   onChanged,
 }: {
   readonly action: ProjectLifecycleAction;
   readonly project: ProjectContract;
+  readonly archiveBlockedReason?: string;
   readonly returnFocusRef: RefObject<HTMLElement | null>;
   readonly onClose: () => void;
   readonly onChanged: (current: ProjectCurrentResponse, action: ProjectLifecycleAction) => void;
@@ -168,7 +170,8 @@ export const ProjectLifecycleDialog = ({
       title={`${actionLabel} Project`}
       description={
         action === 'archive'
-          ? 'Archived Projects leave the active workspace and retain their durable history.'
+          ? (archiveBlockedReason ??
+            'Archived Projects leave the active workspace and retain their durable history.')
           : 'Restoring returns this empty Project to the active workspace.'
       }
       placement="bottom"
@@ -185,6 +188,7 @@ export const ProjectLifecycleDialog = ({
           <Button
             variant={action === 'archive' ? 'danger' : 'primary'}
             busy={mutation.isPending}
+            disabled={action === 'archive' && archiveBlockedReason !== undefined}
             onClick={() => void change()}
           >
             {retryWithLatest ? `Reload and retry ${action}` : `${actionLabel} Project`}
@@ -193,9 +197,11 @@ export const ProjectLifecycleDialog = ({
       }
     >
       <p>
-        {action === 'archive'
-          ? `Archive “${project.title}”? You can restore it later.`
-          : `Restore “${project.title}” to active Projects?`}
+        {action === 'archive' && archiveBlockedReason
+          ? 'Stay in this Project or switch away normally. Browser status checks stop on switch, while accepted remote work may continue and reconnect when reopened.'
+          : action === 'archive'
+            ? `Archive “${project.title}”? You can restore it later.`
+            : `Restore “${project.title}” to active Projects?`}
       </p>
       {error ? (
         <StatusNotice role="alert" tone="warning" title={`${actionLabel} not applied`}>

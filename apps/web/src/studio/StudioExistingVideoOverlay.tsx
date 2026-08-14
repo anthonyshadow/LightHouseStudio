@@ -3,6 +3,7 @@ import type { BrowserCapabilities } from '../application/types';
 import type { ExistingVideoSavedRecipe } from '../features/existing-video/ExistingVideoRecipeChooser';
 import type { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import type { SaveVideoState } from '../features/saved-videos/useSaveVideo';
+import type { ProjectProcessingController } from '../features/projects/useProjectProcessingController';
 import { OverlayPanel } from '../ui';
 import type { useProviderAvailability } from './useProviderAvailability';
 import type { useStudioCharacterWorkflow } from './useStudioCharacterWorkflow';
@@ -31,6 +32,7 @@ export const StudioExistingVideoOverlay = ({
   onFinish,
   onStartRecording,
   providerStartBlockedReason,
+  projectProcessing,
 }: {
   readonly open: boolean;
   readonly existingVideo: ReturnType<typeof useExistingVideoWorkflow>;
@@ -47,6 +49,7 @@ export const StudioExistingVideoOverlay = ({
   readonly onFinish: () => void;
   readonly onStartRecording: () => void;
   readonly providerStartBlockedReason?: string;
+  readonly projectProcessing?: ProjectProcessingController;
 }) => {
   const { availability } = provider;
   const { recording } = takeReview;
@@ -82,7 +85,9 @@ export const StudioExistingVideoOverlay = ({
           onCreateCharacter={character.createForExistingVideo}
           onCreateWardrobeVariant={character.openWardrobeForExistingVideo}
           onFinish={onFinish}
-          {...(recording.presented ? { onSaveVideo: savedVideo.requestSavePresentedVideo } : {})}
+          {...(recording.presented && !projectProcessing
+            ? { onSaveVideo: savedVideo.requestSavePresentedVideo }
+            : {})}
           saveVideoState={saveVideoState}
           onAdjustVideo={savedVideo.openVideoAdjust}
           recordingSupported={
@@ -90,6 +95,7 @@ export const StudioExistingVideoOverlay = ({
           }
           onRecordVideo={onStartRecording}
           {...(providerStartBlockedReason ? { providerStartBlockedReason } : {})}
+          {...(projectProcessing ? { projectProcessing } : {})}
         />
       </Suspense>
     </OverlayPanel>

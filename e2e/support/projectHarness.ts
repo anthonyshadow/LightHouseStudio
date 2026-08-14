@@ -1,6 +1,8 @@
 import type {
   AppendProjectRevisionRequest,
   ProjectCurrentResponse,
+  ProjectProcessingAttempt,
+  ProjectProcessingCapability,
   ProjectSourceResponse,
   ProjectWorkingMediaResponse,
 } from '@studio/contracts';
@@ -12,7 +14,13 @@ const PROJECT_SOURCE_REVISION_ID = '4159225b-60f4-4f94-a3d5-08feee91a91d';
 const PROJECT_CREATIVE_REVISION_ID = '3ac244b9-ec36-4a1e-b95e-7bcf37eb0b2d';
 const PROJECT_WORKING_MEDIA_REVISION_ID = '80eb98cb-0dd4-4aac-8507-084789045d71';
 const PROJECT_POST_ADOPTION_CREATIVE_REVISION_ID = '66517242-ccf5-4fa5-bcee-5831039119c9';
+const PROJECT_PROCESSING_RESULT_REVISION_ID = '77117242-ccf5-4fa5-bcee-5831039119c9';
+const PROJECT_PROCESSING_RESULT_ASSET_ID = '88117242-ccf5-4fa5-bcee-5831039119c9';
 const PROJECT_TIMESTAMP = '2030-01-01T00:00:00.000Z';
+
+interface ProjectHarnessOptions {
+  readonly completeProcessingAfterReopen?: boolean;
+}
 
 export const emptyProjectFixture = (): ProjectCurrentResponse => ({
   project: {
@@ -67,7 +75,11 @@ export const emptyProjectFixture = (): ProjectCurrentResponse => ({
   },
 });
 
-export const installProjectHarness = async (page: Page, seed = false) => {
+export const installProjectHarness = async (
+  page: Page,
+  seed = false,
+  options: ProjectHarnessOptions = {},
+) => {
   let current: ProjectCurrentResponse | null = seed ? emptyProjectFixture() : null;
   let source: ProjectSourceResponse | null = null;
   let sourceBytes: Buffer | null = null;
@@ -77,6 +89,11 @@ export const installProjectHarness = async (page: Page, seed = false) => {
   const sourceOperationKeys: string[] = [];
   const checkpointRequests: AppendProjectRevisionRequest[] = [];
   const workingMediaOperationKeys: string[] = [];
+  const processingOperationKeys: string[] = [];
+  const processingProviderIntents: string[] = [];
+  let processingAttempt: ProjectProcessingAttempt | null = null;
+  let processingReconcileCount = 0;
+  let processingInitiatingRevisionId: string | null = null;
   await page.route('**/api/projects**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -86,6 +103,190 @@ export const installProjectHarness = async (page: Page, seed = false) => {
     const sourceContentPath = `${sourcePath}/content`;
     const revisionsPath = `${detailPath}/revisions`;
     const workingMediaPath = `${detailPath}/working-media`;
+    const processingPath = `${detailPath}/processing`;
+    if (url.pathname === `${processingPath}/current` && method === 'GET' && current) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          projectId: TEST_PROJECT_ID,
+          currentProjectVersion: current.project.version,
+          currentRevisionId: current.revision.id,
+          currentRevisionNumber: current.revision.revisionNumber,
+          attempt: processingAttempt,
+        }),
+      });
+      return;
+    }
+    if (url.pathname === `${processingPath}/history` && method === 'GET' && current) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          attempts: processingAttempt ? [processingAttempt] : [],
+          nextCursor: null,
+        }),
+      });
+      return;
+    }
+    if (
+      options.completeProcessingAfterReopen &&
+      url.pathname === `${processingPath}/submit` &&
+      method === 'POST' &&
+      current
+    ) {
+      const body = request.postDataJSON() as {
+        expectedVersion: number;
+        expectedRevisionNumber: number;
+        capability: ProjectProcessingCapability;
+      };
+      const operationId = request.headers()['idempotency-key'] ?? '';
+      processingOperationKeys.push(operationId);
+      processingProviderIntents.push(request.headers()['x-lightframe-provider-intent'] ?? '');
+      processingInitiatingRevisionId = current.revision.id;
+      processingAttempt = {
+        operationId,
+        projectId: TEST_PROJECT_ID,
+        capability: body.capability,
+        attemptNumber: 1,
+        retryOfOperationId: null,
+        initiatingRevisionId: current.revision.id,
+        initiatingRevisionNumber: current.revision.revisionNumber,
+        phase: 'accepted',
+        isCurrent: true,
+        ambiguous: false,
+        cancellation: 'unsupported',
+        retryPolicy: 'not-allowed',
+        blocksArchive: true,
+        createdAt: '2030-01-01T00:06:00.000Z',
+        updatedAt: '2030-01-01T00:06:00.000Z',
+        acceptedAt: '2030-01-01T00:06:00.000Z',
+        completedAt: null,
+        expiresAt: '2030-01-01T01:06:00.000Z',
+        nextPollAfterMs: 8_000,
+        result: null,
+        error: null,
+      };
+      current = {
+        ...current,
+        project: {
+          ...current.project,
+          status: 'processing',
+          version: body.expectedVersion + 1,
+          updatedAt: '2030-01-01T00:06:00.000Z',
+        },
+      };
+      if (source) source = { ...source, project: current.project, revision: current.revision };
+      await route.fulfill({
+        status: 202,
+        contentType: 'application/json',
+        body: JSON.stringify({ replayed: false, attempt: processingAttempt }),
+      });
+      return;
+    }
+    if (
+      options.completeProcessingAfterReopen &&
+      url.pathname === `${processingPath}/reconcile` &&
+      method === 'POST' &&
+      current &&
+      processingAttempt &&
+      source &&
+      sourceBytes
+    ) {
+      processingReconcileCount += 1;
+      const previous = current;
+      const operationId = processingAttempt.operationId;
+      const resultContentUrl = `${processingPath}/${operationId}/result/content`;
+      current = {
+        project: {
+          ...previous.project,
+          status: 'ready',
+          version: previous.project.version + 1,
+          currentRevisionId: PROJECT_PROCESSING_RESULT_REVISION_ID,
+          currentRevisionNumber: previous.revision.revisionNumber + 1,
+          updatedAt: '2030-01-01T00:07:00.000Z',
+        },
+        revision: {
+          id: PROJECT_PROCESSING_RESULT_REVISION_ID,
+          projectId: TEST_PROJECT_ID,
+          revisionNumber: previous.revision.revisionNumber + 1,
+          parentRevisionId: previous.revision.id,
+          parentRevisionNumber: previous.revision.revisionNumber,
+          snapshot: {
+            ...previous.revision.snapshot,
+            workingMedia: { kind: 'asset', assetId: PROJECT_PROCESSING_RESULT_ASSET_ID },
+            presentedMedia: { kind: 'asset', assetId: PROJECT_PROCESSING_RESULT_ASSET_ID },
+            workflowPhase: 'review',
+            updatedAt: '2030-01-01T00:07:00.000Z',
+          },
+          authorKind: 'system',
+          source: 'job-result',
+          createdAt: '2030-01-01T00:07:00.000Z',
+        },
+      };
+      workingMediaBytes = sourceBytes;
+      const workingContentUrl = `${workingMediaPath}/${PROJECT_PROCESSING_RESULT_REVISION_ID}/content`;
+      workingMedia = {
+        ...current,
+        isCurrent: true,
+        media: {
+          kind: 'media-asset',
+          reference: { kind: 'asset', assetId: PROJECT_PROCESSING_RESULT_ASSET_ID },
+          assetId: PROJECT_PROCESSING_RESULT_ASSET_ID,
+          savedVideoId: null,
+          videoVersionId: null,
+          mimeType: source.source.mimeType,
+          filename: 'character-swap-result.mp4',
+          sizeBytes: sourceBytes.byteLength,
+          checksumSha256: '1'.repeat(64),
+          container: source.source.container,
+          videoCodec: source.source.videoCodec,
+          audioCodec: source.source.audioCodec,
+          durationMs: source.source.durationMs,
+          width: source.source.width,
+          height: source.source.height,
+          hasAudio: source.source.hasAudio,
+          adoptedRevisionId: PROJECT_PROCESSING_RESULT_REVISION_ID,
+          adoptedRevisionNumber: current.revision.revisionNumber,
+          adoptedAt: '2030-01-01T00:07:00.000Z',
+          contentUrl: workingContentUrl,
+        },
+      };
+      source = { ...source, project: current.project, revision: current.revision };
+      processingAttempt = {
+        ...processingAttempt,
+        initiatingRevisionId:
+          processingInitiatingRevisionId ?? processingAttempt.initiatingRevisionId,
+        phase: 'complete',
+        blocksArchive: false,
+        updatedAt: '2030-01-01T00:07:00.000Z',
+        completedAt: '2030-01-01T00:07:00.000Z',
+        nextPollAfterMs: null,
+        result: {
+          assetId: PROJECT_PROCESSING_RESULT_ASSET_ID,
+          retainedAt: '2030-01-01T00:07:00.000Z',
+          historical: false,
+          media: {
+            mimeType: source.source.mimeType,
+            container: source.source.container,
+            videoCodec: source.source.videoCodec,
+            audioCodec: source.source.audioCodec,
+            durationMs: source.source.durationMs,
+            width: source.source.width,
+            height: source.source.height,
+            sizeBytes: sourceBytes.byteLength,
+            hasAudio: source.source.hasAudio,
+          },
+          contentUrl: resultContentUrl,
+        },
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ replayed: true, attempt: processingAttempt }),
+      });
+      return;
+    }
     if (url.pathname === '/api/projects' && method === 'GET') {
       const lifecycle = url.searchParams.get('lifecycle');
       const projects =
@@ -420,5 +621,10 @@ export const installProjectHarness = async (page: Page, seed = false) => {
     sourceOperationKeys,
     checkpointRequests,
     workingMediaOperationKeys,
+    processingOperationKeys,
+    processingProviderIntents,
+    get processingReconcileCount() {
+      return processingReconcileCount;
+    },
   };
 };

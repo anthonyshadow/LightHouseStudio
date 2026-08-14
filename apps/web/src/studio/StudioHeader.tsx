@@ -1,9 +1,10 @@
 import { useTheme } from '@emotion/react';
 import type { AuthenticatedUser } from '@studio/contracts';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { AccountMenu } from '../features/account/AccountMenu';
 import type { BrowserCapabilities, ProviderAvailability } from '../features/media-session';
 import { Button } from '../ui';
+import { useDismissiblePopover } from '../ui/primitives/useDismissiblePopover';
 import {
   brandStyles,
   capabilityDetailStyles,
@@ -77,25 +78,7 @@ const StatusMenu = ({
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const closeOutside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
-        onOpenChange(false);
-      }
-    };
-    const closeWithEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      onOpenChange(false);
-      triggerRef.current?.focus();
-    };
-    document.addEventListener('pointerdown', closeOutside, true);
-    document.addEventListener('keydown', closeWithEscape);
-    return () => {
-      document.removeEventListener('pointerdown', closeOutside, true);
-      document.removeEventListener('keydown', closeWithEscape);
-    };
-  }, [onOpenChange, open]);
+  useDismissiblePopover({ open, onOpenChange, rootRef, triggerRef });
 
   return (
     <div ref={rootRef} css={capabilityStyles(theme)} aria-label="Integration availability">

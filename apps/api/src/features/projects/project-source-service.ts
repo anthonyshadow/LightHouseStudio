@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import {
   projectSourceResponseSchema,
   type InspectedVideo,
@@ -7,7 +7,6 @@ import {
 import {
   acceptProjectSource,
   ProjectRuleError,
-  type ProjectAggregate,
   type ProjectConflict,
   type ProjectMediaReference,
   type ProjectSourceKind,
@@ -20,12 +19,14 @@ import type {
 } from '../saved-videos/saved-video-repository.js';
 import { inspectSavedVideoFile } from '../saved-videos/saved-video-inspection.js';
 import { safeSavedVideoFilename } from '../saved-videos/saved-video-service.js';
-import type {
-  ProjectCurrentRead,
-  ProjectRepository,
-  ProjectRetentionPolicy,
-  ProjectSourceRecord,
+import {
+  projectAggregateForCurrent,
+  type ProjectCurrentRead,
+  type ProjectRepository,
+  type ProjectRetentionPolicy,
+  type ProjectSourceRecord,
 } from './project-repository.js';
+import { projectRequestFingerprint } from './project-request-fingerprint.js';
 import { projectAssetLinksForRevision } from './project-snapshot-relations.js';
 import { publicProjectCurrent } from './project-service.js';
 import { inspectStoredProjectMedia } from './project-media-inspection.js';
@@ -56,9 +57,6 @@ interface ReuseSourceInput {
   readonly videoVersionId: string;
 }
 
-const fingerprint = (value: unknown): string =>
-  createHash('sha256').update(JSON.stringify(value)).digest('hex');
-
 const sourceContentUrl = (projectId: string): string =>
   `/api/projects/${encodeURIComponent(projectId)}/source/content`;
 
@@ -86,15 +84,6 @@ const sourceResponse = (
       contentUrl: sourceContentUrl(source.projectId),
     },
   });
-
-const currentAggregate = (current: ProjectCurrentRead): ProjectAggregate => ({
-  project: current.project,
-  revisions: [current.revision],
-  assetLinks: [],
-  versionReferenceLinks: [],
-  jobLinks: [],
-  outputLinks: [],
-});
 
 const versionMediaReference = (
   savedVideoId: string,
@@ -161,7 +150,7 @@ export class ProjectSourceService {
       await this.#assertProjectAccessible(input.ownerUserId, input.projectId);
       const inspected = await this.#inspect(input.sourcePath);
       const filename = safeSavedVideoFilename(input.filename, inspected.mimeType);
-      const requestFingerprint = fingerprint({
+      const requestFingerprint = projectRequestFingerprint({
         version: 1,
         projectId: input.projectId,
         expectedVersion: input.expectedVersion,
@@ -248,7 +237,7 @@ export class ProjectSourceService {
         ownerUserId: input.ownerUserId,
         projectId: input.projectId,
         operationKey: input.operationKey,
-        requestFingerprint: fingerprint({
+        requestFingerprint: projectRequestFingerprint({
           version: 1,
           projectId: input.projectId,
           expectedVersion: input.expectedVersion,
@@ -312,7 +301,7 @@ export class ProjectSourceService {
     let accepted;
     try {
       accepted = acceptProjectSource(
-        currentAggregate(current),
+        projectAggregateForCurrent(current),
         {
           expectedProjectVersion: input.expectedVersion,
           expectedRevisionNumber: input.expectedRevisionNumber,

@@ -38,9 +38,10 @@ Project session beside current working media. **Save creative setup** records th
 and Variant IDs plus exact applied labels, resource revisions, immutable reference ID, prompt, and
 treatment settings as one semantic checkpoint. It does not copy or take lifecycle ownership of the
 Character record. If that owner-scoped record later disappears or changes, the Project retains its
-historical applied explanation and offers **Choose another**. Project **Start** remains disabled;
-this configuration never requests a token, SDK connection, or provider job. The standalone live
-journey above is unchanged.
+historical applied explanation and offers **Choose another**. Project advanced-live **Start**
+remains disabled. The Project existing-video editor may explicitly **Start Project Character
+Swap** through the recoverable exact-revision command; saving configuration alone never requests a
+token, SDK connection, or provider job. The standalone live journey above is unchanged.
 
 ## Guards and recovery
 

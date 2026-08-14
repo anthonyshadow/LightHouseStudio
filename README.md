@@ -22,9 +22,13 @@ semantic checkpoints: reusable Character/Variant, Outfit, Voice, prompt,
 treatment, capture metadata, and validated local-edit state save through the one Project session.
 A validated local Render preview or exact same-owner retained Media Asset/Saved Video Version can
 be explicitly adopted as durable working media without replacing the original or creating output
-provenance. Project provider processing and output saving remain future steps. Rich Campaign
-planning and multi-format content creation remain future product directions. The app is not
-approved for LAN, tunnel, proxy, or public exposure.
+provenance. Project Character Swap and Virtual Try On now start through one exact-revision,
+pre-linked processing command, reconnect accepted work after refresh, require an explicit
+cost-bearing retry, and present only a durably retained current result as working media. Project
+provider Voice remains gated because its synchronous adapter has no durable reconnect identity;
+Project output saving remains the next implementation step. Rich Campaign planning and
+multi-format content creation remain future product directions. The app is not approved for LAN,
+tunnel, proxy, or public exposure.
 
 ## Status
 

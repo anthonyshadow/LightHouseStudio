@@ -67,14 +67,16 @@ owns the detailed sequence and launch evidence.
 
 ## Phase 2 — Campaign and Project video workspace MVP
 
-**Status: in progress; invariant correction, lifecycle authority/API, the empty-Project workspace,
-and optional Campaign organization are implemented. Durable Project source acceptance is next.**
+**Status: in progress through recoverable visual processing; invariant correction, lifecycle,
+Campaign organization, durable source/working media, creative checkpoints, and Project-bound
+Character Swap/VTO result retention are implemented. Atomic output save is next.**
 
 - Correct the dormant Project foundation's revision and media-reference lineage, transaction/replay,
   retention, status, read-bounding, and cleanup invariants before exposing writes.
 - Maintain the implemented owner-derived Project services, HTTP routes, local/relational
   persistence parity, and accessible Projects workspace for Quick Start, list, open, rename,
-  archive, and restore. The workspace remains lifecycle-only until durable source acceptance.
+  archive, restore, source/working-media management, creative setup, and recoverable visual
+  processing.
 - Maintain the implemented deliberately small Campaign aggregate—name and optional brief—that groups Projects
   without owning their media or processing state.
 - Keep Campaign membership optional: one Campaign may group many Projects, a Project belongs to
@@ -83,8 +85,9 @@ and optional Campaign organization are implemented. Durable Project source accep
   Campaign deletion requires all Projects to be detached or moved.
 - Accept a durable recorded, uploaded, or explicitly reused video source before calling a Project
   resumable; restore exact Project state after navigation or restart.
-- Connect Project revisions to exact applied creative intent, current edit specifications,
-  processing jobs, durable results, and Saved Video/Video Version outputs.
+- Maintain exact applied creative intent, current edit specifications, pre-linked processing jobs,
+  and durable current-or-historical results. Add the still-future atomic Saved Video/Video Version
+  output boundary without creating another result authority.
 - Preserve Project Revision as creative state and Video Version as playable media history; expose
   bounded history and download an exact ready Version.
 - Keep one active focused video workflow per Project. Do not implement the deferred Deliverable
