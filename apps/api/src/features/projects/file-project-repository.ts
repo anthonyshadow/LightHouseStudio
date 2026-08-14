@@ -13,6 +13,7 @@ import {
   type ProjectAssetLink,
   type ProjectJobLink,
   type ProjectOutputLink,
+  type ProjectRevision,
 } from '@studio/domain';
 import type {
   ResumableVideoProcessingJob,
@@ -520,6 +521,19 @@ export class FileProjectRepository
       ({ project }) => project.id === projectId && project.deletedAt === null,
     );
     return aggregate === undefined ? null : currentRead(aggregate);
+  }
+
+  async getRevision(
+    ownerUserId: string,
+    projectId: string,
+    revisionNumber: number,
+  ): Promise<ProjectRevision | null> {
+    const aggregate = (await this.#read(ownerUserId)).projects.find(
+      ({ project }) => project.id === projectId && project.deletedAt === null,
+    );
+    return (
+      aggregate?.revisions.find((revision) => revision.revisionNumber === revisionNumber) ?? null
+    );
   }
 
   async getCurrentWithSource(
@@ -2026,6 +2040,21 @@ export class FileProjectRepository
     return (
       aggregate?.outputLinks.find((output) => output.videoVersionId === videoVersionId) ?? null
     );
+  }
+
+  async assignedSavedVideoIds(
+    ownerUserId: string,
+    savedVideoIds: readonly string[],
+  ): Promise<ReadonlySet<string>> {
+    const candidates = new Set(savedVideoIds);
+    const assigned = new Set<string>();
+    if (candidates.size === 0) return assigned;
+    for (const aggregate of (await this.#read(ownerUserId)).projects) {
+      for (const output of aggregate.outputLinks) {
+        if (candidates.has(output.savedVideoId)) assigned.add(output.savedVideoId);
+      }
+    }
+    return assigned;
   }
 
   async #link<Link extends ProjectJobLink | ProjectOutputLink>(

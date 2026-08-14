@@ -1,13 +1,18 @@
 import {
   projectConflictResponseSchema,
   projectCurrentResponseSchema,
+  projectHistoryResponseSchema,
+  projectOutputHistoryResponseSchema,
   projectSourceResponseSchema,
   saveProjectOutputResponseSchema,
   projectWorkingMediaResponseSchema,
   projectsResponseSchema,
+  type AdoptProjectWorkingMediaRequest,
   type AppendProjectRevisionRequest,
   type ProjectConflictContract,
   type ProjectCurrentResponse,
+  type ProjectHistoryResponse,
+  type ProjectOutputHistoryResponse,
   type ProjectSourceResponse,
   type SaveProjectOutputRequest,
   type SaveProjectOutputResponse,
@@ -334,13 +339,7 @@ export const reuseProjectWorkingMedia = (input: {
   readonly operationKey: string;
   readonly expectedVersion: number;
   readonly expectedRevisionNumber: number;
-  readonly media:
-    | { readonly kind: 'asset'; readonly assetId: string }
-    | {
-        readonly kind: 'saved-video-version';
-        readonly savedVideoId: string;
-        readonly videoVersionId: string;
-      };
+  readonly media: AdoptProjectWorkingMediaRequest['media'];
   readonly localEdit: ProjectCurrentResponse['revision']['snapshot']['localEdit'];
   readonly signal?: AbortSignal;
 }): Promise<ProjectWorkingMediaResponse> =>
@@ -382,3 +381,50 @@ export const saveProjectOutput = (input: {
     invalidProjectResponse,
     parseProjectConflict,
   );
+
+export const getProjectHistory = (input: {
+  readonly projectId: string;
+  readonly cursor?: string;
+  readonly signal?: AbortSignal;
+}): Promise<ProjectHistoryResponse> => {
+  const query = new URLSearchParams({ pageSize: '20' });
+  if (input.cursor) query.set('cursor', input.cursor);
+  return requestJson(
+    `/api/projects/${encodeURIComponent(input.projectId)}/history?${query.toString()}`,
+    {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+      ...(input.signal ? { signal: input.signal } : {}),
+    },
+    projectHistoryResponseSchema,
+    invalidProjectResponse,
+  );
+};
+
+export const getProjectOutputs = (input: {
+  readonly projectId: string;
+  readonly cursor?: string;
+  readonly signal?: AbortSignal;
+}): Promise<ProjectOutputHistoryResponse> => {
+  const query = new URLSearchParams({ pageSize: '20' });
+  if (input.cursor) query.set('cursor', input.cursor);
+  return requestJson(
+    `/api/projects/${encodeURIComponent(input.projectId)}/outputs?${query.toString()}`,
+    {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+      ...(input.signal ? { signal: input.signal } : {}),
+    },
+    projectOutputHistoryResponseSchema,
+    invalidProjectResponse,
+  );
+};
+
+export const projectOutputContentUrl = (
+  projectId: string,
+  videoVersionId: string,
+  download = false,
+): string => {
+  const url = `/api/projects/${encodeURIComponent(projectId)}/outputs/${encodeURIComponent(videoVersionId)}/content`;
+  return download ? `${url}?download=true` : url;
+};

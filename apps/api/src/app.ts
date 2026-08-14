@@ -60,6 +60,7 @@ import { registerProjectRoutes } from './features/projects/routes.js';
 import { ProjectSourceService } from './features/projects/project-source-service.js';
 import { ProjectWorkingMediaService } from './features/projects/project-working-media-service.js';
 import { ProjectOutputService } from './features/projects/project-output-service.js';
+import { ProjectHistoryService } from './features/projects/project-history-service.js';
 import {
   isProjectProcessingRepository,
   type ProjectProcessingRepository,
@@ -366,6 +367,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
   const savedVideoService = new SavedVideoService(savedVideoRepository, assetBytes, {
     deleteStoredAssetsOnManualDelete: dependencies.config.assetStoreProvider === 'r2',
     ...(projectRetention === undefined ? {} : { projectRetention }),
+    ...(projectRepository === undefined ? {} : { projectOutputs: projectRepository }),
   });
   const projectSourceService =
     projectRepository === undefined
@@ -391,6 +393,10 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
           savedVideoRepository,
           assetBytes,
         );
+  const projectHistoryService =
+    projectRepository === undefined
+      ? undefined
+      : new ProjectHistoryService(projectRepository, savedVideoRepository);
   const projectProcessingService =
     projectRepository === undefined || projectProcessingRepository === undefined
       ? undefined
@@ -441,6 +447,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
     projectSourceService,
     projectWorkingMediaService,
     projectOutputService,
+    projectHistoryService,
   );
   registerProjectProcessingRoutes(app, projectProcessingService);
   registerCampaignRoutes(app, campaignService);

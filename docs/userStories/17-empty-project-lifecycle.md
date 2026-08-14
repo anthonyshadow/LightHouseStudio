@@ -114,12 +114,22 @@ provider work.
     conflicts without another Version or partial aggregate advancement. Removing the Saved Video
     from the global library explains and preserves exact Project-scoped Version access while any
     active, archived, or tombstoned Project output retains it.
+25. Project history uses separate bounded cursor pages for Project changes, processing attempts and
+    retained stale results, and immutable output Versions. Output rows distinguish the producing
+    revision from the later revision that made the Version current. Lists contain metadata only;
+    preview and **Download** fetch one exact retained Version through Project-scoped content.
+26. **Use in Project** can explicitly adopt one exact retained output Version or valid stale
+    processing result as working media after current lifecycle and CAS validation. It never changes
+    the immutable original, Saved Video current pointer, or Add Version target, and stale work is
+    never promoted automatically. A removed global Saved Video remains reachable only through an
+    exact same-owner retaining Project relation with truthful retention copy.
 
 ## Boundaries
 
 This story includes bounded semantic creative/edit checkpoints, working-media adoption, recoverable
-visual processing, and atomic Saved Video output save, but no Campaign expansion, Version-history
-UI, Project Download changes, generic Export record, or IndexedDB Project data. Project source
-selection, session hydration, configuration, local adoption, and output save start no provider.
+visual processing, atomic Saved Video output save, bounded history categories, and exact-Version
+preview/reuse/Download, but no Campaign expansion, restore/rollback, Variation, generic Export
+record, or IndexedDB Project data. Project source selection, session hydration, configuration,
+local adoption, history viewing, and output save start no provider.
 Standalone existing-video behavior retains its separate save/replace contract. Project
 server/repository authority, retention, and cleanup remain as documented in Architecture.

@@ -255,11 +255,12 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   expectNoExternalProviderTraffic(network);
 });
 
-test('a Project saves a new Video, explicitly appends a Version, and reconciles response loss after refresh', async ({
+test('a Project saves exact Versions, reconciles response loss, and retains truthful history', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
   const projects = await installProjectHarness(page, true, {
+    includeUnassignedVideo: true,
     loseAppendOutputResponseOnce: true,
   });
   const fixture = await loadDecodableH264VideoFixture();
@@ -296,6 +297,59 @@ test('a Project saves a new Video, explicitly appends a Version, and reconciles 
   expect(projects.outputOperationKeys).toHaveLength(3);
   expect(projects.outputOperationKeys[2]).toBe(pendingOperationId);
   expect(projects.outputRequests[2]).toEqual(projects.outputRequests[1]);
+
+  const versionHistory = page.getByRole('list', { name: 'Saved video Version history' });
+  const olderVersion = versionHistory.getByRole('listitem').filter({ hasText: 'Version 1' });
+  await expect(
+    page.getByRole('heading', { name: 'Processing attempts and results' }),
+  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Project changes' })).toBeVisible();
+  await expect(olderVersion).toContainText('Produced by Project revision 2');
+  await expect(versionHistory).toContainText('Version 2 · Current in Saved Videos');
+
+  const [firstDownload] = await Promise.all([
+    page.waitForEvent('download'),
+    olderVersion.getByRole('link', { name: 'Download' }).click(),
+  ]);
+  expect(firstDownload.suggestedFilename()).toBe('project-output-source.mp4');
+
+  await olderVersion.getByRole('button', { name: 'Preview Version 1' }).click();
+  const versionPreview = page.getByRole('dialog', { name: 'Launch master · Version 1' });
+  await expect(versionPreview.getByLabel('Preview Launch master, Version 1')).toBeVisible();
+  await versionPreview.getByRole('button', { name: 'Use in Project' }).click();
+  await expect(
+    page.getByText(/immutable original and Saved Video current pointer were not changed/u),
+  ).toBeVisible();
+  expect(projects.reuseOperationKeys).toHaveLength(1);
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: 'Add Version' }).click();
+  await expect(page.getByRole('dialog', { name: 'Choose Add Version target' })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: 'Lightframe Demo account menu' }).click();
+  await page.getByRole('menuitem', { name: 'Saved Videos (exits Project)' }).click();
+  const gallery = page.getByRole('dialog', { name: 'Saved Videos' });
+  await expect(gallery.getByText('Unassigned Content').first()).toBeVisible();
+  await expect(gallery.getByRole('heading', { name: 'Legacy unassigned' })).toBeVisible();
+  await expect(gallery.getByRole('button', { name: 'Load in Studio' }).first()).toBeEnabled();
+
+  await gallery.getByLabel('More actions for Launch master').click();
+  page.once('dialog', (dialog) => void dialog.accept());
+  await gallery.getByRole('button', { name: 'Delete' }).click();
+  await expect(gallery.getByRole('heading', { name: 'Launch master' })).toHaveCount(0);
+
+  await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+  const retainedHistory = page.getByRole('list', { name: 'Saved video Version history' });
+  const retainedOlderVersion = retainedHistory
+    .getByRole('listitem')
+    .filter({ hasText: 'Version 1' });
+  await expect(retainedOlderVersion).toContainText('Removed from Saved Videos');
+  const [retainedDownload] = await Promise.all([
+    page.waitForEvent('download'),
+    retainedOlderVersion.getByRole('link', { name: 'Download' }).click(),
+  ]);
+  expect(retainedDownload.suggestedFilename()).toBe('project-output-source.mp4');
   expectNoExternalProviderTraffic(network);
 });
 

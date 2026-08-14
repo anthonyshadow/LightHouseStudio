@@ -1,6 +1,9 @@
 import type {
+  AdoptProjectWorkingMediaRequest,
   AppendProjectRevisionRequest,
   ProjectCurrentResponse,
+  ProjectHistoryResponse,
+  ProjectOutputHistoryItem,
   ProjectProcessingAttempt,
   ProjectProcessingCapability,
   ProjectSourceResponse,
@@ -24,6 +27,7 @@ const PROJECT_TIMESTAMP = '2030-01-01T00:00:00.000Z';
 
 interface ProjectHarnessOptions {
   readonly completeProcessingAfterReopen?: boolean;
+  readonly includeUnassignedVideo?: boolean;
   readonly loseAppendOutputResponseOnce?: boolean;
 }
 
@@ -98,23 +102,58 @@ export const installProjectHarness = async (
   const processingProviderIntents: string[] = [];
   const outputOperationKeys: string[] = [];
   const outputRequests: SaveProjectOutputRequest[] = [];
+  const reuseOperationKeys: string[] = [];
   const outputReceipts = new Map<
     string,
     { readonly fingerprint: string; readonly response: SaveProjectOutputResponse }
   >();
   const outputSavedVideos = new Map<string, SavedVideoDetail>();
+  const removedSavedVideoIds = new Set<string>();
   let processingAttempt: ProjectProcessingAttempt | null = null;
   let processingReconcileCount = 0;
   let processingInitiatingRevisionId: string | null = null;
   let loseAppendOutputResponse = options.loseAppendOutputResponseOnce ?? false;
 
+  if (options.includeUnassignedVideo) {
+    const videoId = '75117242-ccf5-4fa5-bcee-5831039119c9';
+    const version = {
+      id: '76117242-ccf5-4fa5-bcee-5831039119c9',
+      videoId,
+      ordinal: 1,
+      origin: 'legacy-import' as const,
+      characterName: null,
+      characterVariantName: null,
+      sourceVersionId: null,
+      mimeType: 'video/mp4' as const,
+      filename: 'legacy-unassigned.mp4',
+      sizeBytes: 1_024,
+      durationMs: 1_000,
+      width: 1_280,
+      height: 720,
+      createdAt: '2029-12-31T23:59:00.000Z',
+    };
+    outputSavedVideos.set(videoId, {
+      id: videoId,
+      title: 'Legacy unassigned',
+      status: 'ready',
+      currentVersion: version,
+      sourceVideoId: null,
+      versionCount: 1,
+      thumbnailAvailable: false,
+      assignment: 'unassigned',
+      createdAt: version.createdAt,
+      updatedAt: version.createdAt,
+      versions: [version],
+    });
+  }
+
   await page.route('**/api/videos**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
     if (url.pathname === '/api/videos' && request.method() === 'GET') {
-      const videos: SavedVideoSummary[] = [...outputSavedVideos.values()].map(
-        ({ versions: _versions, ...summary }) => summary,
-      );
+      const videos: SavedVideoSummary[] = [...outputSavedVideos.values()]
+        .filter(({ id }) => !removedSavedVideoIds.has(id))
+        .map(({ versions: _versions, ...summary }) => summary);
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -127,6 +166,46 @@ export const installProjectHarness = async (
             formats: videos.length === 0 ? [] : ['landscape'],
           },
         }),
+      });
+      return;
+    }
+    const videoPath = url.pathname.match(/^\/api\/videos\/([^/]+)$/u);
+    if (videoPath && request.method() === 'GET') {
+      const video = outputSavedVideos.get(videoPath[1]!);
+      if (video && !removedSavedVideoIds.has(video.id)) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(video),
+        });
+      } else {
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'not_found', message: 'Video unavailable.' } }),
+        });
+      }
+      return;
+    }
+    if (videoPath && request.method() === 'DELETE') {
+      if (outputSavedVideos.has(videoPath[1]!)) removedSavedVideoIds.add(videoPath[1]!);
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    const versionContentPath = url.pathname.match(
+      /^\/api\/videos\/([^/]+)\/versions\/([^/]+)\/content$/u,
+    );
+    if (versionContentPath && sourceBytes) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'video/mp4',
+        headers: {
+          'Content-Length': String(sourceBytes.byteLength),
+          'Content-Disposition': url.searchParams.has('download')
+            ? 'attachment; filename="project-output.mp4"'
+            : 'inline; filename="project-output.mp4"',
+        },
+        ...(request.method() === 'HEAD' ? {} : { body: sourceBytes }),
       });
       return;
     }
@@ -144,6 +223,112 @@ export const installProjectHarness = async (
     const workingMediaPath = `${detailPath}/working-media`;
     const processingPath = `${detailPath}/processing`;
     const outputPath = `${detailPath}/outputs`;
+    const outputItems = (): ProjectOutputHistoryItem[] => {
+      const seen = new Set<string>();
+      return [...outputReceipts.values()]
+        .map(({ response }) => response)
+        .filter(({ output }) => {
+          if (seen.has(output.videoVersionId)) return false;
+          seen.add(output.videoVersionId);
+          return true;
+        })
+        .reverse()
+        .flatMap((response) => {
+          const savedVideo = outputSavedVideos.get(response.output.savedVideoId);
+          const version = savedVideo?.versions.find(
+            ({ id }) => id === response.output.videoVersionId,
+          );
+          if (!savedVideo || !version) return [];
+          return [
+            {
+              kind: 'saved-video-version' as const,
+              output: response.output,
+              savedVideo: {
+                id: savedVideo.id,
+                title: savedVideo.title,
+                libraryStatus: removedSavedVideoIds.has(savedVideo.id)
+                  ? ('removed' as const)
+                  : ('ready' as const),
+                currentVersionId: savedVideo.currentVersion.id,
+              },
+              version,
+              referenceRevision: {
+                revisionId: response.revision.id,
+                revisionNumber: response.revision.revisionNumber,
+                createdAt: response.revision.createdAt,
+              },
+              isCurrentForProject:
+                current?.revision.snapshot.lastSuccessfulOutput?.videoVersionId === version.id,
+              contentUrl: `${outputPath}/${version.id}/content`,
+            },
+          ];
+        });
+    };
+    if (url.pathname === `${detailPath}/history` && method === 'GET' && current) {
+      const response: ProjectHistoryResponse = {
+        revisions: [
+          {
+            kind: 'project-change',
+            revisionId: current.revision.id,
+            revisionNumber: current.revision.revisionNumber,
+            parentRevisionId: current.revision.parentRevisionId,
+            parentRevisionNumber: current.revision.parentRevisionNumber,
+            source: current.revision.source,
+            authorKind: current.revision.authorKind,
+            workflowPhase: current.revision.snapshot.workflowPhase,
+            outputReference: current.revision.snapshot.lastSuccessfulOutput,
+            createdAt: current.revision.createdAt,
+          },
+        ],
+        nextCursor: null,
+      };
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(response),
+      });
+      return;
+    }
+    if (url.pathname === outputPath && method === 'GET' && current) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ outputs: outputItems(), nextCursor: null }),
+      });
+      return;
+    }
+    const exactOutputPath = url.pathname.match(
+      new RegExp(`^${outputPath}/([^/]+)(/content)?$`, 'u'),
+    );
+    if (exactOutputPath && method === 'GET') {
+      const item = outputItems().find(({ version }) => version.id === exactOutputPath[1]);
+      if (!item) {
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'not_found', message: 'Output unavailable.' } }),
+        });
+      } else if (exactOutputPath[2] === '/content' && sourceBytes) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'video/mp4',
+          headers: {
+            'Content-Length': String(sourceBytes.byteLength),
+            'Content-Disposition': url.searchParams.has('download')
+              ? `attachment; filename="${item.version.filename}"`
+              : `inline; filename="${item.version.filename}"`,
+          },
+          body: sourceBytes,
+        });
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(item),
+        });
+      }
+      return;
+    }
     if (url.pathname === outputPath && method === 'POST' && current && source && sourceBytes) {
       const operationId = request.headers()['idempotency-key'] ?? '';
       const body = request.postDataJSON() as SaveProjectOutputRequest;
@@ -238,6 +423,7 @@ export const installProjectHarness = async (
                 body.media.kind === 'saved-video-version' ? body.media.savedVideoId : null,
               versionCount: 1,
               thumbnailAvailable: false,
+              assignment: 'project-output',
               createdAt,
               updatedAt: createdAt,
               versions: [version],
@@ -672,6 +858,107 @@ export const installProjectHarness = async (
       });
       return;
     }
+    if (url.pathname === `${workingMediaPath}/reuse` && method === 'POST' && current && source) {
+      const operationKey = request.headers()['idempotency-key'] ?? '';
+      reuseOperationKeys.push(operationKey);
+      const body = request.postDataJSON() as AdoptProjectWorkingMediaRequest;
+      const previous = current;
+      const revisionNumber = previous.revision.revisionNumber + 1;
+      const revisionId = `86117242-ccf5-4fa5-bcee-${revisionNumber.toString().padStart(12, '0')}`;
+      const reusableVersion = body.media.kind === 'saved-video-version' ? body.media : null;
+      const output =
+        reusableVersion !== null
+          ? outputItems().find(
+              ({ savedVideo, version }) =>
+                savedVideo.id === reusableVersion.savedVideoId &&
+                version.id === reusableVersion.videoVersionId,
+            )
+          : undefined;
+      if (
+        body.expectedVersion !== previous.project.version ||
+        body.expectedRevisionNumber !== previous.revision.revisionNumber ||
+        (body.media.kind === 'saved-video-version' && !output)
+      ) {
+        await route.fulfill({
+          status: 409,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: { code: 'conflict', message: 'The Project changed.' },
+            conflict: {
+              kind: 'project-version',
+              projectId: TEST_PROJECT_ID,
+              expectedVersion: body.expectedVersion,
+              actualVersion: previous.project.version,
+            },
+          }),
+        });
+        return;
+      }
+      current = {
+        project: {
+          ...previous.project,
+          status: 'ready',
+          version: previous.project.version + 1,
+          currentRevisionId: revisionId,
+          currentRevisionNumber: revisionNumber,
+          updatedAt: '2030-01-01T00:12:00.000Z',
+        },
+        revision: {
+          id: revisionId,
+          projectId: TEST_PROJECT_ID,
+          revisionNumber,
+          parentRevisionId: previous.revision.id,
+          parentRevisionNumber: previous.revision.revisionNumber,
+          snapshot: {
+            ...previous.revision.snapshot,
+            workingMedia: body.media,
+            presentedMedia: body.media,
+            lastSuccessfulOutput: null,
+            workflowPhase: 'review',
+            updatedAt: '2030-01-01T00:12:00.000Z',
+          },
+          authorKind: 'user',
+          source: 'user-edit',
+          createdAt: '2030-01-01T00:12:00.000Z',
+        },
+      };
+      const version = output?.version;
+      workingMediaBytes = sourceBytes;
+      workingMedia = {
+        ...current,
+        isCurrent: true,
+        media: {
+          kind: body.media.kind === 'saved-video-version' ? 'saved-video-version' : 'media-asset',
+          reference: body.media,
+          assetId: source.revision.snapshot.sourceAssetId!,
+          savedVideoId: body.media.kind === 'saved-video-version' ? body.media.savedVideoId : null,
+          videoVersionId:
+            body.media.kind === 'saved-video-version' ? body.media.videoVersionId : null,
+          mimeType: version?.mimeType ?? source.source.mimeType,
+          filename: version?.filename ?? source.source.filename,
+          sizeBytes: version?.sizeBytes ?? source.source.sizeBytes,
+          checksumSha256: '3'.repeat(64),
+          container: source.source.container,
+          videoCodec: source.source.videoCodec,
+          audioCodec: source.source.audioCodec,
+          durationMs: version?.durationMs ?? source.source.durationMs,
+          width: version?.width ?? source.source.width,
+          height: version?.height ?? source.source.height,
+          hasAudio: source.source.hasAudio,
+          adoptedRevisionId: revisionId,
+          adoptedRevisionNumber: revisionNumber,
+          adoptedAt: '2030-01-01T00:12:00.000Z',
+          contentUrl: `${workingMediaPath}/${revisionId}/content`,
+        },
+      };
+      source = { ...source, project: current.project, revision: current.revision };
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify(workingMedia),
+      });
+      return;
+    }
     if (url.pathname === workingMediaPath && method === 'POST' && current) {
       const operationKey = request.headers()['idempotency-key'] ?? '';
       workingMediaOperationKeys.push(operationKey);
@@ -856,6 +1143,7 @@ export const installProjectHarness = async (
     processingProviderIntents,
     outputOperationKeys,
     outputRequests,
+    reuseOperationKeys,
     get processingReconcileCount() {
       return processingReconcileCount;
     },

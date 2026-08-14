@@ -138,6 +138,11 @@ The retained suite protects:
   replay; append and Project CAS; local composite-journal restart at every commit boundary;
   relational transaction/concurrency; tombstoned-library Project retention/content; and browser
   response-loss refresh reconciliation without a duplicate Version;
+- bounded metadata-only Project revision/output/processing cursors; distinct producing and
+  output-reference revisions; exact old-Version selection, preview, reuse, and Download; retained
+  tombstoned Project content; explicit stale-result adoption; legacy Unassigned Content without
+  producer backfill; and proof that these actions do not move the Saved Video pointer or infer an
+  Add Version target;
 - a no-provider Chromium journey from reusable Character selection through one Project semantic
   checkpoint, local edit/Render preview, explicit working-media adoption, and refresh, including
   denial of unexpected external HTTP and WebSocket traffic;
