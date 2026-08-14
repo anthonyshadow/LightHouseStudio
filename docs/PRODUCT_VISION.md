@@ -17,9 +17,9 @@ The implemented product is narrower than that vision. Today, Lightframe Studio i
 single-operator studio centered on video creation and transformation. It records or imports video,
 supports local editing and optional creative transformations, maintains reusable characters,
 outfits, and voices, saves versioned video outputs, and downloads finished work from Saved Videos.
-It also provides resumable video Projects, atomic Project output save, and lightweight optional
-Campaign organization. Bounded Project history/download UI, multi-format creation, collaboration,
-and direct publishing do not exist yet.
+It also provides resumable video Projects, atomic Project output save, lightweight optional Campaign
+organization, bounded Project history, and exact-Version preview, reuse, and Download. Multi-format
+creation, collaboration, and direct publishing do not exist yet.
 
 The intended product lifecycle is:
 
@@ -91,15 +91,17 @@ The current Studio supports:
 Projects and Campaigns have authenticated browser and HTTP lifecycle surfaces. A Project can accept
 and resume one immutable video source, checkpoint intent, adopt or retain exact working media,
 recover visual processing, and explicitly save its ready current output. Standalone Studio creative
-work is not automatically placed in a Project, existing Saved Videos are not backfilled, and
-Project history/download UI remains future work.
+work is not automatically placed in a Project, legacy Saved Videos are not backfilled, and
+Project history separates bounded revision, processing, and output-Version views; an exact retained
+Version can be previewed, explicitly reused as working media, or downloaded without changing the
+Saved Video current pointer.
 
 ### Near-term product direction
 
-The next coherent product layer exposes bounded Project revision/output history and exact-Version
-delivery over the implemented immutable source, creative, processing, and atomic output authority.
-A Project remains one focused video workflow and may stand alone; Campaign membership remains
-optional, owner-constrained, and non-cascading.
+The next product work begins only after the local Campaign/Project MVP acceptance record is complete.
+Near-term evidence should validate the implemented workflow, then prioritize only demonstrated needs
+for organization, creative variations, or delivery. A Project remains one focused video workflow and
+may stand alone; Campaign membership remains optional, owner-constrained, and non-cascading.
 
 Project working context, creative state, processing jobs, Saved Video records, immutable Video
 Versions, and Project output relations stay distinct. Rich Campaign planning, search, tags, review
@@ -119,22 +121,22 @@ public-service, security, and operational gates.
 
 ## Product model
 
-| Concept           | Durable meaning                                                                                        | Current status                                                                                           |
-| ----------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| Workspace         | The user's overall Lightframe Studio environment, libraries, settings, and accessible work             | One authenticated, single-operator Studio exists; shared/team workspaces do not                          |
-| Campaign          | A marketing or creative initiative that can group Projects; richer planning context can evolve later   | Minimal optional aggregate, local/relational persistence, lifecycle API/UI, and guarded deletion exist   |
-| Project           | A focused production effort with resumable creative intent, sources, revisions, jobs, and outputs      | Source/session resume, processing recovery, and exact output save exist; history/delivery UI is pending  |
-| Content           | Creative material and messaging independent of file format or storage representation                   | Broad product term; current finished output is primarily video                                           |
-| Asset             | A piece of imported, generated, transformed, or organized content with ownership, type, and lineage    | Media/reference asset infrastructure exists, but user-facing saved outputs and workflows are video-led   |
-| Version           | An immutable state in the history of the same logical record                                           | Video Version is immutable playable history; Project Revision is creative-state history, not media       |
-| Variation         | A purposeful alternative for another audience, placement, format, message, or treatment                | Some outputs and Character variants can serve this purpose; no generic campaign variation model exists   |
-| Character         | A reusable creative identity with saved reference, prompt, and related selections                      | Implemented as a saved creative resource                                                                 |
-| Character variant | A saved Wardrobe child of one Character with an exact reusable reference                               | Implemented; not the same as a generic campaign Asset variation                                          |
-| Creative resource | A reusable input or direction such as a Character, Character variant, Outfit, Voice, recipe, or prompt | Characters, variants, Outfits, Voices, and recipes are implemented with different persistence lifecycles |
-| Library           | An organized collection intended for finding and reusing retained records                              | Saved Videos, Saved Characters, Saved Outfits, Saved Voices, and Recipe Shelf exist                      |
-| Gallery           | A visual library view optimized for browsing and acting on media records                               | Saved Videos is the current gallery; Gallery is not a separate ownership model                           |
-| Export            | Producing a validated deliverable in a chosen file, format, size, or channel-ready specification       | Video rendering and download exist; broader export presets do not                                        |
-| Publish           | Sending an approved asset to an external destination through an authorized integration                 | Vision only; no publishing or scheduling integration exists                                              |
+| Concept           | Durable meaning                                                                                        | Current status                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Workspace         | The user's overall Lightframe Studio environment, libraries, settings, and accessible work             | One authenticated, single-operator Studio exists; shared/team workspaces do not                           |
+| Campaign          | A marketing or creative initiative that can group Projects; richer planning context can evolve later   | Minimal optional aggregate, local/relational persistence, lifecycle API/UI, and guarded deletion exist    |
+| Project           | A focused production effort with resumable creative intent, sources, revisions, jobs, and outputs      | Source/session resume, processing recovery, exact output save, bounded history, reuse, and Download exist |
+| Content           | Creative material and messaging independent of file format or storage representation                   | Broad product term; current finished output is primarily video                                            |
+| Asset             | A piece of imported, generated, transformed, or organized content with ownership, type, and lineage    | Media/reference asset infrastructure exists, but user-facing saved outputs and workflows are video-led    |
+| Version           | An immutable state in the history of the same logical record                                           | Video Version is immutable playable history; Project Revision is creative-state history, not media        |
+| Variation         | A purposeful alternative for another audience, placement, format, message, or treatment                | Some outputs and Character variants can serve this purpose; no generic campaign variation model exists    |
+| Character         | A reusable creative identity with saved reference, prompt, and related selections                      | Implemented as a saved creative resource                                                                  |
+| Character variant | A saved Wardrobe child of one Character with an exact reusable reference                               | Implemented; not the same as a generic campaign Asset variation                                           |
+| Creative resource | A reusable input or direction such as a Character, Character variant, Outfit, Voice, recipe, or prompt | Characters, variants, Outfits, Voices, and recipes are implemented with different persistence lifecycles  |
+| Library           | An organized collection intended for finding and reusing retained records                              | Saved Videos, Saved Characters, Saved Outfits, Saved Voices, and Recipe Shelf exist                       |
+| Gallery           | A visual library view optimized for browsing and acting on media records                               | Saved Videos is the current gallery; Gallery is not a separate ownership model                            |
+| Export            | Producing a validated deliverable in a chosen file, format, size, or channel-ready specification       | Video rendering and download exist; broader export presets do not                                         |
+| Publish           | Sending an approved asset to an external destination through an authorized integration                 | Vision only; no publishing or scheduling integration exists                                               |
 
 Campaigns and Projects are separate concepts. The MVP decision allows one Campaign to group many
 Projects while a Project belongs to zero or one Campaign and may stand alone. Campaign lifecycle
@@ -172,7 +174,7 @@ and its resumable creative history. Referenced source/working media links to the
 revision that used it; generated outputs also record the exact producing revision and processing
 operation.
 
-The implemented organization relationship and planned media hierarchy are:
+The implemented organization and media hierarchy are:
 
 ```text
 Workspace / authenticated owner scope
@@ -203,14 +205,16 @@ exact behavior matters. A provider change should not require redefining what Lig
 
 ## Asset organization and distribution
 
-Saved outputs should become reusable, searchable records with source and derivation context rather
-than isolated generations. Projects and Campaigns should eventually make that context visible;
-libraries should support reuse across appropriate scopes without weakening ownership.
+Saved outputs are reusable records with Project provenance where known and truthful **Unassigned
+Content** when it is not. Project history exposes exact producing revisions and Versions; Campaigns
+provide lightweight organization without taking output ownership. Future search or richer context
+must preserve those ownership and lineage boundaries.
 
-Download is the current delivery mechanism and is available from Saved Videos. Future distribution
-may include channel-specific export presets, aspect-ratio and format adaptation, scheduling, direct
-publishing, and marketing-platform integrations. No particular integration is committed until its
-product, authentication, permission, failure, privacy, and support boundaries are approved.
+Download is the current delivery mechanism and is available from Saved Videos and exact retained
+Project output Versions. Future distribution may include channel-specific export presets,
+aspect-ratio and format adaptation, scheduling, direct publishing, and marketing-platform
+integrations. No particular integration is committed until its product, authentication, permission,
+failure, privacy, and support boundaries are approved.
 
 ## Product principles
 
@@ -271,8 +275,7 @@ provider ID, device ID, or browser-supplied value with ownership.
 
 ## Current non-claims
 
-Lightframe Studio does not currently provide Project history/download UI, rich Campaign planning,
-generic multi-format asset management, direct social or advertising publishing, scheduling,
-collaborative review, team roles, public sharing, self-service signup, billing, or an approved
-public deployment. The broader vision does not relax the current loopback, privacy, provider-cost,
-or manual/live validation boundaries.
+Lightframe Studio does not currently provide rich Campaign planning, generic multi-format asset
+management, direct social or advertising publishing, scheduling, collaborative review, team roles,
+public sharing, self-service signup, billing, or an approved public deployment. The broader vision
+does not relax the current loopback, privacy, provider-cost, or manual/live validation boundaries.

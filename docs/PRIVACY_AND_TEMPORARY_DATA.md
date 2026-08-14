@@ -1,5 +1,9 @@
 # Privacy and temporary data
 
+**Status:** current local-first data, provider-contact, retention, and cleanup boundary
+
+**Reviewed:** 2026-08-14
+
 Lightframe Studio is local-first, not offline-only. Local capture and local Voice stay in the
 browser. Provider transfer occurs only after an explicit provider action through the loopback
 broker.
@@ -199,6 +203,9 @@ Operator controls:
 - reload/close to clear tab-only drafts, device preferences, and current takes;
 - use Release/Discard for the current take and Saved Videos rename/delete controls for gallery
   records;
+- use Campaign and Project archive/restore controls to hide or return retained work without
+  cascading into Projects, revisions, reusable resources, Saved Videos, or bytes;
+- use Project history or Saved Videos to preview and download one exact retained ready Version;
 - use Logout to cancel/release authorized session work and clear the cookie; otherwise the cookie
   expires at its fixed 24-hour boundary and may survive browser closure;
 - clear exact-origin site data for browser persistence;

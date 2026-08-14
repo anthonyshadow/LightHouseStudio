@@ -440,7 +440,9 @@ test('persistent controls preserve local media across VTON choice, AI stop, trac
   expect(trackState).toEqual({ microphoneEnabled: false, cameraEnabled: false });
 
   await controls.getByRole('button', { name: 'Close' }).click();
-  await expect(page.getByText('Studio idle', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('[data-stage-status-long]', { hasText: /^Studio idle$/u }),
+  ).toBeVisible();
   const browser = await readBrowserState(page);
   expect(browser.cameraCalls).toBe(1);
   expect(browser.connections.map((connection) => connection.model)).toEqual(['lucy-vton-latest']);
@@ -713,7 +715,7 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
   await page.getByRole('button', { name: 'Start Character AI' }).click();
 
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
-  await expect(page.getByText(/^AI active/u)).toBeVisible();
+  await expect(page.locator('[data-stage-status-long]', { hasText: /^AI active/u })).toBeVisible();
 
   await page.getByLabel('Character direction').fill('An adult paper-cut science host');
   await expect(page.getByText('Changes are pending', { exact: true })).toBeVisible();
@@ -740,13 +742,15 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
   ]);
 
   await triggerProviderDisconnect(page);
-  await expect(page.getByText('AI stopped · local preview', { exact: true })).toBeVisible();
+  await expect(
+    page.locator('[data-stage-status-long]', { hasText: /^AI stopped · local preview$/u }),
+  ).toBeVisible();
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
 
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Start Character AI' }).click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
-  await expect(page.getByText(/^AI active/u)).toBeVisible();
+  await expect(page.locator('[data-stage-status-long]', { hasText: /^AI active/u })).toBeVisible();
 
   await page.getByRole('button', { name: 'Reset AI' }).click();
   await expect(page.getByLabel('Character direction')).toHaveValue('');
@@ -882,7 +886,7 @@ test('VTON 3 accepts a valid ephemeral garment image and starts with image-only 
 
   await page.getByRole('button', { name: 'Start Virtual Try-On AI' }).click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
-  await expect(page.getByText(/^AI active/u)).toBeVisible();
+  await expect(page.locator('[data-stage-status-long]', { hasText: /^AI active/u })).toBeVisible();
 
   const browser = await readBrowserState(page);
   expect(browser.cameraCalls).toBe(1);

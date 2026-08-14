@@ -26,15 +26,16 @@ const PROJECT_PROCESSING_RESULT_ASSET_ID = '88117242-ccf5-4fa5-bcee-5831039119c9
 const PROJECT_TIMESTAMP = '2030-01-01T00:00:00.000Z';
 
 interface ProjectHarnessOptions {
+  readonly campaignId?: string | null;
   readonly completeProcessingAfterReopen?: boolean;
   readonly includeUnassignedVideo?: boolean;
   readonly loseAppendOutputResponseOnce?: boolean;
 }
 
-export const emptyProjectFixture = (): ProjectCurrentResponse => ({
+export const emptyProjectFixture = (campaignId: string | null = null): ProjectCurrentResponse => ({
   project: {
     id: TEST_PROJECT_ID,
-    campaignId: null,
+    campaignId,
     title: 'Untitled Project',
     status: 'draft',
     version: 1,
@@ -89,7 +90,9 @@ export const installProjectHarness = async (
   seed = false,
   options: ProjectHarnessOptions = {},
 ) => {
-  let current: ProjectCurrentResponse | null = seed ? emptyProjectFixture() : null;
+  let current: ProjectCurrentResponse | null = seed
+    ? emptyProjectFixture(options.campaignId)
+    : null;
   let source: ProjectSourceResponse | null = null;
   let sourceBytes: Buffer | null = null;
   let workingMedia: ProjectWorkingMediaResponse | null = null;
@@ -706,8 +709,11 @@ export const installProjectHarness = async (
     }
     if (url.pathname === '/api/projects' && method === 'GET') {
       const lifecycle = url.searchParams.get('lifecycle');
+      const campaignId = url.searchParams.get('campaignId');
       const projects =
-        current && (current.project.archivedAt === null ? 'active' : 'archived') === lifecycle
+        current &&
+        (current.project.archivedAt === null ? 'active' : 'archived') === lifecycle &&
+        (campaignId === null || current.project.campaignId === campaignId)
           ? [current.project]
           : [];
       await route.fulfill({
@@ -719,7 +725,10 @@ export const installProjectHarness = async (
     }
     if (url.pathname === '/api/projects' && method === 'POST') {
       operationKeys.push(request.headers()['idempotency-key'] ?? '');
-      current ??= emptyProjectFixture();
+      const body = request.postDataJSON() as { campaignId?: string | null };
+      current ??= emptyProjectFixture(
+        body.campaignId === undefined ? (options.campaignId ?? null) : body.campaignId,
+      );
       await route.fulfill({
         status: 201,
         contentType: 'application/json',

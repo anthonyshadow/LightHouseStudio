@@ -47,6 +47,7 @@ describe('AccountMenu', () => {
       </StudioDesignProvider>,
     );
     const trigger = screen.getByRole('button', { name: 'Lightframe Demo account menu' });
+    expect(screen.getByText('Libraries')).toBeVisible();
 
     await userInput.click(trigger);
     await waitFor(() =>
@@ -112,5 +113,32 @@ describe('AccountMenu', () => {
     await userInput.click(screen.getByRole('button', { name: 'Lightframe Demo account menu' }));
     expect(screen.getByText('Global libraries · exits Project')).toBeVisible();
     expect(screen.getByRole('menuitem', { name: 'Saved Videos (exits Project)' })).toBeVisible();
+  });
+
+  it('marks the exact current saved library without changing the compact account control name', async () => {
+    const userInput = userEvent.setup();
+    render(
+      <StudioDesignProvider>
+        <AccountMenuHarness
+          user={user}
+          activeLibrary="characters"
+          onOpenVideos={vi.fn()}
+          onOpenCharacters={vi.fn()}
+          onOpenOutfits={vi.fn()}
+          onLogout={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    const trigger = screen.getByRole('button', { name: 'Lightframe Demo account menu' });
+    expect(trigger).toHaveAttribute('data-library-active', 'true');
+    await userInput.click(trigger);
+    expect(screen.getByRole('menuitem', { name: 'Saved Characters' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(screen.getByRole('menuitem', { name: 'Saved Videos' })).not.toHaveAttribute(
+      'aria-current',
+    );
   });
 });

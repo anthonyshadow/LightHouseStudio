@@ -93,6 +93,28 @@ describe('ConfirmationDialog', () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
+  it('announces a recoverable action failure without moving initial focus from Cancel', async () => {
+    render(
+      <StudioDesignProvider>
+        <ConfirmationDialog
+          open
+          title="Could not log out"
+          description="Cleanup did not complete."
+          alert="You are still in Studio. Retry or stay."
+          confirmLabel="Retry logout"
+          cancelLabel="Stay in Studio"
+          onCancel={vi.fn()}
+          onConfirm={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByRole('alert')).toHaveTextContent('You are still in Studio');
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Stay in Studio' })).toHaveFocus(),
+    );
+  });
+
   it('takes topmost focus, dismisses only itself, and restores the exact invoking control', async () => {
     const user = userEvent.setup();
     const onParentClose = vi.fn();

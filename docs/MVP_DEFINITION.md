@@ -1,11 +1,13 @@
 # Lightframe Studio Campaign and Project MVP definition
 
-**Status:** active MVP product target; objective criteria 1–6 plus the bounded Project-session
-foundation are implemented, while creative integration and later criteria remain sequenced work
+**Status:** accepted local Campaign/Project capability boundary; all 17 objective criteria and
+required automated gates are recorded as passed
 
 **Defined:** 2026-08-11
 
-**Evidence:** [MVP alignment audit](MVP_ALIGNMENT_AUDIT.md)
+**Current evidence and go/no-go:** [MVP acceptance runbook](MVP_ACCEPTANCE.md)
+
+**Historical basis:** [MVP alignment audit](MVP_ALIGNMENT_AUDIT.md)
 
 **Delivery plan:** [Lightframe MVP implementation sequence](implementation/LIGHTFRAME_MVP_IMPLEMENTATION_SEQUENCE.md)
 
@@ -259,8 +261,8 @@ Record, upload, or reuse an exact Saved Video Version as source
   ↓
 Wait for durable source acceptance; local preview remains usable
   ↓
-Use local editing and/or one explicit Character Swap or Virtual Try On,
-optionally followed by Voice treatment
+Use local editing and/or one explicit Character Swap or Virtual Try On;
+checkpoint Voice settings where useful, while unsupported Project Voice processing remains gated
   ↓
 Checkpoint semantic intent automatically and show saved/conflict state
   ↓
@@ -369,8 +371,10 @@ persistence mode unless a mode is explicitly and canonically unsupported before 
    the original becomes durable before the Project claims resumability.
 6. Refresh, browser restart, and application restart restore Project identity, source, current
    semantic state, and a fresh playable content URL.
-7. Character Swap, Virtual Try On, Voice treatment, reusable Character/Variant/Outfit/Voice/recipe
-   choices, and local edit state operate in the Project without duplicating their lifecycle owners.
+7. Character Swap, Virtual Try On, reusable Character/Variant/Outfit/Voice/recipe choices, and local
+   edit state operate in the Project without duplicating their lifecycle owners. Voice settings can
+   be checkpointed; a Voice-processing adapter either retains a recoverable Project result before
+   claiming success or remains truthfully gated.
 8. The user can see whether Project state is saving, saved, conflicted, processing,
    needs-attention, or ready/completed.
 9. A queued provider job reconnects after navigation/reload once its provider identity is durable;
@@ -393,6 +397,13 @@ persistence mode unless a mode is explicitly and canonically unsupported before 
     live-provider limits are reported honestly.
 17. Canonical README, Architecture, Product Vision/Roadmap, privacy/persistence guidance, user
     stories, testing docs, and ADRs match the behavior that actually ships.
+
+Implementation presence is not acceptance evidence by itself. The
+[MVP acceptance runbook](MVP_ACCEPTANCE.md) maps each criterion to focused implementation/tests and
+records passing results for all 17 criteria and every required automated gate. The resulting
+conclusion is **GO for the local Campaign/Project MVP only**. Environment-dependent physical-device,
+assistive-technology, live Neon/R2, and paid-provider checks remain named limits and do not
+authorize public deployment.
 
 ## Explicit non-goals
 

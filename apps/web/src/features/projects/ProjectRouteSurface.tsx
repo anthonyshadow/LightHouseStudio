@@ -10,8 +10,9 @@ import {
   type ReactNode,
 } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { APP_PATHS, projectIdFromPath, projectPath } from '../../app/paths';
+import { APP_PATHS, campaignPath, projectIdFromPath, projectPath } from '../../app/paths';
 import { Button, StatusNotice } from '../../ui';
+import { useCampaignDetail } from '../campaigns/useCampaignsController';
 import {
   ProjectCampaignDialog,
   ProjectLifecycleDialog,
@@ -115,7 +116,7 @@ const ProjectListSection = ({
           <p>
             {archived
               ? 'Archived work appears here and can be restored.'
-              : 'Quick Start creates an empty Project without a Campaign or source.'}
+              : 'Quick Start creates an Unassigned Project. Add one inspected source, reuse saved creative resources, then save outputs as Versions you can download exactly. Move it into an optional Campaign whenever that helps.'}
           </p>
         </div>
       ) : null}
@@ -233,9 +234,10 @@ const ProjectsWorkspace = () => {
             Projects
           </h2>
           <p>
-            Create and manage focused video work. Each Project can retain one inspected immutable
-            video original, semantic creative checkpoints, and durable working media. Provider
-            processing and output saving arrive later.
+            Create resumable video work with an optional Campaign. Each Project retains one
+            inspected immutable source, durable working media and creative checkpoints, and can
+            reuse saved resources. Provider work stays explicit; save outputs as Versions and
+            download any exact Version.
           </p>
         </div>
         <Button
@@ -616,6 +618,7 @@ const ProjectDetail = ({
   const theme = useTheme();
   const navigate = useNavigate();
   const session = useProjectSession(projectId);
+  const campaign = useCampaignDetail(session.current?.project.campaignId ?? null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const dialogReturnRef = useRef<HTMLElement | null>(null);
   const [renameTarget, setRenameTarget] = useState<ProjectContract | null>(null);
@@ -673,6 +676,7 @@ const ProjectDetail = ({
   const current = session.current;
   const project = current.project;
   const archived = project.archivedAt !== null;
+  const campaignName = campaign.data?.name ?? null;
   const closeDialog = () => {
     setRenameTarget(null);
     setLifecycleDialog(null);
@@ -685,9 +689,17 @@ const ProjectDetail = ({
         <Button
           data-detail-breadcrumb
           variant="quiet"
-          onClick={() => void navigate(APP_PATHS.projects)}
+          onClick={() =>
+            void navigate(
+              project.campaignId === null ? APP_PATHS.projects : campaignPath(project.campaignId),
+            )
+          }
         >
-          ← All Projects
+          {project.campaignId === null
+            ? '← All Projects'
+            : campaignName === null
+              ? '← Campaign'
+              : `← ${campaignName}`}
         </Button>
         <div data-detail-identity>
           <div>
@@ -703,7 +715,17 @@ const ProjectDetail = ({
                 <time dateTime={project.updatedAt}>{formatUpdatedAt(project.updatedAt)}</time>
               </span>
               <span>Revision {project.currentRevisionNumber}</span>
-              <span>{project.campaignId === null ? 'No Campaign' : 'Campaign assigned'}</span>
+              {project.campaignId === null ? (
+                <span>No Campaign</span>
+              ) : (
+                <span aria-live="polite">
+                  {campaign.isPending
+                    ? 'Campaign: loading…'
+                    : campaign.isError || campaignName === null
+                      ? 'Campaign unavailable'
+                      : `Campaign: ${campaignName}`}
+                </span>
+              )}
             </div>
           </div>
           <div data-detail-actions>

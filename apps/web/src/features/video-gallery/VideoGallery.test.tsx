@@ -138,6 +138,41 @@ describe('VideoGallery', () => {
     await waitFor(() => expect(previewTrigger).toHaveFocus());
   });
 
+  it('recovers Version history and preview media errors while exposing both current-Version actions', async () => {
+    const item = video();
+    mockGalleryPages({ '': page([item]) });
+    mockApiServer.use(
+      jsonScenario('GET', `/api/videos/${item.id}`, [
+        {
+          status: 503,
+          body: { error: { code: 'temporarily_unavailable', message: 'Try again.' } },
+        },
+        { body: detail(item) },
+      ]),
+    );
+    const onUse = renderGallery();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Preview Morning take' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Morning take' });
+    expect(await within(dialog).findByText(/Version history could not be loaded/u)).toBeVisible();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Retry' }));
+
+    const player = await within(dialog).findByLabelText('Preview of Morning take, Version 1');
+    fireEvent.error(player);
+    expect(
+      within(dialog).getByText(/This saved video could not be previewed/u),
+    ).toBeInTheDocument();
+    fireEvent.loadedData(player);
+    expect(
+      within(dialog).queryByText(/This saved video could not be previewed/u),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Edit video' }));
+    await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, 'edit'));
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Load in Studio' }));
+    await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, 'play'));
+  });
+
   it('selects, previews, and downloads an exact older Version without using or changing current', async () => {
     const current = video({
       versionCount: 2,
@@ -197,7 +232,7 @@ describe('VideoGallery', () => {
     renderGallery();
 
     expect(await screen.findByRole('heading', { name: 'No saved videos yet' })).toBeInTheDocument();
-    expect(screen.getByText(/Save Video/u)).toBeInTheDocument();
+    expect(screen.getByText(/Save as New Video/u)).toBeInTheDocument();
   });
 
   it('aggregates cursor pages through Query', async () => {
@@ -225,7 +260,47 @@ describe('VideoGallery', () => {
     expect(new URL(requests.at(-1)!.url).searchParams.get('cursor')).toBe('page-two');
   });
 
-  it('renames and confirms deletion without loading media bytes', async () => {
+  it('retries a failed library request', async () => {
+    const item = video();
+    mockApiServer.use(
+      jsonScenario('GET', '/api/videos', [
+        {
+          status: 503,
+          body: { error: { code: 'temporarily_unavailable', message: 'Library unavailable.' } },
+        },
+        { body: page([item]) },
+      ]),
+    );
+    renderGallery();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The request could not be completed.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('heading', { name: 'Morning take' })).toBeInTheDocument();
+  });
+
+  it('falls back from a broken thumbnail and reports a non-Error Studio load failure', async () => {
+    const item = video();
+    mockGalleryPages({ '': page([item]) });
+    const onUse = vi.fn().mockRejectedValue('offline');
+    renderGallery(onUse);
+    await screen.findByRole('heading', { name: 'Morning take' });
+
+    const thumbnail = screen
+      .getByRole('button', { name: 'Preview Morning take' })
+      .querySelector('img');
+    expect(thumbnail).not.toBeNull();
+    fireEvent.error(thumbnail!);
+    expect(screen.getByLabelText('Thumbnail could not load')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText('More actions for Morning take'));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit video' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('The video could not be loaded.');
+    expect(onUse).toHaveBeenCalledWith(item, 'edit');
+  });
+
+  it('renames and confirms deletion in focus-managed dialogs without loading media bytes', async () => {
     const original = video();
     const renamed = video({ title: 'Renamed take' });
     mockApiServer.use(
@@ -242,22 +317,66 @@ describe('VideoGallery', () => {
       ]),
     );
     api.renameSavedVideo.mockResolvedValue(renamed);
-    vi.spyOn(window, 'prompt').mockReturnValue('Renamed take');
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderGallery();
     await screen.findByRole('heading', { name: 'Morning take' });
 
     fireEvent.click(screen.getByLabelText('More actions for Morning take'));
     fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    const renameDialog = screen.getByRole('dialog', { name: 'Rename saved video' });
+    const renameInput = within(renameDialog).getByRole('textbox', { name: /Video title/u });
+    expect(renameInput).toHaveFocus();
+    fireEvent.submit(renameInput.closest('form')!);
+    expect(api.renameSavedVideo).not.toHaveBeenCalled();
+    fireEvent.change(renameInput, {
+      target: { value: 'Renamed take' },
+    });
+    fireEvent.submit(renameInput.closest('form')!);
     expect(await screen.findByRole('heading', { name: 'Renamed take' })).toBeInTheDocument();
     expect(api.renameSavedVideo).toHaveBeenCalledWith(original.id, 'Renamed take');
+    fireEvent.click(screen.getByLabelText('More actions for Renamed take'));
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-
-    expect(window.confirm).toHaveBeenCalledWith(
-      expect.stringContaining('Exact Versions and bytes remain available from any Project history'),
+    const removeDialog = screen.getByRole('dialog', { name: 'Remove saved video' });
+    expect(within(removeDialog).getByRole('button', { name: 'Keep video' })).toHaveFocus();
+    expect(removeDialog).toHaveTextContent(
+      'Exact Versions and bytes remain available from any retaining Project history',
     );
+    fireEvent.click(within(removeDialog).getByRole('button', { name: 'Remove from Saved Videos' }));
     await waitFor(() => expect(api.deleteSavedVideo).toHaveBeenCalledWith(original.id));
     expect(screen.queryByRole('heading', { name: 'Renamed take' })).not.toBeInTheDocument();
+  });
+
+  it('keeps failed rename and removal actions open with accessible retry errors', async () => {
+    const item = video();
+    mockGalleryPages({ '': page([item]) });
+    api.renameSavedVideo.mockRejectedValueOnce(new Error('Rename is temporarily unavailable.'));
+    api.deleteSavedVideo.mockRejectedValueOnce(new Error('Removal is temporarily unavailable.'));
+    renderGallery();
+    await screen.findByRole('heading', { name: 'Morning take' });
+
+    fireEvent.click(screen.getByLabelText('More actions for Morning take'));
+    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    const renameDialog = screen.getByRole('dialog', { name: 'Rename saved video' });
+    fireEvent.change(within(renameDialog).getByRole('textbox', { name: /Video title/u }), {
+      target: { value: 'Retry title' },
+    });
+    fireEvent.click(within(renameDialog).getByRole('button', { name: 'Rename video' }));
+    expect(await within(renameDialog).findByRole('alert')).toHaveTextContent(
+      'Rename is temporarily unavailable.',
+    );
+    fireEvent.click(within(renameDialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Rename saved video' })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByLabelText('More actions for Morning take')).toHaveFocus();
+
+    fireEvent.click(screen.getByLabelText('More actions for Morning take'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    const removeDialog = screen.getByRole('dialog', { name: 'Remove saved video' });
+    fireEvent.click(within(removeDialog).getByRole('button', { name: 'Remove from Saved Videos' }));
+    expect(await within(removeDialog).findByRole('alert')).toHaveTextContent(
+      'Removal is temporarily unavailable.',
+    );
+    expect(removeDialog).toBeVisible();
   });
 
   it('requests character and format filters with each supported sort order', async () => {
@@ -295,6 +414,13 @@ describe('VideoGallery', () => {
         expect(new URL(requests.at(-1)!.url).searchParams.get('sort')).toBe(label.toLowerCase()),
       );
     }
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    await waitFor(() => {
+      const parameters = new URL(requests.at(-1)!.url).searchParams;
+      expect(parameters.has('characterName')).toBe(false);
+      expect(parameters.has('format')).toBe(false);
+    });
   });
 
   it('keeps the character control operable when older videos have no attribution', async () => {

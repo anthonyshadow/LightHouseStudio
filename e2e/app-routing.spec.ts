@@ -309,7 +309,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
 
   const [firstDownload] = await Promise.all([
     page.waitForEvent('download'),
-    olderVersion.getByRole('link', { name: 'Download' }).click(),
+    olderVersion.getByRole('link', { name: 'Download Launch master, Version 1' }).click(),
   ]);
   expect(firstDownload.suggestedFilename()).toBe('project-output-source.mp4');
 
@@ -335,8 +335,11 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   await expect(gallery.getByRole('button', { name: 'Load in Studio' }).first()).toBeEnabled();
 
   await gallery.getByLabel('More actions for Launch master').click();
-  page.once('dialog', (dialog) => void dialog.accept());
   await gallery.getByRole('button', { name: 'Delete' }).click();
+  await page
+    .getByRole('dialog', { name: 'Remove saved video' })
+    .getByRole('button', { name: 'Remove from Saved Videos' })
+    .click();
   await expect(gallery.getByRole('heading', { name: 'Launch master' })).toHaveCount(0);
 
   await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
@@ -347,7 +350,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   await expect(retainedOlderVersion).toContainText('Removed from Saved Videos');
   const [retainedDownload] = await Promise.all([
     page.waitForEvent('download'),
-    retainedOlderVersion.getByRole('link', { name: 'Download' }).click(),
+    retainedOlderVersion.getByRole('link', { name: 'Download Launch master, Version 1' }).click(),
   ]);
   expect(retainedDownload.suggestedFilename()).toBe('project-output-source.mp4');
   expectNoExternalProviderTraffic(network);
@@ -518,6 +521,151 @@ test('Campaign creation reaches a Campaign Project without activating media or p
   await expect
     .poll(async () => readBrowserState(page))
     .toMatchObject({ cameraCalls: 0, requirementModels: [], connections: [], recorderStarts: 0 });
+  expectNoExternalProviderTraffic(network);
+});
+
+test('Prompt 13 MVP journey resumes one Campaign Project through exact Version delivery', async ({
+  page,
+}) => {
+  test.setTimeout(120_000);
+  const network = await installSuccessfulStudioHarness(page);
+  const campaigns = await installCampaignHarness(page);
+  await page.addInitScript(
+    ({ storageKey, store }) => window.localStorage.setItem(storageKey, JSON.stringify(store)),
+    { storageKey: CREATIVE_ASSET_STORAGE_KEY, store: SEEDED_PROJECT_CREATIVE_STORE },
+  );
+  await page.goto('/studio/campaigns');
+
+  await page.getByRole('button', { name: 'Create Campaign' }).click();
+  const createCampaign = page.getByRole('dialog', { name: 'Create Campaign' });
+  await createCampaign.getByRole('textbox', { name: /Campaign name/u }).fill('Summer launch');
+  await createCampaign.getByRole('textbox', { name: /Brief/u }).fill('Keep the launch focused.');
+  await createCampaign.getByRole('button', { name: 'Create Campaign' }).click();
+  await page.getByRole('button', { name: 'New Project' }).click();
+  await expect(page).toHaveURL(new RegExp(`/studio/projects/${TEST_PROJECT_ID}$`, 'u'));
+  expect(campaigns.campaignOperationKeys).toHaveLength(1);
+  expect(campaigns.campaignOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
+  expect(campaigns.projectOperationKeys).toHaveLength(1);
+  expect(campaigns.projectOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
+
+  const projects = await installProjectHarness(page, true, {
+    campaignId: TEST_CAMPAIGN_ID,
+    completeProcessingAfterReopen: true,
+    loseAppendOutputResponseOnce: true,
+  });
+  const fixture = await loadDecodableH264VideoFixture();
+  await page.reload();
+  await expect(page.getByRole('button', { name: '← Summer launch' })).toBeVisible();
+  await expect(page.getByText('Campaign: Summer launch', { exact: true })).toBeVisible();
+  await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
+    name: 'campaign-project-source.mp4',
+    mimeType: 'video/mp4',
+    buffer: fixture,
+  });
+  await expect(page.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+  expect(projects.sourceOperationKeys).toHaveLength(1);
+  expect(projects.sourceOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
+
+  await openCharacterOptions(page);
+  await page.getByRole('button', { name: 'Choose saved character' }).click();
+  await page
+    .getByRole('dialog', { name: 'Recipe Shelf' })
+    .getByRole('button', { name: 'Use Project Field Host' })
+    .click();
+  await page.getByRole('button', { name: 'Save creative setup' }).click();
+  await expect(page.getByText('Creative setup saved as one Project checkpoint.')).toBeVisible();
+  expect(projects.checkpointRequests).toHaveLength(1);
+  expect(projects.checkpointRequests[0]?.proposal.selectedCharacter).toMatchObject({
+    characterId: 'project-field-host',
+    characterLabel: 'Project Field Host',
+  });
+
+  await page
+    .getByRole('navigation', { name: 'Creative workspace tools' })
+    .getByRole('button', { name: 'Edit Video', exact: true })
+    .click();
+  const existingVideo = page.getByRole('dialog', { name: 'Use existing video' });
+  await existingVideo.getByRole('button', { name: 'Start Project Character Swap' }).click();
+  await expect.poll(() => projects.processingOperationKeys).toHaveLength(1);
+  expect(projects.processingOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
+  expect(projects.processingProviderIntents).toEqual(['video']);
+  await existingVideo.getByRole('button', { name: 'Close panel' }).click();
+
+  await page.reload();
+  await expect(page.getByText('Character Swap accepted / queued', { exact: true })).toBeVisible();
+  await expect(page.getByText('Result ready', { exact: true })).toBeVisible({ timeout: 15_000 });
+  expect(projects.processingOperationKeys).toHaveLength(1);
+  expect(projects.processingReconcileCount).toBeGreaterThanOrEqual(1);
+
+  await page.getByRole('button', { name: '← Summer launch' }).click();
+  const activeProjects = page.getByRole('list', { name: 'Active Projects in Summer launch' });
+  await activeProjects.getByRole('button', { name: 'Open' }).click();
+  const resumeGuard = page.getByRole('dialog', {
+    name: 'Discard temporary Studio work and open this Project?',
+  });
+  await expect(resumeGuard).toBeVisible();
+  await resumeGuard.getByRole('button', { name: 'Discard and open Project' }).click();
+  await expect(page.getByText('Result ready', { exact: true })).toBeVisible();
+  expect(projects.processingOperationKeys).toHaveLength(1);
+
+  await page.getByRole('button', { name: 'Save as New Video' }).click();
+  const createVideo = page.getByRole('dialog', { name: 'Save as New Video' });
+  await createVideo.getByLabel('Video title').fill('Campaign master');
+  await createVideo.getByRole('button', { name: 'Save as New Video' }).click();
+  await expect(page.getByText('Saved “Campaign master” as Version 1.')).toBeVisible();
+  await page.getByRole('button', { name: 'Add Version' }).click();
+  await page
+    .getByRole('dialog', { name: 'Choose Add Version target' })
+    .getByRole('button', { name: /Campaign master/u })
+    .click();
+  await page
+    .getByRole('dialog', { name: 'Confirm Add Version' })
+    .getByRole('button', { name: 'Add Version' })
+    .click();
+  await expect(page.getByText('The save response was unavailable.')).toBeVisible();
+  expect(projects.outputOperationKeys).toHaveLength(2);
+  const pendingAppendKey = projects.outputOperationKeys[1];
+  expect(pendingAppendKey).toMatch(/^[0-9a-f-]{36}$/u);
+  expect(pendingAppendKey).not.toBe(projects.outputOperationKeys[0]);
+
+  await page.reload();
+  await expect(page.getByText('Added Version 2 to “Campaign master”.')).toBeVisible();
+  expect(projects.outputOperationKeys).toHaveLength(3);
+  expect(projects.outputOperationKeys[2]).toBe(pendingAppendKey);
+  expect(projects.outputRequests[2]).toEqual(projects.outputRequests[1]);
+  const history = page.getByRole('list', { name: 'Saved video Version history' });
+  const firstVersion = history.getByRole('listitem').filter({ hasText: 'Version 1' });
+  await expect(history).toContainText('Version 2 · Current in Saved Videos');
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    firstVersion.getByRole('link', { name: 'Download Campaign master, Version 1' }).click(),
+  ]);
+  expect(download.suggestedFilename()).toBe('campaign-project-source.mp4');
+
+  await page.getByRole('button', { name: '← Summer launch' }).click();
+  await page.getByRole('button', { name: 'Archive' }).click();
+  await page
+    .getByRole('dialog', { name: 'Archive Campaign' })
+    .getByRole('button', { name: 'Archive Campaign' })
+    .click();
+  await expect(page.getByText('Archived', { exact: true })).toBeVisible();
+  await expect(page.getByText('Campaign archived', { exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole('list', { name: 'Active Projects in Summer launch' })
+      .getByRole('button', { name: 'Open' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Restore' }).click();
+  await page
+    .getByRole('dialog', { name: 'Restore Campaign' })
+    .getByRole('button', { name: 'Restore Campaign' })
+    .click();
+  await expect(page.getByText('Active', { exact: true })).toBeVisible();
+  expect(campaigns.lifecycleRequests).toEqual([
+    { action: 'archive', expectedVersion: 1 },
+    { action: 'restore', expectedVersion: 2 },
+  ]);
+  expect(network.apiRequests.some(({ path }) => path.startsWith('/api/video-jobs'))).toBe(false);
   expectNoExternalProviderTraffic(network);
 });
 

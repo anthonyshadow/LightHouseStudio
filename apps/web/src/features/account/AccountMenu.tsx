@@ -10,6 +10,7 @@ interface AccountMenuProps {
   readonly onOpenChange: (open: boolean) => void;
   readonly busy?: boolean | undefined;
   readonly projectContextActive?: boolean | undefined;
+  readonly activeLibrary?: 'videos' | 'characters' | 'outfits' | undefined;
   readonly onOpenVideos: () => void;
   readonly onOpenCharacters: () => void;
   readonly onOpenOutfits: () => void;
@@ -22,6 +23,7 @@ export const AccountMenu = ({
   onOpenChange,
   busy = false,
   projectContextActive = false,
+  activeLibrary,
   onOpenVideos,
   onOpenCharacters,
   onOpenOutfits,
@@ -51,9 +53,9 @@ export const AccountMenu = ({
     action();
   };
   const libraryItems = [
-    { label: 'Saved Videos', open: onOpenVideos },
-    { label: 'Saved Characters', open: onOpenCharacters },
-    { label: 'Saved Outfits', open: onOpenOutfits },
+    { id: 'videos', label: 'Saved Videos', open: onOpenVideos },
+    { id: 'characters', label: 'Saved Characters', open: onOpenCharacters },
+    { id: 'outfits', label: 'Saved Outfits', open: onOpenOutfits },
   ] as const;
 
   return (
@@ -63,9 +65,11 @@ export const AccountMenu = ({
         position: 'relative',
         flex: '0 0 auto',
         '& > button': {
-          width: '2.75rem',
+          width: 'auto',
+          minWidth: '2.75rem',
           height: '2.75rem',
-          padding: 0,
+          gap: theme.space.xs,
+          paddingInline: theme.space.sm,
           borderColor: theme.colors.border,
           borderRadius: theme.radii.round,
           color: theme.colors.text,
@@ -76,6 +80,18 @@ export const AccountMenu = ({
             background: theme.colors.surfaceStrong,
           },
         },
+        '& > button[data-library-active="true"]': {
+          borderColor: theme.colors.accent,
+          background: theme.colors.accentSoft,
+        },
+        '& [data-library-label]': {
+          fontSize: theme.fontSizes.metadata,
+          whiteSpace: 'nowrap',
+        },
+        '@media (max-width: 39.99rem)': {
+          '& > button': { width: '2.75rem', padding: 0 },
+          '& [data-library-label]': { display: 'none' },
+        },
       }}
     >
       <Button
@@ -85,6 +101,7 @@ export const AccountMenu = ({
         aria-label={`${user.displayName} account menu`}
         aria-haspopup="menu"
         aria-expanded={open}
+        data-library-active={activeLibrary !== undefined}
         disabled={busy}
         onClick={() => onOpenChange(!open)}
         onKeyDown={(event) => {
@@ -94,6 +111,9 @@ export const AccountMenu = ({
         }}
       >
         <span aria-hidden="true">{initials || 'U'}</span>
+        <span data-library-label aria-hidden="true">
+          Libraries
+        </span>
       </Button>
       {open ? (
         <div
@@ -150,6 +170,10 @@ export const AccountMenu = ({
             },
             '& > button': { justifyContent: 'flex-start', width: '100%' },
             '& > button[role="menuitem"]': { minHeight: '2.75rem' },
+            '& > button[aria-current="page"]': {
+              color: theme.colors.text,
+              background: theme.colors.accentSoft,
+            },
             '& > button[data-logout]': {
               marginBlockStart: theme.space.xs,
               borderTop: `1px solid ${theme.colors.border}`,
@@ -172,12 +196,13 @@ export const AccountMenu = ({
           <span role="presentation" data-menu-section-label>
             {projectContextActive ? 'Global libraries · exits Project' : 'Saved libraries'}
           </span>
-          {libraryItems.map(({ label, open: openLibrary }) => (
+          {libraryItems.map(({ id, label, open: openLibrary }) => (
             <Button
-              key={label}
+              key={id}
               role="menuitem"
               variant="quiet"
               aria-label={projectContextActive ? `${label} (exits Project)` : undefined}
+              aria-current={activeLibrary === id ? 'page' : undefined}
               onClick={() => run(openLibrary)}
             >
               {label}

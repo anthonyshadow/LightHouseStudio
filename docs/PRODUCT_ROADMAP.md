@@ -6,8 +6,10 @@
 
 **Product model and principles:** [Product vision](PRODUCT_VISION.md)
 
-**Next implementation program:** [Campaign and Project MVP definition](MVP_DEFINITION.md) and
-[remaining implementation sequence](implementation/LIGHTFRAME_MVP_IMPLEMENTATION_SEQUENCE.md)
+**Current MVP boundary:** [Campaign and Project MVP definition](MVP_DEFINITION.md)
+
+**Acceptance status:** [MVP acceptance runbook](MVP_ACCEPTANCE.md); Prompt 02–13 history remains in the
+[implementation sequence](implementation/LIGHTFRAME_MVP_IMPLEMENTATION_SEQUENCE.md)
 
 This roadmap describes how Lightframe Studio can grow from the implemented video-focused Studio
 into a broader content creation and campaign workspace. Phases express product dependency and
@@ -37,21 +39,22 @@ to that capability.
 This phase does not include the Phase 2 Campaign/Project organization layer, collaboration,
 multi-format output, or publishing. Those organization capabilities are now implemented in Phase 2.
 
-## Foundation already present — Durable Project model
+## Implemented foundation — Durable Project model
 
-**Status: implemented technical authority, lifecycle API, and empty-Project browser capability.**
+**Status: implemented and composed into the Campaign/Project video workspace.**
 
-The domain, HTTP schemas, database schema, local/shadow file authority, and authoritative
-relational repository define a
-video-oriented `Project` aggregate with immutable revisions and links to source/working media,
-processing jobs, and Saved Video outputs. Authenticated APIs support empty create, bounded list,
-current read, rename, archive, and restore; the browser uses these lifecycle capabilities, while
-existing Saved Videos remain unassigned.
+The domain, HTTP schemas, database schema, local/shadow file authority, and authoritative relational
+repository define a video-oriented `Project` aggregate with immutable revisions and links to
+source/working media, processing jobs, and Saved Video outputs. Authenticated APIs support empty
+create, bounded list, current read, rename, archive, and restore; the browser composes the full
+workspace over these authorities, while legacy records without trustworthy output lineage remain
+unassigned.
 
-This foundation should be evolved, not advertised as a finished Project experience. It represents
-a focused production effort, not a Campaign. Before Project writes become user-facing, the known
-revision-lineage, exact-Version-reference, output-replay, retention, current-status, bounded-read,
-and local-persistence gaps in the [MVP alignment audit](MVP_ALIGNMENT_AUDIT.md) must be corrected.
+The Prompt 02–12 implementation corrected the historical revision-lineage,
+exact-Version-reference, output-replay, retention, current-status, bounded-read, and
+local-persistence gaps recorded in the [historical MVP alignment audit](MVP_ALIGNMENT_AUDIT.md).
+The foundation represents a focused production effort, not a Campaign, and remains the authority
+under the browser workspace.
 
 ## Parallel enabling track — Account and service readiness
 
@@ -67,14 +70,15 @@ owns the detailed sequence and launch evidence.
 
 ## Phase 2 — Campaign and Project video workspace MVP
 
-**Status: in progress through bounded Project history and exact-Version delivery; invariant
-correction, lifecycle, Campaign organization, durable source/working media, creative checkpoints,
-Project-bound Character Swap/VTO result retention, exact Saved Video/Video Version output linking,
-legacy Unassigned Content, and exact-Version preview/reuse/Download are implemented. MVP
-acceptance and hardening are next.**
+**Status: implementation and local-MVP acceptance complete.**
 
-- Correct the dormant Project foundation's revision and media-reference lineage, transaction/replay,
-  retention, status, read-bounding, and cleanup invariants before exposing writes.
+Invariant correction, lifecycle, Campaign organization, durable source/working media, creative
+checkpoints, Project-bound Character Swap/VTO result retention, exact Saved Video/Video Version
+output linking, legacy Unassigned Content, and exact-Version preview/reuse/Download are implemented.
+The [acceptance runbook](MVP_ACCEPTANCE.md) records the local-only GO and its evidence.
+
+- Preserve the corrected Project foundation's revision and media-reference lineage,
+  transaction/replay, retention, status, read-bounding, and cleanup invariants.
 - Maintain the implemented owner-derived Project services, HTTP routes, local/relational
   persistence parity, and accessible Projects workspace for Quick Start, list, open, rename,
   archive, restore, source/working-media management, creative setup, and recoverable visual
@@ -97,7 +101,8 @@ acceptance and hardening are next.**
 
 The objective criteria and twelve focused implementation prompts are maintained in the linked MVP
 documents. This phase remains local-first, loopback-only, single-operator, and video-focused; it is
-not a public-service launch.
+not a public-service launch. A capability being implemented does not make the MVP accepted until the
+runbook records every required automated gate.
 
 ## Phase 3 — Post-MVP organization and creative variations
 
@@ -146,7 +151,8 @@ organize, export, retention, and cleanup path exists for it.
 
 ## Phase 6 — Export, distribution, and publishing
 
-**Status: download exists for Saved Videos; all other items are future direction.**
+**Status: exact-Version Download exists in Saved Videos and Project history; all other items are
+future direction.**
 
 - Add channel-aware export presets, filenames, metadata, aspect ratios, resolution, and format
   validation.
@@ -206,10 +212,10 @@ a Campaign or make a Project title carry campaign semantics.
 ### Media-neutral asset identity
 
 The existing media-asset boundary already provides opaque IDs, ownership, byte lifecycle, MIME and
-inspection metadata, and relationship-aware retention for its current consumers. It does not yet
-consult dormant Project relationships; that gap is Phase 2 work. Future content types should extend
-the boundary with a discriminated media kind and format-specific metadata rather than funneling
-every record through `SavedVideo` or assuming all assets are playable media.
+inspection metadata, and relationship-aware retention for its current consumers, including active,
+archived, and tombstoned Project relations. Future content types should extend the boundary with a
+discriminated media kind and format-specific metadata rather than funneling every record through
+`SavedVideo` or assuming all assets are playable media.
 
 ### Versions, variations, and derivatives
 
@@ -220,10 +226,11 @@ retained dependent still needs an asset.
 
 ### Project snapshots
 
-Snapshot v1 is intentionally video-oriented, including video edit and MP4 export specifications.
-Multi-format support requires a reviewed snapshot schema version and migration, likely with
-format-specific workflow payloads. Unknown versions must fail safely; old Projects must remain
-readable or explicitly migrated.
+Snapshot v2 is intentionally video-oriented, including exact applied creative provenance, video edit,
+and MP4 export specifications. The reader explicitly migrates snapshot v1 without fabricating missing
+provenance. Multi-format support requires another reviewed snapshot schema version and migration,
+likely with format-specific workflow payloads. Unknown versions must fail safely; old Projects must
+remain readable or explicitly migrated.
 
 ### Storage and delivery
 

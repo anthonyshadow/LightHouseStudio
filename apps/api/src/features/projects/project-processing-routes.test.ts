@@ -385,6 +385,93 @@ describe('Project processing route authority', () => {
     });
   });
 
+  it('enforces session ownership, provider intent, and strict processing bodies before submission', async () => {
+    const provider = new DeterministicVideoProvider();
+    const prepared = application(provider);
+    const { projectId } = await prepareProject(prepared.app);
+    const request = {
+      expectedVersion: 3,
+      expectedRevisionNumber: 3,
+      capability: 'character-swap' as const,
+    };
+
+    const missingIntent = await prepared.app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/processing/submit`,
+      headers: {
+        ...browserHeaders,
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: request,
+    });
+    const unknownField = await prepared.app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/processing/submit`,
+      headers: {
+        ...providerHeaders,
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: { ...request, ownerUserId },
+    });
+    expect(missingIntent.statusCode).toBe(403);
+    expect(unknownField.statusCode).toBe(400);
+    expect(provider.submissions).toBe(0);
+
+    const authenticated = createApp({
+      config: testConfig({
+        demoAuthEnabled: true,
+        lightframeDataDir: directory,
+      }),
+      decartVideoProvider: provider,
+      persistence: {
+        projects: prepared.repository,
+        projectProcessing: prepared.repository,
+      },
+    });
+    applications.push(authenticated);
+    const unauthenticated = await authenticated.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/processing/current`,
+      headers: providerHeaders,
+    });
+    expect(unauthenticated.statusCode).toBe(401);
+
+    const login = await authenticated.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { login: 'demo@lightframe.local', password: 'lightframe-demo' },
+    });
+    const cookie = String(login.headers['set-cookie']).split(';', 1)[0]!;
+    const isolatedCurrent = await authenticated.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/processing/current`,
+      headers: { ...providerHeaders, cookie },
+    });
+    const isolatedHistory = await authenticated.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/processing/history`,
+      headers: { ...browserHeaders, cookie },
+    });
+    const isolatedSubmit = await authenticated.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/processing/submit`,
+      headers: {
+        ...providerHeaders,
+        cookie,
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: request,
+    });
+    expect(isolatedCurrent.statusCode).toBe(404);
+    expect(isolatedHistory.statusCode).toBe(404);
+    expect(isolatedSubmit.statusCode).toBe(404);
+    expect(provider.submissions).toBe(0);
+  });
+
   it('surfaces unknown acceptance as ambiguous and requires a new cost-confirmed retry identity', async () => {
     const provider = new DeterministicVideoProvider();
     provider.rejectSubmission = true;

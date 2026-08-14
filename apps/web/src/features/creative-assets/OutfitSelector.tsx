@@ -1,9 +1,9 @@
 import { useTheme } from '@emotion/react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { RecipeSelection } from './RecipeShelf.types';
 import { savedPromptToRecipeSelection } from './recipeSelection';
 import type { CreativeAssetRepository, RecentPrompt, SavedPrompt } from './types';
-import { Button, SegmentedControl, StatusNotice, Surface } from '../../ui';
+import { Button, ConfirmationDialog, SegmentedControl, StatusNotice, Surface } from '../../ui';
 
 const views = [
   { value: 'saved', label: 'Saved' },
@@ -39,6 +39,9 @@ export const OutfitSelector = ({
   const theme = useTheme();
   const [view, setView] = useState<'saved' | 'recent'>('saved');
   const [error, setError] = useState<string | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<SavedPrompt | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const removeTriggerRef = useRef<HTMLButtonElement | null>(null);
   const store = repository.getSnapshot().store;
   const saved = store.savedPrompts.filter((item) => item.modelModeId === 'lucy-vton-latest');
   const recent = store.recentPrompts.filter((item) => item.modelModeId === 'lucy-vton-latest');
@@ -56,6 +59,24 @@ export const OutfitSelector = ({
       vtonInputKind: item.vtonInputKind,
       enhancePrompt: item.enhancePrompt,
     });
+  };
+  const closeRemove = () => {
+    if (removeBusy) return;
+    setRemoveTarget(null);
+    setError(null);
+  };
+  const remove = async () => {
+    if (removeTarget === null || removeBusy) return;
+    setRemoveBusy(true);
+    setError(null);
+    try {
+      await repository.deleteSavedPrompt(removeTarget.id);
+      setRemoveTarget(null);
+    } catch {
+      setError('The outfit could not be removed. Retry or keep it in the saved library.');
+    } finally {
+      setRemoveBusy(false);
+    }
   };
 
   return (
@@ -109,18 +130,11 @@ export const OutfitSelector = ({
                   </Button>
                   <Button
                     variant="danger"
-                    onClick={() => {
-                      if (!window.confirm(`Remove ${item.title} from saved outfits?`)) return;
-                      try {
-                        void repository.deleteSavedPrompt(item.id);
-                        setError(null);
-                      } catch (caught) {
-                        setError(
-                          caught instanceof Error
-                            ? caught.message
-                            : 'The outfit could not be removed.',
-                        );
-                      }
+                    aria-label={`Remove ${item.title}`}
+                    onClick={(event) => {
+                      removeTriggerRef.current = event.currentTarget;
+                      setError(null);
+                      setRemoveTarget(item);
                     }}
                   >
                     Remove
@@ -158,6 +172,19 @@ export const OutfitSelector = ({
           </p>
         )}
       </div>
+      <ConfirmationDialog
+        open={removeTarget !== null}
+        title="Remove saved outfit?"
+        description={`Remove “${removeTarget?.title ?? 'this outfit'}” from saved outfits? Existing Project checkpoints keep their recorded resource identity, but the resource will not be available for new selection.`}
+        alert={error ?? undefined}
+        confirmLabel={removeBusy ? 'Removing outfit…' : 'Remove outfit'}
+        cancelLabel="Keep outfit"
+        danger
+        busy={removeBusy}
+        returnFocusRef={removeTriggerRef}
+        onCancel={closeRemove}
+        onConfirm={() => void remove()}
+      />
     </div>
   );
 };

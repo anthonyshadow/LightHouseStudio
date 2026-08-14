@@ -34,10 +34,14 @@ export const useCampaignList = (lifecycle: 'active' | 'archived') =>
     getNextPageParam: (page) => page.nextCursor,
   });
 
-export const useCampaignDetail = (campaignId: string) =>
+export const useCampaignDetail = (campaignId: string | null) =>
   useQuery({
-    queryKey: campaignQueryKeys.detail(campaignId),
-    queryFn: ({ signal }) => getCampaign(campaignId, signal),
+    queryKey: campaignQueryKeys.detail(campaignId ?? 'unassigned'),
+    queryFn: ({ signal }) => {
+      if (campaignId === null) throw new Error('A Campaign id is required.');
+      return getCampaign(campaignId, signal);
+    },
+    enabled: campaignId !== null,
   });
 
 export const useCampaignsController = () => {
@@ -65,7 +69,10 @@ export const useCampaignsController = () => {
       readonly name: string;
       readonly brief: string | null;
       readonly expectedVersion: number;
-    }) => editCampaign(input.campaignId, input),
+    }) => {
+      const { campaignId, ...request } = input;
+      return editCampaign(campaignId, request);
+    },
     onSuccess: reconcile,
   });
   const archiveMutation = useMutation({

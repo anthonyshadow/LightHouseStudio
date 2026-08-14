@@ -1,4 +1,4 @@
-import { useTheme } from '@emotion/react';
+import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import type {
   AdoptProjectWorkingMediaRequest,
   ProjectCurrentResponse,
@@ -39,6 +39,27 @@ const historyListStyles = {
   display: 'grid',
   gap: '0.65rem',
 } as const;
+
+const downloadLinkStyles = (theme: Theme): CSSObject => ({
+  minWidth: '2.75rem',
+  minHeight: '2.75rem',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0.55rem 0.8rem',
+  border: `1px solid ${theme.colors.borderStrong}`,
+  borderRadius: theme.radii.medium,
+  color: theme.colors.text,
+  background: theme.colors.surfaceStrong,
+  fontWeight: 720,
+  lineHeight: 1.1,
+  textDecoration: 'none',
+  '&:hover': { borderColor: theme.colors.accent },
+  '&:focus-visible': {
+    outline: `2px solid ${theme.colors.focus}`,
+    outlineOffset: '2px',
+  },
+});
 
 export const ProjectHistorySection = ({
   current,
@@ -288,6 +309,8 @@ export const ProjectHistorySection = ({
                     <a
                       href={projectOutputContentUrl(projectId, item.version.id, true)}
                       download={item.version.filename}
+                      aria-label={`Download ${item.savedVideo.title}, Version ${item.version.ordinal}`}
+                      css={downloadLinkStyles(theme)}
                     >
                       Download
                     </a>
@@ -424,6 +447,8 @@ export const ProjectHistorySection = ({
               <a
                 href={projectOutputContentUrl(projectId, preview.version.id, true)}
                 download={preview.version.filename}
+                aria-label={`Download ${preview.savedVideo.title}, Version ${preview.version.ordinal}`}
+                css={downloadLinkStyles(theme)}
               >
                 Download
               </a>

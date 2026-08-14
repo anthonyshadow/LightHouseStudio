@@ -510,7 +510,9 @@ test('regeneration distinguishes a fresh image from an instructed source-image e
   expect(originalAssetId).toBeDefined();
 
   await page.getByRole('button', { name: 'Regenerate' }).click();
-  await page.getByRole('button', { name: 'Regenerate', exact: true }).click();
+  const freshRegeneration = page.getByRole('dialog', { name: 'Regenerate character preview' });
+  await expect(freshRegeneration).toBeVisible();
+  await freshRegeneration.getByRole('button', { name: 'Regenerate', exact: true }).click();
   await expect.poll(() => network.referenceImageGenerations.length).toBe(2);
   expect(network.referenceImageEdits).toHaveLength(0);
 
@@ -522,7 +524,10 @@ test('regeneration distinguishes a fresh image from an instructed source-image e
   await page
     .getByLabel('What would you like changed?')
     .fill('Use a warmer key light while preserving the exact character identity.');
-  await page.getByRole('button', { name: 'Regenerate', exact: true }).click();
+  const instructedRegeneration = page.getByRole('dialog', {
+    name: 'Regenerate character preview',
+  });
+  await instructedRegeneration.getByRole('button', { name: 'Regenerate', exact: true }).click();
   await expect.poll(() => network.referenceImageEdits.length).toBe(1);
   expect(network.referenceImageEdits[0]).toMatchObject({
     sourceAssetId: network.referenceImageGenerations[1]?.assetId,

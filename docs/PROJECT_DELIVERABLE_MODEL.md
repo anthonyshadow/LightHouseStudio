@@ -9,8 +9,8 @@ The current Project foundation allows one Project to retain many Saved Video out
 intentionally gives each Project one active creative snapshot at a time. That is enough for a
 focused Project such as **Summer Launch Video Set** to retain and independently play a 30-second
 launch video, a 15-second social cut, and a vertical teaser after those outputs have been saved.
-That Project could later belong to a separate **Summer Product Launch** Campaign; Campaigns are not
-implemented.
+That Project can belong to a separate **Summer Product Launch** Campaign through the implemented
+optional, non-cascading Campaign membership.
 
 A `Project Deliverable` becomes useful when all three videos must also remain independently
 editable and resumable at the same time. For example, each may need its own source, edit history,
@@ -22,7 +22,7 @@ provider, or background-work changes today.
 ## Proposed model
 
 ```text
-Campaign: Summer Product Launch (future; not implemented)
+Campaign: Summer Product Launch (implemented optional organizer)
 └── Project: Summer Launch Video Set
     ├── Deliverable: 30-second launch video
     │   ├── immutable deliverable revisions
@@ -35,9 +35,9 @@ Campaign: Summer Product Launch (future; not implemented)
 ```
 
 The Project remains the project-level aggregate root for name, archive/delete policy, ordering, and
-the list of deliverables. A future Campaign would group Projects through a separate,
-owner-constrained relationship; it would not take ownership of Project processing state. Each
-Deliverable becomes a child aggregate with its own:
+the list of deliverables. The implemented Campaign relationship groups Projects separately and does
+not take ownership of Project processing state. Each future Deliverable becomes a child aggregate
+with its own:
 
 - immutable owner inherited from and constrained to the parent Project;
 - title, position, derived status, aggregate version, current revision, and timestamps;
@@ -128,5 +128,6 @@ Before building this model, confirm:
 5. Whether Project-level creative defaults are copied into new Deliverables or referenced live.
 6. Whether the UI calls these children **Videos**, **Deliverables**, **Cuts**, or another exact name.
 
-Campaign membership is a separate product and architecture decision. Do not make Deliverable
-implementation the implicit point where Campaign ownership or hierarchy is introduced.
+Campaign membership is an implemented separate product and architecture decision. Do not make a
+future Deliverable implementation the point where Campaign ownership, cardinality, or lifecycle is
+silently changed.

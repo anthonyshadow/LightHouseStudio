@@ -23,6 +23,10 @@ export const installCampaignHarness = async (page: Page, seed = false) => {
   let currentProject: ProjectCurrentResponse | null = null;
   const campaignOperationKeys: string[] = [];
   const projectOperationKeys: string[] = [];
+  const lifecycleRequests: Array<{
+    readonly action: 'archive' | 'restore';
+    readonly expectedVersion: number;
+  }> = [];
 
   await page.route('**/api/campaigns**', async (route) => {
     const request = route.request();
@@ -55,6 +59,26 @@ export const installCampaignHarness = async (page: Page, seed = false) => {
       url.pathname === `/api/campaigns/${TEST_CAMPAIGN_ID}` &&
       method === 'GET'
     ) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(currentCampaign),
+      });
+      return;
+    }
+    const lifecycle = url.pathname.match(
+      new RegExp(`^/api/campaigns/${TEST_CAMPAIGN_ID}/(archive|restore)$`, 'u'),
+    )?.[1] as 'archive' | 'restore' | undefined;
+    if (currentCampaign && lifecycle && method === 'POST') {
+      const body = request.postDataJSON() as { expectedVersion: number };
+      lifecycleRequests.push({ action: lifecycle, expectedVersion: body.expectedVersion });
+      currentCampaign = {
+        ...currentCampaign,
+        status: lifecycle === 'archive' ? 'archived' : 'active',
+        version: currentCampaign.version + 1,
+        archivedAt: lifecycle === 'archive' ? '2030-01-01T00:20:00.000Z' : null,
+        updatedAt: '2030-01-01T00:20:00.000Z',
+      };
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -119,5 +143,5 @@ export const installCampaignHarness = async (page: Page, seed = false) => {
     });
   });
 
-  return { campaignOperationKeys, projectOperationKeys };
+  return { campaignOperationKeys, projectOperationKeys, lifecycleRequests };
 };

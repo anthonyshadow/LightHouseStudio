@@ -284,6 +284,138 @@ describe('FileProjectRepository', () => {
     expect(migrated.projects[0]?.revisions[0]?.snapshot.schemaVersion).toBe(2);
   });
 
+  it.each([4, 5] as const)(
+    'migrates v%s Project metadata to v6 once and reopens idempotently',
+    async (schemaVersion) => {
+      const operationKey = randomUUID();
+      const service = new ProjectService(new FileProjectRepository(directory));
+      const created = await service.create(ownerUserId, operationKey, `Prompt ${schemaVersion}`);
+      if (!created.ok) throw new Error('Expected a Project create.');
+      const paths = metadataPaths(directory, ownerUserId);
+      const previous = JSON.parse(await readFile(paths.primary, 'utf8')) as {
+        schemaVersion: number;
+        outputReceipts?: unknown;
+      };
+      previous.schemaVersion = schemaVersion;
+      delete previous.outputReceipts;
+      await writeFile(paths.primary, `${JSON.stringify(previous)}\n`, 'utf8');
+      await writeFile(paths.backup, `${JSON.stringify(previous)}\n`, 'utf8');
+
+      const migratedService = new ProjectService(new FileProjectRepository(directory));
+      await expect(
+        migratedService.get(ownerUserId, created.current.project.id),
+      ).resolves.toMatchObject({
+        project: { title: `Prompt ${schemaVersion}`, campaignId: null },
+        revision: { snapshot: { sourceAssetId: null } },
+      });
+      await expect(
+        migratedService.create(ownerUserId, operationKey, `Prompt ${schemaVersion}`),
+      ).resolves.toEqual(created);
+      const migratedSerialized = await readFile(paths.primary, 'utf8');
+      const migrated = JSON.parse(migratedSerialized) as {
+        schemaVersion: number;
+        outputReceipts: unknown[];
+        projects: Array<{
+          source: unknown;
+          workingMediaAdoptions: unknown[];
+          outputLinks: unknown[];
+        }>;
+      };
+      expect(migrated).toMatchObject({
+        schemaVersion: 6,
+        outputReceipts: [],
+        projects: [{ source: null, workingMediaAdoptions: [], outputLinks: [] }],
+      });
+
+      const reopened = new ProjectService(new FileProjectRepository(directory));
+      await expect(reopened.get(ownerUserId, created.current.project.id)).resolves.toMatchObject({
+        project: { id: created.current.project.id, campaignId: null },
+      });
+      await expect(
+        reopened.create(ownerUserId, operationKey, `Prompt ${schemaVersion}`),
+      ).resolves.toEqual(created);
+      await expect(readFile(paths.primary, 'utf8')).resolves.toBe(migratedSerialized);
+    },
+  );
+
+  it.each([1, 5] as const)(
+    'recovers a prepared v%s Project create journal once and remains stable after another reopen',
+    async (schemaVersion) => {
+      const operationKey = randomUUID();
+      const interrupted = new ProjectService(
+        new FileProjectRepository(directory, {
+          afterJournalPrepared: () => {
+            throw new Error('simulated legacy journal interruption');
+          },
+        }),
+      );
+      await expect(
+        interrupted.create(ownerUserId, operationKey, `Recovered v${schemaVersion}`),
+      ).rejects.toThrow('simulated legacy journal interruption');
+
+      const paths = metadataPaths(directory, ownerUserId);
+      const prepared = JSON.parse(await readFile(paths.journal, 'utf8')) as {
+        schemaVersion: number;
+        writes: {
+          metadata?: {
+            schemaVersion: number;
+            campaigns?: unknown;
+            campaignCreateReceipts?: unknown;
+            processingJobs?: unknown;
+            outputReceipts?: unknown;
+            projects: Array<{ project: { campaignId?: string | null } }>;
+          };
+          projectMetadata?: unknown;
+        };
+      };
+      const metadata = prepared.writes.metadata;
+      if (metadata === undefined) throw new Error('Expected prepared Project metadata.');
+      prepared.schemaVersion = schemaVersion;
+      metadata.schemaVersion = schemaVersion;
+      delete metadata.outputReceipts;
+      if (schemaVersion === 1) {
+        delete metadata.campaigns;
+        delete metadata.campaignCreateReceipts;
+        delete metadata.processingJobs;
+        for (const aggregate of metadata.projects) delete aggregate.project.campaignId;
+        prepared.writes = { projectMetadata: metadata };
+      }
+      await writeFile(paths.journal, `${JSON.stringify(prepared)}\n`, 'utf8');
+
+      const recovered = new ProjectService(new FileProjectRepository(directory));
+      const page = await recovered.list(ownerUserId, { lifecycle: 'active', pageSize: 20 });
+      expect(page.projects).toMatchObject([{ title: `Recovered v${schemaVersion}` }]);
+      const replay = await recovered.create(
+        ownerUserId,
+        operationKey,
+        `Recovered v${schemaVersion}`,
+      );
+      expect(replay).toMatchObject({
+        ok: true,
+        current: { project: { id: page.projects[0]?.id, campaignId: null } },
+      });
+      await expect(readFile(paths.journal, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+      const recoveredSerialized = await readFile(paths.primary, 'utf8');
+      expect(JSON.parse(recoveredSerialized)).toMatchObject({
+        schemaVersion: 6,
+        campaigns: [],
+        processingJobs: [],
+        outputReceipts: [],
+        createReceipts: [{ operationKey }],
+        projects: [{ source: null, workingMediaAdoptions: [], outputLinks: [] }],
+      });
+
+      const reopened = new ProjectService(new FileProjectRepository(directory));
+      await expect(
+        reopened.create(ownerUserId, operationKey, `Recovered v${schemaVersion}`),
+      ).resolves.toEqual(replay);
+      expect(
+        (await reopened.list(ownerUserId, { lifecycle: 'active', pageSize: 20 })).projects,
+      ).toHaveLength(1);
+      await expect(readFile(paths.primary, 'utf8')).resolves.toBe(recoveredSerialized);
+    },
+  );
+
   it('recovers Campaign create receipts and preserves membership across restart', async () => {
     const key = randomUUID();
     const repository = new FileProjectRepository(directory);

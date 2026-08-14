@@ -32,8 +32,9 @@ future features current.
 ## Shared runtime rules
 
 - `/` is the provider-free entry and Login surface. `/studio`, `/studio/projects`,
-  `/studio/projects/:projectId`, `/studio/videos`, `/studio/characters`, and `/studio/outfits` are
-  authenticated views of one active Studio runtime; every other path returns to `/`.
+  `/studio/projects/:projectId`, `/studio/campaigns`, `/studio/campaigns/:campaignId`,
+  `/studio/videos`, `/studio/characters`, and `/studio/outfits` are authenticated views of one
+  active Studio runtime; every other path returns to `/`.
 - Studio begins in neutral Local Camera mode with camera and microphone off. Only an explicit
   control-bar, upload-panel, or Dock action acquires media; only an explicit AI Start contacts a
   provider.
@@ -50,7 +51,9 @@ future features current.
 - Campaign and Project lifecycle/source management is user-facing, including optional membership,
   move/detach, the virtual No Campaign group, durable source resume, and guarded bounded session
   autosave. Creative/edit checkpoints, recoverable visual processing, and exact output save are
-  implemented; bounded Project history and Download UI are not.
+  implemented. Bounded Project changes, processing attempts/results, and output-Version history
+  support exact preview, explicit reuse, and Download. Provider Voice and advanced live Project
+  starts remain gated when they cannot meet durable reconnect/result-retention requirements.
 - Character Builder owns true character creation and editing. Workshop owns only Add, Replace, and
   Restyle object recipes.
 - Saved Character Wardrobe owns normalized original/variant browsing and variant creation while
@@ -74,5 +77,7 @@ Deterministic tests cover the implemented journeys, including synthetic provider
 cases. The [testing strategy](../TESTING.md) maps those critical journeys to the smallest useful
 domain, controller, API, browser, or visual layer. It does not qualify physical devices,
 accessibility tools, codecs, memory behavior, live provider entitlement/output, or cleanup.
+The [MVP acceptance runbook](../MVP_ACCEPTANCE.md) is the only current go/no-go record for the
+complete local Campaign/Project journey; the presence of these stories is not release evidence.
 Use [Manual QA](../MANUAL_QA.md) and the authorized
 [live-provider procedure](../LIVE_PROVIDER_SMOKE.md) for those environment-dependent checks.

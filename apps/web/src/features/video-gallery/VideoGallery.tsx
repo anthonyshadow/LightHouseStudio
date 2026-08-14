@@ -14,7 +14,7 @@ import {
   useQueryClient,
   type InfiniteData,
 } from '@tanstack/react-query';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   deleteSavedVideo,
   downloadSavedVideoUrl,
@@ -24,7 +24,7 @@ import {
   savedVideoContentUrl,
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
-import { Button, OverlayPanel, SelectField, StatusNotice } from '../../ui';
+import { Button, OverlayPanel, SelectField, StatusNotice, TextField } from '../../ui';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import {
   actionMenuPopoverStyles,
@@ -114,8 +114,8 @@ const VideoGalleryGrid = ({
   onThumbnailError: (videoId: string) => void;
   onOpenPreview: (video: SavedVideoSummary, trigger: HTMLButtonElement) => void;
   onUse: (video: SavedVideoSummary, intent: 'play' | 'edit') => Promise<void>;
-  onRename: (video: SavedVideoSummary) => Promise<void>;
-  onRemove: (video: SavedVideoSummary) => Promise<void>;
+  onRename: (video: SavedVideoSummary, trigger: HTMLElement) => void;
+  onRemove: (video: SavedVideoSummary, trigger: HTMLElement) => void;
 }) => {
   'use memo';
 
@@ -219,14 +219,28 @@ const VideoGalleryGrid = ({
                     >
                       Download
                     </a>
-                    <button type="button" disabled={busy} onClick={() => void onRename(video)}>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={(event) => {
+                        const details = event.currentTarget.closest('details');
+                        const trigger = details?.querySelector<HTMLElement>('summary');
+                        details?.removeAttribute('open');
+                        onRename(video, trigger ?? event.currentTarget);
+                      }}
+                    >
                       Rename
                     </button>
                     <button
                       type="button"
                       data-danger=""
                       disabled={busy}
-                      onClick={() => void onRemove(video)}
+                      onClick={(event) => {
+                        const details = event.currentTarget.closest('details');
+                        const trigger = details?.querySelector<HTMLElement>('summary');
+                        details?.removeAttribute('open');
+                        onRemove(video, trigger ?? event.currentTarget);
+                      }}
                     >
                       Delete
                     </button>
@@ -251,14 +265,27 @@ export const VideoGallery = ({
   const [characterName, setCharacterName] = useState('');
   const [format, setFormat] = useState<SavedVideoFormat | ''>('');
   const [sort, setSort] = useState<SavedVideoSort>('latest');
-  const [message, setMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{
+    readonly role: 'status' | 'alert';
+    readonly tone: 'neutral' | 'success' | 'danger';
+    readonly message: string;
+  } | null>(null);
   const [useBusyId, setUseBusyId] = useState<string | null>(null);
   const [previewVideo, setPreviewVideo] = useState<SavedVideoSummary | null>(null);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState(false);
+  const [action, setAction] = useState<{
+    readonly kind: 'rename' | 'remove';
+    readonly video: SavedVideoSummary;
+  } | null>(null);
+  const [renameTitle, setRenameTitle] = useState('');
+  const [actionError, setActionError] = useState<string | null>(null);
   const [brokenThumbnails, setBrokenThumbnails] = useState<ReadonlySet<string>>(() => new Set());
   const previewTriggerRef = useRef<HTMLButtonElement | null>(null);
   const previewPlayerRef = useRef<HTMLVideoElement | null>(null);
+  const actionTriggerRef = useRef<HTMLElement | null>(null);
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  const actionCancelRef = useRef<HTMLButtonElement | null>(null);
 
   const videosQuery = useInfiniteQuery({
     queryKey: [
@@ -334,29 +361,51 @@ export const VideoGallery = ({
     };
   }, [previewVideo]);
 
-  const rename = async (video: SavedVideoSummary) => {
-    const title = window.prompt('Rename saved video', video.title)?.trim();
-    if (!title || title === video.title) return;
+  const closeAction = () => {
+    if (renameMutation.isPending || deleteMutation.isPending) return;
+    setAction(null);
+    setActionError(null);
+  };
+
+  const openAction = (
+    kind: 'rename' | 'remove',
+    video: SavedVideoSummary,
+    trigger: HTMLElement,
+  ) => {
+    actionTriggerRef.current = trigger;
+    setRenameTitle(video.title);
+    setActionError(null);
+    setAction({ kind, video });
+  };
+
+  const rename = async (event?: FormEvent) => {
+    event?.preventDefault();
+    if (action?.kind !== 'rename') return;
+    const title = renameTitle.trim();
+    if (!title || title === action.video.title) return;
+    setActionError(null);
     try {
-      await renameMutation.mutateAsync({ videoId: video.id, title });
-      setMessage('Video renamed.');
+      await renameMutation.mutateAsync({ videoId: action.video.id, title });
+      setNotice({ role: 'status', tone: 'success', message: `Renamed video to “${title}”.` });
+      setAction(null);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'The video could not be renamed.');
+      setActionError(error instanceof Error ? error.message : 'The video could not be renamed.');
     }
   };
 
-  const remove = async (video: SavedVideoSummary) => {
-    if (
-      !window.confirm(
-        `Remove “${video.title}” from Saved Videos? This hides it from the global library. Exact Versions and bytes remain available from any Project history that references them.`,
-      )
-    )
-      return;
+  const remove = async () => {
+    if (action?.kind !== 'remove') return;
+    setActionError(null);
     try {
-      await deleteMutation.mutateAsync(video.id);
-      setMessage('Video removed from Saved Videos. Referenced Project history remains preserved.');
+      await deleteMutation.mutateAsync(action.video.id);
+      setNotice({
+        role: 'status',
+        tone: 'success',
+        message: 'Video removed from Saved Videos. Referenced Project history remains preserved.',
+      });
+      setAction(null);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'The video could not be deleted.');
+      setActionError(error instanceof Error ? error.message : 'The video could not be deleted.');
     }
   };
 
@@ -365,7 +414,11 @@ export const VideoGallery = ({
     try {
       await onUse(video, intent);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'The video could not be loaded.');
+      setNotice({
+        role: 'alert',
+        tone: 'danger',
+        message: error instanceof Error ? error.message : 'The video could not be loaded.',
+      });
     } finally {
       setUseBusyId(null);
     }
@@ -419,14 +472,21 @@ export const VideoGallery = ({
     return (
       <div>
         <h2>No saved videos yet</h2>
-        <p>Record or upload a video, then choose Save Video. Downloads start from this gallery.</p>
+        <p>
+          Finish a Project with Save as New Video or Add Version, or save a standalone Studio video.
+          Download always selects one exact ready Version.
+        </p>
       </div>
     );
   }
 
   return (
     <div css={galleryStyles(theme)}>
-      {message ? <StatusNotice role="status">{message}</StatusNotice> : null}
+      {notice ? (
+        <StatusNotice role={notice.role} tone={notice.tone}>
+          {notice.message}
+        </StatusNotice>
+      ) : null}
       {videos.some((video) => video.assignment === 'unassigned') ? (
         <StatusNotice role="status" tone="neutral" title="Unassigned Content">
           These legacy or independently saved videos have no trustworthy producing Project. They
@@ -494,8 +554,8 @@ export const VideoGallery = ({
           }
           onOpenPreview={openPreview}
           onUse={handleUseVideo}
-          onRename={rename}
-          onRemove={remove}
+          onRename={(video, trigger) => openAction('rename', video, trigger)}
+          onRemove={(video, trigger) => openAction('remove', video, trigger)}
         />
       )}
       {videosQuery.hasNextPage ? (
@@ -510,6 +570,90 @@ export const VideoGallery = ({
           </Button>
         </div>
       ) : null}
+      <OverlayPanel
+        open={action?.kind === 'rename'}
+        onClose={closeAction}
+        title="Rename saved video"
+        description="Change the library title without changing any immutable Video Version."
+        placement="bottom"
+        size="standard"
+        closeDisabled={renameMutation.isPending}
+        closeOnBackdrop={false}
+        initialFocusRef={renameInputRef}
+        returnFocusRef={actionTriggerRef}
+        footer={
+          <div css={{ display: 'flex', justifyContent: 'flex-end', gap: theme.space.sm }}>
+            <Button variant="quiet" disabled={renameMutation.isPending} onClick={closeAction}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              busy={renameMutation.isPending}
+              disabled={
+                renameTitle.trim().length === 0 ||
+                renameTitle.trim().length > 120 ||
+                renameTitle.trim() === action?.video.title
+              }
+              onClick={() => void rename()}
+            >
+              Rename video
+            </Button>
+          </div>
+        }
+      >
+        <form onSubmit={(event) => void rename(event)}>
+          <TextField
+            ref={renameInputRef}
+            label="Video title"
+            required
+            maxLength={120}
+            disabled={renameMutation.isPending}
+            value={renameTitle}
+            {...(actionError ? { error: actionError } : {})}
+            onChange={(event) => setRenameTitle(event.currentTarget.value)}
+          />
+          {actionError ? <p>Correct the title or retry when the local API is available.</p> : null}
+        </form>
+      </OverlayPanel>
+
+      <OverlayPanel
+        open={action?.kind === 'remove'}
+        onClose={closeAction}
+        title="Remove saved video"
+        description="Hide this video from the global library without claiming physical erasure."
+        placement="bottom"
+        size="standard"
+        closeDisabled={deleteMutation.isPending}
+        closeOnBackdrop={false}
+        initialFocusRef={actionCancelRef}
+        returnFocusRef={actionTriggerRef}
+        footer={
+          <div css={{ display: 'flex', justifyContent: 'flex-end', gap: theme.space.sm }}>
+            <Button
+              ref={actionCancelRef}
+              variant="quiet"
+              disabled={deleteMutation.isPending}
+              onClick={closeAction}
+            >
+              Keep video
+            </Button>
+            <Button variant="danger" busy={deleteMutation.isPending} onClick={() => void remove()}>
+              Remove from Saved Videos
+            </Button>
+          </div>
+        }
+      >
+        <p>
+          Remove “{action?.video.title}” from Saved Videos? Exact Versions and bytes remain
+          available from any retaining Project history.
+        </p>
+        {actionError ? (
+          <StatusNotice role="alert" tone="danger" title="Video not removed">
+            {actionError}
+          </StatusNotice>
+        ) : null}
+      </OverlayPanel>
+
       <OverlayPanel
         open={previewVideo !== null}
         onClose={closePreview}
