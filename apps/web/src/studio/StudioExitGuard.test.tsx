@@ -171,6 +171,18 @@ describe('StudioExitGuard', () => {
     expect(await screen.findByRole('heading', { name: 'Studio child route' })).toBeInTheDocument();
   });
 
+  it('names the discard boundary truthfully when temporary Studio work enters a Project', async () => {
+    const { router } = renderGuard({ hasTemporaryTake: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Switch Project' }));
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Discard temporary Studio work and open this Project?',
+      }),
+    ).toBeVisible();
+    expect(router.state.location.pathname).toBe('/studio');
+  });
+
   it('protects hard unloads during recording, voice work, or dirty Shelf work', () => {
     renderGuard({ voiceProcessingActive: true });
     const event = new Event('beforeunload', { cancelable: true });
@@ -207,6 +219,66 @@ describe('StudioExitGuard', () => {
     expect(session.discard).toHaveBeenCalledOnce();
   });
 
+  it('reapplies a conflicted Project proposal before completing the requested switch', async () => {
+    const session = projectSession({
+      phase: 'conflict',
+      message: 'Another session changed this Project.',
+      retry: vi.fn(() => Promise.resolve(true)),
+    });
+    const { router } = renderProjectGuard({ projectSession: session });
+    fireEvent.click(screen.getByRole('button', { name: 'Switch Project' }));
+
+    expect(await screen.findByRole('heading', { name: 'Project save conflict' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Reapply and leave' }));
+
+    await waitFor(() => expect(session.retry).toHaveBeenCalledOnce());
+    await waitFor(() => expect(router.state.location.pathname).toContain('730c73ca'));
+    expect(session.discard).not.toHaveBeenCalled();
+  });
+
+  it('keeps the preserved proposal in place when reapplying it does not save', async () => {
+    const session = projectSession({
+      phase: 'error',
+      message: null,
+      retry: vi.fn(() => Promise.resolve(false)),
+    });
+    const { router } = renderProjectGuard({ projectSession: session });
+    fireEvent.click(screen.getByRole('button', { name: 'Switch Project' }));
+
+    expect(await screen.findByRole('heading', { name: 'Project not saved' })).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveTextContent('Project authority is unavailable');
+    fireEvent.click(screen.getByRole('button', { name: 'Reapply and leave' }));
+
+    await waitFor(() => expect(session.retry).toHaveBeenCalledOnce());
+    expect(router.state.location.pathname).toContain('18b120ac');
+    expect(session.discard).not.toHaveBeenCalled();
+  });
+
+  it('shows the pending Project save and allows cancelling the attempted switch', async () => {
+    let resolveFlush: (saved: boolean) => void = vi.fn();
+    const session = projectSession({
+      phase: 'saving',
+      flush: vi.fn(
+        () =>
+          new Promise<boolean>((resolve) => {
+            resolveFlush = resolve;
+          }),
+      ),
+    });
+    const { router } = renderProjectGuard({ projectSession: session });
+    fireEvent.click(screen.getByRole('button', { name: 'Switch Project' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Saving Project before leaving' }),
+    ).toBeVisible();
+    expect(screen.getByRole('status')).toHaveTextContent('Saving changes');
+    fireEvent.click(screen.getByRole('button', { name: 'Stay in Project' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toContain('18b120ac'));
+    resolveFlush(false);
+    await waitFor(() => expect(session.flush).toHaveBeenCalledOnce());
+  });
+
   it('protects hard unload while a Project proposal is pending', () => {
     renderProjectGuard({ projectSession: projectSession() });
     const event = new Event('beforeunload', { cancelable: true });
@@ -232,7 +304,7 @@ describe('StudioExitGuard', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: 'Discard staged source work and switch Projects?',
+        name: 'Discard temporary Project work and switch Projects?',
       }),
     ).toBeInTheDocument();
     expect(router.state.location.pathname).toContain('18b120ac');
@@ -264,6 +336,38 @@ describe('StudioExitGuard', () => {
         name: 'Finish Project media work before switching Projects',
       }),
     ).toBeInTheDocument();
+    expect(router.state.location.pathname).toContain('18b120ac');
+  });
+
+  it('requires explicit discard before Project-scoped creative work can switch Projects', async () => {
+    const onDiscardTemporaryWork = vi.fn();
+    const { router } = renderProjectGuard({
+      projectContextDirty: true,
+      onDiscardTemporaryWork,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Switch Project' }));
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Discard temporary Project work and switch Projects?',
+      }),
+    ).toBeVisible();
+    expect(router.state.location.pathname).toContain('18b120ac');
+    fireEvent.click(screen.getByRole('button', { name: 'Discard and switch' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toContain('730c73ca'));
+    expect(onDiscardTemporaryWork).toHaveBeenCalledOnce();
+  });
+
+  it('protects active Project Voice work when leaving its URL-owned context', async () => {
+    const { router } = renderProjectGuard({ voiceProcessingActive: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Open Studio child' }));
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Discard temporary Project work and leave this Project?',
+      }),
+    ).toBeVisible();
     expect(router.state.location.pathname).toContain('18b120ac');
   });
 });

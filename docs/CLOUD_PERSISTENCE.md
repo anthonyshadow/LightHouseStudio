@@ -7,6 +7,10 @@ This is the canonical setup, migration, rollback, and limitation guide for cloud
 does not authorize public exposure: Elysia on Bun still binds only to `127.0.0.1`, and the seeded demo
 account is not production identity or tenancy.
 
+The [MVP acceptance runbook](MVP_ACCEPTANCE.md) owns exact-candidate migration evidence. A migration
+or repository test being present is not a passing release result until its isolated PostgreSQL run is
+recorded there.
+
 ## What is implemented
 
 - Drizzle migrations for users/credentials, durable sessions, Campaigns, Projects/revisions/
@@ -81,8 +85,8 @@ account is not production identity or tenancy.
 - Project history reuses existing owner-constrained revision, processing-attempt, and output-link
   indexes. Each category has an independent opaque cursor and metadata-only page. Exact output
   metadata/content requires the same-owner Project/Version relation and may use retained tombstone
-  lineage without making the Saved Video globally visible. Prompt 12 adds no schema migration,
-  backfill, byte copy, or production migration action.
+  lineage without making the Saved Video globally visible. The history/delivery surface added no
+  schema migration, backfill, byte copy, or production migration action.
 - Additive migration `0017` adds only `processing_jobs(status, expires_at)` and
   `reference_images(updated_at)` indexes for expiry/activity scans. It rewrites no application
   records and is not applied automatically to production.
@@ -95,6 +99,13 @@ account is not production identity or tenancy.
 - Additive migration `0020` adds the `output-save` Project revision enum value and
   `project_output_operation_receipts`. It does not backfill output ownership, rewrite existing
   content, copy bytes, or apply automatically to production.
+- The isolated PostgreSQL compatibility fixture starts from valid pre-`0010` Project rows, includes
+  an independent legacy Saved Video, Saved Voice, and creative prompt, applies the remaining chain
+  through `0020`, and verifies that the legacy resources remain readable and unassigned without
+  fabricated Project/source/output lineage. Local Project fixtures exercise v1/v4/v5→v6 reopen and
+  prepared-journal recovery; Saved Video fixtures exercise legacy v1/v3→v4 unassigned reopen. These
+  are test capabilities, not a claim that the exact candidate or production data was migrated; the
+  recorded isolated-database result belongs in [MVP acceptance](MVP_ACCEPTANCE.md).
 - Project processing admission commits the exact Project/revision link and app-owned operation
   before provider submission in every persistence mode. Restart recovery reconnects status or
   retrieval only for jobs with a durable provider identity and never repeats an initial billable
@@ -259,9 +270,9 @@ verification, lifecycle, or cleanup contracts above.
   indexes only: Project relation indexes follow revision cursors, and Saved Video Version indexes
   support owner-scoped asset-retention batches without rewriting application data. Additive
   migration `0012` creates the owner/operation-key Project create receipt, request fingerprint, and
-  result Project ID. It does not rewrite Projects or content. Rolling application code back before
-  Prompt 03 leaves this extra table unused; dropping it would discard create replay history and is
-  not an automatic rollback step.
+  result Project ID. It does not rewrite Projects or content. Application code that predates
+  Project lifecycle receipt reads leaves this extra table unused; dropping it would discard create
+  replay history and is not an automatic rollback step.
 - Additive migration `0014` creates Campaign lifecycle/receipt tables and nullable
   `projects.campaign_id`, with a restrictive composite owner foreign key and no legacy assignment.
   Additive migration `0015` adds only active/archived Campaign-membership Project list indexes.
@@ -269,9 +280,9 @@ verification, lifecycle, or cleanup contracts above.
   replay history and dropping membership requires every Project to be detached first. Do not
   remove these objects as an automatic rollback. Additive migration `0016` owns immutable Project
   source rows; `0018` owns snapshot-v2 admission and working-media adoption receipts. Additive
-  `0019` owns Project-processing retry/result identity and exact retained-result relations. Dropping
-  `0020` owns Project-output replay authority and the `output-save` enum value. Dropping any of
-  these would discard replay/lineage authority and is not an automatic rollback. Local schema v6 is
+  `0019` owns Project-processing retry/result identity and exact retained-result relations. Migration
+  `0020` owns Project-output replay authority and the `output-save` enum value. Dropping any of these
+  would discard replay/lineage authority and is not an automatic rollback. Local schema v6 is
   not readable by older parsers; downgrade requires restoring a verified pre-upgrade metadata
   backup or deploying compatible reader code, never ad hoc field stripping.
 

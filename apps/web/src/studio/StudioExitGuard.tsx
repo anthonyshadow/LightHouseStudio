@@ -12,6 +12,7 @@ export interface StudioExitGuardProps {
   readonly hasTemporaryTake: boolean;
   readonly voiceProcessingActive: boolean;
   readonly shelfDirty: boolean;
+  readonly projectContextDirty?: boolean;
   readonly projectSourceActivity?: Readonly<{
     projectId: string;
     accepted: boolean;
@@ -57,6 +58,7 @@ export const StudioExitGuard = ({
   hasTemporaryTake,
   voiceProcessingActive,
   shelfDirty,
+  projectContextDirty = false,
   projectSourceActivity = null,
   projectSession = null,
   onDiscardTemporaryWork,
@@ -66,7 +68,11 @@ export const StudioExitGuard = ({
   const projectSavePending =
     projectSession?.hasLocalProposal === true || projectSession?.phase === 'saving';
   const hasDiscardableWork =
-    hasTemporaryTake || voiceProcessingActive || shelfDirty || projectSourceStaging;
+    hasTemporaryTake ||
+    voiceProcessingActive ||
+    shelfDirty ||
+    projectContextDirty ||
+    projectSourceStaging;
   const unsafeWorkActive =
     recordingOrFinalizing || videoRenderingActive || hasDiscardableWork || projectSavePending;
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
@@ -79,6 +85,8 @@ export const StudioExitGuard = ({
     const unsafeProjectWorkActive =
       recordingOrFinalizing ||
       videoRenderingActive ||
+      voiceProcessingActive ||
+      projectContextDirty ||
       projectSourceStaging ||
       projectDraftActive ||
       projectSavePending;
@@ -108,7 +116,12 @@ export const StudioExitGuard = ({
       const projectChangeBlocked = shouldBlockProjectContextChange(
         location.pathname,
         nextPathname,
-        recordingOrFinalizing || videoRenderingActive || projectSourceStaging || projectDraftActive,
+        recordingOrFinalizing ||
+          videoRenderingActive ||
+          voiceProcessingActive ||
+          projectContextDirty ||
+          projectSourceStaging ||
+          projectDraftActive,
       );
       return outsideStudioBlocked || projectChangeBlocked;
     },
@@ -118,8 +131,10 @@ export const StudioExitGuard = ({
       location.pathname,
       projectSourceActivity,
       projectSourceStaging,
+      projectContextDirty,
       recordingOrFinalizing,
       videoRenderingActive,
+      voiceProcessingActive,
     ],
   );
 
@@ -153,6 +168,7 @@ export const StudioExitGuard = ({
       !videoRenderingActive &&
       !voiceProcessingActive &&
       !shelfDirty &&
+      !projectContextDirty &&
       !projectSourceStaging &&
       !projectSavePending
     )
@@ -166,6 +182,7 @@ export const StudioExitGuard = ({
     return () => window.removeEventListener('beforeunload', protectTransientWork);
   }, [
     projectSourceStaging,
+    projectContextDirty,
     projectSavePending,
     recordingOrFinalizing,
     shelfDirty,
@@ -212,6 +229,30 @@ export const StudioExitGuard = ({
     hasDiscardableWork;
   const projectDiscardConfirmationOpen = temporaryWorkPromptOpen && projectContextChangeBlocked;
   const discardConfirmationOpen = temporaryWorkPromptOpen && !projectContextChangeBlocked;
+  const currentProjectId = projectIdFromPath(location.pathname);
+  const destinationProjectId =
+    blocker.state === 'blocked' ? projectIdFromPath(blocker.location.pathname) : null;
+  const projectDiscardCopy =
+    currentProjectId === null
+      ? {
+          title: 'Discard temporary Studio work and open this Project?',
+          description:
+            'Opening a Project now discards the current in-memory take, active Voice work, unsaved edits, and unsaved creative configuration. Saved Studio resources remain available.',
+          confirmLabel: 'Discard and open Project',
+        }
+      : destinationProjectId === null
+        ? {
+            title: 'Discard temporary Project work and leave this Project?',
+            description:
+              'Leaving this Project now cancels active source staging and discards finalized in-memory recordings, active Voice work, unsaved edits, and unsaved creative configuration. Server-accepted source and saved revisions remain attached to this Project.',
+            confirmLabel: 'Discard and leave Project',
+          }
+        : {
+            title: 'Discard temporary Project work and switch Projects?',
+            description:
+              'Switching Projects now cancels active source staging and discards finalized in-memory recordings, active Voice work, unsaved edits, and unsaved creative configuration. Server-accepted source and saved revisions remain attached to the original Project.',
+            confirmLabel: 'Discard and switch',
+          };
   const activeWorkCopy = videoRenderingActive
     ? projectContextChangeBlocked
       ? {
@@ -301,9 +342,9 @@ export const StudioExitGuard = ({
 
       <ConfirmationDialog
         open={projectDiscardConfirmationOpen}
-        title="Discard staged source work and switch Projects?"
-        description="Switching now cancels the active source transfer or discards the finalized in-memory recording. Any source already accepted by the server remains attached to the original Project."
-        confirmLabel="Discard and switch"
+        title={projectDiscardCopy.title}
+        description={projectDiscardCopy.description}
+        confirmLabel={projectDiscardCopy.confirmLabel}
         cancelLabel="Stay in Project"
         danger
         onCancel={stayInStudio}

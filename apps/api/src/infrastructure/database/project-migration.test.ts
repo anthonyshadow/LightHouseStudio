@@ -28,6 +28,10 @@ const projectProcessingMigrationUrl = new URL(
   '../../../drizzle/0019_tearful_microchip.sql',
   import.meta.url,
 );
+const projectOutputMigrationUrl = new URL(
+  '../../../drizzle/0020_tiresome_wolf_cub.sql',
+  import.meta.url,
+);
 
 describe('Project aggregate migration', () => {
   it('is additive and creates every normalized Project relationship', async () => {
@@ -176,6 +180,26 @@ describe('Project processing authority migration', () => {
     expect(migration).toContain('project_jobs_result_revision_same_project_fk');
     expect(migration).toContain('processing_jobs_result_consistent');
     expect(migration).toContain('project_jobs_result_revision_consistent');
+    expect(migration).not.toMatch(
+      /\b(?:DROP|TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"|\bINSERT\s+INTO\b/u,
+    );
+  });
+});
+
+describe('Project output authority migration', () => {
+  it('adds output-save revision identity and owner-scoped replay receipts without backfill', async () => {
+    const migration = await readFile(projectOutputMigrationUrl, 'utf8');
+
+    expect(migration).toContain(
+      'ALTER TYPE "public"."project_revision_source" ADD VALUE \'output-save\'',
+    );
+    expect(migration).toContain('CREATE TABLE "project_output_operation_receipts"');
+    expect(migration).toContain('PRIMARY KEY("owner_user_id","operation_id")');
+    expect(migration).toContain('project_output_receipts_fingerprint_length');
+    expect(migration).toContain('project_output_receipts_revision_positive');
+    expect(migration).toContain('project_output_operation_receipts_owner_user_id_users_id_fk');
+    expect(migration).toContain('ON DELETE restrict');
+    expect(migration).toContain('project_output_receipts_project_idx');
     expect(migration).not.toMatch(
       /\b(?:DROP|TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"|\bINSERT\s+INTO\b/u,
     );

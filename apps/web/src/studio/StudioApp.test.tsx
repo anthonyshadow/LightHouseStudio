@@ -14,6 +14,7 @@ import type {
 import type { PersistedSessionReference } from '../features/media-session';
 import type { ProjectRouteSurfaceProps } from '../features/projects/ProjectRouteSurface';
 import type { ProjectSessionPort } from '../features/projects/useProjectSession';
+import type { StudioHeaderDestination } from './StudioHeader';
 
 type WorkspaceHarnessProps = {
   state: CreativeWorkspaceState;
@@ -216,6 +217,7 @@ const harness = vi.hoisted(() => {
     takeStagePresentation,
     latestWorkspace: null as WorkspaceHarnessProps | null,
     latestProjectSurfaceProps: null as ProjectRouteSurfaceProps | null,
+    latestHeaderDestination: null as StudioHeaderDestination | null,
     fetchReferenceImageMetadata: vi.fn(),
     hydrateReferenceImage: vi.fn(),
     saveVideo: vi.fn(() => Promise.resolve(null)),
@@ -416,6 +418,7 @@ vi.mock('./useTakeReviewFlow', () => ({
 
 vi.mock('./StudioHeader', () => ({
   StudioHeader: ({
+    activeDestination,
     onOpenStudio,
     onOpenProjects,
     onOpenVideos,
@@ -423,35 +426,39 @@ vi.mock('./StudioHeader', () => ({
     onOpenOutfits,
     onLogout,
   }: {
+    activeDestination: StudioHeaderDestination;
     onOpenStudio: () => void;
     onOpenProjects: () => void;
     onOpenVideos: () => void;
     onOpenCharacters: () => void;
     onOpenOutfits: () => void;
     onLogout: () => void;
-  }) => (
-    <div>
-      Studio header
-      <button type="button" onClick={onOpenStudio}>
-        Open Studio
-      </button>
-      <button type="button" onClick={onOpenProjects}>
-        Open Projects
-      </button>
-      <button type="button" onClick={onOpenVideos}>
-        Open saved videos
-      </button>
-      <button type="button" onClick={onOpenCharacters}>
-        Open saved characters
-      </button>
-      <button type="button" onClick={onOpenOutfits}>
-        Open saved outfits
-      </button>
-      <button type="button" onClick={onLogout}>
-        Log out
-      </button>
-    </div>
-  ),
+  }) => {
+    harness.latestHeaderDestination = activeDestination;
+    return (
+      <div>
+        Studio header
+        <button type="button" onClick={onOpenStudio}>
+          Open Studio
+        </button>
+        <button type="button" onClick={onOpenProjects}>
+          Open Projects
+        </button>
+        <button type="button" onClick={onOpenVideos}>
+          Open saved videos
+        </button>
+        <button type="button" onClick={onOpenCharacters}>
+          Open saved characters
+        </button>
+        <button type="button" onClick={onOpenOutfits}>
+          Open saved outfits
+        </button>
+        <button type="button" onClick={onLogout}>
+          Log out
+        </button>
+      </div>
+    );
+  },
 }));
 
 vi.mock('../ui', async () => {
@@ -614,6 +621,7 @@ describe('StudioApp composition lifecycle', () => {
     window.history.replaceState(null, '', '/');
     harness.latestWorkspace = null;
     harness.latestProjectSurfaceProps = null;
+    harness.latestHeaderDestination = null;
     harness.promptCommitted = null;
     harness.recording.original = null;
     harness.recording.presented = null;
@@ -682,6 +690,16 @@ describe('StudioApp composition lifecycle', () => {
     expect(screen.getByTestId('media-stage')).toBe(stage);
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
     expect(harness.session.startLocal).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['/studio/videos', 'videos'],
+    ['/studio/characters', 'characters'],
+    ['/studio/outfits', 'outfits'],
+  ] as const)('reports %s as the current saved-library destination', (path, destination) => {
+    renderStudio(undefined, path);
+
+    expect(harness.latestHeaderDestination).toBe(destination);
   });
 
   it('keeps one hidden media-stage owner while the full Projects workspace is active', async () => {

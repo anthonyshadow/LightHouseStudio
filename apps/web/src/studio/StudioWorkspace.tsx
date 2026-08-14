@@ -214,7 +214,7 @@ export const StudioWorkspace = ({
             ? {
                 controls: ({ visible }: { visible: boolean }) =>
                   projectRecordingAvailable ? (
-                    <div hidden={!visible} aria-label="Project recording controls">
+                    <div hidden={!visible} role="group" aria-label="Project recording controls">
                       <RecordingAction
                         recording={recording}
                         source={activeRecordingSource}

@@ -6,6 +6,8 @@ import { campaignSchema, projectCurrentResponseSchema } from '@studio/contracts'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '../../app.js';
 import { testConfig } from '../../test/fakes.js';
+import { FileProjectRepository } from '../projects/file-project-repository.js';
+import { CampaignService } from './campaign-service.js';
 
 const browserHeaders = { host: 'localhost:5173', origin: 'http://localhost:5173' };
 const jsonHeaders = { ...browserHeaders, 'content-type': 'application/json' };
@@ -218,6 +220,13 @@ describe('Campaign organization routes', () => {
   });
 
   it('applies authentication, trusted Origin, strict validation, and safe unavailable behavior', async () => {
+    const otherOwnerCampaign = await new CampaignService(
+      new FileProjectRepository(directory),
+    ).create('458c4aca-a9fa-4c25-a2c8-d218768216a1', randomUUID(), {
+      name: 'Other owner Campaign',
+      brief: null,
+    });
+    if (!otherOwnerCampaign.ok) throw new Error('Expected another owner Campaign.');
     const authenticated = createApp({
       config: testConfig({ demoAuthEnabled: true, lightframeDataDir: directory }),
     });
@@ -238,6 +247,19 @@ describe('Campaign organization routes', () => {
       payload: { login: 'demo@lightframe.local', password: 'lightframe-demo' },
     });
     const cookie = String(login.headers['set-cookie']).split(';', 1)[0]!;
+    const isolatedRead = await authenticated.inject({
+      method: 'GET',
+      url: `/api/campaigns/${otherOwnerCampaign.campaign.id}`,
+      headers: { host: browserHeaders.host, cookie },
+    });
+    const isolatedMutation = await authenticated.inject({
+      method: 'PATCH',
+      url: `/api/campaigns/${otherOwnerCampaign.campaign.id}`,
+      headers: { ...jsonHeaders, cookie },
+      payload: { name: 'Must not change', brief: null, expectedVersion: 1 },
+    });
+    expect(isolatedRead.statusCode).toBe(404);
+    expect(isolatedMutation.statusCode).toBe(404);
     expect(
       (
         await authenticated.inject({

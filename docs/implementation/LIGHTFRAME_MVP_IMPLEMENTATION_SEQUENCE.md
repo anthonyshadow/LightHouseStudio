@@ -1,8 +1,8 @@
-# Lightframe Studio remaining MVP implementation sequence
+# Lightframe Studio MVP implementation sequence
 
-**Status:** active execution program; Prompt 12 implemented
+**Status:** completed Prompt 02–13 implementation and local-MVP acceptance record
 
-**Starts from:** Prompt 12 is complete; Prompt 13 is the next implementation boundary
+**Acceptance evidence:** [MVP acceptance runbook](../MVP_ACCEPTANCE.md)
 
 **Defined:** 2026-08-11
 
@@ -12,9 +12,9 @@
 
 ## How to use this sequence
 
-This document replaces unimplemented historical Prompts 02–21. Historical Prompt 00 and Prompt 01
-remain implementation history and are not rerun. Execute each new prompt against the repository as
-it exists at that time, on one coherent branch/PR, and stop after its completion report.
+This document replaced unimplemented historical Prompts 02–21. Historical Prompt 00 and Prompt 01
+remain implementation history and were not rerun. Prompts 02–13 were executed serially against the
+repository state at each boundary; the audit rationale remains here as the implementation record.
 
 Every prompt begins with a fresh, selective audit because paths and owners may change between
 branches. Current implementation and canonical docs override assumptions in this plan. Preserve
@@ -34,20 +34,20 @@ backfill.
 
 ## Ordered outcomes
 
-| New prompt       | Outcome                                                                                                                                                        |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 02 — implemented | Correct the dormant relational Project foundation so lineage, exact references, replay, retention, status facts, and reads are safe before writes are exposed. |
-| 03 — implemented | Add local/shadow Project authority plus owner-derived Project application services and lifecycle APIs, without browser UI.                                     |
-| 04 — implemented | Establish authenticated Project/Studio routing and a minimal Projects workspace for lifecycle management.                                                      |
-| 05 — implemented | Add optional lightweight Campaigns and safe Project membership without imposing Campaign creation on Quick Start.                                              |
-| 06 — implemented | Accept, hydrate, and resume one immutable durable video source for an open Project.                                                                            |
-| 07 — implemented | Add a URL-owned Project session, semantic autosave, conflict handling, and switch/exit protection without creative-tool integration.                           |
-| 08 — implemented | Integrate reusable creative intent, local editing, and one durable working-media adoption command while provider starts remain gated.                          |
-| 09 — implemented | Establish Project-bound processing authority, pre-submit correlation, recovery, ambiguity handling, and durable result retention without enabling UI starts.   |
-| 10 — implemented | Route Project Character Swap, VTO, and supported Voice actions through that authority with truthful reconnect/retry/stale-result UX.                           |
-| 11 — implemented | Save one exact immutable Video Version and Project output through crash-safe composite orchestration.                                                          |
-| 12 — implemented | Expose bounded Project/output history, legacy Unassigned Content, exact-Version reuse, and Download.                                                           |
-| 13               | Complete navigation, accessibility, compatibility, acceptance coverage, and canonical documentation for the local MVP.                                         |
+| New prompt                            | Outcome                                                                                                                                                        |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 02 — implemented                      | Correct the dormant relational Project foundation so lineage, exact references, replay, retention, status facts, and reads are safe before writes are exposed. |
+| 03 — implemented                      | Add local/shadow Project authority plus owner-derived Project application services and lifecycle APIs, without browser UI.                                     |
+| 04 — implemented                      | Establish authenticated Project/Studio routing and a minimal Projects workspace for lifecycle management.                                                      |
+| 05 — implemented                      | Add optional lightweight Campaigns and safe Project membership without imposing Campaign creation on Quick Start.                                              |
+| 06 — implemented                      | Accept, hydrate, and resume one immutable durable video source for an open Project.                                                                            |
+| 07 — implemented                      | Add a URL-owned Project session, semantic autosave, conflict handling, and switch/exit protection without creative-tool integration.                           |
+| 08 — implemented                      | Integrate reusable creative intent, local editing, and one durable working-media adoption command while provider starts remain gated.                          |
+| 09 — implemented                      | Establish Project-bound processing authority, pre-submit correlation, recovery, ambiguity handling, and durable result retention without enabling UI starts.   |
+| 10 — implemented                      | Route Project Character Swap, VTO, and supported Voice actions through that authority with truthful reconnect/retry/stale-result UX.                           |
+| 11 — implemented                      | Save one exact immutable Video Version and Project output through crash-safe composite orchestration.                                                          |
+| 12 — implemented                      | Expose bounded Project/output history, legacy Unassigned Content, exact-Version reuse, and Download.                                                           |
+| 13 — implemented and accepted locally | Complete navigation, accessibility, compatibility, acceptance coverage, and canonical documentation for the local MVP.                                         |
 
 ## Dependency map
 

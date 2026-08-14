@@ -51,7 +51,11 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
     <main css={entryStyles(theme)}>
       <div>
         <h1 css={visuallyHiddenStyles()}>Enter Lightframe Studio</h1>
-        <p>Record or upload a video, then review it and apply optional AI edits.</p>
+        <p>
+          Start in Studio, or use a Project for resumable work; Campaigns are optional. Projects
+          retain an inspected source and durable working state, reuse saved creative resources, save
+          output as Versions, and download the exact Version you choose.
+        </p>
         <Button
           ref={enterRef}
           variant="primary"

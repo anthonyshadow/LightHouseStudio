@@ -142,7 +142,15 @@ jobs:
           node-version-file: .nvmrc
       - run: bun ci
       - run: bun run db:migrate:development
+      - run: bun run --filter @studio/api db:check
       - run: bun run db:smoke:development
+      - name: Run PostgreSQL migration and repository integration tests
+        run: >-
+          ./node_modules/.bin/vitest run
+          apps/api/src/infrastructure/database/project-migration.postgres.integration.test.ts
+          apps/api/src/infrastructure/database/project-repository.postgres.integration.test.ts
+          apps/api/src/infrastructure/database/campaign-migration.postgres.integration.test.ts
+          apps/api/src/infrastructure/database/campaign-repository.postgres.integration.test.ts
 
   visual:
     name: Curated visual regression

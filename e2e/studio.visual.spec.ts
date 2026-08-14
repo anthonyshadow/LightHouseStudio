@@ -434,7 +434,9 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await controls.getByRole('button', { name: 'Start AI' }).click();
       await page.getByRole('button', { name: 'Start with Cinematic Field Presenter' }).click();
       await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
-      await expect(page.getByText(/^AI active/u)).toBeVisible();
+      await expect(
+        page.locator('[data-stage-status-long]', { hasText: /^AI active/u }),
+      ).toBeVisible();
     },
   },
   'character-builder-combined-ready': {

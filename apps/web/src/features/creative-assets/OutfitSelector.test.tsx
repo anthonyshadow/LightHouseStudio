@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
@@ -40,6 +40,7 @@ describe('OutfitSelector', () => {
       savedPromptId: saved.id,
     });
     const onSelect = vi.fn();
+    const onSaveCopy = vi.fn();
 
     render(
       <StudioDesignProvider>
@@ -47,7 +48,7 @@ describe('OutfitSelector', () => {
           repository={repository}
           onCreate={vi.fn()}
           onEdit={vi.fn()}
-          onSaveCopy={vi.fn()}
+          onSaveCopy={onSaveCopy}
           onSelect={onSelect}
         />
       </StudioDesignProvider>,
@@ -55,6 +56,8 @@ describe('OutfitSelector', () => {
 
     expect(screen.getByRole('heading', { name: 'Copper coat' })).toBeInTheDocument();
     expect(screen.queryByText('Character recipe')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save a copy' }));
+    expect(onSaveCopy).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: saved.id }));
     await user.click(screen.getByRole('button', { name: 'Select' }));
     expect(onSelect).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -109,5 +112,93 @@ describe('OutfitSelector', () => {
     await user.click(screen.getByRole('button', { name: 'Edit' }));
     expect(onEdit).toHaveBeenCalledExactlyOnceWith(saved);
     expect(onClear).not.toHaveBeenCalled();
+  });
+
+  it('awaits saved-outfit removal and exposes a recoverable dialog error', async () => {
+    const user = userEvent.setup();
+    const repository = createRepository();
+    const saved = await repository.createSavedPrompt({
+      title: 'Linen jacket',
+      prompt: 'Dress the subject in a linen jacket.',
+      modelModeId: 'lucy-vton-latest',
+      source: 'manual',
+    });
+    const remove = vi
+      .spyOn(repository, 'deleteSavedPrompt')
+      .mockRejectedValueOnce(new Error('sensitive persistence detail'))
+      .mockResolvedValueOnce();
+    render(
+      <StudioDesignProvider>
+        <OutfitSelector
+          repository={repository}
+          onCreate={vi.fn()}
+          onEdit={vi.fn()}
+          onSaveCopy={vi.fn()}
+          onSelect={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Remove Linen jacket' }));
+    const dialog = screen.getByRole('dialog', { name: 'Remove saved outfit?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remove outfit' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'The outfit could not be removed',
+    );
+    expect(dialog).not.toHaveTextContent('sensitive persistence detail');
+    await user.click(within(dialog).getByRole('button', { name: 'Remove outfit' }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Remove saved outfit?' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(remove).toHaveBeenCalledTimes(2);
+    expect(remove).toHaveBeenCalledWith(saved.id);
+  });
+
+  it('runs available maintenance actions and restores focus when removal is cancelled', async () => {
+    const user = userEvent.setup();
+    const repository = createRepository();
+    const saved = await repository.createSavedPrompt({
+      title: 'Linen jacket',
+      prompt: 'Dress the subject in a linen jacket.',
+      modelModeId: 'lucy-vton-latest',
+      source: 'manual',
+    });
+    const remove = vi.spyOn(repository, 'deleteSavedPrompt');
+    const onClear = vi.fn();
+    const onCreate = vi.fn();
+
+    render(
+      <StudioDesignProvider>
+        <OutfitSelector
+          repository={repository}
+          activeOutfitLabel="Linen jacket"
+          onClear={onClear}
+          onCreate={onCreate}
+          onEdit={vi.fn()}
+          onSaveCopy={vi.fn()}
+          onSelect={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Unselect outfit' }));
+    await user.click(screen.getByRole('button', { name: 'Create new outfit' }));
+    expect(onClear).toHaveBeenCalledOnce();
+    expect(onCreate).toHaveBeenCalledOnce();
+
+    const removeTrigger = screen.getByRole('button', { name: 'Remove Linen jacket' });
+    await user.click(removeTrigger);
+    const dialog = screen.getByRole('dialog', { name: 'Remove saved outfit?' });
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Keep outfit' })).toHaveFocus(),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Keep outfit' }));
+
+    expect(remove).not.toHaveBeenCalled();
+    await waitFor(() => expect(removeTrigger).toHaveFocus());
+    expect(screen.getByRole('heading', { name: saved.title })).toBeVisible();
   });
 });

@@ -3,6 +3,30 @@
 - Status: Accepted
 - Date: 2026-08-11
 
+## Implemented evolution
+
+This ADR records the initial durable-Project foundation and its deliberately limited implementation
+boundary at the time of the decision. Subsequent Prompt 03–13 work preserved the aggregate,
+ownership, CAS, immutable-revision, normalized-lineage, retention, and non-cascading decisions while
+adding the following compatible current behavior:
+
+- snapshot v2 is the write format; snapshot v1 remains an explicit read migration that never
+  fabricates applied creative provenance;
+- an optional, separately owned Campaign aggregate groups zero or more Projects through an
+  owner-constrained nullable relationship;
+- authenticated lifecycle, source, working-media, processing, output, and bounded-history routes
+  back the Project browser workspace;
+- local schema v6 owns prepared create, source, working-media, Project-job/result, and composite
+  output recovery journals; and
+- exact output Versions and Project-retained content remain available through bounded owner-checked
+  history even if the global Saved Video is tombstoned.
+
+The original references below to “no browser Project route or UI,” snapshot v1 as the only format,
+prepared-create-only local recovery, and Campaign as future describe the foundation change itself,
+not current product capability. See [Architecture](../ARCHITECTURE.md),
+[MVP definition](../MVP_DEFINITION.md), and [MVP acceptance](../MVP_ACCEPTANCE.md) for current
+composition and evidence.
+
 ## Context
 
 Saved Videos represent durable outputs and immutable output versions, but they do not preserve the
@@ -66,7 +90,8 @@ foundation must not add Project routes, Project UI, public tenancy, or automatic
   making the shadow database authoritative.
 - Authenticated lifecycle routes expose bounded list, idempotent empty create, current read, rename,
   archive, and restore. They derive owner from the verified session, use Project-version CAS, and
-  return finite typed conflicts. There is deliberately no browser Project route or UI yet.
+  return finite typed conflicts. This foundation decision did not yet add a browser Project route or
+  UI; the implemented evolution above now composes both over the same authority.
 - Normal reads return only the Project and current revision. Revision and relation history have
   bounded cursor-based repository reads. A common owner-scoped Project retention policy protects
   direct assets and Version/output assets in Saved Video, reference-image, and generic byte cleanup
@@ -95,9 +120,10 @@ The one-active-context model does not yet support several independently resumabl
 inside one Project. The deferred [Project Deliverable child model](../PROJECT_DELIVERABLE_MODEL.md)
 defines that possible extension without making it current behavior.
 
-A future Campaign may group Projects through a separately designed, owner-constrained
-relationship. That addition must define standalone Project behavior and archive, detach, delete,
-and retention semantics instead of repurposing the Project aggregate as campaign metadata.
+The later Campaign implementation groups Projects through a separately designed,
+owner-constrained relationship. It preserves standalone Project behavior and explicit archive,
+detach, tombstone, and retention semantics instead of repurposing the Project aggregate as Campaign
+metadata.
 
 ## Alternatives considered
 

@@ -43,16 +43,23 @@ export const StudioLifecycleDialogs = ({
       <ConfirmationDialog
         open={logout.promptOpen}
         title={
-          logout.hasProjectProposal
-            ? 'Log out and discard unsaved Project changes?'
-            : 'Log out and discard temporary work?'
+          logout.failure
+            ? 'Could not log out'
+            : logout.hasProjectProposal
+              ? 'Log out and discard unsaved Project changes?'
+              : 'Log out and discard temporary work?'
         }
         description={
-          logout.hasProjectProposal
-            ? 'Project saving did not complete. Logging out now explicitly discards the preserved local proposal plus any temporary media or library work. Server-saved Project revisions remain available.'
-            : 'Logging out stops local media and discards the current temporary take, active source staging, active Voice work, unsaved video edits, and unsaved library changes. Saved account items remain available.'
+          logout.failure
+            ? 'Cleanup and sign-out did not complete. Lightframe kept you in Studio so you can retry without silently abandoning the session.'
+            : logout.hasProjectProposal
+              ? 'Project saving did not complete. Logging out now explicitly discards the preserved local proposal plus any temporary media or library work. Server-saved Project revisions remain available.'
+              : 'Logging out stops local media and discards the current temporary take, active source staging, active Voice work, unsaved video edits, and unsaved library changes. Saved account items remain available.'
         }
-        confirmLabel={logout.busy ? 'Logging out…' : 'Log out and discard'}
+        alert={logout.failure ?? undefined}
+        confirmLabel={
+          logout.busy ? 'Logging out…' : logout.failure ? 'Retry logout' : 'Log out and discard'
+        }
         cancelLabel="Stay in Studio"
         danger
         busy={logout.busy}

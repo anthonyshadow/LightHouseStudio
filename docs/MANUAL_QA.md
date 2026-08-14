@@ -7,6 +7,10 @@ live provider accounts.
 **Current state:** physical device/browser validation remains open. Emulation and synthetic media
 do not replace it.
 
+The [MVP acceptance runbook](MVP_ACCEPTANCE.md) owns automated local-MVP go/no-go. This document owns
+environment-dependent evidence and must not be used to turn an unrun physical/live row into an
+automated pass or a public-service claim.
+
 ## Before physical or paid work
 
 Run the exact release candidate:
@@ -36,15 +40,16 @@ Wardrobe try-on is separately enabled and is never inferred from Character Swap.
 Run these before physical/provider work so later evidence uses the intended owner and clean local
 state:
 
-| Check                    | Pass condition                                                                                                                                                                                                                                                          |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `entry-login`            | `/` requests no media/capability/provider work; Login traps focus; development prefills both configured credentials; incorrect credentials use one generic error and clear no unrelated data                                                                            |
-| `session-restore`        | Correct login opens Studio; closing/reopening the browser restores direct `/studio` and library routes within 24 hours without exposing a token to URL or browser storage                                                                                               |
-| `session-expiry-logout`  | Expired/revoked session returns to entry; logout blocks non-discardable work, confirms discardable work, releases indicators/resources, clears the cookie, and returns to Login                                                                                         |
-| `studio-library-routing` | `/studio/videos`, `/studio/characters`, and `/studio/outfits` keep the same stage/runtime; browser Back/Forward, Escape, account-menu arrow/Home/End keys, and return focus behave correctly                                                                            |
-| `save-video`             | Save is idempotent and is the only review durability action; optional thumbnail failure is non-fatal; replace confirms and appends a version; download/rename/delete operate on the selected owner gallery record; R2 deletion removes its unshared versions/thumbnails |
-| `video-gallery-states`   | Empty/loading/error/missing/placeholder/populated/load-more states avoid eager video requests; thumbnail Preview darkens the gallery, traps/returns focus, detaches on close, and remains usable at all five viewports and 200% text                                    |
-| `saved-character-outfit` | Both libraries show the user-scoped records; Use follows existing handoff; delete removes relationships without provider work or unintended immutable-byte deletion                                                                                                     |
+| Check                    | Pass condition                                                                                                                                                                                                                                                                   |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `entry-login`            | `/` requests no media/capability/provider work; Login traps focus; development prefills both configured credentials; incorrect credentials use one generic error and clear no unrelated data                                                                                     |
+| `session-restore`        | Correct login opens Studio; closing/reopening the browser restores direct `/studio` and library routes within 24 hours without exposing a token to URL or browser storage                                                                                                        |
+| `session-expiry-logout`  | Expired/revoked session returns to entry; logout blocks non-discardable work, confirms discardable work, releases indicators/resources, clears the cookie, and returns to Login                                                                                                  |
+| `studio-library-routing` | `/studio/videos`, `/studio/characters`, and `/studio/outfits` keep the same stage/runtime; browser Back/Forward, Escape, account-menu arrow/Home/End keys, and return focus behave correctly                                                                                     |
+| `local-mvp-journey`      | Campaign or Quick Start → Project → durable source → reusable creative choice/local edit → synthetic recoverable processing → Save/Add Version → history/exact Download → leave/resume/archive stays coherent, names current Campaign/Project, and contacts no external provider |
+| `save-video`             | Save is idempotent and is the only review durability action; optional thumbnail failure is non-fatal; replace confirms and appends a version; download/rename/delete operate on the selected owner gallery record; R2 deletion removes its unshared versions/thumbnails          |
+| `video-gallery-states`   | Empty/loading/error/missing/placeholder/populated/load-more states avoid eager video requests; thumbnail Preview darkens the gallery, traps/returns focus, detaches on close, and remains usable at all five viewports and 200% text                                             |
+| `saved-character-outfit` | Both libraries show the user-scoped records; Use follows existing handoff; delete removes relationships without provider work or unintended immutable-byte deletion                                                                                                              |
 
 Local-only Saved Video deletion conservatively retains detached bytes. With R2 selected, manual
 deletion must remove each unshared version/thumbnail object; force one failed delete in a disposable
@@ -332,5 +337,6 @@ Using keyboard and a screen reader:
 
 A passing JSON record must contain every required check for the exact row and commit. A blocked or
 failed record is valid evidence but does not satisfy release. Re-run the validator after recording
-results; release remains open until it reports `12/12` provider/local and `45/45` physical rows with
-no invalid records.
+results; the physical/live release record remains open until it reports `12/12` provider/local and
+`45/45` physical rows with no invalid records. Those totals are separate from automated local-MVP
+acceptance and do not authorize public deployment.

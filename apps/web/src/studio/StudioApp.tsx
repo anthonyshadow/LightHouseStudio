@@ -573,7 +573,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     updateOutfitDirty(false);
     discardWardrobeDirty();
     discardSavedVideoWork();
+    closeOverlay();
   }, [
+    closeOverlay,
     processing,
     recording,
     discardSavedVideoWork,
@@ -775,7 +777,17 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             user={auth.session!.user}
             accountBusy={logout.busy || logout.preparing}
             activeDestination={
-              campaignRouteActive ? 'campaigns' : projectRouteActive ? 'projects' : 'studio'
+              campaignRouteActive
+                ? 'campaigns'
+                : projectRouteActive
+                  ? 'projects'
+                  : location.pathname === APP_PATHS.videos
+                    ? 'videos'
+                    : location.pathname === APP_PATHS.characters
+                      ? 'characters'
+                      : location.pathname === APP_PATHS.outfits
+                        ? 'outfits'
+                        : 'studio'
             }
             projectContextActive={projectContextActive}
             onOpenStudio={() => void navigate(APP_PATHS.studio)}
@@ -864,6 +876,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           hasTemporaryTake={Boolean(recording.presented)}
           voiceProcessingActive={recording.processingState === 'processing'}
           shelfDirty={shelfDirty || outfit.dirty || character.wardrobeDirty || videoEditor.dirty}
+          projectContextDirty={
+            projectContextActive &&
+            (shelfDirty || outfit.dirty || character.wardrobeDirty || videoEditor.dirty)
+          }
           projectSourceActivity={activeProjectSourceActivity}
           projectSession={activeProjectSession}
           onDiscardTemporaryWork={discardTemporaryWork}
