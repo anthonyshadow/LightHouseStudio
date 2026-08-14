@@ -143,7 +143,7 @@ describe('MediaStage', () => {
     expect(firstVideo?.srcObject).toBe(localStream);
     expect(firstVideo?.muted).toBe(true);
     expect(firstVideo?.controls).toBe(false);
-    expect(screen.getByRole('status', { name: 'Local preview' })).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Local preview');
 
     view.rerender(
       stage({
@@ -472,7 +472,9 @@ describe('MediaStage', () => {
     act(() => track.end());
 
     expect(video).toHaveAttribute('aria-hidden', 'true');
-    expect(screen.getByText('Camera unavailable')).toBeInTheDocument();
+    expect(
+      screen.getByText('Camera unavailable', { selector: '[data-stage-status-long]' }),
+    ).toBeInTheDocument();
     expect(view.container.querySelector('video')).toBe(video);
   });
 
@@ -495,7 +497,9 @@ describe('MediaStage', () => {
     );
 
     expect(view.container.querySelector('video')).toHaveAttribute('aria-hidden', 'true');
-    expect(screen.getByText('Finalizing take')).toBeInTheDocument();
+    expect(
+      screen.getByText('Finalizing take', { selector: '[data-stage-status-long]' }),
+    ).toBeInTheDocument();
     expect(screen.queryByText('Last live frame')).not.toBeInTheDocument();
     expect(screen.getByText('Finalizing take…')).toBeInTheDocument();
   });

@@ -109,6 +109,7 @@ export const projectRevisionSource = pgEnum('project_revision_source', [
   'create',
   'user-edit',
   'job-result',
+  'output-save',
   'restore',
   'migration',
 ]);
@@ -1096,6 +1097,39 @@ export const projectOutputs = pgTable(
         projectRevisions.revisionNumber,
       ],
     }).onDelete('restrict'),
+  ],
+);
+
+export const projectOutputOperationReceipts = pgTable(
+  'project_output_operation_receipts',
+  {
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    operationId: uuid('operation_id').notNull(),
+    requestFingerprint: text('request_fingerprint').notNull(),
+    projectId: uuid('project_id').notNull(),
+    savedVideoId: uuid('saved_video_id').notNull(),
+    videoVersionId: uuid('video_version_id').notNull(),
+    resultRevisionId: uuid('result_revision_id').notNull(),
+    resultRevisionNumber: integer('result_revision_number').notNull(),
+    result: jsonb('result').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.ownerUserId, table.operationId] }),
+    index('project_output_receipts_project_idx').on(
+      table.ownerUserId,
+      table.projectId,
+      table.resultRevisionNumber,
+    ),
+    check(
+      'project_output_receipts_fingerprint_length',
+      sql`length(${table.requestFingerprint}) = 64`,
+    ),
+    check('project_output_receipts_revision_positive', sql`${table.resultRevisionNumber} > 0`),
   ],
 );
 

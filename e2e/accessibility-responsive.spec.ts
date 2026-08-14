@@ -3,8 +3,15 @@ import { expect, test, type Page } from '@playwright/test';
 import type { CapabilitiesResponse } from '@studio/contracts';
 import { TEST_AUTH_SESSION } from './support/authFixture';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
-import { openCharacterOptions, openRecipeDockWhenOverlaid } from './support/studioHarness';
+import {
+  expectNoExternalProviderTraffic,
+  installSuccessfulStudioHarness,
+  openCharacterOptions,
+  openRecipeDockWhenOverlaid,
+} from './support/studioHarness';
 import { installCampaignHarness } from './support/campaignHarness';
+import { loadDecodableH264VideoFixture } from './support/existingVideoHarness';
+import { installProjectHarness, TEST_PROJECT_ID } from './support/projectHarness';
 
 type MockStudioState = {
   apiRequests: string[];
@@ -314,6 +321,45 @@ for (const viewport of representativeViewports) {
     );
   });
 }
+
+test('small-mobile Project output review reflows at 200% text with accessible save choices', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await installProjectHarness(page, true);
+  await page.setViewportSize(STUDIO_VIEWPORT_SIZES.smallMobile);
+  await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+  const fixture = await loadDecodableH264VideoFixture();
+  await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
+    name: 'accessible-project-output.mp4',
+    mimeType: 'video/mp4',
+    buffer: fixture,
+  });
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '200%';
+  });
+
+  const createTrigger = page.getByRole('button', { name: 'Save as New Video' });
+  const appendTrigger = page.getByRole('button', { name: 'Add Version' });
+  await expect(createTrigger).toBeVisible();
+  await expect(appendTrigger).toBeVisible();
+  for (const trigger of [createTrigger, appendTrigger]) {
+    const bounds = await trigger.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.height).toBeGreaterThanOrEqual(44);
+  }
+  await expectNoDocumentOverflow(page);
+  await expectNoAxeViolations(page);
+
+  await createTrigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Save as New Video' });
+  await expect(dialog.getByLabel('Video title')).toBeFocused();
+  await expectNoDocumentOverflow(page);
+  await expectNoAxeViolations(page);
+  await page.keyboard.press('Escape');
+  await expect(createTrigger).toBeFocused();
+  expectNoExternalProviderTraffic(network);
+});
 
 test('small-mobile Builder steps survive 200% text and keep one preview', async ({ page }) => {
   test.setTimeout(60_000);

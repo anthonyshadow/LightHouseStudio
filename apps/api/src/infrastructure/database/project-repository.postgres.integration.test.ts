@@ -1,4 +1,5 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { Readable } from 'node:stream';
 import {
   acceptProjectSource,
   adoptProjectWorkingMedia,
@@ -16,6 +17,9 @@ import { DrizzleAssetLifecycleRegistry } from './asset-lifecycle-registry.js';
 import { DrizzleProjectRepository } from './project-repository.js';
 import { DrizzleProjectRetentionPolicy } from './project-retention-policy.js';
 import { ProjectService } from '../../features/projects/project-service.js';
+import { ProjectOutputService } from '../../features/projects/project-output-service.js';
+import { DrizzleSavedVideoRepository } from './saved-video-repository.js';
+import type { AssetByteStore } from '../../storage/asset-byte-store.js';
 import type { ProjectProcessingAttemptRecord } from '../../features/projects/project-processing-repository.js';
 import type {
   ProjectSourceRecord,
@@ -28,6 +32,7 @@ import {
   projectAssets,
   projectJobs,
   projectOperationReceipts,
+  projectOutputOperationReceipts,
   projectOutputs,
   projectRevisions,
   projects,
@@ -580,6 +585,269 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
       await connection.db.delete(users).where(eq(users.id, otherOwnerUserId));
     }
   }, 20_000);
+
+  it('atomically saves new/append output metadata and reconciles concurrent exact replay', async () => {
+    const ownerUserId = randomUUID();
+    const projectId = randomUUID();
+    const sourceAssetId = randomUUID();
+    const createRevisionId = randomUUID();
+    const sourceRevisionId = randomUUID();
+    const sourceOperationId = randomUUID();
+    const outputOperationId = randomUUID();
+    const appendOperationId = randomUUID();
+    const staleAppendOperationId = randomUUID();
+    const createdAt = '2026-08-13T18:00:00.000Z';
+    const acceptedAt = '2026-08-13T18:01:00.000Z';
+    const outputAt = '2026-08-13T18:02:00.000Z';
+    const media = Buffer.from('postgres-project-output-media');
+    const checksumSha256 = createHash('sha256').update(media).digest('hex');
+    const inspected = {
+      mimeType: 'video/mp4' as const,
+      container: 'mp4' as const,
+      videoCodec: 'avc' as const,
+      audioCodec: 'aac' as const,
+      durationMs: 12_000,
+      width: 1_280,
+      height: 720,
+      sizeBytes: media.byteLength,
+      hasAudio: true,
+    };
+    const bytes: AssetByteStore = {
+      storeFile: () => Promise.reject(new Error('not used')),
+      storeBytes: () => Promise.reject(new Error('not used')),
+      open: (readOwnerUserId, assetId) =>
+        Promise.resolve(
+          readOwnerUserId === ownerUserId && assetId === sourceAssetId
+            ? {
+                manifest: {
+                  schemaVersion: 1,
+                  assetId: sourceAssetId,
+                  ownerUserId,
+                  mimeType: inspected.mimeType,
+                  filename: 'project-output.mp4',
+                  sizeBytes: media.byteLength,
+                  checksumSha256,
+                  createdAt: acceptedAt,
+                },
+                createReadStream: (range) =>
+                  Readable.from(
+                    range === undefined ? media : media.subarray(range.start, range.end + 1),
+                  ),
+              }
+            : null,
+        ),
+      exists: (readOwnerUserId, assetId) =>
+        Promise.resolve(readOwnerUserId === ownerUserId && assetId === sourceAssetId),
+      delete: () => Promise.resolve(),
+    };
+    const repository = new DrizzleProjectRepository(connection.db);
+    const savedVideoRepository = new DrizzleSavedVideoRepository(connection.db);
+
+    try {
+      await connection.db.insert(users).values({
+        id: ownerUserId,
+        login: `${ownerUserId}@project-output.test`,
+        normalizedLogin: `${ownerUserId}@project-output.test`,
+        username: `po-${ownerUserId}`,
+        email: `${ownerUserId}@project-output.test`,
+        displayName: 'Project Output Integration',
+      });
+      await connection.db.insert(mediaAssets).values({
+        id: sourceAssetId,
+        ownerUserId,
+        storageProvider: 'local',
+        storageKey: sourceAssetId,
+        status: 'ready',
+        mimeType: inspected.mimeType,
+        filename: 'project-output.mp4',
+        sizeBytes: media.byteLength,
+        checksumSha256,
+      });
+      const created = createProject(
+        {
+          id: projectId,
+          ownerUserId,
+          title: 'Relational output',
+          author: { kind: 'user', authorId: ownerUserId },
+          facts: {
+            sourceStatus: 'none',
+            currentAttempt: { status: 'none' },
+            validatedLastSuccessfulOutput: null,
+          },
+        },
+        { now: createdAt, createId: () => createRevisionId },
+      );
+      await repository.create(created);
+      const accepted = acceptProjectSource(
+        created,
+        {
+          expectedProjectVersion: 1,
+          expectedRevisionNumber: 1,
+          assetId: sourceAssetId,
+          mediaReference: { kind: 'asset', assetId: sourceAssetId },
+          author: { kind: 'user', authorId: ownerUserId },
+        },
+        { now: acceptedAt, createId: () => sourceRevisionId },
+      );
+      if (!accepted.ok) throw new Error('Expected source acceptance.');
+      const acceptedRevision = accepted.value.revisions.at(-1)!;
+      await expect(
+        repository.acceptSource({
+          ownerUserId,
+          projectId,
+          expectedVersion: 1,
+          expectedRevisionNumber: 1,
+          nextProject: accepted.value.project,
+          revision: acceptedRevision,
+          assetLinks: projectAssetLinksForRevision(acceptedRevision),
+          source: {
+            projectId,
+            ownerUserId,
+            assetId: sourceAssetId,
+            kind: 'uploaded',
+            savedVideoId: null,
+            videoVersionId: null,
+            acceptedRevisionId: sourceRevisionId,
+            acceptedRevisionNumber: 2,
+            operationKey: sourceOperationId,
+            requestFingerprint: 'a'.repeat(64),
+            mimeType: inspected.mimeType,
+            filename: 'project-output.mp4',
+            sizeBytes: media.byteLength,
+            checksumSha256,
+            container: inspected.container,
+            videoCodec: inspected.videoCodec,
+            audioCodec: inspected.audioCodec,
+            durationMs: inspected.durationMs,
+            width: inspected.width,
+            height: inspected.height,
+            hasAudio: inspected.hasAudio,
+            acceptedAt,
+          },
+        }),
+      ).resolves.toMatchObject({ kind: 'accepted' });
+
+      const outputService = new ProjectOutputService(
+        repository,
+        repository,
+        savedVideoRepository,
+        bytes,
+        {
+          now: () => new Date(outputAt),
+          inspect: () => Promise.resolve(inspected),
+        },
+      );
+      const first = await outputService.save(ownerUserId, projectId, outputOperationId, {
+        expectedVersion: 2,
+        expectedRevisionNumber: 2,
+        media: { kind: 'asset', assetId: sourceAssetId },
+        target: { kind: 'new', title: 'Relational master' },
+      });
+      expect(first).toMatchObject({
+        ok: true,
+        response: {
+          replayed: false,
+          project: { status: 'completed', version: 3, currentRevisionNumber: 3 },
+          output: { producingRevisionNumber: 2 },
+          savedVideo: { versionCount: 1 },
+        },
+      });
+      if (!first.ok) throw new Error('Expected new output save.');
+      await expect(
+        outputService.save(ownerUserId, projectId, outputOperationId, {
+          expectedVersion: 2,
+          expectedRevisionNumber: 2,
+          media: { kind: 'asset', assetId: sourceAssetId },
+          target: { kind: 'new', title: 'Relational master' },
+        }),
+      ).resolves.toMatchObject({ ok: true, response: { replayed: true } });
+
+      const appendRequest = {
+        expectedVersion: 3,
+        expectedRevisionNumber: 3,
+        media: first.response.revision.snapshot.workingMedia!,
+        target: {
+          kind: 'version' as const,
+          savedVideoId: first.response.savedVideo.id,
+          expectedVersionId: first.response.savedVideo.currentVersion.id,
+        },
+      };
+      const concurrent = await Promise.all([
+        outputService.save(ownerUserId, projectId, appendOperationId, appendRequest),
+        outputService.save(ownerUserId, projectId, appendOperationId, appendRequest),
+      ]);
+      expect(concurrent.every((result) => result.ok)).toBe(true);
+      expect(concurrent.map((result) => (result.ok ? result.response.replayed : null))).toEqual(
+        expect.arrayContaining([false, true]),
+      );
+      const appended = concurrent.find((result) => result.ok && result.response.replayed === false);
+      if (appended === undefined || !appended.ok) throw new Error('Expected appended output.');
+      expect(appended.response).toMatchObject({
+        project: { version: 4, currentRevisionNumber: 4 },
+        output: { producingRevisionNumber: 3 },
+        savedVideo: { versionCount: 2, currentVersion: { ordinal: 2 } },
+      });
+      await expect(
+        outputService.save(ownerUserId, projectId, staleAppendOperationId, {
+          expectedVersion: 4,
+          expectedRevisionNumber: 4,
+          media: appended.response.revision.snapshot.workingMedia!,
+          target: {
+            kind: 'version',
+            savedVideoId: first.response.savedVideo.id,
+            expectedVersionId: first.response.savedVideo.currentVersion.id,
+          },
+        }),
+      ).resolves.toMatchObject({
+        ok: false,
+        conflict: { kind: 'saved-video-version' },
+      });
+      await expect(
+        connection.db.select().from(projectOutputs).where(eq(projectOutputs.projectId, projectId)),
+      ).resolves.toHaveLength(2);
+      await expect(
+        connection.db
+          .select()
+          .from(videoVersions)
+          .where(eq(videoVersions.videoId, first.response.savedVideo.id)),
+      ).resolves.toHaveLength(2);
+      await expect(
+        connection.db
+          .select()
+          .from(projectOutputOperationReceipts)
+          .where(eq(projectOutputOperationReceipts.projectId, projectId)),
+      ).resolves.toHaveLength(2);
+      await expect(
+        connection.db
+          .select()
+          .from(projectWorkingMediaAdoptions)
+          .where(eq(projectWorkingMediaAdoptions.projectId, projectId)),
+      ).resolves.toHaveLength(2);
+    } finally {
+      await connection.db
+        .delete(projectOutputOperationReceipts)
+        .where(eq(projectOutputOperationReceipts.projectId, projectId));
+      await connection.db
+        .delete(projectWorkingMediaAdoptions)
+        .where(eq(projectWorkingMediaAdoptions.projectId, projectId));
+      await connection.db
+        .delete(projectVersionReferences)
+        .where(eq(projectVersionReferences.projectId, projectId));
+      await connection.db.delete(projectOutputs).where(eq(projectOutputs.projectId, projectId));
+      await connection.db.delete(projectAssets).where(eq(projectAssets.projectId, projectId));
+      await connection.db.delete(projectSources).where(eq(projectSources.projectId, projectId));
+      await connection.db
+        .update(projects)
+        .set({ currentRevisionId: null, currentRevisionNumber: 0 })
+        .where(eq(projects.id, projectId));
+      await connection.db.delete(projectRevisions).where(eq(projectRevisions.projectId, projectId));
+      await connection.db.delete(projects).where(eq(projects.id, projectId));
+      await connection.db.delete(videoVersions).where(eq(videoVersions.ownerUserId, ownerUserId));
+      await connection.db.delete(savedVideos).where(eq(savedVideos.ownerUserId, ownerUserId));
+      await connection.db.delete(mediaAssets).where(eq(mediaAssets.id, sourceAssetId));
+      await connection.db.delete(users).where(eq(users.id, ownerUserId));
+    }
+  }, 30_000);
 
   it('atomically accepts and replays one inspected ready Project source', async () => {
     const ownerUserId = randomUUID();

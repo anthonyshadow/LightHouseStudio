@@ -2,12 +2,15 @@ import {
   projectConflictResponseSchema,
   projectCurrentResponseSchema,
   projectSourceResponseSchema,
+  saveProjectOutputResponseSchema,
   projectWorkingMediaResponseSchema,
   projectsResponseSchema,
   type AppendProjectRevisionRequest,
   type ProjectConflictContract,
   type ProjectCurrentResponse,
   type ProjectSourceResponse,
+  type SaveProjectOutputRequest,
+  type SaveProjectOutputResponse,
   type ProjectWorkingMediaResponse,
   type ProjectsQuery,
 } from '@studio/contracts';
@@ -356,6 +359,26 @@ export const reuseProjectWorkingMedia = (input: {
       ...(input.signal ? { signal: input.signal } : {}),
     },
     projectWorkingMediaResponseSchema,
+    invalidProjectResponse,
+    parseProjectConflict,
+  );
+
+export const saveProjectOutput = (input: {
+  readonly projectId: string;
+  readonly operationId: string;
+  readonly request: SaveProjectOutputRequest;
+  readonly signal?: AbortSignal;
+}): Promise<SaveProjectOutputResponse> =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(input.projectId)}/outputs`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { ...jsonHeaders, 'Idempotency-Key': input.operationId },
+      body: JSON.stringify(input.request),
+      ...(input.signal ? { signal: input.signal } : {}),
+    },
+    saveProjectOutputResponseSchema,
     invalidProjectResponse,
     parseProjectConflict,
   );

@@ -17,8 +17,9 @@ The implemented product is narrower than that vision. Today, Lightframe Studio i
 single-operator studio centered on video creation and transformation. It records or imports video,
 supports local editing and optional creative transformations, maintains reusable characters,
 outfits, and voices, saves versioned video outputs, and downloads finished work from Saved Videos.
-It also provides user-facing empty Projects and lightweight optional Campaign organization.
-Project source/resume, multi-format creation, collaboration, and direct publishing do not exist yet.
+It also provides resumable video Projects, atomic Project output save, and lightweight optional
+Campaign organization. Bounded Project history/download UI, multi-format creation, collaboration,
+and direct publishing do not exist yet.
 
 The intended product lifecycle is:
 
@@ -83,24 +84,27 @@ The current Studio supports:
   versions;
 - a Saved Videos gallery with metadata, filtering, preview, rename, delete, reuse, and download;
   and
-- durable empty Projects plus lightweight optional Campaigns, with lifecycle and membership parity
-  across local/shadow and authoritative relational modes.
+- durable Projects with source/working-media resume, creative checkpoints, recoverable visual
+  processing, exact output save, and lightweight optional Campaigns, with persistence parity across
+  local/shadow and authoritative relational modes.
 
-Projects and Campaigns have authenticated browser and HTTP lifecycle surfaces. Current Studio
-creative work is not automatically placed in a Project, existing Saved Videos are not backfilled,
-and empty Projects do not yet accept or resume media.
+Projects and Campaigns have authenticated browser and HTTP lifecycle surfaces. A Project can accept
+and resume one immutable video source, checkpoint intent, adopt or retain exact working media,
+recover visual processing, and explicitly save its ready current output. Standalone Studio creative
+work is not automatically placed in a Project, existing Saved Videos are not backfilled, and
+Project history/download UI remains future work.
 
 ### Near-term product direction
 
-The next coherent product layer attaches one immutable durable video source to the existing Project
-workspace. A Project remains one focused video workflow and may stand alone; the implemented
-Campaign relationship remains optional, owner-constrained, and non-cascading. Campaign has only a
-name, optional brief, lifecycle, and fast New Project path.
+The next coherent product layer exposes bounded Project revision/output history and exact-Version
+delivery over the implemented immutable source, creative, processing, and atomic output authority.
+A Project remains one focused video workflow and may stand alone; Campaign membership remains
+optional, owner-constrained, and non-cascading.
 
-Project should connect working context, source media, creative choices, jobs, versions, and outputs
-without turning a Saved Video into editable project state. Rich Campaign planning, search, tags,
-review states, and reusable defaults should be introduced only with validated value and explicit
-ownership and lifecycle rules. See the [MVP definition](MVP_DEFINITION.md) for the bounded target.
+Project working context, creative state, processing jobs, Saved Video records, immutable Video
+Versions, and Project output relations stay distinct. Rich Campaign planning, search, tags, review
+states, and reusable defaults should be introduced only with validated value and explicit ownership
+and lifecycle rules. See the [MVP definition](MVP_DEFINITION.md) for the bounded target.
 
 ### Long-term product vision
 
@@ -119,10 +123,10 @@ public-service, security, and operational gates.
 | ----------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
 | Workspace         | The user's overall Lightframe Studio environment, libraries, settings, and accessible work             | One authenticated, single-operator Studio exists; shared/team workspaces do not                          |
 | Campaign          | A marketing or creative initiative that can group Projects; richer planning context can evolve later   | Minimal optional aggregate, local/relational persistence, lifecycle API/UI, and guarded deletion exist   |
-| Project           | A focused production effort with resumable creative intent, sources, revisions, jobs, and outputs      | Empty lifecycle UI/API and durable authority exist; source/session resume is not implemented             |
+| Project           | A focused production effort with resumable creative intent, sources, revisions, jobs, and outputs      | Source/session resume, processing recovery, and exact output save exist; history/delivery UI is pending  |
 | Content           | Creative material and messaging independent of file format or storage representation                   | Broad product term; current finished output is primarily video                                           |
 | Asset             | A piece of imported, generated, transformed, or organized content with ownership, type, and lineage    | Media/reference asset infrastructure exists, but user-facing saved outputs and workflows are video-led   |
-| Version           | An immutable state in the history of the same logical record                                           | Implemented for Saved Videos and Project revisions; not a generic all-content version model              |
+| Version           | An immutable state in the history of the same logical record                                           | Video Version is immutable playable history; Project Revision is creative-state history, not media       |
 | Variation         | A purposeful alternative for another audience, placement, format, message, or treatment                | Some outputs and Character variants can serve this purpose; no generic campaign variation model exists   |
 | Character         | A reusable creative identity with saved reference, prompt, and related selections                      | Implemented as a saved creative resource                                                                 |
 | Character variant | A saved Wardrobe child of one Character with an exact reusable reference                               | Implemented; not the same as a generic campaign Asset variation                                          |
@@ -180,9 +184,11 @@ Workspace / authenticated owner scope
 └── standalone Project
 ```
 
-Campaign and nullable Project membership are implemented schema. The source/revision/output branch
-remains the bounded Project target. “No Campaign” is a virtual view rather than a default Campaign
-row. Ownership derives from verified server identity; Campaign lifecycle is non-cascading.
+Campaign membership and the Project source/revision/job/output branch are implemented schema. An
+output relation attributes one exact Video Version to its producing pre-save Project Revision; a
+separate completed post-save revision points at that retained output. “No Campaign” is a virtual
+view rather than a default Campaign row. Ownership derives from verified server identity; Campaign
+lifecycle is non-cascading.
 
 ## Creation and editing workflows
 
@@ -265,8 +271,8 @@ provider ID, device ID, or browser-supplied value with ownership.
 
 ## Current non-claims
 
-Lightframe Studio does not currently provide Project source/resume, rich Campaign planning,
+Lightframe Studio does not currently provide Project history/download UI, rich Campaign planning,
 generic multi-format asset management, direct social or advertising publishing, scheduling,
-collaborative review, team roles,
-public sharing, self-service signup, billing, or an approved public deployment. The broader vision
-does not relax the current loopback, privacy, provider-cost, or manual/live validation boundaries.
+collaborative review, team roles, public sharing, self-service signup, billing, or an approved
+public deployment. The broader vision does not relax the current loopback, privacy, provider-cost,
+or manual/live validation boundaries.

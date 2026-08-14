@@ -559,16 +559,23 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await expect(page.getByRole('heading', { name: 'Summer launch' })).toBeVisible();
     },
   },
-  'empty-project-detail': {
-    id: 'empty-project-detail',
+  'project-output-review': {
+    id: 'project-output-review',
     setup: async (page) => {
       await installProjectHarness(page, true);
       await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
-      await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+      const fixture = await loadDecodableH264VideoFixture();
+      await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
+        name: 'project-output-review.mp4',
+        mimeType: 'video/mp4',
+        buffer: fixture,
+      });
+      const outputHeading = page.getByRole('heading', { name: 'Review and save output' });
+      await expect(outputHeading).toBeVisible();
+      await page.getByRole('button', { name: 'Add Version' }).scrollIntoViewIfNeeded();
       await expect(page.getByLabel('Studio media stage')).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Record', exact: true })).toBeEnabled();
-      await expect(page.getByRole('button', { name: 'Upload', exact: true })).toBeEnabled();
-      await expect(page.getByRole('button', { name: 'Use Saved Video' })).toBeEnabled();
+      await expect(page.getByRole('button', { name: 'Save as New Video' })).toBeEnabled();
+      await expect(page.getByRole('button', { name: 'Add Version' })).toBeEnabled();
     },
   },
   'vton-prepared-with-reference': {

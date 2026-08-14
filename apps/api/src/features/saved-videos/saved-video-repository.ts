@@ -10,6 +10,7 @@ import {
   type SavedVideoFormat,
   type SavedVideosQuery,
 } from '@studio/contracts';
+import { KeyedLock } from '../../application/keyed-lock.js';
 import { persistedTimestampSchema } from '../../application/timestamps.js';
 
 const legacyVersionSchema = z
@@ -38,7 +39,7 @@ const versionV2Schema = legacyVersionSchema.extend({
 const versionSchema = versionV2Schema.extend({
   durationMs: z.number().int().positive().max(300_000),
 });
-const versionV4Schema = versionSchema.extend({
+export const storedVideoVersionSchema = versionSchema.extend({
   characterVariantName: savedVideoCharacterVariantNameSchema.nullable(),
 });
 
@@ -69,8 +70,8 @@ const aggregateV2Schema = legacyAggregateSchema.extend({
 const aggregateV3Schema = legacyAggregateSchema.extend({
   versions: z.array(versionSchema).min(1).max(100),
 });
-const aggregateSchema = legacyAggregateSchema.extend({
-  versions: z.array(versionV4Schema).min(1).max(100),
+export const storedSavedVideoAggregateSchema = legacyAggregateSchema.extend({
+  versions: z.array(storedVideoVersionSchema).min(1).max(100),
 });
 const receiptSchema = z
   .object({
@@ -97,13 +98,28 @@ const libraryV3Schema = legacyLibrarySchema.extend({
   schemaVersion: z.literal(3),
   videos: z.array(aggregateV3Schema),
 });
-const librarySchema = legacyLibrarySchema.extend({
+export const savedVideoLibrarySchema = legacyLibrarySchema.extend({
   schemaVersion: z.literal(4),
-  videos: z.array(aggregateSchema),
+  videos: z.array(storedSavedVideoAggregateSchema),
 });
 
-export type StoredVideoVersion = z.infer<typeof versionV4Schema>;
-export type StoredSavedVideoAggregate = z.infer<typeof aggregateSchema>;
+export type StoredVideoVersion = z.infer<typeof storedVideoVersionSchema>;
+export type StoredSavedVideoAggregate = z.infer<typeof storedSavedVideoAggregateSchema>;
+
+export const appendStoredVideoVersion = (
+  current: StoredSavedVideoAggregate,
+  version: StoredVideoVersion,
+): StoredSavedVideoAggregate => ({
+  video: {
+    ...current.video,
+    currentVersionId: version.id,
+    status: 'ready',
+    updatedAt: version.createdAt,
+  },
+  versions: [...current.versions, version],
+  revision: current.revision + 1,
+});
+
 export interface StoredVideoVersionRead {
   readonly video: StoredSavedVideoAggregate['video'];
   readonly version: StoredVideoVersion;
@@ -119,7 +135,7 @@ export interface SavedVideoReceiptLookup {
   readonly idempotencyKey: string;
 }
 export type OwnedSavedVideoReceipt = SavedVideoReceipt & { readonly ownerUserId: string };
-type SavedVideoLibrary = z.infer<typeof librarySchema>;
+export type SavedVideoLibrary = z.infer<typeof savedVideoLibrarySchema>;
 
 export interface SavedVideoRepositoryPage {
   readonly videos: readonly StoredSavedVideoSummary[];
@@ -162,6 +178,12 @@ export interface SavedVideoRepository {
     videoId: string,
     versionId: string,
   ): Promise<StoredVideoVersionRead | null>;
+  /** Owner-checked exact Version access for a separately verified retained Project relation. */
+  getRetainedVersion(
+    ownerUserId: string,
+    videoId: string,
+    versionId: string,
+  ): Promise<StoredVideoVersionRead | null>;
   rename(
     ownerUserId: string,
     videoId: string,
@@ -197,12 +219,13 @@ const emptyLibrary = (ownerUserId: string): SavedVideoLibrary => ({
 
 export class FileSavedVideoRepository implements SavedVideoRepository {
   readonly #root: string;
-  readonly #locks = new Map<string, Promise<unknown>>();
+  readonly #ownerLock: KeyedLock;
   readonly #cache = new Map<string, SavedVideoLibrary>();
   readonly #loads = new Map<string, Promise<SavedVideoLibrary>>();
 
-  constructor(dataDirectory: string) {
+  constructor(dataDirectory: string, options: { readonly ownerLock?: KeyedLock } = {}) {
     this.#root = path.resolve(dataDirectory, 'metadata', 'v1', 'saved-videos');
+    this.#ownerLock = options.ownerLock ?? new KeyedLock();
   }
 
   #file(ownerUserId: string): string {
@@ -231,7 +254,7 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
     const load = (async () => {
       try {
         const raw = JSON.parse(await readFile(this.#file(ownerUserId), 'utf8')) as unknown;
-        const current = librarySchema.safeParse(raw);
+        const current = savedVideoLibrarySchema.safeParse(raw);
         let library: SavedVideoLibrary;
         let needsRewrite = false;
         if (current.success) {
@@ -245,7 +268,7 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
             : v2.success
               ? v2.data
               : legacyLibrarySchema.parse(raw);
-          library = librarySchema.parse({
+          library = savedVideoLibrarySchema.parse({
             ...legacy,
             schemaVersion: 4,
             videos: legacy.videos.map((aggregate) => ({
@@ -287,7 +310,7 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
     const filePath = this.#file(library.ownerUserId);
     const temporaryPath = `${filePath}.tmp-${randomUUID()}`;
     try {
-      const validated = librarySchema.parse(library);
+      const validated = savedVideoLibrarySchema.parse(library);
       const handle = await open(temporaryPath, 'wx', 0o600);
       try {
         await handle.writeFile(`${JSON.stringify(validated)}\n`, 'utf8');
@@ -307,20 +330,7 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
     ownerUserId: string,
     mutation: (library: SavedVideoLibrary) => Promise<Result> | Result,
   ): Promise<Result> {
-    const prior = this.#locks.get(ownerUserId) ?? Promise.resolve();
-    let release!: () => void;
-    const next = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const chain = prior.then(() => next);
-    this.#locks.set(ownerUserId, chain);
-    await prior;
-    try {
-      return await mutation(await this.#read(ownerUserId));
-    } finally {
-      release();
-      if (this.#locks.get(ownerUserId) === chain) this.#locks.delete(ownerUserId);
-    }
+    return this.#ownerLock.run(ownerUserId, async () => mutation(await this.#read(ownerUserId)));
   }
 
   async findReceipt(
@@ -404,16 +414,9 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
       const current = library.videos[index];
       if (current === undefined || current.video.currentVersionId !== expectedVersionId)
         return 'conflict';
-      const next: StoredSavedVideoAggregate = aggregateSchema.parse({
-        video: {
-          ...current.video,
-          currentVersionId: version.id,
-          status: 'ready',
-          updatedAt: version.createdAt,
-        },
-        versions: [...current.versions, version],
-        revision: current.revision + 1,
-      });
+      const next = storedSavedVideoAggregateSchema.parse(
+        appendStoredVideoVersion(current, version),
+      );
       const videos = [...library.videos];
       videos[index] = next;
       await this.#write({
@@ -467,6 +470,30 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
     return aggregate === null || version === undefined ? null : { video: aggregate.video, version };
   }
 
+  async getRetainedVersion(
+    ownerUserId: string,
+    videoId: string,
+    versionId: string,
+  ): Promise<StoredVideoVersionRead | null> {
+    const aggregate = (await this.#read(ownerUserId)).videos.find(
+      (item) => item.video.id === videoId,
+    );
+    const version = aggregate?.versions.find(({ id }) => id === versionId);
+    return aggregate === undefined || version === undefined
+      ? null
+      : { video: aggregate.video, version };
+  }
+
+  /** Called only while the shared owner lock is held by the local composite output unit of work. */
+  readLibraryForProjectOutput(ownerUserId: string): Promise<SavedVideoLibrary> {
+    return this.#read(ownerUserId);
+  }
+
+  /** Called only while the shared owner lock is held and a durable composite journal exists. */
+  writeLibraryForProjectOutput(library: SavedVideoLibrary): Promise<void> {
+    return this.#write(savedVideoLibrarySchema.parse(library));
+  }
+
   async rename(
     ownerUserId: string,
     videoId: string,
@@ -480,7 +507,7 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
       if (index < 0) return null;
       const current = library.videos[index];
       if (current === undefined) return null;
-      const next = aggregateSchema.parse({
+      const next = storedSavedVideoAggregateSchema.parse({
         ...current,
         video: { ...current.video, title, updatedAt },
         revision: current.revision + 1,
@@ -500,7 +527,7 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
       const current = library.videos[index];
       if (index < 0 || current === undefined || current.video.status === 'missing') return;
       const videos = [...library.videos];
-      videos[index] = aggregateSchema.parse({
+      videos[index] = storedSavedVideoAggregateSchema.parse({
         ...current,
         video: { ...current.video, status: 'missing', updatedAt },
         revision: current.revision + 1,
@@ -527,8 +554,11 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
       if (versionIndex < 0 || version === undefined) return null;
       if (version.thumbnailAssetId !== null) return current;
       const versions = [...current.versions];
-      versions[versionIndex] = versionV4Schema.parse({ ...version, thumbnailAssetId: assetId });
-      const next = aggregateSchema.parse({
+      versions[versionIndex] = storedVideoVersionSchema.parse({
+        ...version,
+        thumbnailAssetId: assetId,
+      });
+      const next = storedSavedVideoAggregateSchema.parse({
         ...current,
         video: { ...current.video, updatedAt },
         versions,
@@ -552,7 +582,7 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
       if (index < 0 || current === undefined) return null;
       if (current.video.deletedAt !== null) return current;
       const videos = [...library.videos];
-      const deleted = aggregateSchema.parse({
+      const deleted = storedSavedVideoAggregateSchema.parse({
         ...current,
         video: { ...current.video, status: 'deleted', deletedAt, updatedAt: deletedAt },
         revision: current.revision + 1,

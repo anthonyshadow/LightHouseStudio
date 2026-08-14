@@ -46,6 +46,7 @@ import {
 } from './useProjectSourceController';
 import { ProjectProcessingStatusPanel } from './ProjectProcessingStatusPanel';
 import type { ProjectProcessingController } from './useProjectProcessingController';
+import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
 
 const projectStatusLabel = (status: ProjectContract['status']): string =>
   status === 'needs-attention'
@@ -328,6 +329,7 @@ export interface ProjectRecordingCandidate {
 }
 
 export interface ProjectRouteSurfaceProps {
+  readonly ownerUserId?: string;
   readonly creativeCheckpoint?: ReactNode;
   readonly sourceRuntime?: ProjectSourceRuntime;
   readonly recordingCandidate?: ProjectRecordingCandidate | null;
@@ -608,6 +610,7 @@ const ProjectDetail = ({
   onSessionChange,
   creativeCheckpoint,
   processing,
+  ownerUserId,
 }: { readonly projectId: string } & ProjectRouteSurfaceProps) => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -768,6 +771,13 @@ const ProjectDetail = ({
         {...(onWorkingMediaActivityChange
           ? { onActivityChange: onWorkingMediaActivityChange }
           : {})}
+      />
+
+      <ProjectOutputSaveSection
+        current={current}
+        session={session.port}
+        archived={archived}
+        ownerUserId={ownerUserId}
       />
 
       {renameTarget ? (

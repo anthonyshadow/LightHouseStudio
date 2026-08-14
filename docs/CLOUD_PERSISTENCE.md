@@ -47,11 +47,18 @@ account is not production identity or tenancy.
   attached in the revision transaction. Exact retained media is reused without copying bytes.
   Exact replay returns the original revision; changed media/edit/base tokens conflict. The source
   row and source asset remain unchanged, and no output or Add Version relation is created.
-- A schema-version-5 local Campaign/Project repository is authoritative in `local` and `shadow`.
-  It uses one owner namespace/lock/journal, atomic primary/backup replacement, strict
-  v1/v2/v3/v4→v5 startup migration, durable operation receipts, and prepared source-acceptance,
-  working-media, Project-job admission, and result-retention envelopes that reconcile metadata
-  after interruption. `shadow` does not make Drizzle
+- Project output save uses additive migration `0020` and one owner-scoped command. The application
+  verifies the exact already-durable current bytes before metadata commit. One PostgreSQL
+  transaction then creates or CAS-appends the immutable Video Version, records its pre-save
+  producing revision, appends the completed `output-save` revision and hydration record, advances
+  Project/Saved Video pointers, and stores the original replay result. It creates no new byte
+  object, and exact replay returns that stored result after response loss; changed replay conflicts.
+- A schema-version-6 local Campaign/Project repository is authoritative in `local` and `shadow`.
+  It uses one owner namespace/shared lock, atomic primary/backup replacement, strict
+  v1/v2/v3/v4/v5→v6 startup migration, durable operation receipts, and prepared source-acceptance,
+  working-media, Project-job, result-retention, and composite Project-output envelopes that
+  reconcile metadata after interruption. The output envelope carries complete next Project and
+  Saved Video libraries and commits them in a recoverable order. `shadow` does not make Drizzle
   Campaign/Project tables authoritative or claim their replication.
 - A private R2 `AssetByteStore` with opaque keys, streaming/multipart upload, app-owned SHA-256,
   byte-range reads, owner checks, database lifecycle states, multipart abort/cleanup, and deletion
@@ -77,6 +84,9 @@ account is not production identity or tenancy.
 - Additive migration `0019` adds processing-job result-asset/retry identity and Project-job
   result-revision fields, restrictive result relations, and recovery/history indexes. It does not
   assign legacy jobs to Projects, rewrite existing content, or apply automatically to production.
+- Additive migration `0020` adds the `output-save` Project revision enum value and
+  `project_output_operation_receipts`. It does not backfill output ownership, rewrite existing
+  content, copy bytes, or apply automatically to production.
 - Project processing admission commits the exact Project/revision link and app-owned operation
   before provider submission in every persistence mode. Restart recovery reconnects status or
   retrieval only for jobs with a durable provider identity and never repeats an initial billable
@@ -97,8 +107,10 @@ account is not production identity or tenancy.
   during later library reads/writes.
 - Relationship-safe manual Saved Video deletion whenever private R2 is selected: the record is
   tombstoned first, all immutable versions and thumbnails are collected, active owner relationships
-  are rechecked, and only unshared R2 objects are deleted. `deleting` lifecycle rows remain
-  claimable so an interrupted R2 request can be retried without restoring the gallery record.
+  are rechecked, and only unshared R2 objects are deleted. Project-retained Versions remain hidden
+  from the global library but stream through an exact same-owner Project output route. `deleting`
+  lifecycle rows remain claimable so an interrupted R2 request can be retried without restoring the
+  gallery record.
 - One owner-scoped Project retention query protects direct assets and exact Version/output assets
   across Saved Video, reference-image, and generic lifecycle deletion. Archive and tombstone retain
   these relations; no Project physical-purge policy is implemented.
@@ -250,9 +262,10 @@ verification, lifecycle, or cleanup contracts above.
   remove these objects as an automatic rollback. Additive migration `0016` owns immutable Project
   source rows; `0018` owns snapshot-v2 admission and working-media adoption receipts. Additive
   `0019` owns Project-processing retry/result identity and exact retained-result relations. Dropping
-  any of these would discard replay/lineage authority and is not an automatic rollback. Local
-  schema v5 is not readable by older parsers; downgrade requires restoring a verified pre-upgrade
-  metadata backup or deploying compatible reader code, never ad hoc field stripping.
+  `0020` owns Project-output replay authority and the `output-save` enum value. Dropping any of
+  these would discard replay/lineage authority and is not an automatic rollback. Local schema v6 is
+  not readable by older parsers; downgrade requires restoring a verified pre-upgrade metadata
+  backup or deploying compatible reader code, never ad hoc field stripping.
 
 ## Operational checks before any non-loopback deployment
 

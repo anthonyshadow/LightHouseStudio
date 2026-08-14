@@ -197,6 +197,9 @@ describe('VideoGallery', () => {
     expect(api.renameSavedVideo).toHaveBeenCalledWith(original.id, 'Renamed take');
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
+    expect(window.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Exact Versions and bytes remain available from any Project history'),
+    );
     await waitFor(() => expect(api.deleteSavedVideo).toHaveBeenCalledWith(original.id));
     expect(screen.queryByRole('heading', { name: 'Renamed take' })).not.toBeInTheDocument();
   });

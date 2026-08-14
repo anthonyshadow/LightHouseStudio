@@ -255,6 +255,50 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   expectNoExternalProviderTraffic(network);
 });
 
+test('a Project saves a new Video, explicitly appends a Version, and reconciles response loss after refresh', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  const projects = await installProjectHarness(page, true, {
+    loseAppendOutputResponseOnce: true,
+  });
+  const fixture = await loadDecodableH264VideoFixture();
+  await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+  await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
+    name: 'project-output-source.mp4',
+    mimeType: 'video/mp4',
+    buffer: fixture,
+  });
+  await expect(page.getByRole('heading', { name: 'Review and save output' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Save as New Video' }).click();
+  const createDialog = page.getByRole('dialog', { name: 'Save as New Video' });
+  await createDialog.getByLabel('Video title').fill('Launch master');
+  await createDialog.getByRole('button', { name: 'Save as New Video' }).click();
+  await expect(page.getByText('Saved “Launch master” as Version 1.')).toBeVisible();
+  expect(projects.outputRequests[0]?.target).toEqual({ kind: 'new', title: 'Launch master' });
+
+  await page.getByRole('button', { name: 'Add Version' }).click();
+  const picker = page.getByRole('dialog', { name: 'Choose Add Version target' });
+  await expect(picker.getByText('Launch master', { exact: true })).toBeVisible();
+  await picker.getByRole('button', { name: /Launch master/u }).click();
+  const confirmation = page.getByRole('dialog', { name: 'Confirm Add Version' });
+  await expect(confirmation).toContainText('Current Version 1');
+  await confirmation.getByRole('button', { name: 'Add Version' }).click();
+  await expect(page.getByText('The save response was unavailable.')).toBeVisible();
+  expect(projects.outputOperationKeys).toHaveLength(2);
+  expect(projects.outputRequests[1]?.target).toMatchObject({ kind: 'version' });
+
+  const pendingOperationId = projects.outputOperationKeys[1];
+  await page.reload();
+  await expect(page.getByText('Added Version 2 to “Launch master”.')).toBeVisible();
+  await expect(page.getByText('Completed', { exact: true })).toBeVisible();
+  expect(projects.outputOperationKeys).toHaveLength(3);
+  expect(projects.outputOperationKeys[2]).toBe(pendingOperationId);
+  expect(projects.outputRequests[2]).toEqual(projects.outputRequests[1]);
+  expectNoExternalProviderTraffic(network);
+});
+
 test('an accepted Project operation reconnects after refresh and presents its retained result without resubmission', async ({
   page,
 }) => {

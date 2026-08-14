@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import type { RealtimeSessionTiming } from '../media-session';
 import { formatDuration } from '../recording/recordingHelpers';
 import type { RecordingProcessingOperation } from '../recording/types';
+import { VisuallyHidden } from '../../ui';
 import {
   activityIndicatorStyles,
   badgeStyles,
@@ -112,13 +113,16 @@ export const MediaStageToolbar = ({
                 )}, maximum ${formatDuration(
                   recordingTiming.maximumSeconds,
                 )}, ${formatDuration(recordingTiming.remainingSeconds)} remaining`
-              : statusLabel
+              : undefined
           }
           css={badgeStyles(theme, statusTone)}
           data-recording-duration-status={recording ? recordingTiming.status : undefined}
         >
+          {!recording ? <VisuallyHidden>{statusLabel}</VisuallyHidden> : null}
           <span css={statusDotStyles(theme, statusTone)} aria-hidden="true" />
-          <span data-stage-status-long>{statusLabel}</span>
+          <span data-stage-status-long aria-hidden="true">
+            {statusLabel}
+          </span>
           <span data-stage-status-short aria-hidden="true">
             {compactStatusLabel}
           </span>

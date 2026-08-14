@@ -27,6 +27,7 @@ import {
   type ProjectJobLink,
   type ProjectMediaReference,
 } from '@studio/domain';
+import { KeyedLock } from '../../application/keyed-lock.js';
 import { AppError } from '../../http/app-error.js';
 import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
 import type { ReferenceImageAssetStore } from '../reference-images/asset-store.js';
@@ -153,7 +154,7 @@ const parseHistoryCursor = (
 };
 
 export class ProjectProcessingService {
-  readonly #locks = new Map<string, Promise<unknown>>();
+  readonly #lock = new KeyedLock();
 
   constructor(
     private readonly projects: ProjectRepository,
@@ -177,23 +178,6 @@ export class ProjectProcessingService {
 
   get #createId(): () => string {
     return this.options.createId ?? randomUUID;
-  }
-
-  async #withLock<Result>(key: string, operation: () => Promise<Result>): Promise<Result> {
-    const prior = this.#locks.get(key) ?? Promise.resolve();
-    let release!: () => void;
-    const next = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const chain = prior.then(() => next);
-    this.#locks.set(key, chain);
-    await prior;
-    try {
-      return await operation();
-    } finally {
-      release();
-      if (this.#locks.get(key) === chain) this.#locks.delete(key);
-    }
   }
 
   async #requireCurrent(ownerUserId: string, projectId: string): Promise<ProjectCurrentRead> {
@@ -306,7 +290,7 @@ export class ProjectProcessingService {
     readonly retryOfOperationId?: string;
     readonly acknowledgePossibleDuplicateCost?: boolean;
   }): Promise<ProjectProcessingMutationResponse> {
-    return this.#withLock(`${input.ownerUserId}:${input.operationId}`, async () => {
+    return this.#lock.run(`${input.ownerUserId}:${input.operationId}`, async () => {
       const prior = await this.processing.getProjectAttempt(
         input.ownerUserId,
         input.projectId,
@@ -581,7 +565,7 @@ export class ProjectProcessingService {
     projectId: string,
     operationId: string,
   ): Promise<ProjectProcessingAttemptRecord | null> {
-    return this.#withLock(`${ownerUserId}:${operationId}:reconcile`, async () => {
+    return this.#lock.run(`${ownerUserId}:${operationId}:reconcile`, async () => {
       let attempt = await this.processing.getProjectAttempt(ownerUserId, projectId, operationId);
       if (attempt === null) return null;
       if (

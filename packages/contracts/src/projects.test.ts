@@ -5,11 +5,13 @@ import {
   projectConflictResponseSchema,
   projectCurrentResponseSchema,
   projectOutputLinkSchema,
+  projectOutputSaveResultSchema,
   projectSourceResponseSchema,
   projectSourceUploadMetadataSchema,
   projectSnapshotSchema,
   projectStatusFactsSchema,
   projectWorkingMediaResponseSchema,
+  saveProjectOutputRequestSchema,
 } from './projects';
 
 const assetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
@@ -438,6 +440,108 @@ describe('Project snapshot contract', () => {
     expect(projectWorkingMediaResponseSchema.parse(response)).toEqual(response);
     expect(
       projectWorkingMediaResponseSchema.safeParse({ ...response, isCurrent: false }).success,
+    ).toBe(false);
+  });
+
+  it('binds output intent to one explicit target and keeps producer provenance pre-save', () => {
+    const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
+    const producingRevisionId = '80eb98cb-0dd4-4aac-8507-084789045d71';
+    const resultRevisionId = '66517242-ccf5-5fa5-bcee-5831039119c9';
+    const operationId = '4a31b6c7-8a54-4878-b240-182652a34d31';
+    const reference = { savedVideoId: videoId, videoVersionId: versionId };
+    const snapshot = {
+      ...validSnapshot(),
+      workingMedia: { kind: 'saved-video-version' as const, ...reference },
+      presentedMedia: { kind: 'saved-video-version' as const, ...reference },
+      lastSuccessfulOutput: reference,
+      workflowPhase: 'complete' as const,
+    };
+    const result = {
+      operationId,
+      project: {
+        id: projectId,
+        campaignId: null,
+        title: 'Saved output',
+        status: 'completed' as const,
+        version: 3,
+        currentRevisionId: resultRevisionId,
+        currentRevisionNumber: 3,
+        archivedAt: null,
+        deletedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      revision: {
+        id: resultRevisionId,
+        projectId,
+        revisionNumber: 3,
+        parentRevisionId: producingRevisionId,
+        parentRevisionNumber: 2,
+        snapshot,
+        authorKind: 'user' as const,
+        source: 'output-save' as const,
+        createdAt: now,
+      },
+      output: {
+        projectId,
+        ...reference,
+        producingRevisionId,
+        producingRevisionNumber: 2,
+        createdAt: now,
+      },
+      savedVideo: {
+        id: videoId,
+        title: 'Saved output',
+        status: 'ready' as const,
+        currentVersion: {
+          id: versionId,
+          videoId,
+          ordinal: 1,
+          origin: 'editor' as const,
+          characterName: null,
+          characterVariantName: null,
+          sourceVersionId: null,
+          mimeType: 'video/mp4' as const,
+          filename: 'output.mp4',
+          sizeBytes: 1_024,
+          durationMs: 10_000,
+          width: 1_280,
+          height: 720,
+          createdAt: now,
+        },
+        sourceVideoId: null,
+        versionCount: 1,
+        thumbnailAvailable: false,
+        createdAt: now,
+        updatedAt: now,
+        versions: [] as unknown[],
+      },
+      contentUrl: `/api/projects/${projectId}/outputs/${versionId}/content`,
+    };
+    result.savedVideo.versions = [result.savedVideo.currentVersion];
+
+    expect(projectOutputSaveResultSchema.parse(result)).toEqual(result);
+    expect(
+      projectOutputSaveResultSchema.safeParse({
+        ...result,
+        revision: { ...result.revision, parentRevisionNumber: 1 },
+      }).success,
+    ).toBe(false);
+    expect(
+      saveProjectOutputRequestSchema.parse({
+        expectedVersion: 2,
+        expectedRevisionNumber: 2,
+        media: { kind: 'asset', assetId },
+        target: { kind: 'version', savedVideoId: videoId, expectedVersionId: versionId },
+      }),
+    ).toMatchObject({ target: { kind: 'version', expectedVersionId: versionId } });
+    expect(
+      saveProjectOutputRequestSchema.safeParse({
+        expectedVersion: 2,
+        expectedRevisionNumber: 2,
+        media: { kind: 'saved-video-version', savedVideoId: videoId, videoVersionId: versionId },
+        target: { kind: 'version', savedVideoId: videoId },
+      }).success,
     ).toBe(false);
   });
 });

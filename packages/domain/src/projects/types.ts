@@ -43,6 +43,7 @@ export const PROJECT_REVISION_SOURCES = [
   'create',
   'user-edit',
   'job-result',
+  'output-save',
   'restore',
   'migration',
 ] as const;
@@ -269,7 +270,7 @@ export interface ProjectStatusFacts {
 export type ProjectConflict =
   | {
       readonly kind: 'operation-key';
-      readonly operation: 'create' | 'source-accept' | 'working-media-adopt';
+      readonly operation: 'create' | 'source-accept' | 'working-media-adopt' | 'output-save';
     }
   | {
       readonly kind: 'project-version';
@@ -299,6 +300,12 @@ export type ProjectConflict =
   | {
       readonly kind: 'immutable-source';
       readonly projectId: string;
+    }
+  | {
+      readonly kind: 'saved-video-version';
+      readonly savedVideoId: string;
+      readonly expectedVersionId: string;
+      readonly actualVersionId: string;
     };
 
 export type ProjectMutationResult<T> =

@@ -26,9 +26,12 @@ provenance. Project Character Swap and Virtual Try On now start through one exac
 pre-linked processing command, reconnect accepted work after refresh, require an explicit
 cost-bearing retry, and present only a durably retained current result as working media. Project
 provider Voice remains gated because its synchronous adapter has no durable reconnect identity;
-Project output saving remains the next implementation step. Rich Campaign planning and
-multi-format content creation remain future product directions. The app is not approved for LAN,
-tunnel, proxy, or public exposure.
+the current exact ready Project media can now be saved explicitly as a new Saved Video or, after
+choosing and confirming one active target, appended as an immutable Video Version. The composite
+save records producing-revision provenance, advances one completed post-save Project revision, and
+reconciles the same durable operation after response loss or reload. Project history and delivery
+UI remain future work. Rich Campaign planning and multi-format content creation remain future
+product directions. The app is not approved for LAN, tunnel, proxy, or public exposure.
 
 ## Status
 
@@ -95,8 +98,12 @@ Campaign archive is non-cascading and Campaign deletion requires archive plus ze
 Projects. An empty Project offers **Record**, **Upload**, and **Use Saved Video**. It becomes
 resumable only after the API stores or verifies the bytes, inspects the media, commits the
 owner-bound source record and revision, and reports **All changes saved**. The first accepted
-original cannot be replaced; another original requires another Project. The full-screen library surfaces likewise
-never create another media session. The gallery
+original cannot be replaced; another original requires another Project. A source-bearing Project's
+review surface keeps **All changes saved**, **Render preview**, **Save as New Video**, and **Add
+Version** distinct. Add Version never follows source lineage implicitly: the user chooses an active
+Saved Video and confirms its current Version, then the server applies Saved Video and Project CAS in
+one replay-safe metadata operation. The full-screen library surfaces likewise never create another
+media session. The gallery
 loads metadata and lazy thumbnails first, then fetches video bytes only for an explicit Preview,
 Studio, Edit, or Download action. Saved Videos can be filtered by attributed parent character and
 Landscape, Portrait, or Square format, then ordered by Latest, Oldest, Shortest, or Longest. When
@@ -104,9 +111,11 @@ a Wardrobe variant was used, the card and preview also show that exact variant w
 the parent character's filter group. A thumbnail Preview opens a centered, focus-managed player over
 the darkened gallery; that scoped player owns no tracks, object URL, recorder, or provider session
 and detaches its authenticated content URL on close. Any saved video can be deleted independently;
-a retained derived video remains usable when its source record is deleted. With private R2
-selected, manual deletion also removes every unshared version and thumbnail object; interrupted
-object deletion is safe to retry. **Use existing video**
+a retained derived video remains usable when its source record is deleted. Removing a Saved Video
+from the global library also preserves any exact Version linked by a Project and its bytes; that
+Version remains available only through the owner-checked Project content route. With private R2
+selected, manual deletion removes only unshared version and thumbnail objects; interrupted object
+deletion is safe to retry. **Use existing video**
 retains its separate approved source/result player. Every other path returns to `/`. Older Guided
 compatibility videos were not imported during the Phase 1 cutover; their retired repository and UI
 wiring are now removed.

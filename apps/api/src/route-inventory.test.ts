@@ -86,6 +86,8 @@ const projectSourceRoutes: readonly Route[] = [
   'POST /api/projects/:projectId/source/reuse',
   'POST /api/projects/:projectId/working-media',
   'POST /api/projects/:projectId/working-media/reuse',
+  'POST /api/projects/:projectId/outputs',
+  'GET /api/projects/:projectId/outputs/:videoVersionId/content',
 ];
 
 const withExplicitHeadSiblings = (routes: readonly Route[]): Route[] =>
