@@ -1,4 +1,5 @@
 import type { AppPersistenceDependencies } from '../app.js';
+import { KeyedLock } from '../application/keyed-lock.js';
 import type { RuntimeConfig } from '../config/environment.js';
 import { FileProjectRepository } from '../features/projects/file-project-repository.js';
 import { FileSavedVideoRepository } from '../features/saved-videos/saved-video-repository.js';
@@ -23,14 +24,22 @@ const createLocalMetadataPersistence = (
   dataDirectory: string,
 ): Pick<
   AppPersistenceDependencies,
-  'savedVideos' | 'projects' | 'projectProcessing' | 'campaigns' | 'projectRetention'
+  | 'savedVideos'
+  | 'projects'
+  | 'projectProcessing'
+  | 'campaigns'
+  | 'projectOutputMetadata'
+  | 'projectRetention'
 > => {
-  const projects = new FileProjectRepository(dataDirectory);
+  const ownerLock = new KeyedLock();
+  const savedVideos = new FileSavedVideoRepository(dataDirectory, { ownerLock });
+  const projects = new FileProjectRepository(dataDirectory, { ownerLock, savedVideos });
   return {
-    savedVideos: new FileSavedVideoRepository(dataDirectory),
+    savedVideos,
     projects,
     projectProcessing: projects,
     campaigns: projects,
+    projectOutputMetadata: projects,
     projectRetention: projects,
   };
 };
@@ -123,6 +132,7 @@ export const createConfiguredPersistence = async (
       processingJobs: processingJobTraces,
       projects,
       projectProcessing: projects,
+      projectOutputMetadata: projects,
       campaigns: new DrizzleCampaignRepository(connection.db),
       projectRetention,
       creativeLibraries: new DrizzleCreativeLibraryRepository(

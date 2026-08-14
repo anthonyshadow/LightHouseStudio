@@ -67,9 +67,10 @@ owns the detailed sequence and launch evidence.
 
 ## Phase 2 — Campaign and Project video workspace MVP
 
-**Status: in progress through recoverable visual processing; invariant correction, lifecycle,
-Campaign organization, durable source/working media, creative checkpoints, and Project-bound
-Character Swap/VTO result retention are implemented. Atomic output save is next.**
+**Status: in progress through atomic Project output save; invariant correction, lifecycle,
+Campaign organization, durable source/working media, creative checkpoints, Project-bound
+Character Swap/VTO result retention, and exact Saved Video/Video Version output linking are
+implemented. Bounded history and exact-Version delivery are next.**
 
 - Correct the dormant Project foundation's revision and media-reference lineage, transaction/replay,
   retention, status, read-bounding, and cleanup invariants before exposing writes.
@@ -86,7 +87,7 @@ Character Swap/VTO result retention are implemented. Atomic output save is next.
 - Accept a durable recorded, uploaded, or explicitly reused video source before calling a Project
   resumable; restore exact Project state after navigation or restart.
 - Maintain exact applied creative intent, current edit specifications, pre-linked processing jobs,
-  and durable current-or-historical results. Add the still-future atomic Saved Video/Video Version
+  durable current-or-historical results, and the implemented atomic Saved Video/Video Version
   output boundary without creating another result authority.
 - Preserve Project Revision as creative state and Video Version as playable media history; expose
   bounded history and download an exact ready Version.

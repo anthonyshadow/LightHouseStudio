@@ -377,6 +377,154 @@ describe('Project lifecycle routes', () => {
     expect(ranged.rawPayload).toEqual(fixture.subarray(1, 6));
   });
 
+  it('saves and replays explicit Project outputs, appends only to the confirmed target, and retains Project content', async () => {
+    const app = localApp();
+    const created = (await create(app, 'Project output route')).response;
+    const projectId = json<{ project: { id: string } }>(created).project.id;
+    const fixture = Buffer.from(
+      (
+        await readFile(
+          new URL('../../../../../e2e/fixtures/decodable-h264-video.base64', import.meta.url),
+          'utf8',
+        )
+      ).replaceAll(/\s/gu, ''),
+      'base64',
+    );
+    const sourceKey = randomUUID();
+    const source = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/source`,
+      headers: {
+        ...browserHeaders,
+        'content-type': 'video/mp4',
+        'idempotency-key': sourceKey,
+        'x-lightframe-project-source': encodeURIComponent(
+          JSON.stringify({
+            expectedVersion: 1,
+            expectedRevisionNumber: 1,
+            kind: 'uploaded',
+            filename: 'project-output.mp4',
+          }),
+        ),
+      },
+      payload: fixture,
+    });
+    const sourceBody = json<{
+      project: { version: number };
+      revision: {
+        revisionNumber: number;
+        snapshot: { workingMedia: { kind: 'asset'; assetId: string } };
+      };
+    }>(source);
+    const operationId = randomUUID();
+    const firstPayload = {
+      expectedVersion: sourceBody.project.version,
+      expectedRevisionNumber: sourceBody.revision.revisionNumber,
+      media: sourceBody.revision.snapshot.workingMedia,
+      target: { kind: 'new', title: 'Output master' },
+    };
+    const save = (payload: unknown = firstPayload, key = operationId) =>
+      app.inject({
+        method: 'POST',
+        url: `/api/projects/${projectId}/outputs`,
+        headers: {
+          ...browserHeaders,
+          'content-type': 'application/json',
+          'idempotency-key': key,
+        },
+        payload,
+      });
+
+    const first = await save();
+    expect(first.statusCode).toBe(201);
+    expect(first.json()).toMatchObject({
+      replayed: false,
+      project: { id: projectId, status: 'completed', version: 3 },
+      revision: { revisionNumber: 3, parentRevisionNumber: 2, source: 'output-save' },
+      output: { producingRevisionNumber: 2 },
+      savedVideo: { title: 'Output master', versionCount: 1 },
+    });
+    expect(first.body).not.toContain('ownerUserId');
+    expect(first.body).not.toContain('checksum');
+    expect(first.body).not.toContain(directory);
+    const firstBody = json<{
+      project: { version: number };
+      revision: {
+        revisionNumber: number;
+        snapshot: {
+          workingMedia: {
+            kind: 'saved-video-version';
+            savedVideoId: string;
+            videoVersionId: string;
+          };
+        };
+      };
+      output: { savedVideoId: string; videoVersionId: string };
+      savedVideo: { id: string; currentVersion: { id: string } };
+      contentUrl: string;
+    }>(first);
+    const replay = await save();
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json()).toEqual({ ...json<Record<string, unknown>>(first), replayed: true });
+    const mismatch = await save({
+      ...firstPayload,
+      target: { kind: 'new', title: 'Different title' },
+    });
+    expect(mismatch.statusCode).toBe(409);
+    expect(mismatch.json()).toMatchObject({
+      conflict: { kind: 'operation-key', operation: 'output-save' },
+    });
+
+    const append = await save(
+      {
+        expectedVersion: firstBody.project.version,
+        expectedRevisionNumber: firstBody.revision.revisionNumber,
+        media: firstBody.revision.snapshot.workingMedia,
+        target: {
+          kind: 'version',
+          savedVideoId: firstBody.savedVideo.id,
+          expectedVersionId: firstBody.savedVideo.currentVersion.id,
+        },
+      },
+      randomUUID(),
+    );
+    expect(append.statusCode).toBe(201);
+    expect(append.json()).toMatchObject({
+      output: { producingRevisionNumber: 3 },
+      savedVideo: {
+        id: firstBody.savedVideo.id,
+        versionCount: 2,
+        currentVersion: { ordinal: 2, sourceVersionId: firstBody.savedVideo.currentVersion.id },
+      },
+    });
+
+    const ranged = await app.inject({
+      method: 'GET',
+      url: firstBody.contentUrl,
+      headers: { host: browserHeaders.host, range: 'bytes=3-9' },
+    });
+    expect(ranged.statusCode).toBe(206);
+    expect(ranged.rawPayload).toEqual(fixture.subarray(3, 10));
+    await app.inject({
+      method: 'DELETE',
+      url: `/api/videos/${firstBody.savedVideo.id}`,
+      headers: browserHeaders,
+    });
+    const hidden = await app.inject({
+      method: 'GET',
+      url: `/api/videos/${firstBody.savedVideo.id}`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(hidden.statusCode).toBe(404);
+    const retained = await app.inject({
+      method: 'GET',
+      url: firstBody.contentUrl,
+      headers: { host: browserHeaders.host },
+    });
+    expect(retained.statusCode).toBe(200);
+    expect(retained.rawPayload).toEqual(fixture);
+  });
+
   it('keeps pagination cursors filter-bound and create idempotency durable across app restart', async () => {
     const firstApp = localApp();
     const key = randomUUID();

@@ -11,9 +11,11 @@ download only from that gallery, and load a chosen version into the existing Stu
    prompts for an optional video name; a blank field keeps the existing generated artifact name.
    Saving is explicit, reports progress/result, and repeated submission of the same artifact is
    idempotent. Release remains disabled until the current artifact is saved.
-2. **Save as New Video** creates a titled gallery record and immutable first version. **Replace
-   Existing Video** is secondary, requires confirmation, checks the expected current version, and
-   appends bytes rather than overwriting history.
+2. **Save as New Video** creates a titled gallery record and immutable first version. In the
+   standalone workflow, **Replace Existing Video** is secondary, requires confirmation, checks the
+   expected current version, and appends bytes rather than overwriting history. In a Project,
+   **Add Version** is a separate explicit target selection and confirmation; it is never inferred
+   from a Saved Video Version reused as source.
    In authoritative Neon/private-R2 mode, the authenticated API stages the save and the browser
    transfers multipart bytes directly to R2; the result is not visible until the API verifies and
    attaches it. Local and shadow modes retain their existing API-mediated upload behavior.
@@ -39,7 +41,9 @@ download only from that gallery, and load a chosen version into the existing Stu
 8. Rename changes metadata. Delete confirms, tombstones only the chosen record, and removes it from
    the visible gallery. Every video can be deleted independently in any order; retained derived
    records keep their historical source lineage even when that source record is deleted. With
-   private R2 selected, deletion also removes all unshared immutable-version and thumbnail objects.
+   private R2 selected, deletion removes only immutable-version and thumbnail objects that no
+   Project output still retains. A tombstoned global record stays hidden, while an exact
+   same-owner Project-retained Version remains available through Project-scoped content.
    Download exists only in Saved Videos and uses an authenticated content response.
 
 ## Acceptance checks
@@ -71,4 +75,6 @@ version and thumbnail asset ID, rechecks the owner's remaining active Saved Vide
 and deletes only unshared stored objects. A failed physical deletion returns a safe storage error;
 repeating the delete reuses the tombstoned lineage and retries cleanup. This does not add automatic
 orphan collection, backup expiry, legal-hold, or account deletion. Retired Guided compatibility
-code is removed and those records are not imported.
+code is removed and those records are not imported. Project output relations retain their exact
+Version bytes and owner-checked Project content access even after the logical Saved Video disappears
+from the global gallery; they do not restore it to that gallery.

@@ -85,7 +85,7 @@ const publicSummary = (summary: StoredSavedVideoSummary): SavedVideoSummary =>
     updatedAt: summary.video.updatedAt,
   });
 
-const publicDetail = (aggregate: StoredSavedVideoAggregate): SavedVideoDetail => {
+export const publicSavedVideoDetail = (aggregate: StoredSavedVideoAggregate): SavedVideoDetail => {
   const version = currentVersion(aggregate);
   return savedVideoDetailSchema.parse({
     ...publicSummary(aggregateSummary(aggregate, version)),
@@ -266,7 +266,7 @@ export class SavedVideoService {
     const receipt = await this.#findReceipt(ownerUserId, idempotencyKey);
     if (receipt === null) return null;
     const aggregate = await this.#repository.get(ownerUserId, receipt.videoId);
-    return aggregate === null ? null : publicDetail(aggregate);
+    return aggregate === null ? null : publicSavedVideoDetail(aggregate);
   }
 
   async saveNew(
@@ -313,7 +313,7 @@ export class SavedVideoService {
       if (!saved.versions.some((savedVersion) => savedVersion.id === version.id)) {
         await this.#deleteAsset(ownerUserId, version.assetId);
       }
-      return publicDetail(saved);
+      return publicSavedVideoDetail(saved);
     } catch (error) {
       await this.#deleteAsset(ownerUserId, version.assetId);
       throw error;
@@ -383,7 +383,7 @@ export class SavedVideoService {
         'conflict',
         'The saved video changed before this version could be added.',
       );
-    return publicDetail(result);
+    return publicSavedVideoDetail(result);
   }
 
   async saveNewFromStagedAsset(
@@ -435,7 +435,7 @@ export class SavedVideoService {
       if (!saved.versions.some((savedVersion) => savedVersion.id === version.id)) {
         await this.#deleteAsset(ownerUserId, assetId);
       }
-      return publicDetail(saved);
+      return publicSavedVideoDetail(saved);
     } catch (error) {
       await this.#deleteAsset(ownerUserId, assetId);
       throw error;
@@ -513,7 +513,7 @@ export class SavedVideoService {
         'conflict',
         'The saved video changed before this version could be added.',
       );
-    return publicDetail(result);
+    return publicSavedVideoDetail(result);
   }
 
   async list(
@@ -585,7 +585,7 @@ export class SavedVideoService {
     const aggregate = await this.#repository.get(ownerUserId, videoId);
     if (aggregate === null)
       throw new AppError(404, 'not_found', 'That saved video is unavailable.');
-    return publicDetail(aggregate);
+    return publicSavedVideoDetail(aggregate);
   }
 
   async findByIdempotencyKey(
@@ -610,7 +610,7 @@ export class SavedVideoService {
     );
     if (aggregate === null)
       throw new AppError(404, 'not_found', 'That saved video is unavailable.');
-    return publicDetail(aggregate);
+    return publicSavedVideoDetail(aggregate);
   }
 
   async delete(ownerUserId: string, videoId: string): Promise<void> {
@@ -668,7 +668,7 @@ export class SavedVideoService {
         'The saved video file is missing from local storage.',
       );
     }
-    return { video: publicDetail(aggregate), version, asset };
+    return { video: publicSavedVideoDetail(aggregate), version, asset };
   }
 
   async saveThumbnail(
@@ -682,7 +682,7 @@ export class SavedVideoService {
     if (aggregate === null || aggregate === undefined || version === undefined) {
       throw new AppError(404, 'not_found', 'That saved video version is unavailable.');
     }
-    if (version.thumbnailAssetId !== null) return publicDetail(aggregate);
+    if (version.thumbnailAssetId !== null) return publicSavedVideoDetail(aggregate);
     let thumbnail: Buffer;
     try {
       thumbnail = await withWorkflowSpan('media.sharp.saved_video_thumbnail', {}, () =>
@@ -729,7 +729,7 @@ export class SavedVideoService {
     if (updated === null) {
       throw new AppError(404, 'not_found', 'That saved video version is unavailable.');
     }
-    return publicDetail(updated);
+    return publicSavedVideoDetail(updated);
   }
 
   async thumbnail(

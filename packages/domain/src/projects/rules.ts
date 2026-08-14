@@ -4,6 +4,7 @@ import type {
   ProjectConflict,
   ProjectMutationContext,
   ProjectMutationResult,
+  ProjectOutputLink,
   ProjectRevision,
   ProjectRevisionAuthor,
   ProjectRevisionSource,
@@ -528,6 +529,137 @@ export interface AppendProjectRevisionInput {
   readonly source: Exclude<ProjectRevisionSource, 'create'>;
   readonly facts: ProjectStatusFacts;
 }
+
+export interface SaveProjectOutputInput {
+  readonly expectedProjectVersion: number;
+  readonly expectedRevisionNumber: number;
+  readonly savedVideoId: string;
+  readonly videoVersionId: string;
+  readonly author: ProjectRevisionAuthor;
+}
+
+/**
+ * Records immutable producer provenance on the pre-save revision, then advances the Project to a
+ * distinct post-save revision that presents the exact retained Version. This is intentionally a
+ * dedicated transition: changing an ordinary revision's media clears a stale output pointer,
+ * while this command proves the replacement reference names the same newly retained output.
+ */
+export const saveProjectOutput = (
+  aggregate: ProjectAggregate,
+  input: SaveProjectOutputInput,
+  context: ProjectMutationContext,
+): ProjectMutationResult<ProjectAggregate> => {
+  const { project } = aggregate;
+  if (project.version !== input.expectedProjectVersion) {
+    return projectVersionConflict(project, input.expectedProjectVersion);
+  }
+  if (project.currentRevisionNumber !== input.expectedRevisionNumber) {
+    return {
+      ok: false,
+      conflict: {
+        kind: 'revision',
+        projectId: project.id,
+        expectedRevisionNumber: input.expectedRevisionNumber,
+        actualRevisionNumber: project.currentRevisionNumber,
+      },
+    };
+  }
+  if (project.archivedAt !== null || project.deletedAt !== null) {
+    throw new ProjectRuleError(
+      'invalid-transition',
+      'Archived or deleted projects cannot save outputs.',
+    );
+  }
+  if (project.status === 'processing') {
+    throw new ProjectRuleError(
+      'invalid-transition',
+      'Active Project processing must finish before its ready output can be saved.',
+    );
+  }
+  const producingRevision = aggregate.revisions.find(
+    ({ id, revisionNumber }) =>
+      id === project.currentRevisionId && revisionNumber === project.currentRevisionNumber,
+  );
+  if (producingRevision === undefined) {
+    throw new ProjectRuleError('invalid-snapshot', 'The producing Project revision is missing.');
+  }
+  const { workingMedia, presentedMedia, sourceAssetId } = producingRevision.snapshot;
+  if (
+    sourceAssetId === null ||
+    workingMedia === null ||
+    presentedMedia === null ||
+    JSON.stringify(workingMedia) !== JSON.stringify(presentedMedia)
+  ) {
+    throw new ProjectRuleError(
+      'invalid-snapshot',
+      'A Project output requires one exact ready working and presented media reference.',
+    );
+  }
+
+  const savedVideoId = requireId(input.savedVideoId, 'Saved video');
+  const videoVersionId = requireId(input.videoVersionId, 'Video version');
+  if (aggregate.outputLinks.some((link) => link.videoVersionId === videoVersionId)) {
+    throw new ProjectRuleError(
+      'invalid-snapshot',
+      'That Video Version already has producing Project provenance.',
+    );
+  }
+  const now = requireTimestamp(context.now);
+  requireId(input.author.authorId, 'Revision author');
+  const revisionId = requireId(context.createId(), 'Project revision');
+  const revisionNumber = producingRevision.revisionNumber + 1;
+  const outputReference = { savedVideoId, videoVersionId };
+  const snapshot = validateProjectSnapshot({
+    ...producingRevision.snapshot,
+    workingMedia: { kind: 'saved-video-version', ...outputReference },
+    presentedMedia: { kind: 'saved-video-version', ...outputReference },
+    lastSuccessfulOutput: outputReference,
+    workflowPhase: 'complete',
+    updatedAt: now,
+  });
+  const output: ProjectOutputLink = {
+    projectId: project.id,
+    ownerUserId: project.ownerUserId,
+    ...outputReference,
+    producingRevisionId: producingRevision.id,
+    producingRevisionNumber: producingRevision.revisionNumber,
+    createdAt: now,
+  };
+  const revision: ProjectRevision = {
+    id: revisionId,
+    projectId: project.id,
+    ownerUserId: project.ownerUserId,
+    revisionNumber,
+    parentRevisionId: producingRevision.id,
+    parentRevisionNumber: producingRevision.revisionNumber,
+    snapshot,
+    author: input.author,
+    source: 'output-save',
+    createdAt: now,
+  };
+  const status = deriveProjectStatus(snapshot, {
+    sourceStatus: 'ready',
+    currentAttempt: { status: 'none' },
+    validatedLastSuccessfulOutput: outputReference,
+  });
+  assertStatusTransition(project.status, status);
+  return {
+    ok: true,
+    value: {
+      ...aggregate,
+      project: {
+        ...project,
+        status,
+        version: project.version + 1,
+        currentRevisionId: revision.id,
+        currentRevisionNumber: revision.revisionNumber,
+        updatedAt: now,
+      },
+      revisions: [...aggregate.revisions, revision],
+      outputLinks: [...aggregate.outputLinks, output],
+    },
+  };
+};
 
 export const appendProjectRevision = (
   aggregate: ProjectAggregate,

@@ -270,6 +270,9 @@ export const mainGridStyles = (projectContextActive = false): CSSObject => ({
           gridTemplateColumns: 'minmax(0, 1fr)',
           gridTemplateRows: 'minmax(12rem, 45%) minmax(0, 1fr)',
         },
+        '@media (max-width: 39.99rem)': {
+          gridTemplateRows: 'minmax(min(10rem, 40vh), 40%) minmax(0, 1fr)',
+        },
       }
     : {}),
 });

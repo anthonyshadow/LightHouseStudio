@@ -26,7 +26,7 @@ future features current.
 | Log in, restore, and log out safely                    | [Login and local session](14-login-and-session.md)                             |
 | Save, browse, version, and reload local videos         | [Saved Video Gallery](15-saved-video-gallery.md)                               |
 | Reuse saved characters and outfits                     | [Saved creative libraries](16-saved-creative-libraries.md)                     |
-| Create Projects and retain one immutable video source  | [Project lifecycle and immutable source](17-empty-project-lifecycle.md)        |
+| Create, resume, process, and save one Project video    | [Project lifecycle and immutable source](17-empty-project-lifecycle.md)        |
 | Organize Projects with optional Campaigns              | [Campaign organization](18-campaign-organization.md)                           |
 
 ## Shared runtime rules
@@ -49,7 +49,8 @@ future features current.
   Character/VTO transformation and Workshop are advanced flows.
 - Campaign and Project lifecycle/source management is user-facing, including optional membership,
   move/detach, the virtual No Campaign group, durable source resume, and guarded bounded session
-  autosave. Creative/edit producers, processing, and Project output history are not.
+  autosave. Creative/edit checkpoints, recoverable visual processing, and exact output save are
+  implemented; bounded Project history and Download UI are not.
 - Character Builder owns true character creation and editing. Workshop owns only Add, Replace, and
   Restyle object recipes.
 - Saved Character Wardrobe owns normalized original/variant browsing and variant creation while

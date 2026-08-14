@@ -11,15 +11,16 @@ import {
   type ProjectMediaReference,
   type VideoEditSpec,
 } from '@studio/domain';
+import { KeyedLock } from '../../application/keyed-lock.js';
 import { AppError } from '../../http/app-error.js';
 import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
-import type {
-  SavedVideoRepository,
-  StoredVideoVersion,
-} from '../saved-videos/saved-video-repository.js';
+import type { SavedVideoRepository } from '../saved-videos/saved-video-repository.js';
 import { inspectSavedVideoFile } from '../saved-videos/saved-video-inspection.js';
 import { safeSavedVideoFilename } from '../saved-videos/saved-video-service.js';
-import { inspectStoredProjectMedia } from './project-media-inspection.js';
+import {
+  inspectStoredProjectMedia,
+  storedVideoVersionMatchesInspection,
+} from './project-media-inspection.js';
 import {
   projectAggregateForCurrent,
   type ProjectCurrentRead,
@@ -106,7 +107,7 @@ const responseFor = (read: ProjectWorkingMediaRead): ProjectWorkingMediaResponse
   });
 
 export class ProjectWorkingMediaService {
-  readonly #locks = new Map<string, Promise<unknown>>();
+  readonly #lock = new KeyedLock();
 
   constructor(
     private readonly projects: ProjectRepository,
@@ -132,23 +133,6 @@ export class ProjectWorkingMediaService {
     return this.options.inspect ?? inspectSavedVideoFile;
   }
 
-  async #withLock<Result>(key: string, operation: () => Promise<Result>): Promise<Result> {
-    const prior = this.#locks.get(key) ?? Promise.resolve();
-    let release!: () => void;
-    const next = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const chain = prior.then(() => next);
-    this.#locks.set(key, chain);
-    await prior;
-    try {
-      return await operation();
-    } finally {
-      release();
-      if (this.#locks.get(key) === chain) this.#locks.delete(key);
-    }
-  }
-
   async #requireProject(ownerUserId: string, projectId: string): Promise<ProjectCurrentRead> {
     const current = await this.projects.getCurrent(ownerUserId, projectId);
     if (current === null) {
@@ -165,7 +149,7 @@ export class ProjectWorkingMediaService {
   async uploadLocalRender(
     input: UploadProjectWorkingMediaInput,
   ): Promise<ProjectWorkingMediaMutationResult> {
-    return this.#withLock(`${input.ownerUserId}:${input.operationKey}`, async () => {
+    return this.#lock.run(`${input.ownerUserId}:${input.operationKey}`, async () => {
       const current = await this.#requireProject(input.ownerUserId, input.projectId);
       const inspected = await this.#inspect(input.sourcePath);
       const filename = safeSavedVideoFilename(input.filename, inspected.mimeType);
@@ -241,7 +225,7 @@ export class ProjectWorkingMediaService {
   }
 
   async reuse(input: ReuseProjectWorkingMediaInput): Promise<ProjectWorkingMediaMutationResult> {
-    return this.#withLock(`${input.ownerUserId}:${input.operationKey}`, async () => {
+    return this.#lock.run(`${input.ownerUserId}:${input.operationKey}`, async () => {
       const current = await this.#requireProject(input.ownerUserId, input.projectId);
       if (input.media.kind === 'saved-video-version') {
         const saved = await this.savedVideos.getVersion(
@@ -257,7 +241,13 @@ export class ProjectWorkingMediaService {
           throw new AppError(404, 'not_found', 'That retained media is unavailable.');
         }
         const inspected = await inspectStoredProjectMedia(asset, this.#inspect);
-        this.#assertVersionMatches(saved.version, inspected, asset);
+        if (!storedVideoVersionMatchesInspection(saved.version, inspected, asset)) {
+          throw new AppError(
+            409,
+            'conflict',
+            'That retained media no longer matches its inspection.',
+          );
+        }
         return this.#adoptRetained(
           input,
           current,
@@ -436,23 +426,6 @@ export class ProjectWorkingMediaService {
       response: responseFor(persisted.value),
       replayed: persisted.kind === 'replayed',
     };
-  }
-
-  #assertVersionMatches(
-    version: StoredVideoVersion,
-    inspected: InspectedVideo,
-    asset: AssetReadHandle,
-  ): void {
-    if (
-      version.assetId !== asset.manifest.assetId ||
-      version.mimeType !== inspected.mimeType ||
-      version.sizeBytes !== inspected.sizeBytes ||
-      version.durationMs !== Math.round(inspected.durationMs) ||
-      version.width !== inspected.width ||
-      version.height !== inspected.height
-    ) {
-      throw new AppError(409, 'conflict', 'That retained media no longer matches its inspection.');
-    }
   }
 
   async get(ownerUserId: string, projectId: string): Promise<ProjectWorkingMediaResponse> {

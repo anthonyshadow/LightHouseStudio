@@ -11,10 +11,10 @@ import type {
   ProjectVersionReferenceLink,
 } from '@studio/domain';
 import type {
-  SavedVideoReceipt,
   StoredSavedVideoAggregate,
   StoredVideoVersion,
 } from '../saved-videos/saved-video-repository.js';
+import type { ProjectOutputSaveResult } from '@studio/contracts';
 
 export type ProjectPersistenceMutationResult =
   | { readonly kind: 'updated' }
@@ -209,31 +209,75 @@ export type ProjectLinkMutationResult =
       readonly conflict: Extract<ProjectConflict, { readonly kind: 'relation-mismatch' }>;
     };
 
+export interface ProjectOutputOperationReceipt {
+  readonly operationId: string;
+  readonly requestFingerprint: string;
+  readonly projectId: string;
+  readonly savedVideoId: string;
+  readonly videoVersionId: string;
+  readonly resultRevisionId: string;
+  readonly resultRevisionNumber: number;
+  readonly result: ProjectOutputSaveResult;
+  readonly createdAt: string;
+}
+
+export type ProjectOutputMetadataCommitResult =
+  | {
+      readonly kind: 'committed' | 'replayed';
+      readonly receipt: ProjectOutputOperationReceipt;
+    }
+  | { readonly kind: 'not-found' }
+  | {
+      readonly kind: 'conflict';
+      readonly conflict: Extract<
+        ProjectConflict,
+        | { readonly kind: 'operation-key' }
+        | { readonly kind: 'project-version' }
+        | { readonly kind: 'revision' }
+        | { readonly kind: 'saved-video-version' }
+      >;
+    };
+
 /**
  * Application seam for Prompt 11's crash-safe composite save. Implementations must commit all
  * metadata in one authority transaction; no caller may emulate this with sequential repository
  * calls.
  */
 export interface ProjectOutputMetadataUnitOfWork {
+  findReceipt(
+    ownerUserId: string,
+    operationId: string,
+  ): Promise<ProjectOutputOperationReceipt | null>;
   commit(input: {
     readonly ownerUserId: string;
+    readonly receipt: ProjectOutputOperationReceipt;
     readonly savedVideo:
       | {
           readonly kind: 'create';
           readonly aggregate: StoredSavedVideoAggregate;
-          readonly receipt: SavedVideoReceipt;
         }
       | {
           readonly kind: 'append';
           readonly videoId: string;
           readonly expectedVersionId: string;
           readonly version: StoredVideoVersion;
-          readonly receipt: SavedVideoReceipt;
         };
     readonly projectRevision: AppendProjectRevisionPersistenceInput;
     readonly output: ProjectOutputLink;
-  }): Promise<ProjectPersistenceMutationResult>;
+    /** Hydration record for the post-save revision's exact presented Saved Video Version. */
+    readonly media: ProjectWorkingMediaRecord;
+  }): Promise<ProjectOutputMetadataCommitResult>;
 }
+
+export const isProjectOutputMetadataUnitOfWork = (
+  value: unknown,
+): value is ProjectOutputMetadataUnitOfWork =>
+  typeof value === 'object' &&
+  value !== null &&
+  'findReceipt' in value &&
+  typeof value.findReceipt === 'function' &&
+  'commit' in value &&
+  typeof value.commit === 'function';
 
 /** Common owner-scoped media-retention policy; local Project authority will implement this port. */
 export interface ProjectRetentionPolicy {
@@ -296,4 +340,9 @@ export interface ProjectRepository {
   ): Promise<ProjectPersistenceMutationResult>;
   linkJob(link: ProjectJobLink): Promise<ProjectLinkMutationResult>;
   linkOutput(link: ProjectOutputLink): Promise<ProjectLinkMutationResult>;
+  getOutput(
+    ownerUserId: string,
+    projectId: string,
+    videoVersionId: string,
+  ): Promise<ProjectOutputLink | null>;
 }

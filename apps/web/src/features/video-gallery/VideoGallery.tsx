@@ -329,10 +329,15 @@ export const VideoGallery = ({
   };
 
   const remove = async (video: SavedVideoSummary) => {
-    if (!window.confirm(`Delete “${video.title}” from Saved Videos?`)) return;
+    if (
+      !window.confirm(
+        `Remove “${video.title}” from Saved Videos? This hides it from the global library. Exact Versions and bytes remain available from any Project history that references them.`,
+      )
+    )
+      return;
     try {
       await deleteMutation.mutateAsync(video.id);
-      setMessage('Video removed.');
+      setMessage('Video removed from Saved Videos. Referenced Project history remains preserved.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'The video could not be deleted.');
     }

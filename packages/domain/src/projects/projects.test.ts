@@ -15,6 +15,7 @@ import {
   ProjectRuleError,
   renameProject,
   restoreProject,
+  saveProjectOutput,
   validateProjectSnapshot,
 } from './index';
 import { createDefaultVideoEditSpec } from '../video-editing';
@@ -143,6 +144,64 @@ describe('Project aggregate rules', () => {
         { now, createId: () => firstRevisionId },
       ),
     ).toThrow(ProjectRuleError);
+  });
+
+  it('keeps the producing revision distinct from the completed post-save output revision', () => {
+    const accepted = acceptProjectSource(
+      emptyProject(),
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        assetId: sourceAssetId,
+        mediaReference: { kind: 'asset', assetId: sourceAssetId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    expect(accepted.ok).toBe(true);
+    if (!accepted.ok) return;
+    const outputRevisionId = '5354b1d3-4022-4c85-a7b6-b230b58ba10b';
+    const savedVideoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
+    const videoVersionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
+
+    const saved = saveProjectOutput(
+      accepted.value,
+      {
+        expectedProjectVersion: 2,
+        expectedRevisionNumber: 2,
+        savedVideoId,
+        videoVersionId,
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => outputRevisionId },
+    );
+
+    expect(saved.ok).toBe(true);
+    if (!saved.ok) return;
+    expect(saved.value.outputLinks).toContainEqual(
+      expect.objectContaining({
+        savedVideoId,
+        videoVersionId,
+        producingRevisionId: secondRevisionId,
+        producingRevisionNumber: 2,
+      }),
+    );
+    expect(saved.value.project).toMatchObject({
+      status: 'completed',
+      currentRevisionId: outputRevisionId,
+      currentRevisionNumber: 3,
+    });
+    expect(saved.value.revisions.at(-1)).toMatchObject({
+      id: outputRevisionId,
+      parentRevisionId: secondRevisionId,
+      source: 'output-save',
+      snapshot: {
+        workingMedia: { kind: 'saved-video-version', savedVideoId, videoVersionId },
+        presentedMedia: { kind: 'saved-video-version', savedVideoId, videoVersionId },
+        lastSuccessfulOutput: { savedVideoId, videoVersionId },
+        workflowPhase: 'complete',
+      },
+    });
   });
 
   it('keeps visual processing choices mutually exclusive and rejects browser URLs', () => {

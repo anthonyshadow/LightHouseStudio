@@ -1,5 +1,6 @@
 import type { RuntimeConfig } from './config/environment.js';
 import { ApplicationRuntime } from './application/application-runtime.js';
+import { KeyedLock } from './application/keyed-lock.js';
 import { AuthService } from './features/auth/auth-service.js';
 import { registerAuthRoutes } from './features/auth/routes.js';
 import {
@@ -52,11 +53,13 @@ import type {
   ProjectRepository,
   ProjectRetentionPolicy,
 } from './features/projects/project-repository.js';
+import { isProjectOutputMetadataUnitOfWork } from './features/projects/project-repository.js';
 import { FileProjectRepository } from './features/projects/file-project-repository.js';
 import { ProjectService } from './features/projects/project-service.js';
 import { registerProjectRoutes } from './features/projects/routes.js';
 import { ProjectSourceService } from './features/projects/project-source-service.js';
 import { ProjectWorkingMediaService } from './features/projects/project-working-media-service.js';
+import { ProjectOutputService } from './features/projects/project-output-service.js';
 import {
   isProjectProcessingRepository,
   type ProjectProcessingRepository,
@@ -292,13 +295,23 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
       optimizerVersion: dependencies.config.openAiPromptOptimizerVersion,
     },
   );
+  const fallbackMetadataLock = new KeyedLock();
+  const fallbackSavedVideoRepository = new FileSavedVideoRepository(
+    dependencies.config.lightframeDataDir,
+    { ownerLock: fallbackMetadataLock },
+  );
   const savedVideoRepository =
-    dependencies.persistence?.savedVideos ??
-    new FileSavedVideoRepository(dependencies.config.lightframeDataDir);
+    dependencies.persistence?.savedVideos ?? fallbackSavedVideoRepository;
   const projectRepository =
     dependencies.persistence?.projects ??
     (dependencies.config.databaseMode === 'local' || dependencies.config.databaseMode === 'shadow'
-      ? new FileProjectRepository(dependencies.config.lightframeDataDir)
+      ? new FileProjectRepository(dependencies.config.lightframeDataDir, {
+          ownerLock: fallbackMetadataLock,
+          savedVideos:
+            savedVideoRepository instanceof FileSavedVideoRepository
+              ? savedVideoRepository
+              : fallbackSavedVideoRepository,
+        })
       : undefined);
   const projectProcessingRepository =
     dependencies.persistence?.projectProcessing ??
@@ -366,6 +379,18 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
       : new ProjectWorkingMediaService(projectRepository, savedVideoRepository, assetBytes, {
           ...(projectRetention === undefined ? {} : { projectRetention }),
         });
+  const projectOutputMetadata =
+    dependencies.persistence?.projectOutputMetadata ??
+    (isProjectOutputMetadataUnitOfWork(projectRepository) ? projectRepository : undefined);
+  const projectOutputService =
+    projectRepository === undefined || projectOutputMetadata === undefined
+      ? undefined
+      : new ProjectOutputService(
+          projectRepository,
+          projectOutputMetadata,
+          savedVideoRepository,
+          assetBytes,
+        );
   const projectProcessingService =
     projectRepository === undefined || projectProcessingRepository === undefined
       ? undefined
@@ -410,7 +435,13 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
   registerRealtimeRoutes(app, decartProvider);
   registerVideoJobRoutes(app, videoJobService);
   registerSavedVideoRoutes(app, savedVideoService, directSavedVideoUploadService);
-  registerProjectRoutes(app, projectService, projectSourceService, projectWorkingMediaService);
+  registerProjectRoutes(
+    app,
+    projectService,
+    projectSourceService,
+    projectWorkingMediaService,
+    projectOutputService,
+  );
   registerProjectProcessingRoutes(app, projectProcessingService);
   registerCampaignRoutes(app, campaignService);
   registerCreativeLibraryRoutes(

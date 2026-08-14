@@ -66,7 +66,9 @@ const toAggregate = (
   revision: video.revision,
 });
 
-const versionValues = (version: StoredVideoVersion): typeof videoVersions.$inferInsert => ({
+export const savedVideoVersionValues = (
+  version: StoredVideoVersion,
+): typeof videoVersions.$inferInsert => ({
   id: version.id,
   videoId: version.videoId,
   ownerUserId: version.ownerUserId,
@@ -84,6 +86,21 @@ const versionValues = (version: StoredVideoVersion): typeof videoVersions.$infer
   width: version.width,
   height: version.height,
   createdAt: toIsoTimestamp(version.createdAt),
+});
+
+export const savedVideoValues = (
+  aggregate: StoredSavedVideoAggregate,
+): typeof savedVideos.$inferInsert => ({
+  id: aggregate.video.id,
+  ownerUserId: aggregate.video.ownerUserId,
+  title: aggregate.video.title,
+  currentVersionId: aggregate.video.currentVersionId,
+  sourceVideoId: aggregate.video.sourceVideoId,
+  status: aggregate.video.status,
+  revision: aggregate.revision,
+  deletedAt: nullableIsoTimestamp(aggregate.video.deletedAt),
+  createdAt: toIsoTimestamp(aggregate.video.createdAt),
+  updatedAt: toIsoTimestamp(aggregate.video.updatedAt),
 });
 
 const receiptValues = (
@@ -230,19 +247,8 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
     if (existing !== null) return existing;
     try {
       return await this.db.transaction(async (tx) => {
-        await tx.insert(savedVideos).values({
-          id: aggregate.video.id,
-          ownerUserId,
-          title: aggregate.video.title,
-          currentVersionId: aggregate.video.currentVersionId,
-          sourceVideoId: aggregate.video.sourceVideoId,
-          status: aggregate.video.status,
-          revision: aggregate.revision,
-          deletedAt: nullableIsoTimestamp(aggregate.video.deletedAt),
-          createdAt: toIsoTimestamp(aggregate.video.createdAt),
-          updatedAt: toIsoTimestamp(aggregate.video.updatedAt),
-        });
-        await tx.insert(videoVersions).values(aggregate.versions.map(versionValues));
+        await tx.insert(savedVideos).values(savedVideoValues(aggregate));
+        await tx.insert(videoVersions).values(aggregate.versions.map(savedVideoVersionValues));
         await tx.insert(savedVideoReceipts).values(receiptValues(ownerUserId, receipt));
         return aggregate;
       });
@@ -280,7 +286,7 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
           .limit(1);
         if (current === undefined) return 'not-found' as const;
         if (current.currentVersionId !== expectedVersionId) return 'conflict' as const;
-        await tx.insert(videoVersions).values(versionValues(version));
+        await tx.insert(videoVersions).values(savedVideoVersionValues(version));
         await tx
           .update(savedVideos)
           .set({
@@ -491,6 +497,34 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
           eq(savedVideos.ownerUserId, ownerUserId),
           eq(savedVideos.id, videoId),
           isNull(savedVideos.deletedAt),
+          eq(videoVersions.id, versionId),
+        ),
+      )
+      .limit(1);
+    return row === undefined
+      ? null
+      : { video: toVideo(row.video), version: toVersion(row.version) };
+  }
+
+  async getRetainedVersion(
+    ownerUserId: string,
+    videoId: string,
+    versionId: string,
+  ): Promise<StoredVideoVersionRead | null> {
+    const [row] = await this.db
+      .select({ video: savedVideos, version: videoVersions })
+      .from(savedVideos)
+      .innerJoin(
+        videoVersions,
+        and(
+          eq(videoVersions.videoId, savedVideos.id),
+          eq(videoVersions.ownerUserId, savedVideos.ownerUserId),
+        ),
+      )
+      .where(
+        and(
+          eq(savedVideos.ownerUserId, ownerUserId),
+          eq(savedVideos.id, videoId),
           eq(videoVersions.id, versionId),
         ),
       )

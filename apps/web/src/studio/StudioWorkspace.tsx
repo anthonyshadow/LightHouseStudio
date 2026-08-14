@@ -65,6 +65,7 @@ interface StudioWorkspaceProps {
   readonly environment: {
     readonly browser: BrowserCapabilities;
     readonly desktopLayout: boolean;
+    readonly ownerUserId: string;
   };
   readonly stage: {
     readonly presentation: StagePresentation;
@@ -121,7 +122,7 @@ export const StudioWorkspace = ({
   } = route;
   const { visible: showFirstSuccessGuide, dismiss: onDismissFirstSuccessGuide } = guide;
   const { session, takeReview, videoEditor, savedVideo, project, projectProcessing } = controllers;
-  const { browser, desktopLayout: desktopStudioLayout } = environment;
+  const { browser, desktopLayout: desktopStudioLayout, ownerUserId } = environment;
   const {
     presentation: stagePresentation,
     aspectRatio: stageAspectRatio,
@@ -328,6 +329,7 @@ export const StudioWorkspace = ({
       {projectRouteActive ? (
         <Suspense fallback={<p role="status">Loading Projects workspace…</p>}>
           <ProjectRouteSurface
+            ownerUserId={ownerUserId}
             creativeCheckpoint={projectCreativeCheckpoint}
             processing={projectProcessing}
             sourceRuntime={project.sourceRuntime}

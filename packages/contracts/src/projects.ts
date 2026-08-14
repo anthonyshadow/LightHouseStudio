@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { savedVideoDetailSchema, savedVideoTitleSchema } from './saved-videos';
 
 export const PROJECT_SNAPSHOT_SCHEMA_VERSION = 2 as const;
 export const LEGACY_PROJECT_SNAPSHOT_SCHEMA_VERSION = 1 as const;
@@ -25,6 +26,7 @@ export const PROJECT_REVISION_SOURCES = [
   'create',
   'user-edit',
   'job-result',
+  'output-save',
   'restore',
   'migration',
 ] as const;
@@ -517,7 +519,7 @@ export const projectConflictSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('operation-key'),
-      operation: z.enum(['create', 'source-accept', 'working-media-adopt']),
+      operation: z.enum(['create', 'source-accept', 'working-media-adopt', 'output-save']),
     })
     .strict(),
   z
@@ -538,6 +540,14 @@ export const projectConflictSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('active-jobs'), projectId: projectIdSchema }).strict(),
   z.object({ kind: z.literal('campaign-membership'), projectId: projectIdSchema }).strict(),
   z.object({ kind: z.literal('immutable-source'), projectId: projectIdSchema }).strict(),
+  z
+    .object({
+      kind: z.literal('saved-video-version'),
+      savedVideoId: z.uuid(),
+      expectedVersionId: z.uuid(),
+      actualVersionId: z.uuid(),
+    })
+    .strict(),
   z
     .object({
       kind: z.literal('revision'),
@@ -561,6 +571,9 @@ export const moveProjectCampaignRequestSchema = z
   .object({ campaignId: z.uuid().nullable(), expectedVersion: z.number().int().positive() })
   .strict();
 export const projectParamsSchema = z.object({ projectId: projectIdSchema }).strict();
+export const projectOutputVersionParamsSchema = z
+  .object({ projectId: projectIdSchema, videoVersionId: z.uuid() })
+  .strict();
 export const projectWorkingMediaParamsSchema = z
   .object({ projectId: projectIdSchema, revisionId: projectRevisionIdSchema })
   .strict();
@@ -677,6 +690,26 @@ export const adoptProjectWorkingMediaRequestSchema = z
   })
   .strict();
 
+export const projectOutputSaveTargetSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('new'), title: savedVideoTitleSchema }).strict(),
+  z
+    .object({
+      kind: z.literal('version'),
+      savedVideoId: z.uuid(),
+      expectedVersionId: z.uuid(),
+    })
+    .strict(),
+]);
+
+export const saveProjectOutputRequestSchema = z
+  .object({
+    expectedVersion: z.number().int().positive(),
+    expectedRevisionNumber: z.number().int().positive(),
+    media: projectMediaReferenceSchema,
+    target: projectOutputSaveTargetSchema,
+  })
+  .strict();
+
 const projectWorkingMediaSchema = z
   .object({
     kind: z.enum(['local-render', 'media-asset', 'saved-video-version']),
@@ -767,6 +800,51 @@ export const projectWorkingMediaResponseSchema = z
     }
   });
 
+export const projectOutputSaveResultSchema = z
+  .object({
+    operationId: projectOperationKeySchema,
+    project: projectSchema,
+    revision: projectRevisionSchema,
+    output: projectOutputLinkSchema,
+    savedVideo: savedVideoDetailSchema,
+    contentUrl: z.string().startsWith('/api/projects/').max(500),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const reference = value.revision.snapshot.lastSuccessfulOutput;
+    const working = value.revision.snapshot.workingMedia;
+    const presented = value.revision.snapshot.presentedMedia;
+    if (
+      value.project.id !== value.output.projectId ||
+      value.project.currentRevisionId !== value.revision.id ||
+      value.project.currentRevisionNumber !== value.revision.revisionNumber ||
+      value.project.status !== 'completed' ||
+      value.revision.source !== 'output-save' ||
+      value.revision.parentRevisionId !== value.output.producingRevisionId ||
+      value.revision.parentRevisionNumber !== value.output.producingRevisionNumber ||
+      value.savedVideo.id !== value.output.savedVideoId ||
+      value.savedVideo.currentVersion.id !== value.output.videoVersionId ||
+      reference?.savedVideoId !== value.output.savedVideoId ||
+      reference.videoVersionId !== value.output.videoVersionId ||
+      working?.kind !== 'saved-video-version' ||
+      working.savedVideoId !== value.output.savedVideoId ||
+      working.videoVersionId !== value.output.videoVersionId ||
+      presented?.kind !== 'saved-video-version' ||
+      presented.savedVideoId !== value.output.savedVideoId ||
+      presented.videoVersionId !== value.output.videoVersionId
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message:
+          'A Project output result must preserve producing-revision provenance and name the exact completed post-save Version.',
+      });
+    }
+  });
+
+export const saveProjectOutputResponseSchema = projectOutputSaveResultSchema
+  .extend({ replayed: z.boolean() })
+  .strict();
+
 export const projectSourceResponseSchema = z
   .object({
     project: projectSchema,
@@ -843,3 +921,7 @@ export type ProjectWorkingMediaUploadMetadata = z.infer<
 >;
 export type AdoptProjectWorkingMediaRequest = z.infer<typeof adoptProjectWorkingMediaRequestSchema>;
 export type ProjectWorkingMediaResponse = z.infer<typeof projectWorkingMediaResponseSchema>;
+export type ProjectOutputSaveTarget = z.infer<typeof projectOutputSaveTargetSchema>;
+export type SaveProjectOutputRequest = z.infer<typeof saveProjectOutputRequestSchema>;
+export type ProjectOutputSaveResult = z.infer<typeof projectOutputSaveResultSchema>;
+export type SaveProjectOutputResponse = z.infer<typeof saveProjectOutputResponseSchema>;
