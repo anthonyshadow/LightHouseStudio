@@ -55,7 +55,7 @@ local-live/recording state/viewport pair.
 | Desktop               | `08-video-editor/lighting-dirty.png`                 |
 | Small mobile          | `08-video-editor/crop-dirty.png`                     |
 | Desktop               | `10-campaigns/workspace.png`                         |
-| Small mobile          | `09-projects/empty-detail.png`                       |
+| Small mobile          | `09-projects/output-review.png`                      |
 | Desktop               | `05-virtual-try-on/prepared-with-reference.png`      |
 | Desktop               | `06-voice/voice-browser-loaded.png`                  |
 | Small mobile          | `01-studio/take-finalizing.png`                      |
@@ -63,10 +63,10 @@ local-live/recording state/viewport pair.
 
 The matrix intentionally emphasizes the record/upload first impression, neutral Local Camera
 startup, provider-free live capture, dominant recording Stop, the densest Builder/review states,
-deterministic dirty Lighting/Crop editor layouts, the active/archived Campaigns workspace, the empty
-Project detail boundary, and representative loading/error states. These organization cases keep the
-review budget from 29 to 31 because durable lifecycle and source-truthfulness are new protected
-composition contracts.
+deterministic dirty Lighting/Crop editor layouts, the active/archived Campaigns workspace, the
+small-mobile Project output-review boundary, and representative loading/error states. These cases
+keep the review budget from 29 to 31 because durable Campaign navigation and exact-Version output
+review are protected composition contracts.
 
 ## Determinism and readiness
 

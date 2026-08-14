@@ -1,9 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { createEmptyProjectSnapshot } from '@studio/domain';
+import {
+  createEmptyCreativeAssetStore,
+  createEmptyProjectSnapshot,
+  createSavedPrompt,
+} from '@studio/domain';
 import { Pool, type PoolClient } from 'pg';
 import { describe, expect, it } from 'vitest';
+import { createPostgresDatabase } from './client.js';
+import { DrizzleCreativeLibraryRepository } from './creative-library-repository.js';
+import { DrizzleProjectRepository } from './project-repository.js';
+import { DrizzleSavedVideoRepository } from './saved-video-repository.js';
+import { DrizzleSavedVoiceRepository } from './saved-voice-repository.js';
 
 const databaseUrl =
   process.env.LIGHTFRAME_PROJECT_TEST_DATABASE_URL ??
@@ -59,9 +68,28 @@ describe.runIf(databaseUrl !== undefined)(
           const versionAssetId = randomUUID();
           const savedVideoId = randomUUID();
           const videoVersionId = randomUUID();
+          const legacyVideoAssetId = randomUUID();
+          const legacySavedVideoId = randomUUID();
+          const legacyVideoVersionId = randomUUID();
+          const legacySavedVoiceId = randomUUID();
+          const legacySavedVoiceProviderId = `legacy-voice-${randomUUID()}`;
+          const legacyCreativeAssetId = `legacy-prompt-${randomUUID()}`;
           const legacyProcessingJobId = randomUUID();
           const now = '2026-08-11T12:00:00.000Z';
           const later = '2026-08-11T12:05:00.000Z';
+          const legacyCreativeStore = createSavedPrompt(
+            createEmptyCreativeAssetStore(),
+            {
+              title: 'Legacy studio look',
+              prompt: 'Use soft studio lighting.',
+              modelModeId: 'lucy-latest',
+              source: 'manual',
+            },
+            { now, createId: () => legacyCreativeAssetId },
+          );
+          const legacyCreativePrompt = legacyCreativeStore.savedPrompts[0];
+          if (legacyCreativePrompt === undefined)
+            throw new Error('Expected a legacy prompt fixture.');
           const emptySnapshot = createEmptyProjectSnapshot(now);
           const firstSnapshot = {
             schemaVersion: 1 as const,
@@ -104,30 +132,70 @@ describe.runIf(databaseUrl !== undefined)(
             (id, owner_user_id, storage_provider, storage_key, status, mime_type, filename,
              size_bytes, checksum_sha256)
            values
-            ($1, $3, 'local', $4, 'ready', 'video/mp4', 'source.mp4', 100, $6),
-            ($2, $3, 'local', $5, 'ready', 'video/mp4', 'version.mp4', 100, $7)`,
+            ($1, $4, 'local', $5, 'ready', 'video/mp4', 'source.mp4', 100, $8),
+            ($2, $4, 'local', $6, 'ready', 'video/mp4', 'version.mp4', 100, $9),
+            ($3, $4, 'local', $7, 'ready', 'video/mp4', 'legacy-unassigned.mp4', 120, $10)`,
             [
               sourceAssetId,
               versionAssetId,
+              legacyVideoAssetId,
               ownerUserId,
               sourceAssetId,
               versionAssetId,
+              legacyVideoAssetId,
               'a'.repeat(64),
               'b'.repeat(64),
+              'c'.repeat(64),
             ],
           );
           await client.query(
             `insert into saved_videos
             (id, owner_user_id, title, current_version_id, status, revision)
-           values ($1, $2, 'Migrated Version', $3, 'ready', 1)`,
-            [savedVideoId, ownerUserId, videoVersionId],
+           values
+            ($1, $3, 'Migrated Version', $2, 'ready', 1),
+            ($4, $3, 'Legacy unassigned', $5, 'ready', 1)`,
+            [savedVideoId, videoVersionId, ownerUserId, legacySavedVideoId, legacyVideoVersionId],
           );
           await client.query(
             `insert into video_versions
             (id, video_id, owner_user_id, ordinal, origin, asset_id, mime_type, filename,
              size_bytes, duration_ms, width, height)
-           values ($1, $2, $3, 1, 'uploaded', $4, 'video/mp4', 'version.mp4', 100, 1000, 1280, 720)`,
-            [videoVersionId, savedVideoId, ownerUserId, versionAssetId],
+           values
+            ($1, $3, $4, 1, 'uploaded', $5, 'video/mp4', 'version.mp4', 100, 1000, 1280, 720),
+            ($2, $6, $4, 1, 'legacy-import', $7, 'video/mp4', 'legacy-unassigned.mp4', 120, 2000, 1280, 720)`,
+            [
+              videoVersionId,
+              legacyVideoVersionId,
+              savedVideoId,
+              ownerUserId,
+              versionAssetId,
+              legacySavedVideoId,
+              legacyVideoAssetId,
+            ],
+          );
+          await client.query(
+            `insert into saved_voices
+              (id, owner_user_id, provider, provider_voice_id, public_owner_id, saved_at)
+             values ($1, $2, 'elevenlabs', $3, 'legacy-public-owner', $4)`,
+            [legacySavedVoiceId, ownerUserId, legacySavedVoiceProviderId, now],
+          );
+          await client.query(
+            `insert into creative_libraries
+              (owner_user_id, revision, schema_version, created_at, updated_at)
+             values ($1, 1, $2, $3, $3)`,
+            [ownerUserId, legacyCreativeStore.schemaVersion, now],
+          );
+          await client.query(
+            `insert into creative_assets
+              (id, owner_user_id, kind, revision, schema_version, payload, created_at, updated_at)
+             values ($1, $2, 'saved-prompt', 1, $3, $4, $5, $5)`,
+            [
+              legacyCreativeAssetId,
+              ownerUserId,
+              legacyCreativeStore.schemaVersion,
+              legacyCreativePrompt,
+              now,
+            ],
           );
           await client.query(
             `insert into projects
@@ -277,6 +345,100 @@ describe.runIf(databaseUrl !== undefined)(
               [legacyProcessingJobId, secondRevisionId],
             ),
           ).rejects.toThrow('project_jobs_result_revision_consistent');
+
+          const remainingMigrations = migrationFiles.filter((name) => name >= '0020_');
+          expect(remainingMigrations).toContain('0020_tiresome_wolf_cub.sql');
+          for (const filename of remainingMigrations) await applyMigration(client, filename);
+
+          const compatibility = createPostgresDatabase(targetUrl.toString());
+          try {
+            const projects = new DrizzleProjectRepository(compatibility.db);
+            const savedVideos = new DrizzleSavedVideoRepository(compatibility.db);
+            const creativeLibrary = new DrizzleCreativeLibraryRepository(compatibility.db);
+            const savedVoices = new DrizzleSavedVoiceRepository(compatibility.db);
+
+            await expect(projects.getCurrent(ownerUserId, projectId)).resolves.toMatchObject({
+              project: {
+                id: projectId,
+                campaignId: null,
+                currentRevisionId: secondRevisionId,
+                currentRevisionNumber: 2,
+              },
+              revision: { id: secondRevisionId, revisionNumber: 2 },
+            });
+            await expect(savedVideos.get(ownerUserId, legacySavedVideoId)).resolves.toMatchObject({
+              video: {
+                id: legacySavedVideoId,
+                title: 'Legacy unassigned',
+                currentVersionId: legacyVideoVersionId,
+                status: 'ready',
+              },
+              versions: [
+                {
+                  id: legacyVideoVersionId,
+                  assetId: legacyVideoAssetId,
+                  origin: 'legacy-import',
+                },
+              ],
+            });
+            await expect(
+              projects.assignedSavedVideoIds(ownerUserId, [savedVideoId, legacySavedVideoId]),
+            ).resolves.toEqual(new Set([savedVideoId]));
+            await expect(creativeLibrary.load(ownerUserId)).resolves.toMatchObject({
+              revision: 1,
+              store: { savedPrompts: [{ id: legacyCreativeAssetId }] },
+            });
+            await expect(savedVoices.list(ownerUserId)).resolves.toEqual([
+              expect.objectContaining({
+                id: legacySavedVoiceId,
+                providerVoiceId: legacySavedVoiceProviderId,
+                publicOwnerId: 'legacy-public-owner',
+              }),
+            ]);
+          } finally {
+            await compatibility.close();
+          }
+
+          await expect(
+            client.query<{
+              asset_linked: boolean;
+              output_linked: boolean;
+              source_linked: boolean;
+              version_referenced: boolean;
+              working_media_linked: boolean;
+            }>(
+              `select
+                exists(select 1 from project_assets where asset_id = $1) as asset_linked,
+                exists(select 1 from project_outputs where saved_video_id = $2) as output_linked,
+                exists(select 1 from project_sources where saved_video_id = $2) as source_linked,
+                exists(select 1 from project_version_references where saved_video_id = $2)
+                  as version_referenced,
+                exists(select 1 from project_working_media_adoptions where saved_video_id = $2)
+                  as working_media_linked`,
+              [legacyVideoAssetId, legacySavedVideoId],
+            ),
+          ).resolves.toMatchObject({
+            rows: [
+              {
+                asset_linked: false,
+                output_linked: false,
+                source_linked: false,
+                version_referenced: false,
+                working_media_linked: false,
+              },
+            ],
+          });
+          const revisionSources = await client.query<{ enumlabel: string }>(
+            `select enumlabel
+               from pg_enum
+               inner join pg_type on pg_type.oid = pg_enum.enumtypid
+               where pg_type.typname = 'project_revision_source'
+               order by enumsortorder`,
+          );
+          expect(revisionSources.rows.map(({ enumlabel }) => enumlabel)).toContain('output-save');
+          await expect(
+            client.query('select operation_id from project_output_operation_receipts'),
+          ).resolves.toMatchObject({ rows: [] });
         } finally {
           client.release();
           await target.end();
@@ -285,6 +447,6 @@ describe.runIf(databaseUrl !== undefined)(
         if (created) await admin.query(`drop database ${databaseName} with (force)`);
         await admin.end();
       }
-    }, 30_000);
+    }, 45_000);
   },
 );

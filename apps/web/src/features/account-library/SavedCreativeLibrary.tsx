@@ -5,7 +5,8 @@ import type {
   SavedCharacterPrompt,
   SavedPrompt,
 } from '../creative-assets/types';
-import { Button } from '../../ui';
+import { useRef, useState } from 'react';
+import { Button, ConfirmationDialog } from '../../ui';
 
 const compactGrid = (theme: Theme): CSSObject => ({
   display: 'grid',
@@ -232,78 +233,119 @@ export const SavedCharacterLibrary = ({
   'use memo';
 
   const theme = useTheme();
+  const [deleteTarget, setDeleteTarget] = useState<SavedCharacterPrompt | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeDelete = () => {
+    if (deleteBusy) return;
+    setDeleteTarget(null);
+    setDeleteError(null);
+  };
+  const confirmDelete = async () => {
+    if (deleteTarget === null || deleteBusy) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await repository.deleteSavedCharacterPrompt(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch {
+      setDeleteError('The character could not be deleted. Retry or keep it in Saved Characters.');
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
   return (
-    <div css={characterLibraryStyles(theme)}>
-      {items.length === 0 ? (
-        <div css={emptyLibraryStyles(theme)}>
-          <div>
-            <h2>No saved characters yet</h2>
-            <p>Create a character in Studio and save it to see it here.</p>
+    <>
+      <div css={characterLibraryStyles(theme)}>
+        {items.length === 0 ? (
+          <div css={emptyLibraryStyles(theme)}>
+            <div>
+              <h2>No saved characters yet</h2>
+              <p>Create a character in Studio and save it to see it here.</p>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div css={characterGridStyles(theme)}>
-          {items.map((item) => (
-            <article key={item.id} css={characterCardStyles(theme)}>
-              <div css={characterVisualStyles(theme)}>
-                {item.referenceImageAssetId ? (
-                  <img src={referenceImageContentUrl(item.referenceImageAssetId)} alt={item.name} />
-                ) : (
-                  <div data-character-placeholder aria-hidden="true">
-                    <span data-character-initial>{item.name.trim().charAt(0).toUpperCase()}</span>
-                  </div>
-                )}
-              </div>
-              <div css={characterContentStyles(theme)}>
-                <h3>{item.name}</h3>
-                <p>{item.prompt}</p>
-                <div css={characterActionsStyles(theme)}>
-                  <Button variant="primary" onClick={() => onUse(item)}>
-                    Use in Studio
-                  </Button>
-                  <div data-secondary-character-actions>
-                    <Button
-                      variant="secondary"
-                      aria-label="Wardrobe"
-                      title="Wardrobe"
-                      onClick={() => onOpenWardrobe(item)}
-                    >
-                      <CharacterActionIcon name="wardrobe" />
+        ) : (
+          <div css={characterGridStyles(theme)}>
+            {items.map((item) => (
+              <article key={item.id} css={characterCardStyles(theme)}>
+                <div css={characterVisualStyles(theme)}>
+                  {item.referenceImageAssetId ? (
+                    <img
+                      src={referenceImageContentUrl(item.referenceImageAssetId)}
+                      alt={item.name}
+                    />
+                  ) : (
+                    <div data-character-placeholder aria-hidden="true">
+                      <span data-character-initial>{item.name.trim().charAt(0).toUpperCase()}</span>
+                    </div>
+                  )}
+                </div>
+                <div css={characterContentStyles(theme)}>
+                  <h3>{item.name}</h3>
+                  <p>{item.prompt}</p>
+                  <div css={characterActionsStyles(theme)}>
+                    <Button variant="primary" onClick={() => onUse(item)}>
+                      Use in Studio
                     </Button>
-                    <Button
-                      variant="secondary"
-                      aria-label="Create new from this character"
-                      title="Create new from this character"
-                      onClick={() => onCreateFrom(item)}
-                    >
-                      <CharacterActionIcon name="copy" />
-                    </Button>
-                    <Button
-                      variant="quiet"
-                      aria-label="Delete"
-                      title="Delete"
-                      css={{
-                        color: theme.colors.danger,
-                        '&:hover:not(:disabled):not([aria-disabled="true"])': {
+                    <div data-secondary-character-actions>
+                      <Button
+                        variant="secondary"
+                        aria-label="Wardrobe"
+                        title="Wardrobe"
+                        onClick={() => onOpenWardrobe(item)}
+                      >
+                        <CharacterActionIcon name="wardrobe" />
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        aria-label="Create new from this character"
+                        title="Create new from this character"
+                        onClick={() => onCreateFrom(item)}
+                      >
+                        <CharacterActionIcon name="copy" />
+                      </Button>
+                      <Button
+                        variant="quiet"
+                        aria-label={`Delete ${item.name}`}
+                        title={`Delete ${item.name}`}
+                        css={{
                           color: theme.colors.danger,
-                          background: theme.colors.dangerSoft,
-                        },
-                      }}
-                      onClick={() => {
-                        if (window.confirm(`Delete “${item.name}” and its wardrobe records?`))
-                          void repository.deleteSavedCharacterPrompt(item.id);
-                      }}
-                    >
-                      <CharacterActionIcon name="delete" />
-                    </Button>
+                          '&:hover:not(:disabled):not([aria-disabled="true"])': {
+                            color: theme.colors.danger,
+                            background: theme.colors.dangerSoft,
+                          },
+                        }}
+                        onClick={(event) => {
+                          deleteTriggerRef.current = event.currentTarget;
+                          setDeleteError(null);
+                          setDeleteTarget(item);
+                        }}
+                      >
+                        <CharacterActionIcon name="delete" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-    </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+      <ConfirmationDialog
+        open={deleteTarget !== null}
+        title="Delete saved character?"
+        description={`Delete “${deleteTarget?.name ?? 'this character'}” and its wardrobe records? This saved resource will no longer be available for new work.`}
+        alert={deleteError ?? undefined}
+        confirmLabel={deleteBusy ? 'Deleting character…' : 'Delete character'}
+        cancelLabel="Keep character"
+        danger
+        busy={deleteBusy}
+        returnFocusRef={deleteTriggerRef}
+        onCancel={closeDelete}
+        onConfirm={() => void confirmDelete()}
+      />
+    </>
   );
 };
 
@@ -321,43 +363,82 @@ export const SavedOutfitLibrary = ({
   'use memo';
 
   const theme = useTheme();
+  const [deleteTarget, setDeleteTarget] = useState<SavedPrompt | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const closeDelete = () => {
+    if (deleteBusy) return;
+    setDeleteTarget(null);
+    setDeleteError(null);
+  };
+  const confirmDelete = async () => {
+    if (deleteTarget === null || deleteBusy) return;
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      await repository.deleteSavedPrompt(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch {
+      setDeleteError('The outfit could not be deleted. Retry or keep it in Saved Outfits.');
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
   return (
-    <div css={{ display: 'grid', gap: theme.space.md }}>
-      <div>
-        <Button variant="primary" onClick={onCreate}>
-          Create new saved outfit
-        </Button>
-      </div>
-      {items.length === 0 ? (
+    <>
+      <div css={{ display: 'grid', gap: theme.space.md }}>
         <div>
-          <h2>No saved outfits yet</h2>
-          <p>Create an outfit in Studio and save it to see it here.</p>
+          <Button variant="primary" onClick={onCreate}>
+            Create new saved outfit
+          </Button>
         </div>
-      ) : (
-        <div css={compactGrid(theme)}>
-          {items.map((item) => (
-            <article key={item.id} css={compactCard(theme)}>
-              {item.referenceImageAssetId ? (
-                <img src={referenceImageContentUrl(item.referenceImageAssetId)} alt="" />
-              ) : null}
-              <h3>{item.title}</h3>
-              <p>{item.prompt || 'Reference-image outfit'}</p>
-              <Button variant="primary" onClick={() => onUse(item)}>
-                Use in Studio
-              </Button>
-              <Button
-                variant="danger"
-                onClick={() => {
-                  if (window.confirm(`Delete “${item.title}”?`))
-                    void repository.deleteSavedPrompt(item.id);
-                }}
-              >
-                Delete
-              </Button>
-            </article>
-          ))}
-        </div>
-      )}
-    </div>
+        {items.length === 0 ? (
+          <div>
+            <h2>No saved outfits yet</h2>
+            <p>Create an outfit in Studio and save it to see it here.</p>
+          </div>
+        ) : (
+          <div css={compactGrid(theme)}>
+            {items.map((item) => (
+              <article key={item.id} css={compactCard(theme)}>
+                {item.referenceImageAssetId ? (
+                  <img src={referenceImageContentUrl(item.referenceImageAssetId)} alt="" />
+                ) : null}
+                <h3>{item.title}</h3>
+                <p>{item.prompt || 'Reference-image outfit'}</p>
+                <Button variant="primary" onClick={() => onUse(item)}>
+                  Use in Studio
+                </Button>
+                <Button
+                  variant="danger"
+                  aria-label={`Delete ${item.title}`}
+                  onClick={(event) => {
+                    deleteTriggerRef.current = event.currentTarget;
+                    setDeleteError(null);
+                    setDeleteTarget(item);
+                  }}
+                >
+                  Delete
+                </Button>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+      <ConfirmationDialog
+        open={deleteTarget !== null}
+        title="Delete saved outfit?"
+        description={`Delete “${deleteTarget?.title ?? 'this outfit'}”? This saved resource will no longer be available for new work.`}
+        alert={deleteError ?? undefined}
+        confirmLabel={deleteBusy ? 'Deleting outfit…' : 'Delete outfit'}
+        cancelLabel="Keep outfit"
+        danger
+        busy={deleteBusy}
+        returnFocusRef={deleteTriggerRef}
+        onCancel={closeDelete}
+        onConfirm={() => void confirmDelete()}
+      />
+    </>
   );
 };

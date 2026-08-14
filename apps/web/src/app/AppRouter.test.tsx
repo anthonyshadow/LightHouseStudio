@@ -15,6 +15,28 @@ const appHarness = vi.hoisted(() => ({
   latestProps: null as StudioAppProps | null,
 }));
 
+vi.mock('../features/auth/LoginDialog', () => ({
+  LoginDialog: ({
+    message,
+    onClose,
+    onSuccess,
+  }: {
+    message?: string | null;
+    onClose: () => void;
+    onSuccess: () => void;
+  }) => (
+    <div role="dialog" aria-label="Log in to Lightframe">
+      {message ? <p role="status">{message}</p> : null}
+      <button type="button" onClick={onClose}>
+        Cancel login
+      </button>
+      <button type="button" onClick={onSuccess}>
+        Complete login
+      </button>
+    </div>
+  ),
+}));
+
 vi.mock('../studio/StudioApp', () => ({
   StudioApp: (props: StudioAppProps) => {
     appHarness.renderCount += 1;
@@ -91,6 +113,9 @@ describe('AppRouter', () => {
 
     expect(screen.getByRole('heading', { name: 'Enter Lightframe Studio' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Enter Studio' })).toBeInTheDocument();
+    expect(
+      screen.getByText(/use a Project for resumable work; Campaigns are optional/u),
+    ).toBeVisible();
     expect(screen.queryByText('Studio route')).not.toBeInTheDocument();
     expect(appHarness.renderCount).toBe(0);
     expect(document.title).toBe('Enter Lightframe Studio');
@@ -115,6 +140,43 @@ describe('AppRouter', () => {
     expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
     expect(screen.queryByText('Studio route')).not.toBeInTheDocument();
     expect(appHarness.renderCount).toBe(0);
+  });
+
+  it('opens and dismisses local login from an unauthenticated entry', async () => {
+    renderApplication('/', null);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
+    expect(await screen.findByRole('dialog', { name: 'Log in to Lightframe' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel login' }));
+    expect(screen.queryByRole('dialog', { name: 'Log in to Lightframe' })).not.toBeInTheDocument();
+  });
+
+  it('clears a stale protected-route login request when login is dismissed', async () => {
+    const { router } = renderApplication({
+      pathname: '/',
+      state: { loginRequired: true, from: '/studio/videos' },
+    });
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Your session is required to continue.',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel login' }));
+
+    await waitFor(() => expect(router.state.location.state).toBeNull());
+    expect(router.state.location.pathname).toBe('/');
+  });
+
+  it('restores an allowed Studio destination after successful login', async () => {
+    const { router } = renderApplication({
+      pathname: '/',
+      state: { loginRequired: true, from: '/studio/videos' },
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Complete login' }));
+
+    expect(await screen.findByText('Studio route')).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/studio/videos');
   });
 
   it('restores focus to the camera entry after browser Back', async () => {

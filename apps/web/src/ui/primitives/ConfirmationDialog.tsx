@@ -6,6 +6,7 @@ export interface ConfirmationDialogProps {
   open: boolean;
   title: string;
   description: string;
+  alert?: string | undefined;
   confirmLabel: string;
   cancelLabel?: string;
   danger?: boolean;
@@ -24,6 +25,7 @@ export const ConfirmationDialog = ({
   open,
   title,
   description,
+  alert,
   confirmLabel,
   cancelLabel = 'Stay',
   danger = false,
@@ -77,6 +79,7 @@ export const ConfirmationDialog = ({
       }
     >
       <p>{description}</p>
+      {alert ? <p role="alert">{alert}</p> : null}
     </OverlayPanel>
   );
 };

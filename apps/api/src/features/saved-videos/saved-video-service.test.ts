@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import type { SavedVideoUploadMetadata } from '@studio/contracts';
 import { LocalAssetByteStore } from '../../storage/asset-byte-store.js';
+import { FileProjectRepository } from '../projects/file-project-repository.js';
 import { FileSavedVideoRepository, type SavedVideoRepository } from './saved-video-repository.js';
 import { SavedVideoService } from './saved-video-service.js';
 
@@ -599,4 +600,104 @@ describe('SavedVideoService', () => {
       ],
     });
   });
+
+  it.each([1, 3] as const)(
+    'migrates v%s Saved Video metadata once, stays unassigned, and reopens idempotently',
+    async (schemaVersion) => {
+      const videoId = crypto.randomUUID();
+      const versionId = crypto.randomUUID();
+      const manifestDirectory = path.join(directory, 'metadata', 'v1', 'saved-videos');
+      const manifestPath = path.join(
+        manifestDirectory,
+        `${createHash('sha256').update(ownerUserId).digest('hex')}.json`,
+      );
+      await mkdir(manifestDirectory, { recursive: true });
+      const version = {
+        id: versionId,
+        videoId,
+        ownerUserId,
+        ordinal: 1,
+        origin: 'legacy-import',
+        sourceVersionId: null,
+        assetId: crypto.randomUUID(),
+        thumbnailAssetId: null,
+        mimeType: 'video/mp4',
+        filename: `legacy-v${schemaVersion}.mp4`,
+        sizeBytes: 11,
+        durationMs: schemaVersion === 1 ? 12_000.4 : 12_000,
+        width: 1_280,
+        height: 720,
+        createdAt: '2026-08-01T12:00:00.000Z',
+        ...(schemaVersion === 3 ? { characterName: 'Legacy Mara' } : {}),
+      };
+      await writeFile(
+        manifestPath,
+        `${JSON.stringify({
+          schemaVersion,
+          ownerUserId,
+          revision: 1,
+          videos: [
+            {
+              video: {
+                id: videoId,
+                ownerUserId,
+                title: `Legacy v${schemaVersion}`,
+                currentVersionId: versionId,
+                sourceVideoId: null,
+                status: 'ready',
+                createdAt: '2026-08-01T12:00:00.000Z',
+                updatedAt: '2026-08-01T12:00:00.000Z',
+                deletedAt: null,
+              },
+              versions: [version],
+              revision: 1,
+            },
+          ],
+          receipts: [],
+        })}\n`,
+        'utf8',
+      );
+
+      const first = new SavedVideoService(new FileSavedVideoRepository(directory), bytes, {
+        projectOutputs: new FileProjectRepository(directory),
+      });
+      await expect(first.get(ownerUserId, videoId)).resolves.toMatchObject({
+        id: videoId,
+        title: `Legacy v${schemaVersion}`,
+        assignment: 'unassigned',
+        currentVersion: {
+          id: versionId,
+          origin: 'legacy-import',
+          characterName: schemaVersion === 3 ? 'Legacy Mara' : null,
+          characterVariantName: null,
+          durationMs: 12_000,
+        },
+      });
+      const migratedSerialized = await readFile(manifestPath, 'utf8');
+      expect(JSON.parse(migratedSerialized)).toMatchObject({
+        schemaVersion: 4,
+        videos: [
+          {
+            versions: [
+              {
+                characterName: schemaVersion === 3 ? 'Legacy Mara' : null,
+                characterVariantName: null,
+                durationMs: 12_000,
+              },
+            ],
+          },
+        ],
+      });
+
+      const reopened = new SavedVideoService(new FileSavedVideoRepository(directory), bytes, {
+        projectOutputs: new FileProjectRepository(directory),
+      });
+      await expect(reopened.get(ownerUserId, videoId)).resolves.toMatchObject({
+        id: videoId,
+        assignment: 'unassigned',
+        currentVersion: { id: versionId },
+      });
+      await expect(readFile(manifestPath, 'utf8')).resolves.toBe(migratedSerialized);
+    },
+  );
 });

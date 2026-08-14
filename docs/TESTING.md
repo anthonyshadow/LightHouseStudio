@@ -4,6 +4,10 @@ Lightframe Studio uses the smallest test layer that can prove a meaningful produ
 contract. A test belongs in the repository only when its failure would identify a user-visible,
 security, data, lifecycle, provider, accessibility, or release regression.
 
+The [MVP acceptance runbook](MVP_ACCEPTANCE.md) maps the 17 objective criteria and owns
+exact-candidate results. This strategy describes retained test authority; it does not claim that an
+unrecorded candidate command passed.
+
 ## Retained layers
 
 | Layer                      | Owns                                                                                               |
@@ -25,21 +29,22 @@ opens those stories.
 
 ## Commands
 
-| Command                              | Scope                                                                             |
-| ------------------------------------ | --------------------------------------------------------------------------------- |
-| `bun run test`                       | Default essential non-visual Vitest suite, including API integration tests        |
-| `bun run test:unit`                  | Domain, contracts, web adapters, components, and controllers                      |
-| `bun run test:integration`           | API routes/providers, Vite integration, and repository utility scripts            |
-| `bun run test:coverage`              | Explicit coverage gate using the retained Vitest suite                            |
-| `bun run test:e2e`                   | Focused functional browser journeys                                               |
-| `bun run test:production`            | Built loopback static-serving smoke; run `bun run build` first                    |
-| `bun run test:visual`                | Explicit curated visual regression suite                                          |
-| `bun run test:visual:update`         | Intentionally regenerate curated baselines for an approved visual change          |
-| `bun run screenshots:capture`        | Broad non-baseline screenshot artifact for manual design review                   |
-| `bun run test:all`                   | Vitest, build, production smoke, functional E2E, and visual regression            |
-| `bun run quality`                    | Normal implementation gate: types, lint, format, architecture, Vitest, and builds |
-| `bun run check:dead-code:production` | Production file/dependency reachability; excludes test-only exports               |
-| `bun run db:smoke:development`       | Local PostgreSQL connection, transaction, seeded-user, and cleanup smoke          |
+| Command                                 | Scope                                                                             |
+| --------------------------------------- | --------------------------------------------------------------------------------- |
+| `bun run test`                          | Default essential non-visual Vitest suite, including API integration tests        |
+| `bun run test:unit`                     | Domain, contracts, web adapters, components, and controllers                      |
+| `bun run test:integration`              | API routes/providers, Vite integration, and repository utility scripts            |
+| `bun run test:coverage`                 | Explicit coverage gate using the retained Vitest suite                            |
+| `bun run test:e2e`                      | Focused functional browser journeys                                               |
+| `bun run test:production`               | Built loopback static-serving smoke; run `bun run build` first                    |
+| `bun run test:visual`                   | Explicit curated visual regression suite                                          |
+| `bun run test:visual:update`            | Intentionally regenerate curated baselines for an approved visual change          |
+| `bun run screenshots:capture`           | Broad non-baseline screenshot artifact for manual design review                   |
+| `bun run test:all`                      | Vitest, build, production smoke, functional E2E, and visual regression            |
+| `bun run quality`                       | Normal implementation gate: types, lint, format, architecture, Vitest, and builds |
+| `bun run check:dead-code:production`    | Production file/dependency reachability; excludes test-only exports               |
+| `bun run db:smoke:development`          | Local PostgreSQL connection, transaction, seeded-user, and cleanup smoke          |
+| `bun run --filter @studio/api db:check` | Validate Drizzle migration history                                                |
 
 The focused Project repository transaction test runs automatically in the CI database environment.
 Against the isolated local development database, run it explicitly after migrations:
@@ -150,6 +155,10 @@ The retained suite protects:
   active-membership rules, relational same-owner/restrict constraints, authenticated routes,
   create/detail/New Project, move/detach, virtual No Campaign filtering, non-cascading lifecycle,
   blocked nonempty tombstone, and archived-empty tombstone;
+- pre-`0010`→`0020` PostgreSQL compatibility with valid historical Project rows, independent legacy
+  Saved Video/Voice/creative-resource usability, truthful unassigned lineage, and current
+  source/processing/output authorities; local Project v1–5→v6 and Saved Video legacy-format
+  idempotent reopen/recovery without fabricated relations;
 - app-owned saved-voice membership, first-read claim, owner-checked preview/conversion, and proof
   that relationship removal never calls provider voice deletion;
 - loopback Host/Origin, explicit provider intent, bounded response/stream handling, SSRF-resistant
@@ -157,6 +166,23 @@ The retained suite protects:
 - one persistent media stage, shared overlay focus/inert/Escape behavior, dominant recording Stop,
   200% text, and constrained mobile scrolling; and
 - unexpected external HTTP and WebSocket denial in ordinary automated tests.
+
+## Local MVP acceptance boundary
+
+The exact local-MVP candidate must include one connected no-paid-provider browser journey across
+Campaign or
+standalone Project creation, durable source, creative checkpoint/local edit, accepted synthetic
+processing recovery, new-video and Add-Version save, bounded history, exact old-Version Download,
+leave/resume, and non-cascading archive. Focused browser cases cover CAS conflict, response-loss
+replay, refresh during accepted processing, missing reusable resource, cleanup retention, Campaign
+archive, Project switching, exact old-Version Download, and legacy **Unassigned Content**.
+
+Lower-layer tests remain authoritative for exhaustive owner/CAS/schema/idempotency matrices, but do
+not replace those named browser boundaries. Conversely, one browser happy path does not replace the
+full forward PostgreSQL fixture, local-format upgrades, repository transaction tests, focused
+accessibility checks, or curated visual cases. The completed exact-candidate results are recorded in
+[MVP acceptance](MVP_ACCEPTANCE.md). Its local-only GO does not extend to the manual and live gates
+below.
 
 Physical devices, real codecs and browser memory, assistive-technology output, completed browser
 downloads, live provider entitlement/output/retention, paid-provider behavior, real Neon migration

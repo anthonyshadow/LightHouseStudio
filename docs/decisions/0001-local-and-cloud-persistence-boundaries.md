@@ -32,8 +32,11 @@ tenancy are not.
   creative-library revisions, and accepted-job recovery when the configured
   persistence mode enables it.
 - Private Cloudflare R2 may own media bytes through the server-side
-  `AssetByteStore` boundary. Buckets, keys, credentials, and content remain
-  private and browser access stays mediated by authenticated application routes.
+  `AssetByteStore` boundary. Buckets, object keys, credentials, and normal content
+  delivery remain private and mediated by authenticated application routes. The
+  authoritative direct-upload path is a narrow exception: after authenticated
+  owner/stage checks, the browser receives only a short-lived exact multipart-part
+  presigned URL, while completion and attachment return to server authority.
 - Metadata and media bytes remain explicit, separately mapped representations.
   Database transactions do not pretend to include object storage; lifecycle
   states, relationship checks, idempotency, and retryable cleanup coordinate the

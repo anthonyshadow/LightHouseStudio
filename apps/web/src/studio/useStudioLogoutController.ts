@@ -29,6 +29,10 @@ export const useStudioLogoutController = ({
   const [blockedOpen, setBlockedOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [preparing, setPreparing] = useState(false);
+  const [failure, setFailure] = useState<{
+    readonly message: string;
+    readonly discardPendingWork: boolean;
+  } | null>(null);
 
   useEffect(
     () => cleanup.register('studio-temporary-state', 'cancel-operations', cleanupTemporaryState),
@@ -44,6 +48,7 @@ export const useStudioLogoutController = ({
       if (busy) return;
       setBusy(true);
       setPromptOpen(false);
+      setFailure(null);
       try {
         if (discardPendingWork) {
           projectSourceActivity?.abort?.();
@@ -52,6 +57,13 @@ export const useStudioLogoutController = ({
         await cleanup.run();
         await logout();
         onLoggedOut();
+      } catch {
+        setFailure({
+          message:
+            'Lightframe could not finish local cleanup and sign-out. You are still in Studio; retry or stay and check the local API.',
+          discardPendingWork,
+        });
+        setPromptOpen(true);
       } finally {
         setBusy(false);
       }
@@ -60,6 +72,7 @@ export const useStudioLogoutController = ({
   );
 
   const request = useCallback(async () => {
+    setFailure(null);
     if (hasActiveWork) {
       setBlockedOpen(true);
       return;
@@ -70,8 +83,14 @@ export const useStudioLogoutController = ({
         return;
       }
       setPreparing(true);
-      const saved = await projectSession.flush();
-      setPreparing(false);
+      let saved: boolean;
+      try {
+        saved = await projectSession.flush();
+      } catch {
+        saved = false;
+      } finally {
+        setPreparing(false);
+      }
       if (!saved) {
         setPromptOpen(true);
         return;
@@ -89,10 +108,14 @@ export const useStudioLogoutController = ({
     blockedOpen,
     busy,
     preparing,
+    failure: failure?.message ?? null,
     hasProjectProposal: projectSession?.hasLocalProposal ?? false,
     request,
-    dismissPrompt: () => setPromptOpen(false),
+    dismissPrompt: () => {
+      setPromptOpen(false);
+      setFailure(null);
+    },
     dismissBlocked: () => setBlockedOpen(false),
-    confirmDiscard: () => void complete(true),
+    confirmDiscard: () => void complete(failure?.discardPendingWork ?? true),
   } as const;
 };

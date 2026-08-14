@@ -6,11 +6,12 @@ import type {
   ProjectProcessingAttempt,
   ProjectWorkingMediaResponse,
 } from '@studio/contracts';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HttpResponse, http } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
+import { jsonScenario } from '../../test/msw/handlers';
 import { mockApiServer } from '../../test/msw/server';
 import { StudioDesignProvider } from '../../ui';
 import { ProjectHistorySection } from './ProjectHistorySection';
@@ -156,6 +157,58 @@ const staleAttempt: ProjectProcessingAttempt = {
   error: null,
 };
 
+const adoptedWorkingMedia = (isCurrent = true): ProjectWorkingMediaResponse => {
+  const adoptedRevisionId = '66517242-ccf5-4fa5-bcee-5831039119c9';
+  const mediaReference = {
+    kind: 'saved-video-version' as const,
+    savedVideoId,
+    videoVersionId: versionId,
+  };
+  return {
+    project: {
+      ...current.project,
+      version: 3,
+      currentRevisionId: adoptedRevisionId,
+      currentRevisionNumber: 3,
+    },
+    revision: {
+      ...current.revision,
+      id: adoptedRevisionId,
+      revisionNumber: 3,
+      parentRevisionId: revisionId,
+      parentRevisionNumber: 2,
+      snapshot: {
+        ...snapshot,
+        workingMedia: isCurrent ? mediaReference : { kind: 'asset', assetId: sourceAssetId },
+        presentedMedia: isCurrent ? mediaReference : { kind: 'asset', assetId: sourceAssetId },
+      },
+    },
+    isCurrent,
+    media: {
+      kind: 'saved-video-version',
+      reference: mediaReference,
+      assetId: sourceAssetId,
+      savedVideoId,
+      videoVersionId: versionId,
+      mimeType: 'video/mp4',
+      filename: 'removed-master.mp4',
+      sizeBytes: 1_024,
+      checksumSha256: 'a'.repeat(64),
+      container: 'mp4',
+      videoCodec: 'avc',
+      audioCodec: 'aac',
+      durationMs: 10_000,
+      width: 1_280,
+      height: 720,
+      hasAudio: true,
+      adoptedRevisionId,
+      adoptedRevisionNumber: 3,
+      adoptedAt: now,
+      contentUrl: `/api/projects/${projectId}/working-media/${adoptedRevisionId}/content`,
+    },
+  };
+};
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -178,58 +231,7 @@ describe('ProjectHistorySection', () => {
       retry: () => Promise.resolve(true),
       discard: () => true,
     };
-    const adoptedSnapshot = {
-      ...snapshot,
-      workingMedia: {
-        kind: 'saved-video-version' as const,
-        savedVideoId,
-        videoVersionId: versionId,
-      },
-      presentedMedia: {
-        kind: 'saved-video-version' as const,
-        savedVideoId,
-        videoVersionId: versionId,
-      },
-    };
-    const adopted: ProjectWorkingMediaResponse = {
-      project: {
-        ...current.project,
-        version: 3,
-        currentRevisionId: '66517242-ccf5-4fa5-bcee-5831039119c9',
-        currentRevisionNumber: 3,
-      },
-      revision: {
-        ...current.revision,
-        id: '66517242-ccf5-4fa5-bcee-5831039119c9',
-        revisionNumber: 3,
-        parentRevisionId: revisionId,
-        parentRevisionNumber: 2,
-        snapshot: adoptedSnapshot,
-      },
-      isCurrent: true,
-      media: {
-        kind: 'saved-video-version',
-        reference: { kind: 'saved-video-version', savedVideoId, videoVersionId: versionId },
-        assetId: sourceAssetId,
-        savedVideoId,
-        videoVersionId: versionId,
-        mimeType: 'video/mp4',
-        filename: 'removed-master.mp4',
-        sizeBytes: 1_024,
-        checksumSha256: 'a'.repeat(64),
-        container: 'mp4',
-        videoCodec: 'avc',
-        audioCodec: 'aac',
-        durationMs: 10_000,
-        width: 1_280,
-        height: 720,
-        hasAudio: true,
-        adoptedRevisionId: '66517242-ccf5-4fa5-bcee-5831039119c9',
-        adoptedRevisionNumber: 3,
-        adoptedAt: now,
-        contentUrl: `/api/projects/${projectId}/working-media/66517242-ccf5-4fa5-bcee-5831039119c9/content`,
-      },
-    };
+    const adopted = adoptedWorkingMedia();
     mockApiServer.use(
       http.get(`*/api/projects/${projectId}/outputs`, () =>
         HttpResponse.json({ outputs: [output], nextCursor: null }),
@@ -282,7 +284,9 @@ describe('ProjectHistorySection', () => {
     ).toBeVisible();
     expect(screen.getByText(/Removed from Saved Videos/u)).toBeVisible();
     expect(screen.getByText(/valid stale result/u)).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Download' })).toHaveAttribute(
+    expect(
+      screen.getByRole('link', { name: 'Download Removed master, Version 1' }),
+    ).toHaveAttribute(
       'href',
       `/api/projects/${projectId}/outputs/${versionId}/content?download=true`,
     );
@@ -293,7 +297,21 @@ describe('ProjectHistorySection', () => {
       'src',
       `/api/projects/${projectId}/outputs/${versionId}/content`,
     );
-    await user.click(within(dialog).getByRole('button', { name: 'Use in Project' }));
+    expect(
+      within(dialog).getByRole('link', { name: 'Download Removed master, Version 1' }),
+    ).toHaveAttribute(
+      'href',
+      `/api/projects/${projectId}/outputs/${versionId}/content?download=true`,
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Close panel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Preview Version 1' })).toHaveFocus(),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Preview Version 1' }));
+    const reopenedDialog = screen.getByRole('dialog', { name: 'Removed master · Version 1' });
+    await user.click(within(reopenedDialog).getByRole('button', { name: 'Use in Project' }));
     await waitFor(() =>
       expect(accepted).toHaveBeenCalledWith({
         project: adopted.project,
@@ -301,5 +319,309 @@ describe('ProjectHistorySection', () => {
       }),
     );
     expect(await screen.findByText(/Saved Video current pointer were not changed/u)).toBeVisible();
+  });
+
+  it('retries each independent history feed and reaches its empty state', async () => {
+    const unavailable = {
+      status: 503,
+      body: { error: { code: 'temporarily_unavailable', message: 'Try again.' } },
+    } as const;
+    mockApiServer.use(
+      jsonScenario('GET', `/api/projects/${projectId}/outputs`, [
+        unavailable,
+        { body: { outputs: [], nextCursor: null } },
+      ]),
+      jsonScenario('GET', `/api/projects/${projectId}/processing/history`, [
+        unavailable,
+        { body: { attempts: [], nextCursor: null } },
+      ]),
+      jsonScenario('GET', `/api/projects/${projectId}/history`, [
+        unavailable,
+        { body: { revisions: [], nextCursor: null } },
+      ]),
+    );
+    const session: ProjectSessionPort = {
+      projectId,
+      phase: 'saved',
+      current,
+      proposal: null,
+      hasLocalProposal: false,
+      message: null,
+      getCurrent: () => current,
+      flush: () => Promise.resolve(true),
+      acceptCurrent: vi.fn(),
+      propose: () => true,
+      retry: () => Promise.resolve(true),
+      discard: () => true,
+    };
+    render(
+      <StudioDesignProvider>
+        <RemoteStateTestProvider>
+          <ProjectHistorySection current={current} session={session} archived={false} />
+        </RemoteStateTestProvider>
+      </StudioDesignProvider>,
+    );
+
+    const retryButtons = await screen.findAllByRole('button', { name: 'Retry' });
+    expect(retryButtons).toHaveLength(3);
+    for (const button of retryButtons) fireEvent.click(button);
+
+    expect(
+      await screen.findByText('No Saved Video Versions have been produced by this Project yet.'),
+    ).toBeVisible();
+    expect(screen.getByText('No processing attempts have been recorded.')).toBeVisible();
+    expect(screen.getByRole('list', { name: 'Project change history' })).toBeEmptyDOMElement();
+  });
+
+  it('pages each history feed without eagerly fetching retained media', async () => {
+    mockApiServer.use(
+      jsonScenario('GET', `/api/projects/${projectId}/outputs`, [
+        { body: { outputs: [], nextCursor: 'outputs-page-2' } },
+        { body: { outputs: [], nextCursor: null } },
+      ]),
+      jsonScenario('GET', `/api/projects/${projectId}/processing/history`, [
+        { body: { attempts: [], nextCursor: 'processing-page-2' } },
+        { body: { attempts: [], nextCursor: null } },
+      ]),
+      jsonScenario('GET', `/api/projects/${projectId}/history`, [
+        { body: { revisions: [], nextCursor: 'revisions-page-2' } },
+        { body: { revisions: [], nextCursor: null } },
+      ]),
+    );
+    const session: ProjectSessionPort = {
+      projectId,
+      phase: 'saved',
+      current,
+      proposal: null,
+      hasLocalProposal: false,
+      message: null,
+      getCurrent: () => current,
+      flush: () => Promise.resolve(true),
+      acceptCurrent: vi.fn(),
+      propose: () => true,
+      retry: () => Promise.resolve(true),
+      discard: () => true,
+    };
+    render(
+      <StudioDesignProvider>
+        <RemoteStateTestProvider>
+          <ProjectHistorySection current={current} session={session} archived={false} />
+        </RemoteStateTestProvider>
+      </StudioDesignProvider>,
+    );
+
+    const versions = await screen.findByRole('button', { name: 'Load more Versions' });
+    const attempts = screen.getByRole('button', { name: 'Load more processing attempts' });
+    const changes = screen.getByRole('button', { name: 'Load more Project changes' });
+    fireEvent.click(versions);
+    fireEvent.click(attempts);
+    fireEvent.click(changes);
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: 'Load more Versions' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Load more processing attempts' }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Load more Project changes' }),
+      ).not.toBeInTheDocument();
+    });
+    expect(document.querySelector('video')).toBeNull();
+  });
+
+  it('preserves a pending Project proposal instead of adopting historical media', async () => {
+    let reuseRequests = 0;
+    mockApiServer.use(
+      http.get(`*/api/projects/${projectId}/outputs`, () =>
+        HttpResponse.json({ outputs: [output], nextCursor: null }),
+      ),
+      http.get(`*/api/projects/${projectId}/history`, () =>
+        HttpResponse.json({ revisions: [], nextCursor: null }),
+      ),
+      http.get(`*/api/projects/${projectId}/processing/history`, () =>
+        HttpResponse.json({ attempts: [], nextCursor: null }),
+      ),
+      http.post(`*/api/projects/${projectId}/working-media/reuse`, () => {
+        reuseRequests += 1;
+        return HttpResponse.json({}, { status: 500 });
+      }),
+    );
+    const flush = vi.fn().mockResolvedValue(false);
+    const session: ProjectSessionPort = {
+      projectId,
+      phase: 'conflict',
+      current,
+      proposal: {
+        workflowPhase: snapshot.workflowPhase,
+        liveMode: snapshot.liveMode,
+        selectedCharacter: snapshot.selectedCharacter,
+        selectedOutfit: snapshot.selectedOutfit,
+        selectedVoice: snapshot.selectedVoice,
+        visualTreatment: snapshot.visualTreatment,
+        creativeIntent: snapshot.creativeIntent,
+        localEdit: snapshot.localEdit,
+      },
+      hasLocalProposal: true,
+      message: null,
+      getCurrent: () => current,
+      flush,
+      acceptCurrent: vi.fn(),
+      propose: () => true,
+      retry: () => Promise.resolve(true),
+      discard: () => true,
+    };
+    render(
+      <StudioDesignProvider>
+        <RemoteStateTestProvider>
+          <ProjectHistorySection current={current} session={session} archived={false} />
+        </RemoteStateTestProvider>
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Use in Project' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Resolve the preserved Project proposal before changing working media.',
+    );
+    expect(flush).toHaveBeenCalledOnce();
+    expect(reuseRequests).toBe(0);
+  });
+
+  it('reports a retained processing result that cannot be validated for reuse', async () => {
+    mockApiServer.use(
+      http.get(`*/api/projects/${projectId}/outputs`, () =>
+        HttpResponse.json({ outputs: [], nextCursor: null }),
+      ),
+      http.get(`*/api/projects/${projectId}/history`, () =>
+        HttpResponse.json({ revisions: [], nextCursor: null }),
+      ),
+      http.get(`*/api/projects/${projectId}/processing/history`, () =>
+        HttpResponse.json({ attempts: [staleAttempt], nextCursor: null }),
+      ),
+      http.post(`*/api/projects/${projectId}/working-media/reuse`, () =>
+        HttpResponse.json(
+          { error: { code: 'temporarily_unavailable', message: 'Do not expose this.' } },
+          { status: 503 },
+        ),
+      ),
+    );
+    const session: ProjectSessionPort = {
+      projectId,
+      phase: 'saved',
+      current,
+      proposal: null,
+      hasLocalProposal: false,
+      message: null,
+      getCurrent: () => current,
+      flush: () => Promise.resolve(true),
+      acceptCurrent: vi.fn(),
+      propose: () => true,
+      retry: () => Promise.resolve(true),
+      discard: () => true,
+    };
+    render(
+      <StudioDesignProvider>
+        <RemoteStateTestProvider>
+          <ProjectHistorySection current={current} session={session} archived={false} />
+        </RemoteStateTestProvider>
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Use in Project' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This historical media could not be validated for current Project use.',
+    );
+  });
+
+  it('rejects an adoption receipt when the Project advanced before it became current', async () => {
+    const accepted = vi.fn();
+    mockApiServer.use(
+      http.get(`*/api/projects/${projectId}/outputs`, () =>
+        HttpResponse.json({ outputs: [output], nextCursor: null }),
+      ),
+      http.get(`*/api/projects/${projectId}/history`, () =>
+        HttpResponse.json({ revisions: [], nextCursor: null }),
+      ),
+      http.get(`*/api/projects/${projectId}/processing/history`, () =>
+        HttpResponse.json({ attempts: [], nextCursor: null }),
+      ),
+      http.post(`*/api/projects/${projectId}/working-media/reuse`, () =>
+        HttpResponse.json(adoptedWorkingMedia(false), { status: 201 }),
+      ),
+    );
+    const session: ProjectSessionPort = {
+      projectId,
+      phase: 'saved',
+      current,
+      proposal: null,
+      hasLocalProposal: false,
+      message: null,
+      getCurrent: () => current,
+      flush: () => Promise.resolve(true),
+      acceptCurrent: accepted,
+      propose: () => true,
+      retry: () => Promise.resolve(true),
+      discard: () => true,
+    };
+    render(
+      <StudioDesignProvider>
+        <RemoteStateTestProvider>
+          <ProjectHistorySection current={current} session={session} archived={false} />
+        </RemoteStateTestProvider>
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Use in Project' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The Project changed before this historical media could be adopted.',
+    );
+    expect(accepted).not.toHaveBeenCalled();
+  });
+
+  it('does not adopt history when Project authority disappears after a successful flush', async () => {
+    let reuseRequests = 0;
+    const flush = vi.fn().mockResolvedValue(true);
+    mockApiServer.use(
+      http.get(`*/api/projects/${projectId}/outputs`, () =>
+        HttpResponse.json({ outputs: [output], nextCursor: null }),
+      ),
+      http.get(`*/api/projects/${projectId}/history`, () =>
+        HttpResponse.json({ revisions: [], nextCursor: null }),
+      ),
+      http.get(`*/api/projects/${projectId}/processing/history`, () =>
+        HttpResponse.json({ attempts: [], nextCursor: null }),
+      ),
+      http.post(`*/api/projects/${projectId}/working-media/reuse`, () => {
+        reuseRequests += 1;
+        return HttpResponse.error();
+      }),
+    );
+    const session: ProjectSessionPort = {
+      projectId,
+      phase: 'saved',
+      current,
+      proposal: null,
+      hasLocalProposal: false,
+      message: null,
+      getCurrent: () => null,
+      flush,
+      acceptCurrent: vi.fn(),
+      propose: () => true,
+      retry: () => Promise.resolve(true),
+      discard: () => true,
+    };
+    render(
+      <StudioDesignProvider>
+        <RemoteStateTestProvider>
+          <ProjectHistorySection current={current} session={session} archived={false} />
+        </RemoteStateTestProvider>
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Use in Project' }));
+
+    await waitFor(() => expect(flush).toHaveBeenCalledOnce());
+    expect(reuseRequests).toBe(0);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

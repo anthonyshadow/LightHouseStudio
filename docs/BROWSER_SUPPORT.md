@@ -6,6 +6,9 @@ Browser media behavior depends on the exact browser/OS patch, hardware, permissi
 provider WebRTC path. The app feature-detects critical APIs, while physical support claims still
 require validation on the exact target.
 
+The [MVP acceptance runbook](MVP_ACCEPTANCE.md) records deterministic browser evidence. It does not
+replace the physical target rule below.
+
 Use a secure context. Loopback HTTP (`127.0.0.1` or `localhost`) is valid for the local product;
 non-loopback use requires HTTPS and a separately approved public security design.
 
@@ -25,6 +28,8 @@ Automated layout/visual checks cover:
 - one persistent live/playback video;
 - stable stage geometry across mode, warning, recording, finalizing, playback, and overlay states;
 - reachable Record/Stop, device settings, close, and primary overlay actions;
+- Campaign/Project workspace, small-mobile Project output review, and selected 200%-text
+  organization/history cases;
 - document/body containment within one CSS pixel; and
 - deterministic Chromium states with animation disabled.
 
@@ -44,6 +49,7 @@ areas, the software keyboard, browser chrome changes, or physical 200% text/refl
 | Camera zoom       | Numeric track zoom capability and `applyConstraints`                                   | Control omitted; no CSS crop substitute                                                |
 | Recording         | Live video, `MediaRecorder`, decodable capture, H.264 WebCodecs encode                 | No raw download fallback; conversion fails safely and the session remains controllable |
 | Existing video    | File input/drop, Blob playback, supported H.264/VP8 file                               | Local validation explains export needs; camera stays optional                          |
+| Durable Project   | Authenticated API plus supported video decode and local storage/relational authority   | Safe loading/error state; no false resumability, provider start, or stale media reuse  |
 | Local video edit  | WebGL, dedicated workers, OffscreenCanvas, H.264 WebCodecs encode, AAC when needed     | Playback, Download, Voice, and existing workflows remain usable; no main-thread export |
 | Decart output     | Local capture, WebRTC, provider reachability/entitlement                               | Local preview remains the fallback                                                     |
 | Batch visual      | Supported source, broker, operation capability; WebCodecs for required MP4 preparation | Local preview/download remains available without a configured operation                |
@@ -179,7 +185,9 @@ uploaded-video pick, replace, local download, mutually exclusive Character Swap 
 including capability-required local MOV/WebM preparation; the
 local video editor's preview/render/cancel/replace choices; the 270/300-second warning and
 finalization; local and ElevenLabs Voice;
-download/playback; background/foreground recovery; memory checkpoints; and cleanup. Touch rows
+download/playback; Campaign/Project/library navigation; visible current Campaign/Project identity;
+durable-source refresh; exact Project-history Version preview/Download; background/foreground
+recovery; memory checkpoints; and cleanup. Touch rows
 also require native file pickers, portrait/landscape, safe areas, browser chrome, software
 keyboard, 200% text, touch-control recovery, and camera switching when exposed. Desktop rows
 require the five canonical viewports, pointer/keyboard recovery, 200% text, and device replacement.

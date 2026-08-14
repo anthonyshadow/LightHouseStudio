@@ -416,6 +416,23 @@ test('mobile Campaign organization remains keyboard-accessible at 200% text', as
   await expectNoAxeViolations(page);
   await page.keyboard.press('Escape');
   await expect(createTrigger).toBeFocused();
+
+  const activeCampaigns = page.getByRole('list', { name: 'Active Campaigns' });
+  const openCampaign = activeCampaigns.getByRole('button', { name: 'Open' });
+  await openCampaign.focus();
+  await page.keyboard.press('Enter');
+  const newProject = page.getByRole('button', { name: 'New Project' });
+  await expect(newProject).toBeVisible();
+  await newProject.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+  await expect(page.getByText('Campaign: Summer launch', { exact: true })).toBeVisible();
+  await expectNoDocumentOverflow(page);
+  await expectNoAxeViolations(page);
+  const campaignBreadcrumb = page.getByRole('button', { name: '← Summer launch' });
+  await campaignBreadcrumb.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Summer launch' })).toBeVisible();
   expect(await cameraCalls(page)).toBe(0);
   expect(network.blockedExternalRequests).toEqual([]);
   expect(network.blockedExternalWebSockets).toEqual([]);

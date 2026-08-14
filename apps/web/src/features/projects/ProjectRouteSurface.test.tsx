@@ -1,21 +1,44 @@
 // @vitest-environment jsdom
 
-import type { ProjectCurrentResponse } from '@studio/contracts';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import type {
+  CampaignContract,
+  ProjectCurrentResponse,
+  ProjectSourceResponse,
+  SavedVideoSummary,
+} from '@studio/contracts';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { HttpResponse, http } from 'msw';
+import { delay, HttpResponse, http } from 'msw';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import { mockApiServer } from '../../test/msw/server';
-import { ProjectRouteSurface } from './ProjectRouteSurface';
+import { ProjectRouteSurface, type ProjectRouteSurfaceProps } from './ProjectRouteSurface';
+import type { ProjectSourceRuntime } from './useProjectSourceController';
+import type { ProjectSessionPort } from './useProjectSession';
 
 const activeId = '18b120ac-1578-46e3-8c3d-42307772f391';
 const archivedId = '3b41f4fc-0881-4313-878d-d77a1b43f192';
 const secondActiveId = '730c73ca-a6af-4509-83c0-b3c18c1ee81a';
 const revisionId = '89a972fe-bfb5-4214-94f7-4bd54f12ce06';
+const campaignId = '20ce94fa-15d1-42c6-abd3-77ff61516b48';
+const sourceAssetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
+const savedVideoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
+const videoVersionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
 const now = '2026-08-11T16:00:00.000Z';
+
+const campaign = (): CampaignContract => ({
+  id: campaignId,
+  name: 'Summer launch',
+  brief: null,
+  status: 'active',
+  version: 1,
+  archivedAt: null,
+  deletedAt: null,
+  createdAt: now,
+  updatedAt: now,
+});
 
 const currentProject = (
   id: string,
@@ -74,7 +97,55 @@ const currentProject = (
   },
 });
 
-const renderProjects = (path = '/studio/projects') => {
+const acceptedProject = (): ProjectCurrentResponse => {
+  const initial = currentProject(activeId, {
+    status: 'ready',
+    version: 2,
+    currentRevisionId: secondActiveId,
+    currentRevisionNumber: 2,
+  });
+  const media = { kind: 'asset' as const, assetId: sourceAssetId };
+  return {
+    project: initial.project,
+    revision: {
+      ...initial.revision,
+      id: secondActiveId,
+      revisionNumber: 2,
+      parentRevisionId: revisionId,
+      parentRevisionNumber: 1,
+      snapshot: {
+        ...initial.revision.snapshot,
+        sourceAssetId,
+        workingMedia: media,
+        presentedMedia: media,
+        workflowPhase: 'creative',
+      },
+    },
+  };
+};
+
+const acceptedSourceResponse = (): ProjectSourceResponse => ({
+  ...acceptedProject(),
+  source: {
+    kind: 'recorded',
+    savedVideoId: null,
+    videoVersionId: null,
+    mimeType: 'video/mp4',
+    filename: 'accepted-source.mp4',
+    sizeBytes: 4,
+    container: 'mp4',
+    videoCodec: 'avc',
+    audioCodec: null,
+    durationMs: 1_000,
+    width: 640,
+    height: 360,
+    hasAudio: false,
+    acceptedAt: now,
+    contentUrl: `/api/projects/${activeId}/source/content`,
+  },
+});
+
+const renderProjects = (path = '/studio/projects', props: ProjectRouteSurfaceProps = {}) => {
   mockApiServer.use(
     http.get('*/api/projects/:projectId/history', () =>
       HttpResponse.json({ revisions: [], nextCursor: null }),
@@ -87,7 +158,10 @@ const renderProjects = (path = '/studio/projects') => {
     ),
   );
   const router = createMemoryRouter(
-    [{ path: '/studio/projects/*', element: <ProjectRouteSurface /> }],
+    [
+      { path: '/studio/projects/*', element: <ProjectRouteSurface {...props} /> },
+      { path: '/studio/campaigns/:campaignId', element: <div>Campaign return</div> },
+    ],
     { initialEntries: [path] },
   );
   const view = render(
@@ -133,6 +207,9 @@ describe('Project route surface', () => {
     expect(await screen.findByRole('heading', { name: 'Launch cut' })).toBeVisible();
     expect(await screen.findByRole('heading', { name: 'Archived concept' })).toBeVisible();
     expect(screen.queryByText('No source yet')).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/Create resumable video work with an optional Campaign/u),
+    ).toBeVisible();
 
     const activeList = screen.getByRole('list', { name: 'Active Projects' });
     await userEvent.click(within(activeList).getByRole('button', { name: 'Open' }));
@@ -145,6 +222,50 @@ describe('Project route surface', () => {
     expect(screen.getByRole('button', { name: 'Upload' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Use Saved Video' })).toBeDisabled();
     expect(screen.queryByRole('video')).not.toBeInTheDocument();
+  });
+
+  it('shows the assigned Campaign name and returns safely to its detail route', async () => {
+    const assigned = currentProject(activeId, { campaignId });
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(assigned)),
+      http.get(`*/api/campaigns/${campaignId}`, async () => {
+        await delay(75);
+        return HttpResponse.json(campaign());
+      }),
+    );
+    const { router } = renderProjects(`/studio/projects/${activeId}`);
+    const user = userEvent.setup();
+
+    expect(await screen.findByText('Campaign: loading…')).toBeVisible();
+    expect(await screen.findByText('Campaign: Summer launch')).toBeVisible();
+    const campaignReturn = screen.getByRole('button', { name: '← Summer launch' });
+    await user.click(campaignReturn);
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/studio/campaigns/${campaignId}`),
+    );
+    expect(screen.getByText('Campaign return')).toBeVisible();
+  });
+
+  it('keeps a generic Campaign return when assigned Campaign details are unavailable', async () => {
+    const assigned = currentProject(activeId, { campaignId });
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(assigned)),
+      http.get(`*/api/campaigns/${campaignId}`, () =>
+        HttpResponse.json(
+          { error: { code: 'not_found', message: 'Campaign not found.' } },
+          { status: 404 },
+        ),
+      ),
+    );
+    const { router } = renderProjects(`/studio/projects/${activeId}`);
+    const user = userEvent.setup();
+
+    expect(await screen.findByText('Campaign unavailable')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: '← Campaign' }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/studio/campaigns/${campaignId}`),
+    );
   });
 
   it('reuses the Quick Start operation key after response failure and reconciles replay', async () => {
@@ -163,6 +284,7 @@ describe('Project route surface', () => {
     const { router } = renderProjects();
     const user = userEvent.setup();
 
+    expect(await screen.findByText(/Quick Start creates an Unassigned Project/u)).toBeVisible();
     await user.click(await screen.findByRole('button', { name: 'Quick Start' }));
     expect(await screen.findByText('Project not created')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Retry Quick Start' }));
@@ -329,5 +451,576 @@ describe('Project route surface', () => {
     await waitFor(() => expect(renameTrigger).toHaveFocus());
     expect(screen.getByText('Project renamed to Proposed title.')).toBeVisible();
     expect(renameWrites).toBe(2);
+  });
+
+  it('switches between Project groups and renames from the active list', async () => {
+    const renamed = currentProject(activeId, { title: 'Launch master' });
+    let listedProject = currentProject(activeId).project;
+    const activeCampaignFilters: Array<string | null> = [];
+    mockApiServer.use(
+      http.get('*/api/projects', ({ request }) => {
+        const url = new URL(request.url);
+        if (url.searchParams.get('lifecycle') === 'archived') {
+          return HttpResponse.json({ projects: [], nextCursor: null });
+        }
+        const filter = url.searchParams.get('campaignId');
+        activeCampaignFilters.push(filter);
+        return HttpResponse.json({
+          projects: filter === 'none' ? [] : [listedProject],
+          nextCursor: null,
+        });
+      }),
+      http.patch(`*/api/projects/${activeId}`, async ({ request }) => {
+        expect(await request.json()).toEqual({ title: 'Launch master', expectedVersion: 1 });
+        listedProject = renamed.project;
+        return HttpResponse.json(renamed);
+      }),
+    );
+    const user = userEvent.setup();
+    renderProjects();
+
+    expect(await screen.findByRole('heading', { name: 'Launch cut' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'No Campaign' }));
+    expect(await screen.findByRole('heading', { name: 'No Campaign' })).toBeVisible();
+    expect(await screen.findByText('No active Projects yet')).toBeVisible();
+    expect(activeCampaignFilters).toContain('none');
+
+    await user.click(screen.getByRole('button', { name: 'All Active' }));
+    const activeList = await screen.findByRole('list', { name: 'Active Projects' });
+    await user.click(within(activeList).getByRole('button', { name: 'Rename' }));
+    const dialog = screen.getByRole('dialog', { name: 'Rename Project' });
+    const input = within(dialog).getByRole('textbox', { name: /Project name/u });
+    await user.clear(input);
+    await user.type(input, 'Launch master{Enter}');
+
+    expect(await screen.findByText('Project renamed to Launch master.')).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Launch master' })).toBeVisible();
+  });
+
+  it('shows Project loading and retries a safe detail failure', async () => {
+    let detailReads = 0;
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, async () => {
+        detailReads += 1;
+        if (detailReads === 1) {
+          await delay(50);
+          return HttpResponse.json(
+            { error: { code: 'feature_unavailable', message: 'Projects are starting.' } },
+            { status: 503 },
+          );
+        }
+        return HttpResponse.json(currentProject(activeId));
+      }),
+    );
+    const user = userEvent.setup();
+    renderProjects(`/studio/projects/${activeId}`);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading Project…');
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Projects are starting.');
+    await user.click(within(alert).getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByRole('heading', { name: 'Launch cut' })).toBeVisible();
+    expect(detailReads).toBe(2);
+  });
+
+  it('returns from an unavailable detail to the bounded Projects workspace', async () => {
+    installProjectLists([], []);
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () =>
+        HttpResponse.json(
+          { error: { code: 'not_found', message: 'Project not found.' } },
+          { status: 404 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    const { router } = renderProjects(`/studio/projects/${activeId}`);
+
+    const alert = await screen.findByRole('alert');
+    await user.click(within(alert).getByRole('button', { name: 'Back to Projects' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/studio/projects'));
+    expect(await screen.findByRole('heading', { name: 'Projects' })).toBeVisible();
+  });
+
+  it('reopens an accepted immutable source without starting provider work', async () => {
+    const durable = acceptedProject();
+    const source = acceptedSourceResponse();
+    const present = vi.fn<ProjectSourceRuntime['present']>();
+    const clear = vi.fn<ProjectSourceRuntime['clear']>();
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(durable)),
+      http.get(`*/api/projects/${activeId}/source`, async () => {
+        await delay(50);
+        return HttpResponse.json(source);
+      }),
+      http.get(`*/api/projects/${activeId}/source/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+        }),
+      ),
+    );
+    renderProjects(`/studio/projects/${activeId}`, {
+      sourceRuntime: { present, clear },
+    });
+
+    expect(await screen.findByText(/Restoring the durable Project source/u)).toBeVisible();
+    await waitFor(() => expect(present).toHaveBeenCalledOnce());
+    expect(present.mock.calls[0]?.[0]).toBe(activeId);
+    expect(present.mock.calls[0]?.[1].blob).toBeInstanceOf(File);
+    const sourceHeading = screen.getByRole('heading', { name: 'Immutable original' });
+    expect(sourceHeading.parentElement).toHaveTextContent(
+      'accepted-source.mp4 · 640×360 · 1 seconds',
+    );
+  });
+
+  it('accepts one finalized recording while exposing bounded source activity', async () => {
+    const file = new File([new Uint8Array([1, 2, 3, 4])], 'recording.mp4', {
+      type: 'video/mp4',
+    });
+    const present = vi.fn<ProjectSourceRuntime['present']>();
+    const clear = vi.fn<ProjectSourceRuntime['clear']>();
+    const activities: Parameters<
+      NonNullable<ProjectRouteSurfaceProps['onSourceActivityChange']>
+    >[0][] = [];
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(currentProject(activeId))),
+      http.post(`*/api/projects/${activeId}/source`, async ({ request }) => {
+        expect(request.headers.get('idempotency-key')).toMatch(/^[0-9a-f-]{36}$/u);
+        await delay(75);
+        return HttpResponse.json(acceptedSourceResponse(), { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderProjects(`/studio/projects/${activeId}`, {
+      sourceRuntime: { present, clear },
+      recordingCandidate: { file, ready: true },
+      onSourceActivityChange: (activity) => activities.push(activity),
+    });
+
+    await user.click(await screen.findByRole('button', { name: 'Use finalized recording' }));
+    expect(await screen.findByText(/Transferring and inspecting source media/u)).toBeVisible();
+    expect(screen.queryByText('All changes saved')).not.toBeInTheDocument();
+
+    expect(await screen.findByRole('heading', { name: 'Immutable original' })).toBeVisible();
+    expect(present).toHaveBeenCalledWith(activeId, expect.objectContaining({ blob: file }));
+    expect(activities).toContainEqual(
+      expect.objectContaining({ phase: 'preparing', busy: true, accepted: false }),
+    );
+    await waitFor(() =>
+      expect(activities.at(-1)).toEqual(
+        expect.objectContaining({ phase: 'saved', busy: false, accepted: true }),
+      ),
+    );
+  });
+
+  it('keeps an upload replaceable across conflict and safe failure states', async () => {
+    const file = new File([new Uint8Array([1, 2, 3, 4])], 'upload.mp4', {
+      type: 'video/mp4',
+    });
+    const present = vi.fn<ProjectSourceRuntime['present']>();
+    const clear = vi.fn<ProjectSourceRuntime['clear']>();
+    const operationKeys: string[] = [];
+    let attempts = 0;
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(currentProject(activeId))),
+      http.post(`*/api/projects/${activeId}/source`, ({ request }) => {
+        operationKeys.push(request.headers.get('idempotency-key') ?? '');
+        attempts += 1;
+        return attempts === 1
+          ? HttpResponse.json(
+              {
+                error: { code: 'conflict', message: 'The Project source changed.' },
+                conflict: {
+                  kind: 'project-version',
+                  projectId: activeId,
+                  expectedVersion: 1,
+                  actualVersion: 2,
+                },
+              },
+              { status: 409 },
+            )
+          : HttpResponse.json(
+              { error: { code: 'feature_unavailable', message: 'Source upload unavailable.' } },
+              { status: 503 },
+            );
+      }),
+      http.get(`*/api/projects/${activeId}/source`, () =>
+        HttpResponse.json(
+          { error: { code: 'not_found', message: 'No accepted source.' } },
+          { status: 404 },
+        ),
+      ),
+    );
+    const inputClick = vi.spyOn(HTMLInputElement.prototype, 'click');
+    const view = renderProjects(`/studio/projects/${activeId}`, {
+      sourceRuntime: { present, clear },
+    });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Upload' }));
+    expect(inputClick).toHaveBeenCalledOnce();
+    const input = view.container.querySelector('input[type="file"]');
+    expect(input).toBeInstanceOf(HTMLInputElement);
+    fireEvent.change(input!, { target: { files: [file] } });
+    const conflict = await screen.findByRole('alert');
+    expect(conflict).toHaveTextContent('The Project source changed.');
+
+    fireEvent.change(input!, { target: { files: [file] } });
+    const error = await screen.findByRole('alert');
+    expect(error).toHaveTextContent('Source upload unavailable.');
+    expect(screen.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+    expect(operationKeys).toHaveLength(2);
+    expect(operationKeys[1]).toBe(operationKeys[0]);
+  });
+
+  it('recovers and pages the Saved Video picker before reusing one exact Version', async () => {
+    const selectedVideo: SavedVideoSummary = {
+      id: savedVideoId,
+      title: 'Library source',
+      status: 'ready',
+      currentVersion: {
+        id: videoVersionId,
+        videoId: savedVideoId,
+        ordinal: 2,
+        origin: 'uploaded',
+        characterName: null,
+        characterVariantName: null,
+        sourceVersionId: null,
+        mimeType: 'video/mp4',
+        filename: 'library-source.mp4',
+        sizeBytes: 4,
+        durationMs: 1_000,
+        width: 640,
+        height: 360,
+        createdAt: now,
+      },
+      sourceVideoId: null,
+      versionCount: 2,
+      thumbnailAvailable: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const sourceReference = {
+      kind: 'saved-video-version' as const,
+      savedVideoId,
+      videoVersionId,
+    };
+    const baseSource = acceptedSourceResponse();
+    const reusedSource: ProjectSourceResponse = {
+      ...baseSource,
+      revision: {
+        ...baseSource.revision,
+        snapshot: {
+          ...baseSource.revision.snapshot,
+          workingMedia: sourceReference,
+          presentedMedia: sourceReference,
+        },
+      },
+      source: {
+        ...baseSource.source,
+        kind: 'saved-video-version',
+        savedVideoId,
+        videoVersionId,
+        filename: 'library-source.mp4',
+      },
+    };
+    const present = vi.fn<ProjectSourceRuntime['present']>();
+    const clear = vi.fn<ProjectSourceRuntime['clear']>();
+    let firstPageReads = 0;
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(currentProject(activeId))),
+      http.get('*/api/videos', ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get('cursor');
+        if (cursor === 'saved-next') {
+          return HttpResponse.json({
+            videos: [],
+            nextCursor: null,
+            total: 1,
+            facets: { characterNames: [], formats: ['landscape'] },
+          });
+        }
+        firstPageReads += 1;
+        return firstPageReads === 1
+          ? HttpResponse.json(
+              { error: { code: 'feature_unavailable', message: 'Saved Videos unavailable.' } },
+              { status: 503 },
+            )
+          : HttpResponse.json({
+              videos: [selectedVideo],
+              nextCursor: 'saved-next',
+              total: 1,
+              facets: { characterNames: [], formats: ['landscape'] },
+            });
+      }),
+      http.post(`*/api/projects/${activeId}/source/reuse`, async ({ request }) => {
+        expect(await request.json()).toEqual({
+          expectedVersion: 1,
+          expectedRevisionNumber: 1,
+          savedVideoId,
+          videoVersionId,
+        });
+        return HttpResponse.json(reusedSource, { status: 201 });
+      }),
+      http.get(`*/api/projects/${activeId}/source/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderProjects(`/studio/projects/${activeId}`, {
+      sourceRuntime: { present, clear },
+    });
+
+    await user.click(await screen.findByRole('button', { name: 'Use Saved Video' }));
+    let dialog = screen.getByRole('dialog', { name: 'Use Saved Video' });
+    const unavailable = await within(dialog).findByRole('alert');
+    await user.click(within(unavailable).getByRole('button', { name: 'Retry' }));
+    await user.click(await within(dialog).findByRole('button', { name: 'Load more Saved Videos' }));
+    await waitFor(() =>
+      expect(
+        within(dialog).queryByRole('button', { name: 'Load more Saved Videos' }),
+      ).not.toBeInTheDocument(),
+    );
+    await user.click(within(dialog).getByRole('button', { name: 'Close panel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Use Saved Video' }));
+    dialog = screen.getByRole('dialog', { name: 'Use Saved Video' });
+    await user.click(within(dialog).getByRole('button', { name: /Library source/u }));
+
+    await waitFor(() => expect(present).toHaveBeenCalledOnce());
+    expect(present.mock.calls[0]?.[0]).toBe(activeId);
+    expect(present.mock.calls[0]?.[1].blob).toBeInstanceOf(File);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(
+      screen.getByRole('heading', { name: 'Immutable original' }).parentElement,
+    ).toHaveTextContent('This Project references the exact Saved Video Version');
+  });
+
+  it('moves a standalone Project after a recoverable Campaign assignment failure', async () => {
+    const initial = currentProject(activeId);
+    const moved = currentProject(activeId, { campaignId, version: 2 });
+    let moves = 0;
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(initial)),
+      http.get('*/api/campaigns', () =>
+        HttpResponse.json({ campaigns: [campaign()], nextCursor: null }),
+      ),
+      http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(campaign())),
+      http.post(`*/api/projects/${activeId}/campaign`, async ({ request }) => {
+        expect(await request.json()).toEqual({ campaignId, expectedVersion: 1 });
+        moves += 1;
+        return moves === 1
+          ? HttpResponse.json(
+              { error: { code: 'feature_unavailable', message: 'Campaign move unavailable.' } },
+              { status: 503 },
+            )
+          : HttpResponse.json(moved);
+      }),
+    );
+    const user = userEvent.setup();
+    renderProjects(`/studio/projects/${activeId}`);
+
+    await user.click(await screen.findByRole('button', { name: 'Move Project' }));
+    const dialog = screen.getByRole('dialog', { name: 'Project Campaign' });
+    await user.click(within(dialog).getByRole('combobox', { name: 'Campaign' }));
+    await user.click(screen.getByRole('option', { name: 'Summer launch' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm location' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'Campaign move unavailable.',
+    );
+
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm location' }));
+    expect(await screen.findByText('Launch cut moved to Summer launch.')).toBeVisible();
+    expect(await screen.findByText('Campaign: Summer launch')).toBeVisible();
+    expect(moves).toBe(2);
+  });
+
+  it('preserves an archive command across stale detail authority and retries explicitly', async () => {
+    const initial = currentProject(activeId);
+    const latest = currentProject(activeId, { version: 2 });
+    const archived = currentProject(activeId, {
+      status: 'archived',
+      version: 3,
+      archivedAt: now,
+    });
+    let detailReads = 0;
+    let archiveWrites = 0;
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => {
+        detailReads += 1;
+        return HttpResponse.json(detailReads === 1 ? initial : latest);
+      }),
+      http.post(`*/api/projects/${activeId}/archive`, async ({ request }) => {
+        archiveWrites += 1;
+        const body = (await request.json()) as { expectedVersion: number };
+        if (archiveWrites === 1) {
+          return HttpResponse.json(
+            {
+              error: { code: 'conflict', message: 'The Project changed. Refresh it.' },
+              conflict: {
+                kind: 'project-version',
+                projectId: activeId,
+                expectedVersion: body.expectedVersion,
+                actualVersion: 2,
+              },
+            },
+            { status: 409 },
+          );
+        }
+        expect(body).toEqual({ expectedVersion: 2 });
+        return HttpResponse.json(archived);
+      }),
+    );
+    const user = userEvent.setup();
+    renderProjects(`/studio/projects/${activeId}`);
+
+    await user.click(await screen.findByRole('button', { name: 'Archive' }));
+    const dialog = screen.getByRole('dialog', { name: 'Archive Project' });
+    await user.click(within(dialog).getByRole('button', { name: 'Archive Project' }));
+    expect(await within(dialog).findByText('The Project changed. Refresh it.')).toBeVisible();
+    await user.click(within(dialog).getByRole('button', { name: 'Reload and retry archive' }));
+
+    expect(await screen.findByText('Launch cut archived.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Restore' })).toBeVisible();
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Launch cut' })).toHaveFocus());
+    expect(archiveWrites).toBe(2);
+  });
+
+  it('shows a preserved session conflict and reapplies it only after explicit retry', async () => {
+    const initial = currentProject(activeId);
+    const latestRevisionId = secondActiveId;
+    const savedRevisionId = archivedId;
+    const latest: ProjectCurrentResponse = {
+      project: {
+        ...initial.project,
+        version: 2,
+        currentRevisionId: latestRevisionId,
+        currentRevisionNumber: 2,
+      },
+      revision: {
+        ...initial.revision,
+        id: latestRevisionId,
+        revisionNumber: 2,
+        parentRevisionId: revisionId,
+        parentRevisionNumber: 1,
+        snapshot: { ...initial.revision.snapshot, workflowPhase: 'review' },
+      },
+    };
+    const saved: ProjectCurrentResponse = {
+      project: {
+        ...latest.project,
+        version: 3,
+        currentRevisionId: savedRevisionId,
+        currentRevisionNumber: 3,
+      },
+      revision: {
+        ...latest.revision,
+        id: savedRevisionId,
+        revisionNumber: 3,
+        parentRevisionId: latestRevisionId,
+        parentRevisionNumber: 2,
+        snapshot: { ...latest.revision.snapshot, workflowPhase: 'creative' },
+      },
+    };
+    let detailReads = 0;
+    let revisionWrites = 0;
+    let sessionPort: ProjectSessionPort | null = null;
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => {
+        detailReads += 1;
+        return HttpResponse.json(detailReads === 1 ? initial : latest);
+      }),
+      http.post(`*/api/projects/${activeId}/revisions`, async ({ request }) => {
+        revisionWrites += 1;
+        const body = (await request.json()) as {
+          expectedVersion: number;
+          expectedRevisionNumber: number;
+          proposal: { workflowPhase: string };
+        };
+        expect(body.proposal.workflowPhase).toBe('creative');
+        if (revisionWrites === 1) {
+          return HttpResponse.json(
+            {
+              error: { code: 'conflict', message: 'Refresh the Project.' },
+              conflict: {
+                kind: 'revision',
+                projectId: activeId,
+                expectedRevisionNumber: body.expectedRevisionNumber,
+                actualRevisionNumber: 2,
+              },
+            },
+            { status: 409 },
+          );
+        }
+        expect(body).toMatchObject({ expectedVersion: 2, expectedRevisionNumber: 2 });
+        await delay(50);
+        return HttpResponse.json(saved, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    renderProjects(`/studio/projects/${activeId}`, {
+      onSessionChange: (next) => {
+        sessionPort = next;
+      },
+    });
+
+    expect(await screen.findByRole('heading', { name: 'Launch cut' })).toBeVisible();
+    await waitFor(() => expect(sessionPort).not.toBeNull());
+    act(() => {
+      sessionPort?.propose({ workflowPhase: 'creative' });
+    });
+    expect(screen.getByText(/semantic Project checkpoint is queued/u)).toBeVisible();
+    await act(async () => {
+      expect(await sessionPort?.flush()).toBe(false);
+    });
+
+    const conflict = await screen.findByRole('alert');
+    expect(conflict).toHaveTextContent(
+      'This Project changed in another session. Your local proposal was preserved.',
+    );
+    await user.click(within(conflict).getByRole('button', { name: 'Reapply changes' }));
+    expect(
+      await screen.findByText(/Committing one coalesced semantic Project revision/u),
+    ).toBeVisible();
+    expect(await screen.findByText('All changes saved')).toBeVisible();
+    expect(revisionWrites).toBe(2);
+  });
+
+  it('allows a preserved session save error to be discarded explicitly', async () => {
+    const initial = currentProject(activeId);
+    let sessionPort: ProjectSessionPort | null = null;
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(initial)),
+      http.post(`*/api/projects/${activeId}/revisions`, () =>
+        HttpResponse.json(
+          { error: { code: 'feature_unavailable', message: 'Project saving unavailable.' } },
+          { status: 503 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderProjects(`/studio/projects/${activeId}`, {
+      onSessionChange: (next) => {
+        sessionPort = next;
+      },
+    });
+
+    expect(await screen.findByRole('heading', { name: 'Launch cut' })).toBeVisible();
+    await waitFor(() => expect(sessionPort).not.toBeNull());
+    act(() => {
+      sessionPort?.propose({ workflowPhase: 'creative' });
+    });
+    await act(async () => {
+      expect(await sessionPort?.flush()).toBe(false);
+    });
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Project saving unavailable.');
+    await user.click(within(alert).getByRole('button', { name: 'Discard local changes' }));
+    expect(await screen.findByText('All changes saved')).toBeVisible();
   });
 });

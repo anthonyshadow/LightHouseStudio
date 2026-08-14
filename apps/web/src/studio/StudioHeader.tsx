@@ -19,13 +19,16 @@ export type CapabilityState = 'loading' | 'ready' | 'error';
 
 type HeaderMenu = 'account' | 'status';
 
+export type StudioHeaderDestination =
+  'studio' | 'campaigns' | 'projects' | 'videos' | 'characters' | 'outfits';
+
 type StudioHeaderProps = {
   availability: ProviderAvailability;
   browser: BrowserCapabilities;
   capabilityState: CapabilityState;
   user: AuthenticatedUser;
   accountBusy?: boolean;
-  activeDestination: 'studio' | 'campaigns' | 'projects';
+  activeDestination: StudioHeaderDestination;
   projectContextActive?: boolean;
   onOpenStudio: () => void;
   onOpenProjects: () => void;
@@ -209,6 +212,13 @@ export const StudioHeader = ({
           onOpenChange={(open) => setMenuOpen('account', open)}
           busy={accountBusy}
           projectContextActive={projectContextActive}
+          activeLibrary={
+            activeDestination === 'videos' ||
+            activeDestination === 'characters' ||
+            activeDestination === 'outfits'
+              ? activeDestination
+              : undefined
+          }
           onOpenVideos={onOpenVideos}
           onOpenCharacters={onOpenCharacters}
           onOpenOutfits={onOpenOutfits}

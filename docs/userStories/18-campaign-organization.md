@@ -35,7 +35,7 @@ making Campaign setup a prerequisite for creative work.
   trusted-origin mutations. Lists are cursor-bounded, and create replays use durable operation
   receipts.
 - Campaign and empty-Project views do not acquire camera/microphone access, start a provider, or
-  claim that a Project is resumable before Prompt 06 adds a durable source.
+  claim that a Project is resumable before durable source acceptance succeeds.
 - The current product remains loopback-only, single-operator, and video-focused. Rich planning,
   tags, dates, approvals, publishing, collaboration, and public accounts remain deferred.
 

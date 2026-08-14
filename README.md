@@ -6,9 +6,14 @@ small creative teams that want to move from an idea or existing asset to campaig
 without stitching together disconnected creative tools.
 
 The implemented product is currently a local-first, single-operator browser studio centered on
-video. Its primary loop is:
+video. Its resumable workspace loop is:
 
-**Log in → Record or Upload → Review → optional Virtual Try On, Character Swap, and/or Voice → Save → Download an exact Version**
+**Log in → Quick Start a standalone Project or open a Campaign → accept a durable source →
+create, edit, or transform → Save as New Video or Add Version → review history → Download an
+exact Version**
+
+The standalone Studio remains available for a fast record/upload workflow that does not
+automatically create or assign a Project.
 
 Live character transformation and Workshop remain advanced tools. The app binds to loopback. Phase
 1 provides one seeded local demo account, authenticated ownership, and durable local saved-media
@@ -37,9 +42,11 @@ The app is not approved for LAN, tunnel, proxy, or public exposure.
 
 ## Status
 
-The core workflow is implemented and automated tests cover local, Character, VTO, recording,
-review, and voice paths. Physical-device and live-provider results remain useful validation
-inputs, but their absence does not disable configured application features.
+The core Campaign/Project workflow is implemented and has passed the local automated MVP boundary.
+The [MVP acceptance runbook](docs/MVP_ACCEPTANCE.md) records all 17 objective criteria and required
+automated gates as passing. This local-only GO does not include physical-device,
+assistive-technology, live Neon/R2, or paid-provider checks and does not imply public-service
+readiness.
 
 ## Product direction
 
@@ -60,6 +67,8 @@ terminology, and the [product roadmap](docs/PRODUCT_ROADMAP.md) for the current-
 Neither document changes the current loopback, account, provider, privacy, or deployment limits.
 
 ## Product flow
+
+### Standalone Studio flow
 
 1. Open `/`, choose **Log in**, and submit the locally configured demo credentials. The backend
    verifies the Argon2id password hash and issues a session JWT in a host-only, HTTP-only cookie.
@@ -88,6 +97,8 @@ Neither document changes the current loopback, account, provider, privacy, or de
    use **Dock** for direct Character/VTO recipes and **Shelf** for saved characters, outfits, and
    their builders. A prepared selection can then be started explicitly from **Start AI** or the
    Dock and recorded through the existing live flow.
+
+### Campaign and Project workspace
 
 `/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio`,
 `/studio/campaigns`, `/studio/campaigns/:campaignId`, `/studio/projects`,
@@ -140,8 +151,11 @@ stage. **Save creative setup** appends one coalesced semantic checkpoint; it nev
 slider ticks, undo history, or provider state. **Edit Video** keeps its worker candidate temporary
 as **Render preview** until **Adopt as working media** stores, inspects, checksums, and CAS-appends
 the ready result. Refresh restores the current working media while retaining the immutable original.
-Project Character/VTO/remote Voice Start actions remain disabled with explanatory copy; local Voice
-configuration and local editing do not contact a provider.
+Project Character Swap and Virtual Try On use the recoverable Project processing command when the
+configured capability is available. Provider Voice and advanced live starts remain gated because
+their adapters do not provide the durable reconnect contract required by a resumable Project. Local
+Voice settings can be checkpointed, but a locally rendered Voice result is not yet adopted as
+resumable Project working media. Local editing and configuration do not contact a provider.
 
 ## Capabilities and provider boundaries
 
@@ -449,6 +463,7 @@ Start with the [documentation map](docs/README.md). Key references:
 
 - [Product vision and terminology](docs/PRODUCT_VISION.md)
 - [Product roadmap](docs/PRODUCT_ROADMAP.md)
+- [Local MVP acceptance and evidence](docs/MVP_ACCEPTANCE.md)
 - [Implemented journeys](docs/userStories/README.md)
 - [Architecture and ownership](docs/ARCHITECTURE.md)
 - [Privacy and temporary data](docs/PRIVACY_AND_TEMPORARY_DATA.md)

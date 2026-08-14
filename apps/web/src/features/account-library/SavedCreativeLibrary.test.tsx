@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import { createCreativeAssetRepository } from '../creative-assets/repository';
@@ -24,7 +24,6 @@ describe('saved creative libraries', () => {
     const onCreateFrom = vi.fn();
     const onOpenWardrobe = vi.fn();
     const remove = vi.spyOn(repository, 'deleteSavedCharacterPrompt');
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const view = render(
       <StudioDesignProvider>
         <SavedCharacterLibrary
@@ -56,12 +55,16 @@ describe('saved creative libraries', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Use in Studio' }));
     fireEvent.click(screen.getByRole('button', { name: 'Wardrobe' }));
     fireEvent.click(screen.getByRole('button', { name: 'Create new from this character' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Field host' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete saved character?' });
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Keep character' })).toHaveFocus(),
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete character' }));
     expect(onUse).toHaveBeenCalledWith(character);
     expect(onOpenWardrobe).toHaveBeenCalledWith(character);
     expect(onCreateFrom).toHaveBeenCalledWith(character);
-    expect(confirm).toHaveBeenCalledOnce();
-    expect(remove).toHaveBeenCalledWith(character.id);
+    await waitFor(() => expect(remove).toHaveBeenCalledWith(character.id));
   });
 
   it('shows outfit empty state, use handoff, and declines deletion', async () => {
@@ -75,7 +78,6 @@ describe('saved creative libraries', () => {
     const onUse = vi.fn();
     const onCreate = vi.fn();
     const remove = vi.spyOn(repository, 'deleteSavedPrompt');
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
     const view = render(
       <StudioDesignProvider>
         <SavedOutfitLibrary items={[]} repository={repository} onUse={onUse} onCreate={onCreate} />
@@ -96,9 +98,111 @@ describe('saved creative libraries', () => {
     expect(screen.getByText('Reference-image outfit')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Create new saved outfit' }));
     fireEvent.click(screen.getByRole('button', { name: 'Use in Studio' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    const deleteTrigger = screen.getByRole('button', { name: 'Delete Evening coat' });
+    fireEvent.click(deleteTrigger);
+    const dialog = screen.getByRole('dialog', { name: 'Delete saved outfit?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Keep outfit' }));
     expect(onUse).toHaveBeenCalledWith(outfit);
     expect(onCreate).toHaveBeenCalledOnce();
     expect(remove).not.toHaveBeenCalled();
+    await waitFor(() => expect(deleteTrigger).toHaveFocus());
+  });
+
+  it('keeps a failed character deletion open with a sanitized accessible retry error', async () => {
+    const repository = createCreativeAssetRepository({ storage: null });
+    const character = await repository.createSavedCharacterPrompt({
+      name: 'Field host',
+      prompt: 'A documentary field host',
+      promptIntent: null,
+      referenceImageAssetId: null,
+    });
+    vi.spyOn(repository, 'deleteSavedCharacterPrompt').mockRejectedValueOnce(
+      new Error('sensitive persistence detail'),
+    );
+    render(
+      <StudioDesignProvider>
+        <SavedCharacterLibrary
+          items={[character]}
+          repository={repository}
+          onUse={vi.fn()}
+          onCreateFrom={vi.fn()}
+          onOpenWardrobe={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    const deleteTrigger = screen.getByRole('button', { name: 'Delete Field host' });
+    fireEvent.click(deleteTrigger);
+    const dialog = screen.getByRole('dialog', { name: 'Delete saved character?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete character' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'The character could not be deleted',
+    );
+    expect(dialog).not.toHaveTextContent('sensitive persistence detail');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Keep character' }));
+    await waitFor(() => expect(deleteTrigger).toHaveFocus());
+
+    fireEvent.click(deleteTrigger);
+    expect(
+      within(screen.getByRole('dialog', { name: 'Delete saved character?' })).queryByRole('alert'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps an outfit deletion modal while busy, then supports a sanitized retry', async () => {
+    const repository = createCreativeAssetRepository({ storage: null });
+    const outfit = await repository.createSavedPrompt({
+      title: 'Evening coat',
+      prompt: 'A structured evening coat',
+      modelModeId: 'lucy-vton-latest',
+    });
+    let rejectDeletion: ((reason?: unknown) => void) | undefined;
+    const remove = vi
+      .spyOn(repository, 'deleteSavedPrompt')
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectDeletion = reject;
+          }),
+      )
+      .mockResolvedValueOnce();
+    render(
+      <StudioDesignProvider>
+        <SavedOutfitLibrary
+          items={[outfit]}
+          repository={repository}
+          onUse={vi.fn()}
+          onCreate={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    const deleteTrigger = screen.getByRole('button', { name: 'Delete Evening coat' });
+    fireEvent.click(deleteTrigger);
+    const dialog = screen.getByRole('dialog', { name: 'Delete saved outfit?' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete outfit' }));
+
+    expect(await within(dialog).findByRole('button', { name: 'Deleting outfit…' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Keep outfit' })).toBeDisabled();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getByRole('dialog', { name: 'Delete saved outfit?' })).toBeVisible();
+
+    act(() => {
+      rejectDeletion?.(new Error('sensitive persistence detail'));
+    });
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'The outfit could not be deleted',
+    );
+    expect(dialog).not.toHaveTextContent('sensitive persistence detail');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Delete outfit' }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Delete saved outfit?' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(remove).toHaveBeenCalledTimes(2);
+    expect(remove).toHaveBeenLastCalledWith(outfit.id);
+    await waitFor(() => expect(deleteTrigger).toHaveFocus());
   });
 });
