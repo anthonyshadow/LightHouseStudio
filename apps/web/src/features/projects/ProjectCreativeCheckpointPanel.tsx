@@ -4,7 +4,7 @@ import type { useProjectCreativeSessionAdapter } from './useProjectCreativeSessi
 import type { useProjectWorkingMediaController } from './useProjectWorkingMediaController';
 
 export const PROJECT_PROVIDER_START_BLOCKED_REASON =
-  'Project provider processing is unavailable until recoverable Project processing is enabled.';
+  'Project live provider starts remain unavailable because they do not use the recoverable Project processing command.';
 
 export const ProjectCreativeCheckpointPanel = ({
   controller,
@@ -45,8 +45,8 @@ export const ProjectCreativeCheckpointPanel = ({
       <div>
         <strong>Project creative setup</strong>
         <p>
-          Configuration is local until this explicit checkpoint. No provider Start is available in
-          Projects yet.
+          Configuration is local until this explicit checkpoint. Character Swap and Virtual Try On
+          Start save this exact setup before creating one Project-linked provider operation.
         </p>
         {issue ? (
           <StatusNotice tone="warning" title={issue.historicalLabel} role="status">

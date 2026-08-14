@@ -24,6 +24,7 @@ import type { useStudioOutfitWorkflow } from './useStudioOutfitWorkflow';
 import type { ActiveOverlay } from './useStudioOverlayController';
 import type { useStudioSavedVideoController } from './useStudioSavedVideoController';
 import type { useTakeReviewFlow } from './useTakeReviewFlow';
+import type { ProjectProcessingController } from '../features/projects/useProjectProcessingController';
 import { REVIEW_LOCK_REASON } from './studioPolicies';
 
 interface StudioToolOverlaysProps {
@@ -50,6 +51,7 @@ interface StudioToolOverlaysProps {
   readonly aiSessionActive: boolean;
   readonly captureSettingsDisabledReason: string | undefined;
   readonly providerStartBlockedReason?: string | undefined;
+  readonly projectProcessing?: ProjectProcessingController | undefined;
   readonly characterSelectorRef: RefObject<HTMLButtonElement | null>;
   readonly outfitToggleRef: RefObject<HTMLButtonElement | null>;
   readonly shelfToggleRef: RefObject<HTMLButtonElement | null>;
@@ -94,6 +96,7 @@ export const StudioToolOverlays = ({
   aiSessionActive,
   captureSettingsDisabledReason,
   providerStartBlockedReason,
+  projectProcessing,
   characterSelectorRef,
   outfitToggleRef,
   shelfToggleRef,
@@ -135,6 +138,7 @@ export const StudioToolOverlays = ({
         onFinish={onFinishExistingVideo}
         onStartRecording={onStartExistingVideoRecording}
         {...(providerStartBlockedReason ? { providerStartBlockedReason } : {})}
+        {...(projectProcessing ? { projectProcessing } : {})}
       />
 
       <StudioOutfitOverlays

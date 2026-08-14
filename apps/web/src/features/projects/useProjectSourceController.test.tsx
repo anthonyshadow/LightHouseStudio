@@ -7,6 +7,7 @@ import type {
 } from '@studio/contracts';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { delay, HttpResponse, http } from 'msw';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import { mockApiServer } from '../../test/msw/server';
@@ -249,6 +250,40 @@ describe('useProjectSourceController', () => {
     expect(mediaOwner.present.mock.calls[0]?.[1].artifactMetadata.filename).toBe(
       'adopted-working.mp4',
     );
+  });
+
+  it('does not clear freshly presented media when equivalent authority is accepted', async () => {
+    const events: string[] = [];
+    mockApiServer.use(
+      http.get(`*/api/projects/${firstProjectId}/source`, () =>
+        HttpResponse.json(sourceResponse(firstProjectId)),
+      ),
+      http.get(`*/api/projects/${firstProjectId}/source/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+        }),
+      ),
+    );
+    const mediaOwner: ProjectSourceRuntime = {
+      present: vi.fn(() => events.push('present')),
+      clear: vi.fn(() => events.push('clear')),
+    };
+    const hook = renderHook(
+      () => {
+        const [current, setCurrent] = useState(() => currentProject(firstProjectId, true));
+        return useProjectSourceController(
+          firstProjectId,
+          current,
+          mediaOwner,
+          undefined,
+          setCurrent,
+        );
+      },
+      { wrapper: RemoteStateTestProvider },
+    );
+
+    await waitFor(() => expect(hook.result.current.phase).toBe('saved'));
+    expect(events).toEqual(['clear', 'present']);
   });
 
   it('aborts an old Project hydration so late completion cannot replace the new stage', async () => {

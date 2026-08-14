@@ -65,7 +65,7 @@ const publicVersion = (version: StoredVideoVersion) => ({
 
 const aggregateSummary = (
   aggregate: StoredSavedVideoAggregate,
-  version = currentVersion(aggregate),
+  version: StoredVideoVersion,
 ): StoredSavedVideoSummary => ({
   video: aggregate.video,
   currentVersion: version,

@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { pipeline } from 'node:stream/promises';
@@ -23,7 +23,6 @@ import {
   projectProcessingPhase,
   projectProcessingRetryPolicy,
   promoteProjectJobResult,
-  type ProjectAggregate,
   type ProjectAssetLink,
   type ProjectJobLink,
   type ProjectMediaReference,
@@ -32,12 +31,14 @@ import { AppError } from '../../http/app-error.js';
 import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
 import type { ReferenceImageAssetStore } from '../reference-images/asset-store.js';
 import { inspectStoredProjectMedia } from './project-media-inspection.js';
-import type {
-  ProjectCurrentRead,
-  ProjectRepository,
-  ProjectSourceRecord,
-  ProjectWorkingMediaRecord,
+import {
+  projectAggregateForCurrent,
+  type ProjectCurrentRead,
+  type ProjectRepository,
+  type ProjectSourceRecord,
+  type ProjectWorkingMediaRecord,
 } from './project-repository.js';
+import { projectRequestFingerprint } from './project-request-fingerprint.js';
 import type {
   ProjectProcessingAttemptRecord,
   ProjectProcessingRepository,
@@ -51,18 +52,6 @@ import type { VideoJobService } from '../video-jobs/video-job-service.js';
 
 const PROCESSING_SYSTEM_AUTHOR = 'project-processing';
 const PROCESSING_POLL_AFTER_MS = 2_000;
-
-const fingerprint = (value: unknown): string =>
-  createHash('sha256').update(JSON.stringify(value)).digest('hex');
-
-const currentAggregate = (current: ProjectCurrentRead): ProjectAggregate => ({
-  project: current.project,
-  revisions: [current.revision],
-  assetLinks: [],
-  versionReferenceLinks: [],
-  jobLinks: [],
-  outputLinks: [],
-});
 
 const sourceMediaReference = (source: ProjectSourceRecord): ProjectMediaReference =>
   source.kind === 'saved-video-version'
@@ -435,7 +424,7 @@ export class ProjectProcessingService {
           );
         }
         const createdAt = this.#now().toISOString();
-        const requestFingerprint = fingerprint({
+        const requestFingerprint = projectRequestFingerprint({
           version: 1,
           projectId: input.projectId,
           initiatingRevisionId: current.revision.id,
@@ -659,7 +648,7 @@ export class ProjectProcessingService {
         attempt.projectId,
       );
       const promotion = promoteProjectJobResult(
-        currentAggregate(current),
+        projectAggregateForCurrent(current),
         {
           expectedProjectVersion: current.project.version,
           expectedRevisionNumber: current.revision.revisionNumber,
@@ -691,7 +680,7 @@ export class ProjectProcessingService {
           adoptedRevisionId: revision.id,
           adoptedRevisionNumber: revision.revisionNumber,
           operationKey: attempt.operationId,
-          requestFingerprint: fingerprint({
+          requestFingerprint: projectRequestFingerprint({
             version: 1,
             operation: 'retain-project-job-result',
             requestFingerprint: attempt.requestFingerprint,

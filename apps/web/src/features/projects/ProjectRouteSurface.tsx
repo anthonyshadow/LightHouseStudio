@@ -44,6 +44,8 @@ import {
   type ProjectSourcePhase,
   type ProjectSourceRuntime,
 } from './useProjectSourceController';
+import { ProjectProcessingStatusPanel } from './ProjectProcessingStatusPanel';
+import type { ProjectProcessingController } from './useProjectProcessingController';
 
 const projectStatusLabel = (status: ProjectContract['status']): string =>
   status === 'needs-attention'
@@ -334,6 +336,7 @@ export interface ProjectRouteSurfaceProps {
   readonly onSourceActivityChange?: (activity: ProjectSourceActivity) => void;
   readonly onWorkingMediaActivityChange?: (activity: ProjectWorkingMediaActivity) => void;
   readonly onSessionChange?: (session: ProjectSessionPort | null) => void;
+  readonly processing?: ProjectProcessingController;
 }
 
 const unavailableSourceRuntime: ProjectSourceRuntime = {
@@ -604,6 +607,7 @@ const ProjectDetail = ({
   onWorkingMediaActivityChange,
   onSessionChange,
   creativeCheckpoint,
+  processing,
 }: { readonly projectId: string } & ProjectRouteSurfaceProps) => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -738,11 +742,13 @@ const ProjectDetail = ({
 
       {creativeCheckpoint}
 
-      <StatusNotice role="status" tone="neutral" title="Project processing is gated">
-        Configure creative intent and local edits freely. Provider-backed Start actions remain
-        unavailable until recoverable Project processing is enabled; configuration submits no
-        provider work.
-      </StatusNotice>
+      {processing ? (
+        <ProjectProcessingStatusPanel controller={processing} />
+      ) : (
+        <StatusNotice role="status" tone="neutral" title="Project processing unavailable">
+          Project processing authority is not mounted. Configuration submits no provider work.
+        </StatusNotice>
+      )}
 
       <ProjectSourceSection
         key={current.project.id}
@@ -792,6 +798,13 @@ const ProjectDetail = ({
         <ProjectLifecycleDialog
           action={lifecycleDialog.action}
           project={lifecycleDialog.project}
+          {...(lifecycleDialog.action === 'archive' && processing?.attempt?.blocksArchive
+            ? {
+                archiveBlockedReason: processing.attempt.ambiguous
+                  ? 'Archive is blocked because submission acceptance is unresolved. Another attempt may duplicate provider cost; use the explicit retry decision first.'
+                  : 'Archive is blocked while accepted provider work is active. Leaving or switching does not stop provider work or cost; reopen this Project to reconnect.',
+              }
+            : {})}
           returnFocusRef={dialogReturnRef}
           onClose={closeDialog}
           onChanged={(updated, action) => {

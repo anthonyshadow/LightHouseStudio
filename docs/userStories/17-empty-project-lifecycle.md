@@ -95,13 +95,14 @@ provider work.
     returns status to current ready/attempt truth. Completing a local render or adoption alone does
     not make the Project `completed`. Saving setup, temporary rendering, and durable working-media
     readiness use distinct status copy.
-22. Project Character/VTO/ElevenLabs provider-backed Start actions remain gated with explanatory
-    UI. Configuration and the local render/adoption path make no provider call. Backend authority
-    now pre-links a direct Project processing command, reconnects durable visual-provider jobs,
-    exposes ambiguity/explicit retry truth, and retains current or stale results safely, but Prompt
-    10 owns the visible integration. Provider-backed Voice remains unavailable there because its
-    synchronous response has no durable reconnect identity. Rendering or working-media adoption
-    blocks Project switching/exit until it completes or returns to a safe cancellable checkpoint.
+22. Project Character Swap and Virtual Try On now start visibly through the one pre-linked Project
+    processing command. Reopen reconnects durable visual-provider jobs without submission,
+    unknown acceptance never auto-retries, and current/stale retained results are labeled
+    separately. Configuration and local render/adoption still make no provider call. Provider-
+    backed Voice and live starts remain gated because their adapters do not meet the durable
+    reconnect contract. Accepted visual work may continue after a Project switch; local rendering
+    or working-media adoption still blocks switching/exit until it completes or returns to a safe
+    cancellable checkpoint.
 
 ## Boundaries
 

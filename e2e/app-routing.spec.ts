@@ -255,6 +255,69 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   expectNoExternalProviderTraffic(network);
 });
 
+test('an accepted Project operation reconnects after refresh and presents its retained result without resubmission', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  const projects = await installProjectHarness(page, true, {
+    completeProcessingAfterReopen: true,
+  });
+  await page.addInitScript(
+    ({ storageKey, store }) => window.localStorage.setItem(storageKey, JSON.stringify(store)),
+    { storageKey: CREATIVE_ASSET_STORAGE_KEY, store: SEEDED_PROJECT_CREATIVE_STORE },
+  );
+  const fixture = await loadDecodableH264VideoFixture();
+  await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+  await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
+    name: 'project-processing-source.mp4',
+    mimeType: 'video/mp4',
+    buffer: fixture,
+  });
+  await expect(page.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+
+  await openCharacterOptions(page);
+  await page.getByRole('button', { name: 'Choose saved character' }).click();
+  await page
+    .getByRole('dialog', { name: 'Recipe Shelf' })
+    .getByRole('button', { name: 'Use Project Field Host' })
+    .click();
+  await page.getByRole('button', { name: 'Save creative setup' }).click();
+  await expect(page.getByText('Creative setup saved as one Project checkpoint.')).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Creative workspace tools' })
+    .getByRole('button', { name: 'Edit Video', exact: true })
+    .click();
+  const existingVideo = page.getByRole('dialog', { name: 'Use existing video' });
+  await expect(
+    existingVideo.getByRole('button', { name: 'Start Project Character Swap' }),
+  ).toBeEnabled();
+  await existingVideo.getByRole('button', { name: 'Start Project Character Swap' }).click();
+
+  await expect.poll(() => projects.processingOperationKeys).toHaveLength(1);
+  expect(projects.processingOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
+  expect(projects.processingProviderIntents).toEqual(['video']);
+  await existingVideo.getByRole('button', { name: 'Close panel' }).click();
+  await page.getByRole('button', { name: 'Archive' }).click();
+  const archive = page.getByRole('dialog', { name: 'Archive Project' });
+  await expect(archive.getByRole('button', { name: 'Archive Project' })).toBeDisabled();
+  await expect(archive).toContainText('accepted provider work is active');
+  await expect(archive).toContainText('accepted remote work may continue');
+  await archive.getByRole('button', { name: 'Cancel' }).click();
+  await page.reload();
+
+  await expect(page.getByText('Character Swap accepted / queued', { exact: true })).toBeVisible();
+  await expect(page.getByText('Result ready', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Revision 5', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Studio media stage').locator('video')).toHaveAttribute(
+    'src',
+    /^blob:/u,
+  );
+  expect(projects.processingOperationKeys).toHaveLength(1);
+  expect(projects.processingReconcileCount).toBeGreaterThanOrEqual(1);
+  expect(network.apiRequests.some(({ path }) => path.startsWith('/api/video-jobs'))).toBe(false);
+  expectNoExternalProviderTraffic(network);
+});
+
 test('a Project checkpoints a reusable Character, adopts a local render, and refreshes without provider contact', async ({
   page,
 }) => {

@@ -57,12 +57,11 @@ const requireId = (value: string, label: string): string => {
   return normalized;
 };
 
-const requireAppliedLabel = (value: string, label: string): string => {
+const requireAppliedLabel = (value: string, label: string): void => {
   const normalized = value.replaceAll(/\s+/gu, ' ').trim();
   if (normalized.length === 0 || normalized.length > PROJECT_APPLIED_LABEL_MAX_LENGTH) {
     throw new ProjectRuleError('invalid-snapshot', `${label} is invalid.`);
   }
-  return normalized;
 };
 
 export const normalizeProjectTitle = (value: string): string => {

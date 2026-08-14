@@ -116,8 +116,8 @@ The retained suite protects:
   prompt/reference/treatment/live/edit mapping; prompt-only VTO without a fabricated Outfit;
   owner-safe missing/changed creative-resource explanation, saved-Voice relationship validation
   without provider intent/contact, and live mode/capture restoration without media acquisition;
-  explicit checkpoint coalescing; provider-Start gating; and one-stage configuration beside current
-  Project media;
+  explicit checkpoint coalescing; one-stage configuration beside current Project media; recoverable
+  Character Swap/VTO Start; and truthful provider-Voice/live gating;
 - local and relational Project working-media adoption for inspected/checksummed local renders and
   exact same-owner retained Media Asset/Saved Video Versions; source immutability, used-by versus
   produced-by lineage, output-pointer clearing, CAS/replay/fingerprint conflict, prepared-journal
@@ -129,6 +129,10 @@ The retained suite protects:
   no-identity submission without resubmission; shadow trace failure isolation; active/archive
   interlock; owner/Origin/provider-intent routes; durable current `job-result` promotion and stale
   historical `job-output` retention; and proof that neither result path creates a Saved Video;
+- Project browser processing adapters/controllers for exact command routing, same-key response-loss
+  replay, queued refresh/reopen reconnect without submit, finite status/copy, explicit
+  duplicate-cost retry acknowledgement, retained-result Project-authority refresh, and denial of
+  the legacy Project video-job path;
 - a no-provider Chromium journey from reusable Character selection through one Project semantic
   checkpoint, local edit/Render preview, explicit working-media adoption, and refresh, including
   denial of unexpected external HTTP and WebSocket traffic;

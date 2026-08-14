@@ -1,18 +1,21 @@
 import { useTheme } from '@emotion/react';
-import type { RefObject } from 'react';
+import { useState, type RefObject } from 'react';
 import type { VideoProcessingOperationCapability } from '@studio/contracts';
 import { Button } from '../../ui';
+import type { ProjectProcessingController } from '../projects/useProjectProcessingController';
 import type { SaveVideoState } from '../saved-videos/useSaveVideo';
 import {
   actionBarStyles,
   actionButtonsStyles,
   actionSummaryStyles,
 } from './ExistingVideoPanel.styles';
+import { ExistingVideoProjectProcessingActions } from './ExistingVideoProjectProcessingActions';
 import {
   existingVideoStepIsComplete,
   planSummary,
   visualToolLabel,
 } from './existingVideoPresentation';
+import { operationForModel } from './existingVideoWorkflowPolicy';
 import type { ExistingVideoWorkflow } from './useExistingVideoWorkflow';
 
 export interface ExistingVideoActionBarProps {
@@ -27,6 +30,7 @@ export interface ExistingVideoActionBarProps {
   readonly onSaveVideo?: () => void;
   readonly saveVideoState?: SaveVideoState;
   readonly providerStartBlockedReason?: string;
+  readonly projectProcessing?: ProjectProcessingController;
 }
 
 const readyActionLabel = (workflow: ExistingVideoWorkflow): string => {
@@ -54,8 +58,10 @@ export const ExistingVideoActionBar = ({
   onSaveVideo,
   saveVideoState = { status: 'idle' },
   providerStartBlockedReason,
+  projectProcessing,
 }: ExistingVideoActionBarProps) => {
   const theme = useTheme();
+  const [retryConfirmationOpen, setRetryConfirmationOpen] = useState(false);
   const step = workflow.steps[0];
   const plan = planSummary(workflow);
   const stepIncomplete = Boolean(
@@ -74,6 +80,27 @@ export const ExistingVideoActionBar = ({
     saveVideoState.status === 'saved' && saveVideoState.artifactId === workflow.result?.id;
   const providerBacked = Boolean(step || workflow.voiceSelection?.kind === 'elevenlabs');
   const providerStartBlocked = providerBacked ? providerStartBlockedReason : undefined;
+
+  const projectCapability = step ? operationForModel(step.modelId) : null;
+  const localVoiceOnly = step === undefined && workflow.voiceSelection?.kind === 'local';
+  if (
+    projectProcessing &&
+    !localVoiceOnly &&
+    (providerBacked || projectProcessing.attempt !== null)
+  ) {
+    return (
+      <ExistingVideoProjectProcessingActions
+        theme={theme}
+        workflow={workflow}
+        projectProcessing={projectProcessing}
+        projectCapability={projectCapability}
+        stepIncomplete={stepIncomplete}
+        visualUnavailable={visualUnavailable}
+        retryConfirmationOpen={retryConfirmationOpen}
+        onRetryConfirmationOpenChange={setRetryConfirmationOpen}
+      />
+    );
+  }
 
   if (workflow.phase === 'complete') {
     return (

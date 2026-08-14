@@ -244,20 +244,24 @@ focus return, reduced motion, and overlay stacking at every canonical viewport a
 
 ## Project processing integration boundary
 
-Prompt 09 adds server authority, not visible Project processing controls. In ordinary manual QA:
+Project Character Swap and Virtual Try On now expose recoverable Project Start/status controls. In
+ordinary no-provider manual QA:
 
-- open a source-bearing Project, configure Character Swap, VTO, and Voice, and confirm every
-  provider-backed Project Start remains disabled with truthful explanatory copy;
-- save/refresh the creative setup and confirm there is no processing submit/reconcile request,
-  provider SDK load, external request, new Saved Video, or automatic result presentation; and
-- confirm local Render preview and explicit working-media adoption retain their existing lifecycle
+- open a source-bearing Project, configure a visual treatment, save the setup, and confirm that
+  configuration/checkpointing alone creates no processing submit, provider SDK load, external
+  request, Saved Video, or output Version;
+- confirm Project provider Voice and advanced live starts remain disabled with reconnect-specific
+  explanatory copy, while standalone and local-Voice paths retain their existing behavior;
+- with visual provider capability unavailable, confirm the Project visual Start is disabled before
+  provider intent or HTTP; and
+- confirm local Render preview and explicit working-media adoption retain their separate lifecycle
   and do not create a Project processing attempt.
 
-The route-level pre-link, restart, ambiguity, explicit retry, archive blocking, stale-result
-retention, and current `job-result` behavior are deterministic fake-provider/database evidence.
-Do not turn them into paid manual work during ordinary QA. If a release specifically authorizes a
-live API-only Project attempt before Prompt 10 provides UI, use the additional gated procedure in
-[Live provider smoke](LIVE_PROVIDER_SMOKE.md) and record that the visible Project gate stayed intact.
+Queued reconnect, exact same-key response-loss replay, ambiguity, explicit duplicate-cost retry,
+archive blocking, stale-result retention, and current `job-result` presentation remain deterministic
+fake-provider/controller/database evidence in ordinary validation. Do not turn them into paid manual
+work. A specifically authorized live visual pass uses [Live provider smoke](LIVE_PROVIDER_SMOKE.md);
+each Start or retry requires separate approval.
 
 ## Accessibility
 

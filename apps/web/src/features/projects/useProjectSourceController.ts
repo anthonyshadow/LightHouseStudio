@@ -225,12 +225,17 @@ export const useProjectSourceController = (
 
   useEffect(() => {
     mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      runtime.clear(projectId);
+    };
+  }, [projectId, runtime]);
+
+  useEffect(() => {
     if (current.revision.snapshot.sourceAssetId === null) {
       hydratedMediaRef.current = null;
       runtime.clear(projectId);
-      return () => {
-        mountedRef.current = false;
-      };
+      return;
     }
     const mediaIdentity = JSON.stringify(current.revision.snapshot.presentedMedia);
     if (hydratedMediaRef.current === mediaIdentity) return;
@@ -257,9 +262,7 @@ export const useProjectSourceController = (
         if (controllerRef.current === controller) controllerRef.current = null;
       });
     return () => {
-      mountedRef.current = false;
       controller.abort('project-route-unmounted');
-      runtime.clear(projectId);
     };
   }, [
     current.revision.id,

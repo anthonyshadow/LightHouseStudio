@@ -188,7 +188,7 @@ export const useExistingVideoJobLifecycle = ({
       removeVideoJobStatus(queryClient, jobId);
       return finalizeVisual(
         blob,
-        blob.type || current.result.mimeType || 'video/mp4',
+        blob.type || current.result.mimeType,
         stepIndex,
         controller,
         generation,

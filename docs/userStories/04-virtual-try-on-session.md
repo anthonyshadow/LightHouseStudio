@@ -45,10 +45,10 @@ In a Project, the same Outfit/prompt/reference configuration can be checkpointed
 VTO. A saved-outfit checkpoint keeps the exact Outfit ID, label, revision, immutable reference,
 input kind, enhancement setting, applied prompt, provider binding, and resolution; a prompt-only or
 reference-image checkpoint does not fabricate an Outfit. Missing or changed owner-scoped resources
-retain historical labels and **Choose another**. Project provider-backed **Start Virtual Try-On**
-remains gated; the backend can now pre-link and recover an exact-revision queued attempt for Prompt
-10 to integrate, but configuration alone never invokes it. The standalone live and existing-video
-journeys retain their current explicit Start.
+retain historical labels and **Choose another**. Project **Start Virtual Try On** saves the exact
+setup and then uses the Project-bound command. It reconnects a queued attempt after reopen and never
+falls back to this advanced live session. Configuration alone never invokes it. The standalone live
+and existing-video journeys retain their current explicit Start.
 
 ## Guards and recovery
 
