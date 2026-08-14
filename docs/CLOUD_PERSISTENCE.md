@@ -1,7 +1,7 @@
 # PostgreSQL, Neon, Drizzle, and Cloudflare R2
 
 **Status:** implemented, configuration-gated infrastructure; local remains the default  
-**Reviewed:** 2026-08-13
+**Reviewed:** 2026-08-14
 
 This is the canonical setup, migration, rollback, and limitation guide for cloud persistence. It
 does not authorize public exposure: Elysia on Bun still binds only to `127.0.0.1`, and the seeded demo
@@ -75,6 +75,14 @@ account is not production identity or tenancy.
   claim timestamp before object cleanup, so one persistent failure cannot starve later stages.
 - Saved Video gallery pages select only the parent/current Version projection and one grouped
   Version count for the bounded page; they do not load every historical Version to form summaries.
+  An explicit detail read returns that one video's bounded immutable Version metadata for exact
+  selection. The gallery derives **Unassigned Content** from the absence of any Project output
+  relation; no row, backfill, or synthetic producer is created.
+- Project history reuses existing owner-constrained revision, processing-attempt, and output-link
+  indexes. Each category has an independent opaque cursor and metadata-only page. Exact output
+  metadata/content requires the same-owner Project/Version relation and may use retained tombstone
+  lineage without making the Saved Video globally visible. Prompt 12 adds no schema migration,
+  backfill, byte copy, or production migration action.
 - Additive migration `0017` adds only `processing_jobs(status, expires_at)` and
   `reference_images(updated_at)` indexes for expiry/activity scans. It rewrites no application
   records and is not applied automatically to production.

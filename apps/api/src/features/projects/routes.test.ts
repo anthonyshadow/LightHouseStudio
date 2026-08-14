@@ -497,6 +497,107 @@ describe('Project lifecycle routes', () => {
         currentVersion: { ordinal: 2, sourceVersionId: firstBody.savedVideo.currentVersion.id },
       },
     });
+    const appendBody = json<{
+      project: { version: number };
+      revision: { revisionNumber: number };
+      output: { videoVersionId: string };
+    }>(append);
+
+    const outputPage = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/outputs?pageSize=1`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(outputPage.statusCode).toBe(200);
+    expect(outputPage.json()).toMatchObject({
+      outputs: [
+        {
+          kind: 'saved-video-version',
+          output: { producingRevisionNumber: 3 },
+          version: { ordinal: 2 },
+          referenceRevision: { revisionNumber: 4 },
+          isCurrentForProject: true,
+          savedVideo: { libraryStatus: 'ready' },
+        },
+      ],
+    });
+    const outputCursor = json<{ nextCursor: string }>(outputPage).nextCursor;
+    const invalidOutputCursor = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/outputs?cursor=not-a-cursor`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(invalidOutputCursor.statusCode).toBe(400);
+    const olderOutputPage = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/outputs?pageSize=1&cursor=${encodeURIComponent(outputCursor)}`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(olderOutputPage.json()).toMatchObject({
+      outputs: [{ version: { ordinal: 1 }, isCurrentForProject: false }],
+      nextCursor: null,
+    });
+    const history = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/history?pageSize=2`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(history.statusCode).toBe(200);
+    expect(history.json()).toMatchObject({
+      revisions: [
+        { kind: 'project-change', revisionNumber: 4, source: 'output-save' },
+        { kind: 'project-change', revisionNumber: 3, source: 'output-save' },
+      ],
+    });
+    expect(history.body).not.toContain('snapshot');
+    const exactMetadata = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/outputs/${appendBody.output.videoVersionId}`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(exactMetadata.json()).toMatchObject({
+      version: { id: appendBody.output.videoVersionId, ordinal: 2 },
+      output: { producingRevisionNumber: 3 },
+      referenceRevision: { revisionNumber: 4 },
+    });
+
+    const standalone = await app.inject({
+      method: 'POST',
+      url: '/api/videos',
+      headers: {
+        ...browserHeaders,
+        'content-type': 'video/mp4',
+        'idempotency-key': randomUUID(),
+        'x-lightframe-video-metadata': encodeURIComponent(
+          JSON.stringify({
+            title: 'Legacy standalone',
+            origin: 'legacy-import',
+            characterName: null,
+            characterVariantName: null,
+            filename: 'legacy.mp4',
+            sourceVideoId: null,
+            sourceVersionId: null,
+          }),
+        ),
+      },
+      payload: fixture,
+    });
+    expect(standalone.statusCode).toBe(201);
+    const gallery = await app.inject({
+      method: 'GET',
+      url: '/api/videos?pageSize=20',
+      headers: { host: browserHeaders.host },
+    });
+    expect(
+      json<{ videos: Array<{ title: string; assignment: string }> }>(gallery).videos.map(
+        ({ title, assignment }) => ({ title, assignment }),
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        { title: 'Output master', assignment: 'project-output' },
+        { title: 'Legacy standalone', assignment: 'unassigned' },
+      ]),
+    );
 
     const ranged = await app.inject({
       method: 'GET',
@@ -523,6 +624,54 @@ describe('Project lifecycle routes', () => {
     });
     expect(retained.statusCode).toBe(200);
     expect(retained.rawPayload).toEqual(fixture);
+    const retainedMetadata = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/outputs/${firstBody.output.videoVersionId}`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(retainedMetadata.json()).toMatchObject({ savedVideo: { libraryStatus: 'removed' } });
+    const reuseRemovedVersion = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/working-media/reuse`,
+      headers: {
+        ...browserHeaders,
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: {
+        expectedVersion: appendBody.project.version,
+        expectedRevisionNumber: appendBody.revision.revisionNumber,
+        media: {
+          kind: 'saved-video-version',
+          savedVideoId: firstBody.output.savedVideoId,
+          videoVersionId: firstBody.output.videoVersionId,
+        },
+        localEdit: null,
+      },
+    });
+    expect(reuseRemovedVersion.statusCode).toBe(201);
+    expect(reuseRemovedVersion.json()).toMatchObject({
+      isCurrent: true,
+      media: {
+        kind: 'saved-video-version',
+        videoVersionId: firstBody.output.videoVersionId,
+      },
+      revision: { snapshot: { lastSuccessfulOutput: null } },
+    });
+    const download = await app.inject({
+      method: 'GET',
+      url: `${firstBody.contentUrl}?download=true`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(download.headers['content-disposition']).toMatch(/^attachment;/u);
+    const outputHead = await app.inject({
+      method: 'HEAD',
+      url: firstBody.contentUrl,
+      headers: { host: browserHeaders.host },
+    });
+    expect(outputHead.statusCode).toBe(200);
+    expect(outputHead.body).toBe('');
+    expect(outputHead.headers['content-length']).toBe(String(fixture.byteLength));
   });
 
   it('keeps pagination cursors filter-bound and create idempotency durable across app restart', async () => {
@@ -586,6 +735,18 @@ describe('Project lifecycle routes', () => {
       headers: { host: browserHeaders.host, cookie },
     });
     expect(isolated.statusCode).toBe(404);
+    const isolatedHistory = await authenticated.inject({
+      method: 'GET',
+      url: `/api/projects/${otherOwnerProject.current.project.id}/history`,
+      headers: { host: browserHeaders.host, cookie },
+    });
+    const isolatedOutputs = await authenticated.inject({
+      method: 'GET',
+      url: `/api/projects/${otherOwnerProject.current.project.id}/outputs`,
+      headers: { host: browserHeaders.host, cookie },
+    });
+    expect(isolatedHistory.statusCode).toBe(404);
+    expect(isolatedOutputs.statusCode).toBe(404);
     const untrusted = await authenticated.inject({
       method: 'POST',
       url: '/api/projects',

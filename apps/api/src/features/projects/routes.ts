@@ -4,6 +4,10 @@ import {
   createProjectRequestSchema,
   projectConflictResponseSchema,
   projectLifecycleRequestSchema,
+  projectHistoryQuerySchema,
+  projectHistoryResponseSchema,
+  projectOutputHistoryItemSchema,
+  projectOutputHistoryResponseSchema,
   projectOperationKeySchema,
   projectOutputVersionParamsSchema,
   projectSourceResponseSchema,
@@ -45,6 +49,7 @@ import type {
   ProjectOutputSaveMutationResult,
   ProjectOutputService,
 } from './project-output-service.js';
+import type { ProjectHistoryService } from './project-history-service.js';
 
 const header = (request: HttpRequest, name: string): string | undefined => {
   const value = request.headers[name];
@@ -147,7 +152,16 @@ const sendProjectMediaContent = (
   const filename = media.filename.replaceAll(/["\\\r\n]/gu, '_');
   reply.header('Accept-Ranges', 'bytes');
   reply.header('Content-Type', media.mimeType);
-  reply.header('Content-Disposition', `inline; filename="${filename}"`);
+  reply.header('X-Content-Type-Options', 'nosniff');
+  const download =
+    typeof request.query === 'object' &&
+    request.query !== null &&
+    'download' in request.query &&
+    request.query.download === 'true';
+  reply.header(
+    'Content-Disposition',
+    `${download ? 'attachment' : 'inline'}; filename="${filename}"`,
+  );
   if (range === null) {
     reply.header('Content-Length', size);
     return reply.send(media.asset.createReadStream());
@@ -195,6 +209,7 @@ export const registerProjectRoutes = (
   sourceService?: ProjectSourceService,
   workingMediaService?: ProjectWorkingMediaService,
   outputService?: ProjectOutputService,
+  historyService?: ProjectHistoryService,
 ): void => {
   app.get('/api/projects', async (request) => {
     const query = projectsQuerySchema.safeParse(request.query);
@@ -468,6 +483,52 @@ export const registerProjectRoutes = (
         mimeType: result.version.mimeType,
         filename: result.version.filename,
       });
+    });
+  }
+
+  if (historyService !== undefined) {
+    app.get('/api/projects/:projectId/history', async (request) => {
+      const params = projectParamsSchema.safeParse(request.params);
+      const query = projectHistoryQuerySchema.safeParse(request.query);
+      if (!params.success || !query.success) {
+        throw new AppError(400, 'validation_error', 'Use a valid Project history page.');
+      }
+      return projectHistoryResponseSchema.parse(
+        await historyService.revisions(
+          ownerUserIdForRequest(request),
+          params.data.projectId,
+          query.data,
+        ),
+      );
+    });
+
+    app.get('/api/projects/:projectId/outputs', async (request) => {
+      const params = projectParamsSchema.safeParse(request.params);
+      const query = projectHistoryQuerySchema.safeParse(request.query);
+      if (!params.success || !query.success) {
+        throw new AppError(400, 'validation_error', 'Use a valid Project output page.');
+      }
+      return projectOutputHistoryResponseSchema.parse(
+        await historyService.outputs(
+          ownerUserIdForRequest(request),
+          params.data.projectId,
+          query.data,
+        ),
+      );
+    });
+
+    app.get('/api/projects/:projectId/outputs/:videoVersionId', async (request) => {
+      const params = projectOutputVersionParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        throw new AppError(400, 'validation_error', 'Choose a valid Project output.');
+      }
+      return projectOutputHistoryItemSchema.parse(
+        await historyService.output(
+          ownerUserIdForRequest(request),
+          params.data.projectId,
+          params.data.videoVersionId,
+        ),
+      );
     });
   }
 

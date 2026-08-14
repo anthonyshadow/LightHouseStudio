@@ -311,6 +311,18 @@ export const listSavedVideos = (input: ListSavedVideosInput = {}): Promise<Saved
   );
 };
 
+export const getSavedVideo = (videoId: string, signal?: AbortSignal): Promise<SavedVideoDetail> =>
+  requestJson(
+    `/api/videos/${encodeURIComponent(videoId)}`,
+    {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+      ...(signal ? { signal } : {}),
+    },
+    savedVideoDetailSchema,
+    invalidResponse,
+  );
+
 export const renameSavedVideo = (videoId: string, title: string): Promise<SavedVideoDetail> =>
   requestJson(
     `/api/videos/${encodeURIComponent(videoId)}`,
@@ -338,8 +350,8 @@ export const savedVideoContentUrl = (videoId: string, versionId?: string): strin
     ? `/api/videos/${encodeURIComponent(videoId)}/versions/${encodeURIComponent(versionId)}/content`
     : `/api/videos/${encodeURIComponent(videoId)}/content`;
 
-export const downloadSavedVideoUrl = (videoId: string): string =>
-  `${savedVideoContentUrl(videoId)}?download=true`;
+export const downloadSavedVideoUrl = (videoId: string, versionId?: string): string =>
+  `${savedVideoContentUrl(videoId, versionId)}?download=true`;
 
 export const savedVideoThumbnailUrl = (videoId: string): string =>
   `/api/videos/${encodeURIComponent(videoId)}/thumbnail`;

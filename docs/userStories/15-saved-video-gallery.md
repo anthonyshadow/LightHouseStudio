@@ -3,7 +3,8 @@
 ## Story
 
 As the authenticated operator, I can save a finalized video, browse lightweight gallery records,
-download only from that gallery, and load a chosen version into the existing Studio stage.
+select and download an exact immutable Version, and load the current Version into the existing
+Studio stage.
 
 ## Observable behavior
 
@@ -35,7 +36,9 @@ download only from that gallery, and load a chosen version into the existing Stu
 6. Activating a ready thumbnail explicitly fetches owner-checked bytes into a centered video
    preview over a darkened gallery. The dialog traps focus, closes with Escape, returns focus to the
    thumbnail, and detaches its player source when closed; it owns no tracks, object URL, recorder,
-   or provider session.
+   or provider session. The dialog lists immutable Versions with ordinal, current marker, origin,
+   timestamp, media facts, and status. Selecting an older Version previews and downloads that exact
+   content without changing the Saved Video current pointer.
 7. **Use** fetches owner-checked bytes only after selection, validates them through the existing
    source path, and returns to the Studio stage/editor with saved video/version lineage.
 8. Rename changes metadata. Delete confirms, tombstones only the chosen record, and removes it from
@@ -44,7 +47,11 @@ download only from that gallery, and load a chosen version into the existing Stu
    private R2 selected, deletion removes only immutable-version and thumbnail objects that no
    Project output still retains. A tombstoned global record stays hidden, while an exact
    same-owner Project-retained Version remains available through Project-scoped content.
-   Download exists only in Saved Videos and uses an authenticated content response.
+   Download is available for the selected exact ready Version through an authenticated content
+   response. Project history may also download an exact Project-retained Version.
+9. A legacy or independently saved record with no trustworthy Project output relation is labeled
+   **Unassigned Content**, remains fully usable, and receives no fabricated producer. Later source
+   reuse records only truthful used-by lineage.
 
 ## Acceptance checks
 

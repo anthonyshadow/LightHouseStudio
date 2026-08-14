@@ -1,8 +1,8 @@
 # Lightframe Studio remaining MVP implementation sequence
 
-**Status:** active execution program; Prompt 07 implemented
+**Status:** active execution program; Prompt 12 implemented
 
-**Starts from:** Prompt 07 is complete; Prompt 08 is the next implementation boundary
+**Starts from:** Prompt 12 is complete; Prompt 13 is the next implementation boundary
 
 **Defined:** 2026-08-11
 
@@ -42,11 +42,11 @@ backfill.
 | 05 — implemented | Add optional lightweight Campaigns and safe Project membership without imposing Campaign creation on Quick Start.                                              |
 | 06 — implemented | Accept, hydrate, and resume one immutable durable video source for an open Project.                                                                            |
 | 07 — implemented | Add a URL-owned Project session, semantic autosave, conflict handling, and switch/exit protection without creative-tool integration.                           |
-| 08               | Integrate reusable creative intent, local editing, and one durable working-media adoption command while provider starts remain gated.                          |
-| 09               | Establish Project-bound processing authority, pre-submit correlation, recovery, ambiguity handling, and durable result retention without enabling UI starts.   |
-| 10               | Route Project Character Swap, VTO, and supported Voice actions through that authority with truthful reconnect/retry/stale-result UX.                           |
-| 11               | Save one exact immutable Video Version and Project output through crash-safe composite orchestration.                                                          |
-| 12               | Expose bounded Project/output history, legacy Unassigned Content, exact-Version reuse, and Download.                                                           |
+| 08 — implemented | Integrate reusable creative intent, local editing, and one durable working-media adoption command while provider starts remain gated.                          |
+| 09 — implemented | Establish Project-bound processing authority, pre-submit correlation, recovery, ambiguity handling, and durable result retention without enabling UI starts.   |
+| 10 — implemented | Route Project Character Swap, VTO, and supported Voice actions through that authority with truthful reconnect/retry/stale-result UX.                           |
+| 11 — implemented | Save one exact immutable Video Version and Project output through crash-safe composite orchestration.                                                          |
+| 12 — implemented | Expose bounded Project/output history, legacy Unassigned Content, exact-Version reuse, and Download.                                                           |
 | 13               | Complete navigation, accessibility, compatibility, acceptance coverage, and canonical documentation for the local MVP.                                         |
 
 ## Dependency map

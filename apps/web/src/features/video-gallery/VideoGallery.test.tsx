@@ -45,9 +45,15 @@ const video = (override: Partial<SavedVideoSummary> = {}): SavedVideoSummary => 
   sourceVideoId: null,
   versionCount: 1,
   thumbnailAvailable: true,
+  assignment: 'project-output',
   createdAt: '2026-08-05T12:00:00.000Z',
   updatedAt: '2026-08-05T12:00:00.000Z',
   ...override,
+});
+
+const detail = (summary: SavedVideoSummary, versions = [summary.currentVersion]) => ({
+  ...summary,
+  versions,
 });
 
 const page = (videos: readonly SavedVideoSummary[]) => ({
@@ -112,21 +118,71 @@ describe('VideoGallery', () => {
   it('opens a centered authenticated preview on thumbnail activation and restores focus on close', async () => {
     const item = video();
     mockGalleryPages({ '': page([item]) });
+    mockApiServer.use(jsonScenario('GET', `/api/videos/${item.id}`, { body: detail(item) }));
     renderGallery();
 
     const previewTrigger = await screen.findByRole('button', { name: 'Preview Morning take' });
     fireEvent.click(previewTrigger);
 
     const dialog = await screen.findByRole('dialog', { name: 'Morning take' });
-    expect(within(dialog).getByLabelText('Preview of Morning take')).toHaveAttribute(
+    expect(within(dialog).getByLabelText('Preview of Morning take, Version 1')).toHaveAttribute(
       'src',
-      `/api/videos/${item.id}/content`,
+      `/api/videos/${item.id}/versions/${item.currentVersion.id}/content`,
     );
     expect(within(dialog).getByText('1280×720')).toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: 'Escape' });
-    await waitFor(() => expect(screen.queryByLabelText('Preview of Morning take')).toBeNull());
+    await waitFor(() =>
+      expect(screen.queryByLabelText('Preview of Morning take, Version 1')).toBeNull(),
+    );
     await waitFor(() => expect(previewTrigger).toHaveFocus());
+  });
+
+  it('selects, previews, and downloads an exact older Version without using or changing current', async () => {
+    const current = video({
+      versionCount: 2,
+      currentVersion: {
+        ...video().currentVersion,
+        id: '3edb9c78-efb2-43a4-8074-acba56158245',
+        ordinal: 2,
+        sourceVersionId: video().currentVersion.id,
+        filename: 'morning-v2.mp4',
+        createdAt: '2026-08-06T12:00:00.000Z',
+      },
+    });
+    const older = video().currentVersion;
+    mockGalleryPages({ '': page([current]) });
+    mockApiServer.use(
+      jsonScenario('GET', `/api/videos/${current.id}`, {
+        body: detail(current, [older, current.currentVersion]),
+      }),
+    );
+    const onUse = renderGallery();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Preview Morning take' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Morning take' });
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Version 1' }));
+
+    expect(within(dialog).getByLabelText('Preview of Morning take, Version 1')).toHaveAttribute(
+      'src',
+      `/api/videos/${current.id}/versions/${older.id}/content`,
+    );
+    expect(within(dialog).getByText('Older Version')).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'Download' })).toHaveAttribute(
+      'href',
+      `/api/videos/${current.id}/versions/${older.id}/content?download=true`,
+    );
+    expect(within(dialog).queryByRole('button', { name: 'Load in Studio' })).toBeNull();
+    expect(onUse).not.toHaveBeenCalled();
+  });
+
+  it('labels legacy records as Unassigned Content without treating them as errors', async () => {
+    mockGalleryPages({ '': page([video({ assignment: 'unassigned' })]) });
+    renderGallery();
+
+    expect(await screen.findAllByText('Unassigned Content')).toHaveLength(2);
+    expect(screen.getByText(/no trustworthy producing Project/u)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('shows an actionable empty state', async () => {

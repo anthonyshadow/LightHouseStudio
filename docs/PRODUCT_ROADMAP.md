@@ -67,10 +67,11 @@ owns the detailed sequence and launch evidence.
 
 ## Phase 2 — Campaign and Project video workspace MVP
 
-**Status: in progress through atomic Project output save; invariant correction, lifecycle,
-Campaign organization, durable source/working media, creative checkpoints, Project-bound
-Character Swap/VTO result retention, and exact Saved Video/Video Version output linking are
-implemented. Bounded history and exact-Version delivery are next.**
+**Status: in progress through bounded Project history and exact-Version delivery; invariant
+correction, lifecycle, Campaign organization, durable source/working media, creative checkpoints,
+Project-bound Character Swap/VTO result retention, exact Saved Video/Video Version output linking,
+legacy Unassigned Content, and exact-Version preview/reuse/Download are implemented. MVP
+acceptance and hardening are next.**
 
 - Correct the dormant Project foundation's revision and media-reference lineage, transaction/replay,
   retention, status, read-bounding, and cleanup invariants before exposing writes.

@@ -292,6 +292,11 @@ export interface ProjectRepository {
     readonly receipt: ProjectCreateReceipt;
   }): Promise<ProjectCreatePersistenceResult>;
   getCurrent(ownerUserId: string, projectId: string): Promise<ProjectCurrentRead | null>;
+  getRevision(
+    ownerUserId: string,
+    projectId: string,
+    revisionNumber: number,
+  ): Promise<ProjectRevision | null>;
   getCurrentWithSource(
     ownerUserId: string,
     projectId: string,
@@ -345,4 +350,8 @@ export interface ProjectRepository {
     projectId: string,
     videoVersionId: string,
   ): Promise<ProjectOutputLink | null>;
+  assignedSavedVideoIds(
+    ownerUserId: string,
+    savedVideoIds: readonly string[],
+  ): Promise<ReadonlySet<string>>;
 }
