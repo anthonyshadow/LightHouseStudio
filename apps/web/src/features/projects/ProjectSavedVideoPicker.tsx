@@ -4,6 +4,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import type { RefObject } from 'react';
 import { listSavedVideos } from '../../adapters/api-client/savedVideosApi';
 import { Button, OverlayPanel, StatusNotice } from '../../ui';
+import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 
 export const ProjectSavedVideoPicker = ({
   open,
@@ -11,16 +12,26 @@ export const ProjectSavedVideoPicker = ({
   returnFocusRef,
   onClose,
   onSelect,
+  title = 'Use Saved Video',
+  description = "Choose one exact active Version as this Project's immutable original. The stored bytes are referenced, not copied.",
+  emptyTitle = 'No Saved Videos yet',
+  emptyBody = 'Save a video in Studio first, or use Upload or Record for this Project.',
+  listLabel = 'Saved Videos available as a Project source',
 }: {
   readonly open: boolean;
   readonly busy: boolean;
   readonly returnFocusRef: RefObject<HTMLElement | null>;
   readonly onClose: () => void;
   readonly onSelect: (video: SavedVideoSummary) => void;
+  readonly title?: string;
+  readonly description?: string;
+  readonly emptyTitle?: string;
+  readonly emptyBody?: string;
+  readonly listLabel?: string;
 }) => {
   const theme = useTheme();
   const query = useInfiniteQuery({
-    queryKey: ['project-source', 'saved-videos'],
+    queryKey: savedVideoQueryKeys.lists,
     queryFn: ({ pageParam, signal }) =>
       listSavedVideos({ sort: 'latest', ...(pageParam ? { cursor: pageParam } : {}), signal }),
     initialPageParam: null as string | null,
@@ -33,8 +44,8 @@ export const ProjectSavedVideoPicker = ({
     <OverlayPanel
       open={open}
       onClose={onClose}
-      title="Use Saved Video"
-      description="Choose one exact active Version as this Project's immutable original. The stored bytes are referenced, not copied."
+      title={title}
+      description={description}
       placement="bottom"
       size="wide"
       bodyMode="scroll"
@@ -52,13 +63,13 @@ export const ProjectSavedVideoPicker = ({
         </StatusNotice>
       ) : null}
       {!query.isPending && !query.isError && videos.length === 0 ? (
-        <StatusNotice tone="neutral" title="No Saved Videos yet">
-          Save a video in Studio first, or use Upload or Record for this Project.
+        <StatusNotice tone="neutral" title={emptyTitle}>
+          {emptyBody}
         </StatusNotice>
       ) : null}
       {videos.length > 0 ? (
         <ul
-          aria-label="Saved Videos available as a Project source"
+          aria-label={listLabel}
           css={{
             display: 'grid',
             gap: theme.space.sm,

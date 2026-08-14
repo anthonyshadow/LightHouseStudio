@@ -1,22 +1,9 @@
 import type {
   ProjectAssetLink,
-  ProjectMediaReference,
   ProjectRevision,
   ProjectVersionReferenceLink,
 } from '@studio/domain';
-
-export const projectMediaReferencesEqual = (
-  left: ProjectMediaReference | null,
-  right: ProjectMediaReference | null,
-): boolean => {
-  if (left === null || right === null) return left === right;
-  if (left.kind === 'asset') return right.kind === 'asset' && left.assetId === right.assetId;
-  return (
-    right.kind === 'saved-video-version' &&
-    left.savedVideoId === right.savedVideoId &&
-    left.videoVersionId === right.videoVersionId
-  );
-};
+export { projectMediaReferencesEqual } from '@studio/domain';
 
 export const projectAssetLinksForRevision = (
   revision: ProjectRevision,

@@ -1,6 +1,7 @@
 import {
   type InspectedVideo,
   inspectedVideoSchema,
+  projectOutputSaveResultSchema,
   projectProcessingCapabilitySchema,
   projectSnapshotSchema,
   videoJobErrorCodeSchema,
@@ -31,6 +32,9 @@ import type {
   ProjectLinkHistoryKind,
   ProjectLinkHistoryPage,
   ProjectLinkMutationResult,
+  ProjectOutputMetadataCommitResult,
+  ProjectOutputMetadataUnitOfWork,
+  ProjectOutputOperationReceipt,
   ProjectPersistenceMutationResult,
   ProjectRepository,
   ProjectRevisionHistoryPage,
@@ -42,6 +46,15 @@ import type {
   ProjectWorkingMediaRead,
   ProjectWorkingMediaRecord,
 } from '../../features/projects/project-repository.js';
+import type {
+  StoredSavedVideoAggregate,
+  StoredVideoVersion,
+} from '../../features/saved-videos/saved-video-repository.js';
+import {
+  storedSavedVideoAggregateSchema,
+  storedVideoVersionSchema,
+} from '../../features/saved-videos/saved-video-repository.js';
+import { savedVideoValues, savedVideoVersionValues } from './saved-video-repository.js';
 import type { StoredAssetManifest } from '../../storage/asset-byte-store.js';
 import {
   projectProcessingAttemptMatchesTrace,
@@ -86,6 +99,7 @@ import {
   projectAssets,
   projectJobs,
   projectOperationReceipts,
+  projectOutputOperationReceipts,
   projectOutputs,
   projectRevisions,
   projectSources,
@@ -99,6 +113,7 @@ import {
 type DatabaseExecutor = Parameters<Parameters<LightframeDatabase['transaction']>[0]>[0];
 type ProjectJobRow = typeof projectJobs.$inferSelect;
 type ProjectOutputRow = typeof projectOutputs.$inferSelect;
+type ProjectOutputReceiptRow = typeof projectOutputOperationReceipts.$inferSelect;
 type ProcessingJobRow = typeof processingJobs.$inferSelect;
 type CurrentProjectRow = {
   readonly project: typeof projects.$inferSelect;
@@ -441,7 +456,21 @@ const replayOrRelationConflict = <Row>(
         conflict: { kind: 'relation-mismatch', projectId, relation },
       };
 
-export class DrizzleProjectRepository implements ProjectRepository, ProjectProcessingRepository {
+const toProjectOutputReceipt = (row: ProjectOutputReceiptRow): ProjectOutputOperationReceipt => ({
+  operationId: row.operationId,
+  requestFingerprint: row.requestFingerprint,
+  projectId: row.projectId,
+  savedVideoId: row.savedVideoId,
+  videoVersionId: row.videoVersionId,
+  resultRevisionId: row.resultRevisionId,
+  resultRevisionNumber: row.resultRevisionNumber,
+  result: projectOutputSaveResultSchema.parse(row.result),
+  createdAt: toIsoTimestamp(row.createdAt),
+});
+
+export class DrizzleProjectRepository
+  implements ProjectRepository, ProjectProcessingRepository, ProjectOutputMetadataUnitOfWork
+{
   constructor(private readonly db: LightframeDatabase) {}
 
   async #processingAttempt(
@@ -2640,6 +2669,388 @@ export class DrizzleProjectRepository implements ProjectRepository, ProjectProce
     });
   }
 
+  async findReceipt(
+    ownerUserId: string,
+    operationId: string,
+  ): Promise<ProjectOutputOperationReceipt | null> {
+    const [row] = await this.db
+      .select()
+      .from(projectOutputOperationReceipts)
+      .where(
+        and(
+          eq(projectOutputOperationReceipts.ownerUserId, ownerUserId),
+          eq(projectOutputOperationReceipts.operationId, operationId),
+        ),
+      )
+      .limit(1);
+    return row === undefined ? null : toProjectOutputReceipt(row);
+  }
+
+  async commit(
+    input: Parameters<ProjectOutputMetadataUnitOfWork['commit']>[0],
+  ): Promise<ProjectOutputMetadataCommitResult> {
+    const receipt: ProjectOutputOperationReceipt = {
+      ...input.receipt,
+      result: projectOutputSaveResultSchema.parse(input.receipt.result),
+    };
+    return this.db.transaction(async (tx) => {
+      const [priorRow] = await tx
+        .select()
+        .from(projectOutputOperationReceipts)
+        .where(
+          and(
+            eq(projectOutputOperationReceipts.ownerUserId, input.ownerUserId),
+            eq(projectOutputOperationReceipts.operationId, receipt.operationId),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (priorRow !== undefined) {
+        const prior = toProjectOutputReceipt(priorRow);
+        return prior.requestFingerprint === receipt.requestFingerprint &&
+          prior.projectId === receipt.projectId
+          ? { kind: 'replayed', receipt: prior }
+          : {
+              kind: 'conflict',
+              conflict: { kind: 'operation-key', operation: 'output-save' },
+            };
+      }
+
+      const [current] = await tx
+        .select()
+        .from(projects)
+        .where(
+          and(
+            eq(projects.id, input.projectRevision.projectId),
+            eq(projects.ownerUserId, input.ownerUserId),
+            isNull(projects.deletedAt),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (current === undefined) return { kind: 'not-found' } as const;
+      // A competing operation may have committed while this transaction waited for the Project
+      // lock. Re-read the receipt before interpreting the now-advanced Project CAS as a conflict.
+      const [receiptAfterProjectLock] = await tx
+        .select()
+        .from(projectOutputOperationReceipts)
+        .where(
+          and(
+            eq(projectOutputOperationReceipts.ownerUserId, input.ownerUserId),
+            eq(projectOutputOperationReceipts.operationId, receipt.operationId),
+          ),
+        )
+        .limit(1);
+      if (receiptAfterProjectLock !== undefined) {
+        const prior = toProjectOutputReceipt(receiptAfterProjectLock);
+        return prior.requestFingerprint === receipt.requestFingerprint &&
+          prior.projectId === receipt.projectId
+          ? { kind: 'replayed', receipt: prior }
+          : {
+              kind: 'conflict',
+              conflict: { kind: 'operation-key', operation: 'output-save' },
+            };
+      }
+      if (current.version !== input.projectRevision.expectedVersion) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'project-version',
+            projectId: current.id,
+            expectedVersion: input.projectRevision.expectedVersion,
+            actualVersion: current.version,
+          },
+        } as const;
+      }
+      if (current.currentRevisionNumber !== input.projectRevision.expectedRevisionNumber) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'revision',
+            projectId: current.id,
+            expectedRevisionNumber: input.projectRevision.expectedRevisionNumber,
+            actualRevisionNumber: current.currentRevisionNumber,
+          },
+        } as const;
+      }
+
+      let savedVideoId: string;
+      let version: StoredVideoVersion;
+      let createAggregate: StoredSavedVideoAggregate | null = null;
+      let appendCurrent: typeof savedVideos.$inferSelect | null = null;
+      if (input.savedVideo.kind === 'create') {
+        createAggregate = storedSavedVideoAggregateSchema.parse(input.savedVideo.aggregate);
+        version = createAggregate.versions[0]!;
+        savedVideoId = createAggregate.video.id;
+        if (
+          createAggregate.versions.length !== 1 ||
+          createAggregate.video.ownerUserId !== input.ownerUserId ||
+          createAggregate.video.currentVersionId !== version.id ||
+          createAggregate.video.status !== 'ready' ||
+          createAggregate.video.deletedAt !== null ||
+          createAggregate.revision !== 1 ||
+          version.ownerUserId !== input.ownerUserId ||
+          version.videoId !== savedVideoId ||
+          version.ordinal !== 1
+        ) {
+          throw new ProjectPersistenceError(
+            'invalid-aggregate',
+            'The Project output Saved Video create is inconsistent.',
+          );
+        }
+      } else {
+        version = storedVideoVersionSchema.parse(input.savedVideo.version);
+        savedVideoId = input.savedVideo.videoId;
+        const [target] = await tx
+          .select()
+          .from(savedVideos)
+          .where(
+            and(
+              eq(savedVideos.id, savedVideoId),
+              eq(savedVideos.ownerUserId, input.ownerUserId),
+              isNull(savedVideos.deletedAt),
+            ),
+          )
+          .for('update')
+          .limit(1);
+        if (target === undefined) return { kind: 'not-found' } as const;
+        if (target.currentVersionId !== input.savedVideo.expectedVersionId) {
+          return {
+            kind: 'conflict',
+            conflict: {
+              kind: 'saved-video-version',
+              savedVideoId,
+              expectedVersionId: input.savedVideo.expectedVersionId,
+              actualVersionId: target.currentVersionId,
+            },
+          } as const;
+        }
+        const [currentVersion] = await tx
+          .select({ ordinal: videoVersions.ordinal })
+          .from(videoVersions)
+          .where(
+            and(
+              eq(videoVersions.videoId, savedVideoId),
+              eq(videoVersions.ownerUserId, input.ownerUserId),
+              eq(videoVersions.id, target.currentVersionId),
+            ),
+          )
+          .for('share')
+          .limit(1);
+        if (
+          currentVersion === undefined ||
+          version.videoId !== savedVideoId ||
+          version.ownerUserId !== input.ownerUserId ||
+          version.sourceVersionId !== input.savedVideo.expectedVersionId ||
+          version.ordinal !== currentVersion.ordinal + 1
+        ) {
+          throw new ProjectPersistenceError(
+            'invalid-aggregate',
+            'The Project output Version append is inconsistent.',
+          );
+        }
+        appendCurrent = target;
+      }
+
+      const revision: ProjectRevision = {
+        ...input.projectRevision.revision,
+        snapshot: projectSnapshotSchema.parse(input.projectRevision.revision.snapshot),
+      };
+      const output = input.output;
+      const nextProject = input.projectRevision.nextProject;
+      const validNextState =
+        current.archivedAt === null &&
+        receipt.projectId === current.id &&
+        receipt.savedVideoId === savedVideoId &&
+        receipt.videoVersionId === version.id &&
+        receipt.resultRevisionId === revision.id &&
+        receipt.resultRevisionNumber === revision.revisionNumber &&
+        receipt.result.project.version === nextProject.version &&
+        receipt.result.revision.id === revision.id &&
+        receipt.result.output.videoVersionId === version.id &&
+        receipt.result.savedVideo.currentVersion.id === version.id &&
+        nextProject.id === current.id &&
+        nextProject.ownerUserId === current.ownerUserId &&
+        nextProject.version === current.version + 1 &&
+        nextProject.status === 'completed' &&
+        nextProject.currentRevisionId === revision.id &&
+        nextProject.currentRevisionNumber === revision.revisionNumber &&
+        revision.projectId === current.id &&
+        revision.ownerUserId === current.ownerUserId &&
+        revision.parentRevisionId === current.currentRevisionId &&
+        revision.parentRevisionNumber === current.currentRevisionNumber &&
+        revision.revisionNumber === current.currentRevisionNumber + 1 &&
+        revision.source === 'output-save' &&
+        output.projectId === current.id &&
+        output.ownerUserId === current.ownerUserId &&
+        output.savedVideoId === savedVideoId &&
+        output.videoVersionId === version.id &&
+        output.producingRevisionId === current.currentRevisionId &&
+        output.producingRevisionNumber === current.currentRevisionNumber &&
+        input.media.projectId === current.id &&
+        input.media.ownerUserId === current.ownerUserId &&
+        input.media.kind === 'saved-video-version' &&
+        input.media.assetId === version.assetId &&
+        input.media.savedVideoId === savedVideoId &&
+        input.media.videoVersionId === version.id &&
+        input.media.adoptedRevisionId === revision.id &&
+        input.media.adoptedRevisionNumber === revision.revisionNumber &&
+        input.media.operationKey === receipt.operationId &&
+        input.media.requestFingerprint === receipt.requestFingerprint &&
+        projectMediaReferencesEqual(input.media.mediaReference, revision.snapshot.workingMedia) &&
+        projectMediaReferencesEqual(input.media.mediaReference, revision.snapshot.presentedMedia) &&
+        revision.snapshot.lastSuccessfulOutput?.savedVideoId === savedVideoId &&
+        revision.snapshot.lastSuccessfulOutput.videoVersionId === version.id;
+      if (!validNextState) {
+        throw new ProjectPersistenceError(
+          'invalid-aggregate',
+          'The Project output transaction does not continue the locked aggregate.',
+        );
+      }
+      assertRevisionAssetLinks(revision, input.projectRevision.assetLinks);
+      const [asset] = await tx
+        .select({
+          id: mediaAssets.id,
+          status: mediaAssets.status,
+          mimeType: mediaAssets.mimeType,
+          filename: mediaAssets.filename,
+          sizeBytes: mediaAssets.sizeBytes,
+          checksumSha256: mediaAssets.checksumSha256,
+        })
+        .from(mediaAssets)
+        .where(
+          and(eq(mediaAssets.id, version.assetId), eq(mediaAssets.ownerUserId, input.ownerUserId)),
+        )
+        .for('share')
+        .limit(1);
+      if (
+        asset === undefined ||
+        asset.status !== 'ready' ||
+        asset.mimeType !== version.mimeType ||
+        asset.filename !== version.filename ||
+        asset.sizeBytes !== version.sizeBytes ||
+        input.media.assetId !== version.assetId ||
+        input.media.mimeType !== version.mimeType ||
+        input.media.filename !== version.filename ||
+        input.media.sizeBytes !== version.sizeBytes ||
+        input.media.checksumSha256 !== asset.checksumSha256 ||
+        input.media.durationMs !== version.durationMs ||
+        input.media.width !== version.width ||
+        input.media.height !== version.height
+      ) {
+        throw new ProjectPersistenceError(
+          'asset-not-ready',
+          'The exact Project output bytes are missing, unready, or changed.',
+        );
+      }
+
+      const insertedReceipt = await tx
+        .insert(projectOutputOperationReceipts)
+        .values({
+          ownerUserId: input.ownerUserId,
+          operationId: receipt.operationId,
+          requestFingerprint: receipt.requestFingerprint,
+          projectId: receipt.projectId,
+          savedVideoId: receipt.savedVideoId,
+          videoVersionId: receipt.videoVersionId,
+          resultRevisionId: receipt.resultRevisionId,
+          resultRevisionNumber: receipt.resultRevisionNumber,
+          result: receipt.result,
+          createdAt: toIsoTimestamp(receipt.createdAt),
+        })
+        .onConflictDoNothing({
+          target: [
+            projectOutputOperationReceipts.ownerUserId,
+            projectOutputOperationReceipts.operationId,
+          ],
+        })
+        .returning({ operationId: projectOutputOperationReceipts.operationId });
+      if (insertedReceipt.length === 0) {
+        const [racedRow] = await tx
+          .select()
+          .from(projectOutputOperationReceipts)
+          .where(
+            and(
+              eq(projectOutputOperationReceipts.ownerUserId, input.ownerUserId),
+              eq(projectOutputOperationReceipts.operationId, receipt.operationId),
+            ),
+          )
+          .limit(1);
+        if (racedRow === undefined) {
+          throw new ProjectPersistenceError(
+            'invalid-aggregate',
+            'The Project output receipt race could not be reconciled.',
+          );
+        }
+        const raced = toProjectOutputReceipt(racedRow);
+        return raced.requestFingerprint === receipt.requestFingerprint &&
+          raced.projectId === receipt.projectId
+          ? { kind: 'replayed', receipt: raced }
+          : {
+              kind: 'conflict',
+              conflict: { kind: 'operation-key', operation: 'output-save' },
+            };
+      }
+
+      if (createAggregate !== null) {
+        await tx.insert(savedVideos).values(savedVideoValues(createAggregate));
+      }
+      await tx.insert(videoVersions).values(savedVideoVersionValues(version));
+      if (appendCurrent !== null) {
+        await tx
+          .update(savedVideos)
+          .set({
+            currentVersionId: version.id,
+            status: 'ready',
+            revision: appendCurrent.revision + 1,
+            updatedAt: toIsoTimestamp(version.createdAt),
+          })
+          .where(
+            and(
+              eq(savedVideos.id, appendCurrent.id),
+              eq(savedVideos.ownerUserId, appendCurrent.ownerUserId),
+            ),
+          );
+      }
+      await tx.insert(projectOutputs).values({
+        projectId: output.projectId,
+        ownerUserId: output.ownerUserId,
+        savedVideoId: output.savedVideoId,
+        videoVersionId: output.videoVersionId,
+        producingRevisionId: output.producingRevisionId,
+        producingRevisionNumber: output.producingRevisionNumber,
+        createdAt: toIsoTimestamp(output.createdAt),
+      });
+      const versionReferenceLinks = projectVersionReferenceLinksForRevision(revision);
+      await assertReadyAssets(tx, input.ownerUserId, input.projectRevision.assetLinks);
+      await assertReadyVersionReferences(tx, input.ownerUserId, versionReferenceLinks);
+      await assertLastSuccessfulOutput(tx, revision);
+      await tx.insert(projectRevisions).values(revisionValues(revision));
+      if (input.projectRevision.assetLinks.length > 0) {
+        await tx
+          .insert(projectAssets)
+          .values(input.projectRevision.assetLinks.map(assetLinkValues));
+      }
+      if (versionReferenceLinks.length > 0) {
+        await tx
+          .insert(projectVersionReferences)
+          .values(versionReferenceLinks.map(versionReferenceValues));
+      }
+      await tx.insert(projectWorkingMediaAdoptions).values(projectWorkingMediaValues(input.media));
+      await tx
+        .update(projects)
+        .set({
+          status: nextProject.status,
+          version: nextProject.version,
+          currentRevisionId: nextProject.currentRevisionId,
+          currentRevisionNumber: nextProject.currentRevisionNumber,
+          updatedAt: toIsoTimestamp(nextProject.updatedAt),
+        })
+        .where(and(eq(projects.id, current.id), eq(projects.ownerUserId, current.ownerUserId)));
+      return { kind: 'committed', receipt };
+    });
+  }
+
   async linkJob(link: ProjectJobLink): Promise<ProjectLinkMutationResult> {
     return this.db.transaction(async (tx) => {
       const [projectRow] = await tx
@@ -2806,5 +3217,34 @@ export class DrizzleProjectRepository implements ProjectRepository, ProjectProce
         .limit(1);
       return replayOrRelationConflict(raced, exact, link.projectId, 'output');
     });
+  }
+
+  async getOutput(
+    ownerUserId: string,
+    projectId: string,
+    videoVersionId: string,
+  ): Promise<ProjectOutputLink | null> {
+    const [row] = await this.db
+      .select()
+      .from(projectOutputs)
+      .where(
+        and(
+          eq(projectOutputs.ownerUserId, ownerUserId),
+          eq(projectOutputs.projectId, projectId),
+          eq(projectOutputs.videoVersionId, videoVersionId),
+        ),
+      )
+      .limit(1);
+    return row === undefined
+      ? null
+      : {
+          projectId: row.projectId,
+          ownerUserId: row.ownerUserId,
+          savedVideoId: row.savedVideoId,
+          videoVersionId: row.videoVersionId,
+          producingRevisionId: row.producingRevisionId,
+          producingRevisionNumber: row.producingRevisionNumber,
+          createdAt: toIsoTimestamp(row.createdAt),
+        };
   }
 }

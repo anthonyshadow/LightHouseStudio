@@ -5,11 +5,14 @@ import {
   projectConflictResponseSchema,
   projectLifecycleRequestSchema,
   projectOperationKeySchema,
+  projectOutputVersionParamsSchema,
   projectSourceResponseSchema,
   projectSourceUploadMetadataSchema,
   projectWorkingMediaParamsSchema,
   projectWorkingMediaResponseSchema,
   projectWorkingMediaUploadMetadataSchema,
+  saveProjectOutputRequestSchema,
+  saveProjectOutputResponseSchema,
   reuseProjectSourceRequestSchema,
   moveProjectCampaignRequestSchema,
   projectParamsSchema,
@@ -27,6 +30,7 @@ import type {
 import { ownerUserIdForRequest } from '../../http/authentication.js';
 import { AppError } from '../../http/app-error.js';
 import { isSpooledAudioUpload } from '../../application/spooled-upload.js';
+import type { AssetReadHandle } from '../../storage/asset-byte-store.js';
 import { contentRangeHeaders, parseByteRange } from '../saved-videos/byte-range.js';
 import type { ProjectService, ProjectServiceMutationResult } from './project-service.js';
 import type {
@@ -37,6 +41,10 @@ import type {
   ProjectWorkingMediaMutationResult,
   ProjectWorkingMediaService,
 } from './project-working-media-service.js';
+import type {
+  ProjectOutputSaveMutationResult,
+  ProjectOutputService,
+} from './project-output-service.js';
 
 const header = (request: HttpRequest, name: string): string | undefined => {
   const value = request.headers[name];
@@ -59,6 +67,7 @@ const operationKeyConflictMessages = {
   'source-accept': 'That source operation was already used for a different Project source request.',
   'working-media-adopt':
     'That working-media operation was already used for different media or edit settings.',
+  'output-save': 'That Idempotency-Key was already used for a different Project output save.',
 } satisfies Record<
   Extract<ProjectConflict, { readonly kind: 'operation-key' }>['operation'],
   string
@@ -80,6 +89,8 @@ const conflictMessage = (conflict: ProjectConflict): string => {
       return 'Choose an active Campaign you can access, or detach the Project.';
     case 'immutable-source':
       return 'This Project already has its immutable original. Start a new Project for a different source.';
+    case 'saved-video-version':
+      return 'The selected Saved Video changed. Confirm its current Version before adding another.';
   }
 };
 
@@ -107,6 +118,45 @@ const sendReplayableMutation = (
       conflict: result.conflict,
     }),
   );
+};
+
+const sendProjectOutputMutation = (reply: HttpReply, result: ProjectOutputSaveMutationResult) => {
+  if (result.ok) {
+    if (!result.response.replayed) reply.status(201);
+    return saveProjectOutputResponseSchema.parse(result.response);
+  }
+  return reply.status(409).send(
+    projectConflictResponseSchema.parse({
+      error: { code: 'conflict', message: conflictMessage(result.conflict) },
+      conflict: result.conflict,
+    }),
+  );
+};
+
+const sendProjectMediaContent = (
+  request: HttpRequest,
+  reply: HttpReply,
+  media: {
+    readonly asset: AssetReadHandle;
+    readonly mimeType: string;
+    readonly filename: string;
+  },
+) => {
+  const size = media.asset.manifest.sizeBytes;
+  const range = parseByteRange(header(request, 'range'), size);
+  const filename = media.filename.replaceAll(/["\\\r\n]/gu, '_');
+  reply.header('Accept-Ranges', 'bytes');
+  reply.header('Content-Type', media.mimeType);
+  reply.header('Content-Disposition', `inline; filename="${filename}"`);
+  if (range === null) {
+    reply.header('Content-Length', size);
+    return reply.send(media.asset.createReadStream());
+  }
+  const headers = contentRangeHeaders(range, size);
+  reply.status(206);
+  reply.header('Content-Range', headers.contentRange);
+  reply.header('Content-Length', headers.contentLength);
+  return reply.send(media.asset.createReadStream(range));
 };
 
 const parseUploadMetadata = <Output>(
@@ -144,6 +194,7 @@ export const registerProjectRoutes = (
   service: ProjectService | undefined,
   sourceService?: ProjectSourceService,
   workingMediaService?: ProjectWorkingMediaService,
+  outputService?: ProjectOutputService,
 ): void => {
   app.get('/api/projects', async (request) => {
     const query = projectsQuerySchema.safeParse(request.query);
@@ -276,21 +327,11 @@ export const registerProjectRoutes = (
         ownerUserIdForRequest(request),
         params.data.projectId,
       );
-      const size = result.asset.manifest.sizeBytes;
-      const range = parseByteRange(header(request, 'range'), size);
-      const filename = result.source.filename.replaceAll(/["\\\r\n]/gu, '_');
-      reply.header('Accept-Ranges', 'bytes');
-      reply.header('Content-Type', result.source.mimeType);
-      reply.header('Content-Disposition', `inline; filename="${filename}"`);
-      if (range === null) {
-        reply.header('Content-Length', size);
-        return reply.send(result.asset.createReadStream());
-      }
-      const headers = contentRangeHeaders(range, size);
-      reply.status(206);
-      reply.header('Content-Range', headers.contentRange);
-      reply.header('Content-Length', headers.contentLength);
-      return reply.send(result.asset.createReadStream(range));
+      return sendProjectMediaContent(request, reply, {
+        asset: result.asset,
+        mimeType: result.source.mimeType,
+        filename: result.source.filename,
+      });
     });
   }
 
@@ -380,23 +421,54 @@ export const registerProjectRoutes = (
           params.data.projectId,
           params.data.revisionId,
         );
-        const size = result.asset.manifest.sizeBytes;
-        const range = parseByteRange(header(request, 'range'), size);
-        const filename = result.media.filename.replaceAll(/["\\\r\n]/gu, '_');
-        reply.header('Accept-Ranges', 'bytes');
-        reply.header('Content-Type', result.media.mimeType);
-        reply.header('Content-Disposition', `inline; filename="${filename}"`);
-        if (range === null) {
-          reply.header('Content-Length', size);
-          return reply.send(result.asset.createReadStream());
-        }
-        const headers = contentRangeHeaders(range, size);
-        reply.status(206);
-        reply.header('Content-Range', headers.contentRange);
-        reply.header('Content-Length', headers.contentLength);
-        return reply.send(result.asset.createReadStream(range));
+        return sendProjectMediaContent(request, reply, {
+          asset: result.asset,
+          mimeType: result.media.mimeType,
+          filename: result.media.filename,
+        });
       },
     );
+  }
+
+  if (outputService !== undefined) {
+    app.post('/api/projects/:projectId/outputs', async (request, reply) => {
+      const params = projectParamsSchema.safeParse(request.params);
+      const operationId = projectOperationKeySchema.safeParse(header(request, 'idempotency-key'));
+      const body = saveProjectOutputRequestSchema.safeParse(request.body);
+      if (!params.success || !operationId.success || !body.success) {
+        throw new AppError(
+          400,
+          'validation_error',
+          'Provide the exact current Project media, an explicit save target, and a UUID Idempotency-Key.',
+        );
+      }
+      return sendProjectOutputMutation(
+        reply,
+        await outputService.save(
+          ownerUserIdForRequest(request),
+          params.data.projectId,
+          operationId.data,
+          body.data,
+        ),
+      );
+    });
+
+    app.get('/api/projects/:projectId/outputs/:videoVersionId/content', async (request, reply) => {
+      const params = projectOutputVersionParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        throw new AppError(400, 'validation_error', 'Choose a valid Project output.');
+      }
+      const result = await outputService.content(
+        ownerUserIdForRequest(request),
+        params.data.projectId,
+        params.data.videoVersionId,
+      );
+      return sendProjectMediaContent(request, reply, {
+        asset: result.asset,
+        mimeType: result.version.mimeType,
+        filename: result.version.filename,
+      });
+    });
   }
 
   app.patch('/api/projects/:projectId', async (request, reply) => {

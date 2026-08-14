@@ -77,6 +77,7 @@ primary flows in [user stories](userStories/README.md) and complete every applic
 | `local-voice`                  | Warm/Clear/Robot always start from immutable original; success/cancel/failure preserves a valid take                                                                                                                                                                       |
 | `elevenlabs-voice`             | Saved browse/preview sends no take; Apply sends only original sidecar; remux/original recovery works                                                                                                                                                                       |
 | `gallery-download-playback`    | Save leaves review intact and enables Release; Saved Videos download produces an MP4 with H.264 and AAC when audio exists                                                                                                                                                  |
+| `project-output-save`          | Ready Project media saves as a new Saved Video or, after separate target selection and confirmation, one immutable added Version; refresh after response loss reconciles without duplication                                                                               |
 | `background-foreground`        | Background/foreground, screen lock/call/device interruption recovers safely or finalizes without take loss                                                                                                                                                                 |
 | `memory-checkpoints`           | Complete [300-second memory protocol](RECORDING_MEMORY_POLICY.md) through processing and Release/Discard                                                                                                                                                                   |
 | `cleanup`                      | Camera/mic indicators, WebRTC/provider clients, recorders, timers, listeners, audio contexts, tracks, and superseded URLs terminate once                                                                                                                                   |
@@ -262,6 +263,22 @@ archive blocking, stale-result retention, and current `job-result` presentation 
 fake-provider/controller/database evidence in ordinary validation. Do not turn them into paid manual
 work. A specifically authorized live visual pass uses [Live provider smoke](LIVE_PROVIDER_SMOKE.md);
 each Start or retry requires separate approval.
+
+## Project output save boundary
+
+Using synthetic compatible media and no live provider:
+
+- open a ready source-bearing Project and confirm the review surface distinguishes current media
+  from the immutable original, and that **All changes saved**, **Render preview**, **Save as New
+  Video**, and **Add Version** describe separate states/actions;
+- save as a new titled video, then separately select an active Saved Video for **Add Version** and
+  verify the confirmation names its title, current version ordinal, and current-media dimensions;
+- simulate an unavailable response or refresh immediately after submission and confirm the pending
+  operation reconciles to the exact one Saved Video/Version/Project result rather than offering a
+  blind duplicate submission; and
+- delete the Saved Video from the global gallery, confirm the copy explains that Project history is
+  preserved, and verify the Project-scoped current output still plays while the gallery record stays
+  hidden. Do not treat this as Prompt 12 history or Download coverage.
 
 ## Accessibility
 

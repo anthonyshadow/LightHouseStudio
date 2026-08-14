@@ -11,12 +11,10 @@ import {
   type ProjectMediaReference,
   type ProjectSourceKind,
 } from '@studio/domain';
+import { KeyedLock } from '../../application/keyed-lock.js';
 import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
 import { AppError } from '../../http/app-error.js';
-import type {
-  SavedVideoRepository,
-  StoredVideoVersion,
-} from '../saved-videos/saved-video-repository.js';
+import type { SavedVideoRepository } from '../saved-videos/saved-video-repository.js';
 import { inspectSavedVideoFile } from '../saved-videos/saved-video-inspection.js';
 import { safeSavedVideoFilename } from '../saved-videos/saved-video-service.js';
 import {
@@ -29,7 +27,10 @@ import {
 import { projectRequestFingerprint } from './project-request-fingerprint.js';
 import { projectAssetLinksForRevision } from './project-snapshot-relations.js';
 import { publicProjectCurrent } from './project-service.js';
-import { inspectStoredProjectMedia } from './project-media-inspection.js';
+import {
+  inspectStoredProjectMedia,
+  storedVideoVersionMatchesInspection,
+} from './project-media-inspection.js';
 
 export type ProjectSourceMutationResult =
   | { readonly ok: true; readonly response: ProjectSourceResponse; readonly replayed: boolean }
@@ -91,7 +92,7 @@ const versionMediaReference = (
 ): ProjectMediaReference => ({ kind: 'saved-video-version', savedVideoId, videoVersionId });
 
 export class ProjectSourceService {
-  readonly #locks = new Map<string, Promise<unknown>>();
+  readonly #lock = new KeyedLock();
 
   constructor(
     private readonly projects: ProjectRepository,
@@ -117,23 +118,6 @@ export class ProjectSourceService {
     return this.options.inspect ?? inspectSavedVideoFile;
   }
 
-  async #withLock<Result>(key: string, operation: () => Promise<Result>): Promise<Result> {
-    const prior = this.#locks.get(key) ?? Promise.resolve();
-    let release!: () => void;
-    const next = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const chain = prior.then(() => next);
-    this.#locks.set(key, chain);
-    await prior;
-    try {
-      return await operation();
-    } finally {
-      release();
-      if (this.#locks.get(key) === chain) this.#locks.delete(key);
-    }
-  }
-
   async #assertProjectAccessible(ownerUserId: string, projectId: string): Promise<void> {
     if ((await this.projects.getCurrent(ownerUserId, projectId)) === null) {
       throw new AppError(404, 'not_found', 'That Project is unavailable.');
@@ -146,7 +130,7 @@ export class ProjectSourceService {
   }
 
   async upload(input: UploadSourceInput): Promise<ProjectSourceMutationResult> {
-    return this.#withLock(`${input.ownerUserId}:${input.operationKey}`, async () => {
+    return this.#lock.run(`${input.ownerUserId}:${input.operationKey}`, async () => {
       await this.#assertProjectAccessible(input.ownerUserId, input.projectId);
       const inspected = await this.#inspect(input.sourcePath);
       const filename = safeSavedVideoFilename(input.filename, inspected.mimeType);
@@ -216,7 +200,7 @@ export class ProjectSourceService {
   }
 
   async reuseSavedVideo(input: ReuseSourceInput): Promise<ProjectSourceMutationResult> {
-    return this.#withLock(`${input.ownerUserId}:${input.operationKey}`, async () => {
+    return this.#lock.run(`${input.ownerUserId}:${input.operationKey}`, async () => {
       await this.#assertProjectAccessible(input.ownerUserId, input.projectId);
       const savedVersion = await this.savedVideos.getVersion(
         input.ownerUserId,
@@ -232,7 +216,13 @@ export class ProjectSourceService {
         throw new AppError(404, 'asset_missing', 'That Saved Video source file is unavailable.');
       }
       const inspected = await inspectStoredProjectMedia(asset, this.#inspect);
-      this.#assertVersionMatchesInspection(version, inspected, asset);
+      if (!storedVideoVersionMatchesInspection(version, inspected, asset)) {
+        throw new AppError(
+          409,
+          'conflict',
+          'That Saved Video Version no longer matches its inspected media.',
+        );
+      }
       return this.#accept({
         ownerUserId: input.ownerUserId,
         projectId: input.projectId,
@@ -362,27 +352,6 @@ export class ProjectSourceService {
       response: sourceResponse(persisted.current, persisted.source),
       replayed: persisted.kind === 'replayed',
     };
-  }
-
-  #assertVersionMatchesInspection(
-    version: StoredVideoVersion,
-    inspected: InspectedVideo,
-    asset: AssetReadHandle,
-  ): void {
-    if (
-      version.assetId !== asset.manifest.assetId ||
-      version.mimeType !== inspected.mimeType ||
-      version.sizeBytes !== inspected.sizeBytes ||
-      version.durationMs !== Math.round(inspected.durationMs) ||
-      version.width !== inspected.width ||
-      version.height !== inspected.height
-    ) {
-      throw new AppError(
-        409,
-        'conflict',
-        'That Saved Video Version no longer matches its inspected media.',
-      );
-    }
   }
 
   async get(ownerUserId: string, projectId: string): Promise<ProjectSourceResponse> {

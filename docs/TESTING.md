@@ -133,6 +133,11 @@ The retained suite protects:
   replay, queued refresh/reopen reconnect without submit, finite status/copy, explicit
   duplicate-cost retry acknowledgement, retained-result Project-authority refresh, and denial of
   the legacy Project video-job path;
+- atomic Project output save for new Saved Videos and explicit append targets; producing-revision
+  versus completed post-save-revision provenance; same-asset reuse; exact/mismatched receipt
+  replay; append and Project CAS; local composite-journal restart at every commit boundary;
+  relational transaction/concurrency; tombstoned-library Project retention/content; and browser
+  response-loss refresh reconciliation without a duplicate Version;
 - a no-provider Chromium journey from reusable Character selection through one Project semantic
   checkpoint, local edit/Render preview, explicit working-media adoption, and refresh, including
   denial of unexpected external HTTP and WebSocket traffic;
@@ -166,7 +171,7 @@ every desktop journey under every engine by default.
 The current visual matrix contains 31 cases within the 31-case review budget. It retains Local live
 and recording at all five canonical viewports, plus selected entry, idle, Character, Builder,
 Shelf, playback, existing-video setup at all five viewports, processing/result, VTO, Voice,
-finalizing, permission-error, desktop Campaigns workspace, and small-mobile empty-Project detail
+finalizing, permission-error, desktop Campaigns workspace, and small-mobile Project output-review
 compositions. Visual
 tests are not part of `bun run test`, `bun run quality`, or ordinary push/pull-request CI.
 

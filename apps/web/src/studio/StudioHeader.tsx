@@ -85,6 +85,7 @@ const StatusMenu = ({
       <button
         ref={triggerRef}
         type="button"
+        aria-label={systemLabel}
         aria-expanded={open}
         aria-controls="studio-availability-details"
         onClick={() => onOpenChange(!open)}

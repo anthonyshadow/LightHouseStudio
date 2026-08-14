@@ -93,9 +93,9 @@ export const FOCUSED_VISUAL_SCENARIOS = {
     id: 'campaigns-workspace',
     baseline: '10-campaigns/workspace.png',
   },
-  emptyProjectDetail: {
-    id: 'empty-project-detail',
-    baseline: '09-projects/empty-detail.png',
+  projectOutputReview: {
+    id: 'project-output-review',
+    baseline: '09-projects/output-review.png',
   },
 } as const;
 
@@ -156,7 +156,7 @@ export const VISUAL_CASE_MATRIX = [
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.videoEditLightingDirty },
   { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS.videoEditCropDirty },
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.campaignsWorkspace },
-  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS.emptyProjectDetail },
+  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS.projectOutputReview },
   ...DESKTOP_VISUAL_SCENARIOS.map((scenario) => ({ viewport: desktopViewport, scenario })),
   ...SMALL_MOBILE_VISUAL_SCENARIOS.map((scenario) => ({
     viewport: smallMobileViewport,

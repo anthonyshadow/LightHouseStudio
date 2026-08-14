@@ -21,6 +21,7 @@ import {
   projectAssets,
   projectJobs,
   projectOutputs,
+  projectOutputOperationReceipts,
   projectRevisionAuthorKind,
   projectRevisions,
   projectRevisionSource,
@@ -68,6 +69,7 @@ describe('Drizzle persistence schema', () => {
       projectVersionReferences,
       projectJobs,
       projectOutputs,
+      projectOutputOperationReceipts,
       projectSources,
       outbox,
       resourceReferences,
@@ -192,6 +194,7 @@ describe('Drizzle persistence schema', () => {
       'create',
       'user-edit',
       'job-result',
+      'output-save',
       'restore',
       'migration',
     ]);

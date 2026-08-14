@@ -103,12 +103,23 @@ provider work.
     reconnect contract. Accepted visual work may continue after a Project switch; local rendering
     or working-media adoption still blocks switching/exit until it completes or returns to a safe
     cancellable checkpoint.
+23. A ready Project review exposes **Save as New Video** and, only after separate Saved Video target
+    selection and confirmation, **Add Version**. The command flushes the session, checks exact
+    Project/revision/media and append CAS, reuses the already-durable current bytes, creates one
+    immutable Video Version, attributes it to the producing pre-save revision, and appends a
+    distinct completed post-save revision with the exact retained output pointer. Reusing a Saved
+    Video Version as source never preselects an Add Version target.
+24. One pending owner/environment/Project-scoped operation survives browser response loss. Reload
+    resubmits only the exact stored request and reconciles the original result; a changed replay
+    conflicts without another Version or partial aggregate advancement. Removing the Saved Video
+    from the global library explains and preserves exact Project-scoped Version access while any
+    active, archived, or tombstoned Project output retains it.
 
 ## Boundaries
 
-This story includes bounded semantic creative/edit checkpoints and working-media adoption, but no
-Campaign expansion, Project provider processing/reconnect/retry UI, Saved Video output save, Version-history
-UI, browser Project authority, or IndexedDB Project data. Project source selection, session
-hydration, configuration, and local adoption start no provider. Standalone existing-video behavior
-retains its separate save/replace contract. Project server/repository authority, retention, and
-cleanup remain as documented in Architecture.
+This story includes bounded semantic creative/edit checkpoints, working-media adoption, recoverable
+visual processing, and atomic Saved Video output save, but no Campaign expansion, Version-history
+UI, Project Download changes, generic Export record, or IndexedDB Project data. Project source
+selection, session hydration, configuration, local adoption, and output save start no provider.
+Standalone existing-video behavior retains its separate save/replace contract. Project
+server/repository authority, retention, and cleanup remain as documented in Architecture.

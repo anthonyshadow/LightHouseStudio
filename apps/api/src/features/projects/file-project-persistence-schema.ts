@@ -4,6 +4,7 @@ import {
   projectProcessingCapabilitySchema,
   projectAssetRoleSchema,
   projectRevisionSourceSchema,
+  projectOutputSaveResultSchema,
   projectSnapshotSchema,
   projectSourceKindSchema,
   projectStatusSchema,
@@ -13,6 +14,7 @@ import {
 } from '@studio/contracts';
 import { z } from 'zod';
 import { persistedTimestampSchema } from '../../application/timestamps.js';
+import { savedVideoLibrarySchema } from '../saved-videos/saved-video-repository.js';
 import { projectMediaReferencesEqual } from './project-snapshot-relations.js';
 
 export const ownerIdSchema = z.uuid();
@@ -299,6 +301,25 @@ export const storedAggregateSchema = z
         message: 'Stored working-media revision is inconsistent.',
       });
     }
+    const outputRelationKeys = new Set(
+      aggregate.outputLinks.map(
+        ({ savedVideoId, videoVersionId }) => `${savedVideoId}:${videoVersionId}`,
+      ),
+    );
+    if (
+      aggregate.revisions.some(({ snapshot }) => {
+        const output = snapshot.lastSuccessfulOutput;
+        return (
+          output !== null &&
+          !outputRelationKeys.has(`${output.savedVideoId}:${output.videoVersionId}`)
+        );
+      })
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Stored Project output pointers require exact retained producer relations.',
+      });
+    }
   });
 
 export const storedCampaignSchema = z
@@ -334,9 +355,38 @@ export const createReceiptSchema = z
   })
   .strict();
 
+export const projectOutputReceiptSchema = z
+  .object({
+    operationId: z.uuid(),
+    requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+    projectId: projectIdSchema,
+    savedVideoId: z.uuid(),
+    videoVersionId: z.uuid(),
+    resultRevisionId: z.uuid(),
+    resultRevisionNumber: z.number().int().positive(),
+    result: projectOutputSaveResultSchema,
+    createdAt: persistedTimestampSchema,
+  })
+  .strict()
+  .superRefine((receipt, context) => {
+    if (
+      receipt.result.operationId !== receipt.operationId ||
+      receipt.result.project.id !== receipt.projectId ||
+      receipt.result.savedVideo.id !== receipt.savedVideoId ||
+      receipt.result.output.videoVersionId !== receipt.videoVersionId ||
+      receipt.result.revision.id !== receipt.resultRevisionId ||
+      receipt.result.revision.revisionNumber !== receipt.resultRevisionNumber
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Stored Project output receipt is inconsistent.',
+      });
+    }
+  });
+
 export const librarySchema = z
   .object({
-    schemaVersion: z.literal(5),
+    schemaVersion: z.literal(6),
     ownerUserId: ownerIdSchema,
     revision: z.number().int().nonnegative(),
     campaigns: z.array(storedCampaignSchema),
@@ -344,6 +394,7 @@ export const librarySchema = z
     processingJobs: z.array(storedProjectProcessingAttemptSchema),
     createReceipts: z.array(createReceiptSchema),
     campaignCreateReceipts: z.array(campaignCreateReceiptSchema),
+    outputReceipts: z.array(projectOutputReceiptSchema),
   })
   .strict()
   .superRefine((library, context) => {
@@ -356,15 +407,35 @@ export const librarySchema = z
     const projectIdSet = new Set(projectIds);
     const campaignIdSet = new Set(campaignIds);
     const processingOperationIds = library.processingJobs.map(({ operationId }) => operationId);
+    const outputOperationIds = library.outputReceipts.map(({ operationId }) => operationId);
     if (
       projectIdSet.size !== projectIds.length ||
       campaignIdSet.size !== campaignIds.length ||
       new Set(operationKeys).size !== operationKeys.length ||
       new Set(campaignOperationKeys).size !== campaignOperationKeys.length ||
       new Set(processingOperationIds).size !== processingOperationIds.length ||
+      new Set(outputOperationIds).size !== outputOperationIds.length ||
       library.campaigns.some(({ ownerUserId }) => ownerUserId !== library.ownerUserId) ||
       library.projects.some(({ project }) => project.ownerUserId !== library.ownerUserId) ||
       library.processingJobs.some(({ ownerUserId }) => ownerUserId !== library.ownerUserId) ||
+      library.outputReceipts.some(
+        (receipt) =>
+          !projectIdSet.has(receipt.projectId) ||
+          !library.projects.some(
+            ({ revisions, outputLinks }) =>
+              revisions.some(
+                ({ id, revisionNumber }) =>
+                  id === receipt.resultRevisionId &&
+                  revisionNumber === receipt.resultRevisionNumber,
+              ) &&
+              outputLinks.some(
+                ({ projectId, savedVideoId, videoVersionId }) =>
+                  projectId === receipt.projectId &&
+                  savedVideoId === receipt.savedVideoId &&
+                  videoVersionId === receipt.videoVersionId,
+              ),
+          ),
+      ) ||
       library.projects.some(
         ({ project }) => project.campaignId !== null && !campaignIdSet.has(project.campaignId),
       ) ||
@@ -404,13 +475,14 @@ export type ProjectLibrary = z.infer<typeof librarySchema>;
 
 const previousLibraryEnvelopeSchema = z
   .object({
-    schemaVersion: z.union([z.literal(2), z.literal(3), z.literal(4)]),
+    schemaVersion: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
     ownerUserId: ownerIdSchema,
     revision: z.number().int().nonnegative(),
     campaigns: z.array(storedCampaignSchema),
     projects: z.array(z.unknown()),
     createReceipts: z.array(createReceiptSchema),
     campaignCreateReceipts: z.array(campaignCreateReceiptSchema),
+    processingJobs: z.array(storedProjectProcessingAttemptSchema).optional(),
   })
   .strict();
 
@@ -435,9 +507,10 @@ export const parseLibrary = (
       migrated: true,
       library: librarySchema.parse({
         ...previous.data,
-        schemaVersion: 5,
+        schemaVersion: 6,
         projects: previous.data.projects.map((aggregate) => storedAggregateSchema.parse(aggregate)),
-        processingJobs: [],
+        processingJobs: previous.data.processingJobs ?? [],
+        outputReceipts: [],
       }),
     };
   }
@@ -455,7 +528,7 @@ export const parseLibrary = (
   return {
     migrated: true,
     library: librarySchema.parse({
-      schemaVersion: 5,
+      schemaVersion: 6,
       ownerUserId: legacy.ownerUserId,
       revision: legacy.revision,
       campaigns: [],
@@ -463,13 +536,14 @@ export const parseLibrary = (
       processingJobs: [],
       createReceipts: legacy.createReceipts,
       campaignCreateReceipts: [],
+      outputReceipts: [],
     }),
   };
 };
 
 export const journalSchema = z
   .object({
-    schemaVersion: z.literal(5),
+    schemaVersion: z.literal(6),
     ownerUserId: ownerIdSchema,
     transactionId: z.uuid(),
     state: z.literal('prepared'),
@@ -523,67 +597,111 @@ export const journalSchema = z
           campaignId: z.uuid(),
         })
         .strict(),
+      z
+        .object({
+          kind: z.literal('project-output-save'),
+          operationId: z.uuid(),
+          requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+          projectId: projectIdSchema,
+          savedVideoId: z.uuid(),
+          videoVersionId: z.uuid(),
+          resultRevisionId: z.uuid(),
+        })
+        .strict(),
     ]),
     preparedAt: persistedTimestampSchema,
-    writes: z.object({ metadata: librarySchema }).strict(),
+    writes: z
+      .object({ metadata: librarySchema, savedVideos: savedVideoLibrarySchema.optional() })
+      .strict(),
   })
   .strict()
   .superRefine((journal, context) => {
     const metadata = journal.writes.metadata;
     const operation = journal.operation;
-    const consistent =
-      operation.kind === 'project-create'
-        ? metadata.createReceipts.some(
+    let consistent: boolean;
+    switch (operation.kind) {
+      case 'project-create':
+        consistent = metadata.createReceipts.some(
+          (receipt) =>
+            receipt.operationKey === operation.operationKey &&
+            receipt.projectId === operation.projectId &&
+            receipt.requestFingerprint === operation.requestFingerprint,
+        );
+        break;
+      case 'campaign-create':
+        consistent = metadata.campaignCreateReceipts.some(
+          (receipt) =>
+            receipt.operationKey === operation.operationKey &&
+            receipt.campaignId === operation.campaignId &&
+            receipt.requestFingerprint === operation.requestFingerprint,
+        );
+        break;
+      case 'project-source-accept':
+        consistent = metadata.projects.some(
+          ({ source }) =>
+            source?.projectId === operation.projectId &&
+            source.operationKey === operation.operationKey &&
+            source.requestFingerprint === operation.requestFingerprint,
+        );
+        break;
+      case 'project-working-media-adopt':
+        consistent = metadata.projects.some(({ workingMediaAdoptions }) =>
+          workingMediaAdoptions.some(
+            (media) =>
+              media.projectId === operation.projectId &&
+              media.adoptedRevisionId === operation.revisionId &&
+              media.operationKey === operation.operationKey &&
+              media.requestFingerprint === operation.requestFingerprint,
+          ),
+        );
+        break;
+      case 'project-processing-admit':
+        consistent = metadata.processingJobs.some(
+          (attempt) =>
+            attempt.operationId === operation.operationId &&
+            attempt.projectId === operation.projectId &&
+            attempt.requestFingerprint === operation.requestFingerprint,
+        );
+        break;
+      case 'project-processing-result':
+        consistent = metadata.processingJobs.some(
+          (attempt) =>
+            attempt.operationId === operation.operationId &&
+            attempt.projectId === operation.projectId &&
+            attempt.outputAssetId === operation.assetId,
+        );
+        break;
+      case 'project-output-save':
+        consistent =
+          metadata.outputReceipts.some(
             (receipt) =>
-              receipt.operationKey === operation.operationKey &&
+              receipt.operationId === operation.operationId &&
+              receipt.requestFingerprint === operation.requestFingerprint &&
               receipt.projectId === operation.projectId &&
-              receipt.requestFingerprint === operation.requestFingerprint,
-          )
-        : operation.kind === 'campaign-create'
-          ? metadata.campaignCreateReceipts.some(
-              (receipt) =>
-                receipt.operationKey === operation.operationKey &&
-                receipt.campaignId === operation.campaignId &&
-                receipt.requestFingerprint === operation.requestFingerprint,
-            )
-          : operation.kind === 'project-source-accept'
-            ? metadata.projects.some(
-                ({ source }) =>
-                  source?.projectId === operation.projectId &&
-                  source.operationKey === operation.operationKey &&
-                  source.requestFingerprint === operation.requestFingerprint,
-              )
-            : operation.kind === 'project-working-media-adopt'
-              ? metadata.projects.some(({ workingMediaAdoptions }) =>
-                  workingMediaAdoptions.some(
-                    (media) =>
-                      media.projectId === operation.projectId &&
-                      media.adoptedRevisionId === operation.revisionId &&
-                      media.operationKey === operation.operationKey &&
-                      media.requestFingerprint === operation.requestFingerprint,
-                  ),
-                )
-              : operation.kind === 'project-processing-admit'
-                ? metadata.processingJobs.some(
-                    (attempt) =>
-                      attempt.operationId === operation.operationId &&
-                      attempt.projectId === operation.projectId &&
-                      attempt.requestFingerprint === operation.requestFingerprint,
-                  )
-                : metadata.processingJobs.some(
-                    (attempt) =>
-                      attempt.operationId === operation.operationId &&
-                      attempt.projectId === operation.projectId &&
-                      attempt.outputAssetId === operation.assetId,
-                  );
-    if (metadata.ownerUserId !== journal.ownerUserId || !consistent) {
+              receipt.savedVideoId === operation.savedVideoId &&
+              receipt.videoVersionId === operation.videoVersionId &&
+              receipt.resultRevisionId === operation.resultRevisionId,
+          ) &&
+          journal.writes.savedVideos?.ownerUserId === journal.ownerUserId &&
+          journal.writes.savedVideos.videos.some(
+            ({ video, versions }) =>
+              video.id === operation.savedVideoId &&
+              versions.some(({ id }) => id === operation.videoVersionId),
+          );
+        break;
+    }
+    if (
+      metadata.ownerUserId !== journal.ownerUserId ||
+      !consistent ||
+      (operation.kind === 'project-output-save') !== (journal.writes.savedVideos !== undefined)
+    ) {
       context.addIssue({ code: 'custom', message: 'Prepared Project journal is inconsistent.' });
     }
   });
 
 const previousJournalSchema = z
   .object({
-    schemaVersion: z.union([z.literal(2), z.literal(3), z.literal(4)]),
+    schemaVersion: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
     ownerUserId: ownerIdSchema,
     transactionId: z.uuid(),
     state: z.literal('prepared'),
@@ -619,14 +737,14 @@ export const parseJournal = (value: unknown): z.infer<typeof journalSchema> => {
   if (previous.success) {
     return journalSchema.parse({
       ...previous.data,
-      schemaVersion: 5,
+      schemaVersion: 6,
       writes: { metadata: parseLibrary(previous.data.writes.metadata).library },
     });
   }
   const legacy = legacyJournalSchema.parse(value);
   const metadata = parseLibrary(legacy.writes.projectMetadata).library;
   return journalSchema.parse({
-    schemaVersion: 5,
+    schemaVersion: 6,
     ownerUserId: legacy.ownerUserId,
     transactionId: legacy.transactionId,
     state: legacy.state,
@@ -637,7 +755,7 @@ export const parseJournal = (value: unknown): z.infer<typeof journalSchema> => {
 };
 
 export const emptyLibrary = (ownerUserId: string): ProjectLibrary => ({
-  schemaVersion: 5,
+  schemaVersion: 6,
   ownerUserId: ownerIdSchema.parse(ownerUserId),
   revision: 0,
   campaigns: [],
@@ -645,6 +763,7 @@ export const emptyLibrary = (ownerUserId: string): ProjectLibrary => ({
   processingJobs: [],
   createReceipts: [],
   campaignCreateReceipts: [],
+  outputReceipts: [],
 });
 
 export type StoredProjectAggregate = z.infer<typeof storedAggregateSchema>;

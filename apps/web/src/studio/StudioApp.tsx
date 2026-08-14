@@ -813,7 +813,11 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             project,
             projectProcessing,
           }}
-          environment={{ browser, desktopLayout: desktopStudioLayout }}
+          environment={{
+            browser,
+            desktopLayout: desktopStudioLayout,
+            ownerUserId: auth.session!.user.id,
+          }}
           stage={{
             presentation: stagePresentation,
             aspectRatio: stageAspectRatio,
