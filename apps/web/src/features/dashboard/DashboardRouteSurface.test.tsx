@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { CampaignContract, ProjectContract, SavedVideoSummary } from '@studio/contracts';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HttpResponse, http } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -121,6 +121,12 @@ describe('DashboardRouteSurface', () => {
     expect(screen.getByText('Summer launch')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Continue Launch cut' }));
     expect(actions.onOpenProject).toHaveBeenCalledWith(project.id);
+
+    await user.click(screen.getByRole('button', { name: 'Videos' }));
+    expect(screen.getByText('Launch master')).toBeVisible();
+    expect(screen.queryByText('Summer launch')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'All Campaigns' }));
+    expect(actions.onOpenCampaigns).toHaveBeenCalledOnce();
   });
 
   it('persists lightweight onboarding separately for each account', async () => {
@@ -151,5 +157,30 @@ describe('DashboardRouteSurface', () => {
 
     renderDashboard('312490eb-3e08-4f89-9246-fb2e917063ce');
     expect(screen.getByRole('heading', { name: 'Start with the outcome you need' })).toBeVisible();
+  });
+
+  it('turns an empty recent-work filter into the appropriate next action', async () => {
+    mockApiServer.use(
+      http.get('*/api/projects', () => HttpResponse.json({ projects: [], nextCursor: null })),
+      http.get('*/api/campaigns', () => HttpResponse.json({ campaigns: [], nextCursor: null })),
+      http.get('*/api/videos', () =>
+        HttpResponse.json({
+          videos: [],
+          nextCursor: null,
+          total: 0,
+          facets: { characterNames: [], formats: [] },
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    const { actions } = renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
+
+    await user.click(await screen.findByRole('button', { name: 'Campaigns' }));
+    const emptyState = screen
+      .getByText('No Campaigns yet. They are optional organizers for related Projects.')
+      .closest('div');
+    expect(emptyState).not.toBeNull();
+    await user.click(within(emptyState!).getByRole('button', { name: 'New Campaign' }));
+    expect(actions.onCreateCampaign).toHaveBeenCalledOnce();
   });
 });
