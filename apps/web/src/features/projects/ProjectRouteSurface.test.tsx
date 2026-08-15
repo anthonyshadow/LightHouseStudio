@@ -252,8 +252,19 @@ describe('Project route surface', () => {
     expect(await screen.findByRole('heading', { name: 'Archived concept' })).toBeVisible();
     expect(screen.queryByText('No source yet')).not.toBeInTheDocument();
     expect(screen.getByText(/Keep focused video work together/u)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Quick project' })).toHaveAttribute(
+      'data-project-create',
+      'quick',
+    );
+    expect(screen.getByRole('button', { name: 'New Project' })).toHaveAttribute(
+      'data-project-create',
+      'named',
+    );
 
     const activeList = screen.getByRole('list', { name: 'Active Projects' });
+    expect(
+      within(activeList).getByText('Launch cut').closest('[data-project-ledger-row]'),
+    ).not.toBeNull();
     await userEvent.click(within(activeList).getByRole('button', { name: 'Open' }));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/projects/${activeId}`));
     expect(await screen.findByRole('heading', { name: 'Focused video workspace' })).toBeVisible();

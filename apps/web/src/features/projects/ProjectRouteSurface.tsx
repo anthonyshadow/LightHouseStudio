@@ -34,14 +34,18 @@ import {
 import {
   detailHeaderStyles,
   dialogActionsStyles,
-  emptyListStyles,
   emptyProjectStyles,
-  listLayoutStyles,
-  listSectionStyles,
-  projectCardStyles,
-  projectListStyles,
+  projectsGroupFilterStyles,
+  projectsHeaderActionsStyles,
+  projectsIndexRouteStyles,
+  projectsLedgerEmptyStyles,
+  projectsLedgerLayoutStyles,
+  projectsLedgerListStyles,
+  projectsLedgerRowStyles,
+  projectsLedgerSectionStyles,
+  projectsWorkspaceHeaderStyles,
+  projectsWorkspaceInnerStyles,
   statusPillStyles,
-  workspaceHeaderStyles,
   workspaceInnerStyles,
   workspaceStyles,
 } from './ProjectRouteSurface.styles';
@@ -106,8 +110,9 @@ const ProjectListSection = ({
 
   return (
     <section
-      css={listSectionStyles(theme)}
+      css={projectsLedgerSectionStyles(theme)}
       aria-labelledby={`${lifecycle}-${campaignId ?? 'all'}-projects-heading`}
+      data-project-ledger-section={lifecycle}
     >
       <header>
         <h3 id={`${lifecycle}-${campaignId ?? 'all'}-projects-heading`}>
@@ -125,7 +130,7 @@ const ProjectListSection = ({
         </StatusNotice>
       ) : null}
       {!query.isPending && !query.isError && projects.length === 0 ? (
-        <div css={emptyListStyles(theme)}>
+        <div css={projectsLedgerEmptyStyles(theme)}>
           <strong>{archived ? 'No archived Projects' : 'No active Projects yet'}</strong>
           <p>
             {archived
@@ -136,31 +141,35 @@ const ProjectListSection = ({
       ) : null}
       {projects.length > 0 ? (
         <ul
-          css={projectListStyles(theme)}
+          css={projectsLedgerListStyles()}
           aria-label={heading ?? `${archived ? 'Archived' : 'Active'} Projects`}
         >
           {projects.map((project) => (
             <li key={project.id}>
-              <article css={projectCardStyles(theme)}>
-                <div>
+              <article css={projectsLedgerRowStyles(theme)} data-project-ledger-row="">
+                <div data-project-identity>
                   <h4>{project.title}</h4>
-                  <div data-project-meta>
-                    <span css={statusPillStyles(theme, archived)}>
-                      {projectStatusLabel(project.status)}
-                    </span>
-                    <span>
-                      Updated{' '}
-                      <time dateTime={project.updatedAt}>{formatUpdatedAt(project.updatedAt)}</time>
-                    </span>
-                  </div>
+                </div>
+                <div data-project-meta>
+                  <span data-project-status>{projectStatusLabel(project.status)}</span>
+                  <span data-project-updated>
+                    Updated{' '}
+                    <time dateTime={project.updatedAt}>{formatUpdatedAt(project.updatedAt)}</time>
+                  </span>
                 </div>
                 <div data-project-actions>
-                  <Button size="small" variant="primary" onClick={() => onOpen(project)}>
+                  <Button
+                    size="small"
+                    variant="primary"
+                    data-project-action="open"
+                    onClick={() => onOpen(project)}
+                  >
                     Open
                   </Button>
                   {!archived ? (
                     <Button
                       size="small"
+                      data-project-action="rename"
                       onClick={(event) => onRename(project, event.currentTarget)}
                     >
                       Rename
@@ -169,6 +178,7 @@ const ProjectListSection = ({
                   <Button
                     size="small"
                     variant={archived ? 'secondary' : 'quiet'}
+                    data-project-action={archived ? 'restore' : 'archive'}
                     onClick={(event) =>
                       onLifecycle(archived ? 'restore' : 'archive', project, event.currentTarget)
                     }
@@ -179,6 +189,7 @@ const ProjectListSection = ({
                     <Button
                       size="small"
                       variant="danger"
+                      data-project-action="delete"
                       onClick={(event) => onDelete(project, event.currentTarget)}
                     >
                       Delete
@@ -273,29 +284,31 @@ const ProjectsWorkspace = () => {
   };
 
   return (
-    <div css={workspaceInnerStyles(theme)}>
-      <header css={workspaceHeaderStyles(theme)}>
+    <div css={projectsWorkspaceInnerStyles(theme)} data-project-index="">
+      <header css={projectsWorkspaceHeaderStyles(theme)}>
         <div>
           <h1 ref={setHeadingRef} tabIndex={-1}>
             Projects
           </h1>
-          <p>
-            Keep focused video work together, with or without a Campaign. A Project can start as an
-            empty collection and become a resumable workspace when you are ready.
-          </p>
+          <p>Keep focused video work together. Start as a collection, become a workspace.</p>
         </div>
-        <div css={dialogActionsStyles(theme)}>
+        <div css={projectsHeaderActionsStyles(theme)} data-project-header-actions="">
+          <Button
+            data-project-create="quick"
+            busy={controller.createMutation.isPending}
+            onClick={() => void quickStart()}
+          >
+            Quick project
+          </Button>
           <Button
             variant="primary"
+            data-project-create="named"
             onClick={(event) => {
               dialogReturnRef.current = event.currentTarget;
               setCreating(true);
             }}
           >
             New Project
-          </Button>
-          <Button busy={controller.createMutation.isPending} onClick={() => void quickStart()}>
-            Quick project
           </Button>
         </div>
       </header>
@@ -312,9 +325,10 @@ const ProjectsWorkspace = () => {
         {announcement}
       </div>
 
-      <div css={dialogActionsStyles(theme)} aria-label="Project groups">
+      <div css={projectsGroupFilterStyles(theme)} aria-label="Project groups">
         <Button
           variant="quiet"
+          data-project-group="all"
           aria-pressed={activeGroup === 'all'}
           onClick={() => setActiveGroup('all')}
         >
@@ -322,6 +336,7 @@ const ProjectsWorkspace = () => {
         </Button>
         <Button
           variant="quiet"
+          data-project-group="none"
           aria-pressed={activeGroup === 'none'}
           onClick={() => setActiveGroup('none')}
         >
@@ -329,7 +344,7 @@ const ProjectsWorkspace = () => {
         </Button>
       </div>
 
-      <div css={listLayoutStyles(theme)}>
+      <div css={projectsLedgerLayoutStyles(theme)}>
         <ProjectListSection
           lifecycle="active"
           {...(activeGroup === 'none'
@@ -1018,7 +1033,11 @@ export const ProjectRouteSurface = (props: ProjectRouteSurfaceProps = {}) => {
   }, [location.pathname]);
 
   return (
-    <div ref={routeRef} css={workspaceStyles(theme)} data-project-route="">
+    <div
+      ref={routeRef}
+      css={projectId === null ? projectsIndexRouteStyles(theme) : workspaceStyles(theme)}
+      data-project-route=""
+    >
       {projectId === null ? (
         <ProjectsWorkspace />
       ) : (
