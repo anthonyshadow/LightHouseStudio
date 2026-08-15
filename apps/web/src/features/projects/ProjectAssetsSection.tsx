@@ -16,9 +16,24 @@ import {
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
 import { studioCreatePath, studioVideoPath } from '../../app/paths';
-import { Button, OverlayPanel, StatusNotice } from '../../ui';
+import { AppIcon, Button, OverlayPanel, StatusNotice } from '../../ui';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
 import { safeProjectError } from './ProjectDialogs';
+import {
+  addAssetActionStyles,
+  assetThumbnailFallbackStyles,
+  assetThumbnailPlayStyles,
+  assetThumbnailStyles,
+  projectAssetActionsStyles,
+  projectAssetFiltersStyles,
+  projectAssetGridStyles,
+  projectAssetItemStyles,
+  projectAssetMetaStyles,
+  projectAssetsEmptyStyles,
+  projectAssetsHeaderStyles,
+  projectAssetsOwnershipStyles,
+  projectAssetsSectionStyles,
+} from './ProjectAssetsSection.styles';
 import { ProjectVideoPreviewPlayer } from './ProjectVideoPreviewPlayer';
 import { useProjectAssetsController } from './useProjectAssetsController';
 
@@ -149,21 +164,7 @@ const AssetThumbnail = ({
       aria-label={
         showThumbnail ? `Thumbnail for ${label}` : `${kindLabel(kind)} visual for ${label}`
       }
-      css={{
-        position: 'relative',
-        width: '100%',
-        aspectRatio: '16 / 9',
-        display: 'grid',
-        placeItems: 'center',
-        overflow: 'hidden',
-        borderRadius: theme.radii.small,
-        color: unavailable ? theme.colors.warning : theme.colors.textMuted,
-        background: [
-          `radial-gradient(circle at 25% 20%, color-mix(in srgb, ${theme.colors.accent} 14%, transparent), transparent 46%)`,
-          `radial-gradient(circle at 80% 85%, color-mix(in srgb, ${theme.colors.violet} 12%, transparent), transparent 48%)`,
-          theme.colors.canvasRaised,
-        ].join(', '),
-      }}
+      css={assetThumbnailStyles(theme, unavailable)}
     >
       {showThumbnail ? (
         <img
@@ -174,41 +175,13 @@ const AssetThumbnail = ({
           onError={() => setBrokenThumbnailUrl(thumbnailUrl)}
         />
       ) : (
-        <span
-          aria-hidden="true"
-          css={{
-            display: 'grid',
-            gap: theme.space.xs,
-            placeItems: 'center',
-            padding: theme.space.md,
-            textAlign: 'center',
-            '& svg': { width: '2.25rem', height: '2.25rem', strokeWidth: 1.5 },
-            '& small': { fontSize: theme.fontSizes.caption },
-          }}
-        >
+        <span aria-hidden="true" css={assetThumbnailFallbackStyles(theme)}>
           <AssetKindIcon kind={kind} />
           <small>{unavailable ? 'Asset unavailable' : `${kindLabel(kind)} preview`}</small>
         </span>
       )}
       {kind === 'video' && !unavailable && showThumbnail ? (
-        <span
-          aria-hidden="true"
-          css={{
-            position: 'absolute',
-            insetBlockStart: '50%',
-            insetInlineStart: '50%',
-            width: '2.75rem',
-            height: '2.75rem',
-            display: 'grid',
-            placeItems: 'center',
-            border: `1px solid color-mix(in srgb, ${theme.colors.text} 30%, transparent)`,
-            borderRadius: theme.radii.round,
-            color: theme.colors.text,
-            background: 'rgba(2, 5, 9, 0.72)',
-            transform: 'translate(-50%, -50%)',
-            '& svg': { width: '1.35rem', height: '1.35rem', strokeWidth: 1.6 },
-          }}
-        >
+        <span aria-hidden="true" css={assetThumbnailPlayStyles(theme)}>
           <AssetKindIcon kind="video" />
         </span>
       ) : null}
@@ -392,48 +365,25 @@ export const ProjectAssetsSection = ({
     [];
 
   return (
-    <section
-      aria-labelledby="project-assets-heading"
-      css={{
-        display: 'grid',
-        gap: theme.space.md,
-        padding: `clamp(${theme.space.md}, 3vw, ${theme.space.xl})`,
-        border: `1px solid ${theme.colors.border}`,
-        borderRadius: theme.radii.large,
-        background: theme.colors.surfaceSoft,
-      }}
-    >
-      <header
-        css={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'end',
-          justifyContent: 'space-between',
-          gap: theme.space.md,
-        }}
-      >
-        <div>
-          <h2 id="project-assets-heading" css={{ margin: 0 }}>
-            Project Assets
-          </h2>
-          <p css={{ margin: `${theme.space.xs} 0 0`, color: theme.colors.textMuted }}>
-            Reusable, non-owning associations. Detaching never deletes an Asset or Project history.
-          </p>
-        </div>
+    <section aria-labelledby="project-assets-heading" css={projectAssetsSectionStyles(theme)}>
+      <header css={projectAssetsHeaderStyles(theme)}>
+        <h2 id="project-assets-heading">Project Assets</h2>
         {!archived ? (
-          <Button ref={addTriggerRef} variant="primary" onClick={() => setPicker('choose')}>
+          <Button
+            ref={addTriggerRef}
+            variant="quiet"
+            css={addAssetActionStyles(theme)}
+            onClick={() => setPicker('choose')}
+          >
+            <AppIcon name="plus" />
             Add Asset
           </Button>
         ) : (
-          <span css={{ color: theme.colors.textMuted }}>Read-only while archived</span>
+          <span data-project-assets-read-only>Read-only while archived</span>
         )}
       </header>
 
-      <div
-        role="group"
-        aria-label="Filter Project Assets"
-        css={{ display: 'flex', flexWrap: 'wrap', gap: theme.space.xs }}
-      >
+      <div role="group" aria-label="Filter Project Assets" css={projectAssetFiltersStyles(theme)}>
         {FILTERS.map(({ value, label }) => (
           <Button
             key={value}
@@ -462,138 +412,72 @@ export const ProjectAssetsSection = ({
         </StatusNotice>
       ) : null}
       {!controller.query.isPending && !controller.query.isError && memberships.length === 0 ? (
-        <div
-          css={{
-            padding: theme.space.lg,
-            border: `1px dashed ${theme.colors.borderStrong}`,
-            borderRadius: theme.radii.medium,
-          }}
-        >
+        <div css={projectAssetsEmptyStyles(theme)}>
           <strong>No {filter === 'all' ? '' : `${kindLabel(filter)} `}Assets attached</strong>
-          <p css={{ marginBlockEnd: 0, color: theme.colors.textMuted }}>
-            Add an existing Asset or create one while keeping the Project source unchanged.
-          </p>
+          <p>Add an existing Asset or create one while keeping the Project source unchanged.</p>
         </div>
       ) : null}
       {memberships.length > 0 ? (
-        <ul
-          aria-label="Assets attached to this Project"
-          css={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 18rem), 1fr))',
-            gap: theme.space.md,
-            margin: 0,
-            padding: 0,
-            listStyle: 'none',
-          }}
-        >
+        <ul aria-label="Assets attached to this Project" css={projectAssetGridStyles(theme)}>
           {memberships.map((membership) => {
             const resolved = labelForMembership(membership, creativeStore, videoSummaries);
             return (
               <li key={membership.id}>
-                <article
-                  css={{
-                    height: '100%',
-                    display: 'grid',
-                    gap: theme.space.sm,
-                    padding: theme.space.sm,
-                    border: `1px solid ${theme.colors.border}`,
-                    borderRadius: theme.radii.medium,
-                    background: theme.colors.surface,
-                  }}
-                >
+                <article css={projectAssetItemStyles(theme)}>
                   <AssetThumbnail
                     kind={membership.kind}
                     label={resolved.label}
                     thumbnailUrl={resolved.thumbnailUrl}
                     unavailable={resolved.unavailable}
                   />
-                  <div
-                    css={{
-                      minWidth: 0,
-                      display: 'flex',
-                      alignItems: 'baseline',
-                      justifyContent: 'space-between',
-                      gap: theme.space.sm,
-                    }}
-                  >
-                    <span
-                      css={{
-                        color: theme.colors.accent,
-                        fontSize: theme.fontSizes.caption,
-                        fontWeight: 800,
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      {kindLabel(membership.kind)}
-                    </span>
-                    <small
-                      title={membership.resourceId}
-                      css={{ minWidth: 0, color: theme.colors.textFaint, overflowWrap: 'anywhere' }}
-                    >
+                  <div css={projectAssetMetaStyles(theme)}>
+                    <span data-project-asset-kind>{kindLabel(membership.kind)}</span>
+                    <small data-project-asset-id title={membership.resourceId}>
                       {abbreviatedId(membership.resourceId)}
                     </small>
                   </div>
-                  <div>
-                    <h3 css={{ margin: 0, overflowWrap: 'anywhere' }}>{resolved.label}</h3>
-                  </div>
+                  <h3>{resolved.label}</h3>
                   {resolved.unavailable ? (
                     <StatusNotice tone="warning">
                       The underlying Asset is unavailable. This association can still be detached.
                     </StatusNotice>
                   ) : null}
                   {(membership.kind === 'video' && !resolved.unavailable) || !archived ? (
-                    <div
-                      css={{
-                        display: 'grid',
-                        gap: theme.space.xs,
-                        marginBlockStart: 'auto',
-                      }}
-                    >
+                    <div css={projectAssetActionsStyles(theme)}>
                       {membership.kind === 'video' && !resolved.unavailable ? (
                         <Button
                           size="small"
                           variant="primary"
-                          css={{ width: '100%' }}
+                          data-project-asset-action="open"
                           onClick={() => openVideoInStudio(membership.resourceId)}
                         >
                           Open in Studio
                         </Button>
                       ) : null}
-                      <div
-                        css={{
-                          display: 'grid',
-                          gridTemplateColumns:
-                            membership.kind === 'video' && !resolved.unavailable && !archived
-                              ? 'repeat(2, minmax(0, 1fr))'
-                              : 'minmax(0, 1fr)',
-                          gap: theme.space.xs,
-                          '& > button': { width: '100%', minWidth: 0 },
-                        }}
-                      >
-                        {membership.kind === 'video' && !resolved.unavailable ? (
-                          <Button
-                            size="small"
-                            onClick={(event) => {
-                              previewTriggerRef.current = event.currentTarget;
-                              setPreviewVideoId(membership.resourceId);
-                            }}
-                          >
-                            Preview
-                          </Button>
-                        ) : null}
-                        {!archived ? (
-                          <Button
-                            size="small"
-                            variant="quiet"
-                            busy={controller.detachMutation.variables === membership.id}
-                            disabled={busy}
-                            onClick={() => void detach(membership)}
-                          >
-                            Detach from Project
-                          </Button>
-                        ) : null}
-                      </div>
+                      {membership.kind === 'video' && !resolved.unavailable ? (
+                        <Button
+                          size="small"
+                          data-project-asset-action="preview"
+                          onClick={(event) => {
+                            previewTriggerRef.current = event.currentTarget;
+                            setPreviewVideoId(membership.resourceId);
+                          }}
+                        >
+                          Preview
+                        </Button>
+                      ) : null}
+                      {!archived ? (
+                        <Button
+                          size="small"
+                          variant="quiet"
+                          data-project-asset-action="detach"
+                          busy={controller.detachMutation.variables === membership.id}
+                          disabled={busy}
+                          onClick={() => void detach(membership)}
+                        >
+                          Detach from Project
+                        </Button>
+                      ) : null}
                     </div>
                   ) : null}
                 </article>
@@ -611,6 +495,10 @@ export const ProjectAssetsSection = ({
           Load more Assets
         </Button>
       ) : null}
+      <p css={projectAssetsOwnershipStyles(theme)}>
+        Detaching never deletes an Asset or Project history. Assets remain reusable everywhere they
+        are available.
+      </p>
 
       <OverlayPanel
         open={picker === 'choose'}

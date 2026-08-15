@@ -267,7 +267,9 @@ describe('Project route surface', () => {
     ).not.toBeNull();
     await userEvent.click(within(activeList).getByRole('button', { name: 'Open' }));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/projects/${activeId}`));
-    expect(await screen.findByRole('heading', { name: 'Focused video workspace' })).toBeVisible();
+    expect(
+      await screen.findByText('No source yet • This Project is ready whenever you want to begin.'),
+    ).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Continue editing' }));
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`),

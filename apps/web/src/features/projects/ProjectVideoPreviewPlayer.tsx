@@ -75,6 +75,7 @@ export const ProjectVideoPreviewPlayer = ({ src, title }: ProjectVideoPreviewPla
           preload="metadata"
           aria-label={`Preview of ${title}`}
           css={{
+            width: '100%',
             height: '100%',
             maxWidth: '100%',
             maxHeight: '100%',
