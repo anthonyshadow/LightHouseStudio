@@ -27,6 +27,7 @@ export const StudioTakeOverlays = ({
   onSaveVideo,
   saveVideoState,
   onReplaceSavedVideo,
+  hasUnsavedChanges,
 }: {
   activeOverlay: ActiveOverlay;
   recording: RecordingController;
@@ -43,6 +44,7 @@ export const StudioTakeOverlays = ({
   onSaveVideo?: () => void;
   saveVideoState?: SaveVideoState;
   onReplaceSavedVideo?: () => void;
+  hasUnsavedChanges?: boolean;
 }) => {
   const theme = useTheme();
   return (
@@ -72,6 +74,7 @@ export const StudioTakeOverlays = ({
             {...(onSaveVideo ? { onSaveVideo } : {})}
             {...(saveVideoState ? { saveVideoState } : {})}
             {...(onReplaceSavedVideo ? { onReplaceSavedVideo } : {})}
+            {...(hasUnsavedChanges !== undefined ? { hasUnsavedChanges } : {})}
           />
         </Suspense>
       </OverlayPanel>

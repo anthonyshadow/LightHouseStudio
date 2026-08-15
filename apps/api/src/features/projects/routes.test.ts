@@ -140,6 +140,79 @@ describe('Project lifecycle routes', () => {
     expect(restored.json()).toMatchObject({ project: { status: 'draft', version: 4 } });
   });
 
+  it('tombstones only one archived Project after explicit confirmation and hides it from reads', async () => {
+    const app = localApp();
+    const first = (await create(app, 'Delete this Project')).response;
+    const second = (await create(app, 'Keep this Project')).response;
+    const projectId = json<{ project: { id: string } }>(first).project.id;
+    const keptProjectId = json<{ project: { id: string } }>(second).project.id;
+
+    const activeDelete = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/tombstone`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { expectedVersion: 1, confirmation: 'permanent-delete' },
+    });
+    expect(activeDelete.statusCode).toBe(409);
+
+    await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/archive`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { expectedVersion: 1 },
+    });
+    const missingConfirmation = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/tombstone`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { expectedVersion: 2 },
+    });
+    expect(missingConfirmation.statusCode).toBe(400);
+
+    const deleted = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/tombstone`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { expectedVersion: 2, confirmation: 'permanent-delete' },
+    });
+    expect(deleted.statusCode).toBe(200);
+    const deletedBody = json<{
+      project: {
+        id: string;
+        status: string;
+        version: number;
+        archivedAt: string | null;
+        deletedAt: string | null;
+      };
+    }>(deleted);
+    expect(deletedBody.project).toMatchObject({
+      id: projectId,
+      status: 'deleted',
+      version: 3,
+    });
+    expect(deletedBody.project.archivedAt).toEqual(expect.stringMatching(/Z$/u));
+    expect(deletedBody.project.deletedAt).toEqual(expect.stringMatching(/Z$/u));
+
+    const archived = await app.inject({
+      method: 'GET',
+      url: '/api/projects?lifecycle=archived',
+      headers: { host: browserHeaders.host },
+    });
+    const active = await app.inject({
+      method: 'GET',
+      url: '/api/projects',
+      headers: { host: browserHeaders.host },
+    });
+    const detail = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(json<{ projects: unknown[] }>(archived).projects).toEqual([]);
+    expect(active.json()).toMatchObject({ projects: [{ id: keptProjectId }] });
+    expect(detail.statusCode).toBe(404);
+  });
+
   it('attaches browser-local Assets idempotently, detaches only memberships, and locks archived Projects', async () => {
     const app = localApp();
     const created = (await create(app, 'Asset collection')).response;

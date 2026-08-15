@@ -125,6 +125,7 @@ const renderBar = (
     onSaveVideo?: () => void;
     saveVideoState?: Parameters<typeof StudioSessionControlBar>[0]['saveVideoState'];
     recordingMode?: StudioSessionController['draft']['mode'];
+    hasUnsavedChanges?: boolean;
   } = {},
 ) =>
   render(
@@ -145,6 +146,9 @@ const renderBar = (
         {...(options.onDiscardTake ? { onDiscardTake: options.onDiscardTake } : {})}
         {...(options.onSaveVideo ? { onSaveVideo: options.onSaveVideo } : {})}
         {...(options.saveVideoState ? { saveVideoState: options.saveVideoState } : {})}
+        {...(options.hasUnsavedChanges !== undefined
+          ? { hasUnsavedChanges: options.hasUnsavedChanges }
+          : {})}
         onOpenVoiceTreatments={onOpenVoiceTreatments}
         onChooseAiExperience={onChooseAiExperience}
         onChangeExperience={onChooseAiExperience}
@@ -395,7 +399,7 @@ describe('StudioSessionControlBar', () => {
     expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit video' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Voice' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Release' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Release' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Record New Video' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Voice' }));
@@ -427,6 +431,7 @@ describe('StudioSessionControlBar', () => {
       </StudioDesignProvider>,
     );
 
+    expect(screen.queryByRole('button', { name: 'Discard' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Release' }));
     expect(savedRecording.discard).toHaveBeenCalledOnce();
     expect(onCloseTakeReview).toHaveBeenCalledOnce();
@@ -453,6 +458,23 @@ describe('StudioSessionControlBar', () => {
     expect(screen.queryByRole('button', { name: 'Start AI' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Recorded take controls' })).not.toBeInTheDocument();
+  });
+
+  it('shows Release instead of Discard for an unchanged video already loaded from Assets', () => {
+    const artifact = takeArtifact();
+    renderBar(
+      createSession(),
+      vi.fn(),
+      createRecording('recorded', { original: artifact, presented: artifact }),
+      vi.fn().mockResolvedValue(undefined),
+      true,
+      vi.fn(),
+      vi.fn(),
+      { hasUnsavedChanges: false },
+    );
+
+    expect(screen.getByRole('button', { name: 'Release' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Discard' })).not.toBeInTheDocument();
   });
 
   it('notifies the upload workflow only after a take discard is confirmed', async () => {

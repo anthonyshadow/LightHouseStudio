@@ -9,6 +9,7 @@ import {
   moveProjectToCampaign,
   renameProject,
   restoreProject,
+  tombstoneProject,
 } from './projectsApi';
 
 const PROJECT_PAGE_SIZE = 20;
@@ -107,6 +108,15 @@ export const useProjectsController = () => {
     onSuccess: reconcile,
     onError: (_error, input) => invalidateProject(input.projectId),
   });
+  const tombstoneMutation = useMutation({
+    mutationFn: (input: { readonly projectId: string; readonly expectedVersion: number }) =>
+      tombstoneProject(input.projectId, input.expectedVersion),
+    onSuccess: async (current) => {
+      queryClient.removeQueries({ queryKey: projectQueryKeys.detail(current.project.id) });
+      await queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
+    },
+    onError: (_error, input) => invalidateProject(input.projectId),
+  });
   const moveMutation = useMutation({
     mutationFn: (input: {
       readonly projectId: string;
@@ -165,6 +175,7 @@ export const useProjectsController = () => {
     renameMutation,
     archiveMutation,
     restoreMutation,
+    tombstoneMutation,
     moveMutation,
     latestProject,
     renameLatest,

@@ -614,6 +614,12 @@ export const renameProjectRequestSchema = z
 export const projectLifecycleRequestSchema = z
   .object({ expectedVersion: z.number().int().positive() })
   .strict();
+export const tombstoneProjectRequestSchema = z
+  .object({
+    expectedVersion: z.number().int().positive(),
+    confirmation: z.literal('permanent-delete'),
+  })
+  .strict();
 export const moveProjectCampaignRequestSchema = z
   .object({ campaignId: z.uuid().nullable(), expectedVersion: z.number().int().positive() })
   .strict();

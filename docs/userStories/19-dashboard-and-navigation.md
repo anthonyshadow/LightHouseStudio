@@ -37,6 +37,8 @@ resources, and browse reusable Assets without activating media or a provider.
 
 - Login restoration, protected deep-link return, legacy redirects, Browser Back/Forward, active
   destination naming, keyboard/focus restoration, mobile layout, and 200% text remain covered.
+- Route-level **Back** controls traverse the actual prior browser entry. A direct deep link with no
+  prior app entry uses the named safe in-app destination instead of leaving the operator stranded.
 - `/studio/:videoId` direct entry is refresh-safe, cancellation-safe, and reports normalized
   unavailable/removed/load failures with navigation back to Videos or its originating Project.
 - Dashboard and organization routes acquire no media, issue no provider token, and do not remount

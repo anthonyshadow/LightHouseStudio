@@ -18,12 +18,28 @@ import {
   projectStatusFactsSchema,
   projectWorkingMediaResponseSchema,
   saveProjectOutputRequestSchema,
+  tombstoneProjectRequestSchema,
 } from './projects';
 
 const assetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
 const videoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
 const versionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
 const now = '2026-08-11T12:00:00.000Z';
+
+describe('Project deletion contract', () => {
+  it('requires the exact explicit tombstone confirmation', () => {
+    expect(
+      tombstoneProjectRequestSchema.parse({
+        expectedVersion: 3,
+        confirmation: 'permanent-delete',
+      }),
+    ).toEqual({ expectedVersion: 3, confirmation: 'permanent-delete' });
+    expect(
+      tombstoneProjectRequestSchema.safeParse({ expectedVersion: 3, confirmation: 'delete' })
+        .success,
+    ).toBe(false);
+  });
+});
 
 describe('Project asset membership contracts', () => {
   it('accepts only supported non-Recipe kinds and bounded pages', () => {

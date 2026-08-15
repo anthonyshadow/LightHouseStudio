@@ -3,6 +3,7 @@ import { projectIdSchema } from '@studio/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
+import { useRouteBack } from '../app/useRouteBack';
 import { ApiClientError } from '../adapters/api-client/apiClient';
 import { getSavedVideo } from '../adapters/api-client/savedVideosApi';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
@@ -148,6 +149,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const theme = useTheme();
   const auth = useAuth();
   const navigate = useNavigate();
+  const goBack = useRouteBack();
   const location = useLocation();
   const queryClient = useQueryClient();
   const createQuery = useMemo(
@@ -835,9 +837,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         action: {
           label: routeOriginProjectId ? 'Back to Project' : 'Back to Assets',
           onAction: () =>
-            void navigate(
-              routeOriginProjectId ? projectPath(routeOriginProjectId) : APP_PATHS.videos,
-            ),
+            goBack(routeOriginProjectId ? projectPath(routeOriginProjectId) : APP_PATHS.videos),
         },
       });
     }
@@ -863,7 +863,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       });
     }
     return notices;
-  }, [directVideoLoad, navigate, projectVideoAttachment, routeOriginProjectId]);
+  }, [directVideoLoad, goBack, projectVideoAttachment, routeOriginProjectId]);
   const effectiveStageNotices = useMemo(
     () => [...stageNotices, ...contextualStageNotices],
     [contextualStageNotices, stageNotices],
@@ -1206,7 +1206,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             betaEnabled: realtimeBetaEnabled,
             providerConfigured: realtimeProviderConfigured,
             onOpenStudio: () => void navigate(APP_PATHS.create),
-            onOpenDashboard: () => void navigate(APP_PATHS.dashboard),
+            onOpenDashboard: () => goBack(APP_PATHS.dashboard),
           }}
           saveVideoState={savedVideoSave.state}
           actions={{

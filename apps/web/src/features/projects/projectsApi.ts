@@ -245,6 +245,25 @@ export const restoreProject = (
 ): Promise<ProjectCurrentResponse> =>
   changeProjectLifecycle(projectId, 'restore', expectedVersion, signal);
 
+export const tombstoneProject = (
+  projectId: string,
+  expectedVersion: number,
+  signal?: AbortSignal,
+): Promise<ProjectCurrentResponse> =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(projectId)}/tombstone`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      headers: jsonHeaders,
+      body: JSON.stringify({ expectedVersion, confirmation: 'permanent-delete' }),
+      ...(signal ? { signal } : {}),
+    },
+    projectCurrentResponseSchema,
+    invalidProjectResponse,
+    parseProjectConflict,
+  );
+
 export const moveProjectToCampaign = (
   projectId: string,
   campaignId: string | null,
