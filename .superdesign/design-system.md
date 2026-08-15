@@ -116,6 +116,28 @@ card/button language.
   approximately 44px targets, visible focus, reduced motion, safe areas, 200% reflow, and no
   document scrolling.
 
+## Project overview UX direction
+
+- Redesign only `/projects/:projectId`. Keep the existing desktop navigation rail, mobile header,
+  and mobile bottom navigation visually and behaviorally unchanged.
+- Treat the overview as a calm project home, not a dashboard. Lead with project identity and one
+  strong **Continue editing** action. Keep Move, Rename, Archive/Restore, and Delete available but
+  visually secondary; destructive actions must not compete with the primary task.
+- Replace rounded cards and nested boxes with a flat editorial structure: generous whitespace,
+  thin full-width dividers, aligned columns, and restrained changes in surface tone. Avoid a border,
+  radius, or shadow around every component. Content thumbnails may remain rectangular media frames.
+- Keep only purposeful copy. Metadata should scan as a compact line and the source/workspace
+  explanation should communicate the next action without repeating ownership or retention policy.
+- Project Assets remain a separate non-owning collection with All, Videos, Characters, Outfits,
+  and Voices filters, Add Asset, preview/open/detach actions, missing-resource state, bounded load
+  more, and archived read-only behavior. Make the collection easy to scan without enclosing every
+  asset in a rounded card.
+- Desktop may use a compact project summary column beside the larger Assets collection. Tablet and
+  mobile switch to one logical reading order. At narrow widths, controls wrap or stack without
+  horizontal overflow; the primary action remains easy to reach and touch targets stay about 44px.
+- Preserve every existing dialog, route, API contract, focus behavior, live announcement, and
+  empty/loading/error state. The redesign changes presentation and information hierarchy only.
+
 ## Responsive contract
 
 Design explicitly for `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`.

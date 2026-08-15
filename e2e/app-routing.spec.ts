@@ -187,7 +187,9 @@ test('Projects quick creation, lifecycle, refresh, and explicit Assets exit stay
 
   await expect(page).toHaveURL(new RegExp(`/projects/${TEST_PROJECT_ID}$`, 'u'));
   await expect(page.getByRole('heading', { name: 'Untitled Project' })).toBeVisible();
-  await expect(page.getByText(/intentionally empty/u)).toBeVisible();
+  await expect(
+    page.getByText('No source yet • This Project is ready whenever you want to begin.'),
+  ).toBeVisible();
   expect(projects.operationKeys).toHaveLength(1);
   expect(projects.operationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
   await expect
@@ -222,6 +224,30 @@ test('Projects quick creation, lifecycle, refresh, and explicit Assets exit stay
   await expect(page).toHaveURL(/\/assets\/videos$/u);
   await expect(page.getByRole('dialog', { name: 'Videos' })).toBeVisible();
   expectNoExternalProviderTraffic(network);
+});
+
+test('Project overview gives the title the full tablet content width', async ({ page }) => {
+  await page.setViewportSize({ width: 834, height: 1112 });
+  await installSuccessfulStudioHarness(page);
+  await installProjectHarness(page, true);
+  await page.goto(`/projects/${TEST_PROJECT_ID}`);
+
+  const title = page.getByRole('heading', { name: 'Untitled Project' });
+  const identity = page.locator('[data-detail-identity]');
+  const actions = page.locator('[data-detail-actions]');
+  await expect(title).toBeVisible();
+  await expect(actions.getByRole('button', { name: 'Continue editing' })).toBeVisible();
+
+  const [titleBox, identityBox, actionsBox] = await Promise.all([
+    title.boundingBox(),
+    identity.boundingBox(),
+    actions.boundingBox(),
+  ]);
+  expect(titleBox).not.toBeNull();
+  expect(identityBox).not.toBeNull();
+  expect(actionsBox).not.toBeNull();
+  expect(Math.abs(titleBox!.width - identityBox!.width)).toBeLessThanOrEqual(2);
+  expect(actionsBox!.y).toBeGreaterThan(titleBox!.y + titleBox!.height);
 });
 
 test('an uploaded Project source accepts once and resumes on the same stage after refresh', async ({
@@ -534,7 +560,9 @@ test('Campaign creation reaches a Campaign Project without activating media or p
   await createProject.getByRole('button', { name: 'Create Project' }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${TEST_PROJECT_ID}$`, 'u'));
   await expect(page.getByRole('heading', { name: 'Launch social cut' })).toBeVisible();
-  await expect(page.getByText(/intentionally empty/u)).toBeVisible();
+  await expect(
+    page.getByText('No source yet • This Project is ready whenever you want to begin.'),
+  ).toBeVisible();
   expect(campaigns.campaignOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
   expect(campaigns.projectOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
   await expect

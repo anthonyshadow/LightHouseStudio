@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { studioTheme } from '../../ui';
 import {
+  projectOverviewHeaderStyles,
+  projectOverviewInnerStyles,
+  projectOverviewRouteStyles,
   projectsHeaderActionsStyles,
   projectsIndexRouteStyles,
   projectsLedgerRowStyles,
@@ -47,6 +50,37 @@ describe('Project index responsive ledger styles', () => {
       },
       '@container (min-width: 52rem)': {
         gridTemplateColumns: 'minmax(10rem, 1fr) 7.5rem 12rem minmax(17rem, auto)',
+      },
+    });
+  });
+});
+
+describe('Project overview Single Flow styles', () => {
+  it('uses the approved flat route and content-width query boundary', () => {
+    expect(projectOverviewRouteStyles(studioTheme)).toMatchObject({
+      border: 0,
+      borderRadius: 0,
+      background: studioTheme.colors.canvas,
+      containerType: 'inline-size',
+    });
+    expect(projectOverviewInnerStyles(studioTheme)).toMatchObject({
+      width: 'min(100%, 88rem)',
+      gridTemplateColumns: 'minmax(0, 1fr)',
+    });
+  });
+
+  it('gives the title the full content width throughout tablet layouts', () => {
+    expect(projectOverviewHeaderStyles(studioTheme)).toMatchObject({
+      '& [data-detail-identity]': {
+        gridTemplateColumns: 'minmax(0, 1fr) auto',
+      },
+      '& h1': { width: '100%', maxWidth: '48rem' },
+      '@container (max-width: 64rem)': {
+        '& [data-detail-identity]': {
+          gridTemplateColumns: 'minmax(0, 1fr)',
+          alignItems: 'stretch',
+        },
+        '& h1': { maxWidth: 'none' },
       },
     });
   });

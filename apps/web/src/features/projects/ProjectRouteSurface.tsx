@@ -20,7 +20,7 @@ import {
   projectWorkspacePath,
 } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
-import { Button, StatusNotice } from '../../ui';
+import { AppIcon, Button, StatusNotice } from '../../ui';
 import { useCampaignDetail } from '../campaigns/useCampaignsController';
 import {
   NewProjectDialog,
@@ -45,6 +45,9 @@ import {
   projectsLedgerSectionStyles,
   projectsWorkspaceHeaderStyles,
   projectsWorkspaceInnerStyles,
+  projectOverviewHeaderStyles,
+  projectOverviewInnerStyles,
+  projectOverviewRouteStyles,
   statusPillStyles,
   workspaceInnerStyles,
   workspaceStyles,
@@ -76,6 +79,10 @@ const formatUpdatedAt = (value: string): string =>
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value));
+
+const projectWorkflowLabel = (
+  phase: ProjectCurrentResponse['revision']['snapshot']['workflowPhase'],
+): string => phase.charAt(0).toUpperCase() + phase.slice(1);
 
 interface ProjectListSectionProps {
   readonly lifecycle: 'active' | 'archived';
@@ -733,6 +740,7 @@ const ProjectDetail = ({
     },
     [onSourceActivityChange],
   );
+  const detailContentStyles = workspaceMode ? workspaceInnerStyles : projectOverviewInnerStyles;
 
   useEffect(() => {
     onSessionChange?.(session.port);
@@ -745,14 +753,14 @@ const ProjectDetail = ({
 
   if (session.current === null && session.phase === 'hydrating') {
     return (
-      <div css={workspaceInnerStyles(theme)}>
+      <div css={detailContentStyles(theme)}>
         <p role="status">Loading Project…</p>
       </div>
     );
   }
   if (session.current === null) {
     return (
-      <div css={workspaceInnerStyles(theme)}>
+      <div css={detailContentStyles(theme)}>
         <StatusNotice role="alert" tone="danger" title="Project unavailable">
           <p>
             {session.message ?? 'Projects could not be loaded. Check the local API and try again.'}
@@ -782,8 +790,8 @@ const ProjectDetail = ({
   };
 
   return (
-    <div css={workspaceInnerStyles(theme)}>
-      <header css={detailHeaderStyles(theme)}>
+    <div css={detailContentStyles(theme)} data-project-overview={workspaceMode ? undefined : ''}>
+      <header css={workspaceMode ? detailHeaderStyles(theme) : projectOverviewHeaderStyles(theme)}>
         <Button
           data-detail-breadcrumb
           variant="quiet"
@@ -811,9 +819,13 @@ const ProjectDetail = ({
               {project.title}
             </h1>
             <div data-detail-meta>
-              <span css={statusPillStyles(theme, archived)}>
-                {projectStatusLabel(project.status)}
-              </span>
+              {workspaceMode ? (
+                <span css={statusPillStyles(theme, archived)}>
+                  {projectStatusLabel(project.status)}
+                </span>
+              ) : (
+                <span data-project-overview-status>{projectStatusLabel(project.status)}</span>
+              )}
               <span>
                 Updated{' '}
                 <time dateTime={project.updatedAt}>{formatUpdatedAt(project.updatedAt)}</time>
@@ -831,11 +843,22 @@ const ProjectDetail = ({
                 </span>
               )}
             </div>
+            {!workspaceMode ? (
+              <div data-project-workspace-status>
+                <AppIcon name="info" />
+                <span>
+                  {current.revision.snapshot.sourceAssetId === null
+                    ? 'No source yet • This Project is ready whenever you want to begin.'
+                    : `Source ready • ${projectWorkflowLabel(current.revision.snapshot.workflowPhase)} workflow active.`}
+                </span>
+              </div>
+            ) : null}
           </div>
           <div data-detail-actions>
             {!workspaceMode ? (
               <Button
                 variant="primary"
+                data-detail-action="continue"
                 onClick={() => void navigate(projectWorkspacePath(project.id))}
               >
                 {archived ? 'View workspace' : 'Continue editing'}
@@ -844,6 +867,7 @@ const ProjectDetail = ({
             {!workspaceMode ? (
               <>
                 <Button
+                  data-detail-action="move"
                   onClick={(event) => {
                     dialogReturnRef.current = event.currentTarget;
                     setCampaignDialog(true);
@@ -853,6 +877,7 @@ const ProjectDetail = ({
                 </Button>
                 {!archived ? (
                   <Button
+                    data-detail-action="rename"
                     onClick={(event) => {
                       dialogReturnRef.current = event.currentTarget;
                       setRenameTarget(project);
@@ -863,6 +888,7 @@ const ProjectDetail = ({
                 ) : null}
                 <Button
                   variant={archived ? 'secondary' : 'danger'}
+                  data-detail-action="archive"
                   onClick={(event) => {
                     dialogReturnRef.current = event.currentTarget;
                     setLifecycleDialog({ action: archived ? 'restore' : 'archive', project });
@@ -873,6 +899,7 @@ const ProjectDetail = ({
                 {archived ? (
                   <Button
                     variant="danger"
+                    data-detail-action="delete"
                     onClick={(event) => {
                       dialogReturnRef.current = event.currentTarget;
                       setDeleteTarget(project);
@@ -937,23 +964,6 @@ const ProjectDetail = ({
             {...(onCreateProjectCharacter ? { onCreateCharacter: onCreateProjectCharacter } : {})}
             {...(onCreateProjectOutfit ? { onCreateOutfit: onCreateProjectOutfit } : {})}
           />
-          <section css={emptyProjectStyles(theme)} aria-labelledby="project-focus-heading">
-            <div>
-              <h3 id="project-focus-heading">Focused video workspace</h3>
-              <p>
-                {current.revision.snapshot.sourceAssetId === null
-                  ? 'This Project is intentionally empty. Keep it collection-only, or open the workspace when you are ready to add a source.'
-                  : `Source ready · workflow ${current.revision.snapshot.workflowPhase}. Continue editing to resume the exact saved state.`}
-              </p>
-              <p>
-                Saved Videos remain reusable assets. Adding one here does not remove it from Assets
-                or prevent another Project from using it.
-              </p>
-            </div>
-            <div data-source-actions>
-              <small>Projects and Campaigns organize work; they do not own reusable Assets.</small>
-            </div>
-          </section>
         </>
       )}
 
@@ -1035,7 +1045,13 @@ export const ProjectRouteSurface = (props: ProjectRouteSurfaceProps = {}) => {
   return (
     <div
       ref={routeRef}
-      css={projectId === null ? projectsIndexRouteStyles(theme) : workspaceStyles(theme)}
+      css={
+        projectId === null
+          ? projectsIndexRouteStyles(theme)
+          : workspaceMode
+            ? workspaceStyles(theme)
+            : projectOverviewRouteStyles(theme)
+      }
       data-project-route=""
     >
       {projectId === null ? (
