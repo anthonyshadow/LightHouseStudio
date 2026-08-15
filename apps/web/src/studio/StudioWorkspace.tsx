@@ -212,7 +212,12 @@ export const StudioWorkspace = ({
   const videoEditing = videoEditor.phase !== 'closed';
 
   return (
-    <main ref={mainRef} id="studio-main" tabIndex={-1} css={mainGridStyles(projectContextActive)}>
+    <main
+      ref={mainRef}
+      id="studio-main"
+      tabIndex={-1}
+      css={mainGridStyles(projectContextActive, organizationRouteActive, dashboardActive)}
+    >
       <div
         ref={fullscreenWorkspaceRef}
         hidden={organizationRouteActive && !projectContextActive}

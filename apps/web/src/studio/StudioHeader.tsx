@@ -3,7 +3,7 @@ import type { AuthenticatedUser } from '@studio/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccountMenu } from '../features/account/AccountMenu';
 import type { BrowserCapabilities, ProviderAvailability } from '../features/media-session';
-import { Button } from '../ui';
+import { AppIcon, Button, type AppIconName } from '../ui';
 import { useDismissiblePopover } from '../ui/primitives/useDismissiblePopover';
 import {
   brandStyles,
@@ -71,6 +71,7 @@ type StatusMenuProps = {
   liveAiState: string;
   existingVideoAiState: string;
   voiceCloudState: string;
+  railPresentation: boolean;
 };
 
 const StatusMenu = ({
@@ -82,6 +83,7 @@ const StatusMenu = ({
   liveAiState,
   existingVideoAiState,
   voiceCloudState,
+  railPresentation,
 }: StatusMenuProps) => {
   const theme = useTheme();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -90,7 +92,11 @@ const StatusMenu = ({
   useDismissiblePopover({ open, onOpenChange, rootRef, triggerRef });
 
   return (
-    <div ref={rootRef} css={capabilityStyles(theme)} aria-label="Integration availability">
+    <div
+      ref={rootRef}
+      css={capabilityStyles(theme, railPresentation)}
+      aria-label="Integration availability"
+    >
       <button
         ref={triggerRef}
         type="button"
@@ -107,7 +113,7 @@ const StatusMenu = ({
           id="studio-availability-details"
           role="region"
           aria-label="Studio availability details"
-          css={capabilityDetailStyles(theme)}
+          css={capabilityDetailStyles(theme, railPresentation)}
         >
           <div data-capability-heading>
             <strong>Studio availability</strong>
@@ -141,6 +147,7 @@ type CreateMenuProps = Readonly<{
   onCreateCampaign: () => void;
   onCreateAsset: (trigger: HTMLButtonElement | null) => void;
   onOpenLive: () => void;
+  railPresentation: boolean;
 }>;
 
 const CreateMenu = ({
@@ -152,6 +159,7 @@ const CreateMenu = ({
   onCreateCampaign,
   onCreateAsset,
   onOpenLive,
+  railPresentation,
 }: CreateMenuProps) => {
   const theme = useTheme();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -172,7 +180,7 @@ const CreateMenu = ({
   };
 
   return (
-    <div ref={rootRef} css={createMenuStyles(theme)}>
+    <div ref={rootRef} css={createMenuStyles(theme, railPresentation)}>
       <Button
         ref={triggerRef}
         size="small"
@@ -182,7 +190,7 @@ const CreateMenu = ({
         aria-expanded={open}
         onClick={() => onOpenChange(!open)}
       >
-        <span aria-hidden="true">＋</span>
+        <AppIcon name="plus" width="1.05rem" height="1.05rem" />
         <span data-create-label-long>Quick Create</span>
       </Button>
       {open ? (
@@ -293,33 +301,42 @@ export const StudioHeader = ({
         ? 'limited'
         : 'ready';
   const systemLabel = systemStatusLabel(capabilityState, localCaptureAvailable);
+  const railPresentation = organizationRouteActive;
   const setMenuOpen = useCallback((menu: HeaderMenu, open: boolean) => {
     setOpenMenu(open ? menu : null);
   }, []);
   const destinations = [
-    { id: 'dashboard', label: 'Dashboard', open: onOpenDashboard },
-    { id: 'projects', label: 'Projects', open: onOpenProjects },
-    { id: 'campaigns', label: 'Campaigns', open: onOpenCampaigns },
-    { id: 'assets', label: 'Assets', open: onOpenAssets },
-  ] as const;
+    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', open: onOpenDashboard },
+    { id: 'projects', label: 'Projects', icon: 'projects', open: onOpenProjects },
+    { id: 'campaigns', label: 'Campaigns', icon: 'campaigns', open: onOpenCampaigns },
+    { id: 'assets', label: 'Assets', icon: 'assets', open: onOpenAssets },
+  ] as const satisfies readonly {
+    id: StudioHeaderDestination;
+    label: string;
+    icon: AppIconName;
+    open: () => void;
+  }[];
 
   return (
     <>
-      <header css={headerStyles(theme)}>
+      <header
+        css={headerStyles(theme, railPresentation)}
+        data-organization-navigation={railPresentation ? 'true' : undefined}
+      >
         <button
           type="button"
           aria-label="Open Lightframe Dashboard"
-          css={brandStyles(theme)}
+          css={brandStyles(theme, railPresentation)}
           onClick={onOpenDashboard}
         >
           <img src="/favicon.svg" alt="" width="38" height="38" />
           <div>
             <strong>Lightframe</strong>
-            <span>Local-first studio</span>
+            <span>{railPresentation ? 'Studio' : 'Local-first studio'}</span>
           </div>
         </button>
-        <nav aria-label="Primary" css={primaryNavigationStyles(theme)}>
-          {destinations.map(({ id, label, open }) => (
+        <nav aria-label="Primary" css={primaryNavigationStyles(theme, railPresentation)}>
+          {destinations.map(({ id, label, icon, open }) => (
             <Button
               key={id}
               size="small"
@@ -327,43 +344,51 @@ export const StudioHeader = ({
               aria-current={activeDestination === id ? 'page' : undefined}
               onClick={open}
             >
-              {label}
+              <AppIcon data-nav-icon name={icon} />
+              <span>{label}</span>
             </Button>
           ))}
         </nav>
-        <div css={headerActionsStyles(theme)}>
-          <CreateMenu
-            open={openMenu === 'create'}
-            onOpenChange={(open) => setMenuOpen('create', open)}
-            liveEnabled={liveEnabled}
-            onCreateVideo={onOpenStudio}
-            onCreateProject={onCreateProject}
-            onCreateCampaign={onCreateCampaign}
-            onCreateAsset={onCreateAsset}
-            onOpenLive={onOpenLive}
-          />
-          <StatusMenu
-            open={openMenu === 'status'}
-            onOpenChange={(open) => setMenuOpen('status', open)}
-            systemState={systemState}
-            systemLabel={systemLabel}
-            localCaptureState={localCaptureState}
-            liveAiState={liveAiState}
-            existingVideoAiState={existingVideoAiState}
-            voiceCloudState={voiceCloudState}
-          />
-          <AccountMenu
-            user={user}
-            open={openMenu === 'account'}
-            onOpenChange={(open) => setMenuOpen('account', open)}
-            busy={accountBusy}
-            onLogout={onLogout}
-          />
+        <div css={headerActionsStyles(theme, railPresentation)}>
+          <div data-create-action>
+            <CreateMenu
+              open={openMenu === 'create'}
+              onOpenChange={(open) => setMenuOpen('create', open)}
+              liveEnabled={liveEnabled}
+              onCreateVideo={onOpenStudio}
+              onCreateProject={onCreateProject}
+              onCreateCampaign={onCreateCampaign}
+              onCreateAsset={onCreateAsset}
+              onOpenLive={onOpenLive}
+              railPresentation={railPresentation}
+            />
+          </div>
+          <div data-utility-actions>
+            <StatusMenu
+              open={openMenu === 'status'}
+              onOpenChange={(open) => setMenuOpen('status', open)}
+              systemState={systemState}
+              systemLabel={systemLabel}
+              localCaptureState={localCaptureState}
+              liveAiState={liveAiState}
+              existingVideoAiState={existingVideoAiState}
+              voiceCloudState={voiceCloudState}
+              railPresentation={railPresentation}
+            />
+            <AccountMenu
+              user={user}
+              open={openMenu === 'account'}
+              onOpenChange={(open) => setMenuOpen('account', open)}
+              busy={accountBusy}
+              presentation={railPresentation ? 'rail' : 'header'}
+              onLogout={onLogout}
+            />
+          </div>
         </div>
       </header>
       {organizationRouteActive ? (
         <nav aria-label="Mobile primary" css={mobileNavigationStyles(theme)}>
-          {destinations.map(({ id, label, open }) => (
+          {destinations.map(({ id, label, icon, open }) => (
             <Button
               key={id}
               size="small"
@@ -371,7 +396,8 @@ export const StudioHeader = ({
               aria-current={activeDestination === id ? 'page' : undefined}
               onClick={open}
             >
-              {label}
+              <AppIcon name={icon} width="1.05rem" height="1.05rem" />
+              <span>{label}</span>
             </Button>
           ))}
         </nav>

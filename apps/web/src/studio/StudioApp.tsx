@@ -1075,8 +1075,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       <a href="#studio-main" css={skipLinkStyles(theme)}>
         Skip to studio
       </a>
-      <div css={shellStyles(theme)}>
-        <div css={headerRegionStyles(theme)}>
+      <div css={shellStyles(theme, organizationRouteActive)}>
+        <div css={headerRegionStyles(theme, organizationRouteActive)}>
           <StudioHeader
             availability={availability}
             browser={browser}

@@ -9,6 +9,7 @@ interface AccountMenuProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly busy?: boolean | undefined;
+  readonly presentation?: 'header' | 'rail';
   readonly onLogout: () => void;
 }
 
@@ -17,6 +18,7 @@ export const AccountMenu = ({
   open,
   onOpenChange,
   busy = false,
+  presentation = 'header',
   onLogout,
 }: AccountMenuProps) => {
   const theme = useTheme();
@@ -38,6 +40,7 @@ export const AccountMenu = ({
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join('');
+  const railPresentation = presentation === 'rail';
   const run = (action: () => void) => {
     onOpenChange(false);
     action();
@@ -72,6 +75,60 @@ export const AccountMenu = ({
           '& > button': { width: '2.75rem', padding: 0 },
           '& [data-account-label]': { display: 'none' },
         },
+        ...(railPresentation
+          ? {
+              '@media (min-width: 48rem)': {
+                width: '100%',
+                '& > button': {
+                  width: '100%',
+                  height: 'auto',
+                  minHeight: '2.75rem',
+                  justifyContent: 'flex-start',
+                  padding: theme.space.xxs,
+                  borderColor: 'transparent',
+                  borderRadius: theme.radii.small,
+                  background: 'transparent',
+                  '&:hover:not(:disabled):not([aria-disabled="true"])': {
+                    borderColor: 'transparent',
+                    background: theme.colors.surfaceSoft,
+                  },
+                },
+                '& [data-account-initials]': {
+                  width: '2rem',
+                  height: '2rem',
+                  flex: '0 0 auto',
+                  display: 'grid',
+                  placeItems: 'center',
+                  border: `1px solid ${theme.colors.border}`,
+                  borderRadius: theme.radii.round,
+                  background: theme.colors.surfaceStrong,
+                  fontSize: theme.fontSizes.caption,
+                },
+                '& [data-account-label]': {
+                  minWidth: 0,
+                  display: 'grid',
+                  gap: '0.08rem',
+                  textAlign: 'start',
+                },
+                '& [data-account-label] strong': {
+                  overflow: 'hidden',
+                  color: theme.colors.text,
+                  fontSize: theme.fontSizes.caption,
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                },
+                '& [data-account-label] small': {
+                  color: theme.colors.textFaint,
+                  fontSize: '0.65rem',
+                  fontWeight: 650,
+                },
+              },
+              '@media (max-width: 47.99rem)': {
+                '& > button': { width: '2.75rem', padding: 0 },
+                '& [data-account-label]': { display: 'none' },
+              },
+            }
+          : {}),
       }}
     >
       <Button
@@ -89,9 +146,18 @@ export const AccountMenu = ({
           onOpenChange(true);
         }}
       >
-        <span aria-hidden="true">{initials || 'U'}</span>
+        <span data-account-initials aria-hidden="true">
+          {initials || 'U'}
+        </span>
         <span data-account-label aria-hidden="true">
-          Account
+          {railPresentation ? (
+            <>
+              <strong>{user.displayName}</strong>
+              <small>Account</small>
+            </>
+          ) : (
+            'Account'
+          )}
         </span>
       </Button>
       {open ? (
@@ -158,6 +224,24 @@ export const AccountMenu = ({
               maxHeight: 'calc(100dvh - 4.5rem)',
               overflowY: 'auto',
             },
+            ...(railPresentation
+              ? {
+                  '@media (min-width: 48rem)': {
+                    insetBlockStart: 'auto',
+                    insetBlockEnd: 0,
+                    insetInlineStart: `calc(100% + ${theme.space.sm})`,
+                    insetInlineEnd: 'auto',
+                  },
+                  '@media (max-width: 47.99rem)': {
+                    position: 'fixed',
+                    insetBlockStart: '4rem',
+                    insetInline: theme.space.xs,
+                    width: 'auto',
+                    maxHeight: 'calc(100dvh - 4.5rem)',
+                    overflowY: 'auto',
+                  },
+                }
+              : {}),
           }}
         >
           <p data-account-identity>

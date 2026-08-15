@@ -210,14 +210,16 @@ tablet and mobile use stage / horizontal category strip / bounded settings rows.
 footer remains sticky and safe-area-aware. `useVideoEditSession` is the sole owner of the pinned
 source, baseline, draft, 50-entry grouped history, generation, candidate, and worker cancellation.
 
-At the existing `64rem` desktop breakpoint, the header has no AI selection control. The
-creative-tool rail owns **Edit Video**, **Select Character**, **Select Outfit**, and **Workshop**.
-The header contains the brand, **Quick Create**, organization navigation, and mutually exclusive
-integration/account popovers. Below the desktop breakpoint, Character and Outfit choices use the
-same AI chooser and creation overlays while the compact tool rail retains Edit Video and Workshop.
-All responsive presentations share one overlay controller, creative-selection handoff, activity
-locks, and return-focus behavior. They never mount duplicate stateful selectors or start
-media/provider work.
+At the existing `64rem` desktop breakpoint, the focused Studio header has no AI selection control.
+The creative-tool rail owns **Edit Video**, **Select Character**, **Select Outfit**, and
+**Workshop**. On organization routes, the same persistent header owner reflows into a left rail at
+`48rem` and above; smaller viewports use its compact top bar and four-item bottom navigation. The
+rail contains the brand, **Quick Create**, organization navigation, and mutually exclusive
+integration/account popovers. Focused Create and Project workspaces keep the compact header and do
+not mount the organization bottom navigation. Character and Outfit choices use the same AI chooser
+and creation overlays while the compact tool rail retains Edit Video and Workshop. All responsive
+presentations share one overlay controller, creative-selection handoff, activity locks, and
+return-focus behavior. They never mount duplicate stateful selectors or start media/provider work.
 
 All tools use the shared `OverlayPanel` portal. It owns focus trap, inert background, Escape,
 topmost dismissal, scroll lock, transition-safe backdrop behavior, and return focus. The portal
