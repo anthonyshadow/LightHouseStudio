@@ -39,10 +39,10 @@ const GuardHarness = (props: StudioExitGuardProps) => {
       <button
         type="button"
         onClick={() => {
-          void navigate('/studio/character');
+          void navigate('/studio/create/live');
         }}
       >
-        Open Studio child
+        Open Live AI
       </button>
       <button
         type="button"
@@ -51,6 +51,14 @@ const GuardHarness = (props: StudioExitGuardProps) => {
         }}
       >
         Switch Project
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          void navigate('/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391');
+        }}
+      >
+        Open Project overview
       </button>
       <StudioExitGuard {...props} />
     </main>
@@ -70,9 +78,12 @@ const renderProjectGuard = (overrides: Partial<StudioExitGuardProps> = {}) => {
   const router = createMemoryRouter(
     [
       { path: '/studio/projects/:projectId', element: <GuardHarness {...props} /> },
-      { path: '/studio/character', element: <h1>Studio child route</h1> },
+      { path: '/studio/projects/:projectId/workspace', element: <GuardHarness {...props} /> },
+      { path: '/studio/create/live', element: <h1>Live AI route</h1> },
     ],
-    { initialEntries: ['/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391'] },
+    {
+      initialEntries: ['/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace'],
+    },
   );
   const view = render(
     <StudioDesignProvider>
@@ -95,10 +106,10 @@ const renderGuard = (overrides: Partial<StudioExitGuardProps> = {}) => {
   const router = createMemoryRouter(
     [
       { path: '/', element: <h1>Entry route</h1> },
-      { path: '/studio', element: <GuardHarness {...props} /> },
-      { path: '/studio/character', element: <h1>Studio child route</h1> },
+      { path: '/studio/create', element: <GuardHarness {...props} /> },
+      { path: '/studio/create/live', element: <h1>Live AI route</h1> },
     ],
-    { initialEntries: ['/studio'] },
+    { initialEntries: ['/studio/create'] },
   );
   const view = render(
     <StudioDesignProvider>
@@ -124,7 +135,7 @@ describe('StudioExitGuard', () => {
     expect(
       await screen.findByRole('heading', { name: 'Finish the take before leaving' }),
     ).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/studio');
+    expect(router.state.location.pathname).toBe('/studio/create');
     expect(props.onDiscardTemporaryWork).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Stay in Studio' }));
@@ -133,7 +144,7 @@ describe('StudioExitGuard', () => {
         screen.queryByRole('heading', { name: 'Finish the take before leaving' }),
       ).not.toBeInTheDocument(),
     );
-    expect(router.state.location.pathname).toBe('/studio');
+    expect(router.state.location.pathname).toBe('/studio/create');
   });
 
   it('requires explicit worker cancellation before a route exit can discard edits', async () => {
@@ -143,7 +154,7 @@ describe('StudioExitGuard', () => {
     expect(
       await screen.findByRole('heading', { name: 'Cancel the video render before leaving' }),
     ).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/studio');
+    expect(router.state.location.pathname).toBe('/studio/create');
     expect(props.onDiscardTemporaryWork).not.toHaveBeenCalled();
   });
 
@@ -164,11 +175,11 @@ describe('StudioExitGuard', () => {
     },
   );
 
-  it('does not block a future transition within the Studio route subtree', async () => {
+  it('does not block Live AI activation within the create workspace', async () => {
     renderGuard({ shelfDirty: true });
-    fireEvent.click(screen.getByRole('button', { name: 'Open Studio child' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Live AI' }));
 
-    expect(await screen.findByRole('heading', { name: 'Studio child route' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Live AI route' })).toBeInTheDocument();
   });
 
   it('names the discard boundary truthfully when temporary Studio work enters a Project', async () => {
@@ -180,7 +191,7 @@ describe('StudioExitGuard', () => {
         name: 'Discard temporary Studio work and open this Project?',
       }),
     ).toBeVisible();
-    expect(router.state.location.pathname).toBe('/studio');
+    expect(router.state.location.pathname).toBe('/studio/create');
   });
 
   it('protects hard unloads during recording, voice work, or dirty Shelf work', () => {
@@ -288,6 +299,26 @@ describe('StudioExitGuard', () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
+  it('allows accepted Project media to move to its overview without a discard prompt', async () => {
+    const { router } = renderProjectGuard({
+      hasTemporaryTake: true,
+      projectSourceActivity: {
+        projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
+        accepted: true,
+        busy: false,
+        abort: null,
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open Project overview' }));
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391',
+      ),
+    );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
   it('explicitly aborts cancellable source staging before switching Projects', async () => {
     const abort = vi.fn();
     const onDiscardTemporaryWork = vi.fn();
@@ -361,7 +392,7 @@ describe('StudioExitGuard', () => {
 
   it('protects active Project Voice work when leaving its URL-owned context', async () => {
     const { router } = renderProjectGuard({ voiceProcessingActive: true });
-    fireEvent.click(screen.getByRole('button', { name: 'Open Studio child' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Live AI' }));
 
     expect(
       await screen.findByRole('heading', {

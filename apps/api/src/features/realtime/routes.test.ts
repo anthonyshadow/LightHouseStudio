@@ -151,6 +151,38 @@ describe('realtime token API', () => {
     expect(token.json<ApiErrorResponse>().error.code).toBe('feature_unavailable');
   });
 
+  it('refuses token minting when the Live AI Beta gate is disabled', async () => {
+    const createToken = vi.fn(() =>
+      Promise.resolve({
+        apiKey: 'must-not-be-issued',
+        expiresAt: '2030-01-01T00:00:00.000Z',
+      }),
+    );
+    const app = createApp({
+      config: testConfig({ realtimeVideoBetaEnabled: false }),
+      decartProvider: { createToken },
+    });
+    apps.push(app);
+
+    const capabilities = await app.inject({ method: 'GET', url: '/api/capabilities' });
+    const token = await app.inject({
+      method: 'POST',
+      url: '/api/realtime-token',
+      headers: localOriginHeaders,
+      payload: {},
+    });
+
+    expect(capabilities.json()).toMatchObject({
+      realtimeVideo: { available: true, betaEnabled: false },
+    });
+    expect(token.statusCode).toBe(503);
+    expect(token.json<ApiErrorResponse>().error).toEqual({
+      code: 'feature_unavailable',
+      message: 'Live AI Beta is not enabled on this Lightframe installation.',
+    });
+    expect(createToken).not.toHaveBeenCalled();
+  });
+
   it('reports an expired Decart credential as an authentication failure', async () => {
     const provider: DecartTokenProvider = {
       createToken: vi.fn(() => Promise.reject(new ProviderError('token', 'upstream', 401))),

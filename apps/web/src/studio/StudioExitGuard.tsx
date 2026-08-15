@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useBlocker, useLocation } from 'react-router';
-import { isStudioPath, projectIdFromPath } from '../app/paths';
+import { APP_PATHS, isProjectWorkspacePath, projectIdFromPath } from '../app/paths';
 import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 import { Button } from '../ui/primitives/Button';
 import { ConfirmationDialog } from '../ui/primitives/ConfirmationDialog';
@@ -32,11 +32,25 @@ const hasUnacceptedProjectDraft = (
   (currentProjectId === null ||
     (projectSourceActivity?.projectId === currentProjectId && !projectSourceActivity.accepted));
 
+const studioWorkspaceKeyFromPath = (pathname: string): string | null => {
+  if (pathname === APP_PATHS.create || pathname === APP_PATHS.live) return 'studio:create';
+  if (!isProjectWorkspacePath(pathname)) return null;
+  const projectId = projectIdFromPath(pathname);
+  return projectId === null ? null : `project:${projectId}`;
+};
+
 export const shouldBlockStudioExit = (
   currentPathname: string,
   nextPathname: string,
   unsafeWorkActive: boolean,
-): boolean => isStudioPath(currentPathname) && !isStudioPath(nextPathname) && unsafeWorkActive;
+): boolean => {
+  const currentWorkspace = studioWorkspaceKeyFromPath(currentPathname);
+  return (
+    unsafeWorkActive &&
+    currentWorkspace !== null &&
+    currentWorkspace !== studioWorkspaceKeyFromPath(nextPathname)
+  );
+};
 
 export const shouldBlockProjectContextChange = (
   currentPathname: string,
@@ -90,8 +104,10 @@ export const StudioExitGuard = ({
       projectSourceStaging ||
       projectDraftActive ||
       projectSavePending;
+    const workspaceExitUnsafe =
+      currentProjectId === null ? unsafeWorkActive : unsafeProjectWorkActive;
     return (
-      shouldBlockStudioExit(currentLocation.pathname, nextLocation.pathname, unsafeWorkActive) ||
+      shouldBlockStudioExit(currentLocation.pathname, nextLocation.pathname, workspaceExitUnsafe) ||
       shouldBlockProjectContextChange(
         currentLocation.pathname,
         nextLocation.pathname,
@@ -108,20 +124,24 @@ export const StudioExitGuard = ({
         hasTemporaryTake,
         projectSourceActivity,
       );
+      const unsafeProjectWorkActive =
+        recordingOrFinalizing ||
+        videoRenderingActive ||
+        voiceProcessingActive ||
+        projectContextDirty ||
+        projectSourceStaging ||
+        projectDraftActive;
       const outsideStudioBlocked = shouldBlockStudioExit(
         location.pathname,
         nextPathname,
-        recordingOrFinalizing || videoRenderingActive || hasDiscardableWork,
+        currentProjectId === null
+          ? recordingOrFinalizing || videoRenderingActive || hasDiscardableWork
+          : unsafeProjectWorkActive,
       );
       const projectChangeBlocked = shouldBlockProjectContextChange(
         location.pathname,
         nextPathname,
-        recordingOrFinalizing ||
-          videoRenderingActive ||
-          voiceProcessingActive ||
-          projectContextDirty ||
-          projectSourceStaging ||
-          projectDraftActive,
+        unsafeProjectWorkActive,
       );
       return outsideStudioBlocked || projectChangeBlocked;
     },

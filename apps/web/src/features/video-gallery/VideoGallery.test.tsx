@@ -111,7 +111,7 @@ describe('VideoGallery', () => {
     expect(screen.getByText('0:12')).toBeInTheDocument();
     expect(screen.getAllByText('Landscape').length).toBeGreaterThan(0);
     expect(screen.getByText('Mara')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Load in Studio' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open in Studio' }));
     await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, 'play'));
   });
 
@@ -169,7 +169,11 @@ describe('VideoGallery', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Edit video' }));
     await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, 'edit'));
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Load in Studio' }));
+    expect(within(dialog).getByRole('button', { name: 'Export' })).toBeDisabled();
+    expect(
+      within(dialog).getByText(/Export formats and channels are not specified/u),
+    ).toBeVisible();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Open in Studio' }));
     await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, 'play'));
   });
 
@@ -207,7 +211,7 @@ describe('VideoGallery', () => {
       'href',
       `/api/videos/${current.id}/versions/${older.id}/content?download=true`,
     );
-    expect(within(dialog).queryByRole('button', { name: 'Load in Studio' })).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: 'Open in Studio' })).toBeNull();
     expect(onUse).not.toHaveBeenCalled();
   });
 
@@ -231,7 +235,9 @@ describe('VideoGallery', () => {
     });
     renderGallery();
 
-    expect(await screen.findByRole('heading', { name: 'No saved videos yet' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'No videos in Assets yet' }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/Save as New Video/u)).toBeInTheDocument();
   });
 
@@ -334,13 +340,13 @@ describe('VideoGallery', () => {
     expect(await screen.findByRole('heading', { name: 'Renamed take' })).toBeInTheDocument();
     expect(api.renameSavedVideo).toHaveBeenCalledWith(original.id, 'Renamed take');
     fireEvent.click(screen.getByLabelText('More actions for Renamed take'));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    const removeDialog = screen.getByRole('dialog', { name: 'Remove saved video' });
+    fireEvent.click(screen.getByRole('button', { name: 'Remove from Assets' }));
+    const removeDialog = screen.getByRole('dialog', { name: 'Remove video from Assets' });
     expect(within(removeDialog).getByRole('button', { name: 'Keep video' })).toHaveFocus();
     expect(removeDialog).toHaveTextContent(
       'Exact Versions and bytes remain available from any retaining Project history',
     );
-    fireEvent.click(within(removeDialog).getByRole('button', { name: 'Remove from Saved Videos' }));
+    fireEvent.click(within(removeDialog).getByRole('button', { name: 'Remove from Assets' }));
     await waitFor(() => expect(api.deleteSavedVideo).toHaveBeenCalledWith(original.id));
     expect(screen.queryByRole('heading', { name: 'Renamed take' })).not.toBeInTheDocument();
   });
@@ -370,9 +376,9 @@ describe('VideoGallery', () => {
     expect(screen.getByLabelText('More actions for Morning take')).toHaveFocus();
 
     fireEvent.click(screen.getByLabelText('More actions for Morning take'));
-    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
-    const removeDialog = screen.getByRole('dialog', { name: 'Remove saved video' });
-    fireEvent.click(within(removeDialog).getByRole('button', { name: 'Remove from Saved Videos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove from Assets' }));
+    const removeDialog = screen.getByRole('dialog', { name: 'Remove video from Assets' });
+    fireEvent.click(within(removeDialog).getByRole('button', { name: 'Remove from Assets' }));
     expect(await within(removeDialog).findByRole('alert')).toHaveTextContent(
       'Removal is temporarily unavailable.',
     );

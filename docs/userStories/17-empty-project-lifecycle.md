@@ -9,14 +9,14 @@ provider work.
 
 ## Observable behavior
 
-1. **Projects** is a primary destination in the existing authenticated Studio chrome.
-   `/studio/projects` lists bounded active and archived summaries; `/studio/projects/:projectId`
-   opens one Project. Both routes are protected, deep-linkable, and return to the same URL after
-   Login. Existing `/studio`, Saved Videos, Saved Characters, and Saved Outfits routes remain
-   canonical.
-2. **Quick Start** creates `Untitled Project` without requiring a Campaign, brief, source, tag, or
-   provider choice. The browser supplies one operation key for the action and reuses it after an
-   uncertain response so the server's durable receipt can reconcile an exact replay.
+1. **Projects** is a primary destination in the authenticated Studio chrome. `/studio/projects`
+   lists bounded active and archived summaries; `/studio/projects/:projectId` is its organization
+   overview; `/studio/projects/:projectId/workspace` opens its focused video workspace. All are
+   protected, deep-linkable, and return to the same URL after Login.
+2. **New Project** asks for a name and optional Campaign. **Quick project** creates `Untitled
+Project` without requiring a Campaign, brief, source, tag, or provider choice. Either path may
+   intentionally remain collection-only. The browser supplies one operation key and reuses it
+   after an uncertain response so the server's durable receipt can reconcile an exact replay.
 3. Summary rows show only title, derived Project status, and updated time. Active and archived
    queries are separate, cursor-bounded pages. Loading, empty, safe-error/retry, and explicit
    **Load more** states do not fetch snapshots, media, history, bytes, storage data, or provider
@@ -28,18 +28,19 @@ provider work.
    **Reload and retry rename** or **Discard change**. Reload fetches current server authority;
    response-loss replay is reconciled when the requested result is already current.
 6. Refreshing or directly opening an empty Project fetches its identity and current revision from
-   server authority. The detail truthfully says **No source yet** and offers **Record**, **Upload**,
-   and **Use Saved Video** without a wizard. Upload previews immediately on the existing stage;
+   server authority. The overview truthfully explains that an intentionally empty collection is
+   valid. **Continue editing** opens the workspace, where **No source yet** offers **Record**,
+   **Upload**, and **Use Saved Video** without a wizard. Upload previews immediately on the stage;
    Record starts local media only after the explicit action and offers a finalized take for
    acceptance; Use Saved Video selects the current exact active Version.
 7. `StudioApp` remains the sole authenticated composition root and owns the one mounted media
-   stage. Project list and Campaign routes hide it; an open Project reuses it beside Project source
-   controls rather than mounting another Studio, player, media session, object-URL owner, shell, or
-   Project store.
-8. Active Project identity is URL-owned. **Studio** navigation and global-library navigation are
-   labelled as Project-context exits. Refreshing `/studio/videos`, `/studio/characters`, or
-   `/studio/outfits` restores that global library and cannot resurrect the prior Project from
-   mounted React state.
+   stage. Project list, overview, Dashboard, Assets, and Campaign routes hide it; only the Project
+   workspace presents it beside source controls. No route mounts another Studio, player, media
+   session, object-URL owner, shell, or Project store.
+8. Active Project identity and surface are URL-owned. Refreshing an `/studio/assets/*` route
+   restores that global Asset view and cannot resurrect the prior Project workspace from mounted
+   React state. Leaving a workspace cannot silently abandon recording, finalization, local render,
+   unaccepted source, dirty creative state, or a pending semantic checkpoint.
 9. The UI distinguishes **Preparing source**, **Saving changes**, **All changes saved**,
    **Conflict**, and safe failure. A Project becomes resumable only after durable byte storage or
    exact Version verification, server inspection, checksum/owner validation, and atomic source

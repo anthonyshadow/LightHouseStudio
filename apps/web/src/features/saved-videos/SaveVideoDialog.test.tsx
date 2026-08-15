@@ -31,7 +31,7 @@ describe('SaveVideoDialog', () => {
 
     expect(name).toHaveFocus();
     await user.type(name, '  Studio intro  ');
-    await user.click(screen.getByRole('button', { name: 'Save Video' }));
+    await user.click(screen.getByRole('button', { name: 'Save to Assets' }));
 
     expect(onSave).toHaveBeenCalledWith('Studio intro');
   });
@@ -41,7 +41,7 @@ describe('SaveVideoDialog', () => {
     const { onSave } = renderDialog();
 
     expect(screen.getByText(/Leave blank to use.*Recorded take/u)).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Save Video' }));
+    await user.click(screen.getByRole('button', { name: 'Save to Assets' }));
 
     expect(onSave).toHaveBeenCalledWith(undefined);
   });

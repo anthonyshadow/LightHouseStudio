@@ -38,6 +38,7 @@ export const testConfig = (overrides: Partial<RuntimeConfig> = {}): RuntimeConfi
   otelTraceSampleRatio: 0.1,
   videoJobMaxActive: 8,
   videoJobMaxActivePerProvider: 4,
+  realtimeVideoBetaEnabled: true,
   existingVideoCharacterSwapProvider: 'decart',
   prunaVideoReplaceEnabled: false,
   prunaImageTryOnEnabled: false,

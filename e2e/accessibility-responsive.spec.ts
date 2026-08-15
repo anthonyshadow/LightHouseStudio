@@ -83,7 +83,7 @@ const installProviderFreeStudio = async (page: Page): Promise<MockStudioState> =
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            realtimeVideo: { available: true },
+            realtimeVideo: { available: true, betaEnabled: true },
             videoProcessing: {
               characterSwap: {
                 available: false,
@@ -203,33 +203,18 @@ for (const viewport of representativeViewports) {
   test(`${viewport.name} preparation is accessible and viewport-bound`, async ({ page }) => {
     const network = await installProviderFreeStudio(page);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await page.goto('/studio');
+    await page.goto('/studio/create');
 
     await expect(page.getByRole('main')).toBeVisible();
-    await expect(page.getByRole('complementary', { name: 'First take guide' })).toContainText(
-      'Record New Video or Upload Video → review',
-    );
-    await expect(
-      page
-        .getByRole('complementary', { name: 'First take guide' })
-        .getByText('Virtual Try On · Character Swap · Voice → Save', { exact: true }),
-    ).toBeVisible();
+    await expect(page.getByLabel('Studio media stage')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Record New Video' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Upload Video' })).toBeVisible();
     const stageFrameBox = await page.locator('[data-stage-frame]').boundingBox();
-    const guideBox = await page.locator('[data-first-success-guide]').boundingBox();
     expect(stageFrameBox).not.toBeNull();
-    expect(guideBox).not.toBeNull();
-    expect(guideBox!.x).toBeGreaterThanOrEqual(stageFrameBox!.x);
-    expect(guideBox!.x + guideBox!.width).toBeLessThanOrEqual(
-      stageFrameBox!.x + stageFrameBox!.width,
-    );
-    expect(guideBox!.y).toBeGreaterThanOrEqual(stageFrameBox!.y);
-    expect(guideBox!.y + guideBox!.height).toBeLessThanOrEqual(
-      stageFrameBox!.y + stageFrameBox!.height,
-    );
     const availability = page.getByLabel('Integration availability');
     await availability.getByRole('button').click();
     await expect(page.getByRole('region', { name: 'Studio availability details' })).toContainText(
-      'AI video configured',
+      'Live AI Beta enabled',
     );
 
     const statusTrigger = availability.getByRole('button');
@@ -246,7 +231,7 @@ for (const viewport of representativeViewports) {
     ).not.toBe('rgba(0, 0, 0, 0)');
 
     await accountTrigger.click();
-    const accountMenu = page.getByRole('menu', { name: 'Account and saved libraries' });
+    const accountMenu = page.getByRole('menu', { name: 'Account' });
     await expect(accountMenu).toBeVisible();
     await expect(page.getByRole('region', { name: 'Studio availability details' })).toHaveCount(0);
     await expect
@@ -328,7 +313,7 @@ test('small-mobile Project output review reflows at 200% text with accessible sa
   const network = await installSuccessfulStudioHarness(page);
   await installProjectHarness(page, true);
   await page.setViewportSize(STUDIO_VIEWPORT_SIZES.smallMobile);
-  await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+  await page.goto(`/studio/projects/${TEST_PROJECT_ID}/workspace`);
   const fixture = await loadDecodableH264VideoFixture();
   await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
     name: 'accessible-project-output.mp4',
@@ -365,7 +350,7 @@ test('small-mobile Builder steps survive 200% text and keep one preview', async 
   test.setTimeout(60_000);
   const network = await installProviderFreeStudio(page);
   await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '200%';
   });
@@ -425,7 +410,10 @@ test('mobile Campaign organization remains keyboard-accessible at 200% text', as
   await expect(newProject).toBeVisible();
   await newProject.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+  const projectDialog = page.getByRole('dialog', { name: 'New Project' });
+  await projectDialog.getByLabel('Project name').fill('Launch social cut');
+  await projectDialog.getByRole('button', { name: 'Create Project' }).click();
+  await expect(page.getByRole('heading', { name: 'Launch social cut' })).toBeVisible();
   await expect(page.getByText('Campaign: Summer launch', { exact: true })).toBeVisible();
   await expectNoDocumentOverflow(page);
   await expectNoAxeViolations(page);
@@ -443,7 +431,7 @@ test('phone and tablet keep AI preparation in Dock and Shelf with no header sele
 }) => {
   const network = await installProviderFreeStudio(page);
   await page.setViewportSize(STUDIO_VIEWPORT_SIZES.compactDesktop);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   const desktopRail = page.getByRole('navigation', { name: 'Creative workspace tools' });
   await expect
     .poll(() =>
@@ -459,7 +447,7 @@ test('phone and tablet keep AI preparation in Dock and Shelf with no header sele
     STUDIO_VIEWPORT_SIZES.mobilePortrait,
   ]) {
     await page.setViewportSize(viewport);
-    await page.goto('/studio');
+    await page.goto('/studio/create');
     const rail = page.getByRole('navigation', { name: 'Creative workspace tools' });
     await expect(rail.getByRole('button')).toHaveCount(4);
     await expect(rail.getByRole('button', { name: 'Select Character' })).toHaveCount(0);
@@ -492,7 +480,7 @@ test('desktop Outfit Builder saves and selects a prompt outfit without media or 
 }) => {
   const network = await installProviderFreeStudio(page);
   await page.setViewportSize(STUDIO_VIEWPORT_SIZES.compactDesktop);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   await page.getByRole('button', { name: 'Select Outfit', exact: true }).click();
   const selector = page.getByRole('dialog', { name: 'Outfit' });
@@ -524,7 +512,7 @@ test('small-mobile Recipe Dock scrolls internally and Escape restores launcher f
 }) => {
   const network = await installProviderFreeStudio(page);
   await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   const launcher = page.getByRole('button', { name: 'Dock' });
   await launcher.focus();
@@ -569,7 +557,7 @@ test('small-mobile Recipe Dock scrolls internally and Escape restores launcher f
 
 test('empty VTON Start is blocked before camera access or token issuance', async ({ page }) => {
   const network = await installProviderFreeStudio(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   await openRecipeDockWhenOverlaid(page);
   const vtonMode = page.getByRole('button', { name: 'Virtual Try-On · VTON 3' });
@@ -595,7 +583,7 @@ test('explicit local Start surfaces a sanitized camera denial without provider w
   page,
 }) => {
   const network = await installProviderFreeStudio(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   await openRecipeDockWhenOverlaid(page);
   const start = page.getByRole('button', { name: 'Start local preview' });

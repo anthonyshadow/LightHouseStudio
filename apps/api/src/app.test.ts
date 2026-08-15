@@ -32,7 +32,7 @@ describe('API shell', () => {
     );
     expect(health.headers['x-trace-id']).toBeUndefined();
     expect(capabilities.json()).toEqual({
-      realtimeVideo: { available: false },
+      realtimeVideo: { available: false, betaEnabled: true },
       videoProcessing: {
         characterSwap: {
           available: false,
@@ -133,7 +133,7 @@ describe('API shell', () => {
     const capabilities = await app.inject({ method: 'GET', url: '/api/capabilities' });
 
     expect(capabilities.json()).toMatchObject({
-      realtimeVideo: { available: false },
+      realtimeVideo: { available: false, betaEnabled: true },
       videoProcessing: {
         characterSwap: {
           available: true,

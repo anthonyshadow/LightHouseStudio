@@ -21,10 +21,13 @@ import { EntryPage } from './EntryPage';
 import {
   APP_PATHS,
   campaignIdFromPath,
+  isAssetsPath,
   isCampaignsPath,
+  isProjectWorkspacePath,
   isProjectsPath,
   isRestorableStudioPath,
   isStudioPath,
+  legacyStudioRedirect,
   projectIdFromPath,
 } from './paths';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -49,20 +52,33 @@ const routeSurfaceStyles = {
 };
 
 const titleForPath = (pathname: string): string => {
+  if (isProjectWorkspacePath(pathname)) return 'Project Studio · Lightframe';
   if (projectIdFromPath(pathname) !== null) return 'Project · Lightframe Studio';
   if (campaignIdFromPath(pathname) !== null) return 'Campaign · Lightframe Studio';
 
   switch (pathname) {
+    case APP_PATHS.dashboard:
+      return 'Dashboard · Lightframe';
+    case APP_PATHS.create:
+      return 'Studio · Lightframe';
+    case APP_PATHS.live:
+      return 'Live AI Beta · Lightframe';
     case APP_PATHS.projects:
       return 'Projects · Lightframe Studio';
     case APP_PATHS.campaigns:
       return 'Campaigns · Lightframe Studio';
+    case APP_PATHS.assets:
+      return 'Assets · Lightframe';
     case APP_PATHS.videos:
-      return 'Saved Videos · Lightframe Studio';
+      return 'Videos · Assets · Lightframe';
     case APP_PATHS.characters:
-      return 'Saved Characters · Lightframe Studio';
+      return 'Characters · Assets · Lightframe';
     case APP_PATHS.outfits:
-      return 'Saved Outfits · Lightframe Studio';
+      return 'Outfits · Assets · Lightframe';
+    case APP_PATHS.voices:
+      return 'Voices · Assets · Lightframe';
+    case APP_PATHS.recipes:
+      return 'Recipes · Assets · Lightframe';
     default:
       return isRestorableStudioPath(pathname) ? 'Lightframe Studio' : 'Enter Lightframe Studio';
   }
@@ -84,7 +100,7 @@ const RouteMetadata = () => {
 
 const StudioLoading = () => (
   <main role="status" aria-live="polite" css={routeSurfaceStyles}>
-    Loading Studio…
+    Loading Lightframe…
   </main>
 );
 
@@ -92,7 +108,7 @@ const RouteErrorFallback = () => (
   <main role="alert" css={routeSurfaceStyles}>
     <div>
       <h1>Studio could not load</h1>
-      <p>Reload Lightframe to try again. Your saved browser-local library is unchanged.</p>
+      <p>Reload Lightframe to try again. Your saved account content is unchanged.</p>
       <Button variant="primary" onClick={() => window.location.reload()}>
         Reload
       </Button>
@@ -163,10 +179,13 @@ export const RoutedApplication = () => {
     setHasVisitedStudio(true);
   }
   const focusMainOnMount =
-    (location.pathname === APP_PATHS.studio ||
+    (location.pathname === APP_PATHS.dashboard ||
+      location.pathname === APP_PATHS.create ||
+      isAssetsPath(location.pathname) ||
       isProjectsPath(location.pathname) ||
       isCampaignsPath(location.pathname)) &&
     location.key !== 'default';
+  const legacyRedirect = legacyStudioRedirect(location.pathname);
 
   return (
     <>
@@ -182,7 +201,11 @@ export const RoutedApplication = () => {
             element={
               isRestorableStudioPath(location.pathname) ? (
                 <ProtectedRoute>
-                  <StudioRoute focusMainOnMount={focusMainOnMount} />
+                  {legacyRedirect ? (
+                    <Navigate replace to={legacyRedirect} />
+                  ) : (
+                    <StudioRoute focusMainOnMount={focusMainOnMount} />
+                  )}
                 </ProtectedRoute>
               ) : (
                 <Navigate replace to={APP_PATHS.entry} />

@@ -15,6 +15,90 @@ export const safeProjectError = (error: unknown): string =>
 
 export type ProjectLifecycleAction = 'archive' | 'restore';
 
+export const NewProjectDialog = ({
+  defaultCampaignId = null,
+  returnFocusRef,
+  onClose,
+  onCreated,
+}: {
+  readonly defaultCampaignId?: string | null;
+  readonly returnFocusRef: RefObject<HTMLElement | null>;
+  readonly onClose: () => void;
+  readonly onCreated: (current: ProjectCurrentResponse) => void;
+}) => {
+  const theme = useTheme();
+  const controller = useProjectsController();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [title, setTitle] = useState('');
+  const [campaignId, setCampaignId] = useState(defaultCampaignId ?? 'none');
+  const [error, setError] = useState<string | null>(null);
+  const busy = controller.createNamedMutation.isPending;
+
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
+    setError(null);
+    try {
+      onCreated(
+        await controller.createNamedMutation.mutateAsync({
+          title,
+          campaignId: projectCampaignId(campaignId),
+        }),
+      );
+    } catch (caught) {
+      setError(safeProjectError(caught));
+    }
+  };
+
+  return (
+    <OverlayPanel
+      open
+      onClose={onClose}
+      title="New Project"
+      description="Name the work now. A Campaign is optional, and the Project may remain collection-only until you add a video."
+      placement="bottom"
+      size="standard"
+      closeDisabled={busy}
+      closeOnBackdrop={false}
+      initialFocusRef={inputRef}
+      returnFocusRef={returnFocusRef}
+      footer={
+        <div css={dialogActionsStyles(theme)}>
+          <Button variant="quiet" disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            busy={busy}
+            disabled={title.trim().length === 0 || title.trim().length > 120}
+            onClick={() => void submit()}
+          >
+            Create Project
+          </Button>
+        </div>
+      }
+    >
+      <form onSubmit={(event) => void submit(event)} css={{ display: 'grid', gap: theme.space.md }}>
+        <TextField
+          ref={inputRef}
+          label="Project name"
+          value={title}
+          required
+          maxLength={120}
+          disabled={busy}
+          {...(error ? { error } : {})}
+          onChange={(event) => setTitle(event.target.value)}
+        />
+        <ProjectCampaignPicker
+          label="Campaign (optional)"
+          value={campaignId}
+          disabled={busy}
+          onValueChange={(value) => setCampaignId(value)}
+        />
+      </form>
+    </OverlayPanel>
+  );
+};
+
 export const RenameProjectDialog = ({
   project,
   returnFocusRef,

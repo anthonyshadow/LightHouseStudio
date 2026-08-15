@@ -27,7 +27,7 @@ test('optimized reference hydrates its stored Lucy prompt atomically and survive
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   await openCharacterBuilder(page);
   await page.getByRole('button', { name: 'Generate Preview' }).click();
@@ -136,7 +136,7 @@ test('wardrobe uses an exact variant image without its parent prompt and remains
   const network = await installSuccessfulStudioHarness(page, {
     wardrobeAddOutfitAvailable: true,
   });
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   await openCharacterBuilder(page);
   await page.getByRole('button', { name: 'Generate Preview' }).click();
@@ -218,7 +218,7 @@ test('saved character opens in Builder and updates its original record after reg
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   await openCharacterBuilder(page);
   await page.getByRole('button', { name: 'Generate Preview' }).click();
@@ -325,7 +325,7 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
       storageKey: CREATIVE_ASSET_STORAGE_KEY,
     },
   );
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();
   await page.getByRole('button', { name: /^Recent\b/u }).click();

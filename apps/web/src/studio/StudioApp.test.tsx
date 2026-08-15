@@ -419,39 +419,39 @@ vi.mock('./useTakeReviewFlow', () => ({
 vi.mock('./StudioHeader', () => ({
   StudioHeader: ({
     activeDestination,
+    onOpenDashboard,
     onOpenStudio,
     onOpenProjects,
-    onOpenVideos,
-    onOpenCharacters,
-    onOpenOutfits,
+    onOpenCampaigns,
+    onOpenAssets,
     onLogout,
   }: {
     activeDestination: StudioHeaderDestination;
+    onOpenDashboard: () => void;
     onOpenStudio: () => void;
     onOpenProjects: () => void;
-    onOpenVideos: () => void;
-    onOpenCharacters: () => void;
-    onOpenOutfits: () => void;
+    onOpenCampaigns: () => void;
+    onOpenAssets: () => void;
     onLogout: () => void;
   }) => {
     harness.latestHeaderDestination = activeDestination;
     return (
       <div>
         Studio header
+        <button type="button" onClick={onOpenDashboard}>
+          Open Dashboard
+        </button>
         <button type="button" onClick={onOpenStudio}>
           Open Studio
         </button>
         <button type="button" onClick={onOpenProjects}>
           Open Projects
         </button>
-        <button type="button" onClick={onOpenVideos}>
-          Open saved videos
+        <button type="button" onClick={onOpenCampaigns}>
+          Open Campaigns
         </button>
-        <button type="button" onClick={onOpenCharacters}>
-          Open saved characters
-        </button>
-        <button type="button" onClick={onOpenOutfits}>
-          Open saved outfits
+        <button type="button" onClick={onOpenAssets}>
+          Open Assets
         </button>
         <button type="button" onClick={onLogout}>
           Log out
@@ -505,6 +505,33 @@ vi.mock('../ui', async () => {
         <input aria-label={label} {...props} />
         {hint ? <span>{hint}</span> : null}
       </label>
+    ),
+    SegmentedControl: ({
+      label,
+      value,
+      options,
+      disabled,
+      onChange,
+    }: {
+      label: string;
+      value: string;
+      options: readonly { value: string; label: string }[];
+      disabled?: boolean;
+      onChange: (value: string) => void;
+    }) => (
+      <div role="group" aria-label={label}>
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={option.value === value}
+            disabled={disabled}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
     ),
     StatusNotice: ({ title, children }: PropsWithChildren<{ title: string }>) => (
       <aside aria-label={title}>{children}</aside>
@@ -595,7 +622,7 @@ const testSession: AuthenticatedSessionResponse = {
   expiresAt: '2099-08-06T12:00:00.000Z',
 };
 
-const renderStudio = (initialIntent?: 'upload', initialPath = '/studio') =>
+const renderStudio = (initialIntent?: 'upload', initialPath = '/studio/create') =>
   render(
     <StudioDesignProvider>
       <AuthProvider initialSession={testSession}>
@@ -671,19 +698,28 @@ describe('StudioApp composition lifecycle', () => {
     expect(screen.getByTestId('media-stage')).toBe(stage);
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open saved videos' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Assets' }));
+    await screen.findByRole('heading', { name: 'Assets' });
+    expect(screen.getByTestId('media-stage')).toBe(stage);
+    expect(stage.closest('[hidden]')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Videos' }));
     await screen.findByText('Deferred saved videos');
     expect(screen.getByTestId('media-stage')).toBe(stage);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open saved characters' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Assets' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Characters' }));
     await screen.findByText('Deferred saved characters');
     expect(screen.getByTestId('media-stage')).toBe(stage);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open saved outfits' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Assets' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Outfits' }));
     await screen.findByText('Deferred saved outfits');
     expect(screen.getByTestId('media-stage')).toBe(stage);
-    fireEvent.click(screen.getByRole('button', { name: 'Close Saved Outfits' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close Outfits' }));
 
+    fireEvent.click(screen.getByRole('button', { name: 'Open Studio' }));
+    await waitFor(() => expect(stage.closest('[hidden]')).not.toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: 'Open outfit options' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Create deferred outfit' }));
     await screen.findByText('Deferred outfit builder');
@@ -693,10 +729,10 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it.each([
-    ['/studio/videos', 'videos'],
-    ['/studio/characters', 'characters'],
-    ['/studio/outfits', 'outfits'],
-  ] as const)('reports %s as the current saved-library destination', (path, destination) => {
+    ['/studio/assets/videos', 'assets'],
+    ['/studio/assets/characters', 'assets'],
+    ['/studio/assets/outfits', 'assets'],
+  ] as const)('reports %s under the Assets destination', (path, destination) => {
     renderStudio(undefined, path);
 
     expect(harness.latestHeaderDestination).toBe(destination);
@@ -720,7 +756,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('keeps the same media-stage owner visible in an open Project and supplies source lifecycle seams', async () => {
-    renderStudio(undefined, '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391');
+    renderStudio(undefined, '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
     const stage = screen.getByTestId('media-stage');
 
     expect(await screen.findByText('Deferred Projects workspace')).toBeInTheDocument();
@@ -734,7 +770,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('flushes the active Project session before logout cleanup', async () => {
-    renderStudio(undefined, '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391');
+    renderStudio(undefined, '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
     await screen.findByText('Deferred Projects workspace');
     const flush = vi.fn(() => Promise.resolve(true));
     const sessionPort: ProjectSessionPort = {
@@ -827,13 +863,13 @@ describe('StudioApp composition lifecycle', () => {
     renderStudio();
 
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    expect(screen.getByRole('region', { name: 'Save video' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Save to Assets' })).toBeInTheDocument();
     expect(harness.saveVideo).not.toHaveBeenCalled();
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Video name (optional)' }), {
       target: { value: 'Studio intro' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Save Video' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save to Assets' }));
 
     await waitFor(() =>
       expect(harness.saveVideo).toHaveBeenCalledWith(presented, 'Studio intro', undefined, null),

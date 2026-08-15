@@ -34,6 +34,21 @@ const CampaignRouteSurface = lazy(() =>
     default: module.CampaignRouteSurface,
   })),
 );
+const DashboardRouteSurface = lazy(() =>
+  import('../features/dashboard/DashboardRouteSurface').then((module) => ({
+    default: module.DashboardRouteSurface,
+  })),
+);
+const AssetsRouteSurface = lazy(() =>
+  import('../features/assets/AssetsRouteSurface').then((module) => ({
+    default: module.AssetsRouteSurface,
+  })),
+);
+const LiveBetaRouteSurface = lazy(() =>
+  import('../features/beta/LiveBetaRouteSurface').then((module) => ({
+    default: module.LiveBetaRouteSurface,
+  })),
+);
 
 const deferredWorkspaceFallback = <p role="status">Loading studio tool…</p>;
 
@@ -45,8 +60,12 @@ interface StudioWorkspaceProps {
   };
   readonly route: {
     readonly organizationActive: boolean;
+    readonly dashboardActive: boolean;
+    readonly assetsActive: boolean;
+    readonly liveUnavailableActive: boolean;
     readonly projectContextActive: boolean;
     readonly projectActive: boolean;
+    readonly projectOverviewActive: boolean;
     readonly campaignActive: boolean;
     readonly projectRecordingAvailable: boolean;
   };
@@ -85,6 +104,34 @@ interface StudioWorkspaceProps {
   };
   readonly creativeWorkspace: ReactNode;
   readonly projectCreativeCheckpoint: ReactNode;
+  readonly dashboard: {
+    readonly displayName: string;
+    readonly onCreateVideo: () => void;
+    readonly onCreateProject: () => void;
+    readonly onCreateCampaign: () => void;
+    readonly onOpenAssets: () => void;
+    readonly onOpenProjects: () => void;
+    readonly onOpenCampaigns: () => void;
+    readonly onOpenProject: (projectId: string) => void;
+    readonly onOpenCampaign: (campaignId: string) => void;
+    readonly onOpenVideos: () => void;
+  };
+  readonly assets: {
+    readonly characterCount: number;
+    readonly outfitCount: number;
+    readonly recipeCount: number;
+    readonly onOpen: (
+      destination: 'videos' | 'characters' | 'outfits' | 'voices' | 'recipes',
+    ) => void;
+    readonly onUploadVideo: () => void;
+  };
+  readonly liveBeta: {
+    readonly capabilityState: 'loading' | 'ready' | 'error';
+    readonly betaEnabled: boolean;
+    readonly providerConfigured: boolean;
+    readonly onOpenStudio: () => void;
+    readonly onOpenDashboard: () => void;
+  };
   readonly saveVideoState: SaveVideoState;
   readonly actions: {
     readonly startExistingVideoRecording: () => void;
@@ -108,6 +155,9 @@ export const StudioWorkspace = ({
   activity,
   creativeWorkspace,
   projectCreativeCheckpoint,
+  dashboard,
+  assets,
+  liveBeta,
   saveVideoState,
   actions,
 }: StudioWorkspaceProps) => {
@@ -115,8 +165,12 @@ export const StudioWorkspace = ({
   const { main: mainRef, fullscreen: fullscreenWorkspaceRef, uploadToggle: uploadToggleRef } = refs;
   const {
     organizationActive: organizationRouteActive,
+    dashboardActive,
+    assetsActive,
+    liveUnavailableActive,
     projectContextActive,
     projectActive: projectRouteActive,
+    projectOverviewActive,
     campaignActive: campaignRouteActive,
     projectRecordingAvailable,
   } = route;
@@ -326,9 +380,49 @@ export const StudioWorkspace = ({
           </>
         )}
       </div>
+      {dashboardActive ? (
+        <Suspense fallback={<p role="status">Loading Dashboard…</p>}>
+          <DashboardRouteSurface
+            ownerUserId={ownerUserId}
+            displayName={dashboard.displayName}
+            onCreateVideo={dashboard.onCreateVideo}
+            onCreateProject={dashboard.onCreateProject}
+            onCreateCampaign={dashboard.onCreateCampaign}
+            onOpenAssets={dashboard.onOpenAssets}
+            onOpenProjects={dashboard.onOpenProjects}
+            onOpenCampaigns={dashboard.onOpenCampaigns}
+            onOpenProject={dashboard.onOpenProject}
+            onOpenCampaign={dashboard.onOpenCampaign}
+            onOpenVideos={dashboard.onOpenVideos}
+          />
+        </Suspense>
+      ) : null}
+      {assetsActive ? (
+        <Suspense fallback={<p role="status">Loading Assets…</p>}>
+          <AssetsRouteSurface
+            characterCount={assets.characterCount}
+            outfitCount={assets.outfitCount}
+            recipeCount={assets.recipeCount}
+            onOpen={assets.onOpen}
+            onUploadVideo={assets.onUploadVideo}
+          />
+        </Suspense>
+      ) : null}
+      {liveUnavailableActive ? (
+        <Suspense fallback={<p role="status">Checking Live AI Beta…</p>}>
+          <LiveBetaRouteSurface
+            capabilityState={liveBeta.capabilityState}
+            betaEnabled={liveBeta.betaEnabled}
+            providerConfigured={liveBeta.providerConfigured}
+            onOpenStudio={liveBeta.onOpenStudio}
+            onOpenDashboard={liveBeta.onOpenDashboard}
+          />
+        </Suspense>
+      ) : null}
       {projectRouteActive ? (
         <Suspense fallback={<p role="status">Loading Projects workspace…</p>}>
           <ProjectRouteSurface
+            workspaceMode={!projectOverviewActive}
             ownerUserId={ownerUserId}
             creativeCheckpoint={projectCreativeCheckpoint}
             processing={projectProcessing}

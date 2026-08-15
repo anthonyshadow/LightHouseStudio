@@ -16,6 +16,8 @@ import { StoryColumn, StorySection } from '../support/StoryLayout';
 
 const headerAvailability = {
   decart: true,
+  realtimeBetaEnabled: true,
+  realtimeProviderConfigured: true,
   elevenLabs: true,
   elevenLabsModel: 'eleven_multilingual_v2',
   referenceImages: true,
@@ -53,12 +55,14 @@ const meta = {
     capabilityState: 'ready',
     user: headerUser,
     activeDestination: 'studio',
+    onOpenDashboard: fn(),
     onOpenStudio: fn(),
     onOpenCampaigns: fn(),
     onOpenProjects: fn(),
-    onOpenVideos: fn(),
-    onOpenCharacters: fn(),
-    onOpenOutfits: fn(),
+    onOpenAssets: fn(),
+    onCreateProject: fn(),
+    onCreateCampaign: fn(),
+    onOpenLive: fn(),
     onLogout: fn(),
   },
   parameters: {
@@ -83,12 +87,14 @@ const HeaderHarness = () => {
         capabilityState="ready"
         user={headerUser}
         activeDestination="studio"
+        onOpenDashboard={fn()}
         onOpenStudio={fn()}
         onOpenCampaigns={fn()}
         onOpenProjects={fn()}
-        onOpenVideos={fn()}
-        onOpenCharacters={fn()}
-        onOpenOutfits={fn()}
+        onOpenAssets={fn()}
+        onCreateProject={fn()}
+        onCreateCampaign={fn()}
+        onOpenLive={fn()}
         onLogout={fn()}
       />
     </StoryColumn>

@@ -2,16 +2,44 @@
 
 ## Product context
 
-Lightframe Studio is a local-first, single-operator browser video studio. The primary flow is
-Record or Upload → Review → optional Virtual Try On, Character Swap, and/or Voice → Download.
-`/studio` starts in neutral Local Camera mode with camera, microphone, and AI off until an explicit
-action. It is a fixed-viewport workspace with one persistent media stage; tools are focus-managed
-overlays and must never remount the media. Live AI camera transformation is an advanced flow.
+Lightframe Studio is a local-first, single-operator browser video studio. The primary product model
+is Dashboard → Create, Assets, Projects, or Campaigns. `/studio` is the authenticated Dashboard and
+`/studio/create` is the standalone creation workspace. The workspace flow is Record or Upload →
+Review → optional Virtual Try On, Character Swap, and/or Voice → Save to Assets or Download. It is a
+fixed-viewport workspace with one persistent media stage; tools are focus-managed overlays and must
+never remount the media. Live AI camera transformation is an explicitly gated Beta flow.
 Character Builder creates a reusable Lucy 2.5 character from approachable visual choices, an
 optional upload, and an optional paid reference generation. The post-recording editor adopts a
 validated upload or normalized local recording as an immutable source, then allows zero or one
 visual edit (Character Swap or Virtual Try On) and an optional Voice edit before comparison and
 download.
+
+## Information architecture
+
+- Dashboard orients first-time users, exposes one strong Create video action, and helps returning
+  users continue recent work.
+- Assets exposes retained Videos, Characters, Outfits, Voices, and Recipes. Account navigation is
+  reserved for identity, availability, and logout.
+- A Campaign optionally groups Projects and never owns media-processing state.
+- A Project may intentionally be empty and acts as a collection around one focused, resumable
+  primary video workflow today. Its retained outputs and reusable resources are visible from the
+  Project overview. Future independently resumable Project children are called **Videos** in the UI
+  and **Project Deliverables** in contracts/schema.
+- Studio always declares its context, save destination, and return path. Standalone work returns to
+  Dashboard or Assets; Project work returns to its Project and then its Campaign when applicable.
+- Live AI Beta is hidden from ordinary navigation unless `REALTIME_VIDEO_BETA_ENABLED=true`.
+- Export remains visible but disabled with a concise “Coming later” explanation until an actual
+  format/channel contract exists. Download continues to retrieve an exact retained Video Version.
+
+## Application shell
+
+- Desktop: Lightframe brand/Home, Dashboard, Projects, Campaigns, Assets, one prominent Create
+  action, availability, and Account.
+- Mobile organization screens: compact top bar and four-item bottom navigation for Dashboard,
+  Projects, Campaigns, and Assets. Studio replaces that bottom navigation with a context/exit bar.
+- Every page has one visible page-level `h1`; the brand is a Dashboard link rather than the heading.
+- Use one primary action per screen, consistent overflow menus for secondary actions, actionable
+  empty states, section-scoped loading/retry, and explicit save destinations.
 
 The post-recording editor must be immediately legible to first-time users: confirm the source,
 choose an optional edit, configure only that edit, run it deliberately, then compare and download.

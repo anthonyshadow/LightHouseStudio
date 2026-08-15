@@ -24,8 +24,8 @@ export const SaveVideoDialog = ({ fallbackName, onCancel, onSave }: SaveVideoDia
     <OverlayPanel
       open
       onClose={onCancel}
-      title="Save video"
-      description="Give this video an optional name before saving it to Saved Videos."
+      title="Save to Assets"
+      description="Give this video an optional name before retaining it in Assets."
       placement="bottom"
       size="standard"
       closeOnBackdrop={false}
@@ -36,7 +36,7 @@ export const SaveVideoDialog = ({ fallbackName, onCancel, onSave }: SaveVideoDia
             Cancel
           </Button>
           <Button type="submit" form={formId} variant="primary">
-            Save Video
+            Save to Assets
           </Button>
         </div>
       }

@@ -9,6 +9,8 @@ import { StudioHeader } from './StudioHeader';
 
 const availability = {
   decart: true,
+  realtimeBetaEnabled: true,
+  realtimeProviderConfigured: true,
   elevenLabs: false,
   elevenLabsModel: null,
 };
@@ -37,12 +39,14 @@ const headerProps = {
     lastLoginAt: '2026-08-05T12:00:00.000Z',
   },
   activeDestination: 'studio' as const,
+  onOpenDashboard: vi.fn(),
   onOpenStudio: vi.fn(),
   onOpenProjects: vi.fn(),
   onOpenCampaigns: vi.fn(),
-  onOpenVideos: vi.fn(),
-  onOpenCharacters: vi.fn(),
-  onOpenOutfits: vi.fn(),
+  onOpenAssets: vi.fn(),
+  onCreateProject: vi.fn(),
+  onCreateCampaign: vi.fn(),
+  onOpenLive: vi.fn(),
   onLogout: vi.fn(),
 };
 
@@ -66,42 +70,41 @@ afterEach(() => {
 });
 
 describe('StudioHeader', () => {
-  it('exposes Studio, Campaigns, and Projects as the one primary navigation', async () => {
+  it('exposes Dashboard, Projects, Campaigns, and Assets as primary navigation', async () => {
     const user = userEvent.setup();
     renderHeader();
     const navigation = screen.getByRole('navigation', { name: 'Primary' });
 
-    expect(within(navigation).getByRole('button', { name: 'Studio' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
+    expect(within(navigation).queryByRole('button', { name: 'Studio' })).not.toBeInTheDocument();
+    await user.click(within(navigation).getByRole('button', { name: 'Dashboard' }));
+    expect(headerProps.onOpenDashboard).toHaveBeenCalledOnce();
     await user.click(within(navigation).getByRole('button', { name: 'Projects' }));
     expect(headerProps.onOpenProjects).toHaveBeenCalledOnce();
     await user.click(within(navigation).getByRole('button', { name: 'Campaigns' }));
     expect(headerProps.onOpenCampaigns).toHaveBeenCalledOnce();
+    await user.click(within(navigation).getByRole('button', { name: 'Assets' }));
+    expect(headerProps.onOpenAssets).toHaveBeenCalledOnce();
   });
 
-  it('does not mark Studio current on a saved-library route and identifies the exact library', async () => {
+  it('marks Assets as the current destination independently from Account', async () => {
     const user = userEvent.setup();
-    renderHeader({ activeDestination: 'outfits' });
+    renderHeader({ activeDestination: 'assets' });
     const navigation = screen.getByRole('navigation', { name: 'Primary' });
 
-    expect(within(navigation).getByRole('button', { name: 'Studio' })).not.toHaveAttribute(
-      'aria-current',
-    );
-    expect(within(navigation).queryByRole('button', { current: 'page' })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Demo Creator account menu' }));
-    expect(screen.getByRole('menuitem', { name: 'Saved Outfits' })).toHaveAttribute(
+    expect(within(navigation).getByRole('button', { name: 'Assets' })).toHaveAttribute(
       'aria-current',
       'page',
     );
+
+    await user.click(screen.getByRole('button', { name: 'Demo Creator account menu' }));
+    expect(screen.getByRole('menu', { name: 'Account' })).toBeVisible();
+    expect(screen.queryByRole('menuitem', { name: /Saved/u })).not.toBeInTheDocument();
   });
 
   it('keeps status before the far-right account control and omits Select AI', () => {
     renderHeader();
     const header = screen.getByRole('banner');
-    const status = within(header).getByRole('button', { name: 'Studio available to try' });
+    const status = within(header).getByRole('button', { name: 'Core Studio ready' });
     const account = within(header).getByRole('button', { name: 'Demo Creator account menu' });
 
     expect(status.compareDocumentPosition(account) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -112,28 +115,26 @@ describe('StudioHeader', () => {
     const user = userEvent.setup();
     renderHeader();
     const account = screen.getByRole('button', { name: 'Demo Creator account menu' });
-    const status = screen.getByRole('button', { name: 'Studio available to try' });
+    const status = screen.getByRole('button', { name: 'Core Studio ready' });
 
     await user.click(account);
-    expect(screen.getByRole('menu', { name: 'Account and saved libraries' })).toBeVisible();
+    expect(screen.getByRole('menu', { name: 'Account' })).toBeVisible();
 
     await user.click(status);
-    expect(
-      screen.queryByRole('menu', { name: 'Account and saved libraries' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('menu', { name: 'Account' })).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Studio availability details' })).toBeVisible();
 
     await user.click(account);
     expect(
       screen.queryByRole('region', { name: 'Studio availability details' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('menu', { name: 'Account and saved libraries' })).toBeVisible();
+    expect(screen.getByRole('menu', { name: 'Account' })).toBeVisible();
   });
 
   it('closes status for Escape and outside pointer and restores trigger focus', async () => {
     const user = userEvent.setup();
     renderHeader();
-    const status = screen.getByRole('button', { name: 'Studio available to try' });
+    const status = screen.getByRole('button', { name: 'Core Studio ready' });
 
     await user.click(status);
     await user.keyboard('{Escape}');
@@ -170,38 +171,49 @@ describe('StudioHeader', () => {
 
       await user.click(screen.getByRole('button', { name: label }));
       const details = screen.getByRole('region', { name: 'Studio availability details' });
-      expect(details).toHaveTextContent(`AI video ${ai}`);
+      expect(details).toHaveTextContent(`Existing-video AI ${ai}`);
       expect(details).toHaveTextContent(`Voice cloud ${voice}`);
-      expect(details).toHaveTextContent(
-        'Provider configuration does not verify live service health.',
-      );
+      expect(details).toHaveTextContent('Configuration does not verify live provider health.');
     },
   );
 
   it('reports limited local capture and provider configuration independently', async () => {
     const user = userEvent.setup();
     renderHeader({
-      availability: { decart: false, elevenLabs: false, elevenLabsModel: null },
+      availability: {
+        decart: false,
+        realtimeBetaEnabled: false,
+        realtimeProviderConfigured: false,
+        elevenLabs: false,
+        elevenLabsModel: null,
+      },
       browser: { ...browser, secureContext: false },
     });
 
     await user.click(screen.getByRole('button', { name: 'Studio limited' }));
     const details = screen.getByRole('region', { name: 'Studio availability details' });
     expect(details).toHaveTextContent('Local capture unavailable');
-    expect(details).toHaveTextContent('AI video not configured');
+    expect(details).toHaveTextContent('Existing-video AI not configured');
     expect(details).toHaveTextContent('Voice cloud not configured (optional)');
   });
 
-  it('labels leaving an active Project for Studio and invokes the exact destination', async () => {
+  it('offers all creation paths and hides Live AI when its beta gate is off', async () => {
     const user = userEvent.setup();
-    renderHeader({ activeDestination: 'projects', projectContextActive: true });
+    renderHeader({
+      availability: {
+        decart: true,
+        realtimeBetaEnabled: false,
+        realtimeProviderConfigured: true,
+        elevenLabs: false,
+        elevenLabsModel: null,
+      },
+    });
 
-    await user.click(screen.getByRole('button', { name: 'Exit Project to Studio' }));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+    const menu = screen.getByRole('menu', { name: 'Create' });
+    expect(within(menu).queryByRole('menuitem', { name: /Live AI/u })).not.toBeInTheDocument();
+    await user.click(within(menu).getByRole('menuitem', { name: 'New video' }));
 
     expect(headerProps.onOpenStudio).toHaveBeenCalledOnce();
-    expect(screen.getByRole('button', { name: 'Projects' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
   });
 });

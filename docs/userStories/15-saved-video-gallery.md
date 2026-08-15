@@ -1,4 +1,4 @@
-# Save and reuse videos
+# Save and reuse Videos in Assets
 
 ## Story
 
@@ -8,7 +8,7 @@ Studio stage.
 
 ## Observable behavior
 
-1. A healthy review artifact exposes **Save Video**, never a direct Download action. Saving first
+1. A healthy review artifact exposes **Save to Assets**, never a direct Download action. Saving first
    prompts for an optional video name; a blank field keeps the existing generated artifact name.
    Saving is explicit, reports progress/result, and repeated submission of the same artifact is
    idempotent. Release remains disabled until the current artifact is saved.
@@ -20,9 +20,10 @@ Studio stage.
    In authoritative Neon/private-R2 mode, the authenticated API stages the save and the browser
    transfers multipart bytes directly to R2; the result is not visible until the API verifies and
    attaches it. Local and shadow modes retain their existing API-mediated upload behavior.
-3. `/studio/videos` reuses the mounted `StudioApp` and persistent `MediaStage`. The gallery first
-   loads filtered/sorted metadata in cursor pages; it does not eagerly load video bytes. The
-   default order is Latest, with Oldest, Shortest, and Longest alternatives.
+3. `/studio/assets/videos` reuses the mounted `StudioApp` and persistent `MediaStage`; the Assets
+   view hides the stage without unmounting its owner. The gallery first loads filtered/sorted
+   metadata in cursor pages; it does not eagerly load video bytes. The default order is Latest,
+   with Oldest, Shortest, and Longest alternatives.
 4. The gallery can show only videos attributed to a chosen saved character and/or the chosen
    current-version format: Landscape, Portrait, or Square. Available character and format facets
    cover the full owner library rather than only the current page. Older saved versions without
@@ -39,10 +40,12 @@ Studio stage.
    or provider session. The dialog lists immutable Versions with ordinal, current marker, origin,
    timestamp, media facts, and status. Selecting an older Version previews and downloads that exact
    content without changing the Saved Video current pointer.
-7. **Use** fetches owner-checked bytes only after selection, validates them through the existing
-   source path, and returns to the Studio stage/editor with saved video/version lineage.
-8. Rename changes metadata. Delete confirms, tombstones only the chosen record, and removes it from
-   the visible gallery. Every video can be deleted independently in any order; retained derived
+7. **Open in Studio** fetches owner-checked bytes only after selection, validates them through the
+   existing source path, and returns to the Studio stage/editor with saved video/version lineage.
+   **Add to Project** links the exact ready Version to a selected empty same-owner Project through
+   the existing source-acceptance contract; the Video remains reusable and no bytes are copied.
+8. Rename changes metadata. **Remove from Assets** confirms, tombstones only the chosen record, and
+   removes it from the visible gallery. Every video can be removed independently in any order; retained derived
    records keep their historical source lineage even when that source record is deleted. With
    private R2 selected, deletion removes only immutable-version and thumbnail objects that no
    Project output still retains. A tombstoned global record stays hidden, while an exact

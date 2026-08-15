@@ -36,16 +36,15 @@ Authenticated owner scope (the current Workspace)
 │   └── Project 0..N
 ├── standalone Project 0..N
 │
-├── reusable resources
+├── Assets
+│   ├── Saved Videos
+│   │   └── immutable Video Versions
 │   ├── Character
 │   │   └── Character Variant / Wardrobe item
 │   ├── Outfit
 │   ├── Voice / Saved Voice relationship
 │   ├── Recipe / prompt
 │   └── immutable reference media
-│
-└── Saved Videos
-    └── immutable Video Versions
 
 Project
 ├── current immutable Project Revision
@@ -100,10 +99,9 @@ variations, calendar, analytics, publishing, or collaboration in MVP.
 
 ### Campaign UX
 
-- Campaigns is a primary authenticated navigation destination alongside Projects and the Studio
-  libraries.
+- Campaigns is a primary authenticated navigation destination alongside Projects and Assets.
 - Create Campaign asks for only **Name** and optional **Brief**.
-- Success opens Campaign detail with a primary **New Project** or **Quick Start** action.
+- Success opens Campaign detail with a primary **New Project** action whose Campaign is preselected.
 - Campaign detail lists its active Projects and provides move/detach and archive/restore actions.
 - The user is never required to create a Campaign before beginning creative work.
 
@@ -251,11 +249,11 @@ resource without exposing another owner's existence.
 The MVP keeps the current Studio flexible and does not introduce a forced wizard:
 
 ```text
-Log in
+Log in to Dashboard
   ↓
 Open Projects, or open/create a Campaign
   ↓
-Quick Start a standalone or Campaign Project
+Create a named Project, or use Quick project for an untitled standalone Project
   ↓
 Record, upload, or reuse an exact Saved Video Version as source
   ↓
@@ -284,21 +282,22 @@ must never revoke media still owned by another active Project/session.
 
 Minimum authenticated destinations are:
 
+- **Dashboard:** orientation, account onboarding, recent work, and explicit creation/resume actions;
+- **Create:** the focused standalone video workspace at `/studio/create`;
 - **Projects:** default active list, recent status, optional Campaign, create/open/rename/archive;
 - **Campaigns:** active list, create/open/rename/edit brief/archive, and grouped Projects;
-- **Studio:** the open Project work context plus the existing creative surface;
-- **Saved Videos:** all retained output/library records, with Project association when known and
-  “Unassigned Content” for legacy or independently saved records;
-- **Characters** and **Outfits:** existing libraries; and
-- current contextual access to Voices, Wardrobe, Recipe Shelf, and builders.
+- **Project overview/workspace:** organization at `/studio/projects/:projectId` and focused media
+  work at its `/workspace` child;
+- **Assets:** Videos, Characters, Outfits, Voices, and Recipes, with “Unassigned Content” for legacy
+  or independently saved Videos; and
+- current contextual access to Wardrobe and builders.
 
-This MVP does not require a new Voices top-level route if Project-aware access remains discoverable
-and tested. It does require Campaigns, Projects, current Project identity, save state, and processing
-state to be clear in the main navigation/shell.
+It requires Campaigns, Projects, Assets, current Project identity, save state, and processing state
+to be clear in the main navigation/shell.
 
-Active Project identity is owned by `/studio/projects/:projectId`. Opening a global library route is
-a guarded exit from that Project context, not an identity kept only in mounted React state;
-in-Project resource selection uses contextual pickers or returns through the explicit Project URL.
+Active Project identity is owned by the overview/workspace URL pair. Opening a global Assets route
+is a guarded workspace exit, not an identity kept only in mounted React state; in-Project resource
+selection uses contextual pickers or returns through the explicit Project workspace URL.
 
 ## Persistence and reliability contract
 
@@ -363,8 +362,8 @@ persistence mode unless a mode is explicitly and canonically unsupported before 
    workspace organized through optional Campaigns and Projects.
 2. The user can create, rename/edit, archive, restore, guarded-tombstone, list, and open a Campaign
    with name and optional brief; tombstone is blocked while Projects remain attached.
-3. The user can Quick Start a standalone Project or create one in an active Campaign without
-   unnecessary required metadata.
+3. The user can create a named standalone or Campaign Project, or use Quick project without
+   unnecessary required metadata; any Project may intentionally remain collection-only.
 4. The user can move/detach a Project and use the virtual No Campaign view; Campaign lifecycle does
    not cascade.
 5. The user can record, upload, or explicitly reuse a Saved Video Version as the Project source;
@@ -386,8 +385,8 @@ persistence mode unless a mode is explicitly and canonically unsupported before 
     Project Revision through crash-safe/idempotent orchestration.
 12. The user can browse bounded Project history/outputs, open/use/download an exact previous Video
     Version, and find legacy Unassigned Content.
-13. The user can move coherently among Campaigns, Projects, an open Project Studio, Saved Videos,
-    and reusable-resource libraries without losing or silently discarding work.
+13. The user can move coherently among Dashboard, Create, Campaigns, Project overview/workspace,
+    and Assets without losing or silently discarding work.
 14. Download selects an exact ready Video Version and is labeled distinctly from **All changes
     saved**, **Render preview**, **Save as New Video**, and **Add Version**.
 15. Cross-owner, missing, archived/deleted, replay, conflict, cleanup-retention, refresh-resume, and

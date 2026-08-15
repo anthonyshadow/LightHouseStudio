@@ -323,6 +323,12 @@ export const previewFooterStyles = (theme: Theme): CSSObject => ({
   justifyContent: 'flex-end',
   gap: theme.space.xs,
   '& > *': { minWidth: '8.5rem' },
+  '& > small': {
+    flexBasis: '100%',
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSizes.caption,
+    textAlign: 'end',
+  },
   '& > a': {
     minHeight: '2.85rem',
     display: 'inline-flex',
@@ -346,7 +352,7 @@ export const previewFooterStyles = (theme: Theme): CSSObject => ({
     display: 'grid',
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
     '& > *': { minWidth: 0 },
-    '& > *:last-child': { gridColumn: '1 / -1' },
+    '& > small': { gridColumn: '1 / -1', textAlign: 'start' },
   },
   '@media (max-width: 20rem)': { gridTemplateColumns: 'minmax(0, 1fr)' },
 });

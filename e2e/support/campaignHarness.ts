@@ -115,11 +115,15 @@ export const installCampaignHarness = async (page: Page, seed = false) => {
     }
     if (url.pathname === '/api/projects' && method === 'POST') {
       projectOperationKeys.push(request.headers()['idempotency-key'] ?? '');
-      const body = request.postDataJSON() as { campaignId: string | null };
+      const body = request.postDataJSON() as { campaignId: string | null; title?: string };
       const empty = emptyProjectFixture();
       currentProject = {
         ...empty,
-        project: { ...empty.project, campaignId: body.campaignId },
+        project: {
+          ...empty.project,
+          campaignId: body.campaignId,
+          title: body.title ?? empty.project.title,
+        },
       };
       await route.fulfill({
         status: 201,

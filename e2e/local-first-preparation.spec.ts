@@ -59,7 +59,7 @@ test.beforeEach(async ({ page, request, baseURL }) => {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        realtimeVideo: { available: true },
+        realtimeVideo: { available: true, betaEnabled: true },
         videoProcessing: {
           characterSwap: {
             available: false,
@@ -107,7 +107,7 @@ test('prepares an object recipe accessibly without camera or provider work', asy
     if (url.pathname.startsWith('/api/')) apiRequests.push(url.pathname);
   });
 
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   const icon = page.locator('link[rel~="icon"]');
   await expect(icon).toHaveAttribute('href', '/favicon.svg');
@@ -121,7 +121,7 @@ test('prepares an object recipe accessibly without camera or provider work', asy
   );
   await page.getByLabel('Integration availability').getByRole('button').click();
   await expect(page.getByRole('region', { name: 'Studio availability details' })).toContainText(
-    'AI video configured',
+    'Live AI Beta enabled',
   );
   await page.keyboard.press('Escape');
 
@@ -185,27 +185,27 @@ test('development proxy preserves exact Origin validation for provider mutations
   baseURL,
 }) => {
   const origin = new URL(baseURL ?? 'http://127.0.0.1:4173').origin;
-  const safeInvalidRequests = [
-    request.post('/api/realtime-token', {
-      headers: { Origin: origin },
-      data: { model: 'unsupported-model' },
-    }),
-    request.post('/api/elevenlabs/voice-changer/recording', {
-      headers: {
-        Origin: origin,
-        'Content-Type': 'audio/webm',
-        [VOICE_PROVIDER_INTENT_HEADER]: VOICE_PROVIDER_INTENT_VALUE,
-      },
-      data: 'invalid-without-a-voice-id',
-    }),
-  ];
+  const realtimeResponse = await request.post('/api/realtime-token', {
+    headers: { Origin: origin },
+    data: { model: 'unsupported-model' },
+  });
+  expect(realtimeResponse.status()).toBe(503);
+  expect(apiErrorResponseSchema.parse(await realtimeResponse.json()).error.code).toBe(
+    'feature_unavailable',
+  );
 
-  for (const response of await Promise.all(safeInvalidRequests)) {
-    expect(response.status()).toBe(400);
-    expect(apiErrorResponseSchema.parse(await response.json()).error.code).not.toBe(
-      'forbidden_origin',
-    );
-  }
+  const voiceResponse = await request.post('/api/elevenlabs/voice-changer/recording', {
+    headers: {
+      Origin: origin,
+      'Content-Type': 'audio/webm',
+      [VOICE_PROVIDER_INTENT_HEADER]: VOICE_PROVIDER_INTENT_VALUE,
+    },
+    data: 'invalid-without-a-voice-id',
+  });
+  expect(voiceResponse.status()).toBe(400);
+  expect(apiErrorResponseSchema.parse(await voiceResponse.json()).error.code).not.toBe(
+    'forbidden_origin',
+  );
 
   const mismatchedOrigin = await request.post('/api/realtime-token', {
     headers: { Origin: 'http://127.0.0.1:4100' },

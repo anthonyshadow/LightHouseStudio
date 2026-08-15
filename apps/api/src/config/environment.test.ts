@@ -26,6 +26,7 @@ describe('parseEnvironment', () => {
       r2KeyPrefix: 'media/v1',
       videoJobMaxActive: DEFAULT_VIDEO_JOB_MAX_ACTIVE,
       videoJobMaxActivePerProvider: DEFAULT_VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER,
+      realtimeVideoBetaEnabled: false,
       existingVideoCharacterSwapProvider: 'decart',
       prunaVideoReplaceEnabled: false,
       prunaImageTryOnEnabled: false,
@@ -225,6 +226,7 @@ describe('parseEnvironment', () => {
         DEMO_USER_PASSWORD_HASH:
           '$argon2id$v=19$m=19456,t=2,p=1$3Jc1DI4gFLxlnIHlbUmVvg$HvHo3eFp60xDrSTIRQaDaLilJgFBNQ6fJ4xwlL+I+iA',
         PORT: '4321',
+        REALTIME_VIDEO_BETA_ENABLED: 'true',
         DECART_API_KEY: '  decart-placeholder  ',
         OPENAI_API_KEY: '  openai-placeholder  ',
         OPENAI_PROMPT_OPTIMIZER_MODEL: ' gpt-test-optimizer ',
@@ -251,6 +253,7 @@ describe('parseEnvironment', () => {
     ).toMatchObject({
       nodeEnv: 'production',
       port: 4321,
+      realtimeVideoBetaEnabled: true,
       decartApiKey: 'decart-placeholder',
       openAiApiKey: 'openai-placeholder',
       openAiPromptOptimizerModel: 'gpt-test-optimizer',
@@ -308,6 +311,7 @@ describe('parseEnvironment', () => {
       { PRUNA_VIDEO_REPLACE_MODEL: 'p-video-replace-latest' },
       { PRUNA_IMAGE_TRY_ON_ENABLED: 'TRUE' },
       { PRUNA_IMAGE_TRY_ON_MODEL: 'p-image-try-on-latest' },
+      { REALTIME_VIDEO_BETA_ENABLED: 'TRUE' },
       { VIDEO_JOB_MAX_ACTIVE: '0' },
       { VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER: '101' },
       { VIDEO_JOB_MAX_ACTIVE: '2', VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER: '3' },

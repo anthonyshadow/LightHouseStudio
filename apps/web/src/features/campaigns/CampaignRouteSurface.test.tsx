@@ -89,7 +89,10 @@ const currentProject = (
 
 const renderCampaigns = (path = '/studio/campaigns') => {
   const router = createMemoryRouter(
-    [{ path: '/studio/campaigns/*', element: <CampaignRouteSurface /> }],
+    [
+      { path: '/studio/campaigns/*', element: <CampaignRouteSurface /> },
+      { path: '/studio/projects/:projectId', element: <div>Project route</div> },
+    ],
     { initialEntries: [path] },
   );
   const view = render(
@@ -161,9 +164,13 @@ describe('Campaign route surface', () => {
     );
     expect(await screen.findByRole('heading', { name: 'Summer launch' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'New Project' }));
-    await waitFor(() =>
-      expect(projectCreateBody).toEqual({ title: 'Untitled Project', campaignId }),
+    const projectDialog = screen.getByRole('dialog', { name: 'New Project' });
+    await user.type(
+      within(projectDialog).getByRole('textbox', { name: /Project name/u }),
+      'Launch cut',
     );
+    await user.click(within(projectDialog).getByRole('button', { name: 'Create Project' }));
+    await waitFor(() => expect(projectCreateBody).toEqual({ title: 'Launch cut', campaignId }));
     expect(router.state.location.pathname).toBe(`/studio/projects/${projectId}`);
   });
 
@@ -324,6 +331,9 @@ describe('Campaign route surface', () => {
   it('shows a recoverable New Project error without exposing an upstream body', async () => {
     mockApiServer.use(
       http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(campaign())),
+      http.get('*/api/campaigns', () =>
+        HttpResponse.json({ campaigns: [campaign()], nextCursor: null }),
+      ),
       http.get('*/api/projects', () => HttpResponse.json({ projects: [], nextCursor: null })),
       http.post('*/api/projects', () =>
         HttpResponse.json(
@@ -336,9 +346,12 @@ describe('Campaign route surface', () => {
     renderCampaigns(`/studio/campaigns/${campaignId}`);
 
     await user.click(await screen.findByRole('button', { name: 'New Project' }));
+    const dialog = screen.getByRole('dialog', { name: 'New Project' });
+    await user.type(within(dialog).getByRole('textbox', { name: /Project name/u }), 'Retry cut');
+    await user.click(within(dialog).getByRole('button', { name: 'Create Project' }));
 
-    const error = await screen.findByRole('alert');
-    expect(error).toHaveTextContent('Action not completed');
+    const error = await within(dialog).findByRole('alert');
+    expect(error).toHaveTextContent('The request could not be completed.');
     expect(error).not.toHaveTextContent('upstream project failure');
   });
 

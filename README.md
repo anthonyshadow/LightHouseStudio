@@ -6,11 +6,11 @@ small creative teams that want to move from an idea or existing asset to campaig
 without stitching together disconnected creative tools.
 
 The implemented product is currently a local-first, single-operator browser studio centered on
-video. Its resumable workspace loop is:
+video. Its authenticated Dashboard leads into this resumable workspace loop:
 
-**Log in → Quick Start a standalone Project or open a Campaign → accept a durable source →
-create, edit, or transform → Save as New Video or Add Version → review history → Download an
-exact Version**
+**Log in → Dashboard → create a named or quick Project, or open a Campaign → accept a durable
+source → create, edit, or transform → Save as New Video or Add Version → review history →
+Download an exact Version**
 
 The standalone Studio remains available for a fast record/upload workflow that does not
 automatically create or assign a Project.
@@ -19,7 +19,7 @@ Live character transformation and Workshop remain advanced tools. The app binds 
 1 provides one seeded local demo account, authenticated ownership, and durable local saved-media
 records; it does not provide signup, billing, collaboration, or public multi-user deployment. A
 durable, video-oriented Project authority and lightweight optional Campaigns now support bounded
-lists, Quick Start/New Project, open, edit/rename, move/detach, archive, restore, and guarded
+lists, named/quick Project creation, open, edit/rename, move/detach, archive, restore, and guarded
 Campaign deletion in every persistence mode. An open Project can now durably accept one inspected
 upload, finalized local recording, or exact active Saved Video Version as its immutable original
 and restore it from the same URL. Project creative configuration is now available through explicit
@@ -72,8 +72,10 @@ Neither document changes the current loopback, account, provider, privacy, or de
 
 1. Open `/`, choose **Log in**, and submit the locally configured demo credentials. The backend
    verifies the Argon2id password hash and issues a session JWT in a host-only, HTTP-only cookie.
-   The development login form currently prefills both values by product decision.
-2. Studio opens in neutral **Local Camera** mode. Camera and microphone remain off until the
+   The development login form currently prefills both values by product decision. Successful login
+   opens `/studio`, the provider-free Dashboard within the persistent authenticated shell.
+2. Choose **Create video** to open `/studio/create` in neutral **Local Camera** mode. Camera and
+   microphone remain off until the
    creator explicitly starts them from the control bar or **Record a local video** in the upload
    panel. No AI model, provider session, or remote processing starts on entry or refresh.
 3. Choose a landscape 16:9 or portrait 9:16 local format in Capture Settings, then record on the
@@ -88,10 +90,10 @@ Neither document changes the current loopback, account, provider, privacy, or de
    and/or **Voice**. Combined work completes and validates the visual result before voice
    conversion. Any non-16:9/9:16 upload or local square, 4:5, or incompatible Freeform edit keeps
    Save and Voice but disables Character Swap/VTO before provider contact.
-6. Preview **Original** and **Result**, revise the plan or edit base, then **Save Video**. Save is
+6. Preview **Original** and **Result**, revise the plan or edit base, then **Save to Assets**. Save is
    idempotent. An edit saves as a new, source-linked video by default; explicit replacement
    confirms before appending an immutable version. Download is available for one exact ready
-   Version from Saved Videos or its retaining Project history.
+   Version from Videos in Assets or its retaining Project history.
 7. Prepare advanced live work without starting media: desktop places **Select Character** and
    **Select Outfit** immediately before **Workshop** in the creative-tool rail. Phones and tablets
    use **Dock** for direct Character/VTO recipes and **Shelf** for saved characters, outfits, and
@@ -100,14 +102,16 @@ Neither document changes the current loopback, account, provider, privacy, or de
 
 ### Campaign and Project workspace
 
-`/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio`,
-`/studio/campaigns`, `/studio/campaigns/:campaignId`, `/studio/projects`,
-`/studio/projects/:projectId`, `/studio/videos`, `/studio/characters`, and `/studio/outfits` share
-one persistent `StudioApp` and one stage. Campaigns and the Project list hide the stage; an open
-Project reuses that same stage beside its source controls without creating another shell, player,
-media session, provider action, or browser authority store. **Quick Start** creates a standalone
-`Untitled Project`; **New Project** creates one inside
-an active Campaign. **No Campaign** is a virtual Project group, never a default database row.
+`/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio` is the
+Dashboard; `/studio/create` is standard creation; `/studio/create/live` is gated Live AI Beta;
+`/studio/assets` groups Videos, Characters, Outfits, Voices, and Recipes; and the Campaign/Project
+routes share one persistent `StudioApp` and one stage. Dashboard, Assets, Campaigns, Project lists,
+and Project overviews hide the stage; `/studio/projects/:projectId/workspace` reuses that same stage
+beside its Project controls without creating another shell, player,
+media session, provider action, or browser authority store. **Quick project** creates a standalone
+`Untitled Project`; **New Project** asks for a name and optional Campaign, with the current Campaign
+preselected when launched from its detail. **No Campaign** is a virtual Project group, never a
+default database row.
 Campaign archive is non-cascading and Campaign deletion requires archive plus zero attached
 Projects. An empty Project offers **Record**, **Upload**, and **Use Saved Video**. It becomes
 resumable only after the API stores or verifies the bytes, inspects the media, commits the
@@ -122,7 +126,7 @@ adopted only through explicit **Use in Project**; preview, use, and **Download**
 Saved Video current pointer or infer an Add Version target. The full-screen library surfaces
 likewise never create another media session. The gallery
 loads metadata and lazy thumbnails first, then fetches video bytes only for an explicit Preview,
-Studio, Edit, or Download action. Saved Videos can be filtered by attributed parent character and
+Studio, Edit, or Download action. Videos in Assets can be filtered by attributed parent character and
 Landscape, Portrait, or Square format, then ordered by Latest, Oldest, Shortest, or Longest. When
 a Wardrobe variant was used, the card and preview also show that exact variant without splitting
 the parent character's filter group. Preview can select an exact immutable Version and marks the
@@ -311,7 +315,8 @@ automatic dotenv loading so startup reads only the file selected by `LIGHTFRAME_
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_KEY_PREFIX` | Private R2 S3 configuration; credentials stay server-only, while the exact bucket/key appear only inside short-lived part URLs in direct-upload mode              |
 | `OTEL_TRACING_ENABLED`, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_TRACE_SAMPLE_RATIO`   | Opt-in OTLP/HTTP protobuf traces and explicit `[0,1]` sampling; disabled unless the flag and endpoint are both configured                                         |
 | `VIDEO_JOB_MAX_ACTIVE`, `VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER`                               | Server admission limits for accepted batch work; defaults to `8` globally and `4` per provider                                                                    |
-| `DECART_API_KEY`                                                                          | Realtime scoped credentials, Decart Character Swap, and Decart-only Virtual Try-On                                                                                |
+| `DECART_API_KEY`                                                                          | Server credential for configured Decart operations; presence alone does not admit Live AI Beta                                                                    |
+| `REALTIME_VIDEO_BETA_ENABLED`                                                             | Explicit server-side product gate for Live AI Beta and realtime-token minting; defaults to `false`                                                                |
 | `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER`                                                  | Default Character Swap choice shown in the editor: `decart` (default) or `pruna`                                                                                  |
 | `PRUNA_VIDEO_REPLACE_ENABLED`, `PRUNA_API_KEY`                                            | Enables the Pruna Character Swap option and supplies its shared server credential                                                                                 |
 | `PRUNA_VIDEO_REPLACE_MODEL`                                                               | Exact pinned `p-video-replace` literal; required when Pruna Character Swap is enabled                                                                             |
@@ -328,7 +333,8 @@ automatic dotenv loading so startup reads only the file selected by `LIGHTFRAME_
 | `NODE_ENV`                                                                                | `development`, `test`, or `production`                                                                                                                            |
 
 `GET /api/capabilities` reports configuration presence, not provider reachability, entitlement, or
-quota. Missing optional configuration disables only the corresponding feature.
+quota. Realtime capability metadata reports provider availability separately from the explicit
+beta gate. Missing optional configuration disables only the corresponding feature.
 Private-R2 browser CORS is required only for authoritative direct uploads and must follow the exact
 origin/method/header policy in [Cloud persistence](docs/CLOUD_PERSISTENCE.md).
 

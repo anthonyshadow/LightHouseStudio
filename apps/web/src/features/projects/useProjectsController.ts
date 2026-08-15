@@ -41,6 +41,7 @@ export const useProjectList = (lifecycle: 'active' | 'archived', campaignId?: st
 export const useProjectsController = () => {
   const queryClient = useQueryClient();
   const pendingCreateKey = useRef<string | null>(null);
+  const pendingNamedCreateKey = useRef<string | null>(null);
 
   const reconcile = useCallback(
     async (current: ProjectCurrentResponse) => {
@@ -67,6 +68,18 @@ export const useProjectsController = () => {
     },
     onSuccess: async (current) => {
       pendingCreateKey.current = null;
+      await reconcile(current);
+    },
+  });
+
+  const createNamedMutation = useMutation({
+    mutationFn: async (input: { readonly title: string; readonly campaignId: string | null }) => {
+      const operationKey = pendingNamedCreateKey.current ?? crypto.randomUUID();
+      pendingNamedCreateKey.current = operationKey;
+      return createProject(input.title, operationKey, input.campaignId);
+    },
+    onSuccess: async (current) => {
+      pendingNamedCreateKey.current = null;
       await reconcile(current);
     },
   });
@@ -148,6 +161,7 @@ export const useProjectsController = () => {
 
   return {
     createMutation,
+    createNamedMutation,
     renameMutation,
     archiveMutation,
     restoreMutation,
