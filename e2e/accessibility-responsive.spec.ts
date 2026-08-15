@@ -6,6 +6,7 @@ import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 import {
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
+  readBrowserState,
 } from './support/studioHarness';
 import { installCampaignHarness } from './support/campaignHarness';
 import { loadDecodableH264VideoFixture } from './support/existingVideoHarness';
@@ -197,6 +198,14 @@ const representativeViewports = [
   { name: 'small mobile', ...STUDIO_VIEWPORT_SIZES.smallMobile },
 ] as const;
 
+const dashboardViewports = [
+  { name: 'full desktop', ...STUDIO_VIEWPORT_SIZES.fullDesktop },
+  { name: 'compact desktop', ...STUDIO_VIEWPORT_SIZES.compactDesktop },
+  { name: 'tablet portrait', ...STUDIO_VIEWPORT_SIZES.tabletPortrait },
+  { name: 'mobile portrait', ...STUDIO_VIEWPORT_SIZES.mobilePortrait },
+  { name: 'small mobile', ...STUDIO_VIEWPORT_SIZES.smallMobile },
+] as const;
+
 for (const viewport of representativeViewports) {
   test(`${viewport.name} preparation is accessible and viewport-bound`, async ({ page }) => {
     const network = await installProviderFreeStudio(page);
@@ -291,6 +300,95 @@ for (const viewport of representativeViewports) {
     );
   });
 }
+
+for (const viewport of dashboardViewports) {
+  test(`${viewport.name} Dashboard keeps Refined Momentum navigation and content viewport-bound`, async ({
+    page,
+  }) => {
+    const network = await installSuccessfulStudioHarness(page);
+    await installCampaignHarness(page, true);
+    await installProjectHarness(page, true, { includeUnassignedVideo: true });
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('/dashboard');
+
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByText('Momentum Workspace', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Create video' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Continue Work' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Recent Work' })).toBeVisible();
+    await expect(page.getByLabel('Studio media stage')).toBeHidden();
+
+    const desktopNavigation = page.getByRole('navigation', { name: 'Primary', exact: true });
+    const mobileNavigation = page.getByRole('navigation', {
+      name: 'Mobile primary',
+      exact: true,
+    });
+    const organizationHeader = page.locator('header[data-organization-navigation="true"]');
+    const main = page.getByRole('main');
+
+    if (viewport.width >= 768) {
+      await expect(desktopNavigation).toBeVisible();
+      await expect(mobileNavigation).toBeHidden();
+      const [headerBox, mainBox] = await Promise.all([
+        organizationHeader.boundingBox(),
+        main.boundingBox(),
+      ]);
+      expect(headerBox).not.toBeNull();
+      expect(mainBox).not.toBeNull();
+      expect(headerBox!.x).toBeLessThanOrEqual(1);
+      expect(headerBox!.y).toBeLessThanOrEqual(1);
+      expect(headerBox!.height).toBeGreaterThanOrEqual(viewport.height - 1);
+      expect(mainBox!.x).toBeGreaterThanOrEqual(headerBox!.x + headerBox!.width - 1);
+    } else {
+      await expect(desktopNavigation).toBeHidden();
+      await expect(mobileNavigation).toBeVisible();
+      const mobileNavigationBox = await mobileNavigation.boundingBox();
+      expect(mobileNavigationBox).not.toBeNull();
+      expect(mobileNavigationBox!.x).toBeLessThanOrEqual(1);
+      expect(mobileNavigationBox!.width).toBeGreaterThanOrEqual(viewport.width - 1);
+      expect(mobileNavigationBox!.y + mobileNavigationBox!.height).toBeGreaterThanOrEqual(
+        viewport.height - 1,
+      );
+      for (const trigger of await mobileNavigation.getByRole('button').all()) {
+        const bounds = await trigger.boundingBox();
+        expect(bounds).not.toBeNull();
+        expect(bounds!.height).toBeGreaterThanOrEqual(44);
+      }
+    }
+
+    await expectNoDocumentOverflow(page);
+    await expectNoAxeViolations(page);
+    expect((await readBrowserState(page)).cameraCalls).toBe(0);
+    expectNoExternalProviderTraffic(network);
+  });
+}
+
+test('small-mobile Dashboard remains usable at 200% text', async ({ page }) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await installCampaignHarness(page, true);
+  await installProjectHarness(page, true, { includeUnassignedVideo: true });
+  await page.setViewportSize(STUDIO_VIEWPORT_SIZES.smallMobile);
+  await page.goto('/dashboard');
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '200%';
+  });
+
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Create video' })).toBeVisible();
+  const mobileNavigation = page.getByRole('navigation', {
+    name: 'Mobile primary',
+    exact: true,
+  });
+  await expect(mobileNavigation).toBeVisible();
+  for (const trigger of await mobileNavigation.getByRole('button').all()) {
+    const bounds = await trigger.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.height).toBeGreaterThanOrEqual(44);
+  }
+  await expectNoDocumentOverflow(page);
+  expect((await readBrowserState(page)).cameraCalls).toBe(0);
+  expectNoExternalProviderTraffic(network);
+});
 
 test('small-mobile Project output review reflows at 200% text with accessible save choices', async ({
   page,

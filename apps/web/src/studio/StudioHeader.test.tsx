@@ -87,6 +87,33 @@ describe('StudioHeader', () => {
     expect(headerProps.onOpenAssets).toHaveBeenCalledOnce();
   });
 
+  it('uses one shared organization rail with a mirrored mobile navigation', () => {
+    const { container } = renderHeader({
+      organizationRouteActive: true,
+      activeDestination: 'dashboard',
+    });
+    const header = screen.getByRole('banner');
+    const desktopNavigation = screen.getByRole('navigation', { name: 'Primary' });
+    const mobileNavigation = container.querySelector<HTMLElement>(
+      'nav[aria-label="Mobile primary"]',
+    );
+
+    expect(header).toHaveAttribute('data-organization-navigation', 'true');
+    expect(within(desktopNavigation).getByRole('button', { name: 'Dashboard' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(mobileNavigation).not.toBeNull();
+    expect(within(mobileNavigation!).getAllByRole('button', { hidden: true })).toHaveLength(4);
+    expect(within(header).getByRole('button', { name: 'Quick Create' })).toBeVisible();
+    expect(within(header).getByRole('button', { name: 'Core Studio ready' })).toBeVisible();
+    expect(within(header).getByRole('button', { name: 'Demo Creator account menu' })).toBeVisible();
+    expect(header).not.toHaveTextContent('Pro Plan');
+
+    within(mobileNavigation!).getAllByRole('button', { hidden: true })[1]?.click();
+    expect(headerProps.onOpenProjects).toHaveBeenCalledOnce();
+  });
+
   it('marks Assets as the current destination independently from Account', async () => {
     const user = userEvent.setup();
     renderHeader({ activeDestination: 'assets' });

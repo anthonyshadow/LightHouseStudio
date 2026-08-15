@@ -323,15 +323,16 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
   'dashboard-overview': {
     id: 'dashboard-overview',
     setup: async (page) => {
-      await installProjectHarness(page, true);
       await installCampaignHarness(page, true);
+      await installProjectHarness(page, true, { includeUnassignedVideo: true });
       await page.goto('/dashboard');
       await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
       await expect(
         page.getByRole('heading', { name: 'Start with the outcome you need' }),
       ).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'Campaigns' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Continue Work' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Recent Work' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'New Campaign' })).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toBeHidden();
     },
   },

@@ -12,3 +12,4 @@ export { ConfirmationDialog } from './primitives/ConfirmationDialog';
 export { OverlayPanel } from './primitives/OverlayPanel';
 export { ReferenceImagePreview } from './primitives/ReferenceImagePreview';
 export { ImagePickerDropField } from './primitives/ImagePickerDropField';
+export { AppIcon, type AppIconName } from './primitives/AppIcon';

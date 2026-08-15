@@ -20,10 +20,10 @@ resources, and browse reusable Assets without activating media or a provider.
 4. All protected destinations render through one stable `StudioApp`. Organization routes hide the
    single persistent `MediaStage`; navigation never creates a second stage, media owner, overlay
    system, or global store.
-5. The desktop header exposes Dashboard, Projects, Campaigns, and Assets. **Quick Create** retains
-   New Video, New Project, New Campaign, and gated Live AI, and adds **Create Asset**. The shared
-   chooser offers Video, Character, Outfit, and **Add Voice** only. Project context is propagated
-   when creation starts from a Project.
+5. Desktop and tablet organization routes use a persistent left rail for Dashboard, Projects,
+   Campaigns, and Assets. **Quick Create** retains New Video, New Project, New Campaign, and gated
+   Live AI, and adds **Create Asset**. The shared chooser offers Video, Character, Outfit, and
+   **Add Voice** only. Project context is propagated when creation starts from a Project.
 6. `/assets` launches the current Videos, Characters, Outfits, and Voices libraries. It does not
    invent a new cross-type gallery, and Recipe is absent from routes, cards, menus, counts,
    dialogs, filters, accessibility labels, and Quick Create.

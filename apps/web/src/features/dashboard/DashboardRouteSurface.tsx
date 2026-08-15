@@ -3,7 +3,7 @@ import type { CampaignContract, ProjectContract, SavedVideoSummary } from '@stud
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { listSavedVideos } from '../../adapters/api-client/savedVideosApi';
-import { Button, StatusNotice } from '../../ui';
+import { AppIcon, Button, StatusNotice } from '../../ui';
 import { useCampaignList } from '../campaigns/useCampaignsController';
 import { useProjectList } from '../projects/useProjectsController';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
@@ -12,14 +12,18 @@ import {
   persistDashboardOnboardingDismissed,
 } from './dashboardOnboarding';
 import {
+  allDestinationsStyles,
+  continuePanelStyles,
   dashboardBodyStyles,
-  dashboardHeroStyles,
-  dashboardSectionStyles,
+  dashboardHeaderStyles,
   dashboardStyles,
+  emptyRecentStyles,
   onboardingStyles,
   quickActionsStyles,
-  recentGridStyles,
+  recentFilterStyles,
   recentListStyles,
+  recentWorkStyles,
+  sectionEyebrowStyles,
 } from './DashboardRouteSurface.styles';
 
 const RECENT_LIMIT = 4;
@@ -41,76 +45,33 @@ type DashboardRouteSurfaceProps = Readonly<{
   onOpenVideos: () => void;
 }>;
 
-type RecentSectionProps<T> = Readonly<{
+type RecentKind = 'all' | 'projects' | 'videos' | 'campaigns';
+type ItemKind = Exclude<RecentKind, 'all'>;
+
+type RecentWorkItem = Readonly<{
+  id: string;
+  kind: ItemKind;
   title: string;
-  items: readonly T[];
-  loading: boolean;
-  error: boolean;
-  emptyCopy: string;
-  allLabel: string;
-  onOpenAll: () => void;
-  onRetry: () => void;
-  itemKey: (item: T) => string;
-  itemTitle: (item: T) => string;
-  itemMeta: (item: T) => string;
-  itemUpdatedAt: (item: T) => string;
-  onOpenItem: (item: T) => void;
+  meta: string;
+  updatedAt: string;
+  open: () => void;
 }>;
 
-const RecentSection = <T,>({
-  title,
-  items,
-  loading,
-  error,
-  emptyCopy,
-  allLabel,
-  onOpenAll,
-  onRetry,
-  itemKey,
-  itemTitle,
-  itemMeta,
-  itemUpdatedAt,
-  onOpenItem,
-}: RecentSectionProps<T>) => {
-  const theme = useTheme();
-  const headingId = `dashboard-${title.toLowerCase().replaceAll(' ', '-')}-heading`;
-  return (
-    <section css={dashboardSectionStyles(theme)} aria-labelledby={headingId}>
-      <header>
-        <h2 id={headingId}>{title}</h2>
-        <Button size="small" variant="quiet" onClick={onOpenAll}>
-          {allLabel}
-        </Button>
-      </header>
-      {loading ? <p role="status">Loading {title.toLowerCase()}…</p> : null}
-      {error ? (
-        <StatusNotice role="alert" tone="danger" title={`${title} unavailable`}>
-          <Button size="small" variant="quiet" onClick={onRetry}>
-            Retry
-          </Button>
-        </StatusNotice>
-      ) : null}
-      {!loading && !error && items.length === 0 ? <p data-section-copy>{emptyCopy}</p> : null}
-      {items.length > 0 ? (
-        <ul css={recentListStyles(theme)}>
-          {items.map((item) => {
-            const updatedAt = itemUpdatedAt(item);
-            return (
-              <li key={itemKey(item)}>
-                <button type="button" onClick={() => onOpenItem(item)}>
-                  <span data-recent-title>
-                    <strong>{itemTitle(item)}</strong>
-                    <span>{itemMeta(item)}</span>
-                  </span>
-                  <time dateTime={updatedAt}>{formatUpdatedAt(updatedAt)}</time>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
-    </section>
-  );
+const recentKindLabel: Record<ItemKind, string> = {
+  projects: 'Project',
+  videos: 'Video',
+  campaigns: 'Campaign',
+};
+
+const recentKindIcon = (kind: ItemKind) => {
+  switch (kind) {
+    case 'projects':
+      return 'projects' as const;
+    case 'videos':
+      return 'video' as const;
+    case 'campaigns':
+      return 'campaigns' as const;
+  }
 };
 
 export const DashboardRouteSurface = ({
@@ -131,6 +92,7 @@ export const DashboardRouteSurface = ({
     () => !loadDashboardOnboardingDismissed(ownerUserId),
   );
   const [onboardingStorageWarning, setOnboardingStorageWarning] = useState(false);
+  const [recentKind, setRecentKind] = useState<RecentKind>('all');
   const projectsQuery = useProjectList('active');
   const campaignsQuery = useCampaignList('active');
   const videosQuery = useInfiniteQuery({
@@ -158,6 +120,60 @@ export const DashboardRouteSurface = ({
     [videosQuery.data],
   );
   const continueProject = projects[0] ?? null;
+  const recentItems = useMemo<readonly RecentWorkItem[]>(
+    () =>
+      [
+        ...projects.map((project: ProjectContract) => ({
+          id: project.id,
+          kind: 'projects' as const,
+          title: project.title,
+          meta: project.campaignId === null ? 'No Campaign' : 'Campaign Project',
+          updatedAt: project.updatedAt,
+          open: () => onOpenProject(project.id),
+        })),
+        ...videos.map((video: SavedVideoSummary) => ({
+          id: video.id,
+          kind: 'videos' as const,
+          title: video.title,
+          meta: `${video.versionCount} Version${video.versionCount === 1 ? '' : 's'}`,
+          updatedAt: video.updatedAt,
+          open: onOpenVideos,
+        })),
+        ...campaigns.map((campaign: CampaignContract) => ({
+          id: campaign.id,
+          kind: 'campaigns' as const,
+          title: campaign.name,
+          meta: campaign.brief ?? 'No brief yet',
+          updatedAt: campaign.updatedAt,
+          open: () => onOpenCampaign(campaign.id),
+        })),
+      ].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
+    [campaigns, onOpenCampaign, onOpenProject, onOpenVideos, projects, videos],
+  );
+  const visibleItems = recentItems
+    .filter((item) => recentKind === 'all' || item.kind === recentKind)
+    .slice(0, RECENT_LIMIT);
+  const visibleKinds: readonly ItemKind[] =
+    recentKind === 'all' ? ['projects', 'videos', 'campaigns'] : [recentKind];
+  const queryState = {
+    projects: {
+      loading: projectsQuery.isLoading,
+      error: projectsQuery.isError,
+      retry: () => void projectsQuery.refetch(),
+    },
+    videos: {
+      loading: videosQuery.isLoading,
+      error: videosQuery.isError,
+      retry: () => void videosQuery.refetch(),
+    },
+    campaigns: {
+      loading: campaignsQuery.isLoading,
+      error: campaignsQuery.isError,
+      retry: () => void campaignsQuery.refetch(),
+    },
+  } as const;
+  const visibleLoading = visibleKinds.some((kind) => queryState[kind].loading);
+  const visibleErrors = visibleKinds.filter((kind) => queryState[kind].error);
 
   const dismissOnboarding = () => {
     const persisted = persistDashboardOnboardingDismissed(ownerUserId);
@@ -165,21 +181,38 @@ export const DashboardRouteSurface = ({
     setOnboardingStorageWarning(!persisted);
   };
 
+  const emptyMessage =
+    recentKind === 'projects'
+      ? 'No active Projects yet. Create one when resumable context will help.'
+      : recentKind === 'videos'
+        ? 'No saved Videos yet. Create or upload one when you are ready.'
+        : recentKind === 'campaigns'
+          ? 'No Campaigns yet. They are optional organizers for related Projects.'
+          : 'No recent work yet. Start with a standalone video and organize it later if needed.';
+  const emptyAction =
+    recentKind === 'projects'
+      ? { label: 'New Project', run: onCreateProject }
+      : recentKind === 'campaigns'
+        ? { label: 'New Campaign', run: onCreateCampaign }
+        : { label: 'Create video', run: onCreateVideo };
+
   return (
     <section css={dashboardStyles(theme)} aria-labelledby="dashboard-heading">
-      <header css={dashboardHeroStyles(theme)}>
+      <header css={dashboardHeaderStyles(theme)}>
         <div>
-          <span data-dashboard-eyebrow>Welcome back, {displayName}</span>
-          <h1 id="dashboard-heading" tabIndex={-1}>
-            Dashboard
+          <span data-dashboard-eyebrow title={`Welcome back, ${displayName}`}>
+            Authenticated Studio
+          </span>
+          <h1 id="dashboard-heading" aria-label="Dashboard" tabIndex={-1}>
+            Momentum Workspace
           </h1>
-          <p>Create a video now, resume focused Project work, or organize Projects in Campaigns.</p>
+          <p>Resume focused Project work or start a standalone video.</p>
         </div>
-        <div data-hero-actions>
+        <div data-dashboard-actions>
           <Button variant="primary" onClick={onCreateVideo}>
             Create video
           </Button>
-          <Button variant="secondary" onClick={onOpenAssets}>
+          <Button variant="quiet" onClick={onOpenAssets}>
             Browse Assets
           </Button>
         </div>
@@ -187,28 +220,14 @@ export const DashboardRouteSurface = ({
 
       {onboardingVisible ? (
         <aside css={onboardingStyles(theme)} aria-labelledby="dashboard-getting-started-heading">
-          <div data-onboarding-copy>
-            <h2 id="dashboard-getting-started-heading">Start with the outcome you need</h2>
-            <p>
-              Organization is optional. You can create first and decide where work belongs later.
-            </p>
-            <div data-onboarding-steps>
-              <span data-onboarding-step>
-                <strong>Create</strong>
-                <span>Record or upload one video, edit it, then save it to Assets.</span>
-              </span>
-              <span data-onboarding-step>
-                <strong>Project</strong>
-                <span>
-                  Keep a focused video workflow, its working state, resources, and outputs.
-                </span>
-              </span>
-              <span data-onboarding-step>
-                <strong>Campaign</strong>
-                <span>Optionally group related Projects around one initiative.</span>
-              </span>
-            </div>
-          </div>
+          <h2 id="dashboard-getting-started-heading" data-onboarding-heading>
+            Start with the outcome you need
+          </h2>
+          <AppIcon name="info" data-onboarding-icon />
+          <p>
+            Organization is optional. Use <strong>Projects</strong> for focused workflows and{' '}
+            <strong>Campaigns</strong> to group initiatives.
+          </p>
           <Button size="small" variant="quiet" onClick={dismissOnboarding}>
             Got it
           </Button>
@@ -221,95 +240,136 @@ export const DashboardRouteSurface = ({
       ) : null}
 
       <div css={dashboardBodyStyles(theme)}>
-        <section css={dashboardSectionStyles(theme)} aria-labelledby="continue-heading">
-          <header>
-            <h2 id="continue-heading">Continue</h2>
-          </header>
-          {projectsQuery.isLoading ? <p role="status">Finding recent work…</p> : null}
-          {continueProject ? (
-            <>
-              <p data-section-copy>
-                Resume your most recently updated active Project without changing its saved state.
-              </p>
-              <Button variant="primary" onClick={() => onOpenProject(continueProject.id)}>
-                Continue {continueProject.title}
-              </Button>
-            </>
-          ) : !projectsQuery.isLoading && !projectsQuery.isError ? (
-            <>
-              <p data-section-copy>
-                No active Project yet. Create one only when resumable context helps.
-              </p>
-              <Button variant="secondary" onClick={onCreateProject}>
+        <div data-dashboard-primary-column>
+          <section aria-labelledby="continue-heading">
+            <h2 id="continue-heading" css={sectionEyebrowStyles(theme)}>
+              Continue Work
+            </h2>
+            {projectsQuery.isLoading ? <p role="status">Finding recent work…</p> : null}
+            {projectsQuery.isError ? (
+              <StatusNotice role="alert" tone="danger" title="Projects unavailable">
+                <Button size="small" variant="quiet" onClick={() => void projectsQuery.refetch()}>
+                  Retry
+                </Button>
+              </StatusNotice>
+            ) : null}
+            {continueProject ? (
+              <article css={continuePanelStyles(theme)}>
+                <span data-project-context>
+                  {continueProject.campaignId === null ? 'No Campaign' : 'Campaign Project'}
+                </span>
+                <h3>{continueProject.title}</h3>
+                <time dateTime={continueProject.updatedAt}>
+                  Updated {formatUpdatedAt(continueProject.updatedAt)}
+                </time>
+                <Button
+                  variant="primary"
+                  aria-label={`Continue ${continueProject.title}`}
+                  onClick={() => onOpenProject(continueProject.id)}
+                >
+                  Continue Project
+                  <AppIcon name="chevronRight" width="1rem" height="1rem" />
+                </Button>
+              </article>
+            ) : !projectsQuery.isLoading && !projectsQuery.isError ? (
+              <div css={continuePanelStyles(theme)} data-empty="true">
+                <h3>No active Project yet</h3>
+                <p>Create one only when resumable context will help.</p>
+                <Button variant="secondary" onClick={onCreateProject}>
+                  New Project
+                </Button>
+              </div>
+            ) : null}
+          </section>
+
+          <section aria-labelledby="start-new-heading">
+            <h2 id="start-new-heading" css={sectionEyebrowStyles(theme)}>
+              Start New
+            </h2>
+            <div css={quickActionsStyles(theme)}>
+              <Button variant="quiet" onClick={onCreateProject}>
+                <AppIcon name="projects" />
                 New Project
               </Button>
-            </>
-          ) : null}
-        </section>
+              <Button variant="quiet" onClick={onCreateCampaign}>
+                <AppIcon name="campaigns" />
+                New Campaign
+              </Button>
+            </div>
+          </section>
+        </div>
 
-        <section css={dashboardSectionStyles(theme)} aria-labelledby="quick-actions-heading">
+        <section css={recentWorkStyles(theme)} aria-labelledby="recent-work-heading">
           <header>
-            <h2 id="quick-actions-heading">Start something</h2>
+            <h2 id="recent-work-heading" css={sectionEyebrowStyles(theme)}>
+              Recent Work
+            </h2>
+            <div role="group" aria-label="Filter recent work" css={recentFilterStyles(theme)}>
+              {(['all', 'videos', 'projects', 'campaigns'] as const).map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  aria-pressed={recentKind === kind}
+                  onClick={() => setRecentKind(kind)}
+                >
+                  {kind === 'all' ? 'All' : `${kind[0]?.toUpperCase()}${kind.slice(1)}`}
+                </button>
+              ))}
+            </div>
           </header>
-          <div css={quickActionsStyles(theme)}>
-            <Button variant="secondary" onClick={onCreateProject}>
-              New Project
-            </Button>
-            <Button variant="secondary" onClick={onCreateCampaign}>
-              New Campaign
-            </Button>
-          </div>
-        </section>
-      </div>
 
-      <div css={recentGridStyles(theme)}>
-        <RecentSection<ProjectContract>
-          title="Projects"
-          items={projects}
-          loading={projectsQuery.isLoading}
-          error={projectsQuery.isError}
-          emptyCopy="No active Projects yet."
-          allLabel="All Projects"
-          onOpenAll={onOpenProjects}
-          onRetry={() => void projectsQuery.refetch()}
-          itemKey={(project) => project.id}
-          itemTitle={(project) => project.title}
-          itemMeta={(project) => (project.campaignId === null ? 'No Campaign' : 'Campaign Project')}
-          itemUpdatedAt={(project) => project.updatedAt}
-          onOpenItem={(project) => onOpenProject(project.id)}
-        />
-        <RecentSection<SavedVideoSummary>
-          title="Videos"
-          items={videos}
-          loading={videosQuery.isLoading}
-          error={videosQuery.isError}
-          emptyCopy="No saved videos yet. Create or upload one when you are ready."
-          allLabel="All Videos"
-          onOpenAll={onOpenVideos}
-          onRetry={() => void videosQuery.refetch()}
-          itemKey={(video) => video.id}
-          itemTitle={(video) => video.title}
-          itemMeta={(video) =>
-            `${video.versionCount} Version${video.versionCount === 1 ? '' : 's'}`
-          }
-          itemUpdatedAt={(video) => video.updatedAt}
-          onOpenItem={onOpenVideos}
-        />
-        <RecentSection<CampaignContract>
-          title="Campaigns"
-          items={campaigns}
-          loading={campaignsQuery.isLoading}
-          error={campaignsQuery.isError}
-          emptyCopy="No Campaigns yet. They are optional organizers for related Projects."
-          allLabel="All Campaigns"
-          onOpenAll={onOpenCampaigns}
-          onRetry={() => void campaignsQuery.refetch()}
-          itemKey={(campaign) => campaign.id}
-          itemTitle={(campaign) => campaign.name}
-          itemMeta={(campaign) => campaign.brief ?? 'No brief yet'}
-          itemUpdatedAt={(campaign) => campaign.updatedAt}
-          onOpenItem={(campaign) => onOpenCampaign(campaign.id)}
-        />
+          {visibleLoading ? <p role="status">Loading recent work…</p> : null}
+          {visibleErrors.map((kind) => (
+            <StatusNotice
+              key={kind}
+              role="alert"
+              tone="danger"
+              title={`${recentKindLabel[kind]}s unavailable`}
+            >
+              <Button size="small" variant="quiet" onClick={queryState[kind].retry}>
+                Retry
+              </Button>
+            </StatusNotice>
+          ))}
+
+          {visibleItems.length > 0 ? (
+            <ul css={recentListStyles(theme)}>
+              {visibleItems.map((item) => (
+                <li key={`${item.kind}-${item.id}`}>
+                  <button type="button" onClick={item.open}>
+                    <AppIcon name={recentKindIcon(item.kind)} data-recent-icon />
+                    <span data-recent-title>
+                      <strong>{item.title}</strong>
+                      <span>
+                        {recentKindLabel[item.kind]} · {item.meta}
+                      </span>
+                    </span>
+                    <time dateTime={item.updatedAt}>{formatUpdatedAt(item.updatedAt)}</time>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : !visibleLoading && visibleErrors.length === 0 ? (
+            <div css={emptyRecentStyles(theme)}>
+              <p>{emptyMessage}</p>
+              <Button size="small" variant="quiet" onClick={emptyAction.run}>
+                {emptyAction.label}
+              </Button>
+            </div>
+          ) : null}
+
+          <footer css={allDestinationsStyles(theme)}>
+            <Button size="small" variant="quiet" onClick={onOpenProjects}>
+              All Projects
+            </Button>
+            <Button size="small" variant="quiet" onClick={onOpenVideos}>
+              All Videos
+            </Button>
+            <Button size="small" variant="quiet" onClick={onOpenCampaigns}>
+              All Campaigns
+            </Button>
+          </footer>
+        </section>
       </div>
     </section>
   );
