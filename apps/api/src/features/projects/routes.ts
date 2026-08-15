@@ -8,6 +8,7 @@ import {
   projectAssetsQuerySchema,
   projectConflictResponseSchema,
   projectLifecycleRequestSchema,
+  tombstoneProjectRequestSchema,
   projectHistoryQuerySchema,
   projectHistoryResponseSchema,
   projectOutputHistoryItemSchema,
@@ -635,6 +636,23 @@ export const registerProjectRoutes = (
         ownerUserIdForRequest(request),
         params.data.projectId,
         body.data.expectedVersion,
+      ),
+    );
+  });
+
+  app.post('/api/projects/:projectId/tombstone', async (request, reply) => {
+    const params = projectParamsSchema.safeParse(request.params);
+    const body = tombstoneProjectRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      throw new AppError(400, 'validation_error', 'Confirm deletion of an archived Project.');
+    }
+    return sendMutation(
+      reply,
+      await requireService(service).tombstone(
+        ownerUserIdForRequest(request),
+        params.data.projectId,
+        body.data.expectedVersion,
+        body.data.confirmation,
       ),
     );
   });

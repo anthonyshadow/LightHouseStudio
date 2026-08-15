@@ -11,6 +11,7 @@ import {
   appendProjectRevision,
   archiveProject,
   createProject,
+  deleteProject,
   normalizeProjectTitle,
   ProjectRuleError,
   renameProject,
@@ -318,6 +319,17 @@ export class ProjectService {
         now,
       );
     });
+  }
+
+  async tombstone(
+    ownerUserId: string,
+    projectId: string,
+    expectedVersion: number,
+    confirmation: 'permanent-delete',
+  ): Promise<ProjectServiceMutationResult> {
+    return this.#metadataMutation(ownerUserId, projectId, expectedVersion, (current, now) =>
+      deleteProject(current.project, expectedVersion, confirmation, now),
+    );
   }
 
   async moveToCampaign(

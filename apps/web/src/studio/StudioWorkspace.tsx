@@ -319,6 +319,7 @@ export const StudioWorkspace = ({
                         ? { onSaveVideo: savedVideo.requestSavePresentedVideo }
                         : {})}
                       saveVideoState={saveVideoState}
+                      hasUnsavedChanges={savedVideo.presentedHasUnsavedChanges}
                       {...(savedVideo.activeLoadedSource &&
                       recording.presented?.id !== savedVideo.activeLoadedSource.artifactId
                         ? {

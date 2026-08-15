@@ -260,6 +260,7 @@ export const StudioToolOverlays = ({
         onBackToTakeReview={() => onOpenOverlay('take-review')}
         {...(recording.presented ? { onSaveVideo: savedVideo.requestSavePresentedVideo } : {})}
         saveVideoState={saveVideoState}
+        hasUnsavedChanges={savedVideo.presentedHasUnsavedChanges}
         {...(savedVideo.activeLoadedSource &&
         recording.presented?.id !== savedVideo.activeLoadedSource.artifactId
           ? { onReplaceSavedVideo: () => void savedVideo.replaceLoadedSavedVideo() }

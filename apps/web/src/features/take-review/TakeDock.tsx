@@ -22,6 +22,7 @@ export type TakeDockProps = {
   onSaveVideo?: () => void;
   saveVideoState?: SaveVideoState;
   onReplaceSavedVideo?: () => void;
+  hasUnsavedChanges?: boolean;
 };
 
 const gridStyles = (theme: Theme, view: NonNullable<TakeDockProps['view']>): CSSObject => ({
@@ -205,6 +206,7 @@ export const TakeDock = ({
   onSaveVideo,
   saveVideoState,
   onReplaceSavedVideo,
+  hasUnsavedChanges,
 }: TakeDockProps) => {
   const theme = useTheme();
   const artifact = recording.presented;
@@ -240,7 +242,9 @@ export const TakeDock = ({
               Latest take
             </h2>
             <p role="status" aria-live="polite" aria-atomic="true" css={introStyles(theme)}>
-              Playback remains on the main stage. Save this temporary take before releasing it.
+              {hasUnsavedChanges === false
+                ? 'Playback remains on the main stage. This video has no unsaved changes.'
+                : 'Playback remains on the main stage. Save this temporary take before releasing it.'}
             </p>
           </header>
           <div css={reviewBodyStyles(theme)}>
@@ -283,6 +287,7 @@ export const TakeDock = ({
                 {...(onSaveVideo ? { onSaveVideo } : {})}
                 {...(saveVideoState ? { saveVideoState } : {})}
                 {...(onReplaceSavedVideo ? { onReplaceSavedVideo } : {})}
+                {...(hasUnsavedChanges !== undefined ? { hasUnsavedChanges } : {})}
               />
             </div>
           </div>

@@ -11,7 +11,9 @@ Studio stage.
 1. A healthy review artifact exposes **Save to Assets**, never a direct Download action. Saving first
    prompts for an optional video name; a blank field keeps the existing generated artifact name.
    Saving is explicit, reports progress/result, and repeated submission of the same artifact is
-   idempotent. Release remains disabled until the current artifact is saved.
+   idempotent. An artifact with unsaved changes shows **Discard** but not **Release**. Once that
+   artifact is saved, or when an unchanged Saved Video is opened in Studio, the same control slot
+   shows **Release** but not **Discard**.
 2. **Save as New Video** creates a titled gallery record and immutable first version. In the
    standalone workflow, **Replace Existing Video** is secondary, requires confirmation, checks the
    expected current version, and appends bytes rather than overwriting history. In a Project,

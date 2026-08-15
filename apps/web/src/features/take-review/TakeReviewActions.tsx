@@ -13,6 +13,7 @@ export type TakeReviewActionsProps = {
   onSaveVideo?: () => void;
   saveVideoState?: SaveVideoState;
   onReplaceSavedVideo?: () => void;
+  hasUnsavedChanges?: boolean;
 };
 
 const actionStyles = (
@@ -67,6 +68,7 @@ export const TakeReviewActions = ({
   onSaveVideo,
   saveVideoState = { status: 'idle' },
   onReplaceSavedVideo,
+  hasUnsavedChanges,
 }: TakeReviewActionsProps) => {
   const theme = useTheme();
   const artifact = recording.presented;
@@ -76,6 +78,8 @@ export const TakeReviewActions = ({
   const saved = saveVideoState.status === 'saved' && saveVideoState.artifactId === artifact?.id;
 
   if (!artifact) return null;
+
+  const unsaved = !saved && (hasUnsavedChanges ?? true);
 
   const closeTake = () => {
     recording.discard();
@@ -121,26 +125,30 @@ export const TakeReviewActions = ({
           Edit video
         </Button>
       ) : null}
-      <Button variant="danger" disabled={locked} onClick={discard}>
-        Discard
-      </Button>
+      {unsaved ? (
+        <Button variant="danger" disabled={locked || saving} onClick={discard}>
+          Discard
+        </Button>
+      ) : null}
       {onOpenVoiceTreatments ? (
         <Button variant="secondary" disabled={locked} onClick={onOpenVoiceTreatments}>
           {compact ? 'Voice' : 'Voice treatments'}
         </Button>
       ) : null}
-      <Button
-        variant="secondary"
-        disabled={locked || !saved}
-        title={
-          saved
-            ? 'Close review and release the temporary in-memory take. The saved gallery copy remains available.'
-            : 'Save this video before releasing the temporary take.'
-        }
-        onClick={closeTake}
-      >
-        {compact ? 'Release' : 'Close and release'}
-      </Button>
+      {!unsaved ? (
+        <Button
+          variant="secondary"
+          disabled={locked || saving}
+          title={
+            saved
+              ? 'Close review and release the temporary in-memory take. The saved gallery copy remains available.'
+              : 'Close review and release this unchanged temporary in-memory copy.'
+          }
+          onClick={closeTake}
+        >
+          {compact ? 'Release' : 'Close and release'}
+        </Button>
+      ) : null}
       {saveVideoState.status === 'error' && saveVideoState.artifactId === artifact.id ? (
         <span role="alert">{saveVideoState.message}</span>
       ) : null}

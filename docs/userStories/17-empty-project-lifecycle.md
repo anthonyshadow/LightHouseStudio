@@ -21,9 +21,12 @@ Project` without requiring a Campaign, brief, source, tag, or provider choice. E
    queries are separate, cursor-bounded pages. Loading, empty, safe-error/retry, and explicit
    **Load more** states do not fetch snapshots, media, history, bytes, storage data, or provider
    details.
-4. Open, rename, archive, and restore use owner-derived API behavior and Project-version CAS.
-   Dialogs expose busy/error state, restore useful focus, and announce results. Archive removes a
-   Project from the active list without deleting its history; restore returns it.
+4. Open, rename, archive, restore, and deletion use owner-derived API behavior and Project-version
+   CAS. Dialogs expose busy/error state, restore useful focus, and announce results. Archive removes
+   a Project from the active list without deleting its history; restore returns it. Explicitly
+   deleting one archived Project tombstones only that Project and removes it from visible Project
+   and Campaign lists; retained lineage continues protecting referenced media and no physical purge
+   is claimed.
 5. A stale rename never overwrites server state. The dialog keeps the proposed name and requires
    **Reload and retry rename** or **Discard change**. Reload fetches current server authority;
    response-loss replay is reconciled when the requested result is already current.

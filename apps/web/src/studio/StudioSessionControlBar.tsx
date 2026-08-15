@@ -38,6 +38,7 @@ type StudioSessionControlBarProps = {
   onSaveVideo?: () => void;
   saveVideoState?: SaveVideoState;
   onReplaceSavedVideo?: () => void;
+  hasUnsavedChanges?: boolean;
 };
 
 const MicrophoneIcon = ({ muted }: { muted: boolean }) => (
@@ -316,6 +317,7 @@ export const StudioSessionControlBar = ({
   onSaveVideo,
   saveVideoState,
   onReplaceSavedVideo,
+  hasUnsavedChanges,
 }: StudioSessionControlBarProps) => {
   const theme = useTheme();
   const transition = transitionLabel(session);
@@ -375,6 +377,7 @@ export const StudioSessionControlBar = ({
           {...(onSaveVideo ? { onSaveVideo } : {})}
           {...(saveVideoState ? { saveVideoState } : {})}
           {...(onReplaceSavedVideo ? { onReplaceSavedVideo } : {})}
+          {...(hasUnsavedChanges !== undefined ? { hasUnsavedChanges } : {})}
         />
       ) : (
         <>
