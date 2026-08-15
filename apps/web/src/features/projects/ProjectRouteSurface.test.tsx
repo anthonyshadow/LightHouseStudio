@@ -7,6 +7,7 @@ import type {
   ProjectSourceResponse,
   SavedVideoSummary,
 } from '@studio/contracts';
+import { createEmptyCreativeAssetStore, type CreativeAssetStore } from '@studio/domain';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, HttpResponse, http } from 'msw';
@@ -323,7 +324,7 @@ describe('Project route surface', () => {
 
   it('shows bounded Saved Video memberships, previews in place, and detaches only the association', async () => {
     const membershipId = '08707aa5-7b7f-4ce1-a48e-647370f6d3ab';
-    const summary = savedVideoSummary();
+    const summary = { ...savedVideoSummary(), thumbnailAvailable: true };
     projectAssetsResponse = {
       assets: [
         {
@@ -354,8 +355,27 @@ describe('Project route surface', () => {
 
     expect(await screen.findByRole('heading', { name: 'Project Assets' })).toBeVisible();
     expect(await screen.findByRole('heading', { name: 'Library source' })).toBeVisible();
+    const thumbnail = screen.getByRole('img', { name: 'Thumbnail for Library source' });
+    expect(thumbnail.querySelector('img')).toHaveAttribute(
+      'src',
+      `/api/videos/${savedVideoId}/thumbnail`,
+    );
+    expect(screen.getByRole('button', { name: 'Open in Studio' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Preview' }));
-    expect(await screen.findByRole('dialog', { name: 'Library source' })).toBeVisible();
+    const dialog = await screen.findByRole('dialog', { name: 'Library source' });
+    const previewBody = dialog.querySelector<HTMLElement>('[data-overlay-body-mode="contained"]');
+    expect(previewBody).not.toBeNull();
+    expect(previewBody).toHaveStyle({ overflow: 'hidden' });
+    expect(within(dialog).getByRole('group', { name: 'Video controls' })).toBeVisible();
+    expect(within(dialog).getByRole('button', { name: 'Play video' })).toBeVisible();
+    expect(within(dialog).getByRole('slider', { name: 'Video position' })).toBeVisible();
+    expect(within(dialog).getByLabelText('Preview of Library source')).toHaveStyle({
+      width: '100%',
+      height: '100%',
+      maxWidth: '100%',
+      maxHeight: '100%',
+      objectFit: 'contain',
+    });
     expect(router.state.location.pathname).toBe(`/projects/${activeId}`);
     await user.click(screen.getByRole('button', { name: 'Back to Project' }));
     await waitFor(() =>
@@ -370,6 +390,126 @@ describe('Project route surface', () => {
       expect(screen.queryByRole('heading', { name: 'Library source' })).not.toBeInTheDocument(),
     );
     expect(screen.getByText(/Detaching never deletes an Asset or Project history/u)).toBeVisible();
+  });
+
+  it('opens an attached Saved Video directly in Studio with Project return context', async () => {
+    const summary = savedVideoSummary();
+    projectAssetsResponse = {
+      assets: [
+        {
+          id: '9f748424-285f-4453-b752-dd85dbb5903c',
+          projectId: activeId,
+          kind: 'video',
+          resourceId: savedVideoId,
+          createdAt: now,
+        },
+      ],
+      videoSummaries: [summary],
+      nextCursor: null,
+    };
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(currentProject(activeId))),
+    );
+    const { router } = renderProjects(`/projects/${activeId}`);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Open in Studio' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/studio/${savedVideoId}`));
+    expect(router.state.location.state).toEqual({ fromProjectId: activeId });
+  });
+
+  it('shows retained images and type-specific visuals for attached creative Assets', async () => {
+    const characterId = 'saved-character-visual';
+    const outfitId = 'saved-outfit-visual';
+    const voiceId = 'saved-voice-visual';
+    const creativeStore: CreativeAssetStore = {
+      ...createEmptyCreativeAssetStore(),
+      savedCharacterPrompts: [
+        {
+          id: characterId,
+          name: 'Styled character',
+          prompt: 'A studio presenter',
+          source: 'manual',
+          promptIntent: null,
+          builderDraft: null,
+          guidedDesign: null,
+          referenceImageStatus: 'persisted-reference',
+          referenceImageAssetId: 'character-reference-image',
+          uploadedReferenceImageAssetId: null,
+          finalReferenceKind: 'generated',
+          selectedWardrobeVariantId: null,
+          defaultVoice: null,
+          notes: '',
+          tags: [],
+          createdAt: now,
+          updatedAt: now,
+          lastUsedAt: null,
+          useCount: 0,
+        },
+      ],
+      savedPrompts: [
+        {
+          id: outfitId,
+          title: 'Green jacket',
+          prompt: 'A green studio jacket',
+          modelModeId: 'lucy-vton-latest',
+          source: 'manual',
+          referenceImageAssetId: 'outfit-reference-image',
+          vtonInputKind: 'saved-outfit',
+          enhancePrompt: false,
+          tags: [],
+          createdAt: now,
+          updatedAt: now,
+          lastUsedAt: null,
+          useCount: 0,
+        },
+      ],
+    };
+    projectAssetsResponse = {
+      assets: [
+        {
+          id: '32bbd758-3b08-40d1-8ab6-41a84700e5fc',
+          projectId: activeId,
+          kind: 'character',
+          resourceId: characterId,
+          createdAt: now,
+        },
+        {
+          id: '64c960bc-671a-4b09-9de6-0da19e697647',
+          projectId: activeId,
+          kind: 'outfit',
+          resourceId: outfitId,
+          createdAt: now,
+        },
+        {
+          id: '627e96e5-839d-49ba-9481-797cb28f17c4',
+          projectId: activeId,
+          kind: 'voice',
+          resourceId: voiceId,
+          createdAt: now,
+        },
+      ],
+      videoSummaries: [],
+      nextCursor: null,
+    };
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(currentProject(activeId))),
+    );
+    renderProjects(`/projects/${activeId}`, { creativeStore });
+
+    const characterVisual = await screen.findByRole('img', {
+      name: 'Thumbnail for Styled character',
+    });
+    expect(characterVisual.querySelector('img')).toHaveAttribute(
+      'src',
+      '/api/reference-images/character-reference-image/content',
+    );
+    const outfitVisual = screen.getByRole('img', { name: 'Thumbnail for Green jacket' });
+    expect(outfitVisual.querySelector('img')).toHaveAttribute(
+      'src',
+      '/api/reference-images/outfit-reference-image/content',
+    );
+    expect(screen.getByRole('img', { name: 'Voice visual for Saved Voice' })).toBeVisible();
   });
 
   it('reuses the Quick Start operation key after response failure and reconciles replay', async () => {
