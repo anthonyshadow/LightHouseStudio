@@ -6,9 +6,10 @@ The current live character workflow uses Lucy 2.5.
 
 ## Entry and journey
 
-Enter `/studio`; the one Studio stage stays mounted behind the fullscreen Builder. Create from the
-desktop Character rail or Shelf, or from **Create A Character** at the end of an uploaded video's
-saved-character chooser. **Create new character** in Saved Characters opens the same Builder with a
+Enter the authenticated Studio; the one Studio stage stays mounted behind the fullscreen Builder. Create from the
+desktop Character rail, **Quick Create → Create Asset → Character**, `/assets/characters`, or from
+**Create A Character** at the end of an uploaded video's saved-character chooser. **Create new
+character** in Saved Characters opens the same Builder with a
 brand-new create target. **Create new from this character** hydrates that character into a distinct
 create target, so saving creates a new ID and leaves the source unchanged. Edit from the
 active-character selector or a true character card. Recording and
@@ -33,9 +34,9 @@ handoff from an unsubmitted edited-video Character Swap step.
    - prompt plus the uploaded image;
    - **Save & Use Image Only**; or
    - a current generated/combined preview.
-4. Name and save. Edit updates the existing character ID and preserves unrelated Shelf metadata.
+4. Name and save. Edit updates the existing character ID and preserves unrelated creative-library metadata.
 5. Builder closes and returns to its originating context:
-   - general Studio entry preloads/selects the character in Lucy 2.5, Dock, and Shelf; or
+   - general Studio entry selects the Character in Lucy 2.5 and keeps it available in Characters; or
    - uploaded-video entry reopens the upload panel with the new character selected. With an
      editable-prompt Character Swap binding, image-backed and prompt-only handoff retains its prior
      behavior. With a server-default binding such as Pruna, only an image-backed character can be
@@ -121,7 +122,7 @@ retirement.
 
 - Invalid upload, missing stored reference, optimizer/generation/edit failure, or stale preview
   preserves the prior valid draft/reference and exposes a targeted retry or safe local save path.
-- Durable Shelf failure does not publish in-memory success or close Builder.
+- Durable creative-library failure does not publish in-memory success or close Builder.
 - Studio preload or uploaded-step hydration failure keeps the saved character and retries only the
   incomplete handoff.
 - Shared modal focus/inert/Escape/return-focus behavior, internal scrolling, status regions, and

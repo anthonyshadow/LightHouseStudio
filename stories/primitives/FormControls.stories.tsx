@@ -31,10 +31,10 @@ const FormHarness = () => {
     <StoryColumn width="38rem">
       <StorySection title="Field set">
         <TextField
-          label="Recipe name"
+          label="Asset name"
           value={name}
           required
-          hint="Used in the local creative shelf."
+          hint="Used in the local creative library."
           onChange={(event) => setName(event.currentTarget.value)}
         />
         <TextAreaField

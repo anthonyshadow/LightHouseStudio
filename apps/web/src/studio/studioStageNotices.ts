@@ -106,7 +106,7 @@ export const deriveRealtimeSessionNotices = (
       severity: 'info',
       title: 'AI session maximum reached',
       message:
-        'The expected provider session completed. Local preview and the current recipe remain available.',
+        'The expected provider session completed. Local preview and the current settings remain available.',
       priority: 850,
     },
   ];

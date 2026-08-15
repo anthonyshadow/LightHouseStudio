@@ -18,8 +18,7 @@ export const StudioTakeOverlays = ({
   elevenLabsAvailable,
   elevenLabsModel,
   browserCapabilities,
-  editVideoToggleRef,
-  dockToggleRef,
+  mainRef,
   onClose,
   onDiscardTake,
   onEditVideo,
@@ -35,8 +34,7 @@ export const StudioTakeOverlays = ({
   elevenLabsAvailable: boolean;
   elevenLabsModel: string | null | undefined;
   browserCapabilities: VoiceBrowserCapabilities;
-  editVideoToggleRef: RefObject<HTMLButtonElement | null>;
-  dockToggleRef: RefObject<HTMLButtonElement | null>;
+  mainRef: RefObject<HTMLElement | null>;
   onClose: () => void;
   onDiscardTake: () => void;
   onEditVideo?: () => void;
@@ -47,7 +45,6 @@ export const StudioTakeOverlays = ({
   onReplaceSavedVideo?: () => void;
 }) => {
   const theme = useTheme();
-  const returnFocusRef = recording.presented ? editVideoToggleRef : dockToggleRef;
   return (
     <>
       <OverlayPanel
@@ -58,7 +55,7 @@ export const StudioTakeOverlays = ({
         placement="bottom"
         size="wide"
         bodyMode="contained"
-        returnFocusRef={returnFocusRef}
+        returnFocusRef={mainRef}
       >
         <Suspense fallback={<p role="status">Loading studio tool…</p>}>
           <TakeDock
@@ -109,7 +106,7 @@ export const StudioTakeOverlays = ({
         height="tall"
         centered
         bodyMode="contained"
-        returnFocusRef={returnFocusRef}
+        returnFocusRef={mainRef}
       >
         <Suspense fallback={<p role="status">Loading studio tool…</p>}>
           <TakeDock

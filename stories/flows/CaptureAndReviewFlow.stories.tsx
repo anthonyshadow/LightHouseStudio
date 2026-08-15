@@ -38,7 +38,7 @@ const CaptureFlowHarness = () => {
     return (
       <StoryColumn width="64rem">
         <StatusNotice tone="success" title="Take finalized">
-          Playback belongs on the stage; metadata and retention actions remain in the dock.
+          Playback belongs on the stage; metadata and retention actions remain in the review panel.
         </StatusNotice>
         <TakeDock
           recording={recording}

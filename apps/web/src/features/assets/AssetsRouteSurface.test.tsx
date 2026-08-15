@@ -18,7 +18,6 @@ describe('AssetsRouteSurface', () => {
         <AssetsRouteSurface
           characterCount={2}
           outfitCount={3}
-          recipeCount={4}
           onOpen={onOpen}
           onUploadVideo={onUploadVideo}
         />
@@ -26,12 +25,12 @@ describe('AssetsRouteSurface', () => {
     );
 
     expect(screen.getByRole('heading', { name: 'Assets', level: 1 })).toBeVisible();
-    for (const name of ['Videos', 'Characters', 'Outfits', 'Voices', 'Recipes']) {
+    for (const name of ['Videos', 'Characters', 'Outfits', 'Voices']) {
       expect(screen.getByRole('heading', { name })).toBeVisible();
     }
     expect(screen.getByText('2 saved')).toBeVisible();
     expect(screen.getByText('3 saved')).toBeVisible();
-    expect(screen.getByText('4 saved')).toBeVisible();
+    expect(screen.queryByText(/recipe/i)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Upload video' }));
     expect(onUploadVideo).toHaveBeenCalledOnce();

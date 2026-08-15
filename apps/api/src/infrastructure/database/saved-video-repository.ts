@@ -477,6 +477,45 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
     return this.#getWith(this.db, ownerUserId, videoId);
   }
 
+  async getSummaries(
+    ownerUserId: string,
+    videoIds: readonly string[],
+  ): Promise<readonly StoredSavedVideoSummary[]> {
+    const ids = [...new Set(videoIds)];
+    if (ids.length === 0) return [];
+    const currentVersion = and(
+      eq(videoVersions.id, savedVideos.currentVersionId),
+      eq(videoVersions.ownerUserId, savedVideos.ownerUserId),
+    );
+    const [rows, counts] = await Promise.all([
+      this.db
+        .select({ video: savedVideos, currentVersion: videoVersions })
+        .from(savedVideos)
+        .innerJoin(videoVersions, currentVersion)
+        .where(
+          and(
+            eq(savedVideos.ownerUserId, ownerUserId),
+            isNull(savedVideos.deletedAt),
+            inArray(savedVideos.id, ids),
+          ),
+        ),
+      this.db
+        .select({
+          videoId: videoVersions.videoId,
+          count: sql<number>`count(*)::int`.mapWith(Number),
+        })
+        .from(videoVersions)
+        .where(and(eq(videoVersions.ownerUserId, ownerUserId), inArray(videoVersions.videoId, ids)))
+        .groupBy(videoVersions.videoId),
+    ]);
+    const countByVideoId = new Map(counts.map(({ videoId, count }) => [videoId, count]));
+    return rows.map(({ video, currentVersion: version }) => ({
+      video: toVideo(video),
+      currentVersion: toVersion(version),
+      versionCount: countByVideoId.get(video.id) ?? 1,
+    }));
+  }
+
   async getVersion(
     ownerUserId: string,
     videoId: string,

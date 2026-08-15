@@ -27,6 +27,11 @@ const ConfirmationDialog = lazy(() =>
     default: module.ConfirmationDialog,
   })),
 );
+const SavedCharacterLibrary = lazy(() =>
+  import('../features/account-library/SavedCreativeLibrary').then((module) => ({
+    default: module.SavedCharacterLibrary,
+  })),
+);
 
 export const StudioCharacterOverlays = ({
   ownerUserId,
@@ -41,8 +46,8 @@ export const StudioCharacterOverlays = ({
   characterOpenBlockedReason,
   characterRemovalBlockedReason,
   recordingActive,
+  mainRef,
   characterSelectorRef,
-  shelfToggleRef,
   editVideoToggleRef,
   onClose,
   onOpenSavedCharacters,
@@ -60,8 +65,8 @@ export const StudioCharacterOverlays = ({
   readonly characterOpenBlockedReason: string | undefined;
   readonly characterRemovalBlockedReason: string | undefined;
   readonly recordingActive: boolean;
+  readonly mainRef: RefObject<HTMLElement | null>;
   readonly characterSelectorRef: RefObject<HTMLButtonElement | null>;
-  readonly shelfToggleRef: RefObject<HTMLButtonElement | null>;
   readonly editVideoToggleRef: RefObject<HTMLButtonElement | null>;
   readonly onClose: () => void;
   readonly onOpenSavedCharacters: () => void;
@@ -74,7 +79,7 @@ export const StudioCharacterOverlays = ({
     <>
       <StudioCharacterSelectorOverlay
         open={activeOverlay === 'character-selector'}
-        returnFocusRef={desktopStudioLayout ? characterSelectorRef : shelfToggleRef}
+        returnFocusRef={desktopStudioLayout ? characterSelectorRef : mainRef}
         activeCharacterName={activeCharacterName}
         activeCharacter={activeCharacterRecord}
         editBlockedReason={characterOpenBlockedReason}
@@ -89,6 +94,41 @@ export const StudioCharacterOverlays = ({
       />
 
       <OverlayPanel
+        open={activeOverlay === 'saved-characters'}
+        onClose={onClose}
+        title="Characters"
+        description="Choose a saved character for this Studio session."
+        placement={desktopStudioLayout ? 'right' : 'fullscreen'}
+        size="wide"
+        bodyMode="scroll"
+        returnFocusRef={desktopStudioLayout ? characterSelectorRef : mainRef}
+      >
+        {activeOverlay === 'saved-characters' ? (
+          <Suspense fallback={<p role="status">Loading saved characters…</p>}>
+            <SavedCharacterLibrary
+              items={store.savedCharacterPrompts}
+              repository={repository}
+              onUse={(savedCharacter) => {
+                handoff.actions.useRecipe({
+                  origin: 'character-prompt',
+                  prompt: savedCharacter.prompt,
+                  modelModeId: 'lucy-latest',
+                  assetId: savedCharacter.id,
+                  characterName: savedCharacter.name,
+                  referenceImageAssetId: savedCharacter.referenceImageAssetId,
+                  ...(savedCharacter.builderDraft
+                    ? { builderDraft: savedCharacter.builderDraft }
+                    : {}),
+                });
+              }}
+              onCreateFrom={character.copy}
+              onOpenWardrobe={character.openWardrobe}
+            />
+          </Suspense>
+        ) : null}
+      </OverlayPanel>
+
+      <OverlayPanel
         open={activeOverlay === 'character-wardrobe' && Boolean(character.wardrobeCharacter)}
         onClose={character.closeWardrobe}
         title={
@@ -101,7 +141,7 @@ export const StudioCharacterOverlays = ({
         size="wide"
         bodyMode="contained"
         closeOnBackdrop={!character.wardrobeDirty}
-        returnFocusRef={desktopStudioLayout ? characterSelectorRef : shelfToggleRef}
+        returnFocusRef={desktopStudioLayout ? characterSelectorRef : mainRef}
       >
         {character.wardrobeCharacter ? (
           <Suspense fallback={<p role="status">Loading studio tool…</p>}>
@@ -156,7 +196,7 @@ export const StudioCharacterOverlays = ({
                 ? editVideoToggleRef
                 : desktopStudioLayout
                   ? characterSelectorRef
-                  : shelfToggleRef
+                  : mainRef
             }
             generationAvailable={Boolean(availability.referenceImages)}
             optimizationAvailable={Boolean(availability.referenceImageOptimizerAvailable)}

@@ -72,7 +72,7 @@ const aggregateSummary = (
   versionCount: aggregate.versions.length,
 });
 
-const publicSummary = (
+export const publicSavedVideoSummary = (
   summary: StoredSavedVideoSummary,
   assignedToProject = false,
 ): SavedVideoSummary =>
@@ -95,7 +95,7 @@ export const publicSavedVideoDetail = (
 ): SavedVideoDetail => {
   const version = currentVersion(aggregate);
   return savedVideoDetailSchema.parse({
-    ...publicSummary(aggregateSummary(aggregate, version), assignedToProject),
+    ...publicSavedVideoSummary(aggregateSummary(aggregate, version), assignedToProject),
     versions: aggregate.versions.map(publicSavedVideoVersion),
   });
 };
@@ -545,7 +545,7 @@ export class SavedVideoService {
         )) ?? new Set<string>();
       return {
         videos: page.videos.map((summary) =>
-          publicSummary(summary, assigned.has(summary.video.id)),
+          publicSavedVideoSummary(summary, assigned.has(summary.video.id)),
         ),
         nextCursor:
           offset + page.videos.length < page.total
@@ -594,7 +594,10 @@ export class SavedVideoService {
       )) ?? new Set<string>();
     return {
       videos: page.map(({ aggregate, version }) =>
-        publicSummary(aggregateSummary(aggregate, version), assigned.has(aggregate.video.id)),
+        publicSavedVideoSummary(
+          aggregateSummary(aggregate, version),
+          assigned.has(aggregate.video.id),
+        ),
       ),
       nextCursor:
         offset + page.length < filtered.length ? encodeCursor(offset + page.length, query) : null,

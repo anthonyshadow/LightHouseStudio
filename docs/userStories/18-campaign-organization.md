@@ -10,8 +10,10 @@ making Campaign setup a prerequisite for creative work.
 1. Open **Campaigns** from the primary Studio navigation. Active and archived Campaigns load as
    separate bounded lists; no Project revision or media bytes are loaded for these summaries.
 2. Choose **Create Campaign**, enter a required Name and optional Brief, and submit. Creation is
-   idempotent and opens the new Campaign detail immediately.
-3. Choose **New Project**, enter a name with the active Campaign preselected, or use **Quick
+   idempotent and opens `/campaign/:campaignId` immediately. A success callout offers **Create
+   Project in Campaign** or **Not now**.
+3. Choose the persistent **New Project** action, enter a name with the active Campaign fixed as the
+   relationship source, or use **Quick
    project** in Projects to create a standalone `Untitled Project`.
 4. Campaign detail shows its active and archived Projects. Open one, move it to another active
    Campaign, or detach it to **No Campaign**. Membership changes use the Project version and never
@@ -23,6 +25,8 @@ making Campaign setup a prerequisite for creative work.
 7. Restore an archived Campaign to accept membership again. To delete the organizer, first move or
    detach every active and archived Project, then explicitly confirm **Delete Campaign**. A
    nonempty Campaign is blocked and no cascade action is offered.
+8. **Create another Campaign** reuses the same canonical dialog from Campaign detail. Successful
+   related Project creation opens `/projects/:projectId` with the existing `campaignId` relation.
 
 ## Boundaries
 

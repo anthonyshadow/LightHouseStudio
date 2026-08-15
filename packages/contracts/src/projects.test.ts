@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  attachProjectAssetRequestSchema,
   appendProjectRevisionRequestSchema,
   createProjectRequestSchema,
   projectConflictResponseSchema,
@@ -8,6 +9,9 @@ import {
   projectOutputHistoryResponseSchema,
   projectOutputLinkSchema,
   projectOutputSaveResultSchema,
+  projectAssetMembershipSchema,
+  projectAssetsQuerySchema,
+  projectAssetsResponseSchema,
   projectSourceResponseSchema,
   projectSourceUploadMetadataSchema,
   projectSnapshotSchema,
@@ -20,6 +24,32 @@ const assetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
 const videoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
 const versionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
 const now = '2026-08-11T12:00:00.000Z';
+
+describe('Project asset membership contracts', () => {
+  it('accepts only supported non-Recipe kinds and bounded pages', () => {
+    const membership = {
+      id: '08707aa5-7b7f-4ce1-a48e-647370f6d3ab',
+      projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
+      kind: 'character' as const,
+      resourceId: 'character-one',
+      createdAt: now,
+    };
+    expect(projectAssetMembershipSchema.parse(membership)).toEqual(membership);
+    expect(projectAssetsQuerySchema.parse({})).toEqual({ pageSize: 24 });
+    expect(projectAssetsQuerySchema.safeParse({ pageSize: 51 }).success).toBe(false);
+    expect(
+      projectAssetsResponseSchema.parse({
+        assets: [membership],
+        videoSummaries: [],
+        nextCursor: null,
+      }),
+    ).toMatchObject({ assets: [membership] });
+    expect(
+      attachProjectAssetRequestSchema.safeParse({ kind: 'recipe', resourceId: 'recipe-one' })
+        .success,
+    ).toBe(false);
+  });
+});
 
 const validSnapshot = () => ({
   schemaVersion: 2 as const,

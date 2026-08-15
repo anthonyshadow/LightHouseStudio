@@ -286,16 +286,18 @@ Minimum authenticated destinations are:
 - **Create:** the focused standalone video workspace at `/studio/create`;
 - **Projects:** default active list, recent status, optional Campaign, create/open/rename/archive;
 - **Campaigns:** active list, create/open/rename/edit brief/archive, and grouped Projects;
-- **Project overview/workspace:** organization at `/studio/projects/:projectId` and focused media
+- **Project overview/workspace:** organization at `/projects/:projectId` and focused media
   work at its `/workspace` child;
-- **Assets:** Videos, Characters, Outfits, Voices, and Recipes, with “Unassigned Content” for legacy
-  or independently saved Videos; and
+- **Assets:** Videos, Characters, Outfits, and Voices, with “Unassigned Content” for legacy or
+  independently saved Videos; and
 - current contextual access to Wardrobe and builders.
 
 It requires Campaigns, Projects, Assets, current Project identity, save state, and processing state
 to be clear in the main navigation/shell.
 
-Active Project identity is owned by the overview/workspace URL pair. Opening a global Assets route
+Project detail also exposes non-owning, detachable membership for supported Assets without changing
+source, working-media, output, history, or retention authority. Active Project identity is owned by
+the overview/workspace URL pair. Opening a global Assets route
 is a guarded workspace exit, not an identity kept only in mounted React state; in-Project resource
 selection uses contextual pickers or returns through the explicit Project workspace URL.
 

@@ -42,7 +42,7 @@ const pending: PendingReferenceRecipeUse = {
   referenceImageAssetId: asset.assetId,
   preserveCurrentReference: false,
   savedPromptId: 'saved-prompt',
-  destination: 'shelf',
+  destination: 'selection',
 };
 
 beforeEach(() => {
@@ -161,7 +161,7 @@ describe('useReferenceRecipeHydration', () => {
         vtonInputKind: 'saved-outfit',
         enhancePrompt: false,
         preserveCurrentReference: false,
-        destination: 'shelf',
+        destination: 'selection',
       });
     });
     await waitFor(() => expect(result.current.failureMessage).not.toBeNull());

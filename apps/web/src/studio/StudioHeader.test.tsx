@@ -46,6 +46,7 @@ const headerProps = {
   onOpenAssets: vi.fn(),
   onCreateProject: vi.fn(),
   onCreateCampaign: vi.fn(),
+  onCreateAsset: vi.fn(),
   onOpenLive: vi.fn(),
   onLogout: vi.fn(),
 };
@@ -209,11 +210,27 @@ describe('StudioHeader', () => {
       },
     });
 
-    await user.click(screen.getByRole('button', { name: 'Create' }));
-    const menu = screen.getByRole('menu', { name: 'Create' });
+    await user.click(screen.getByRole('button', { name: 'Quick Create' }));
+    const menu = screen.getByRole('menu', { name: 'Quick Create' });
     expect(within(menu).queryByRole('menuitem', { name: /Live AI/u })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole('menuitem', { name: /Recipe/u })).not.toBeInTheDocument();
     await user.click(within(menu).getByRole('menuitem', { name: 'New video' }));
 
     expect(headerProps.onOpenStudio).toHaveBeenCalledOnce();
+  });
+
+  it('opens the shared Create Asset launcher from Quick Create', async () => {
+    const user = userEvent.setup();
+    renderHeader();
+
+    const trigger = screen.getByRole('button', { name: 'Quick Create' });
+    await user.click(trigger);
+    await user.click(
+      within(screen.getByRole('menu', { name: 'Quick Create' })).getByRole('menuitem', {
+        name: 'Create Asset',
+      }),
+    );
+
+    expect(headerProps.onCreateAsset).toHaveBeenCalledWith(trigger);
   });
 });

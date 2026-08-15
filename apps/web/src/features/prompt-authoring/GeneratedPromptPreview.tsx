@@ -47,7 +47,7 @@ const previewTextStyles = (theme: Theme, empty: boolean): CSSObject => ({
 
 export const GeneratedPromptPreview = ({
   prompt,
-  label = 'Generated recipe',
+  label = 'Generated direction',
 }: GeneratedPromptPreviewProps) => {
   const theme = useTheme();
 

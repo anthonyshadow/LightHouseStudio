@@ -75,7 +75,6 @@ describe('reference recipe attribution', () => {
     expect(
       characterBuilderSaveBlockedReason({
         openBlockedReason: 'Finish the current take.',
-        shelfDirty: true,
         canReplaceLucyRecipe: false,
         referenceUsePending: true,
       }),
@@ -102,7 +101,6 @@ describe('reference recipe attribution', () => {
         activeCharacterName: undefined,
         dispatchActiveRecipe,
         characterBuilderOpenBlockedReason: undefined,
-        shelfDirty: false,
         referenceUsePending: false,
       }),
     );
@@ -220,7 +218,6 @@ describe('reference recipe attribution', () => {
         activeCharacterName: undefined,
         dispatchActiveRecipe,
         characterBuilderOpenBlockedReason: undefined,
-        shelfDirty: false,
         referenceUsePending: false,
       }),
     );

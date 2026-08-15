@@ -7,12 +7,12 @@ import {
 } from './support/existingVideoHarness';
 import {
   CREATIVE_ASSET_STORAGE_KEY,
-  closeRecipeDockWhenOverlaid,
+  closeAiSettings,
   createLocalTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
-  openRecipeDockWhenOverlaid,
+  openAiSettings,
   openCharacterOptions,
   settleVisualPage,
   startLocalPreview,
@@ -200,6 +200,7 @@ const prepareVisualPage = async (page: Page, entryRoute: boolean): Promise<Netwo
   const network = await installSuccessfulStudioHarness(page, {
     elevenLabsAvailable: true,
     stubMediaPlayback: false,
+    initiallyAuthenticated: !entryRoute,
   });
   await page.addInitScript(() => {
     Object.defineProperty(window.performance, 'now', {
@@ -247,25 +248,28 @@ const prepareVisualPage = async (page: Page, entryRoute: boolean): Promise<Netwo
 
 const openCharacterBuilder = async (page: Page): Promise<void> => {
   await openCharacterOptions(page);
-  await page
-    .getByRole('button', { name: /^(Create new character|New character recipe)$/u })
-    .click();
+  await page.getByRole('button', { name: 'Create new character' }).click();
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
 };
 
 const openSavedCharacters = async (page: Page): Promise<void> => {
   await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Choose saved character' }).click();
-  const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
-  await expect(shelf).toBeVisible();
-  const characters = shelf.getByRole('button', { name: /^Characters/u });
-  await expect(characters).toHaveAttribute('aria-pressed', 'true');
-  await expect(shelf.getByRole('list', { name: 'Saved character recipes' })).toBeVisible();
+  const characters = page.getByRole('dialog', { name: 'Characters' });
+  await expect(characters).toBeVisible();
+  await expect(
+    characters.getByRole('article').filter({ hasText: 'Cinematic Field Presenter' }),
+  ).toBeVisible();
 };
 
 const selectSeededCharacter = async (page: Page): Promise<void> => {
   await openSavedCharacters(page);
-  await page.getByRole('button', { name: 'Use Cinematic Field Presenter' }).click();
+  await page
+    .getByRole('dialog', { name: 'Characters' })
+    .getByRole('article')
+    .filter({ hasText: 'Cinematic Field Presenter' })
+    .getByRole('button', { name: 'Use in Studio' })
+    .click();
   await expect(
     page.getByRole('button', {
       name: 'Selected character: Cinematic Field Presenter. Open character options',
@@ -321,7 +325,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     setup: async (page) => {
       await installProjectHarness(page, true);
       await installCampaignHarness(page, true);
-      await page.goto('/studio');
+      await page.goto('/dashboard');
       await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
       await expect(
         page.getByRole('heading', { name: 'Start with the outcome you need' }),
@@ -334,10 +338,11 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
   'assets-overview': {
     id: 'assets-overview',
     setup: async (page) => {
-      await page.goto('/studio/assets');
+      await page.goto('/assets');
       await expect(page.getByRole('heading', { name: 'Assets' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Open Videos' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Open Recipes' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Open Voices' })).toBeVisible();
+      await expect(page.getByText(/Recipe/u)).toHaveCount(0);
       await expect(page.getByLabel('Studio media stage')).toBeHidden();
     },
   },
@@ -433,7 +438,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
         .getByRole('button', { name: 'Record New Video', exact: true })
         .click({ force: true });
       await expect(page.getByLabel('Live local camera preview')).toBeVisible();
-      await closeRecipeDockWhenOverlaid(page);
+      await closeAiSettings(page);
       const controls = page.getByLabel('Studio session controls');
       await controls.getByRole('button', { name: 'Start AI' }).click();
       await page.getByRole('button', { name: 'Start with Cinematic Field Presenter' }).click();
@@ -470,11 +475,13 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'saved-character-selection',
     setup: async (page) => {
       await openSavedCharacters(page);
-      await expect(page.getByTitle('Select Cinematic Field Presenter')).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Characters 1', exact: true })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-      );
+      await expect(
+        page
+          .getByRole('dialog', { name: 'Characters' })
+          .getByRole('article')
+          .filter({ hasText: 'Cinematic Field Presenter' })
+          .getByRole('button', { name: 'Use in Studio' }),
+      ).toBeVisible();
     },
   },
   'take-playback-review-settled': {
@@ -569,7 +576,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'project-output-review',
     setup: async (page) => {
       await installProjectHarness(page, true);
-      await page.goto(`/studio/projects/${TEST_PROJECT_ID}/workspace`);
+      await page.goto(`/projects/${TEST_PROJECT_ID}/workspace`);
       const fixture = await loadDecodableH264VideoFixture();
       await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
         name: 'project-output-review.mp4',
@@ -587,17 +594,17 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
   'vton-prepared-with-reference': {
     id: 'vton-prepared-with-reference',
     setup: async (page) => {
-      await openRecipeDockWhenOverlaid(page);
-      const dock = page.getByRole('dialog', { name: 'Recipe Dock' });
-      await dock.getByRole('button', { name: 'Virtual Try-On · VTON 3' }).click();
-      await dock.getByLabel('Garment direction').fill('A tailored linen travel overshirt');
-      await dock.getByLabel('Garment reference image').setInputFiles({
+      await openAiSettings(page);
+      const settings = page.getByRole('dialog', { name: 'AI Settings' });
+      await settings.getByRole('button', { name: 'Virtual Try-On · VTON 3' }).click();
+      await settings.getByLabel('Garment direction').fill('A tailored linen travel overshirt');
+      await settings.getByLabel('Garment reference image').setInputFiles({
         name: 'linen-overshirt.png',
         mimeType: 'image/png',
         buffer: REFERENCE_PNG,
       });
-      await expect(dock.getByAltText('Current ephemeral reference preview')).toBeVisible();
-      await expect(dock.getByRole('button', { name: 'Start Virtual Try-On AI' })).toBeEnabled();
+      await expect(settings.getByAltText('Current ephemeral reference preview')).toBeVisible();
+      await expect(settings.getByRole('button', { name: 'Start Virtual Try-On AI' })).toBeEnabled();
     },
   },
   'voice-browser-loaded': {
@@ -643,8 +650,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
             ),
         });
       });
-      await openRecipeDockWhenOverlaid(page);
-      await page.getByRole('button', { name: 'Start local preview' }).click({ force: true });
+      await page.getByRole('button', { name: 'Record New Video' }).click({ force: true });
       await expect(
         page.getByRole('alert').filter({ hasText: 'Camera or microphone access was not allowed.' }),
       ).toBeVisible();

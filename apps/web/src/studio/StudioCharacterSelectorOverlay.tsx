@@ -19,7 +19,7 @@ export const StudioCharacterSelectorOverlay = ({
   onChooseSaved,
 }: {
   open: boolean;
-  returnFocusRef: RefObject<HTMLButtonElement | null>;
+  returnFocusRef: RefObject<HTMLElement | null>;
   activeCharacterName: string | null | undefined;
   activeCharacter: SavedCharacterPrompt | null | undefined;
   editBlockedReason: string | null | undefined;

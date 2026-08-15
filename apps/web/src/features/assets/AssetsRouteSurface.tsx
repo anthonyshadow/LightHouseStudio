@@ -1,12 +1,11 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { Button } from '../../ui';
 
-type AssetDestination = 'videos' | 'characters' | 'outfits' | 'voices' | 'recipes';
+type AssetDestination = 'videos' | 'characters' | 'outfits' | 'voices';
 
 type AssetsRouteSurfaceProps = Readonly<{
   characterCount: number;
   outfitCount: number;
-  recipeCount: number;
   onOpen: (destination: AssetDestination) => void;
   onUploadVideo: () => void;
 }>;
@@ -98,24 +97,18 @@ const assetCards: ReadonlyArray<{
   {
     destination: 'outfits',
     title: 'Outfits',
-    description: 'Reuse saved Virtual Try-On outfit recipes in new or existing video work.',
+    description: 'Reuse saved Virtual Try-On outfits in new or existing video work.',
   },
   {
     destination: 'voices',
     title: 'Voices',
     description: 'Preview the voice catalog and manage the voices retained for this account.',
   },
-  {
-    destination: 'recipes',
-    title: 'Recipes',
-    description: 'Find saved and recent creative recipes without entering an active media session.',
-  },
 ];
 
 export const AssetsRouteSurface = ({
   characterCount,
   outfitCount,
-  recipeCount,
   onOpen,
   onUploadVideo,
 }: AssetsRouteSurfaceProps) => {
@@ -123,7 +116,6 @@ export const AssetsRouteSurface = ({
   const countFor = (destination: AssetDestination): string | null => {
     if (destination === 'characters') return `${characterCount} saved`;
     if (destination === 'outfits') return `${outfitCount} saved`;
-    if (destination === 'recipes') return `${recipeCount} saved`;
     return null;
   };
 

@@ -491,7 +491,7 @@ export const CharacterBuilderPanel = ({
         title="Reset this character draft?"
         description={
           saveRecoveryPending
-            ? 'This abandons the pending Studio handoff and removes the resumable draft. Any character already committed to the Shelf remains saved. Reference relationships are detached; immutable local image bytes remain until whole-environment retirement.'
+            ? 'This abandons the pending Studio handoff and removes the resumable draft. Any character already saved to Assets remains available. Reference relationships are detached; immutable local image bytes remain until whole-environment retirement.'
             : 'This removes the resumable draft from this browser and starts a fresh character. Reference relationships are detached; immutable local image bytes remain until whole-environment retirement.'
         }
         confirmLabel="Reset Draft"

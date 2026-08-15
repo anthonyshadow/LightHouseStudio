@@ -1,12 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { fn } from 'storybook/test';
 import { createPromptBuilderDraft } from '@studio/domain';
 import { CharacterBuilderForm } from '@web/features/character-builder/CharacterBuilderForm';
 import { createEmptyGuidedDesign } from '@web/features/character-builder/characterModel';
-import { RecipeShelf } from '@web/features/creative-assets/RecipeShelf';
 import { Button, StatusNotice } from '@web/ui';
-import { createSeededCreativeAssetRepository } from '../fixtures/creativeAssets';
 import { StoryColumn } from '../support/StoryLayout';
 
 const meta = {
@@ -29,7 +26,6 @@ const CharacterCreationHarness = () => {
   const [design, setDesign] = useState(createEmptyGuidedDesign);
   const [builderStep, setBuilderStep] = useState<1 | 2 | 3>(1);
   const [stage, setStage] = useState<'builder' | 'saved'>('builder');
-  const repository = useMemo(() => createSeededCreativeAssetRepository(), []);
 
   return (
     <StoryColumn width="82rem">
@@ -55,17 +51,11 @@ const CharacterCreationHarness = () => {
       ) : (
         <>
           <StatusNotice tone="success" title="Step 2 of 2">
-            The saved character is now available from the local Recipe Shelf.
+            The saved Character is now available from Characters in Assets.
           </StatusNotice>
           <Button variant="quiet" onClick={() => setStage('builder')}>
             Back to builder
           </Button>
-          <RecipeShelf
-            repository={repository}
-            activeMode="lucy-latest"
-            onUsePrompt={fn()}
-            onOpenCharacterWorkshop={fn()}
-          />
         </>
       )}
     </StoryColumn>

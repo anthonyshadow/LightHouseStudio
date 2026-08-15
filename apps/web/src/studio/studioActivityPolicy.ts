@@ -29,15 +29,9 @@ export const characterBuilderBlockedReasons = ({
 
 export const captureBlockedReason = ({
   reviewLocked,
-  shelfDirty,
 }: {
   readonly reviewLocked: boolean;
-  readonly shelfDirty: boolean;
-}): string | undefined => {
-  if (reviewLocked) return REVIEW_LOCK_REASON;
-  if (shelfDirty) return 'Save or discard Recipe Shelf changes before recording.';
-  return undefined;
-};
+}): string | undefined => (reviewLocked ? REVIEW_LOCK_REASON : undefined);
 
 export const captureSettingsDisabledReason = ({
   reviewLocked,
@@ -65,16 +59,16 @@ export const characterRemovalBlockedReason = ({
   readonly aiSessionActive: boolean;
   readonly sessionDisconnected: boolean;
 }): string | undefined => {
-  if (recordingActive) return 'Finish recording before changing the selected AI recipe.';
+  if (recordingActive) return 'Finish recording before changing the selected AI settings.';
   if (finalizing) {
-    return 'Wait for the current take to finish finalizing before changing the selected AI recipe.';
+    return 'Wait for the current take to finish finalizing before changing the selected AI settings.';
   }
   if (reviewLocked) {
-    return 'Release or discard the current take before changing the selected AI recipe.';
+    return 'Release or discard the current take before changing the selected AI settings.';
   }
-  if (aiSessionActive) return 'Stop AI before changing the selected AI recipe.';
+  if (aiSessionActive) return 'Stop AI before changing the selected AI settings.';
   if (sessionDisconnected) {
-    return 'Wait for the current session cleanup before changing the selected AI recipe.';
+    return 'Wait for the current session cleanup before changing the selected AI settings.';
   }
   return undefined;
 };

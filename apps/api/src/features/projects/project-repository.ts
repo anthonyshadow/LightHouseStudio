@@ -2,6 +2,8 @@ import type {
   Project,
   ProjectAggregate,
   ProjectAssetLink,
+  ProjectAssetMembership,
+  ProjectAssetKind,
   ProjectConflict,
   ProjectJobLink,
   ProjectMediaReference,
@@ -46,7 +48,32 @@ export interface AppendProjectRevisionPersistenceInput {
   readonly nextProject: Project;
   readonly revision: ProjectRevision;
   readonly assetLinks: readonly ProjectAssetLink[];
+  readonly assetMemberships?: readonly ProjectAssetMembership[];
 }
+
+export interface ProjectAssetMembershipCursor {
+  readonly createdAt: string;
+  readonly membershipId: string;
+}
+
+export interface ProjectAssetMembershipPageInput {
+  readonly kind?: ProjectAssetKind;
+  readonly cursor?: ProjectAssetMembershipCursor;
+  readonly pageSize: number;
+}
+
+export interface ProjectAssetMembershipPage {
+  readonly memberships: readonly ProjectAssetMembership[];
+  readonly nextCursor: ProjectAssetMembershipCursor | null;
+}
+
+export type ProjectAssetMembershipAttachResult =
+  | { readonly kind: 'attached' | 'existing'; readonly membership: ProjectAssetMembership }
+  | { readonly kind: 'not-found' | 'archived' };
+
+export type ProjectAssetMembershipDetachResult =
+  | { readonly kind: 'detached'; readonly removed: boolean }
+  | { readonly kind: 'not-found' | 'archived' };
 
 export interface ProjectCurrentRead {
   readonly project: Project;
@@ -312,6 +339,26 @@ export interface ProjectRepository {
     operationKey: string,
   ): Promise<ProjectWorkingMediaRead | null>;
   list(ownerUserId: string, input: ProjectSummaryPageInput): Promise<ProjectSummaryPage>;
+  ensureAssetMembershipBackfill(ownerUserId: string): Promise<void>;
+  listAssetMemberships(
+    ownerUserId: string,
+    projectId: string,
+    input: ProjectAssetMembershipPageInput,
+  ): Promise<ProjectAssetMembershipPage | null>;
+  getAssetMembership(
+    ownerUserId: string,
+    projectId: string,
+    kind: ProjectAssetKind,
+    resourceId: string,
+  ): Promise<ProjectAssetMembership | null>;
+  attachAssetMembership(
+    membership: ProjectAssetMembership,
+  ): Promise<ProjectAssetMembershipAttachResult>;
+  detachAssetMembership(
+    ownerUserId: string,
+    projectId: string,
+    membershipId: string,
+  ): Promise<ProjectAssetMembershipDetachResult>;
   listRevisionHistory(
     ownerUserId: string,
     projectId: string,

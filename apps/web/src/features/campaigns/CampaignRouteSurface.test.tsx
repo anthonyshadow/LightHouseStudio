@@ -87,11 +87,11 @@ const currentProject = (
   },
 });
 
-const renderCampaigns = (path = '/studio/campaigns') => {
+const renderCampaigns = (path = '/campaign') => {
   const router = createMemoryRouter(
     [
-      { path: '/studio/campaigns/*', element: <CampaignRouteSurface /> },
-      { path: '/studio/projects/:projectId', element: <div>Project route</div> },
+      { path: '/campaign/*', element: <CampaignRouteSurface /> },
+      { path: '/projects/:projectId', element: <div>Project route</div> },
     ],
     { initialEntries: [path] },
   );
@@ -159,19 +159,19 @@ describe('Campaign route surface', () => {
     );
     await user.click(within(dialog).getByRole('button', { name: 'Create Campaign' }));
 
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe(`/studio/campaigns/${campaignId}`),
-    );
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/campaign/${campaignId}`));
     expect(await screen.findByRole('heading', { name: 'Summer launch' })).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'New Project' }));
+    expect(await screen.findByText('Campaign created')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Create Project in Campaign' }));
     const projectDialog = screen.getByRole('dialog', { name: 'New Project' });
     await user.type(
       within(projectDialog).getByRole('textbox', { name: /Project name/u }),
       'Launch cut',
     );
+    expect(within(projectDialog).getByRole('combobox', { name: 'Campaign' })).toBeDisabled();
     await user.click(within(projectDialog).getByRole('button', { name: 'Create Project' }));
     await waitFor(() => expect(projectCreateBody).toEqual({ title: 'Launch cut', campaignId }));
-    expect(router.state.location.pathname).toBe(`/studio/projects/${projectId}`);
+    expect(router.state.location.pathname).toBe(`/projects/${projectId}`);
   });
 
   it('paginates Campaigns and opens the exact organizer selected from the list', async () => {
@@ -220,7 +220,7 @@ describe('Campaign route surface', () => {
     await user.click(within(winterCard!).getByRole('button', { name: 'Open' }));
 
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe(`/studio/campaigns/${secondCampaignId}`),
+      expect(router.state.location.pathname).toBe(`/campaign/${secondCampaignId}`),
     );
     expect(await screen.findByRole('heading', { name: 'Winter launch' })).toBeVisible();
     expect(screen.getByText('No brief yet.')).toBeVisible();
@@ -271,14 +271,14 @@ describe('Campaign route surface', () => {
       http.get('*/api/campaigns', () => HttpResponse.json({ campaigns: [], nextCursor: null })),
     );
     const user = userEvent.setup();
-    const { router } = renderCampaigns(`/studio/campaigns/${campaignId}`);
+    const { router } = renderCampaigns(`/campaign/${campaignId}`);
 
     const unavailable = await screen.findByRole('alert');
     expect(unavailable).toHaveTextContent('Campaign unavailable');
     expect(unavailable).not.toHaveTextContent('provider body must stay private');
     await user.click(within(unavailable).getByRole('button', { name: 'Back to Campaigns' }));
 
-    await waitFor(() => expect(router.state.location.pathname).toBe('/studio/campaigns'));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/campaign'));
     expect(await screen.findByRole('heading', { name: 'Campaigns' })).toBeVisible();
   });
 
@@ -296,7 +296,7 @@ describe('Campaign route surface', () => {
       }),
     );
     const user = userEvent.setup();
-    renderCampaigns(`/studio/campaigns/${campaignId}`);
+    renderCampaigns(`/campaign/${campaignId}`);
 
     const edit = await screen.findByRole('button', { name: 'Edit' });
     await user.click(edit);
@@ -343,7 +343,7 @@ describe('Campaign route surface', () => {
       ),
     );
     const user = userEvent.setup();
-    renderCampaigns(`/studio/campaigns/${campaignId}`);
+    renderCampaigns(`/campaign/${campaignId}`);
 
     await user.click(await screen.findByRole('button', { name: 'New Project' }));
     const dialog = screen.getByRole('dialog', { name: 'New Project' });
@@ -380,7 +380,7 @@ describe('Campaign route surface', () => {
       }),
     );
     const user = userEvent.setup();
-    const { router } = renderCampaigns(`/studio/campaigns/${campaignId}`);
+    const { router } = renderCampaigns(`/campaign/${campaignId}`);
 
     await user.click(await screen.findByRole('button', { name: 'Load more active Projects' }));
     expect(await screen.findByText('Launch cut two')).toBeVisible();
@@ -389,7 +389,7 @@ describe('Campaign route surface', () => {
     const projectCard = screen.getByText('Launch cut two').closest('article');
     expect(projectCard).not.toBeNull();
     await user.click(within(projectCard!).getByRole('button', { name: 'Open' }));
-    expect(router.state.location.pathname).toBe(`/studio/projects/${secondProjectId}`);
+    expect(router.state.location.pathname).toBe(`/projects/${secondProjectId}`);
   });
 
   it('moves a Project to a paginated Campaign and retries a normalized failure', async () => {
@@ -428,7 +428,7 @@ describe('Campaign route surface', () => {
       }),
     );
     const user = userEvent.setup();
-    renderCampaigns(`/studio/campaigns/${campaignId}`);
+    renderCampaigns(`/campaign/${campaignId}`);
 
     const activeProjects = await screen.findByRole('list', {
       name: 'Active Projects in Summer launch',
@@ -491,7 +491,7 @@ describe('Campaign route surface', () => {
       }),
     );
     const user = userEvent.setup();
-    renderCampaigns(`/studio/campaigns/${campaignId}`);
+    renderCampaigns(`/campaign/${campaignId}`);
 
     const activeProjects = await screen.findByRole('list', {
       name: 'Active Projects in Summer launch',
@@ -536,7 +536,7 @@ describe('Campaign route surface', () => {
       ),
     );
     const user = userEvent.setup();
-    renderCampaigns(`/studio/campaigns/${campaignId}`);
+    renderCampaigns(`/campaign/${campaignId}`);
 
     await user.click(await screen.findByRole('button', { name: 'Delete Campaign' }));
     const dialog = screen.getByRole('dialog', { name: 'Delete Campaign' });
@@ -584,7 +584,7 @@ describe('Campaign route surface', () => {
       }),
     );
     const user = userEvent.setup();
-    renderCampaigns(`/studio/campaigns/${campaignId}`);
+    renderCampaigns(`/campaign/${campaignId}`);
 
     const archivedProjects = await screen.findByRole('list', {
       name: 'Archived Projects in Summer launch',
@@ -636,7 +636,7 @@ describe('Campaign route surface', () => {
       }),
     );
     const user = userEvent.setup();
-    const { router } = renderCampaigns(`/studio/campaigns/${campaignId}`);
+    const { router } = renderCampaigns(`/campaign/${campaignId}`);
 
     const deleteCampaign = await screen.findByRole('button', { name: 'Delete Campaign' });
     await user.click(deleteCampaign);
@@ -651,7 +651,7 @@ describe('Campaign route surface', () => {
       }),
     );
 
-    await waitFor(() => expect(router.state.location.pathname).toBe('/studio/campaigns'));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/campaign'));
     expect(tombstoneBody).toEqual({ expectedVersion: 2, confirmation: 'tombstone' });
     expect(await screen.findByRole('heading', { name: 'Campaigns' })).toBeVisible();
   });

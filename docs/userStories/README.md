@@ -17,7 +17,7 @@ future features current.
 | Run and record a live character transformation           | [Live character transformation](03-character-ai-session.md)                    |
 | Run and record live virtual try-on                       | [Virtual try-on session](04-virtual-try-on-session.md)                         |
 | Build Add, Replace, or Restyle directions                | [Structured prompt workshop](05-structured-prompt-workshop.md)                 |
-| Save and reuse recipes                                   | [Recipe Shelf](06-recipe-shelf.md)                                             |
+| Understand retained creative-storage compatibility       | [Retired Recipe UI boundary](06-recipe-shelf.md)                               |
 | Review, save, and release a take                         | [Take review and cleanup](07-take-review-and-cleanup.md)                       |
 | Apply browser-local voice effects                        | [Local voice treatments](08-local-voice-treatments.md)                         |
 | Browse, save, manage, and apply provider-backed voices   | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                   |
@@ -26,23 +26,23 @@ future features current.
 | Log in, restore, and log out safely                      | [Login and local session](14-login-and-session.md)                             |
 | Orient, create, browse Assets, and navigate responsively | [Dashboard, Assets, and navigation](19-dashboard-and-navigation.md)            |
 | Save, browse, version, and reload local videos           | [Videos in Assets](15-saved-video-gallery.md)                                  |
-| Reuse saved characters, outfits, voices, and recipes     | [Creative Assets](16-saved-creative-libraries.md)                              |
+| Reuse saved characters, outfits, voices, and videos      | [Creative Assets](16-saved-creative-libraries.md)                              |
 | Create, resume, process, and save one Project video      | [Project lifecycle and immutable source](17-empty-project-lifecycle.md)        |
 | Organize Projects with optional Campaigns                | [Campaign organization](18-campaign-organization.md)                           |
 
 ## Shared runtime rules
 
-- `/` is the provider-free entry and Login surface. Dashboard (`/studio`), Create
-  (`/studio/create`), Project overview/workspace, Campaign, and `/studio/assets/*` routes are
+- `/` is the provider-free entry and Login surface. Dashboard (`/dashboard`), Create
+  (`/studio/create`), Project overview/workspace, Campaign, and `/assets/*` routes are
   authenticated views of one active Studio runtime; every other path returns to `/`.
 - Dashboard and other organization routes hide the persistent media stage and start no media or
   provider work. Create and Project workspaces begin in neutral Local Camera mode with camera and
-  microphone off. Only an explicit control-bar, upload-panel, or Dock action acquires media; only
+  microphone off. Only an explicit control-bar or upload-panel action acquires media; only
   an explicit AI Start contacts a provider.
 - Retired Guided repositories and presentation code are removed. Their records are not imported
   into Saved Videos and cannot revive the retired Guided experience.
 - Browser navigation cannot abandon recording/finalization or an active video render. Leaving with
-  a temporary take, active Voice process, dirty local video edit, or dirty Shelf form requires
+  a temporary take, active Voice process, dirty local video edit, or dirty configuration requires
   confirmed discard.
 - Camera access, provider contact, and billable work require an explicit action. Local Camera does
   not request provider credentials, load the Decart SDK, or send media externally.
@@ -55,10 +55,10 @@ future features current.
   implemented. Bounded Project changes, processing attempts/results, and output-Version history
   support exact preview, explicit reuse, and Download. Provider Voice and advanced live Project
   starts remain gated when they cannot meet durable reconnect/result-retention requirements.
-- Character Builder owns true character creation and editing. Workshop owns only Add, Replace, and
-  Restyle object recipes.
+- Character Builder owns true character creation and editing. Prompt Workshop owns Add, Replace,
+  and Restyle directions without exposing Recipe as an Asset type.
 - Saved Character Wardrobe owns normalized original/variant browsing and variant creation while
-  reusing the same Shelf metadata, immutable reference store, and overlay/media ownership.
+  reusing the same compatibility metadata, immutable reference store, and overlay/media ownership.
 - Studio keeps one mounted media stage and one temporary take pipeline. Organization pages hide
   that stage; they do not mount another player. Its immutable source may be recorded, uploaded, or
   a validated local edit; presentation selects the voiced, visual, or source layer.
@@ -66,11 +66,11 @@ future features current.
   the single active model before submission; only the active choice is used.
 - The recording and Decart session limits are independent: each warns at 270 seconds and ends
   through its own safe path at 300 seconds.
-- Recipe metadata is user-namespaced browser data and may revision-sync to Neon when configured.
+- Compatibility prompt metadata is user-namespaced browser data and may revision-sync to Neon when configured.
   Builder reference and saved-video bytes are authenticated assets in the selected local/R2 store.
   In authoritative Neon/R2, creative-library relationships retain saved references while explicit
-  discard and 24-hour inactive-orphan cleanup remove unreferenced staged assets. Dock portrait and
-  garment uploads are tab-ephemeral.
+  discard and 24-hour inactive-orphan cleanup remove unreferenced staged assets. AI Settings
+  portrait and garment uploads are tab-ephemeral.
 
 ## Evidence boundary
 

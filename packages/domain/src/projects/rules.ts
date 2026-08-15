@@ -1,6 +1,8 @@
 import type {
   Project,
   ProjectAggregate,
+  ProjectAssetKind,
+  ProjectAssetMembership,
   ProjectConflict,
   ProjectMutationContext,
   ProjectMutationResult,
@@ -80,6 +82,22 @@ export const normalizeProjectTitle = (value: string): string => {
   }
   return normalized;
 };
+
+export const createProjectAssetMembership = (input: {
+  readonly id: string;
+  readonly projectId: string;
+  readonly ownerUserId: string;
+  readonly kind: ProjectAssetKind;
+  readonly resourceId: string;
+  readonly createdAt: string;
+}): ProjectAssetMembership => ({
+  id: requireId(input.id, 'Project asset membership'),
+  projectId: requireId(input.projectId, 'Project'),
+  ownerUserId: requireId(input.ownerUserId, 'Project owner'),
+  kind: input.kind,
+  resourceId: requireId(input.resourceId, 'Project asset resource'),
+  createdAt: requireTimestamp(input.createdAt),
+});
 
 const validateMediaReference = (reference: ProjectSnapshot['workingMedia']): void => {
   if (reference === null) return;

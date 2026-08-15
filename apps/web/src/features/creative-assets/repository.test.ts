@@ -824,7 +824,7 @@ describe('createCreativeAssetRepository', () => {
     });
   });
 
-  it('recovers corrupt or unknown persisted data without breaking the shelf', () => {
+  it('recovers corrupt or unknown persisted data without breaking the creative library', () => {
     const storage = new MemoryStorage();
     storage.records.set('test-recipes', '{not-json');
     const corrupt = repositoryFixture(storage);

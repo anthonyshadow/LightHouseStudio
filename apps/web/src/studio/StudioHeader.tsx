@@ -38,6 +38,7 @@ type StudioHeaderProps = {
   onOpenAssets: () => void;
   onCreateProject: () => void;
   onCreateCampaign: () => void;
+  onCreateAsset: (trigger: HTMLButtonElement | null) => void;
   onOpenLive: () => void;
   onLogout: () => void;
 };
@@ -138,6 +139,7 @@ type CreateMenuProps = Readonly<{
   onCreateVideo: () => void;
   onCreateProject: () => void;
   onCreateCampaign: () => void;
+  onCreateAsset: (trigger: HTMLButtonElement | null) => void;
   onOpenLive: () => void;
 }>;
 
@@ -148,6 +150,7 @@ const CreateMenu = ({
   onCreateVideo,
   onCreateProject,
   onCreateCampaign,
+  onCreateAsset,
   onOpenLive,
 }: CreateMenuProps) => {
   const theme = useTheme();
@@ -174,20 +177,20 @@ const CreateMenu = ({
         ref={triggerRef}
         size="small"
         variant="primary"
-        aria-label="Create"
+        aria-label="Quick Create"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => onOpenChange(!open)}
       >
         <span aria-hidden="true">＋</span>
-        <span data-create-label-long>Create</span>
+        <span data-create-label-long>Quick Create</span>
       </Button>
       {open ? (
         <div
           ref={menuRef}
           role="menu"
           tabIndex={-1}
-          aria-label="Create"
+          aria-label="Quick Create"
           data-create-menu
           onKeyDown={(event) => {
             if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
@@ -217,6 +220,13 @@ const CreateMenu = ({
           <Button role="menuitem" variant="quiet" onClick={() => run(onCreateCampaign)}>
             New Campaign
           </Button>
+          <Button
+            role="menuitem"
+            variant="quiet"
+            onClick={() => run(() => onCreateAsset(triggerRef.current))}
+          >
+            Create Asset
+          </Button>
           {liveEnabled ? (
             <Button role="menuitem" variant="quiet" onClick={() => run(onOpenLive)}>
               Live AI · Beta
@@ -244,6 +254,7 @@ export const StudioHeader = ({
   onOpenAssets,
   onCreateProject,
   onCreateCampaign,
+  onCreateAsset,
   onOpenLive,
   onLogout,
 }: StudioHeaderProps) => {
@@ -328,6 +339,7 @@ export const StudioHeader = ({
             onCreateVideo={onOpenStudio}
             onCreateProject={onCreateProject}
             onCreateCampaign={onCreateCampaign}
+            onCreateAsset={onCreateAsset}
             onOpenLive={onOpenLive}
           />
           <StatusMenu

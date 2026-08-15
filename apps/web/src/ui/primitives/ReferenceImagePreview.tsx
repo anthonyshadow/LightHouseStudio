@@ -113,7 +113,7 @@ const ReferenceImagePreviewForAsset = ({
         open={open && !failed}
         onClose={() => setOpen(false)}
         title="Character reference"
-        description="Immutable local reference used by this recipe version."
+        description="Immutable local reference used by this saved configuration."
         placement="fullscreen"
         size="wide"
         closeLabel="Close larger reference preview"

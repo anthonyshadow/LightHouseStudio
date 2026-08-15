@@ -62,7 +62,7 @@ export const SessionComposer = ({
     if (
       hasDraftContent(session.draft) &&
       !window.confirm(
-        'Reset this AI recipe? The working prompt and ephemeral image will be cleared; completed takes stay available.',
+        'Reset these AI settings? The working prompt and ephemeral image will be cleared; completed takes stay available.',
       )
     ) {
       return;
@@ -76,8 +76,8 @@ export const SessionComposer = ({
     <Surface
       as="aside"
       {...(embedded
-        ? { 'aria-label': 'Recipe Dock controls' }
-        : { 'aria-labelledby': 'recipe-heading' })}
+        ? { 'aria-label': 'AI Settings controls' }
+        : { 'aria-labelledby': 'ai-settings-heading' })}
       padding="compact"
       style={{ height: '100%', minHeight: 0, overflow: 'hidden', padding: 0 }}
     >
@@ -86,7 +86,7 @@ export const SessionComposer = ({
           {!embedded ? (
             <div css={composerHeadingStyles(theme)}>
               <span aria-hidden="true">✦</span>
-              <h2 id="recipe-heading">Recipe dock</h2>
+              <h2 id="ai-settings-heading">AI Settings</h2>
               <p>Prepare freely. Camera and provider work begin only from explicit actions.</p>
             </div>
           ) : null}
@@ -100,7 +100,7 @@ export const SessionComposer = ({
           />
         </header>
 
-        <div data-scroll-region="recipe-dock" css={composerBodyStyles(theme)}>
+        <div data-scroll-region="ai-settings" css={composerBodyStyles(theme)}>
           {modeSwitchNotice ? (
             <StatusNotice tone="warning" role="status">
               {lockReason ?? 'Finish the current live or recording action before changing modes.'}

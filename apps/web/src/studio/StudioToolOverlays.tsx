@@ -52,10 +52,9 @@ interface StudioToolOverlaysProps {
   readonly captureSettingsDisabledReason: string | undefined;
   readonly providerStartBlockedReason?: string | undefined;
   readonly projectProcessing?: ProjectProcessingController | undefined;
+  readonly mainRef: RefObject<HTMLElement | null>;
   readonly characterSelectorRef: RefObject<HTMLButtonElement | null>;
   readonly outfitToggleRef: RefObject<HTMLButtonElement | null>;
-  readonly shelfToggleRef: RefObject<HTMLButtonElement | null>;
-  readonly dockToggleRef: RefObject<HTMLButtonElement | null>;
   readonly editVideoToggleRef: RefObject<HTMLButtonElement | null>;
   readonly uploadToggleRef: RefObject<HTMLButtonElement | null>;
   readonly onOpenOverlay: (overlay: Exclude<ActiveOverlay, null>) => void;
@@ -65,7 +64,8 @@ interface StudioToolOverlaysProps {
   readonly onStartExistingVideoRecording: () => void;
   readonly onDiscardExistingVideoSelection: () => void;
   readonly onOpenExistingVideo: () => void;
-  readonly onOpenSavedRecipesFor: (mode: ModelMode) => void;
+  readonly onOpenSavedCharacters: () => void;
+  readonly onOpenSavedOutfits: () => void;
   readonly onConfigureVirtualTryOn: () => void;
   readonly onStartPreparedAi: (mode: ModelMode) => void;
   readonly onUnselectCharacter: () => void;
@@ -97,10 +97,9 @@ export const StudioToolOverlays = ({
   captureSettingsDisabledReason,
   providerStartBlockedReason,
   projectProcessing,
+  mainRef,
   characterSelectorRef,
   outfitToggleRef,
-  shelfToggleRef,
-  dockToggleRef,
   editVideoToggleRef,
   uploadToggleRef,
   onOpenOverlay,
@@ -110,7 +109,8 @@ export const StudioToolOverlays = ({
   onStartExistingVideoRecording,
   onDiscardExistingVideoSelection,
   onOpenExistingVideo,
-  onOpenSavedRecipesFor,
+  onOpenSavedCharacters,
+  onOpenSavedOutfits,
   onConfigureVirtualTryOn,
   onStartPreparedAi,
   onUnselectCharacter,
@@ -149,8 +149,8 @@ export const StudioToolOverlays = ({
         handoff={handoff}
         outfit={outfit}
         characterOpenBlockedReason={characterOpenBlockedReason}
+        mainRef={mainRef}
         outfitToggleRef={outfitToggleRef}
-        shelfToggleRef={shelfToggleRef}
         onClose={onCloseOverlay}
         onUnselectAi={onUnselectAi}
       />
@@ -168,11 +168,11 @@ export const StudioToolOverlays = ({
         characterOpenBlockedReason={characterOpenBlockedReason}
         characterRemovalBlockedReason={characterRemovalBlockedReason}
         recordingActive={recordingActive}
+        mainRef={mainRef}
         characterSelectorRef={characterSelectorRef}
-        shelfToggleRef={shelfToggleRef}
         editVideoToggleRef={editVideoToggleRef}
         onClose={onCloseOverlay}
-        onOpenSavedCharacters={() => onOpenSavedRecipesFor('lucy-latest')}
+        onOpenSavedCharacters={onOpenSavedCharacters}
         onUnselectCharacter={onUnselectCharacter}
       />
 
@@ -193,20 +193,20 @@ export const StudioToolOverlays = ({
         onClose={onCloseOverlay}
         onStartCharacter={() => onStartPreparedAi('lucy-latest')}
         onCreateCharacter={character.openNew}
-        onChooseSavedCharacter={() => onOpenSavedRecipesFor('lucy-latest')}
+        onChooseSavedCharacter={onOpenSavedCharacters}
         onStartVirtualTryOn={() => onStartPreparedAi('lucy-vton-latest')}
         onConfigureVirtualTryOn={onConfigureVirtualTryOn}
-        onChooseSavedVirtualTryOn={() => onOpenSavedRecipesFor('lucy-vton-latest')}
+        onChooseSavedVirtualTryOn={onOpenSavedOutfits}
       />
 
       <OverlayPanel
-        open={activeOverlay === 'recipe-dock'}
+        open={activeOverlay === 'ai-settings'}
         onClose={onCloseOverlay}
-        title="Recipe Dock"
+        title="AI Settings"
         description="Prepare freely. Camera and provider work begin only from explicit actions."
         placement="right"
         bodyMode="contained"
-        returnFocusRef={dockToggleRef}
+        returnFocusRef={mainRef}
       >
         <SessionComposer
           embedded
@@ -252,8 +252,7 @@ export const StudioToolOverlays = ({
         elevenLabsAvailable={availability.elevenLabs}
         elevenLabsModel={availability.elevenLabsModel}
         browserCapabilities={browser}
-        editVideoToggleRef={editVideoToggleRef}
-        dockToggleRef={dockToggleRef}
+        mainRef={mainRef}
         onClose={onCloseOverlay}
         onDiscardTake={onDiscardExistingVideoSelection}
         {...(existingVideo.selection ? { onEditVideo: onOpenExistingVideo } : {})}

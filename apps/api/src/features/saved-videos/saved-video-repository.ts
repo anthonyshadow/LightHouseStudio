@@ -173,6 +173,10 @@ export interface SavedVideoRepository {
     assetIds: readonly string[],
   ): Promise<ReadonlySet<string>>;
   get(ownerUserId: string, videoId: string): Promise<StoredSavedVideoAggregate | null>;
+  getSummaries(
+    ownerUserId: string,
+    videoIds: readonly string[],
+  ): Promise<readonly StoredSavedVideoSummary[]>;
   getVersion(
     ownerUserId: string,
     videoId: string,
@@ -458,6 +462,23 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
         (item) => item.video.id === videoId && item.video.deletedAt === null,
       ) ?? null
     );
+  }
+
+  async getSummaries(
+    ownerUserId: string,
+    videoIds: readonly string[],
+  ): Promise<readonly StoredSavedVideoSummary[]> {
+    const requested = new Set(videoIds);
+    if (requested.size === 0) return [];
+    return (await this.#read(ownerUserId)).videos.flatMap((aggregate) => {
+      if (!requested.has(aggregate.video.id) || aggregate.video.deletedAt !== null) return [];
+      const currentVersion = aggregate.versions.find(
+        ({ id }) => id === aggregate.video.currentVersionId,
+      );
+      return currentVersion
+        ? [{ video: aggregate.video, currentVersion, versionCount: aggregate.versions.length }]
+        : [];
+    });
   }
 
   async getVersion(

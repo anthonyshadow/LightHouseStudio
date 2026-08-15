@@ -18,7 +18,10 @@ export const ProtectedRoute = ({ children }: { readonly children: ReactNode }) =
       <Navigate
         replace
         to={APP_PATHS.entry}
-        state={{ loginRequired: true, from: location.pathname }}
+        state={{
+          loginRequired: true,
+          from: `${location.pathname}${location.search}${location.hash}`,
+        }}
       />
     );
   }

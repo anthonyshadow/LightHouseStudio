@@ -1,6 +1,7 @@
 import {
   campaignStatusSchema,
   inspectedVideoSchema,
+  projectAssetKindSchema,
   projectProcessingCapabilitySchema,
   projectAssetRoleSchema,
   projectRevisionSourceSchema,
@@ -16,6 +17,7 @@ import { z } from 'zod';
 import { persistedTimestampSchema } from '../../application/timestamps.js';
 import { savedVideoLibrarySchema } from '../saved-videos/saved-video-repository.js';
 import { projectMediaReferencesEqual } from './project-snapshot-relations.js';
+import { deriveProjectAssetMemberships } from './project-asset-memberships.js';
 
 export const ownerIdSchema = z.uuid();
 const projectIdSchema = z.uuid();
@@ -63,6 +65,17 @@ const storedAssetLinkSchema = z
     role: projectAssetRoleSchema,
     revisionId: z.uuid(),
     revisionNumber: z.number().int().positive(),
+    createdAt: persistedTimestampSchema,
+  })
+  .strict();
+
+export const storedProjectAssetMembershipSchema = z
+  .object({
+    id: z.uuid(),
+    projectId: projectIdSchema,
+    ownerUserId: ownerIdSchema,
+    kind: projectAssetKindSchema,
+    resourceId: opaqueIdSchema,
     createdAt: persistedTimestampSchema,
   })
   .strict();
@@ -386,11 +399,12 @@ export const projectOutputReceiptSchema = z
 
 export const librarySchema = z
   .object({
-    schemaVersion: z.literal(6),
+    schemaVersion: z.literal(7),
     ownerUserId: ownerIdSchema,
     revision: z.number().int().nonnegative(),
     campaigns: z.array(storedCampaignSchema),
     projects: z.array(storedAggregateSchema),
+    assetMemberships: z.array(storedProjectAssetMembershipSchema),
     processingJobs: z.array(storedProjectProcessingAttemptSchema),
     createReceipts: z.array(createReceiptSchema),
     campaignCreateReceipts: z.array(campaignCreateReceiptSchema),
@@ -408,6 +422,10 @@ export const librarySchema = z
     const campaignIdSet = new Set(campaignIds);
     const processingOperationIds = library.processingJobs.map(({ operationId }) => operationId);
     const outputOperationIds = library.outputReceipts.map(({ operationId }) => operationId);
+    const membershipIds = library.assetMemberships.map(({ id }) => id);
+    const membershipKeys = library.assetMemberships.map(
+      ({ projectId, kind, resourceId }) => `${projectId}:${kind}:${resourceId}`,
+    );
     if (
       projectIdSet.size !== projectIds.length ||
       campaignIdSet.size !== campaignIds.length ||
@@ -415,6 +433,8 @@ export const librarySchema = z
       new Set(campaignOperationKeys).size !== campaignOperationKeys.length ||
       new Set(processingOperationIds).size !== processingOperationIds.length ||
       new Set(outputOperationIds).size !== outputOperationIds.length ||
+      new Set(membershipIds).size !== membershipIds.length ||
+      new Set(membershipKeys).size !== membershipKeys.length ||
       library.campaigns.some(({ ownerUserId }) => ownerUserId !== library.ownerUserId) ||
       library.projects.some(({ project }) => project.ownerUserId !== library.ownerUserId) ||
       library.processingJobs.some(({ ownerUserId }) => ownerUserId !== library.ownerUserId) ||
@@ -435,6 +455,10 @@ export const librarySchema = z
                   videoVersionId === receipt.videoVersionId,
               ),
           ),
+      ) ||
+      library.assetMemberships.some(
+        ({ projectId, ownerUserId }) =>
+          ownerUserId !== library.ownerUserId || !projectIdSet.has(projectId),
       ) ||
       library.projects.some(
         ({ project }) => project.campaignId !== null && !campaignIdSet.has(project.campaignId),
@@ -473,6 +497,20 @@ export const librarySchema = z
 
 export type ProjectLibrary = z.infer<typeof librarySchema>;
 
+const versionSixLibraryEnvelopeSchema = z
+  .object({
+    schemaVersion: z.literal(6),
+    ownerUserId: ownerIdSchema,
+    revision: z.number().int().nonnegative(),
+    campaigns: z.array(storedCampaignSchema),
+    projects: z.array(storedAggregateSchema),
+    processingJobs: z.array(storedProjectProcessingAttemptSchema),
+    createReceipts: z.array(createReceiptSchema),
+    campaignCreateReceipts: z.array(campaignCreateReceiptSchema),
+    outputReceipts: z.array(projectOutputReceiptSchema),
+  })
+  .strict();
+
 const previousLibraryEnvelopeSchema = z
   .object({
     schemaVersion: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
@@ -501,14 +539,28 @@ export const parseLibrary = (
 ): { readonly library: ProjectLibrary; readonly migrated: boolean } => {
   const current = librarySchema.safeParse(value);
   if (current.success) return { library: current.data, migrated: false };
+  const versionSix = versionSixLibraryEnvelopeSchema.safeParse(value);
+  if (versionSix.success) {
+    return {
+      migrated: true,
+      library: librarySchema.parse({
+        ...versionSix.data,
+        schemaVersion: 7,
+        assetMemberships: versionSix.data.projects.flatMap(deriveProjectAssetMemberships),
+      }),
+    };
+  }
   const previous = previousLibraryEnvelopeSchema.safeParse(value);
   if (previous.success) {
     return {
       migrated: true,
       library: librarySchema.parse({
         ...previous.data,
-        schemaVersion: 6,
+        schemaVersion: 7,
         projects: previous.data.projects.map((aggregate) => storedAggregateSchema.parse(aggregate)),
+        assetMemberships: previous.data.projects.flatMap((aggregate) =>
+          deriveProjectAssetMemberships(storedAggregateSchema.parse(aggregate)),
+        ),
         processingJobs: previous.data.processingJobs ?? [],
         outputReceipts: [],
       }),
@@ -528,11 +580,12 @@ export const parseLibrary = (
   return {
     migrated: true,
     library: librarySchema.parse({
-      schemaVersion: 6,
+      schemaVersion: 7,
       ownerUserId: legacy.ownerUserId,
       revision: legacy.revision,
       campaigns: [],
       projects,
+      assetMemberships: projects.flatMap(deriveProjectAssetMemberships),
       processingJobs: [],
       createReceipts: legacy.createReceipts,
       campaignCreateReceipts: [],
@@ -543,7 +596,7 @@ export const parseLibrary = (
 
 export const journalSchema = z
   .object({
-    schemaVersion: z.literal(6),
+    schemaVersion: z.literal(7),
     ownerUserId: ownerIdSchema,
     transactionId: z.uuid(),
     state: z.literal('prepared'),
@@ -701,7 +754,7 @@ export const journalSchema = z
 
 const previousJournalSchema = z
   .object({
-    schemaVersion: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5)]),
+    schemaVersion: z.union([z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6)]),
     ownerUserId: ownerIdSchema,
     transactionId: z.uuid(),
     state: z.literal('prepared'),
@@ -737,14 +790,14 @@ export const parseJournal = (value: unknown): z.infer<typeof journalSchema> => {
   if (previous.success) {
     return journalSchema.parse({
       ...previous.data,
-      schemaVersion: 6,
+      schemaVersion: 7,
       writes: { metadata: parseLibrary(previous.data.writes.metadata).library },
     });
   }
   const legacy = legacyJournalSchema.parse(value);
   const metadata = parseLibrary(legacy.writes.projectMetadata).library;
   return journalSchema.parse({
-    schemaVersion: 6,
+    schemaVersion: 7,
     ownerUserId: legacy.ownerUserId,
     transactionId: legacy.transactionId,
     state: legacy.state,
@@ -755,11 +808,12 @@ export const parseJournal = (value: unknown): z.infer<typeof journalSchema> => {
 };
 
 export const emptyLibrary = (ownerUserId: string): ProjectLibrary => ({
-  schemaVersion: 6,
+  schemaVersion: 7,
   ownerUserId: ownerIdSchema.parse(ownerUserId),
   revision: 0,
   campaigns: [],
   projects: [],
+  assetMemberships: [],
   processingJobs: [],
   createReceipts: [],
   campaignCreateReceipts: [],

@@ -12,26 +12,21 @@ export const installSuccessfulStudioHarness = async (
 };
 
 export const openCharacterOptions = async (page: Page): Promise<void> => {
-  const desktopTrigger = page
+  const trigger = page
     .getByRole('navigation', { name: 'Creative workspace tools' })
     .getByRole('button', { name: /^(Select Character|Selected character:)/u });
-  if (await desktopTrigger.isVisible()) {
-    await desktopTrigger.click();
-    return;
-  }
-  const shelfTrigger = page.getByRole('button', { name: 'Shelf', exact: true });
-  await expect(shelfTrigger).toBeVisible();
-  await shelfTrigger.click();
-  await expect(page.getByRole('dialog', { name: 'Recipe Shelf' })).toBeVisible();
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+  await expect(page.getByRole('dialog', { name: 'Character' })).toBeVisible();
 };
 
 export {
-  closeRecipeDockWhenOverlaid,
+  closeAiSettings,
   confirmSaveVideo,
   createLocalTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
-  openRecipeDockWhenOverlaid,
+  openAiSettings,
   settleVisualPage,
   startCharacterAi,
   startLocalPreview,

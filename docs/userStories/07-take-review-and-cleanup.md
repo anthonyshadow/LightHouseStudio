@@ -13,16 +13,15 @@ deliberately release or discard it.
    transcoding to finish. Studio forces H.264 video and AAC audio when present into MP4; the raw
    recorder container is never downloadable.
 4. After the converted MP4 becomes authoritative and live/provider resources release, confirm
-   **Recorded take playback** on the persistent stage. Primary **Record New Video** opens the
-   post-recording editor; Dock-started local and live AI recordings retain compact Save, Discard,
-   Voice, and Release actions directly beneath the video. They never overlay the take or
+   **Recorded take playback** on the persistent stage. Local and live AI recordings retain compact
+   Save, Discard, Voice, and Release actions directly beneath the video. They never overlay the take or
    its native playback controls, and the narrowest supported viewport wraps them into a second row.
 5. Confirm **Edit Video** is enabled in the creative tool rail for any finalized playback. An
-   editor-backed upload or recording reopens its retained editor state; a Dock/live-AI take opens
+   editor-backed upload reopens its retained editor state; a local/live-AI take opens
    the existing-video source chooser without automatically adopting the take. While playback is
-   retained, the rail's live-only **Select Character**, **Select Outfit**, **Workshop**, and
-   **Shelf** actions are disabled. This rail lock does not disable Character Swap, Virtual Try On,
-   Voice, recipe selection, or other controls inside the open existing-video editor.
+   retained, the rail's live-only **Select Character**, **Select Outfit**, and **Workshop** actions
+   are disabled. This rail lock does not disable Character Swap, Virtual Try On, Voice, or other
+   controls inside the open existing-video editor.
    From that editor, **Adjust video** enters the stage-owned local editing workspace without
    remounting the stage video. A confirmed validated export replaces the immutable source; discard
    or failure preserves the take shown when editing began.

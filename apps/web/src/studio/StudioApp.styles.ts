@@ -754,26 +754,13 @@ export const firstSuccessGuideStyles = (theme: Theme): CSSObject => ({
   },
 });
 
-export const libraryModeStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gap: theme.space.sm,
-  maxWidth: '38rem',
-  padding: theme.space.md,
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: theme.radii.large,
-  background: theme.colors.surfaceSoft,
-});
-
-export const creativeOverlayContentStyles = (
-  theme: Theme,
-  panel: 'workshop' | 'shelf',
-): CSSObject => ({
+export const creativeOverlayContentStyles = (): CSSObject => ({
   width: '100%',
   height: '100%',
   minWidth: 0,
   minHeight: 0,
   display: 'grid',
-  gridTemplateRows: panel === 'shelf' ? 'auto minmax(0, 1fr)' : 'minmax(0, 1fr)',
-  gap: panel === 'shelf' ? theme.space.sm : 0,
+  gridTemplateRows: 'minmax(0, 1fr)',
+  gap: 0,
   overflow: 'hidden',
 });

@@ -26,8 +26,8 @@ export const StudioOutfitOverlays = ({
   handoff,
   outfit,
   characterOpenBlockedReason,
+  mainRef,
   outfitToggleRef,
-  shelfToggleRef,
   onClose,
   onUnselectAi,
 }: {
@@ -38,8 +38,8 @@ export const StudioOutfitOverlays = ({
   readonly handoff: ReturnType<typeof useReferenceRecipeHandoff>;
   readonly outfit: ReturnType<typeof useStudioOutfitWorkflow>;
   readonly characterOpenBlockedReason: string | undefined;
+  readonly mainRef: RefObject<HTMLElement | null>;
   readonly outfitToggleRef: RefObject<HTMLButtonElement | null>;
-  readonly shelfToggleRef: RefObject<HTMLButtonElement | null>;
   readonly onClose: () => void;
   readonly onUnselectAi: () => void;
 }) => {
@@ -51,10 +51,10 @@ export const StudioOutfitOverlays = ({
         open={activeOverlay === 'outfit-selector'}
         onClose={onClose}
         title="Outfit"
-        description="Create an outfit, or select a saved or recently used Virtual Try-On recipe."
+        description="Create an outfit, or select a saved or recently used Virtual Try-On configuration."
         placement="right"
         bodyMode="scroll"
-        returnFocusRef={desktopStudioLayout ? outfitToggleRef : shelfToggleRef}
+        returnFocusRef={desktopStudioLayout ? outfitToggleRef : mainRef}
       >
         {activeOverlay === 'outfit-selector' ? (
           <Suspense fallback={<p role="status">Loading studio tool…</p>}>
@@ -89,11 +89,9 @@ export const StudioOutfitOverlays = ({
         bodyMode="scroll"
         closeOnBackdrop={false}
         returnFocusRef={
-          outfit.launch.destination === 'shelf'
-            ? shelfToggleRef
-            : desktopStudioLayout
-              ? outfitToggleRef
-              : shelfToggleRef
+          outfit.launch.destination === 'selector' && desktopStudioLayout
+            ? outfitToggleRef
+            : mainRef
         }
       >
         {activeOverlay === 'outfit-builder' ? (

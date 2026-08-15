@@ -64,7 +64,7 @@ const disconnectError = (reason: RealtimeDisconnectReason): SafeMediaError => {
       return {
         code: 'generation-ended',
         message: 'The AI generation ended before the session maximum.',
-        recovery: 'Your local preview and working recipe are safe. Start AI again when ready.',
+        recovery: 'Your local preview and working settings are safe. Start AI again when ready.',
       };
     case 'provider-disconnected':
       return {
@@ -276,7 +276,7 @@ export const useModelSessionActions = ({
         message:
           safe.code === 'aborted'
             ? safe.message
-            : `${safe.message} The previous live recipe is still active.`,
+            : `${safe.message} The previous live settings are still active.`,
       });
     } finally {
       if (operationRef.current === operation) setApplying(false);

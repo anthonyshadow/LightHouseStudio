@@ -5,7 +5,6 @@ import {
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
   openCharacterOptions,
-  openRecipeDockWhenOverlaid,
   readCreativeAssetStore,
   readBrowserState,
 } from './support/studioHarness';
@@ -14,9 +13,7 @@ import { REFERENCE_PNG } from './support/mediaFixtures';
 
 const openCharacterBuilder = async (page: Page): Promise<void> => {
   await openCharacterOptions(page);
-  await page
-    .getByRole('button', { name: /^(Create new character|New character recipe)$/u })
-    .click();
+  await page.getByRole('button', { name: 'Create new character' }).click();
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
   await page.getByRole('button', { name: 'Adult', exact: true }).click();
   await page.getByRole('button', { name: /^Preview(?: |$)/u }).click();
@@ -67,9 +64,12 @@ test('optimized reference hydrates its stored Lucy prompt atomically and survive
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
   expect(network.referenceImageContentReads).toContain(generated.assetId);
 
-  await openRecipeDockWhenOverlaid(page);
-  await expect(page.getByAltText('Current persisted reference preview')).toBeVisible();
-  await page.getByRole('button', { name: 'Start Character AI' }).click();
+  await page.getByRole('button', { name: 'Record New Video' }).click();
+  await page.getByRole('button', { name: 'Start AI', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Choose live AI experience' })
+    .getByRole('button', { name: 'Start with Field correspondent' })
+    .click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
 
   let browser = await readBrowserState(page);
@@ -89,32 +89,21 @@ test('optimized reference hydrates its stored Lucy prompt atomically and survive
   expect(recentRawPrompt).toBe(generated.rawPrompt);
   expect(recentRawPrompt).not.toBe(optimized.response.result.lucy25CharacterPrompt);
 
-  const manuallyEditedLucyPrompt = `${optimized.response.result.lucy25CharacterPrompt} Keep the hand-painted badge visible.`;
-  await page.getByLabel('Character direction').fill(manuallyEditedLucyPrompt);
-  await page.getByRole('button', { name: 'Apply changes' }).click();
-  await expect.poll(async () => (await readBrowserState(page)).applies.length).toBe(1);
-  browser = await readBrowserState(page);
-  expect(browser.applies).toEqual([
-    {
-      prompt: manuallyEditedLucyPrompt,
-      imageName: `reference-${generated.assetId}.png`,
-      enhance: true,
-    },
-  ]);
-  await expect.poll(async () => (await readCreativeAssetStore(page))?.recentPrompts.length).toBe(2);
-
   await page.reload();
-  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
-  await page.getByRole('button', { name: /^Recent\b/u }).click();
-  await expect(page.getByAltText('Recent character reference')).toHaveCount(2);
+  await openCharacterOptions(page);
+  await page.getByRole('button', { name: 'Choose saved character' }).click();
   await page
-    .getByRole('button', { name: `Use recent prompt: ${generated.rawPrompt}`, exact: true })
+    .getByRole('dialog', { name: 'Characters' })
+    .getByRole('article')
+    .filter({ hasText: 'Field correspondent' })
+    .getByRole('button', { name: 'Use in Studio' })
     .click();
-  await expect(page.getByRole('dialog', { name: 'Recipe Shelf' })).toBeHidden();
-
-  await openRecipeDockWhenOverlaid(page);
-  await expect(page.getByAltText('Current persisted reference preview')).toBeVisible();
-  await page.getByRole('button', { name: 'Start Character AI' }).click();
+  await page.getByRole('button', { name: 'Record New Video' }).click();
+  await page.getByRole('button', { name: 'Start AI', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Choose live AI experience' })
+    .getByRole('button', { name: 'Start with Field correspondent' })
+    .click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
 
   browser = await readBrowserState(page);
@@ -146,9 +135,8 @@ test('wardrobe uses an exact variant image without its parent prompt and remains
   await nameDialog.getByRole('textbox', { name: /Character name/u }).fill('Wardrobe source host');
   await nameDialog.getByRole('button', { name: 'Save Character', exact: true }).click();
 
-  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
-  await page.getByRole('button', { name: /^Characters\b/u }).click();
-  await page.getByRole('button', { name: 'Open Wardrobe source host wardrobe' }).click();
+  await openCharacterOptions(page);
+  await page.getByRole('button', { name: 'Wardrobe', exact: true }).click();
   const wardrobe = page.getByRole('dialog', { name: 'Wardrobe source host wardrobe' });
   await wardrobe.getByRole('button', { name: 'Add outfit' }).click();
   await wardrobe.getByLabel('Garment image').setInputFiles({
@@ -240,12 +228,7 @@ test('saved character opens in Builder and updates its original record after reg
   )?.referenceImageAssetId;
   expect(persistedAssetId).toBe(firstAssetId);
 
-  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
-  await page.getByRole('button', { name: /^Characters\b/u }).click();
-  await expect(page.getByAltText('Reference image for Immutable astronomy host')).toHaveAttribute(
-    'src',
-    new RegExp(firstAssetId, 'u'),
-  );
+  await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Edit Immutable astronomy host' }).click();
   const builder = page.getByRole('dialog', { name: 'Edit Immutable astronomy host' });
   await expect(builder).toBeVisible();
@@ -290,7 +273,7 @@ test('saved character opens in Builder and updates its original record after reg
   expectNoExternalProviderTraffic(network);
 });
 
-test('missing persisted asset keeps the shelf open until explicit text-only recovery', async ({
+test('legacy recent prompts remain hidden when their persisted reference is missing', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -327,25 +310,12 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
   );
   await page.goto('/studio/create');
 
-  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
-  await page.getByRole('button', { name: /^Recent\b/u }).click();
-  await page.getByRole('button', { name: /^Use recent prompt:/u }).click();
-
-  const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
-  await expect(shelf).toBeVisible();
-  const recoveryAlert = page.getByRole('alert');
-  await expect(recoveryAlert).toContainText('This local reference asset is no longer available');
-  await expect(recoveryAlert.getByRole('button', { name: 'Retry' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Continue without reference' })).toBeVisible();
-  expect(network.referenceImageMetadataReads).toEqual([missingAssetId]);
-
-  await recoveryAlert.getByRole('button', { name: 'Retry' }).click();
-  await expect.poll(() => network.referenceImageMetadataReads.length).toBe(2);
-  await page.getByRole('button', { name: 'Continue without reference' }).click();
-  await expect(shelf).toBeHidden();
-
-  await openRecipeDockWhenOverlaid(page);
-  await expect(page.getByLabel('Character direction')).toHaveValue(missingPrompt);
-  await expect(page.getByAltText('Current persisted reference preview')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Recipe|Shelf|Dock/u })).toHaveCount(0);
+  await openCharacterOptions(page);
+  await page.getByRole('button', { name: 'Choose saved character' }).click();
+  await expect(
+    page.getByRole('dialog', { name: 'Characters' }).getByText('No saved characters yet'),
+  ).toBeVisible();
+  expect(network.referenceImageMetadataReads).toEqual([]);
   expectNoExternalProviderTraffic(network);
 });

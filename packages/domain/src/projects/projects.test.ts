@@ -7,6 +7,7 @@ import {
   canTransitionProjectStatus,
   createEmptyProjectSnapshot,
   createProject,
+  createProjectAssetMembership,
   deleteProject,
   deriveProjectStatus,
   isProjectResumable,
@@ -48,6 +49,19 @@ const emptyProject = () =>
   );
 
 describe('Project aggregate rules', () => {
+  it('creates a non-owning Project Asset membership without a Recipe kind', () => {
+    expect(
+      createProjectAssetMembership({
+        id: '08707aa5-7b7f-4ce1-a48e-647370f6d3ab',
+        projectId,
+        ownerUserId,
+        kind: 'video',
+        resourceId: 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338',
+        createdAt: now,
+      }),
+    ).toMatchObject({ projectId, ownerUserId, kind: 'video' });
+  });
+
   it('creates an empty named Project with one immutable initial revision', () => {
     const aggregate = emptyProject();
 

@@ -1,38 +1,60 @@
 import { describe, expect, it } from 'vitest';
 import {
   APP_PATHS,
+  assetLibraryPath,
   campaignIdFromPath,
   campaignPath,
-  isCampaignsPath,
+  canonicalizeLegacyAppPath,
+  canonicalizeProtectedDestination,
   isAssetsPath,
+  isCampaignsPath,
   isProjectWorkspacePath,
   isProjectsPath,
-  isRestorableStudioPath,
+  isProtectedAppPath,
   isStudioPath,
-  legacyStudioRedirect,
+  isStudioWorkspacePath,
   projectIdFromPath,
   projectPath,
   projectWorkspacePath,
+  studioCreatePath,
+  studioVideoIdFromPath,
+  studioVideoPath,
 } from './paths';
 
-describe('authenticated Studio paths', () => {
-  it('recognizes canonical Campaign/Project list/detail and every legacy Studio surface', () => {
-    const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
-    const campaignId = '20ce94fa-15d1-42c6-abd3-77ff61516b48';
-    expect(projectPath(projectId)).toBe(`/studio/projects/${projectId}`);
+describe('authenticated application paths', () => {
+  const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
+  const campaignId = '20ce94fa-15d1-42c6-abd3-77ff61516b48';
+  const videoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
+
+  it('builds and recognizes the canonical route topology', () => {
+    expect(projectPath(projectId)).toBe(`/projects/${projectId}`);
     expect(projectIdFromPath(projectPath(projectId))).toBe(projectId);
-    expect(projectWorkspacePath(projectId)).toBe(`/studio/projects/${projectId}/workspace`);
+    expect(projectWorkspacePath(projectId)).toBe(`/projects/${projectId}/workspace`);
     expect(projectIdFromPath(projectWorkspacePath(projectId))).toBe(projectId);
     expect(isProjectWorkspacePath(projectWorkspacePath(projectId))).toBe(true);
     expect(isProjectsPath(APP_PATHS.projects)).toBe(true);
     expect(isProjectsPath(projectPath(projectId))).toBe(true);
-    expect(campaignPath(campaignId)).toBe(`/studio/campaigns/${campaignId}`);
+    expect(campaignPath(campaignId)).toBe(`/campaign/${campaignId}`);
     expect(campaignIdFromPath(campaignPath(campaignId))).toBe(campaignId);
     expect(isCampaignsPath(APP_PATHS.campaigns)).toBe(true);
     expect(isCampaignsPath(campaignPath(campaignId))).toBe(true);
+    expect(studioVideoPath(videoId)).toBe(`/studio/${videoId}`);
+    expect(studioVideoIdFromPath(studioVideoPath(videoId))).toBe(videoId);
+    expect(studioCreatePath({ intent: 'record', projectId })).toBe(
+      `/studio/create?intent=record&projectId=${projectId}`,
+    );
+    expect(studioCreatePath({ intent: 'upload' })).toBe('/studio/create?intent=upload');
+    expect(studioCreatePath()).toBe(APP_PATHS.create);
+    expect(isStudioWorkspacePath(studioVideoPath(videoId))).toBe(true);
+    expect(assetLibraryPath('video')).toBe(APP_PATHS.videos);
+    expect(assetLibraryPath('character')).toBe(APP_PATHS.characters);
+    expect(assetLibraryPath('outfit')).toBe(APP_PATHS.outfits);
+    expect(assetLibraryPath('voice')).toBe(APP_PATHS.voices);
+
     for (const path of [
-      APP_PATHS.studio,
+      APP_PATHS.dashboard,
       APP_PATHS.create,
+      APP_PATHS.live,
       APP_PATHS.assets,
       APP_PATHS.projects,
       projectPath(projectId),
@@ -43,30 +65,61 @@ describe('authenticated Studio paths', () => {
       APP_PATHS.characters,
       APP_PATHS.outfits,
       APP_PATHS.voices,
-      APP_PATHS.recipes,
+      studioVideoPath(videoId),
     ]) {
-      expect(isStudioPath(path)).toBe(true);
-      expect(isRestorableStudioPath(path)).toBe(true);
+      expect(isProtectedAppPath(path)).toBe(true);
     }
     expect(isAssetsPath(APP_PATHS.assets)).toBe(true);
     expect(isAssetsPath(APP_PATHS.voices)).toBe(true);
-    expect(legacyStudioRedirect(APP_PATHS.legacyVideos)).toBe(APP_PATHS.videos);
-    expect(legacyStudioRedirect(APP_PATHS.legacyCharacters)).toBe(APP_PATHS.characters);
-    expect(legacyStudioRedirect(APP_PATHS.legacyOutfits)).toBe(APP_PATHS.outfits);
-    expect(legacyStudioRedirect(APP_PATHS.legacyLive)).toBe(APP_PATHS.live);
   });
 
-  it('rejects unknown, nested, malformed-encoding, and obsolete paths', () => {
+  it('normalizes every supported legacy organization route', () => {
+    expect(canonicalizeLegacyAppPath('/studio')).toBe(APP_PATHS.dashboard);
+    expect(canonicalizeLegacyAppPath('/studio/projects')).toBe(APP_PATHS.projects);
+    expect(canonicalizeLegacyAppPath(`/studio/projects/${projectId}`)).toBe(projectPath(projectId));
+    expect(canonicalizeLegacyAppPath(`/studio/projects/${projectId}/workspace`)).toBe(
+      projectWorkspacePath(projectId),
+    );
+    expect(canonicalizeLegacyAppPath('/studio/campaigns')).toBe(APP_PATHS.campaigns);
+    expect(canonicalizeLegacyAppPath(`/studio/campaigns/${campaignId}`)).toBe(
+      campaignPath(campaignId),
+    );
+    expect(canonicalizeLegacyAppPath('/studio/assets')).toBe(APP_PATHS.assets);
+    expect(canonicalizeLegacyAppPath('/studio/assets/videos')).toBe(APP_PATHS.videos);
+    expect(canonicalizeLegacyAppPath('/studio/videos')).toBe(APP_PATHS.videos);
+    expect(canonicalizeLegacyAppPath('/studio/assets/characters')).toBe(APP_PATHS.characters);
+    expect(canonicalizeLegacyAppPath('/studio/characters')).toBe(APP_PATHS.characters);
+    expect(canonicalizeLegacyAppPath('/studio/assets/outfits')).toBe(APP_PATHS.outfits);
+    expect(canonicalizeLegacyAppPath('/studio/outfits')).toBe(APP_PATHS.outfits);
+    expect(canonicalizeLegacyAppPath('/studio/assets/voices')).toBe(APP_PATHS.voices);
+    expect(canonicalizeLegacyAppPath('/studio/assets/recipes')).toBe(APP_PATHS.assets);
+    expect(canonicalizeLegacyAppPath('/studio/live')).toBe(APP_PATHS.live);
+  });
+
+  it('restores only normalized, internal protected destinations', () => {
+    expect(canonicalizeProtectedDestination('/studio/videos?sort=latest')).toBe(
+      '/assets/videos?sort=latest',
+    );
+    expect(canonicalizeProtectedDestination(`/projects/${projectId}#assets`)).toBe(
+      `/projects/${projectId}#assets`,
+    );
+    expect(canonicalizeProtectedDestination('//example.com/projects')).toBeNull();
+    expect(canonicalizeProtectedDestination('https://example.com/projects')).toBeNull();
+    expect(canonicalizeProtectedDestination('/not-a-route')).toBeNull();
+  });
+
+  it('rejects unknown, nested, malformed, and non-UUID Studio video paths', () => {
     for (const path of [
       '/studio/unknown',
-      '/studio/projects/id/history',
-      '/studio/projects/%E0%A4%A',
-      '/projects',
+      '/projects/id/history',
+      '/projects/%E0%A4%A',
       '/advanced',
+      '/assets/recipes',
     ]) {
-      expect(isRestorableStudioPath(path)).toBe(false);
+      expect(isProtectedAppPath(path)).toBe(false);
     }
     expect(isStudioPath('/studio/future-child')).toBe(true);
     expect(isStudioPath('/projects')).toBe(false);
+    expect(studioVideoIdFromPath('/studio/not-a-uuid')).toBeNull();
   });
 });

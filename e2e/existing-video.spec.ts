@@ -145,7 +145,7 @@ test('Record a local video closes the panel and keeps capture on the persistent 
   expectNoExternalProviderTraffic(network);
 });
 
-test('Record New Video starts only from the control bar and adopts the local take for editing', async ({
+test('Record New Video starts only from the control bar and keeps the local take in review', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -162,11 +162,14 @@ test('Record New Video starts only from the control bar and adopts the local tak
   await controls.getByRole('button', { name: 'Record' }).click();
   await controls.getByRole('button', { name: 'Stop recording' }).click();
 
-  const dialog = page.getByRole('dialog', { name: 'Use existing video' });
-  await expect(dialog.getByRole('heading', { name: 'Current video' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Character Swap', exact: true })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Virtual Try On', exact: true })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: /^Voice/u })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Use existing video' })).toBeHidden();
+  await expect(page.getByLabel('Recorded take playback')).toBeVisible();
+  await expect(page.getByLabel('Studio media stage')).toHaveAttribute(
+    'data-stage-presentation',
+    'playback',
+  );
+  await expect(page.getByRole('group', { name: 'Recorded take controls' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit Video', exact: true })).toBeEnabled();
   expect((await readBrowserState(page)).cameraCalls).toBe(1);
   expectNoExternalProviderTraffic(network);
 });

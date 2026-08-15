@@ -32,6 +32,10 @@ const projectOutputMigrationUrl = new URL(
   '../../../drizzle/0020_tiresome_wolf_cub.sql',
   import.meta.url,
 );
+const projectAssetMembershipMigrationUrl = new URL(
+  '../../../drizzle/0021_slow_krista_starr.sql',
+  import.meta.url,
+);
 
 describe('Project aggregate migration', () => {
   it('is additive and creates every normalized Project relationship', async () => {
@@ -200,6 +204,24 @@ describe('Project output authority migration', () => {
     expect(migration).toContain('project_output_operation_receipts_owner_user_id_users_id_fk');
     expect(migration).toContain('ON DELETE restrict');
     expect(migration).toContain('project_output_receipts_project_idx');
+    expect(migration).not.toMatch(
+      /\b(?:DROP|TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"|\bINSERT\s+INTO\b/u,
+    );
+  });
+});
+
+describe('Project asset membership migration', () => {
+  it('adds only the non-owning same-owner relation and bounded list index', async () => {
+    const migration = await readFile(projectAssetMembershipMigrationUrl, 'utf8');
+
+    expect(migration).toContain(
+      "CREATE TYPE \"public\".\"project_asset_kind\" AS ENUM('video', 'character', 'outfit', 'voice')",
+    );
+    expect(migration).toContain('CREATE TABLE "project_asset_memberships"');
+    expect(migration).toContain('project_asset_memberships_owner_project_kind_resource_unique');
+    expect(migration).toContain('project_asset_memberships_project_owner_fk');
+    expect(migration).toContain('ON DELETE cascade');
+    expect(migration).toContain('project_asset_memberships_project_kind_recent_idx');
     expect(migration).not.toMatch(
       /\b(?:DROP|TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"|\bINSERT\s+INTO\b/u,
     );

@@ -9,7 +9,7 @@ import { emptyMediaStream, createSessionController } from '../../fixtures/contro
 import { StoryColumn } from '../../support/StoryLayout';
 
 const meta = {
-  title: 'Features/Media Session/Recipe Dock',
+  title: 'Features/Media Session/AI Settings',
   component: SessionComposer,
   subcomponents: {
     ModelRecipeFields,
@@ -22,7 +22,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'SessionComposer combines mode selection, local privacy guidance, Character and Virtual Try-On recipe fields, reference-image validation, lifecycle/status feedback, applied-recipe summary, and persistent start/apply/reset actions.',
+          'SessionComposer combines mode selection, local privacy guidance, Character and Virtual Try-On settings, reference-image validation, lifecycle/status feedback, applied-settings summary, and persistent start/apply/reset actions.',
       },
     },
   },

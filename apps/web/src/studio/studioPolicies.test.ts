@@ -1,15 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
-import { canReplaceDirtyLibraryMode, shouldFinalizeForUnusableModelOutput } from './studioPolicies';
+import { describe, expect, it } from 'vitest';
+import { shouldFinalizeForUnusableModelOutput } from './studioPolicies';
 
 describe('studio transition policies', () => {
-  it('protects an unsaved recipe form before changing model shelves', () => {
-    const confirmDiscard = vi.fn().mockReturnValue(false);
-    expect(canReplaceDirtyLibraryMode(true, confirmDiscard)).toBe(false);
-    expect(confirmDiscard).toHaveBeenCalledOnce();
-    expect(canReplaceDirtyLibraryMode(false, confirmDiscard)).toBe(true);
-    expect(confirmDiscard).toHaveBeenCalledOnce();
-  });
-
   it('finalizes a model take when transformed video becomes unusable', () => {
     expect(shouldFinalizeForUnusableModelOutput('recording', 'lucy-latest', false)).toBe(true);
     expect(shouldFinalizeForUnusableModelOutput('recording', 'local', false)).toBe(false);

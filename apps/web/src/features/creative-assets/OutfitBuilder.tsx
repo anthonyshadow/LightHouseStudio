@@ -26,7 +26,7 @@ type OutfitBuilderProps = {
   readonly disabledReason?: string | undefined;
   readonly onDirtyChange: (dirty: boolean) => void;
   readonly onCancel: () => void;
-  readonly onSaved: (outfit: SavedPrompt) => void;
+  readonly onSaved: (outfit: SavedPrompt) => void | Promise<void>;
 };
 
 const createRequestId = () =>
@@ -59,6 +59,7 @@ export const OutfitBuilder = ({
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [pendingSavedOutfit, setPendingSavedOutfit] = useState<SavedPrompt | null>(null);
   const requestIdRef = useRef(createRequestId());
   const uploadedAssetIdRef = useRef<string | null>(null);
   const committedAssetIdsRef = useRef(new Set<string>());
@@ -114,6 +115,10 @@ export const OutfitBuilder = ({
     setSaving(true);
     setError(null);
     try {
+      if (pendingSavedOutfit !== null) {
+        await onSaved(pendingSavedOutfit);
+        return;
+      }
       let referenceImageAssetId = inputKind === 'saved-outfit' ? retainedReferenceId : null;
       if (inputKind === 'saved-outfit' && referenceFile && !uploadedAssetIdRef.current) {
         const asset = await uploadReferenceImage(referenceFile, requestIdRef.current);
@@ -143,7 +148,8 @@ export const OutfitBuilder = ({
           }));
       if (referenceImageAssetId) committedAssetIdsRef.current.add(referenceImageAssetId);
       onDirtyChange(false);
-      onSaved(saved);
+      setPendingSavedOutfit(saved);
+      await onSaved(saved);
     } catch (caught) {
       setError(
         caught instanceof Error ? caught.message : 'The outfit could not be saved. Try again.',
@@ -160,8 +166,8 @@ export const OutfitBuilder = ({
     >
       <Surface tone="soft" padding="compact">
         <p>
-          Build a reusable garment recipe. Saving does not start the camera, contact Decart, or
-          submit an image provider request.
+          Build a reusable outfit. Saving does not start the camera, contact Decart, or submit an
+          image provider request.
         </p>
       </Surface>
       {error ? (
@@ -258,7 +264,11 @@ export const OutfitBuilder = ({
               title={disabledReason}
               onClick={() => void save()}
             >
-              {saveAndSelect ? 'Save & Select' : 'Save outfit'}
+              {pendingSavedOutfit
+                ? 'Retry Project attachment'
+                : saveAndSelect
+                  ? 'Save & Select'
+                  : 'Save outfit'}
             </Button>
           </div>
         </>

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 describe('CharacterPromptWorkshop', () => {
-  it('owns only Add, Replace, and Restyle recipes', async () => {
+  it('owns only Add, Replace, and Restyle settings', async () => {
     const user = userEvent.setup();
     const getUserMedia = vi.fn();
     Object.defineProperty(navigator, 'mediaDevices', {
@@ -136,27 +136,16 @@ describe('CharacterPromptWorkshop', () => {
     expect(screen.getByLabelText(/^Replacement/)).toHaveValue('glass tumbler');
   });
 
-  it('saves normalized text and a restorable non-character draft', async () => {
+  it('does not expose the retired Recipe save UI', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();
     renderWorkshop({ onSave });
 
     await user.type(screen.getByLabelText(/^Object to add/), '  paper   lantern  ');
     await user.type(screen.getByLabelText(/^Specific placement/), 'above the doorway');
-    await user.click(screen.getByRole('button', { name: 'Save to Recipe Shelf' }));
-    await user.type(screen.getByLabelText(/^Recipe name/), '  Doorway   light  ');
-    await user.click(screen.getByRole('button', { name: 'Save recipe' }));
-
-    await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
-    expect(onSave.mock.calls[0]?.[0]).toMatchObject({
-      name: 'Doorway light',
-      draft: {
-        intent: 'add-object',
-        objectDescription: 'paper lantern',
-        placement: 'above the doorway',
-      },
-      referenceImageAssetId: null,
-    });
+    expect(screen.queryByText(/Recipe/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Save/i })).not.toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
   });
 
   it('uses one accessible progressive section at a time', async () => {

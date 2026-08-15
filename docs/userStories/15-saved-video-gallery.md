@@ -20,7 +20,7 @@ Studio stage.
    In authoritative Neon/private-R2 mode, the authenticated API stages the save and the browser
    transfers multipart bytes directly to R2; the result is not visible until the API verifies and
    attaches it. Local and shadow modes retain their existing API-mediated upload behavior.
-3. `/studio/assets/videos` reuses the mounted `StudioApp` and persistent `MediaStage`; the Assets
+3. `/assets/videos` reuses the mounted `StudioApp` and persistent `MediaStage`; the Assets
    view hides the stage without unmounting its owner. The gallery first loads filtered/sorted
    metadata in cursor pages; it does not eagerly load video bytes. The default order is Latest,
    with Oldest, Shortest, and Longest alternatives.
@@ -40,10 +40,14 @@ Studio stage.
    or provider session. The dialog lists immutable Versions with ordinal, current marker, origin,
    timestamp, media facts, and status. Selecting an older Version previews and downloads that exact
    content without changing the Saved Video current pointer.
-7. **Open in Studio** fetches owner-checked bytes only after selection, validates them through the
-   existing source path, and returns to the Studio stage/editor with saved video/version lineage.
+7. **Open in Studio** navigates to `/studio/:videoId`, fetches owner-checked metadata and only the
+   current Version bytes, enforces the 300 MB bound, and opens the existing review workspace.
+   Direct entry, refresh, and pasted URLs work without navigation state; **Adjust video** remains
+   an explicit action from review rather than opening the editor automatically.
    **Add to Project** links the exact ready Version to a selected empty same-owner Project through
    the existing source-acceptance contract; the Video remains reusable and no bytes are copied.
+   Separately, **Import Saved Video** can add a non-owning Project Asset membership without
+   replacing that Project's immutable source.
 8. Rename changes metadata. **Remove from Assets** confirms, tombstones only the chosen record, and
    removes it from the visible gallery. Every video can be removed independently in any order; retained derived
    records keep their historical source lineage even when that source record is deleted. With

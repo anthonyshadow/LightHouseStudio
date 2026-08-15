@@ -14,6 +14,7 @@ import {
   type Project,
   type ProjectAggregate,
   type ProjectAssetLink,
+  type ProjectAssetMembership,
   type ProjectJobLink,
   type ProjectOutputLink,
   type ProjectRevision,
@@ -29,6 +30,10 @@ import type {
   ProjectCreatePersistenceResult,
   ProjectCurrentRead,
   ProjectCurrentSourceRead,
+  ProjectAssetMembershipAttachResult,
+  ProjectAssetMembershipDetachResult,
+  ProjectAssetMembershipPage,
+  ProjectAssetMembershipPageInput,
   ProjectLinkHistoryKind,
   ProjectLinkHistoryPage,
   ProjectLinkMutationResult,
@@ -73,6 +78,12 @@ import type {
   VideoProcessingJobTrace,
 } from '../../features/processing-jobs/file-processing-job-repository.js';
 import {
+  createSavedVideoProjectMembership,
+  deriveProjectAssetMemberships,
+  deterministicProjectAssetMembershipId,
+  membershipsIntroducedByRevision,
+} from '../../features/projects/project-asset-memberships.js';
+import {
   projectAssetLinksForRevision,
   projectMediaReferencesEqual,
   projectVersionReferenceLinksForRevision,
@@ -95,7 +106,9 @@ import {
 import {
   campaigns,
   mediaAssets,
+  ownerMigrations,
   processingJobs,
+  projectAssetMemberships,
   projectAssets,
   projectJobs,
   projectOperationReceipts,
@@ -468,10 +481,65 @@ const toProjectOutputReceipt = (row: ProjectOutputReceiptRow): ProjectOutputOper
   createdAt: toIsoTimestamp(row.createdAt),
 });
 
+const projectAssetMembershipValues = (
+  membership: ProjectAssetMembership,
+): typeof projectAssetMemberships.$inferInsert => ({
+  id: membership.id,
+  projectId: membership.projectId,
+  ownerUserId: membership.ownerUserId,
+  kind: membership.kind,
+  resourceId: membership.resourceId,
+  createdAt: toIsoTimestamp(membership.createdAt),
+});
+
+const toProjectAssetMembership = (
+  row: typeof projectAssetMemberships.$inferSelect,
+): ProjectAssetMembership => ({
+  id: row.id,
+  projectId: row.projectId,
+  ownerUserId: row.ownerUserId,
+  kind: row.kind,
+  resourceId: row.resourceId,
+  createdAt: toIsoTimestamp(row.createdAt),
+});
+
+const membershipsForRevisionInput = (
+  input: AppendProjectRevisionPersistenceInput,
+): readonly ProjectAssetMembership[] => [
+  ...membershipsIntroducedByRevision(input.revision),
+  ...(input.assetMemberships ?? []),
+];
+
 export class DrizzleProjectRepository
   implements ProjectRepository, ProjectProcessingRepository, ProjectOutputMetadataUnitOfWork
 {
   constructor(private readonly db: LightframeDatabase) {}
+
+  async #persistAssetMemberships(
+    executor: DatabaseExecutor,
+    memberships: readonly ProjectAssetMembership[],
+  ): Promise<void> {
+    const unique = [
+      ...new Map(
+        memberships.map((membership) => [
+          `${membership.ownerUserId}:${membership.projectId}:${membership.kind}:${membership.resourceId}`,
+          membership,
+        ]),
+      ).values(),
+    ];
+    if (unique.length === 0) return;
+    await executor
+      .insert(projectAssetMemberships)
+      .values(unique.map(projectAssetMembershipValues))
+      .onConflictDoNothing({
+        target: [
+          projectAssetMemberships.ownerUserId,
+          projectAssetMemberships.projectId,
+          projectAssetMemberships.kind,
+          projectAssetMemberships.resourceId,
+        ],
+      });
+  }
 
   async #processingAttempt(
     executor: LightframeDatabase | DatabaseExecutor,
@@ -594,6 +662,7 @@ export class DrizzleProjectRepository
         .insert(projectVersionReferences)
         .values(versionReferenceLinks.map(versionReferenceValues));
     }
+    await this.#persistAssetMemberships(tx, deriveProjectAssetMemberships(aggregate));
     await tx
       .update(projects)
       .set({
@@ -964,6 +1033,283 @@ export class DrizzleProjectRepository
     };
   }
 
+  async ensureAssetMembershipBackfill(ownerUserId: string): Promise<void> {
+    const migrationId = 'project-asset-memberships-v1';
+    await this.db.transaction(async (tx) => {
+      const [completed] = await tx
+        .select({ migrationId: ownerMigrations.migrationId })
+        .from(ownerMigrations)
+        .where(
+          and(
+            eq(ownerMigrations.ownerUserId, ownerUserId),
+            eq(ownerMigrations.migrationId, migrationId),
+          ),
+        )
+        .limit(1);
+      if (completed !== undefined) return;
+
+      const projectRows = await tx
+        .select()
+        .from(projects)
+        .where(and(eq(projects.ownerUserId, ownerUserId), isNull(projects.deletedAt)));
+      const projectIds = projectRows.map(({ id }) => id);
+      if (projectIds.length > 0) {
+        const revisionRows = await tx
+          .select()
+          .from(projectRevisions)
+          .where(
+            and(
+              eq(projectRevisions.ownerUserId, ownerUserId),
+              inArray(projectRevisions.projectId, projectIds),
+            ),
+          );
+        const sourceRows = await tx
+          .select()
+          .from(projectSources)
+          .where(
+            and(
+              eq(projectSources.ownerUserId, ownerUserId),
+              inArray(projectSources.projectId, projectIds),
+            ),
+          );
+        const mediaRows = await tx
+          .select()
+          .from(projectWorkingMediaAdoptions)
+          .where(
+            and(
+              eq(projectWorkingMediaAdoptions.ownerUserId, ownerUserId),
+              inArray(projectWorkingMediaAdoptions.projectId, projectIds),
+            ),
+          );
+        const outputRows = await tx
+          .select()
+          .from(projectOutputs)
+          .where(
+            and(
+              eq(projectOutputs.ownerUserId, ownerUserId),
+              inArray(projectOutputs.projectId, projectIds),
+            ),
+          );
+
+        const memberships = projectRows.flatMap((projectRow) =>
+          deriveProjectAssetMemberships({
+            project: toProject(projectRow),
+            revisions: revisionRows
+              .filter(({ projectId }) => projectId === projectRow.id)
+              .map(toRevision),
+            source:
+              sourceRows
+                .filter(({ projectId }) => projectId === projectRow.id)
+                .map(toProjectSource)[0] ?? null,
+            workingMediaAdoptions: mediaRows
+              .filter(({ projectId }) => projectId === projectRow.id)
+              .map(toProjectWorkingMedia),
+            outputLinks: outputRows
+              .filter(({ projectId }) => projectId === projectRow.id)
+              .map((row) => ({
+                projectId: row.projectId,
+                ownerUserId: row.ownerUserId,
+                savedVideoId: row.savedVideoId,
+                videoVersionId: row.videoVersionId,
+                producingRevisionId: row.producingRevisionId,
+                producingRevisionNumber: row.producingRevisionNumber,
+                createdAt: toIsoTimestamp(row.createdAt),
+              })),
+          }),
+        );
+        await this.#persistAssetMemberships(tx, memberships);
+      }
+      await tx
+        .insert(ownerMigrations)
+        .values({ ownerUserId, migrationId })
+        .onConflictDoNothing({
+          target: [ownerMigrations.ownerUserId, ownerMigrations.migrationId],
+        });
+    });
+  }
+
+  async listAssetMemberships(
+    ownerUserId: string,
+    projectId: string,
+    input: ProjectAssetMembershipPageInput,
+  ): Promise<ProjectAssetMembershipPage | null> {
+    if (!Number.isInteger(input.pageSize) || input.pageSize < 1 || input.pageSize > 50) {
+      throw new ProjectPersistenceError(
+        'invalid-aggregate',
+        'Use a bounded Project asset membership page.',
+      );
+    }
+    await this.ensureAssetMembershipBackfill(ownerUserId);
+    const cursorTimestamp =
+      input.cursor === undefined ? undefined : toIsoTimestamp(input.cursor.createdAt);
+    const rows = await this.db
+      .select({ membership: projectAssetMemberships })
+      .from(projectAssetMemberships)
+      .innerJoin(
+        projects,
+        and(
+          eq(projects.id, projectAssetMemberships.projectId),
+          eq(projects.ownerUserId, projectAssetMemberships.ownerUserId),
+          isNull(projects.deletedAt),
+        ),
+      )
+      .where(
+        and(
+          eq(projectAssetMemberships.ownerUserId, ownerUserId),
+          eq(projectAssetMemberships.projectId, projectId),
+          input.kind === undefined ? undefined : eq(projectAssetMemberships.kind, input.kind),
+          input.cursor === undefined
+            ? undefined
+            : or(
+                lt(projectAssetMemberships.createdAt, cursorTimestamp!),
+                and(
+                  eq(projectAssetMemberships.createdAt, cursorTimestamp!),
+                  lt(projectAssetMemberships.id, input.cursor.membershipId),
+                ),
+              ),
+        ),
+      )
+      .orderBy(desc(projectAssetMemberships.createdAt), desc(projectAssetMemberships.id))
+      .limit(input.pageSize + 1);
+    const page = rows
+      .slice(0, input.pageSize)
+      .map(({ membership }) => toProjectAssetMembership(membership));
+    const last = page.at(-1);
+    return this.#pageForExistingProject(
+      ownerUserId,
+      projectId,
+      {
+        memberships: page,
+        nextCursor:
+          rows.length > input.pageSize && last !== undefined
+            ? { createdAt: last.createdAt, membershipId: last.id }
+            : null,
+      },
+      rows.length > 0,
+    );
+  }
+
+  async attachAssetMembership(
+    membership: ProjectAssetMembership,
+  ): Promise<ProjectAssetMembershipAttachResult> {
+    await this.ensureAssetMembershipBackfill(membership.ownerUserId);
+    return this.db.transaction(async (tx) => {
+      const [project] = await tx
+        .select({ status: projects.status })
+        .from(projects)
+        .where(
+          and(
+            eq(projects.id, membership.projectId),
+            eq(projects.ownerUserId, membership.ownerUserId),
+            isNull(projects.deletedAt),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (project === undefined) return { kind: 'not-found' };
+      if (project.status === 'archived') return { kind: 'archived' };
+      const inserted = await tx
+        .insert(projectAssetMemberships)
+        .values(projectAssetMembershipValues(membership))
+        .onConflictDoNothing({
+          target: [
+            projectAssetMemberships.ownerUserId,
+            projectAssetMemberships.projectId,
+            projectAssetMemberships.kind,
+            projectAssetMemberships.resourceId,
+          ],
+        })
+        .returning();
+      if (inserted[0] !== undefined) {
+        return { kind: 'attached', membership: toProjectAssetMembership(inserted[0]) };
+      }
+      const [existing] = await tx
+        .select()
+        .from(projectAssetMemberships)
+        .where(
+          and(
+            eq(projectAssetMemberships.ownerUserId, membership.ownerUserId),
+            eq(projectAssetMemberships.projectId, membership.projectId),
+            eq(projectAssetMemberships.kind, membership.kind),
+            eq(projectAssetMemberships.resourceId, membership.resourceId),
+          ),
+        )
+        .limit(1);
+      if (existing === undefined) {
+        throw new ProjectPersistenceError(
+          'invalid-aggregate',
+          'The Project asset attachment did not produce a retained membership.',
+        );
+      }
+      return { kind: 'existing', membership: toProjectAssetMembership(existing) };
+    });
+  }
+
+  async getAssetMembership(
+    ownerUserId: string,
+    projectId: string,
+    kind: ProjectAssetMembership['kind'],
+    resourceId: string,
+  ): Promise<ProjectAssetMembership | null> {
+    await this.ensureAssetMembershipBackfill(ownerUserId);
+    const [row] = await this.db
+      .select({ membership: projectAssetMemberships })
+      .from(projectAssetMemberships)
+      .innerJoin(
+        projects,
+        and(
+          eq(projects.id, projectAssetMemberships.projectId),
+          eq(projects.ownerUserId, projectAssetMemberships.ownerUserId),
+          isNull(projects.deletedAt),
+        ),
+      )
+      .where(
+        and(
+          eq(projectAssetMemberships.ownerUserId, ownerUserId),
+          eq(projectAssetMemberships.projectId, projectId),
+          eq(projectAssetMemberships.kind, kind),
+          eq(projectAssetMemberships.resourceId, resourceId),
+        ),
+      )
+      .limit(1);
+    return row === undefined ? null : toProjectAssetMembership(row.membership);
+  }
+
+  async detachAssetMembership(
+    ownerUserId: string,
+    projectId: string,
+    membershipId: string,
+  ): Promise<ProjectAssetMembershipDetachResult> {
+    await this.ensureAssetMembershipBackfill(ownerUserId);
+    return this.db.transaction(async (tx) => {
+      const [project] = await tx
+        .select({ status: projects.status })
+        .from(projects)
+        .where(
+          and(
+            eq(projects.id, projectId),
+            eq(projects.ownerUserId, ownerUserId),
+            isNull(projects.deletedAt),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (project === undefined) return { kind: 'not-found' };
+      if (project.status === 'archived') return { kind: 'archived' };
+      const removed = await tx
+        .delete(projectAssetMemberships)
+        .where(
+          and(
+            eq(projectAssetMemberships.id, membershipId),
+            eq(projectAssetMemberships.ownerUserId, ownerUserId),
+            eq(projectAssetMemberships.projectId, projectId),
+          ),
+        )
+        .returning({ id: projectAssetMemberships.id });
+      return { kind: 'detached', removed: removed.length > 0 };
+    });
+  }
+
   async #hasProject(ownerUserId: string, projectId: string): Promise<boolean> {
     const [row] = await this.db
       .select({ id: projects.id })
@@ -1287,6 +1633,7 @@ export class DrizzleProjectRepository
           .insert(projectVersionReferences)
           .values(versionReferenceLinks.map(versionReferenceValues));
       }
+      await this.#persistAssetMemberships(tx, membershipsForRevisionInput(input));
       await tx
         .update(projects)
         .set({
@@ -1463,6 +1810,25 @@ export class DrizzleProjectRepository
           .values(versionReferenceLinks.map(versionReferenceValues));
       }
       await tx.insert(projectSources).values(projectSourceValues(input.source));
+      await this.#persistAssetMemberships(tx, [
+        ...membershipsForRevisionInput(input),
+        ...(input.source.savedVideoId === null
+          ? []
+          : [
+              createSavedVideoProjectMembership({
+                id: deterministicProjectAssetMembershipId(
+                  input.ownerUserId,
+                  input.projectId,
+                  'video',
+                  input.source.savedVideoId,
+                ),
+                ownerUserId: input.ownerUserId,
+                projectId: input.projectId,
+                savedVideoId: input.source.savedVideoId,
+                createdAt: input.source.acceptedAt,
+              }),
+            ]),
+      ]);
       await tx
         .update(projects)
         .set({
@@ -1658,6 +2024,25 @@ export class DrizzleProjectRepository
           .values(versionReferences.map(versionReferenceValues));
       }
       await tx.insert(projectWorkingMediaAdoptions).values(projectWorkingMediaValues(input.media));
+      await this.#persistAssetMemberships(tx, [
+        ...membershipsForRevisionInput(input),
+        ...(input.media.savedVideoId === null
+          ? []
+          : [
+              createSavedVideoProjectMembership({
+                id: deterministicProjectAssetMembershipId(
+                  input.ownerUserId,
+                  input.projectId,
+                  'video',
+                  input.media.savedVideoId,
+                ),
+                ownerUserId: input.ownerUserId,
+                projectId: input.projectId,
+                savedVideoId: input.media.savedVideoId,
+                createdAt: input.media.adoptedAt,
+              }),
+            ]),
+      ]);
       await tx
         .update(projects)
         .set({
@@ -2462,6 +2847,7 @@ export class DrizzleProjectRepository
         await tx
           .insert(projectWorkingMediaAdoptions)
           .values(projectWorkingMediaValues(resultMedia));
+        await this.#persistAssetMemberships(tx, membershipsForRevisionInput(revisionInput));
         await tx
           .update(projectJobs)
           .set({
@@ -3064,6 +3450,21 @@ export class DrizzleProjectRepository
           .values(versionReferenceLinks.map(versionReferenceValues));
       }
       await tx.insert(projectWorkingMediaAdoptions).values(projectWorkingMediaValues(input.media));
+      await this.#persistAssetMemberships(tx, [
+        ...membershipsForRevisionInput(input.projectRevision),
+        createSavedVideoProjectMembership({
+          id: deterministicProjectAssetMembershipId(
+            input.ownerUserId,
+            input.projectRevision.projectId,
+            'video',
+            savedVideoId,
+          ),
+          ownerUserId: input.ownerUserId,
+          projectId: input.projectRevision.projectId,
+          savedVideoId,
+          createdAt: receipt.createdAt,
+        }),
+      ]);
       await tx
         .update(projects)
         .set({

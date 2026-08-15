@@ -1,6 +1,10 @@
 import { useTheme } from '@emotion/react';
+import { projectIdSchema } from '@studio/contracts';
+import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
+import { ApiClientError } from '../adapters/api-client/apiClient';
+import { getSavedVideo } from '../adapters/api-client/savedVideosApi';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
 import { useAuth } from '../application/auth/AuthProvider';
 import { RemoteStateProvider } from '../application/remote-state/RemoteStateProvider';
@@ -14,15 +18,18 @@ import {
   projectIdFromPath,
   projectPath,
   projectWorkspacePath,
+  studioCreatePath,
+  studioVideoIdFromPath,
 } from '../app/paths';
-import type { PromptCommittedHandler } from '../application/types';
-import type { RecipeShelfEntryIntent } from '../features/creative-assets/RecipeShelf.types';
+import type { ModelMode, PromptCommittedHandler } from '../application/types';
 import { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import { isVideoEditBusy } from '../features/video-editor/types';
 import { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
 import { useProjectCreativeSessionAdapter } from '../features/projects/useProjectCreativeSessionAdapter';
 import { useProjectProcessingController } from '../features/projects/useProjectProcessingController';
+import { attachProjectAsset, getProject } from '../features/projects/projectsApi';
+import { projectAssetQueryKeys } from '../features/projects/useProjectAssetsController';
 import {
   ProjectCreativeCheckpointPanel,
   PROJECT_PROVIDER_START_BLOCKED_REASON,
@@ -34,16 +41,17 @@ import {
 } from '../features/media-session';
 import { isModelSessionActive } from '../features/media-session/sessionComposerModel';
 import { persistedReferenceAssetId } from '../features/media-session/types';
+import type { StageNotice } from '../features/live-stage';
 import { useStudioSession } from '../orchestration/session';
 import { headerRegionStyles, pageStyles, shellStyles, skipLinkStyles } from './StudioApp.styles';
 import {
   CreativeWorkspace,
   type AuxiliaryPanel,
   type CreativeWorkspaceState,
-  type ModelMode,
 } from './CreativeWorkspace';
 import { StudioExitGuard } from './StudioExitGuard';
 import { StudioHeader } from './StudioHeader';
+import { AssetCreationLauncher } from './AssetCreationLauncher';
 import { isStudioFormError } from './studioStageNotices';
 import { useProviderAvailability } from './useProviderAvailability';
 import { useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
@@ -77,7 +85,6 @@ const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
 const creativePanelForOverlay = (overlay: ActiveOverlay): AuxiliaryPanel => {
   if (overlay === 'workshop') return 'workshop';
-  if (overlay === 'recipe-shelf') return 'shelf';
   return 'closed';
 };
 
@@ -88,11 +95,10 @@ const creativeToolForOverlay = (
 ): CreativeWorkspaceState['activeTool'] => {
   if (videoEditing) return 'edit-video';
   switch (overlay) {
-    case 'recipe-dock':
-      return 'dock';
     case 'video-upload':
       return 'edit-video';
     case 'character-selector':
+    case 'saved-characters':
       return 'character';
     case 'outfit-selector':
     case 'outfit-builder':
@@ -113,11 +119,59 @@ interface StudioExperienceProps {
   initialIntent?: 'upload';
 }
 
+type ProjectVideoCreationContext =
+  | Readonly<{ status: 'none' }>
+  | Readonly<{ status: 'checking'; projectId: string }>
+  | Readonly<{ status: 'ready'; projectId: string }>;
+
+type DirectVideoLoadState =
+  | Readonly<{ status: 'idle' }>
+  | Readonly<{ status: 'loading'; videoId: string }>
+  | Readonly<{ status: 'ready'; videoId: string }>
+  | Readonly<{ status: 'error'; videoId: string; message: string }>;
+
+type DirectVideoLoadResult =
+  | Readonly<{ status: 'ready'; requestKey: string }>
+  | Readonly<{ status: 'error'; requestKey: string; message: string }>;
+
+type ProjectVideoAttachmentState =
+  | Readonly<{ status: 'idle' }>
+  | Readonly<{ status: 'attaching'; projectId: string; videoId: string }>
+  | Readonly<{ status: 'error'; projectId: string; videoId: string; message: string }>;
+
+const safeDirectVideoLoadMessage = (error: unknown): string =>
+  error instanceof ApiClientError && [403, 404, 410].includes(error.status)
+    ? 'This Saved Video is unavailable or has been removed.'
+    : 'The Saved Video could not be loaded safely. Your Assets are unchanged.';
+
 const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceProps) => {
   const theme = useTheme();
   const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
+  const createQuery = useMemo(
+    () => (location.pathname === APP_PATHS.create ? new URLSearchParams(location.search) : null),
+    [location.pathname, location.search],
+  );
+  const queryCreationIntent =
+    createQuery?.get('intent') === 'record' || createQuery?.get('intent') === 'upload'
+      ? (createQuery.get('intent') as 'record' | 'upload')
+      : null;
+  const creationIntent = queryCreationIntent ?? initialIntent ?? null;
+  const requestedCreationProjectId = createQuery?.get('projectId') ?? null;
+  const parsedCreationProjectId = requestedCreationProjectId
+    ? projectIdSchema.safeParse(requestedCreationProjectId)
+    : null;
+  const validCreationProjectId = parsedCreationProjectId?.success
+    ? parsedCreationProjectId.data
+    : null;
+  const directVideoId = studioVideoIdFromPath(location.pathname);
+  const routeOriginProjectId = useMemo(() => {
+    const state = location.state as { readonly fromProjectId?: unknown } | null;
+    const parsed = projectIdSchema.safeParse(state?.fromProjectId);
+    return parsed.success ? parsed.data : null;
+  }, [location.state]);
   const projectRouteActive = isProjectsPath(location.pathname);
   const campaignRouteActive = isCampaignsPath(location.pathname);
   const dashboardRouteActive = location.pathname === APP_PATHS.dashboard;
@@ -135,6 +189,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const projectContextActive = projectWorkspaceActive && activeProjectId !== null;
   const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+  const quickCreateTriggerRef = useRef<HTMLElement>(null);
+  const [assetCreationLauncherOpen, setAssetCreationLauncherOpen] = useState(false);
   const desktopStudioLayout = useDesktopStudioLayout();
   const {
     repository,
@@ -155,14 +211,108 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     open: openOverlay,
     close: closeOverlay,
     closeIf: closeOverlayIf,
-    toggle: toggleOverlay,
-  } = useStudioOverlayController(initialIntent === 'upload' ? 'video-upload' : null);
+  } = useStudioOverlayController(creationIntent === 'upload' ? 'video-upload' : null);
+
+  const creationContextRequestKey =
+    location.pathname === APP_PATHS.create && validCreationProjectId !== null
+      ? `${location.key}:${validCreationProjectId}`
+      : null;
+  const [verifiedProjectVideoCreation, setVerifiedProjectVideoCreation] = useState<{
+    readonly requestKey: string;
+    readonly projectId: string;
+  } | null>(null);
+  const projectVideoCreationContext: ProjectVideoCreationContext =
+    creationContextRequestKey === null || validCreationProjectId === null
+      ? { status: 'none' }
+      : verifiedProjectVideoCreation?.requestKey === creationContextRequestKey
+        ? { status: 'ready', projectId: validCreationProjectId }
+        : { status: 'checking', projectId: validCreationProjectId };
+  const directVideoRequestKey = directVideoId === null ? null : `${location.key}:${directVideoId}`;
+  const [directVideoLoadResult, setDirectVideoLoadResult] = useState<DirectVideoLoadResult | null>(
+    null,
+  );
+  const directVideoLoad = useMemo<DirectVideoLoadState>(
+    () =>
+      directVideoId === null || directVideoRequestKey === null
+        ? { status: 'idle' }
+        : directVideoLoadResult?.requestKey !== directVideoRequestKey
+          ? { status: 'loading', videoId: directVideoId }
+          : directVideoLoadResult.status === 'ready'
+            ? { status: 'ready', videoId: directVideoId }
+            : {
+                status: 'error',
+                videoId: directVideoId,
+                message: directVideoLoadResult.message,
+              },
+    [directVideoId, directVideoLoadResult, directVideoRequestKey],
+  );
+  const [projectVideoAttachment, setProjectVideoAttachment] = useState<ProjectVideoAttachmentState>(
+    { status: 'idle' },
+  );
+  const [projectVideoAttachmentRetry, setProjectVideoAttachmentRetry] = useState(0);
 
   useEffect(() => {
-    if (initialIntent !== 'upload' || location.pathname !== APP_PATHS.create) return;
+    if (location.pathname !== APP_PATHS.create || requestedCreationProjectId === null) {
+      return;
+    }
+    if (validCreationProjectId === null) {
+      void navigate(
+        studioCreatePath(queryCreationIntent ? { intent: queryCreationIntent } : undefined),
+        {
+          replace: true,
+          state: null,
+        },
+      );
+      return;
+    }
+    const projectId = validCreationProjectId;
+    const requestKey = creationContextRequestKey;
+    if (requestKey === null) return;
+    const controller = new AbortController();
+    void getProject(projectId, controller.signal)
+      .then((current) => {
+        if (controller.signal.aborted) return;
+        if (current.project.status !== 'archived' && current.project.status !== 'deleted') {
+          setVerifiedProjectVideoCreation({ requestKey, projectId });
+          return;
+        }
+        void navigate(
+          studioCreatePath(queryCreationIntent ? { intent: queryCreationIntent } : undefined),
+          { replace: true, state: null },
+        );
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        void navigate(
+          studioCreatePath(queryCreationIntent ? { intent: queryCreationIntent } : undefined),
+          { replace: true, state: null },
+        );
+      });
+    return () => controller.abort('creation-context-changed');
+  }, [
+    creationContextRequestKey,
+    location.pathname,
+    navigate,
+    queryCreationIntent,
+    requestedCreationProjectId,
+    validCreationProjectId,
+  ]);
+
+  useEffect(() => {
+    if (creationIntent !== 'upload' || location.pathname !== APP_PATHS.create) return;
     openOverlay('video-upload');
-    void navigate(APP_PATHS.create, { replace: true, state: null });
-  }, [initialIntent, location.pathname, navigate, openOverlay]);
+    if (initialIntent === 'upload' && location.state !== null) {
+      void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+    }
+  }, [
+    creationIntent,
+    initialIntent,
+    location.pathname,
+    location.search,
+    location.state,
+    navigate,
+    openOverlay,
+  ]);
 
   useEffect(() => {
     if (!liveRouteActive || capabilityState !== 'ready' || !realtimeLiveEnabled) return;
@@ -176,20 +326,15 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const [firstSuccessGuideVisible, setFirstSuccessGuideVisible] = useState(false);
   const [recordingForExistingVideo, setRecordingForExistingVideo] = useState(false);
   const adoptingExistingVideoRecordingRef = useRef<string | null>(null);
-  const [recipeShelfEntryIntent, setRecipeShelfEntryIntent] =
-    useState<RecipeShelfEntryIntent | null>(null);
-  const nextRecipeShelfEntryIntentIdRef = useRef(0);
   const promptCommittedHandlerRef = useRef<PromptCommittedHandler>(noopPromptCommitted);
   const characterSelectorRef = useRef<HTMLButtonElement>(null);
   const outfitToggleRef = useRef<HTMLButtonElement>(null);
   const workshopToggleRef = useRef<HTMLButtonElement>(null);
-  const shelfToggleRef = useRef<HTMLButtonElement>(null);
-  const dockToggleRef = useRef<HTMLButtonElement>(null);
   const editVideoToggleRef = useRef<HTMLButtonElement>(null);
   const uploadToggleRef = useRef<HTMLButtonElement>(null);
   const closeTakeReview = useCallback(() => {
     closeOverlay();
-    window.requestAnimationFrame(() => dockToggleRef.current?.focus());
+    window.requestAnimationFrame(() => mainRef.current?.focus());
   }, [closeOverlay]);
   const handlePromptCommitted = useCallback<PromptCommittedHandler>(
     (...args) => promptCommittedHandlerRef.current(...args),
@@ -301,28 +446,22 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     activeCharacter,
     activeCharacterName,
     activeRecipeLabel,
-    libraryMode,
     workshopDraft,
     workshopDrafts,
     referenceUsePending,
     referenceUseFailureMessage,
     canContinueReferenceUseWithoutImage,
-    shelfDirty,
-    recipeInsertionBlocked,
     characterBuilderSaveBlockedReason,
   } = handoff.state;
   const {
     recordCommittedPrompt,
-    changeLibraryMode,
     rememberWorkshopDraft,
-    setShelfDirty,
     useRecipe: applyRecipeSelection,
     clearActiveCharacter,
     clearActiveRecipe,
     retryReferenceUse,
     continueReferenceUseWithoutImage,
     saveBuiltCharacter,
-    openSavedWorkshop,
     applyWorkshopPrompt,
     saveWorkshopPrompt,
     openWorkshop,
@@ -345,7 +484,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     activityBlockedReason: characterBuilderActivityBlockedReason,
     openBlockedReason: characterBuilderOpenBlockedReason,
     studioSaveBlockedReason: characterBuilderSaveBlockedReason,
-    shelfDirty,
     saveStudioCharacter: saveBuiltCharacter,
     openOverlay,
     closeOverlay,
@@ -381,7 +519,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
 
   useEffect(() => {
     if (!session.error || isStudioFormError(session.error)) return;
-    closeOverlayIf(['recipe-dock', 'capture-settings']);
+    closeOverlayIf(['ai-settings', 'capture-settings']);
   }, [closeOverlayIf, session.error]);
 
   const clearSessionError = session.clearError;
@@ -418,11 +556,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
 
   const closeCreativePanel = closeOverlay;
 
-  const openDock = () => {
-    if (recordingActive) return;
-    openOverlay('recipe-dock');
-  };
-
   const openCaptureSettings = () => {
     if (recordingActive) return;
     if (desktopStudioLayout) {
@@ -433,6 +566,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   };
 
   const openCharacterSelector = useCallback(() => openOverlay('character-selector'), [openOverlay]);
+  const openSavedCharacters = useCallback(() => openOverlay('saved-characters'), [openOverlay]);
   const openOutfitSelector = useCallback(() => openOverlay('outfit-selector'), [openOverlay]);
   const openLiveAiExperience = useCallback(() => {
     if (!realtimeLiveEnabled) return;
@@ -441,7 +575,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
 
   const creativePanel = creativePanelForOverlay(activeOverlay);
   const activeCreativeTool = creativeToolForOverlay(activeOverlay, creativePanel, videoEditing);
-  const captureBlockedReason = resolveCaptureBlockedReason({ reviewLocked, shelfDirty });
+  const captureBlockedReason = resolveCaptureBlockedReason({ reviewLocked });
   const captureSettingsDisabledReason = resolveCaptureSettingsDisabledReason({
     reviewLocked,
     recordingActive,
@@ -502,14 +636,14 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     if (!clearActiveCharacter()) return;
     closeOverlayIf(['character-selector']);
     window.requestAnimationFrame(() =>
-      (desktopStudioLayout ? characterSelectorRef : shelfToggleRef).current?.focus(),
+      (desktopStudioLayout ? characterSelectorRef.current : mainRef.current)?.focus(),
     );
   }, [clearActiveCharacter, closeOverlayIf, desktopStudioLayout]);
   const unselectAi = useCallback(() => {
     if (!clearActiveRecipe()) return;
     closeOverlayIf(['character-selector', 'outfit-selector']);
     window.requestAnimationFrame(() =>
-      (desktopStudioLayout ? characterSelectorRef : shelfToggleRef).current?.focus(),
+      (desktopStudioLayout ? characterSelectorRef.current : mainRef.current)?.focus(),
     );
   }, [clearActiveRecipe, closeOverlayIf, desktopStudioLayout]);
   const startAdvancedModel = useCallback(() => {
@@ -527,31 +661,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       session.selectMode(mode)
     );
   };
-  const openSavedRecipesFor = (mode: ModelMode) => {
-    if (
-      mode === libraryMode &&
-      shelfDirty &&
-      !window.confirm('Discard the unsaved Recipe Shelf changes and open saved characters?')
-    ) {
-      return;
-    }
-    if (!changeLibraryMode(mode)) return;
-    if (mode === 'lucy-latest') {
-      nextRecipeShelfEntryIntentIdRef.current += 1;
-      setRecipeShelfEntryIntent({
-        id: nextRecipeShelfEntryIntentIdRef.current,
-        category: 'characters',
-      });
-    }
-    openOverlay('recipe-shelf');
-  };
-  const consumeRecipeShelfEntryIntent = useCallback((id: number) => {
-    setRecipeShelfEntryIntent((current) => (current?.id === id ? null : current));
-  }, []);
   const configureVirtualTryOn = () => {
     if (!realtimeLiveEnabled) return;
     if (!selectExperienceMode('lucy-vton-latest')) return;
-    openOverlay('recipe-dock');
+    openOverlay('ai-settings');
   };
   const startPreparedAi = (mode: ModelMode) => {
     if (projectContextActive || !realtimeLiveEnabled) return;
@@ -590,6 +703,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     void navigate(APP_PATHS.create, { replace: true });
   }, [navigate]);
   const openVideoUpload = useCallback(() => openOverlay('video-upload'), [openOverlay]);
+  const openTakeReview = useCallback(() => openOverlay('take-review'), [openOverlay]);
   const focusStudio = useCallback(() => {
     window.requestAnimationFrame(() => mainRef.current?.focus());
   }, []);
@@ -607,19 +721,160 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     recordingCharacterAttribution,
     navigateToStudio,
     openVideoUpload,
+    openTakeReview,
     closeOverlay,
     focusStudio,
     focusEditVideo,
   });
+  const loadSavedVideoRoute = savedVideo.loadSavedVideoRoute;
+  const discardSavedVideoWork = savedVideo.discardWork;
+  const directVideoActionsRef = useRef({
+    load: loadSavedVideoRoute,
+    reset: () => {
+      discardSavedVideoWork();
+      existingVideo.reset(true);
+      closeOverlay();
+    },
+  });
+  useLayoutEffect(() => {
+    directVideoActionsRef.current = {
+      load: loadSavedVideoRoute,
+      reset: () => {
+        discardSavedVideoWork();
+        existingVideo.reset(true);
+        closeOverlay();
+      },
+    };
+  }, [closeOverlay, discardSavedVideoWork, existingVideo, loadSavedVideoRoute]);
+
+  useEffect(() => {
+    if (directVideoId === null || directVideoRequestKey === null) return;
+    const controller = new AbortController();
+    const requestKey = directVideoRequestKey;
+    directVideoActionsRef.current.reset();
+    void getSavedVideo(directVideoId, controller.signal)
+      .then((detail) => directVideoActionsRef.current.load(detail, controller.signal))
+      .then(() => {
+        if (!controller.signal.aborted) {
+          setDirectVideoLoadResult({ status: 'ready', requestKey });
+        }
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          setDirectVideoLoadResult({
+            status: 'error',
+            requestKey,
+            message: safeDirectVideoLoadMessage(error),
+          });
+        }
+      });
+    return () => controller.abort('saved-video-route-changed');
+  }, [directVideoId, directVideoRequestKey]);
+
+  const contextualProjectId =
+    projectVideoCreationContext.status === 'ready' ? projectVideoCreationContext.projectId : null;
+  const newlySavedVideoId =
+    savedVideoSave.state.status === 'saved' ? savedVideoSave.state.video.id : null;
+  const projectVideoAttachmentAttemptRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (contextualProjectId === null || newlySavedVideoId === null) return;
+    const attemptKey = `${contextualProjectId}:${newlySavedVideoId}:${projectVideoAttachmentRetry}`;
+    if (projectVideoAttachmentAttemptRef.current === attemptKey) return;
+    projectVideoAttachmentAttemptRef.current = attemptKey;
+    const controller = new AbortController();
+    setProjectVideoAttachment({
+      status: 'attaching',
+      projectId: contextualProjectId,
+      videoId: newlySavedVideoId,
+    });
+    void attachProjectAsset(
+      contextualProjectId,
+      { kind: 'video', resourceId: newlySavedVideoId },
+      controller.signal,
+    )
+      .then(async () => {
+        if (controller.signal.aborted) return;
+        await queryClient.invalidateQueries({
+          queryKey: projectAssetQueryKeys.project(contextualProjectId),
+        });
+        if (!controller.signal.aborted) {
+          setProjectVideoAttachment({ status: 'idle' });
+          void navigate(projectPath(contextualProjectId), { replace: true });
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setProjectVideoAttachment({
+            status: 'error',
+            projectId: contextualProjectId,
+            videoId: newlySavedVideoId,
+            message:
+              'The Video was saved to Assets, but its Project association could not be completed.',
+          });
+        }
+      });
+    return () => controller.abort('project-video-context-changed');
+  }, [contextualProjectId, navigate, newlySavedVideoId, projectVideoAttachmentRetry, queryClient]);
+  const contextualStageNotices = useMemo<readonly StageNotice[]>(() => {
+    const notices: StageNotice[] = [];
+    if (directVideoLoad.status === 'loading') {
+      notices.push({
+        id: 'saved-video-route-loading',
+        severity: 'info',
+        title: 'Loading Saved Video',
+        message: 'Validating the current Version before opening review.',
+        priority: 250,
+      });
+    } else if (directVideoLoad.status === 'error') {
+      notices.push({
+        id: 'saved-video-route-error',
+        severity: 'error',
+        title: 'Saved Video unavailable',
+        message: directVideoLoad.message,
+        priority: 500,
+        action: {
+          label: routeOriginProjectId ? 'Back to Project' : 'Back to Assets',
+          onAction: () =>
+            void navigate(
+              routeOriginProjectId ? projectPath(routeOriginProjectId) : APP_PATHS.videos,
+            ),
+        },
+      });
+    }
+    if (projectVideoAttachment.status === 'attaching') {
+      notices.push({
+        id: 'project-video-attachment',
+        severity: 'info',
+        title: 'Video saved',
+        message: 'Attaching it to the Project…',
+        priority: 350,
+      });
+    } else if (projectVideoAttachment.status === 'error') {
+      notices.push({
+        id: 'project-video-attachment',
+        severity: 'error',
+        title: 'Project attachment needs attention',
+        message: projectVideoAttachment.message,
+        priority: 550,
+        action: {
+          label: 'Retry attachment',
+          onAction: () => setProjectVideoAttachmentRetry((current) => current + 1),
+        },
+      });
+    }
+    return notices;
+  }, [directVideoLoad, navigate, projectVideoAttachment, routeOriginProjectId]);
+  const effectiveStageNotices = useMemo(
+    () => [...stageNotices, ...contextualStageNotices],
+    [contextualStageNotices, stageNotices],
+  );
   const updateOutfitDirty = outfit.updateDirty;
   const discardWardrobeDirty = character.discardWardrobeDirty;
-  const discardSavedVideoWork = savedVideo.discardWork;
   const discardLocalTemporaryWork = useCallback(() => {
     adoptingExistingVideoRecordingRef.current = null;
     setRecordingForExistingVideo(false);
     processing.cancel();
     recording.discard();
-    setShelfDirty(false);
     updateOutfitDirty(false);
     discardWardrobeDirty();
     discardSavedVideoWork();
@@ -630,7 +885,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     recording,
     discardSavedVideoWork,
     discardWardrobeDirty,
-    setShelfDirty,
     updateOutfitDirty,
   ]);
   const discardTemporaryWork = useCallback(() => {
@@ -640,7 +894,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const logoutHasTemporaryWork =
     Boolean(recording.presented) ||
     recording.processingState === 'processing' ||
-    shelfDirty ||
     outfit.dirty ||
     character.wardrobeDirty ||
     videoEditor.dirty ||
@@ -702,6 +955,21 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     window.requestAnimationFrame(() => mainRef.current?.focus());
     void session.startLocal();
   }, [browser, closeOverlay, session]);
+  const startLocalRecording = useCallback(() => {
+    if (!browser.mediaRecorder || !browser.mediaDevices || !browser.secureContext) return;
+    setRecordingForExistingVideo(false);
+    closeOverlay();
+    window.requestAnimationFrame(() => mainRef.current?.focus());
+    void session.startLocal();
+  }, [browser, closeOverlay, session]);
+  const handledRecordIntentRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (location.pathname !== APP_PATHS.create || creationIntent !== 'record') return;
+    const intentKey = `${location.pathname}${location.search}`;
+    if (handledRecordIntentRef.current === intentKey) return;
+    handledRecordIntentRef.current = intentKey;
+    startLocalRecording();
+  }, [creationIntent, location.pathname, location.search, startLocalRecording]);
   const closeExistingVideo = useCallback(() => {
     if (existingVideo.providerActive) return;
     if (existingVideo.active) existingVideo.cancelBeforeAcceptance();
@@ -721,20 +989,25 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         return;
       }
       if (kind === 'prompt' || kind === 'recipe') {
-        openOverlay('recipe-shelf');
+        openWorkshopOverlay();
         return;
       }
       if (kind === 'reference') {
-        openOverlay('recipe-dock');
+        openOverlay('ai-settings');
         return;
       }
       openCharacterSelector();
     },
-    [openCharacterSelector, openOutfitSelector, openOverlay, openPlaybackEditor],
+    [
+      openCharacterSelector,
+      openOutfitSelector,
+      openOverlay,
+      openPlaybackEditor,
+      openWorkshopOverlay,
+    ],
   );
   const creativeWorkspace = (
     <CreativeWorkspace
-      repository={repository}
       state={{
         panel: creativePanel,
         activeTool: activeCreativeTool,
@@ -746,12 +1019,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             ? (activeRecipeLabel ?? 'Configured VTO')
             : undefined,
         activeSessionMode: session.draft.mode,
-        libraryMode,
         workshopDraft,
         workshopDrafts,
         recordingActive,
         sessionModeLocked,
-        recipeInsertionBlocked,
         hasReferenceImage: Boolean(session.draft.referenceImage),
         referenceUsePending,
         referenceUseFailure: referenceUseFailureMessage
@@ -763,40 +1034,23 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                 : {}),
             }
           : null,
-        activeRecipe,
-        recipeShelfEntryIntent,
         hasPlaybackVideo: Boolean(recording.presented),
       }}
       refs={{
         workshopToggleRef,
-        shelfToggleRef,
-        dockToggleRef,
         editVideoToggleRef,
         characterToggleRef: characterSelectorRef,
         outfitToggleRef,
       }}
       actions={{
-        onOpenDock: openDock,
         onOpenEditVideo: openPlaybackEditor,
         onOpenCharacter: openCharacterSelector,
         onOpenOutfit: openOutfitSelector,
         onOpenWorkshop: openWorkshop,
-        onToggleShelf: () => toggleOverlay('recipe-shelf'),
         onClose: closeCreativePanel,
-        onLibraryModeChange: changeLibraryMode,
         onWorkshopDraftChange: rememberWorkshopDraft,
         onUseWorkshop: applyWorkshopPrompt,
         onSaveWorkshop: (action) => void saveWorkshopPrompt(action),
-        onShelfDirtyChange: setShelfDirty,
-        onRecipeShelfEntryIntentConsumed: consumeRecipeShelfEntryIntent,
-        onUseRecipe: applyRecipeSelection,
-        onCreateCharacter: character.openNew,
-        onEditCharacter: character.edit,
-        onOpenWardrobe: character.openWardrobe,
-        onCreateOutfit: () => outfit.openNew(false, 'shelf'),
-        onEditOutfit: (savedOutfit) => outfit.openEditor(savedOutfit, false, 'shelf'),
-        onSaveOutfitCopy: (savedOutfit) => outfit.openCopy(savedOutfit, 'shelf'),
-        onOpenSavedWorkshop: openSavedWorkshop,
       }}
     />
   );
@@ -852,6 +1106,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             onCreateCampaign={() =>
               void navigate(APP_PATHS.campaigns, { state: { createIntent: 'campaign' } })
             }
+            onCreateAsset={(trigger) => {
+              quickCreateTriggerRef.current = trigger;
+              setAssetCreationLauncherOpen(true);
+            }}
             onOpenLive={() => void navigate(APP_PATHS.live)}
             onLogout={() => void logout.request()}
           />
@@ -894,7 +1152,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           stage={{
             presentation: stagePresentation,
             aspectRatio: stageAspectRatio,
-            notices: stageNotices,
+            notices: effectiveStageNotices,
             editPreview: videoEditPreview,
             experienceLabel: currentExperienceLabel,
             experienceImageAssetId: currentExperienceImageAssetId,
@@ -924,23 +1182,24 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             onOpenVideos: () => void navigate(APP_PATHS.videos),
           }}
           assets={{
+            creativeStore: repositoryStore,
             characterCount: repositoryStore.savedCharacterPrompts.length,
             outfitCount: repositoryStore.savedPrompts.filter(
               (item) => item.modelModeId === 'lucy-vton-latest',
             ).length,
-            recipeCount: repositoryStore.savedPrompts.length,
             onOpen: (destination) => {
               const paths = {
                 videos: APP_PATHS.videos,
                 characters: APP_PATHS.characters,
                 outfits: APP_PATHS.outfits,
                 voices: APP_PATHS.voices,
-                recipes: APP_PATHS.recipes,
               } as const;
               void navigate(paths[destination]);
             },
             onUploadVideo: () =>
               void navigate(APP_PATHS.create, { state: { creationIntent: 'upload' } }),
+            onCreateProjectCharacter: character.openNewForProject,
+            onCreateProjectOutfit: outfit.openNewForProject,
           }}
           liveBeta={{
             capabilityState,
@@ -951,7 +1210,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           }}
           saveVideoState={savedVideoSave.state}
           actions={{
-            startExistingVideoRecording,
+            startLocalRecording,
             closeTakeReview,
             discardExistingVideoSelection,
             openVoiceTreatments: () => openOverlay('voice-treatments'),
@@ -960,6 +1219,41 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             openCaptureSettings,
             startProjectRecording,
           }}
+        />
+
+        <AssetCreationLauncher
+          open={assetCreationLauncherOpen}
+          projectId={projectRouteActive ? activeProjectId : null}
+          returnFocusRef={quickCreateTriggerRef}
+          onClose={() => setAssetCreationLauncherOpen(false)}
+          onCreateVideo={(intent, projectId) => {
+            setAssetCreationLauncherOpen(false);
+            void navigate(
+              studioCreatePath({
+                ...(intent === 'new' ? {} : { intent }),
+                ...(projectId ? { projectId } : {}),
+              }),
+            );
+          }}
+          onCreateCharacter={(projectId) => {
+            setAssetCreationLauncherOpen(false);
+            if (projectId) {
+              character.openNewForProject(projectId);
+              return;
+            }
+            void navigate(APP_PATHS.create);
+            character.openNew();
+          }}
+          onCreateOutfit={(projectId) => {
+            setAssetCreationLauncherOpen(false);
+            if (projectId) {
+              outfit.openNewForProject(projectId);
+              return;
+            }
+            void navigate(APP_PATHS.create);
+            outfit.openNew(false, 'library');
+          }}
+          onOpenVoiceLibrary={() => void navigate(APP_PATHS.voices)}
         />
 
         <StudioExitGuard
@@ -976,10 +1270,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           }
           hasTemporaryTake={Boolean(recording.presented)}
           voiceProcessingActive={recording.processingState === 'processing'}
-          shelfDirty={shelfDirty || outfit.dirty || character.wardrobeDirty || videoEditor.dirty}
+          creativeWorkDirty={outfit.dirty || character.wardrobeDirty || videoEditor.dirty}
           projectContextDirty={
-            projectContextActive &&
-            (shelfDirty || outfit.dirty || character.wardrobeDirty || videoEditor.dirty)
+            projectContextActive && (outfit.dirty || character.wardrobeDirty || videoEditor.dirty)
           }
           projectSourceActivity={activeProjectSourceActivity}
           projectSession={activeProjectSession}
@@ -1034,10 +1327,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             outfit.selectSaved(savedOutfit);
             void navigate(APP_PATHS.create);
           }}
-          onUseRecipe={(selection) => {
-            applyRecipeSelection(selection);
-            void navigate(APP_PATHS.create);
-          }}
         />
 
         <StudioToolOverlays
@@ -1067,10 +1356,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           {...(projectContextActive
             ? { providerStartBlockedReason: PROJECT_PROVIDER_START_BLOCKED_REASON }
             : {})}
+          mainRef={mainRef}
           characterSelectorRef={characterSelectorRef}
           outfitToggleRef={outfitToggleRef}
-          shelfToggleRef={shelfToggleRef}
-          dockToggleRef={dockToggleRef}
           editVideoToggleRef={editVideoToggleRef}
           uploadToggleRef={uploadToggleRef}
           onOpenOverlay={openOverlay}
@@ -1080,7 +1368,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           onStartExistingVideoRecording={startExistingVideoRecording}
           onDiscardExistingVideoSelection={discardExistingVideoSelection}
           onOpenExistingVideo={openExistingVideo}
-          onOpenSavedRecipesFor={openSavedRecipesFor}
+          onOpenSavedCharacters={openSavedCharacters}
+          onOpenSavedOutfits={openOutfitSelector}
           onConfigureVirtualTryOn={configureVirtualTryOn}
           onStartPreparedAi={startPreparedAi}
           onUnselectCharacter={unselectCharacter}

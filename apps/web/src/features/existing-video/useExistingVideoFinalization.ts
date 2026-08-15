@@ -143,7 +143,7 @@ export const useExistingVideoFinalization = ({
       controller.signal.throwIfAborted();
       if (generation !== generationRef.current) return null;
       const step = steps[stepIndex];
-      if (!step) throw new Error('The completed visual recipe is unavailable.');
+      if (!step) throw new Error('The completed visual configuration is unavailable.');
       setComparison('result');
       setPendingVisual(null);
       setRetryJob(null);

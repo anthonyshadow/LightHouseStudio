@@ -17,11 +17,13 @@ export type ProjectLifecycleAction = 'archive' | 'restore';
 
 export const NewProjectDialog = ({
   defaultCampaignId = null,
+  campaignLocked = false,
   returnFocusRef,
   onClose,
   onCreated,
 }: {
   readonly defaultCampaignId?: string | null;
+  readonly campaignLocked?: boolean;
   readonly returnFocusRef: RefObject<HTMLElement | null>;
   readonly onClose: () => void;
   readonly onCreated: (current: ProjectCurrentResponse) => void;
@@ -54,7 +56,11 @@ export const NewProjectDialog = ({
       open
       onClose={onClose}
       title="New Project"
-      description="Name the work now. A Campaign is optional, and the Project may remain collection-only until you add a video."
+      description={
+        campaignLocked
+          ? 'Name the Project. It will be created inside the current Campaign.'
+          : 'Name the work now. A Campaign is optional, and the Project may remain collection-only until you add a video.'
+      }
       placement="bottom"
       size="standard"
       closeDisabled={busy}
@@ -89,9 +95,9 @@ export const NewProjectDialog = ({
           onChange={(event) => setTitle(event.target.value)}
         />
         <ProjectCampaignPicker
-          label="Campaign (optional)"
+          label={campaignLocked ? 'Campaign' : 'Campaign (optional)'}
           value={campaignId}
-          disabled={busy}
+          disabled={busy || campaignLocked}
           onValueChange={(value) => setCampaignId(value)}
         />
       </form>
