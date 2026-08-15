@@ -9,11 +9,17 @@ import type {
 import type { CreativeAssetStore } from '@studio/domain';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useNavigate } from 'react-router';
-import { getSavedVideo, savedVideoContentUrl } from '../../adapters/api-client/savedVideosApi';
+import { referenceImageContentUrl } from '../../adapters/api-client/referenceImageRoutes';
+import {
+  getSavedVideo,
+  savedVideoContentUrl,
+  savedVideoThumbnailUrl,
+} from '../../adapters/api-client/savedVideosApi';
 import { studioCreatePath, studioVideoPath } from '../../app/paths';
 import { Button, OverlayPanel, StatusNotice } from '../../ui';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
 import { safeProjectError } from './ProjectDialogs';
+import { ProjectVideoPreviewPlayer } from './ProjectVideoPreviewPlayer';
 import { useProjectAssetsController } from './useProjectAssetsController';
 
 const VoiceLibrary = lazy(() =>
@@ -42,31 +48,172 @@ const labelForMembership = (
   membership: ProjectAssetMembershipContract,
   store: CreativeAssetStore | undefined,
   videoSummaries: ReadonlyMap<string, SavedVideoSummary>,
-): { readonly label: string; readonly unavailable: boolean } => {
+): {
+  readonly label: string;
+  readonly unavailable: boolean;
+  readonly thumbnailUrl: string | null;
+} => {
   if (membership.kind === 'video') {
     const video = videoSummaries.get(membership.resourceId);
     return video
-      ? { label: video.title, unavailable: false }
-      : { label: 'Saved Video unavailable', unavailable: true };
+      ? {
+          label: video.title,
+          unavailable: false,
+          thumbnailUrl: video.thumbnailAvailable ? savedVideoThumbnailUrl(video.id) : null,
+        }
+      : { label: 'Saved Video unavailable', unavailable: true, thumbnailUrl: null };
   }
   if (membership.kind === 'character') {
     const character = store?.savedCharacterPrompts.find(({ id }) => id === membership.resourceId);
     return character
-      ? { label: character.name, unavailable: false }
-      : { label: 'Character unavailable', unavailable: true };
+      ? {
+          label: character.name,
+          unavailable: false,
+          thumbnailUrl: character.referenceImageAssetId
+            ? referenceImageContentUrl(character.referenceImageAssetId)
+            : null,
+        }
+      : { label: 'Character unavailable', unavailable: true, thumbnailUrl: null };
   }
   if (membership.kind === 'outfit') {
     const outfit = store?.savedPrompts.find(
       ({ id, modelModeId }) => id === membership.resourceId && modelModeId === 'lucy-vton-latest',
     );
     return outfit
-      ? { label: outfit.title, unavailable: false }
-      : { label: 'Outfit unavailable', unavailable: true };
+      ? {
+          label: outfit.title,
+          unavailable: false,
+          thumbnailUrl: outfit.referenceImageAssetId
+            ? referenceImageContentUrl(outfit.referenceImageAssetId)
+            : null,
+        }
+      : { label: 'Outfit unavailable', unavailable: true, thumbnailUrl: null };
   }
   return {
     label: 'Saved Voice',
     unavailable: false,
+    thumbnailUrl: null,
   };
+};
+
+const AssetKindIcon = ({ kind }: { readonly kind: ProjectAssetKindContract }) => {
+  if (kind === 'video') {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="m10 9 5 3-5 3Z" fill="currentColor" stroke="none" />
+      </svg>
+    );
+  }
+  if (kind === 'character') {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <circle cx="12" cy="8" r="3.25" />
+        <path d="M5.5 20c.6-4 2.8-6 6.5-6s5.9 2 6.5 6" />
+      </svg>
+    );
+  }
+  if (kind === 'outfit') {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+        <path d="m8.5 3-5 2.5L5 10l3-1.2V21h8V8.8l3 1.2 1.5-4.5-5-2.5a4 4 0 0 1-7 0Z" />
+      </svg>
+    );
+  }
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7" />
+    </svg>
+  );
+};
+
+const AssetThumbnail = ({
+  kind,
+  label,
+  thumbnailUrl,
+  unavailable,
+}: {
+  readonly kind: ProjectAssetKindContract;
+  readonly label: string;
+  readonly thumbnailUrl: string | null;
+  readonly unavailable: boolean;
+}) => {
+  const theme = useTheme();
+  const [brokenThumbnailUrl, setBrokenThumbnailUrl] = useState<string | null>(null);
+  const showThumbnail = thumbnailUrl !== null && brokenThumbnailUrl !== thumbnailUrl;
+
+  return (
+    <div
+      role="img"
+      aria-label={
+        showThumbnail ? `Thumbnail for ${label}` : `${kindLabel(kind)} visual for ${label}`
+      }
+      css={{
+        position: 'relative',
+        width: '100%',
+        aspectRatio: '16 / 9',
+        display: 'grid',
+        placeItems: 'center',
+        overflow: 'hidden',
+        borderRadius: theme.radii.small,
+        color: unavailable ? theme.colors.warning : theme.colors.textMuted,
+        background: [
+          `radial-gradient(circle at 25% 20%, color-mix(in srgb, ${theme.colors.accent} 14%, transparent), transparent 46%)`,
+          `radial-gradient(circle at 80% 85%, color-mix(in srgb, ${theme.colors.violet} 12%, transparent), transparent 48%)`,
+          theme.colors.canvasRaised,
+        ].join(', '),
+      }}
+    >
+      {showThumbnail ? (
+        <img
+          src={thumbnailUrl}
+          alt=""
+          loading="lazy"
+          css={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          onError={() => setBrokenThumbnailUrl(thumbnailUrl)}
+        />
+      ) : (
+        <span
+          aria-hidden="true"
+          css={{
+            display: 'grid',
+            gap: theme.space.xs,
+            placeItems: 'center',
+            padding: theme.space.md,
+            textAlign: 'center',
+            '& svg': { width: '2.25rem', height: '2.25rem', strokeWidth: 1.5 },
+            '& small': { fontSize: theme.fontSizes.caption },
+          }}
+        >
+          <AssetKindIcon kind={kind} />
+          <small>{unavailable ? 'Asset unavailable' : `${kindLabel(kind)} preview`}</small>
+        </span>
+      )}
+      {kind === 'video' && !unavailable && showThumbnail ? (
+        <span
+          aria-hidden="true"
+          css={{
+            position: 'absolute',
+            insetBlockStart: '50%',
+            insetInlineStart: '50%',
+            width: '2.75rem',
+            height: '2.75rem',
+            display: 'grid',
+            placeItems: 'center',
+            border: `1px solid color-mix(in srgb, ${theme.colors.text} 30%, transparent)`,
+            borderRadius: theme.radii.round,
+            color: theme.colors.text,
+            background: 'rgba(2, 5, 9, 0.72)',
+            transform: 'translate(-50%, -50%)',
+            '& svg': { width: '1.35rem', height: '1.35rem', strokeWidth: 1.6 },
+          }}
+        >
+          <AssetKindIcon kind="video" />
+        </span>
+      ) : null}
+    </div>
+  );
 };
 
 const ProjectVideoPreview = ({
@@ -107,7 +254,9 @@ const ProjectVideoPreview = ({
       description="Preview the current Saved Video Version without leaving this Project."
       placement="fullscreen"
       size="wide"
+      height="tall"
       centered
+      bodyMode="contained"
       initialFocus="heading"
       returnFocusRef={returnFocusRef}
       footer={
@@ -139,18 +288,21 @@ const ProjectVideoPreview = ({
         </StatusNotice>
       ) : null}
       {detail ? (
-        <div css={{ display: 'grid', gap: theme.space.md }}>
-          {/* Saved local videos may not include a captions track. */}
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <video
+        <div
+          css={{
+            height: '100%',
+            minWidth: 0,
+            minHeight: 0,
+            display: 'grid',
+            gridTemplateRows: 'minmax(0, 1fr) auto',
+            gap: theme.space.sm,
+          }}
+        >
+          <ProjectVideoPreviewPlayer
             src={savedVideoContentUrl(detail.id, detail.currentVersion.id)}
-            controls
-            playsInline
-            preload="metadata"
-            aria-label={`Preview of ${detail.title}`}
-            css={{ width: '100%', maxHeight: '65vh', borderRadius: theme.radii.medium }}
+            title={detail.title}
           />
-          <p>
+          <p css={{ margin: 0, color: theme.colors.textMuted, fontSize: theme.fontSizes.metadata }}>
             Current Version {detail.currentVersion.ordinal} · {detail.currentVersion.width}×
             {detail.currentVersion.height}
           </p>
@@ -199,6 +351,11 @@ export const ProjectAssetsSection = ({
     [controller.query.data],
   );
   const busy = controller.attachMutation.isPending || controller.detachMutation.isPending;
+
+  const openVideoInStudio = (videoId: string) =>
+    void navigate(studioVideoPath(videoId), {
+      state: { fromProjectId: projectId },
+    });
 
   const attach = async (kind: ProjectAssetKindContract, resourceId: string) => {
     setNotice(null);
@@ -323,8 +480,8 @@ export const ProjectAssetsSection = ({
           aria-label="Assets attached to this Project"
           css={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 15rem), 1fr))',
-            gap: theme.space.sm,
+            gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 18rem), 1fr))',
+            gap: theme.space.md,
             margin: 0,
             padding: 0,
             listStyle: 'none',
@@ -339,57 +496,106 @@ export const ProjectAssetsSection = ({
                     height: '100%',
                     display: 'grid',
                     gap: theme.space.sm,
-                    padding: theme.space.md,
+                    padding: theme.space.sm,
                     border: `1px solid ${theme.colors.border}`,
                     borderRadius: theme.radii.medium,
                     background: theme.colors.surface,
                   }}
                 >
-                  <span
+                  <AssetThumbnail
+                    kind={membership.kind}
+                    label={resolved.label}
+                    thumbnailUrl={resolved.thumbnailUrl}
+                    unavailable={resolved.unavailable}
+                  />
+                  <div
                     css={{
-                      color: theme.colors.accent,
-                      fontSize: theme.fontSizes.caption,
-                      fontWeight: 800,
-                      textTransform: 'uppercase',
+                      minWidth: 0,
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      justifyContent: 'space-between',
+                      gap: theme.space.sm,
                     }}
                   >
-                    {kindLabel(membership.kind)}
-                  </span>
-                  <div>
-                    <h3 css={{ margin: 0, overflowWrap: 'anywhere' }}>{resolved.label}</h3>
-                    <small title={membership.resourceId}>
+                    <span
+                      css={{
+                        color: theme.colors.accent,
+                        fontSize: theme.fontSizes.caption,
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {kindLabel(membership.kind)}
+                    </span>
+                    <small
+                      title={membership.resourceId}
+                      css={{ minWidth: 0, color: theme.colors.textFaint, overflowWrap: 'anywhere' }}
+                    >
                       {abbreviatedId(membership.resourceId)}
                     </small>
+                  </div>
+                  <div>
+                    <h3 css={{ margin: 0, overflowWrap: 'anywhere' }}>{resolved.label}</h3>
                   </div>
                   {resolved.unavailable ? (
                     <StatusNotice tone="warning">
                       The underlying Asset is unavailable. This association can still be detached.
                     </StatusNotice>
                   ) : null}
-                  <div css={{ display: 'flex', flexWrap: 'wrap', gap: theme.space.xs }}>
-                    {membership.kind === 'video' && !resolved.unavailable ? (
-                      <Button
-                        size="small"
-                        onClick={(event) => {
-                          previewTriggerRef.current = event.currentTarget;
-                          setPreviewVideoId(membership.resourceId);
+                  {(membership.kind === 'video' && !resolved.unavailable) || !archived ? (
+                    <div
+                      css={{
+                        display: 'grid',
+                        gap: theme.space.xs,
+                        marginBlockStart: 'auto',
+                      }}
+                    >
+                      {membership.kind === 'video' && !resolved.unavailable ? (
+                        <Button
+                          size="small"
+                          variant="primary"
+                          css={{ width: '100%' }}
+                          onClick={() => openVideoInStudio(membership.resourceId)}
+                        >
+                          Open in Studio
+                        </Button>
+                      ) : null}
+                      <div
+                        css={{
+                          display: 'grid',
+                          gridTemplateColumns:
+                            membership.kind === 'video' && !resolved.unavailable && !archived
+                              ? 'repeat(2, minmax(0, 1fr))'
+                              : 'minmax(0, 1fr)',
+                          gap: theme.space.xs,
+                          '& > button': { width: '100%', minWidth: 0 },
                         }}
                       >
-                        Preview
-                      </Button>
-                    ) : null}
-                    {!archived ? (
-                      <Button
-                        size="small"
-                        variant="quiet"
-                        busy={controller.detachMutation.variables === membership.id}
-                        disabled={busy}
-                        onClick={() => void detach(membership)}
-                      >
-                        Detach from Project
-                      </Button>
-                    ) : null}
-                  </div>
+                        {membership.kind === 'video' && !resolved.unavailable ? (
+                          <Button
+                            size="small"
+                            onClick={(event) => {
+                              previewTriggerRef.current = event.currentTarget;
+                              setPreviewVideoId(membership.resourceId);
+                            }}
+                          >
+                            Preview
+                          </Button>
+                        ) : null}
+                        {!archived ? (
+                          <Button
+                            size="small"
+                            variant="quiet"
+                            busy={controller.detachMutation.variables === membership.id}
+                            disabled={busy}
+                            onClick={() => void detach(membership)}
+                          >
+                            Detach from Project
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
                 </article>
               </li>
             );

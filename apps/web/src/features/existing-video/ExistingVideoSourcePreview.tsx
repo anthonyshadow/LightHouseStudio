@@ -13,7 +13,7 @@ const playerStyles = (theme: Theme): CSSObject => ({
   borderRadius: theme.radii.medium,
   background: theme.colors.canvas,
   '& video': {
-    width: '100%',
+    height: '100%',
     maxHeight: 'min(56vh, 30rem)',
     aspectRatio: '16 / 9',
     display: 'block',
