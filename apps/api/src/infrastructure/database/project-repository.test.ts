@@ -550,6 +550,7 @@ describe('Project persistence mapping and transactions', () => {
       ],
       [],
       [],
+      [],
     );
     const repository = new DrizzleProjectRepository(scripted.db);
 

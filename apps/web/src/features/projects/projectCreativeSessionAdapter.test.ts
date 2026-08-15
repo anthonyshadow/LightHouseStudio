@@ -311,7 +311,7 @@ describe('Project creative session adapter', () => {
     ).toEqual({ mode: null, aspectRatio: null });
   });
 
-  it('explains missing prompts, changed recipes, and owner-unavailable saved Voices historically', () => {
+  it('explains missing prompts and Voices without presenting historical Recipe issues', () => {
     const promptSnapshot = {
       ...current().revision.snapshot,
       creativeIntent: {
@@ -346,13 +346,7 @@ describe('Project creative session adapter', () => {
         resourceRevision: '2026-08-11T16:00:00.000Z',
       },
     };
-    expect(resolveProjectCreativeResourceIssues(recipeSnapshot, store)).toContainEqual(
-      expect.objectContaining({
-        kind: 'recipe',
-        historicalLabel: 'Historical copper recipe',
-        reason: 'changed',
-      }),
-    );
+    expect(resolveProjectCreativeResourceIssues(recipeSnapshot, store)).toEqual([]);
 
     const voiceSnapshot = {
       ...current().revision.snapshot,

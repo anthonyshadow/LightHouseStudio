@@ -4,7 +4,6 @@ import type {
   CreativeAssetRepository,
   CreativeAssetStore,
 } from '../features/creative-assets/types';
-import { useRecipeLibraryMode } from '../features/creative-assets/useRecipeLibraryMode';
 import { confirmModeReplacement } from '../features/media-session/draftPolicy';
 import type { StudioMode, StudioSessionController } from '../features/media-session/types';
 import type { PromptWorkshopAction } from '../features/prompt-authoring/CharacterPromptWorkshop';
@@ -57,9 +56,6 @@ export const useReferenceRecipeHandoff = ({
     () => resolveActiveRecipe(activeRecipeState, store, session.draft),
     [activeRecipeState, session.draft, store],
   );
-  const library = useRecipeLibraryMode(session.draft.mode);
-  const { mode: resolvedLibraryMode, dirty: shelfDirty } = library;
-
   const selectModeWithDraftProtection = useCallback(
     (mode: StudioMode): boolean =>
       !mediaLocked &&
@@ -111,7 +107,6 @@ export const useReferenceRecipeHandoff = ({
     activeCharacterName: activeRecipe.characterName,
     dispatchActiveRecipe,
     characterBuilderOpenBlockedReason,
-    shelfDirty,
     referenceUsePending: hydration.pending,
   });
 
@@ -147,7 +142,7 @@ export const useReferenceRecipeHandoff = ({
   );
 
   const recipeInsertionBlocked =
-    mediaLocked || (sessionModeLocked && session.draft.mode !== resolvedLibraryMode);
+    mediaLocked || (sessionModeLocked && session.draft.mode === 'local');
 
   return {
     state: {
@@ -155,21 +150,17 @@ export const useReferenceRecipeHandoff = ({
       activeCharacter: activeRecipe.character,
       activeCharacterName: activeRecipe.characterName,
       activeRecipeLabel: activeRecipe.label,
-      libraryMode: resolvedLibraryMode,
       workshopDraft: workshop.draft,
       workshopDrafts: workshop.drafts,
       referenceUsePending: hydration.pending,
       referenceUseFailureMessage: hydration.failureMessage,
       canContinueReferenceUseWithoutImage: hydration.canContinueWithoutReference,
-      shelfDirty,
       recipeInsertionBlocked,
       characterBuilderSaveBlockedReason: attribution.characterBuilderSaveBlockedReason,
     },
     actions: {
       recordCommittedPrompt: attribution.recordCommittedPrompt,
-      changeLibraryMode: library.changeMode,
       rememberWorkshopDraft: workshop.rememberDraft,
-      setShelfDirty: library.setDirty,
       useRecipe,
       clearActiveCharacter,
       clearActiveRecipe,

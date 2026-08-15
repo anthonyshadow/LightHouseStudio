@@ -389,7 +389,7 @@ export const useExistingVideoWorkflow = ({
       recording.beginProcessing({
         kind: 'visual-upload',
         title: `Uploading ${stepLabel(step.modelId).toLowerCase()} edit…`,
-        detail: 'Preparing the selected video and recipe for visual processing.',
+        detail: 'Preparing the selected video and settings for visual processing.',
       });
       const recipe: VideoTransformRecipe = {
         operation,

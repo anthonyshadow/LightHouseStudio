@@ -9,6 +9,7 @@ import { CampaignService } from '../campaigns/campaign-service.js';
 
 const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
 const otherOwnerUserId = '458c4aca-a9fa-4c25-a2c8-d218768216a1';
+const now = '2026-08-11T12:00:00.000Z';
 
 const metadataPaths = (directory: string, ownerId: string) => {
   const segment = createHash('sha256').update(ownerId).digest('hex');
@@ -161,7 +162,7 @@ describe('FileProjectRepository', () => {
     ).rejects.toThrow();
   });
 
-  it('migrates v1 Project metadata to v6 without inventing Campaign membership or source', async () => {
+  it('migrates v1 Project metadata to v7 without inventing Campaign membership or source', async () => {
     const service = new ProjectService(new FileProjectRepository(directory));
     const created = await service.create(ownerUserId, randomUUID(), 'Legacy standalone');
     if (!created.ok) throw new Error('Expected a Project create.');
@@ -177,6 +178,7 @@ describe('FileProjectRepository', () => {
     delete current.campaignCreateReceipts;
     delete (current as { processingJobs?: unknown }).processingJobs;
     delete (current as { outputReceipts?: unknown }).outputReceipts;
+    delete (current as { assetMemberships?: unknown }).assetMemberships;
     for (const aggregate of current.projects) delete aggregate.project.campaignId;
     await writeFile(paths.primary, `${JSON.stringify(current)}\n`, 'utf8');
     await writeFile(paths.backup, `${JSON.stringify(current)}\n`, 'utf8');
@@ -190,7 +192,8 @@ describe('FileProjectRepository', () => {
       campaigns: unknown[];
     };
     expect(migrated).toMatchObject({
-      schemaVersion: 6,
+      schemaVersion: 7,
+      assetMemberships: [],
       campaigns: [],
       processingJobs: [],
       outputReceipts: [],
@@ -200,7 +203,100 @@ describe('FileProjectRepository', () => {
     ).toBeNull();
   });
 
-  it('migrates v2 Campaign/Project metadata to v6 with explicit empty source/adoptions', async () => {
+  it('migrates v6 usage into distinct deterministic memberships without backfilling Recipe IDs', async () => {
+    const service = new ProjectService(new FileProjectRepository(directory));
+    const created = await service.create(ownerUserId, randomUUID(), 'Legacy asset usage');
+    if (!created.ok) throw new Error('Expected a Project create.');
+    const paths = metadataPaths(directory, ownerUserId);
+    const savedVideoId = randomUUID();
+    const videoVersionId = randomUUID();
+    const previous = JSON.parse(await readFile(paths.primary, 'utf8')) as {
+      schemaVersion: number;
+      assetMemberships?: unknown;
+      projects: Array<{
+        project: { id: string; ownerUserId: string };
+        outputLinks: Array<Record<string, unknown>>;
+        revisions: Array<{
+          id: string;
+          revisionNumber: number;
+          snapshot: {
+            selectedCharacter: unknown;
+            selectedOutfit: unknown;
+            selectedVoice: unknown;
+            lastSuccessfulOutput: unknown;
+            creativeIntent: { recipeId: string | null; recipeLabel: string | null };
+          };
+        }>;
+      }>;
+    };
+    const aggregate = previous.projects[0]!;
+    const revision = aggregate.revisions[0]!;
+    const snapshot = revision.snapshot;
+    snapshot.selectedCharacter = {
+      characterId: 'legacy-character',
+      characterLabel: 'Legacy Character',
+      characterRevision: now,
+      variantId: null,
+      variantLabel: null,
+      variantRevision: null,
+      referenceAssetId: null,
+    };
+    snapshot.selectedOutfit = {
+      outfitId: 'legacy-outfit',
+      outfitLabel: 'Legacy Outfit',
+      outfitRevision: now,
+      referenceAssetId: null,
+      inputKind: 'saved-outfit',
+    };
+    snapshot.selectedVoice = {
+      kind: 'saved-voice',
+      voiceId: 'legacy-voice',
+      voiceName: 'Legacy Voice',
+      resourceRevision: now,
+      treatment: { stability: 0.5, similarity: 0.8, style: null, speakerBoost: true },
+    };
+    snapshot.lastSuccessfulOutput = { savedVideoId, videoVersionId };
+    aggregate.outputLinks.push({
+      projectId: aggregate.project.id,
+      ownerUserId: aggregate.project.ownerUserId,
+      savedVideoId,
+      videoVersionId,
+      producingRevisionId: revision.id,
+      producingRevisionNumber: revision.revisionNumber,
+      createdAt: now,
+    });
+    snapshot.creativeIntent.recipeId = 'legacy-recipe';
+    snapshot.creativeIntent.recipeLabel = 'Compatibility only';
+    previous.schemaVersion = 6;
+    delete previous.assetMemberships;
+    await writeFile(paths.primary, `${JSON.stringify(previous)}\n`, 'utf8');
+    await writeFile(paths.backup, `${JSON.stringify(previous)}\n`, 'utf8');
+
+    const restarted = new FileProjectRepository(directory);
+    const first = await restarted.listAssetMemberships(ownerUserId, created.current.project.id, {
+      pageSize: 24,
+    });
+    expect(first?.memberships.map(({ kind, resourceId }) => ({ kind, resourceId }))).toEqual(
+      expect.arrayContaining([
+        { kind: 'video', resourceId: savedVideoId },
+        { kind: 'character', resourceId: 'legacy-character' },
+        { kind: 'outfit', resourceId: 'legacy-outfit' },
+        { kind: 'voice', resourceId: 'legacy-voice' },
+      ]),
+    );
+    expect(first?.memberships).toHaveLength(4);
+    const membershipIds = first?.memberships.map(({ id }) => id);
+
+    const reopened = await new FileProjectRepository(directory).listAssetMemberships(
+      ownerUserId,
+      created.current.project.id,
+      { pageSize: 24 },
+    );
+    expect(reopened?.memberships.map(({ id }) => id)).toEqual(membershipIds);
+    expect(JSON.parse(await readFile(paths.primary, 'utf8'))).toMatchObject({ schemaVersion: 7 });
+  });
+
+  it('migrates v2 Campaign/Project metadata to v7 with explicit empty source/adoptions', async () => {
     const service = new ProjectService(new FileProjectRepository(directory));
     const created = await service.create(ownerUserId, randomUUID(), 'Prompt 05 Project');
     if (!created.ok) throw new Error('Expected a Project create.');
@@ -212,6 +308,7 @@ describe('FileProjectRepository', () => {
     previous.schemaVersion = 2;
     delete (previous as { processingJobs?: unknown }).processingJobs;
     delete (previous as { outputReceipts?: unknown }).outputReceipts;
+    delete (previous as { assetMemberships?: unknown }).assetMemberships;
     for (const aggregate of previous.projects) delete aggregate.source;
     await writeFile(paths.primary, `${JSON.stringify(previous)}\n`, 'utf8');
     await writeFile(paths.backup, `${JSON.stringify(previous)}\n`, 'utf8');
@@ -225,14 +322,14 @@ describe('FileProjectRepository', () => {
       schemaVersion: number;
       projects: Array<{ source: unknown }>;
     };
-    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.schemaVersion).toBe(7);
     expect(migrated.projects[0]?.source).toBeNull();
     expect(
       (migrated.projects[0] as { workingMediaAdoptions?: unknown }).workingMediaAdoptions,
     ).toEqual([]);
   });
 
-  it('migrates v3 snapshot v1 records to v6/snapshot v2 without fabricating applied values', async () => {
+  it('migrates v3 snapshot v1 records to v7/snapshot v2 without fabricating applied values', async () => {
     const service = new ProjectService(new FileProjectRepository(directory));
     const created = await service.create(ownerUserId, randomUUID(), 'Prompt 07 Project');
     if (!created.ok) throw new Error('Expected a Project create.');
@@ -247,6 +344,7 @@ describe('FileProjectRepository', () => {
     previous.schemaVersion = 3;
     delete (previous as { processingJobs?: unknown }).processingJobs;
     delete (previous as { outputReceipts?: unknown }).outputReceipts;
+    delete (previous as { assetMemberships?: unknown }).assetMemberships;
     for (const aggregate of previous.projects) {
       delete aggregate.workingMediaAdoptions;
       for (const revision of aggregate.revisions) {
@@ -279,13 +377,13 @@ describe('FileProjectRepository', () => {
         revisions: Array<{ snapshot: { schemaVersion: number } }>;
       }>;
     };
-    expect(migrated.schemaVersion).toBe(6);
+    expect(migrated.schemaVersion).toBe(7);
     expect(migrated.projects[0]?.workingMediaAdoptions).toEqual([]);
     expect(migrated.projects[0]?.revisions[0]?.snapshot.schemaVersion).toBe(2);
   });
 
   it.each([4, 5] as const)(
-    'migrates v%s Project metadata to v6 once and reopens idempotently',
+    'migrates v%s Project metadata to v7 once and reopens idempotently',
     async (schemaVersion) => {
       const operationKey = randomUUID();
       const service = new ProjectService(new FileProjectRepository(directory));
@@ -298,6 +396,7 @@ describe('FileProjectRepository', () => {
       };
       previous.schemaVersion = schemaVersion;
       delete previous.outputReceipts;
+      delete (previous as { assetMemberships?: unknown }).assetMemberships;
       await writeFile(paths.primary, `${JSON.stringify(previous)}\n`, 'utf8');
       await writeFile(paths.backup, `${JSON.stringify(previous)}\n`, 'utf8');
 
@@ -322,7 +421,8 @@ describe('FileProjectRepository', () => {
         }>;
       };
       expect(migrated).toMatchObject({
-        schemaVersion: 6,
+        schemaVersion: 7,
+        assetMemberships: [],
         outputReceipts: [],
         projects: [{ source: null, workingMediaAdoptions: [], outputLinks: [] }],
       });
@@ -363,6 +463,7 @@ describe('FileProjectRepository', () => {
             campaignCreateReceipts?: unknown;
             processingJobs?: unknown;
             outputReceipts?: unknown;
+            assetMemberships?: unknown;
             projects: Array<{ project: { campaignId?: string | null } }>;
           };
           projectMetadata?: unknown;
@@ -373,6 +474,7 @@ describe('FileProjectRepository', () => {
       prepared.schemaVersion = schemaVersion;
       metadata.schemaVersion = schemaVersion;
       delete metadata.outputReceipts;
+      delete metadata.assetMemberships;
       if (schemaVersion === 1) {
         delete metadata.campaigns;
         delete metadata.campaignCreateReceipts;
@@ -397,7 +499,8 @@ describe('FileProjectRepository', () => {
       await expect(readFile(paths.journal, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
       const recoveredSerialized = await readFile(paths.primary, 'utf8');
       expect(JSON.parse(recoveredSerialized)).toMatchObject({
-        schemaVersion: 6,
+        schemaVersion: 7,
+        assetMemberships: [],
         campaigns: [],
         processingJobs: [],
         outputReceipts: [],

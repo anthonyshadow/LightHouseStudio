@@ -6,8 +6,6 @@ import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 import {
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
-  openCharacterOptions,
-  openRecipeDockWhenOverlaid,
 } from './support/studioHarness';
 import { installCampaignHarness } from './support/campaignHarness';
 import { loadDecodableH264VideoFixture } from './support/existingVideoHarness';
@@ -271,25 +269,12 @@ for (const viewport of representativeViewports) {
     await page.keyboard.press('Enter');
     await expect(page.getByRole('main')).toBeFocused();
     await expectNoDocumentOverflow(page);
-    await expect(page.getByRole('button', { name: 'Dock' })).toHaveAccessibleDescription(
-      'Set up camera or AI',
-    );
     await expect(page.getByRole('button', { name: 'Workshop' })).toHaveAccessibleDescription(
       'Advanced · build one visual change',
     );
+    await expect(page.getByRole('button', { name: /Recipe|Shelf|Dock/u })).toHaveCount(0);
 
-    await openRecipeDockWhenOverlaid(page);
-    const characterMode = page.getByRole('button', { name: 'Character · Lucy 2.5' });
-    await characterMode.focus();
-    await page.keyboard.press('Enter');
-    await expect(characterMode).toHaveAttribute('aria-pressed', 'true');
-
-    const direction = page.getByLabel('Character direction');
-    await direction.focus();
-    await page.keyboard.type('An adult field correspondent');
-    await expect(direction).toHaveValue('An adult field correspondent');
-
-    const workshop = page.getByRole('button', { name: 'Open structured prompt workshop' });
+    const workshop = page.getByRole('button', { name: 'Workshop' });
     await workshop.focus();
     await page.keyboard.press('Enter');
     await expect(
@@ -313,7 +298,7 @@ test('small-mobile Project output review reflows at 200% text with accessible sa
   const network = await installSuccessfulStudioHarness(page);
   await installProjectHarness(page, true);
   await page.setViewportSize(STUDIO_VIEWPORT_SIZES.smallMobile);
-  await page.goto(`/studio/projects/${TEST_PROJECT_ID}/workspace`);
+  await page.goto(`/projects/${TEST_PROJECT_ID}/workspace`);
   const fixture = await loadDecodableH264VideoFixture();
   await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
     name: 'accessible-project-output.mp4',
@@ -355,8 +340,12 @@ test('small-mobile Builder steps survive 200% text and keep one preview', async 
     document.documentElement.style.fontSize = '200%';
   });
 
-  await openCharacterOptions(page);
-  await page.getByRole('button', { name: 'New character recipe' }).click();
+  await page.getByRole('button', { name: 'Quick Create' }).click();
+  await page.getByRole('menuitem', { name: 'Create Asset' }).click();
+  await page
+    .getByRole('dialog', { name: 'Create Asset' })
+    .getByRole('button', { name: 'Character' })
+    .click();
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
   const previewStep = dialog.getByRole('button', {
     name: /^Preview(?: |$)/u,
@@ -384,7 +373,7 @@ test('mobile Campaign organization remains keyboard-accessible at 200% text', as
   const network = await installProviderFreeStudio(page);
   await installCampaignHarness(page, true);
   await page.setViewportSize(STUDIO_VIEWPORT_SIZES.mobilePortrait);
-  await page.goto('/studio/campaigns');
+  await page.goto('/campaign');
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '200%';
   });
@@ -426,9 +415,7 @@ test('mobile Campaign organization remains keyboard-accessible at 200% text', as
   expect(network.blockedExternalWebSockets).toEqual([]);
 });
 
-test('phone and tablet keep AI preparation in Dock and Shelf with no header selector', async ({
-  page,
-}) => {
+test('phone and tablet expose supported creative tools without Recipe UI', async ({ page }) => {
   const network = await installProviderFreeStudio(page);
   await page.setViewportSize(STUDIO_VIEWPORT_SIZES.compactDesktop);
   await page.goto('/studio/create');
@@ -439,8 +426,9 @@ test('phone and tablet keep AI preparation in Dock and Shelf with no header sele
         .locator('button')
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
     )
-    .toEqual(['Dock', 'Edit Video', 'Select Character', 'Select Outfit', 'Workshop', 'Shelf']);
+    .toEqual(['Edit Video', 'Select Character', 'Select Outfit', 'Workshop']);
   await expect(page.getByRole('button', { name: /Open Select AI options/u })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Recipe|Shelf|Dock/u })).toHaveCount(0);
 
   for (const viewport of [
     STUDIO_VIEWPORT_SIZES.tabletPortrait,
@@ -449,26 +437,22 @@ test('phone and tablet keep AI preparation in Dock and Shelf with no header sele
     await page.setViewportSize(viewport);
     await page.goto('/studio/create');
     const rail = page.getByRole('navigation', { name: 'Creative workspace tools' });
-    await expect(rail.getByRole('button')).toHaveCount(4);
+    await expect(rail.getByRole('button')).toHaveCount(2);
     await expect(rail.getByRole('button', { name: 'Select Character' })).toHaveCount(0);
     await expect(rail.getByRole('button', { name: 'Select Outfit' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /Select AI/u })).toHaveCount(0);
 
-    const dock = rail.getByRole('button', { name: 'Dock' });
-    await dock.click();
-    const recipeDock = page.getByRole('dialog', { name: 'Recipe Dock' });
-    await expect(recipeDock.getByRole('button', { name: 'Character · Lucy 2.5' })).toBeVisible();
-    await expect(recipeDock.getByRole('button', { name: 'Virtual Try-On · VTON 3' })).toBeVisible();
+    await expect(rail.getByRole('button', { name: /Recipe|Shelf|Dock/u })).toHaveCount(0);
+    const quickCreate = page.getByRole('button', { name: 'Quick Create' });
+    await quickCreate.click();
+    await page.getByRole('menuitem', { name: 'Create Asset' }).click();
+    const launcher = page.getByRole('dialog', { name: 'Create Asset' });
+    for (const assetType of ['Video', 'Character', 'Outfit', 'Add Voice']) {
+      await expect(launcher.getByRole('button', { name: assetType, exact: true })).toBeVisible();
+    }
+    await expect(launcher.getByText(/Recipe/u)).toHaveCount(0);
     await page.keyboard.press('Escape');
-    await expect(dock).toBeFocused();
-
-    const shelf = rail.getByRole('button', { name: 'Shelf' });
-    await shelf.click();
-    const recipeShelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
-    await expect(recipeShelf.getByRole('button', { name: /^Characters/u })).toBeVisible();
-    await expect(recipeShelf.getByRole('button', { name: /^Try-on recipes/u })).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(shelf).toBeFocused();
+    await expect(quickCreate).toBeFocused();
   }
   expect(await cameraCalls(page)).toBe(0);
   expect(network.blockedExternalRequests).toEqual([]);
@@ -507,59 +491,14 @@ test('desktop Outfit Builder saves and selects a prompt outfit without media or 
   expect(network.blockedExternalWebSockets).toEqual([]);
 });
 
-test('small-mobile Recipe Dock scrolls internally and Escape restores launcher focus', async ({
-  page,
-}) => {
-  const network = await installProviderFreeStudio(page);
-  await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('/studio/create');
-
-  const launcher = page.getByRole('button', { name: 'Dock' });
-  await launcher.focus();
-  await expect(launcher).toBeFocused();
-  await page.keyboard.press('Enter');
-
-  const dialog = page.getByRole('dialog', { name: 'Recipe Dock' });
-  await expect(dialog).toBeVisible();
-  await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
-
-  const scrollRegion = page.locator('[data-scroll-region="recipe-dock"]');
-  await expect(scrollRegion).toBeVisible();
-  const beforeScroll = await scrollRegion.evaluate((element) => {
-    const style = getComputedStyle(element);
-    return {
-      clientHeight: element.clientHeight,
-      scrollHeight: element.scrollHeight,
-      scrollTop: element.scrollTop,
-      overflowY: style.overflowY,
-    };
-  });
-  expect(beforeScroll.overflowY).toMatch(/auto|scroll/u);
-  expect(beforeScroll.scrollHeight).toBeGreaterThan(beforeScroll.clientHeight);
-
-  await scrollRegion.evaluate((element) => {
-    element.scrollTop = element.scrollHeight;
-  });
-  await expect.poll(() => scrollRegion.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
-  await expectNoDocumentOverflow(page);
-
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-  await expect(launcher).toBeFocused();
-  await expectNoDocumentOverflow(page);
-  expect(await cameraCalls(page)).toBe(0);
-  expect(new Set(network.apiRequests)).toEqual(
-    new Set(['/api/capabilities', '/api/creative-library']),
-  );
-  expect(network.blockedExternalRequests).toEqual([]);
-  expect(network.blockedExternalWebSockets).toEqual([]);
-});
-
 test('empty VTON Start is blocked before camera access or token issuance', async ({ page }) => {
   const network = await installProviderFreeStudio(page);
-  await page.goto('/studio/create');
+  await page.goto('/studio/create/live');
 
-  await openRecipeDockWhenOverlaid(page);
+  const chooser = page.getByRole('dialog', { name: 'Choose live AI experience' });
+  await expect(chooser).toBeVisible();
+  await chooser.getByRole('button', { name: 'Configure Virtual Try-On' }).click();
+  await expect(page.getByRole('dialog', { name: 'AI Settings' })).toBeVisible();
   const vtonMode = page.getByRole('button', { name: 'Virtual Try-On · VTON 3' });
   await vtonMode.focus();
   await page.keyboard.press('Enter');
@@ -585,8 +524,7 @@ test('explicit local Start surfaces a sanitized camera denial without provider w
   const network = await installProviderFreeStudio(page);
   await page.goto('/studio/create');
 
-  await openRecipeDockWhenOverlaid(page);
-  const start = page.getByRole('button', { name: 'Start local preview' });
+  const start = page.getByRole('button', { name: 'Record New Video' });
   await start.focus();
   await page.keyboard.press('Enter');
 

@@ -4,7 +4,6 @@ import { createRef } from 'react';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../ui';
-import { createCreativeAssetRepository } from '../features/creative-assets/repository';
 import { CreativeWorkspace, type CreativeWorkspaceProps } from './CreativeWorkspace';
 
 const createProps = (
@@ -12,50 +11,32 @@ const createProps = (
   stateOverrides: Partial<CreativeWorkspaceProps['state']> = {},
 ) =>
   ({
-    repository: createCreativeAssetRepository({ storage: null }),
     state: {
       panel: 'closed' as const,
       activeTool: null,
       showDesktopAiTools,
       activeSessionMode: 'local' as const,
-      libraryMode: 'lucy-latest' as const,
       workshopDrafts: {},
       recordingActive: false,
       sessionModeLocked: false,
-      recipeInsertionBlocked: false,
       hasReferenceImage: false,
       referenceUsePending: false,
       referenceUseFailure: null,
-      recipeShelfEntryIntent: null,
       hasPlaybackVideo: true,
       ...stateOverrides,
     },
     actions: {
-      onOpenDock: vi.fn(),
       onOpenEditVideo: vi.fn(),
       onOpenCharacter: vi.fn(),
       onOpenOutfit: vi.fn(),
       onOpenWorkshop: vi.fn(),
-      onToggleShelf: vi.fn(),
       onClose: vi.fn(),
-      onLibraryModeChange: vi.fn(),
       onWorkshopDraftChange: vi.fn(),
       onUseWorkshop: vi.fn(),
       onSaveWorkshop: vi.fn(),
-      onShelfDirtyChange: vi.fn(),
-      onRecipeShelfEntryIntentConsumed: vi.fn(),
-      onUseRecipe: vi.fn(),
-      onCreateCharacter: vi.fn(),
-      onEditCharacter: vi.fn(),
-      onCreateOutfit: vi.fn(),
-      onEditOutfit: vi.fn(),
-      onSaveOutfitCopy: vi.fn(),
-      onOpenSavedWorkshop: vi.fn(),
     },
     refs: {
       workshopToggleRef: createRef<HTMLButtonElement>(),
-      shelfToggleRef: createRef<HTMLButtonElement>(),
-      dockToggleRef: createRef<HTMLButtonElement>(),
       editVideoToggleRef: createRef<HTMLButtonElement>(),
       characterToggleRef: createRef<HTMLButtonElement>(),
       outfitToggleRef: createRef<HTMLButtonElement>(),
@@ -76,10 +57,10 @@ describe('CreativeWorkspace responsive tools', () => {
       within(rail)
         .getAllByRole('button')
         .map((button) => button.getAttribute('aria-label')),
-    ).toEqual(['Dock', 'Edit Video', 'Select Character', 'Select Outfit', 'Workshop', 'Shelf']);
+    ).toEqual(['Edit Video', 'Select Character', 'Select Outfit', 'Workshop']);
   });
 
-  it('keeps the four-button phone and tablet row unchanged', () => {
+  it('keeps the compact row focused on editing and the Prompt Workshop', () => {
     render(
       <StudioDesignProvider>
         <CreativeWorkspace {...createProps(false)} />
@@ -90,7 +71,7 @@ describe('CreativeWorkspace responsive tools', () => {
       within(rail)
         .getAllByRole('button')
         .map((button) => button.getAttribute('aria-label')),
-    ).toEqual(['Dock', 'Edit Video', 'Workshop', 'Shelf']);
+    ).toEqual(['Edit Video', 'Workshop']);
   });
 
   it('enables Edit Video only for inactive playback and invokes the editor action', () => {
@@ -144,7 +125,7 @@ describe('CreativeWorkspace responsive tools', () => {
     expect(screen.getByRole('button', { name: 'Select Character' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Select Outfit' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Workshop' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Shelf' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Shelf|Dock|Recipe/u })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit Video' })).toBeEnabled();
 
     view.rerender(
@@ -156,7 +137,6 @@ describe('CreativeWorkspace responsive tools', () => {
     expect(screen.getByRole('button', { name: 'Select Character' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Select Outfit' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Workshop' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Shelf' })).toBeEnabled();
   });
 
   it('keeps reusable creative setup available beside Project working-media playback', () => {
@@ -169,11 +149,11 @@ describe('CreativeWorkspace responsive tools', () => {
     expect(screen.getByRole('button', { name: 'Select Character' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Select Outfit' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Workshop' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Shelf' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: /Shelf|Dock|Recipe/u })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit Video' })).toBeEnabled();
   });
 
-  it('disables the live Workshop and Shelf buttons in the compact tool row during playback', () => {
+  it('disables the live Workshop button in the compact tool row during playback', () => {
     render(
       <StudioDesignProvider>
         <CreativeWorkspace {...createProps(false)} />
@@ -181,7 +161,7 @@ describe('CreativeWorkspace responsive tools', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Workshop' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Shelf' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Shelf|Dock|Recipe/u })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit Video' })).toBeEnabled();
   });
 });

@@ -11,6 +11,7 @@ import {
   type Project,
   type ProjectAggregate,
   type ProjectAssetLink,
+  type ProjectAssetMembership,
   type ProjectJobLink,
   type ProjectOutputLink,
   type ProjectRevision,
@@ -38,6 +39,10 @@ import type {
   ProjectCreatePersistenceResult,
   ProjectCurrentRead,
   ProjectCurrentSourceRead,
+  ProjectAssetMembershipAttachResult,
+  ProjectAssetMembershipDetachResult,
+  ProjectAssetMembershipPage,
+  ProjectAssetMembershipPageInput,
   ProjectLinkHistoryItem,
   ProjectLinkHistoryKind,
   ProjectLinkHistoryPage,
@@ -89,6 +94,7 @@ import {
   storedCampaignSchema,
   storedJobLinkSchema,
   storedOutputLinkSchema,
+  storedProjectAssetMembershipSchema,
   storedProjectProcessingAttemptSchema,
   storedProjectSourceSchema,
   storedProjectWorkingMediaSchema,
@@ -101,11 +107,42 @@ import {
   projectAssetLinksForRevision,
   projectVersionReferenceLinksForRevision,
 } from './project-snapshot-relations.js';
+import {
+  createSavedVideoProjectMembership,
+  deriveProjectAssetMemberships,
+  deterministicProjectAssetMembershipId,
+  membershipsIntroducedByRevision,
+} from './project-asset-memberships.js';
 
 const isMissingFile = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === 'ENOENT';
 
 const asAggregate = (value: StoredProjectAggregate): ProjectAggregate => value;
+
+const mergeAssetMemberships = (
+  current: readonly ProjectAssetMembership[],
+  incoming: readonly ProjectAssetMembership[],
+): ProjectAssetMembership[] => {
+  const byResource = new Map(
+    current.map((membership) => [
+      `${membership.projectId}:${membership.kind}:${membership.resourceId}`,
+      membership,
+    ]),
+  );
+  for (const value of incoming) {
+    const membership = storedProjectAssetMembershipSchema.parse(value) as ProjectAssetMembership;
+    const key = `${membership.projectId}:${membership.kind}:${membership.resourceId}`;
+    if (!byResource.has(key)) byResource.set(key, membership);
+  }
+  return [...byResource.values()];
+};
+
+const revisionMemberships = (
+  input: AppendProjectRevisionPersistenceInput,
+): readonly ProjectAssetMembership[] => [
+  ...membershipsIntroducedByRevision(input.revision),
+  ...(input.assetMemberships ?? []),
+];
 
 const currentRead = (aggregate: StoredProjectAggregate): ProjectCurrentRead => {
   const revision = aggregate.revisions.find(
@@ -439,6 +476,10 @@ export class FileProjectRepository
         ...library,
         revision: library.revision + 1,
         projects: [...library.projects, aggregate],
+        assetMemberships: mergeAssetMemberships(
+          library.assetMemberships,
+          deriveProjectAssetMemberships(aggregate),
+        ),
       });
     });
   }
@@ -493,10 +534,14 @@ export class FileProjectRepository
         ...library,
         revision: library.revision + 1,
         projects: [...library.projects, aggregate],
+        assetMemberships: mergeAssetMemberships(
+          library.assetMemberships,
+          deriveProjectAssetMemberships(aggregate),
+        ),
         createReceipts: [...library.createReceipts, receipt],
       });
       await this.#write(library, next, {
-        schemaVersion: 6,
+        schemaVersion: 7,
         ownerUserId: aggregate.project.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -725,7 +770,7 @@ export class FileProjectRepository
         processingJobs: [...library.processingJobs, attempt],
       });
       await this.#write(library, next, {
-        schemaVersion: 6,
+        schemaVersion: 7,
         ownerUserId: attempt.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -1049,6 +1094,7 @@ export class FileProjectRepository
       let nextAggregate: StoredProjectAggregate;
       let workingMedia: ProjectWorkingMediaRead | null = null;
       let nextAttempt: ProjectProcessingAttemptRecord;
+      let introducedMemberships: readonly ProjectAssetMembership[] = [];
       if (promoteCurrent) {
         const revisionInput = promotion.revision;
         const media = storedProjectWorkingMediaSchema.parse(
@@ -1099,6 +1145,7 @@ export class FileProjectRepository
           revision: revisionInput.revision,
           media,
         };
+        introducedMemberships = revisionMemberships(revisionInput);
       } else {
         nextAggregate = storedAggregateSchema.parse({
           ...aggregate,
@@ -1127,9 +1174,10 @@ export class FileProjectRepository
         revision: library.revision + 1,
         projects,
         processingJobs,
+        assetMemberships: mergeAssetMemberships(library.assetMemberships, introducedMemberships),
       });
       await this.#write(library, next, {
-        schemaVersion: 6,
+        schemaVersion: 7,
         ownerUserId: input.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -1185,6 +1233,132 @@ export class FileProjectRepository
           ? { updatedAt: last.updatedAt, projectId: last.id }
           : null,
     };
+  }
+
+  async ensureAssetMembershipBackfill(ownerUserId: string): Promise<void> {
+    // Parsing a pre-v7 library performs and persists the deterministic migration in #read.
+    await this.#read(ownerUserId);
+  }
+
+  async listAssetMemberships(
+    ownerUserId: string,
+    projectId: string,
+    input: ProjectAssetMembershipPageInput,
+  ): Promise<ProjectAssetMembershipPage | null> {
+    if (!Number.isInteger(input.pageSize) || input.pageSize < 1 || input.pageSize > 50) {
+      throw new Error('Use a bounded Project asset membership page.');
+    }
+    const library = await this.#read(ownerUserId);
+    const project = library.projects.find(
+      ({ project: candidate }) => candidate.id === projectId && candidate.deletedAt === null,
+    );
+    if (project === undefined) return null;
+    const memberships = library.assetMemberships
+      .filter((membership) => {
+        const matchesProject =
+          membership.projectId === projectId && membership.ownerUserId === ownerUserId;
+        const matchesKind = input.kind === undefined || membership.kind === input.kind;
+        const followsCursor =
+          input.cursor === undefined ||
+          membership.createdAt < input.cursor.createdAt ||
+          (membership.createdAt === input.cursor.createdAt &&
+            membership.id < input.cursor.membershipId);
+        return matchesProject && matchesKind && followsCursor;
+      })
+      .sort(
+        (left, right) =>
+          right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id),
+      );
+    const page = memberships.slice(0, input.pageSize);
+    const last = page.at(-1);
+    return {
+      memberships: page,
+      nextCursor:
+        memberships.length > input.pageSize && last !== undefined
+          ? { createdAt: last.createdAt, membershipId: last.id }
+          : null,
+    };
+  }
+
+  async attachAssetMembership(
+    value: ProjectAssetMembership,
+  ): Promise<ProjectAssetMembershipAttachResult> {
+    const membership = storedProjectAssetMembershipSchema.parse(value) as ProjectAssetMembership;
+    return this.#withOwnerLock(membership.ownerUserId, async () => {
+      const library = await this.#read(membership.ownerUserId);
+      const aggregate = library.projects.find(
+        ({ project }) => project.id === membership.projectId && project.deletedAt === null,
+      );
+      if (aggregate === undefined) return { kind: 'not-found' };
+      if (aggregate.project.status === 'archived') return { kind: 'archived' };
+      const existing = library.assetMemberships.find(
+        (candidate) =>
+          candidate.projectId === membership.projectId &&
+          candidate.kind === membership.kind &&
+          candidate.resourceId === membership.resourceId,
+      );
+      if (existing !== undefined) return { kind: 'existing', membership: existing };
+      await this.#write(library, {
+        ...library,
+        revision: library.revision + 1,
+        assetMemberships: [...library.assetMemberships, membership],
+      });
+      return { kind: 'attached', membership };
+    });
+  }
+
+  async getAssetMembership(
+    ownerUserId: string,
+    projectId: string,
+    kind: ProjectAssetMembership['kind'],
+    resourceId: string,
+  ): Promise<ProjectAssetMembership | null> {
+    const library = await this.#read(ownerUserId);
+    const projectExists = library.projects.some(
+      ({ project }) => project.id === projectId && project.deletedAt === null,
+    );
+    if (!projectExists) return null;
+    return (
+      library.assetMemberships.find(
+        (membership) =>
+          membership.ownerUserId === ownerUserId &&
+          membership.projectId === projectId &&
+          membership.kind === kind &&
+          membership.resourceId === resourceId,
+      ) ?? null
+    );
+  }
+
+  async detachAssetMembership(
+    ownerUserId: string,
+    projectId: string,
+    membershipId: string,
+  ): Promise<ProjectAssetMembershipDetachResult> {
+    return this.#withOwnerLock(ownerUserId, async () => {
+      const library = await this.#read(ownerUserId);
+      const aggregate = library.projects.find(
+        ({ project }) => project.id === projectId && project.deletedAt === null,
+      );
+      if (aggregate === undefined) return { kind: 'not-found' };
+      if (aggregate.project.status === 'archived') return { kind: 'archived' };
+      const nextMemberships = library.assetMemberships.filter(
+        (membership) =>
+          !(
+            membership.id === membershipId &&
+            membership.projectId === projectId &&
+            membership.ownerUserId === ownerUserId
+          ),
+      );
+      const removed = nextMemberships.length !== library.assetMemberships.length;
+      if (removed) {
+        await this.#write(library, {
+          ...library,
+          revision: library.revision + 1,
+          assetMemberships: nextMemberships,
+        });
+      }
+      return { kind: 'detached', removed };
+    });
   }
 
   async listRevisionHistory(
@@ -1324,7 +1498,15 @@ export class FileProjectRepository
       });
       const projects = [...library.projects];
       projects[index] = nextAggregate;
-      await this.#write(library, { ...library, revision: library.revision + 1, projects });
+      await this.#write(library, {
+        ...library,
+        revision: library.revision + 1,
+        projects,
+        assetMemberships: mergeAssetMemberships(
+          library.assetMemberships,
+          revisionMemberships(input),
+        ),
+      });
       return { kind: 'updated' };
     });
   }
@@ -1419,13 +1601,34 @@ export class FileProjectRepository
       });
       const projects = [...library.projects];
       projects[index] = nextAggregate;
+      const sourceMemberships =
+        source.savedVideoId === null
+          ? []
+          : [
+              createSavedVideoProjectMembership({
+                id: deterministicProjectAssetMembershipId(
+                  input.ownerUserId,
+                  input.projectId,
+                  'video',
+                  source.savedVideoId,
+                ),
+                ownerUserId: input.ownerUserId,
+                projectId: input.projectId,
+                savedVideoId: source.savedVideoId,
+                createdAt: source.acceptedAt,
+              }),
+            ];
       const next = librarySchema.parse({
         ...library,
         revision: library.revision + 1,
         projects,
+        assetMemberships: mergeAssetMemberships(library.assetMemberships, [
+          ...revisionMemberships(input),
+          ...sourceMemberships,
+        ]),
       });
       await this.#write(library, next, {
-        schemaVersion: 6,
+        schemaVersion: 7,
         ownerUserId: input.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -1519,13 +1722,34 @@ export class FileProjectRepository
       });
       const projects = [...library.projects];
       projects[index] = nextAggregate;
+      const mediaMemberships =
+        media.savedVideoId === null
+          ? []
+          : [
+              createSavedVideoProjectMembership({
+                id: deterministicProjectAssetMembershipId(
+                  input.ownerUserId,
+                  input.projectId,
+                  'video',
+                  media.savedVideoId,
+                ),
+                ownerUserId: input.ownerUserId,
+                projectId: input.projectId,
+                savedVideoId: media.savedVideoId,
+                createdAt: media.adoptedAt,
+              }),
+            ];
       const next = librarySchema.parse({
         ...library,
         revision: library.revision + 1,
         projects,
+        assetMemberships: mergeAssetMemberships(library.assetMemberships, [
+          ...revisionMemberships(input),
+          ...mediaMemberships,
+        ]),
       });
       await this.#write(library, next, {
-        schemaVersion: 6,
+        schemaVersion: 7,
         ownerUserId: input.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -1693,7 +1917,7 @@ export class FileProjectRepository
         campaignCreateReceipts: [...library.campaignCreateReceipts, receipt],
       });
       await this.#write(library, next, {
-        schemaVersion: 6,
+        schemaVersion: 7,
         ownerUserId: campaign.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -1975,9 +2199,24 @@ export class FileProjectRepository
         revision: library.revision + 1,
         projects,
         outputReceipts: [...library.outputReceipts, receipt],
+        assetMemberships: mergeAssetMemberships(library.assetMemberships, [
+          ...revisionMemberships(input.projectRevision),
+          createSavedVideoProjectMembership({
+            id: deterministicProjectAssetMembershipId(
+              input.ownerUserId,
+              input.projectRevision.projectId,
+              'video',
+              savedVideoId,
+            ),
+            ownerUserId: input.ownerUserId,
+            projectId: input.projectRevision.projectId,
+            savedVideoId,
+            createdAt: receipt.createdAt,
+          }),
+        ]),
       });
       await this.#write(library, next, {
-        schemaVersion: 6,
+        schemaVersion: 7,
         ownerUserId: input.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',

@@ -61,6 +61,7 @@ import { ProjectSourceService } from './features/projects/project-source-service
 import { ProjectWorkingMediaService } from './features/projects/project-working-media-service.js';
 import { ProjectOutputService } from './features/projects/project-output-service.js';
 import { ProjectHistoryService } from './features/projects/project-history-service.js';
+import { ProjectAssetService } from './features/projects/project-asset-service.js';
 import {
   isProjectProcessingRepository,
   type ProjectProcessingRepository,
@@ -397,6 +398,15 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
     projectRepository === undefined
       ? undefined
       : new ProjectHistoryService(projectRepository, savedVideoRepository);
+  const projectAssetService =
+    projectRepository === undefined
+      ? undefined
+      : new ProjectAssetService(
+          projectRepository,
+          savedVideoRepository,
+          savedVoiceRepository,
+          dependencies.persistence?.creativeLibraries,
+        );
   const projectProcessingService =
     projectRepository === undefined || projectProcessingRepository === undefined
       ? undefined
@@ -449,6 +459,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
     projectWorkingMediaService,
     projectOutputService,
     projectHistoryService,
+    projectAssetService,
   );
   registerProjectProcessingRoutes(app, projectProcessingService);
   registerCampaignRoutes(app, campaignService);

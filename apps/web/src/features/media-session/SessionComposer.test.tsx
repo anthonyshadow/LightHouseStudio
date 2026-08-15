@@ -90,7 +90,7 @@ describe('SessionComposer', () => {
     const session = createSession('lucy-vton-latest');
     const view = renderComposer(session);
 
-    expect(view.container.querySelector('[data-scroll-region="recipe-dock"]')).toBeTruthy();
+    expect(view.container.querySelector('[data-scroll-region="ai-settings"]')).toBeTruthy();
     const start = screen.getByRole('button', { name: 'Start Virtual Try-On AI' });
     expect(start).toBeDisabled();
     expect(start).toHaveAccessibleDescription(
@@ -103,7 +103,7 @@ describe('SessionComposer', () => {
     ).toBeInTheDocument();
   });
 
-  it('shares the complete Decart disclosure beside direct Dock Start', () => {
+  it('shares the complete Decart disclosure beside direct AI Start', () => {
     renderComposer(
       createSession('lucy-latest', {
         draft: { ...createEmptyDraft('lucy-latest'), prompt: 'Adult field host' },
@@ -112,7 +112,7 @@ describe('SessionComposer', () => {
 
     const disclosure = screen.getByLabelText('Decart start disclosure');
     expect(disclosure).toHaveTextContent('live camera and microphone media');
-    expect(disclosure).toHaveTextContent('complete applied recipe');
+    expect(disclosure).toHaveTextContent('complete applied settings');
     expect(disclosure).toHaveTextContent('Decart');
     expect(disclosure).toHaveTextContent('at most 300 seconds');
     expect(disclosure).toHaveTextContent('Stop AI ends usage');
@@ -183,11 +183,11 @@ describe('SessionComposer', () => {
     );
 
     expect(screen.getByText('Character AI is live')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Applied recipe' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Applied settings' })).toBeInTheDocument();
     expect(screen.getByText('Video ready')).toBeInTheDocument();
   });
 
-  it('locks recipe editing controls while recording', () => {
+  it('locks AI setting controls while recording', () => {
     const session = createSession('lucy-latest', {
       draft: { ...createEmptyDraft('lucy-latest'), prompt: 'Adult presenter' },
     });

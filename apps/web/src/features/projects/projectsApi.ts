@@ -1,16 +1,21 @@
 import {
+  attachProjectAssetResponseSchema,
+  detachProjectAssetResponseSchema,
   projectConflictResponseSchema,
   projectCurrentResponseSchema,
   projectHistoryResponseSchema,
+  projectAssetsResponseSchema,
   projectOutputHistoryResponseSchema,
   projectSourceResponseSchema,
   saveProjectOutputResponseSchema,
   projectWorkingMediaResponseSchema,
   projectsResponseSchema,
   type AdoptProjectWorkingMediaRequest,
+  type AttachProjectAssetRequest,
   type AppendProjectRevisionRequest,
   type ProjectConflictContract,
   type ProjectCurrentResponse,
+  type ProjectAssetsResponse,
   type ProjectHistoryResponse,
   type ProjectOutputHistoryResponse,
   type ProjectSourceResponse,
@@ -110,6 +115,60 @@ export const getProject = (
       ...(signal ? { signal } : {}),
     },
     projectCurrentResponseSchema,
+    invalidProjectResponse,
+  );
+
+export const listProjectAssets = (input: {
+  readonly projectId: string;
+  readonly kind?: AttachProjectAssetRequest['kind'];
+  readonly cursor?: string;
+  readonly pageSize?: number;
+  readonly signal?: AbortSignal;
+}): Promise<ProjectAssetsResponse> => {
+  const query = new URLSearchParams({ pageSize: String(input.pageSize ?? 24) });
+  if (input.kind) query.set('kind', input.kind);
+  if (input.cursor) query.set('cursor', input.cursor);
+  return requestJson(
+    `/api/projects/${encodeURIComponent(input.projectId)}/assets?${query.toString()}`,
+    {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+      ...(input.signal ? { signal: input.signal } : {}),
+    },
+    projectAssetsResponseSchema,
+    invalidProjectResponse,
+  );
+};
+
+export const attachProjectAsset = (
+  projectId: string,
+  input: AttachProjectAssetRequest,
+  signal?: AbortSignal,
+) =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(projectId)}/assets`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      headers: jsonHeaders,
+      body: JSON.stringify(input),
+      ...(signal ? { signal } : {}),
+    },
+    attachProjectAssetResponseSchema,
+    invalidProjectResponse,
+  );
+
+export const detachProjectAsset = (projectId: string, membershipId: string, signal?: AbortSignal) =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(membershipId)}`,
+    {
+      method: 'DELETE',
+      cache: 'no-store',
+      headers: jsonHeaders,
+      body: '{}',
+      ...(signal ? { signal } : {}),
+    },
+    detachProjectAssetResponseSchema,
     invalidProjectResponse,
   );
 

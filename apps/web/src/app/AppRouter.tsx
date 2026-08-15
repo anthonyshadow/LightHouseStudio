@@ -23,11 +23,10 @@ import {
   campaignIdFromPath,
   isAssetsPath,
   isCampaignsPath,
+  isProtectedAppPath,
   isProjectWorkspacePath,
   isProjectsPath,
-  isRestorableStudioPath,
-  isStudioPath,
-  legacyStudioRedirect,
+  canonicalizeLegacyAppPath,
   projectIdFromPath,
 } from './paths';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -77,16 +76,14 @@ const titleForPath = (pathname: string): string => {
       return 'Outfits · Assets · Lightframe';
     case APP_PATHS.voices:
       return 'Voices · Assets · Lightframe';
-    case APP_PATHS.recipes:
-      return 'Recipes · Assets · Lightframe';
     default:
-      return isRestorableStudioPath(pathname) ? 'Lightframe Studio' : 'Enter Lightframe Studio';
+      return isProtectedAppPath(pathname) ? 'Lightframe Studio' : 'Enter Lightframe Studio';
   }
 };
 
 const RouteMetadata = () => {
   const location = useLocation();
-  const studioRoute = isRestorableStudioPath(location.pathname);
+  const studioRoute = isProtectedAppPath(location.pathname);
   const title = titleForPath(location.pathname);
 
   useLayoutEffect(() => {
@@ -174,9 +171,11 @@ const StudioRoute = ({ focusMainOnMount }: StudioRouteProps) => {
 
 export const RoutedApplication = () => {
   const location = useLocation();
-  const [hasVisitedStudio, setHasVisitedStudio] = useState(() => isStudioPath(location.pathname));
-  if (!hasVisitedStudio && isStudioPath(location.pathname)) {
-    setHasVisitedStudio(true);
+  const [hasVisitedProtectedApp, setHasVisitedProtectedApp] = useState(() =>
+    isProtectedAppPath(location.pathname),
+  );
+  if (!hasVisitedProtectedApp && isProtectedAppPath(location.pathname)) {
+    setHasVisitedProtectedApp(true);
   }
   const focusMainOnMount =
     (location.pathname === APP_PATHS.dashboard ||
@@ -185,7 +184,7 @@ export const RoutedApplication = () => {
       isProjectsPath(location.pathname) ||
       isCampaignsPath(location.pathname)) &&
     location.key !== 'default';
-  const legacyRedirect = legacyStudioRedirect(location.pathname);
+  const legacyRedirect = canonicalizeLegacyAppPath(location.pathname);
 
   return (
     <>
@@ -194,12 +193,12 @@ export const RoutedApplication = () => {
         <Routes>
           <Route
             path={APP_PATHS.entry}
-            element={<EntryRoute focusEnterOnMount={hasVisitedStudio} />}
+            element={<EntryRoute focusEnterOnMount={hasVisitedProtectedApp} />}
           />
           <Route
-            path={`${APP_PATHS.studio}/*`}
+            path="*"
             element={
-              isRestorableStudioPath(location.pathname) ? (
+              isProtectedAppPath(location.pathname) ? (
                 <ProtectedRoute>
                   {legacyRedirect ? (
                     <Navigate replace to={legacyRedirect} />
@@ -212,7 +211,6 @@ export const RoutedApplication = () => {
               )
             }
           />
-          <Route path="*" element={<Navigate replace to={APP_PATHS.entry} />} />
         </Routes>
       </RouteErrorBoundary>
     </>

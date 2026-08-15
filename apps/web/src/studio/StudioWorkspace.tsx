@@ -1,4 +1,5 @@
 import { useTheme } from '@emotion/react';
+import type { CreativeAssetStore } from '@studio/domain';
 import { lazy, Suspense, type ReactNode, type RefObject } from 'react';
 import type { BrowserCapabilities } from '../application/types';
 import { CaptureSettingsPanel, RecordingAction, RecordingControls } from '../features/recording';
@@ -117,13 +118,13 @@ interface StudioWorkspaceProps {
     readonly onOpenVideos: () => void;
   };
   readonly assets: {
+    readonly creativeStore: CreativeAssetStore;
     readonly characterCount: number;
     readonly outfitCount: number;
-    readonly recipeCount: number;
-    readonly onOpen: (
-      destination: 'videos' | 'characters' | 'outfits' | 'voices' | 'recipes',
-    ) => void;
+    readonly onOpen: (destination: 'videos' | 'characters' | 'outfits' | 'voices') => void;
     readonly onUploadVideo: () => void;
+    readonly onCreateProjectCharacter: (projectId: string) => void;
+    readonly onCreateProjectOutfit: (projectId: string) => void;
   };
   readonly liveBeta: {
     readonly capabilityState: 'loading' | 'ready' | 'error';
@@ -134,7 +135,7 @@ interface StudioWorkspaceProps {
   };
   readonly saveVideoState: SaveVideoState;
   readonly actions: {
-    readonly startExistingVideoRecording: () => void;
+    readonly startLocalRecording: () => void;
     readonly closeTakeReview: () => void;
     readonly discardExistingVideoSelection: () => void;
     readonly openVoiceTreatments: () => void;
@@ -190,7 +191,7 @@ export const StudioWorkspace = ({
   } = stage;
   const { captureBlockedReason, captureSettingsDisabledReason, aiSessionActive } = activity;
   const {
-    startExistingVideoRecording: onStartExistingVideoRecording,
+    startLocalRecording: onStartLocalRecording,
     closeTakeReview: onCloseTakeReview,
     discardExistingVideoSelection: onDiscardExistingVideoSelection,
     openVoiceTreatments: onOpenVoiceTreatments,
@@ -301,7 +302,7 @@ export const StudioWorkspace = ({
                       visible={visible}
                       controlsLocked={reviewLocked || finalizingStartedAt !== null}
                       onStopRecording={finishTake}
-                      onStartLocalRecording={onStartExistingVideoRecording}
+                      onStartLocalRecording={onStartLocalRecording}
                       onCloseTakeReview={onCloseTakeReview}
                       onDiscardTake={onDiscardExistingVideoSelection}
                       onOpenVoiceTreatments={onOpenVoiceTreatments}
@@ -402,7 +403,6 @@ export const StudioWorkspace = ({
           <AssetsRouteSurface
             characterCount={assets.characterCount}
             outfitCount={assets.outfitCount}
-            recipeCount={assets.recipeCount}
             onOpen={assets.onOpen}
             onUploadVideo={assets.onUploadVideo}
           />
@@ -424,6 +424,9 @@ export const StudioWorkspace = ({
           <ProjectRouteSurface
             workspaceMode={!projectOverviewActive}
             ownerUserId={ownerUserId}
+            creativeStore={assets.creativeStore}
+            onCreateProjectCharacter={assets.onCreateProjectCharacter}
+            onCreateProjectOutfit={assets.onCreateProjectOutfit}
             creativeCheckpoint={projectCreativeCheckpoint}
             processing={projectProcessing}
             sourceRuntime={project.sourceRuntime}

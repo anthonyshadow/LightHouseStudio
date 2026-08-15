@@ -9,9 +9,9 @@ provider work.
 
 ## Observable behavior
 
-1. **Projects** is a primary destination in the authenticated Studio chrome. `/studio/projects`
-   lists bounded active and archived summaries; `/studio/projects/:projectId` is its organization
-   overview; `/studio/projects/:projectId/workspace` opens its focused video workspace. All are
+1. **Projects** is a primary destination in the authenticated Studio chrome. `/projects`
+   lists bounded active and archived summaries; `/projects/:projectId` is its organization
+   overview; `/projects/:projectId/workspace` opens its focused video workspace. All are
    protected, deep-linkable, and return to the same URL after Login.
 2. **New Project** asks for a name and optional Campaign. **Quick project** creates `Untitled
 Project` without requiring a Campaign, brief, source, tag, or provider choice. Either path may
@@ -37,7 +37,7 @@ Project` without requiring a Campaign, brief, source, tag, or provider choice. E
    stage. Project list, overview, Dashboard, Assets, and Campaign routes hide it; only the Project
    workspace presents it beside source controls. No route mounts another Studio, player, media
    session, object-URL owner, shell, or Project store.
-8. Active Project identity and surface are URL-owned. Refreshing an `/studio/assets/*` route
+8. Active Project identity and surface are URL-owned. Refreshing an `/assets/*` route
    restores that global Asset view and cannot resurrect the prior Project workspace from mounted
    React state. Leaving a workspace cannot silently abandon recording, finalization, local render,
    unaccepted source, dirty creative state, or a pending semantic checkpoint.
@@ -74,7 +74,7 @@ Project` without requiring a Campaign, brief, source, tag, or provider choice. E
     IndexedDB store is activated: a browser crash, forced unload, or confirmed reload can lose only
     the pending in-memory proposal, never a server-accepted revision or source.
 17. The existing creative rail remains available beside one source-bearing Project stage. Character
-    and Variant, Outfit, prompt/recipe, one visual treatment, optional local/saved Voice, capture
+    and Variant, Outfit, prompt configuration, one visual treatment, optional local/saved Voice, capture
     metadata, and validated local edit map through feature-local adapters into the same Project
     session. **Save creative setup** is an explicit semantic boundary; keystrokes, frames, slider
     ticks, and undo/redo entries never append revisions.
@@ -124,6 +124,16 @@ Project` without requiring a Campaign, brief, source, tag, or provider choice. E
     the immutable original, Saved Video current pointer, or Add Version target, and stale work is
     never promoted automatically. A removed global Saved Video remains reachable only through an
     exact same-owner retaining Project relation with truthful retention copy.
+27. Project overview also exposes a separate non-owning Asset collection for Videos, Characters,
+    Outfits, and Voices. Memberships are newest-first cursor pages, idempotent by
+    Project/kind/resource, and do not become sources, working media, outputs, or retention claims.
+    Archived Projects show the collection read-only. Missing underlying records remain visible as
+    unavailable until explicitly detached.
+28. **Add Asset** can attach existing records or launch Project-aware creation. Record/Upload uses
+    `/studio/create?intent=...&projectId=...`; only an explicit Save to Assets attempts attachment,
+    then returns to Project detail. A successful save plus failed attachment preserves the Video
+    and offers retry. Character/Outfit builders and Add Voice attach without leaving Project
+    context. Detach removes only the membership.
 
 ## Boundaries
 

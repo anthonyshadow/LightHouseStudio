@@ -1,14 +1,14 @@
 import { useCallback, useReducer } from 'react';
 
 export type ActiveOverlay =
-  | 'recipe-dock'
+  | 'ai-settings'
   | 'capture-settings'
   | 'take-review'
   | 'voice-treatments'
   | 'workshop'
-  | 'recipe-shelf'
   | 'character-builder'
   | 'character-selector'
+  | 'saved-characters'
   | 'character-wardrobe'
   | 'outfit-selector'
   | 'outfit-builder'

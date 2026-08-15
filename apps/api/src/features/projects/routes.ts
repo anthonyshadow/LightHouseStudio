@@ -1,7 +1,11 @@
 import {
+  attachProjectAssetRequestSchema,
   appendProjectRevisionRequestSchema,
   adoptProjectWorkingMediaRequestSchema,
   createProjectRequestSchema,
+  detachProjectAssetResponseSchema,
+  projectAssetMembershipParamsSchema,
+  projectAssetsQuerySchema,
   projectConflictResponseSchema,
   projectLifecycleRequestSchema,
   projectHistoryQuerySchema,
@@ -50,6 +54,7 @@ import type {
   ProjectOutputService,
 } from './project-output-service.js';
 import type { ProjectHistoryService } from './project-history-service.js';
+import type { ProjectAssetService } from './project-asset-service.js';
 
 const header = (request: HttpRequest, name: string): string | undefined => {
   const value = request.headers[name];
@@ -62,6 +67,17 @@ const requireService = (service: ProjectService | undefined): ProjectService => 
       503,
       'feature_unavailable',
       'Project persistence is unavailable in the configured mode.',
+    );
+  }
+  return service;
+};
+
+const requireAssetService = (service: ProjectAssetService | undefined): ProjectAssetService => {
+  if (service === undefined) {
+    throw new AppError(
+      503,
+      'feature_unavailable',
+      'Project asset persistence is unavailable in the configured mode.',
     );
   }
   return service;
@@ -210,6 +226,7 @@ export const registerProjectRoutes = (
   workingMediaService?: ProjectWorkingMediaService,
   outputService?: ProjectOutputService,
   historyService?: ProjectHistoryService,
+  assetService?: ProjectAssetService,
 ): void => {
   app.get('/api/projects', async (request) => {
     const query = projectsQuerySchema.safeParse(request.query);
@@ -247,6 +264,47 @@ export const registerProjectRoutes = (
       throw new AppError(400, 'validation_error', 'Choose a valid Project.');
     }
     return requireService(service).get(ownerUserIdForRequest(request), params.data.projectId);
+  });
+
+  app.get('/api/projects/:projectId/assets', async (request) => {
+    const params = projectParamsSchema.safeParse(request.params);
+    const query = projectAssetsQuerySchema.safeParse(request.query);
+    if (!params.success || !query.success) {
+      throw new AppError(400, 'validation_error', 'Use a valid Project asset page request.');
+    }
+    return requireAssetService(assetService).list(
+      ownerUserIdForRequest(request),
+      params.data.projectId,
+      query.data,
+    );
+  });
+
+  app.post('/api/projects/:projectId/assets', async (request, reply) => {
+    const params = projectParamsSchema.safeParse(request.params);
+    const body = attachProjectAssetRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      throw new AppError(400, 'validation_error', 'Choose a valid Project asset.');
+    }
+    const response = await requireAssetService(assetService).attach(
+      ownerUserIdForRequest(request),
+      params.data.projectId,
+      body.data,
+    );
+    if (response.created) reply.status(201);
+    return response;
+  });
+
+  app.delete('/api/projects/:projectId/assets/:membershipId', async (request) => {
+    const params = projectAssetMembershipParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      throw new AppError(400, 'validation_error', 'Choose a valid Project asset membership.');
+    }
+    await requireAssetService(assetService).detach(
+      ownerUserIdForRequest(request),
+      params.data.projectId,
+      params.data.membershipId,
+    );
+    return detachProjectAssetResponseSchema.parse({ detached: true });
   });
 
   app.post('/api/projects/:projectId/revisions', async (request, reply) => {

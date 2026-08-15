@@ -1,9 +1,9 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { lazy, Suspense, useLayoutEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../application/auth/AuthProvider';
 import { Button } from '../ui/primitives/Button';
-import { APP_PATHS, isRestorableStudioPath } from './paths';
+import { APP_PATHS, canonicalizeProtectedDestination } from './paths';
 
 const LoginDialog = lazy(() =>
   import('../features/auth/LoginDialog').then((module) => ({ default: module.LoginDialog })),
@@ -53,6 +53,17 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
   const enterRef = useRef<HTMLButtonElement>(null);
   const routeState = location.state as { loginRequired?: unknown; from?: unknown } | null;
   const [loginOpen, setLoginOpen] = useState(routeState?.loginRequired === true);
+  const requestedPath =
+    typeof routeState?.from === 'string' ? canonicalizeProtectedDestination(routeState.from) : null;
+
+  useEffect(() => {
+    if (auth.status === 'unknown') {
+      void auth.restore();
+      return;
+    }
+    if (auth.status !== 'authenticated') return;
+    void navigate(requestedPath ?? APP_PATHS.dashboard, { replace: true });
+  }, [auth, navigate, requestedPath]);
 
   useLayoutEffect(() => {
     if (!focusEnterOnMount) return;
@@ -71,11 +82,16 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
           ref={enterRef}
           variant="primary"
           onClick={() => {
-            if (auth.status === 'authenticated') void navigate(APP_PATHS.studio);
+            if (auth.status === 'authenticated') void navigate(APP_PATHS.dashboard);
             else setLoginOpen(true);
           }}
+          disabled={auth.status === 'unknown'}
         >
-          {auth.status === 'authenticated' ? 'Open Dashboard' : 'Log in'}
+          {auth.status === 'unknown'
+            ? 'Restoring…'
+            : auth.status === 'authenticated'
+              ? 'Open Dashboard'
+              : 'Log in'}
         </Button>
       </div>
       {loginOpen ? (
@@ -93,12 +109,7 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
             }}
             onSuccess={() => {
               setLoginOpen(false);
-              const requestedPath = typeof routeState?.from === 'string' ? routeState.from : null;
-              void navigate(
-                requestedPath && isRestorableStudioPath(requestedPath)
-                  ? requestedPath
-                  : APP_PATHS.studio,
-              );
+              void navigate(requestedPath ?? APP_PATHS.dashboard, { replace: true });
             }}
           />
         </Suspense>

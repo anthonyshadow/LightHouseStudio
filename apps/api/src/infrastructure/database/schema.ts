@@ -96,6 +96,12 @@ export const projectAssetRole = pgEnum('project_asset_role', [
   'audio',
   'thumbnail',
 ]);
+export const projectAssetKind = pgEnum('project_asset_kind', [
+  'video',
+  'character',
+  'outfit',
+  'voice',
+]);
 export const projectVersionReferenceRole = pgEnum('project_version_reference_role', [
   'working',
   'presented',
@@ -597,6 +603,44 @@ export const projects = pgTable(
         projectRevisionNumberColumn(),
       ],
     }).onDelete('restrict'),
+  ],
+);
+
+export const projectAssetMemberships = pgTable(
+  'project_asset_memberships',
+  {
+    id: uuid('id').primaryKey(),
+    projectId: uuid('project_id').notNull(),
+    ownerUserId: uuid('owner_user_id').notNull(),
+    kind: projectAssetKind('asset_kind').notNull(),
+    resourceId: text('resource_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique('project_asset_memberships_owner_project_kind_resource_unique').on(
+      table.ownerUserId,
+      table.projectId,
+      table.kind,
+      table.resourceId,
+    ),
+    index('project_asset_memberships_project_kind_recent_idx').on(
+      table.ownerUserId,
+      table.projectId,
+      table.kind,
+      table.createdAt.desc(),
+      table.id.desc(),
+    ),
+    check(
+      'project_asset_memberships_resource_id_length',
+      sql`length(trim(${table.resourceId})) between 1 and 200`,
+    ),
+    foreignKey({
+      name: 'project_asset_memberships_project_owner_fk',
+      columns: [table.projectId, table.ownerUserId],
+      foreignColumns: [projects.id, projects.ownerUserId],
+    }).onDelete('cascade'),
   ],
 );
 

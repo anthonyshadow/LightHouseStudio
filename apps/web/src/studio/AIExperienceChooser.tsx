@@ -79,11 +79,11 @@ const eyebrowStyles = (theme: Theme, primary: boolean): CSSObject => ({
 const unavailableMessage = (state: CapabilityState): string => {
   switch (state) {
     case 'loading':
-      return 'Integration configuration is still loading. Character building and recipe preparation remain available.';
+      return 'Integration configuration is still loading. Character and outfit preparation remain available.';
     case 'error':
       return 'Integration configuration could not be read. Retry from the header; local preparation remains available.';
     case 'ready':
-      return 'Decart is not configured. You can prepare characters and try-on recipes, but AI Start is unavailable.';
+      return 'Decart is not configured. You can prepare characters and outfits, but AI Start is unavailable.';
   }
 };
 
@@ -158,9 +158,7 @@ export const AIExperienceChooser = ({
           <header>
             <span css={eyebrowStyles(theme, false)}>Live AI · Try-On</span>
             <h3>Virtual Try-On</h3>
-            <p>
-              Preview a garment recipe using the existing VTON configuration and saved-recipe flow.
-            </p>
+            <p>Preview a saved outfit using the existing Virtual Try-On configuration.</p>
           </header>
           <div>
             {virtualTryOnReady && startAvailable ? (

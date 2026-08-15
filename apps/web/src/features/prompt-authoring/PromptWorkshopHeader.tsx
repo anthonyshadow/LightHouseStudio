@@ -102,8 +102,8 @@ export const PromptWorkshopHeader = ({
             Direct one clear visual change
           </h2>
           <p css={introStyles(theme)}>
-            Shape a concise recipe from visible choices. Nothing here opens the camera or updates a
-            live model.
+            Shape a concise direction from visible choices. Nothing here opens the camera or updates
+            a live model.
           </p>
           {hasChanges ? <span css={draftStatusStyles(theme)}>Draft in progress</span> : null}
         </div>

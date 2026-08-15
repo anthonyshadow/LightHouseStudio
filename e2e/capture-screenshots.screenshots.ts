@@ -5,12 +5,12 @@ import type { CapabilitiesResponse } from '@studio/contracts';
 import type { CreativeAssetStore } from '@studio/domain';
 import {
   CREATIVE_ASSET_STORAGE_KEY,
-  closeRecipeDockWhenOverlaid,
+  closeAiSettings,
   createLocalTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
-  openRecipeDockWhenOverlaid,
+  openAiSettings,
   readBrowserState,
   settleVisualPage,
   startCharacterAi,
@@ -230,11 +230,6 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
   );
 };
 
-const openShelf = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Recipe Shelf', exact: true })).toBeVisible();
-};
-
 const showVoiceTreatment = async (page: Page): Promise<void> => {
   await createLocalTake(page);
   await page.getByRole('button', { name: 'Voice treatments' }).click();
@@ -256,8 +251,7 @@ const SCENARIOS: readonly Scenario[] = [
     filename: 'local-idle.png',
     preparationOnly: true,
     setup: async (page) => {
-      await openRecipeDockWhenOverlaid(page);
-      await expect(page.getByRole('button', { name: 'Start local preview' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Record New Video' })).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toContainText('Studio idle');
     },
   },
@@ -311,9 +305,8 @@ const SCENARIOS: readonly Scenario[] = [
             ),
         });
       });
-      await openRecipeDockWhenOverlaid(page);
-      await page.getByRole('button', { name: 'Start local preview' }).click({ force: true });
-      await expect(page.getByRole('dialog', { name: 'Recipe Dock' })).toBeHidden();
+      await page.getByRole('button', { name: 'Record New Video' }).click({ force: true });
+      await expect(page.getByRole('dialog', { name: 'AI Settings' })).toBeHidden();
       await expect(
         page.getByRole('alert').filter({ hasText: 'Camera or microphone access was not allowed.' }),
       ).toBeVisible();
@@ -330,19 +323,19 @@ const SCENARIOS: readonly Scenario[] = [
     setup: async (page) => startVirtualTryOnAi(page),
   },
   {
-    group: '02-recipe-dock',
+    group: '02-ai-settings',
     filename: 'character-prepared.png',
     preparationOnly: true,
     setup: async (page) => {
-      await openRecipeDockWhenOverlaid(page);
+      await openAiSettings(page);
       await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
       await page.getByLabel('Character direction').fill('An adult cinematic field presenter');
-      await expect(page.getByRole('heading', { name: 'Character recipe' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Character settings' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Start Character AI' })).toBeEnabled();
     },
   },
   {
-    group: '02-recipe-dock',
+    group: '02-ai-settings',
     filename: 'character-live-pending-changes.png',
     setup: async (page) => {
       await startCharacterAi(page, false);
@@ -352,11 +345,11 @@ const SCENARIOS: readonly Scenario[] = [
     },
   },
   {
-    group: '02-recipe-dock',
+    group: '02-ai-settings',
     filename: 'virtual-try-on-prepared.png',
     preparationOnly: true,
     setup: async (page) => {
-      await openRecipeDockWhenOverlaid(page);
+      await openAiSettings(page);
       await page.getByRole('button', { name: 'Virtual Try-On · VTON 3' }).click();
       await page.getByLabel('Garment direction').fill('A tailored linen travel overshirt');
       await page.getByLabel('Garment reference image').setInputFiles({
@@ -425,58 +418,6 @@ const SCENARIOS: readonly Scenario[] = [
     },
   },
   {
-    group: '04-recipe-shelf',
-    filename: 'character-saved-recipes.png',
-    preparationOnly: true,
-    setup: async (page) => {
-      await openShelf(page);
-      await expect(page.getByRole('list', { name: 'Saved prompt recipes' })).toBeVisible();
-      await expect(page.getByText('Amber Field Host', { exact: true })).toBeVisible();
-    },
-  },
-  {
-    group: '04-recipe-shelf',
-    filename: 'character-recent-prompts.png',
-    preparationOnly: true,
-    setup: async (page) => {
-      await openShelf(page);
-      await page.getByRole('button', { name: /^Recent/u }).click();
-      await expect(page.getByRole('list', { name: 'Recent successful prompts' })).toBeVisible();
-    },
-  },
-  {
-    group: '04-recipe-shelf',
-    filename: 'character-recipes.png',
-    preparationOnly: true,
-    setup: async (page) => {
-      await openShelf(page);
-      await page.getByRole('button', { name: /^Characters/u }).click();
-      await expect(page.getByRole('list', { name: 'Saved character recipes' })).toBeVisible();
-    },
-  },
-  {
-    group: '04-recipe-shelf',
-    filename: 'virtual-try-on-saved-recipes.png',
-    preparationOnly: true,
-    setup: async (page) => {
-      await openShelf(page);
-      await page.getByRole('button', { name: 'Try-on recipes' }).click();
-      await expect(page.getByText('Structured Amber Jacket', { exact: true })).toBeVisible();
-      await expect(page.getByRole('list', { name: 'Saved prompt recipes' })).toBeVisible();
-    },
-  },
-  {
-    group: '04-recipe-shelf',
-    filename: 'new-character-builder.png',
-    preparationOnly: true,
-    setup: async (page) => {
-      await openShelf(page);
-      await page.getByRole('button', { name: 'New character recipe' }).click();
-      await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'Optional Reference Image' })).toBeVisible();
-    },
-  },
-  {
     group: '05-capture-settings',
     filename: 'local-before-preview.png',
     preparationOnly: true,
@@ -504,10 +445,10 @@ const SCENARIOS: readonly Scenario[] = [
     filename: 'character-provider-managed-quality.png',
     preparationOnly: true,
     setup: async (page) => {
-      await openRecipeDockWhenOverlaid(page);
+      await openAiSettings(page);
       await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
       await page.getByLabel('Character direction').fill('An adult editorial field presenter');
-      await closeRecipeDockWhenOverlaid(page);
+      await closeAiSettings(page);
       const settings = await openCaptureSettingsSurface(page);
       await expect(settings).toBeVisible();
       await expectCaptureDevicesSettled(page);

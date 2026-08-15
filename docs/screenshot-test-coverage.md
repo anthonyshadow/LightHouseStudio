@@ -125,7 +125,7 @@ Screenshots do not qualify:
   behavior;
 - live Decart/VTO output, provider entitlement, quota, cost, retention, or failure handling;
 - live ElevenLabs preview/conversion/remux;
-- every overlay, confirmation, error, Shelf branch, Builder branch, or legacy state; or
+- every overlay, confirmation, error, creative-library branch, Builder branch, or legacy state; or
 - cross-browser pixel identity.
 
 Pure/domain tests own rules; component tests and manual Storybook review own variants and ARIA;

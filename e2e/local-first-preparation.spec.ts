@@ -7,7 +7,7 @@ import {
   VOICE_PROVIDER_INTENT_HEADER,
   VOICE_PROVIDER_INTENT_VALUE,
 } from '@studio/contracts';
-import { openRecipeDockWhenOverlaid } from './support/studioHarness';
+import { openAiSettings } from './support/studioHarness';
 
 test.beforeEach(async ({ page, request, baseURL }) => {
   const origin = new URL(baseURL ?? 'http://127.0.0.1:4173').origin;
@@ -100,7 +100,9 @@ test.beforeEach(async ({ page, request, baseURL }) => {
   });
 });
 
-test('prepares an object recipe accessibly without camera or provider work', async ({ page }) => {
+test('prepares a visual configuration accessibly without camera or provider work', async ({
+  page,
+}) => {
   const apiRequests: string[] = [];
   page.on('request', (request) => {
     const url = new URL(request.url());
@@ -131,7 +133,7 @@ test('prepares an object recipe accessibly without camera or provider work', asy
   await page.keyboard.press('Enter');
   await expect(page.getByRole('main')).toBeFocused();
 
-  await openRecipeDockWhenOverlaid(page);
+  await openAiSettings(page);
   await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
   await expect(page.getByRole('button', { name: 'Character · Lucy 2.5' })).toHaveAttribute(
     'aria-pressed',

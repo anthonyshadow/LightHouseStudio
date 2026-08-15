@@ -348,6 +348,7 @@ describe.runIf(databaseUrl !== undefined)(
 
           const remainingMigrations = migrationFiles.filter((name) => name >= '0020_');
           expect(remainingMigrations).toContain('0020_tiresome_wolf_cub.sql');
+          expect(remainingMigrations).toContain('0021_slow_krista_starr.sql');
           for (const filename of remainingMigrations) await applyMigration(client, filename);
 
           const compatibility = createPostgresDatabase(targetUrl.toString());
@@ -438,6 +439,9 @@ describe.runIf(databaseUrl !== undefined)(
           expect(revisionSources.rows.map(({ enumlabel }) => enumlabel)).toContain('output-save');
           await expect(
             client.query('select operation_id from project_output_operation_receipts'),
+          ).resolves.toMatchObject({ rows: [] });
+          await expect(
+            client.query('select id from project_asset_memberships'),
           ).resolves.toMatchObject({ rows: [] });
         } finally {
           client.release();

@@ -62,6 +62,7 @@ const meta = {
     onOpenAssets: fn(),
     onCreateProject: fn(),
     onCreateCampaign: fn(),
+    onCreateAsset: fn(),
     onOpenLive: fn(),
     onLogout: fn(),
   },
@@ -94,6 +95,7 @@ const HeaderHarness = () => {
         onOpenAssets={fn()}
         onCreateProject={fn()}
         onCreateCampaign={fn()}
+        onCreateAsset={fn()}
         onOpenLive={fn()}
         onLogout={fn()}
       />

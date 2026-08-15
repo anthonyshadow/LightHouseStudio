@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   savedVideoDetailSchema,
+  savedVideoSummarySchema,
   savedVideoTitleSchema,
   savedVideoVersionSchema,
 } from './saved-videos';
@@ -26,6 +27,7 @@ export const PROJECT_ASSET_ROLES = [
   'audio',
   'thumbnail',
 ] as const;
+export const PROJECT_ASSET_KINDS = ['video', 'character', 'outfit', 'voice'] as const;
 export const PROJECT_REVISION_SOURCES = [
   'create',
   'user-edit',
@@ -48,6 +50,7 @@ const VIDEO_EDIT_FILTERS = ['original', 'vivid', 'warm', 'cool', 'mono', 'fade']
 
 export const projectStatusSchema = z.enum(PROJECT_STATUSES);
 export const projectAssetRoleSchema = z.enum(PROJECT_ASSET_ROLES);
+export const projectAssetKindSchema = z.enum(PROJECT_ASSET_KINDS);
 export const projectRevisionSourceSchema = z.enum(PROJECT_REVISION_SOURCES);
 export const projectWorkflowPhaseSchema = z.enum(PROJECT_WORKFLOW_PHASES);
 export const projectIdSchema = z.uuid();
@@ -473,6 +476,46 @@ export const projectAssetLinkSchema = z
     revisionNumber: z.number().int().positive(),
     createdAt: z.iso.datetime(),
   })
+  .strict();
+
+export const projectAssetMembershipSchema = z
+  .object({
+    id: z.uuid(),
+    projectId: projectIdSchema,
+    kind: projectAssetKindSchema,
+    resourceId: creativeAssetIdSchema,
+    createdAt: z.iso.datetime(),
+  })
+  .strict();
+
+export const projectAssetsQuerySchema = z
+  .object({
+    kind: projectAssetKindSchema.optional(),
+    cursor: z.string().trim().min(1).max(1_000).optional(),
+    pageSize: z.coerce.number().int().min(1).max(50).default(24),
+  })
+  .strict();
+
+export const projectAssetsResponseSchema = z
+  .object({
+    assets: z.array(projectAssetMembershipSchema).max(50),
+    videoSummaries: z.array(savedVideoSummarySchema).max(50),
+    nextCursor: z.string().max(1_000).nullable(),
+  })
+  .strict();
+
+export const attachProjectAssetRequestSchema = z
+  .object({ kind: projectAssetKindSchema, resourceId: creativeAssetIdSchema })
+  .strict();
+
+export const attachProjectAssetResponseSchema = z
+  .object({ membership: projectAssetMembershipSchema, created: z.boolean() })
+  .strict();
+
+export const detachProjectAssetResponseSchema = z.object({ detached: z.literal(true) }).strict();
+
+export const projectAssetMembershipParamsSchema = z
+  .object({ projectId: projectIdSchema, membershipId: z.uuid() })
   .strict();
 
 export const projectJobLinkSchema = z
@@ -957,6 +1000,13 @@ export type ProjectSessionProposalContract = z.infer<typeof projectSessionPropos
 export type AppendProjectRevisionRequest = z.infer<typeof appendProjectRevisionRequestSchema>;
 export type ProjectStatusContract = z.infer<typeof projectStatusSchema>;
 export type ProjectAssetRoleContract = z.infer<typeof projectAssetRoleSchema>;
+export type ProjectAssetKindContract = z.infer<typeof projectAssetKindSchema>;
+export type ProjectAssetMembershipContract = z.infer<typeof projectAssetMembershipSchema>;
+export type ProjectAssetsQuery = z.infer<typeof projectAssetsQuerySchema>;
+export type ProjectAssetsResponse = z.infer<typeof projectAssetsResponseSchema>;
+export type AttachProjectAssetRequest = z.infer<typeof attachProjectAssetRequestSchema>;
+export type AttachProjectAssetResponse = z.infer<typeof attachProjectAssetResponseSchema>;
+export type DetachProjectAssetResponse = z.infer<typeof detachProjectAssetResponseSchema>;
 export type ProjectContract = z.infer<typeof projectSchema>;
 export type ProjectRevisionContract = z.infer<typeof projectRevisionSchema>;
 export type ProjectJobLinkContract = z.infer<typeof projectJobLinkSchema>;

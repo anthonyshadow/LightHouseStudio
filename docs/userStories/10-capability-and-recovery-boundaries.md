@@ -31,7 +31,7 @@ recovery path without risking a valid artifact.
 
 ## Non-negotiable boundaries
 
-- Opening tools, browsing Shelf, editing drafts, or listing devices does not request camera or
+- Opening tools, browsing Assets, editing drafts, or listing devices does not request camera or
   provider work.
 - Local Camera never requests Decart credentials or a provider connection.
 - Voice browsing starts only from its labeled provider-contact action.

@@ -100,7 +100,7 @@ export const CharacterNameDialog = ({
         </StatusNotice>
       ) : (
         <StatusNotice>
-          This prompt-only save stays in the browser Recipe Shelf and does not contact an image
+          This prompt-only save stays in the browser Character library and does not contact an image
           provider.
         </StatusNotice>
       )}

@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { hydrateReferenceImage } from '../adapters/api-client/apiClient';
 import type {
   CharacterSaveProgress,
@@ -17,9 +18,13 @@ import {
 } from '../features/existing-video/useExistingVideoWorkflow';
 import { useCharacterBuilderLaunchController } from './useCharacterBuilderLaunchController';
 import type { ActiveOverlay } from './useStudioOverlayController';
+import { attachProjectAsset } from '../features/projects/projectsApi';
+import { projectAssetQueryKeys } from '../features/projects/useProjectAssetsController';
 
 export type CharacterBuilderDestination =
-  Readonly<{ kind: 'studio' }> | Readonly<{ kind: 'existing-video'; stepId: string }>;
+  | Readonly<{ kind: 'studio' }>
+  | Readonly<{ kind: 'existing-video'; stepId: string }>
+  | Readonly<{ kind: 'project'; projectId: string }>;
 
 type SaveCharacter = (
   snapshot: CharacterSaveSnapshot,
@@ -36,7 +41,6 @@ interface UseStudioCharacterWorkflowOptions {
   readonly activityBlockedReason: string | undefined;
   readonly openBlockedReason: string | undefined;
   readonly studioSaveBlockedReason: string | undefined;
-  readonly shelfDirty: boolean;
   readonly saveStudioCharacter: SaveCharacter;
   readonly openOverlay: (overlay: Exclude<ActiveOverlay, null>) => void;
   readonly closeOverlay: () => void;
@@ -50,11 +54,11 @@ export const useStudioCharacterWorkflow = ({
   activityBlockedReason,
   openBlockedReason,
   studioSaveBlockedReason,
-  shelfDirty,
   saveStudioCharacter,
   openOverlay,
   closeOverlay,
 }: UseStudioCharacterWorkflowOptions) => {
+  const queryClient = useQueryClient();
   const [destination, setDestination] = useState<CharacterBuilderDestination>({ kind: 'studio' });
   const [wardrobeCharacterId, setWardrobeCharacterId] = useState<string | null>(null);
   const [wardrobeExistingVideoStepId, setWardrobeExistingVideoStepId] = useState<string | null>(
@@ -114,15 +118,22 @@ export const useStudioCharacterWorkflow = ({
     [activityBlockedReason, existingVideo.providerActive, existingVideo.steps, openNewCharacter],
   );
 
-  const existingVideoSaveBlockedReason =
-    activityBlockedReason ??
-    (shelfDirty
-      ? 'Save or discard the unfinished Recipe Shelf changes before saving this character.'
-      : undefined);
+  const openNewForProject = useCallback(
+    (projectId: string) => {
+      if (openBlockedReason) return;
+      setDestination({ kind: 'project', projectId });
+      openNewCharacter();
+    },
+    [openBlockedReason, openNewCharacter],
+  );
+
+  const existingVideoSaveBlockedReason = activityBlockedReason;
   const saveBlockedReason =
     destination.kind === 'existing-video'
       ? existingVideoSaveBlockedReason
-      : studioSaveBlockedReason;
+      : destination.kind === 'project'
+        ? undefined
+        : studioSaveBlockedReason;
 
   const saveExistingVideoCharacter = useCallback<SaveCharacter>(
     async (snapshot, characterId, stage, progress) => {
@@ -152,6 +163,27 @@ export const useStudioCharacterWorkflow = ({
       await progress.markStudioPreloaded();
     },
     [destination, existingVideo, existingVideoSaveBlockedReason, repository],
+  );
+
+  const saveProjectCharacter = useCallback<SaveCharacter>(
+    async (snapshot, characterId, stage, progress) => {
+      if (destination.kind !== 'project') {
+        throw new Error('The Project character destination is no longer available.');
+      }
+      if (stage === 'intent') {
+        await persistCharacterSaveSnapshot(repository, snapshot, characterId);
+        await progress.markCharacterPersisted();
+      }
+      await attachProjectAsset(destination.projectId, {
+        kind: 'character',
+        resourceId: characterId,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: projectAssetQueryKeys.project(destination.projectId),
+      });
+      await progress.markStudioPreloaded();
+    },
+    [destination, queryClient, repository],
   );
 
   const wardrobeCharacter = wardrobeCharacterId
@@ -229,9 +261,14 @@ export const useStudioCharacterWorkflow = ({
     edit,
     copy,
     createForExistingVideo,
+    openNewForProject,
     saveBlockedReason,
     saveCharacter:
-      destination.kind === 'existing-video' ? saveExistingVideoCharacter : saveStudioCharacter,
+      destination.kind === 'existing-video'
+        ? saveExistingVideoCharacter
+        : destination.kind === 'project'
+          ? saveProjectCharacter
+          : saveStudioCharacter,
     dismissBuilder,
     wardrobeCharacter,
     wardrobeExistingVideoStepId,

@@ -23,7 +23,7 @@ export type PendingReferenceRecipeUse = {
   readonly savedCharacterPromptId?: string;
   readonly savedCharacterVariantId?: string;
   readonly characterName?: string;
-  readonly destination: 'shelf' | 'workshop';
+  readonly destination: 'selection' | 'workshop';
 };
 
 export type ReferenceRecipeHydrationResult = {
@@ -76,7 +76,7 @@ export const referenceHydrationError = (error: unknown): string =>
     : 'The exact local reference could not be validated. Retry the reference handoff.';
 
 const RECIPE_COMMIT_BLOCKED_MESSAGE =
-  'Release the active camera or AI session, then retry this complete recipe handoff.';
+  'Release the active camera or AI session, then retry this complete creative setup.';
 
 type UseReferenceRecipeHydrationOptions = {
   readonly canStart: (pending: PendingReferenceRecipeUse) => boolean;
@@ -90,7 +90,7 @@ type ActiveHydrationOperation = {
 };
 
 /**
- * Owns the sole Shelf/Workshop reference hydration operation and its retryable pending input.
+ * Owns the sole selection/Workshop reference hydration operation and its retryable pending input.
  * The caller remains the authoritative composition boundary for the atomic session commit.
  */
 export const useReferenceRecipeHydration = ({

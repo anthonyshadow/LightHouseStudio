@@ -73,7 +73,7 @@ Neither document changes the current loopback, account, provider, privacy, or de
 1. Open `/`, choose **Log in**, and submit the locally configured demo credentials. The backend
    verifies the Argon2id password hash and issues a session JWT in a host-only, HTTP-only cookie.
    The development login form currently prefills both values by product decision. Successful login
-   opens `/studio`, the provider-free Dashboard within the persistent authenticated shell.
+   opens `/dashboard`, the provider-free Dashboard within the persistent authenticated shell.
 2. Choose **Create video** to open `/studio/create` in neutral **Local Camera** mode. Camera and
    microphone remain off until the
    creator explicitly starts them from the control bar or **Record a local video** in the upload
@@ -94,24 +94,25 @@ Neither document changes the current loopback, account, provider, privacy, or de
    idempotent. An edit saves as a new, source-linked video by default; explicit replacement
    confirms before appending an immutable version. Download is available for one exact ready
    Version from Videos in Assets or its retaining Project history.
-7. Prepare advanced live work without starting media: desktop places **Select Character** and
-   **Select Outfit** immediately before **Workshop** in the creative-tool rail. Phones and tablets
-   use **Dock** for direct Character/VTO recipes and **Shelf** for saved characters, outfits, and
-   their builders. A prepared selection can then be started explicitly from **Start AI** or the
-   Dock and recorded through the existing live flow.
+7. Prepare advanced live work without starting media: **Select Character**, **Select Outfit**, and
+   **Workshop** use the shared creative-library and builder flows. A prepared selection can then be
+   started explicitly from **Start AI** and recorded through the existing live flow.
 
 ### Campaign and Project workspace
 
-`/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio` is the
+`/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/dashboard` is the
 Dashboard; `/studio/create` is standard creation; `/studio/create/live` is gated Live AI Beta;
-`/studio/assets` groups Videos, Characters, Outfits, Voices, and Recipes; and the Campaign/Project
-routes share one persistent `StudioApp` and one stage. Dashboard, Assets, Campaigns, Project lists,
-and Project overviews hide the stage; `/studio/projects/:projectId/workspace` reuses that same stage
-beside its Project controls without creating another shell, player,
+`/studio/:videoId` opens the current Saved Video version in review; `/assets` groups Videos,
+Characters, Outfits, and Voices; and `/campaign` plus `/projects` share one persistent `StudioApp`
+and one stage. Dashboard, Assets, Campaigns, Project lists, and Project overviews hide the stage;
+`/projects/:projectId/workspace` reuses that same stage beside its Project controls without
+creating another shell, player,
 media session, provider action, or browser authority store. **Quick project** creates a standalone
 `Untitled Project`; **New Project** asks for a name and optional Campaign, with the current Campaign
 preselected when launched from its detail. **No Campaign** is a virtual Project group, never a
-default database row.
+default database row. Project detail also contains a non-owning collection of Videos, Characters,
+Outfits, and Voices. Attach/detach never changes the immutable source, working media, outputs,
+history, or underlying asset.
 Campaign archive is non-cascading and Campaign deletion requires archive plus zero attached
 Projects. An empty Project offers **Record**, **Upload**, and **Use Saved Video**. It becomes
 resumable only after the API stores or verifies the bytes, inspects the media, commits the
@@ -146,7 +147,7 @@ wiring are now removed.
 Leaving Studio is blocked during recording/finalization and active local video rendering. Switching
 Projects is also blocked during recording/finalization and requires an explicit abort/discard for
 cancellable source staging or a finalized unaccepted Project take. A temporary take, active Project
-source transfer, active Voice work, dirty video edit, or dirty Recipe Shelf/Outfit Builder/Wardrobe
+source transfer, active Voice work, dirty video edit, or dirty AI settings/Outfit Builder/Wardrobe
 edit requires confirmed discard; an already committed source remains bound to its original Project
 and cannot replace the newly opened stage.
 
@@ -347,10 +348,11 @@ Source checks. Branch names never select credentials at runtime: commands set `L
 explicitly, and ordinary CI cannot read the protected GitHub `development` or `production`
 Environment secrets.
 
-Recipe Shelf `localStorage` and Character Builder IndexedDB names include both the runtime mode and
+Creative-library and Character Builder IndexedDB names include both the runtime mode and
 authenticated user. Development therefore starts with empty browser persistence even when the same
 loopback origin and demo user were previously used in production; only production reads and
-migrates the pre-separation browser keys.
+migrates the pre-separation browser keys. Historical Recipe-shaped records remain compatibility
+data and are not shown as assets.
 
 ## Commands
 

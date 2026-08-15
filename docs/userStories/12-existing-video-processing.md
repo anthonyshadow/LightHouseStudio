@@ -9,7 +9,7 @@ source, then edit either base, save, start over, or discard.
 ## Journey
 
 1. From `/`, the creator logs in or enters Studio. The entry route does not mount Studio, request
-   media, or offer the creation actions. Direct `/studio` visits keep neutral Local Camera mode with
+   media, or offer the creation actions. Direct `/studio/create` visits keep neutral Local Camera mode with
    camera, microphone, and AI off.
 2. The idle Studio control bar exposes **Record New Video** and **Upload Video** actions.
    Upload needs no camera permission, provider credentials, Decart SDK, or external traffic.
@@ -59,7 +59,7 @@ source, then edit either base, save, start over, or discard.
    output resolution, and saved/recent outfit selection use the same keyboard-operable custom
    chooser. It is an anchored listbox on larger viewports and a safe-area-aware bottom sheet on
    phones, with 44px-or-larger touch targets, typeahead, Escape/focus restoration, and no document
-   scrolling. Saved character/outfit options may add a local thumbnail, recipe name, and a
+   scrolling. Saved Character/Outfit options may add a local thumbnail, display name, and a
    two-line prompt summary. Character Swap first selects a parent character, then uses the shared
    original/variant version grid. **Create new wardrobe variant** opens that parent's Wardrobe and
    a successful save returns to the same Character Swap step; **Create A Character** still opens
@@ -75,10 +75,10 @@ source, then edit either base, save, start over, or discard.
    Explicitly closing the panel retains the tab-local selection and plan; an **Edit video** action
    in the recorded-take controls reopens the same workflow. Whenever a playback is retained and
    **Edit Video** is available, the main Studio tool row/column disables its live-only **Select
-   Character**, **Select Outfit**, **Workshop**, and **Shelf** launchers. The editor's own Character
-   Swap, Virtual Try On, Voice, recipe, and builder controls remain governed only by the editor
+   Character**, **Select Outfit**, and **Workshop** launchers. The editor's own Character Swap,
+   Virtual Try On, Voice, saved-resource, and builder controls remain governed only by the editor
    workflow and stay available when their existing step-specific requirements are met.
-7. VTO uses exactly one input mode. **Saved or recent outfit** selects a saved recipe or tab-local
+7. VTO uses exactly one input mode. **Saved or recent outfit** selects a saved Outfit or tab-local
    recent import; **Reference image** prefers a local JPEG/PNG/WebP and reveals its HTTPS URL field
    only after **Use an image URL instead**; **Prompt** alone exposes Enhance Prompt. Switching
    modes clears incompatible fields. Saved prompt outfits restore Prompt mode and their exact
@@ -197,7 +197,7 @@ source, then edit either base, save, start over, or discard.
   cancellation, timeout, or upstream failure), discards the provider text, and exposes only
   provider-neutral guidance. No class triggers an automatic submission retry.
 - Original/variant identity stays local metadata until explicit selection. Character Swap hydrates
-  the exact selected asset; Virtual Try-On recipe/input selection remains unchanged.
+  the exact selected asset; Virtual Try-On outfit/input selection remains unchanged.
 - Selecting an exact saved character version initially leaves Character Swap Prompt empty so its
   image is authoritative. For Decart, text entered afterward is sent with its enhancement flag.
   Pruna advertises a server-default prompt: the editor provides no prompt or enhancement control,
@@ -210,8 +210,8 @@ source, then edit either base, save, start over, or discard.
   retains its appearance, visibility, position, motion, contact, occlusion, and timing. Source
   framing, lighting, background, scene structure, other objects, and audio remain unchanged.
 - If an accepted job's status or content request is interrupted, prompt, reference, enhancement,
-  and saved-recipe fields remain editable. The UI states that **Resume accepted job** still checks
-  the immutable accepted recipe and creates no submission; draft edits apply only after that job
+  and saved Character/Outfit fields remain editable. The UI states that **Resume accepted job**
+  still checks the immutable accepted configuration and creates no submission; draft edits apply only after that job
   reaches a terminal failure and the creator explicitly starts a new submission.
 - Same-origin browser status/content reads remain protected even when the browser omits `Origin`:
   the API verifies the exact loopback referrer or same-origin Fetch Metadata plus explicit video
@@ -240,9 +240,10 @@ Cleanup waits for any admitted delivery stream, retries transient filesystem fai
 pending cleanup state. If retries are exhausted, the server emits one safe diagnostic containing
 only the application job ID; it never logs temporary paths or provider data.
 
-After Decart accepts a batch VTO submission, a persistent prompt or explicitly saved-image outfit
-records an exact Recipe Shelf recent. Directly uploaded or imported reference files enter only the
-bounded tab-local recent registry and are never automatically persisted.
+After Decart accepts a batch VTO submission, a persistent prompt or explicitly saved-image Outfit
+records exact internal recent-use metadata for compatibility. Directly uploaded or imported
+reference files enter only the bounded tab-local recent registry and are never automatically
+persisted. Neither path exposes a Recipe card, Shelf, chooser, or route.
 
 The UI reports one planned submission, not credits or currency. Every provider submission remains
 an explicit, potentially billable action with no automatic retry or fallback.

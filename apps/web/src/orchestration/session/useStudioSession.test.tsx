@@ -838,7 +838,7 @@ describe('useStudioSession model lifecycle contract', () => {
     expect(result.current.error).toEqual({
       code: 'generation-ended',
       message: 'The AI generation ended before the session maximum.',
-      recovery: 'Your local preview and working recipe are safe. Start AI again when ready.',
+      recovery: 'Your local preview and working settings are safe. Start AI again when ready.',
     });
     expect(result.current.realtimeSessionTiming).toBeNull();
     unmount();

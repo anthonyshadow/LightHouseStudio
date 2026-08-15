@@ -181,10 +181,10 @@ describe('AddVideoToProjectDialog', () => {
     );
     const router = createMemoryRouter(
       [
-        { path: '/studio/assets/videos', element: <DialogHarness /> },
-        { path: '/studio/projects/:projectId/workspace', element: <div>Project workspace</div> },
+        { path: '/assets/videos', element: <DialogHarness /> },
+        { path: '/projects/:projectId/workspace', element: <div>Project workspace</div> },
       ],
-      { initialEntries: ['/studio/assets/videos'] },
+      { initialEntries: ['/assets/videos'] },
     );
     render(
       <StudioDesignProvider>
@@ -199,7 +199,7 @@ describe('AddVideoToProjectDialog', () => {
     await user.click(await screen.findByRole('button', { name: /Launch cut/u }));
 
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe(`/studio/projects/${projectId}/workspace`),
+      expect(router.state.location.pathname).toBe(`/projects/${projectId}/workspace`),
     );
     expect(requestBody).toEqual({
       expectedVersion: 1,

@@ -1,5 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectContract, ProjectCurrentResponse } from '@studio/contracts';
+import type { CreativeAssetStore } from '@studio/domain';
 import {
   useCallback,
   useEffect,
@@ -57,6 +58,7 @@ import { ProjectProcessingStatusPanel } from './ProjectProcessingStatusPanel';
 import type { ProjectProcessingController } from './useProjectProcessingController';
 import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
 import { ProjectHistorySection } from './ProjectHistorySection';
+import { ProjectAssetsSection } from './ProjectAssetsSection';
 
 const projectStatusLabel = (status: ProjectContract['status']): string =>
   status === 'needs-attention'
@@ -380,6 +382,9 @@ export interface ProjectRouteSurfaceProps {
   readonly onWorkingMediaActivityChange?: (activity: ProjectWorkingMediaActivity) => void;
   readonly onSessionChange?: (session: ProjectSessionPort | null) => void;
   readonly processing?: ProjectProcessingController;
+  readonly creativeStore?: CreativeAssetStore;
+  readonly onCreateProjectCharacter?: (projectId: string) => void;
+  readonly onCreateProjectOutfit?: (projectId: string) => void;
 }
 
 const unavailableSourceRuntime: ProjectSourceRuntime = {
@@ -653,6 +658,9 @@ const ProjectDetail = ({
   creativeCheckpoint,
   processing,
   ownerUserId,
+  creativeStore,
+  onCreateProjectCharacter,
+  onCreateProjectOutfit,
 }: { readonly projectId: string } & ProjectRouteSurfaceProps) => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -859,23 +867,32 @@ const ProjectDetail = ({
           <ProjectHistorySection current={current} session={session.port} archived={archived} />
         </>
       ) : (
-        <section css={emptyProjectStyles(theme)} aria-labelledby="project-focus-heading">
-          <div>
-            <h3 id="project-focus-heading">Focused video workspace</h3>
-            <p>
-              {current.revision.snapshot.sourceAssetId === null
-                ? 'This Project is intentionally empty. Keep it collection-only, or open the workspace when you are ready to add a source.'
-                : `Source ready · workflow ${current.revision.snapshot.workflowPhase}. Continue editing to resume the exact saved state.`}
-            </p>
-            <p>
-              Saved Videos remain reusable assets. Adding one here does not remove it from Assets or
-              prevent another Project from using it.
-            </p>
-          </div>
-          <div data-source-actions>
-            <small>Projects and Campaigns organize work; they do not own reusable Assets.</small>
-          </div>
-        </section>
+        <>
+          <ProjectAssetsSection
+            projectId={project.id}
+            archived={archived}
+            {...(creativeStore ? { creativeStore } : {})}
+            {...(onCreateProjectCharacter ? { onCreateCharacter: onCreateProjectCharacter } : {})}
+            {...(onCreateProjectOutfit ? { onCreateOutfit: onCreateProjectOutfit } : {})}
+          />
+          <section css={emptyProjectStyles(theme)} aria-labelledby="project-focus-heading">
+            <div>
+              <h3 id="project-focus-heading">Focused video workspace</h3>
+              <p>
+                {current.revision.snapshot.sourceAssetId === null
+                  ? 'This Project is intentionally empty. Keep it collection-only, or open the workspace when you are ready to add a source.'
+                  : `Source ready · workflow ${current.revision.snapshot.workflowPhase}. Continue editing to resume the exact saved state.`}
+              </p>
+              <p>
+                Saved Videos remain reusable assets. Adding one here does not remove it from Assets
+                or prevent another Project from using it.
+              </p>
+            </div>
+            <div data-source-actions>
+              <small>Projects and Campaigns organize work; they do not own reusable Assets.</small>
+            </div>
+          </section>
+        </>
       )}
 
       {!workspaceMode && renameTarget ? (
