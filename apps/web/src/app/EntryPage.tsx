@@ -3,7 +3,6 @@ import { lazy, Suspense, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../application/auth/AuthProvider';
 import { Button } from '../ui/primitives/Button';
-import { visuallyHiddenStyles } from '../ui/primitives/VisuallyHidden';
 import { APP_PATHS, isRestorableStudioPath } from './paths';
 
 const LoginDialog = lazy(() =>
@@ -26,6 +25,19 @@ const entryStyles = (theme: Theme): CSSObject => ({
     textAlign: 'center',
   },
   '& p': { margin: 0, color: theme.colors.textMuted },
+  '& h1': {
+    margin: 0,
+    fontFamily: theme.type.display,
+    fontSize: 'clamp(2rem, 8vw, 3.4rem)',
+    letterSpacing: '-0.045em',
+  },
+  '& [data-entry-eyebrow]': {
+    color: theme.colors.accent,
+    fontSize: theme.fontSizes.caption,
+    fontWeight: 850,
+    letterSpacing: '0.14em',
+    textTransform: 'uppercase',
+  },
   '& button': { minHeight: '3rem' },
 });
 
@@ -50,11 +62,10 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
   return (
     <main css={entryStyles(theme)}>
       <div>
-        <h1 css={visuallyHiddenStyles()}>Enter Lightframe Studio</h1>
+        <span data-entry-eyebrow>Local-first video creation</span>
+        <h1>Lightframe</h1>
         <p>
-          Start in Studio, or use a Project for resumable work; Campaigns are optional. Projects
-          retain an inspected source and durable working state, reuse saved creative resources, save
-          output as Versions, and download the exact Version you choose.
+          Create a video quickly, resume focused Project work, or organize Projects in Campaigns.
         </p>
         <Button
           ref={enterRef}
@@ -64,7 +75,7 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
             else setLoginOpen(true);
           }}
         >
-          {auth.status === 'authenticated' ? 'Enter Studio' : 'Log in'}
+          {auth.status === 'authenticated' ? 'Open Dashboard' : 'Log in'}
         </Button>
       </div>
       {loginOpen ? (

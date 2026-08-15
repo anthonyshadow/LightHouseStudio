@@ -1,17 +1,17 @@
-# Saved character and outfit libraries
+# Creative Assets
 
 ## Story
 
-As the authenticated operator, I can open dedicated Saved Characters and Saved Outfits views,
-reuse or remove a record, and return to creation without losing the shared Studio runtime.
+As the authenticated operator, I can browse dedicated Character, Outfit, Voice, and Recipe views,
+reuse or remove supported records, and return to creation without losing the shared Studio runtime.
 
 ## Observable behavior
 
-1. The account trigger is the far-right header control. Its viewport-safe menu stays above the
-   Studio workspace, never overlaps the integration popover, and links to `/studio/characters` and
-   `/studio/outfits` alongside Saved Videos.
-2. Both routes render full-screen library workspaces inside the existing `StudioApp`; route changes
-   do not remount the media stage, create another session, or contact a provider.
+1. **Assets** is a primary authenticated destination. `/studio/assets` presents Videos, Characters,
+   Outfits, Voices, and Recipes; the account menu is limited to identity and Log out.
+2. `/studio/assets/characters`, `/studio/assets/outfits`, `/studio/assets/voices`, and
+   `/studio/assets/recipes` render full-screen library workspaces inside the existing `StudioApp`;
+   route changes hide rather than remount the media stage and contact no provider automatically.
 3. Saved Characters list the user-scoped Character/Shelf records and support existing exact
    original/variant hydration. **Create new character** opens the ordinary Character Builder with
    a brand-new create target, including when the library is empty. **Use** selects through the
@@ -31,6 +31,9 @@ reuse or remove a record, and return to creation without losing the shared Studi
    An empty cloud library is initialized from the current browser; an empty browser hydrates from
    the cloud. If both contain different non-empty state or revision CAS conflicts, sync pauses,
    shows a safe notice, and preserves the browser copy instead of overwriting either side.
+8. Voices exposes the provider catalog and account-saved relationships as a management surface;
+   applying a Voice remains disabled until an active video workflow owns the selection. Recipes
+   exposes Character and Outfit recipe modes and uses the existing explicit Studio handoff.
 
 ## Ownership and migration
 

@@ -12,6 +12,11 @@ export const pageStyles = (theme: Theme): CSSObject => ({
   '@media (max-width: 39.99rem), (max-height: 48rem)': {
     padding: `max(${theme.space.xs}, env(safe-area-inset-top)) max(${theme.space.xs}, env(safe-area-inset-right)) max(${theme.space.xs}, env(safe-area-inset-bottom)) max(${theme.space.xs}, env(safe-area-inset-left))`,
   },
+  '&[data-organization-route="true"]': {
+    '@media (max-width: 39.99rem)': {
+      paddingBlockEnd: `max(4.6rem, calc(env(safe-area-inset-bottom) + 4rem))`,
+    },
+  },
 });
 
 export const shellStyles = (theme: Theme): CSSObject => ({
@@ -95,28 +100,25 @@ export const primaryNavigationStyles = (theme: Theme): CSSObject => ({
     color: theme.colors.onAccent,
     background: theme.colors.accent,
   },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  '@media (max-width: 52rem)': { display: 'none' },
+  '@media (max-height: 36rem)': {
     '& > button': { paddingInline: theme.space.sm, fontSize: theme.fontSizes.caption },
-  },
-  '@media (max-width: 22rem)': {
-    flex: '1 1 auto',
-    minWidth: 0,
-    overflow: 'hidden',
-    '& > button': {
-      flex: '1 1 auto',
-      paddingInline: theme.space.xxs,
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-    },
   },
 });
 
 export const brandStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
+  minWidth: 0,
+  display: 'inline-grid',
   gridTemplateColumns: '2.4rem minmax(0, 1fr)',
   alignItems: 'center',
   gap: theme.space.sm,
-  minWidth: 0,
+  padding: theme.space.xxs,
+  border: 0,
+  borderRadius: theme.radii.medium,
+  color: theme.colors.text,
+  background: 'transparent',
+  textAlign: 'start',
+  cursor: 'pointer',
   '& img': { width: '2.35rem', height: '2.35rem' },
   '& > div': { minWidth: 0 },
   '& span': {
@@ -128,18 +130,87 @@ export const brandStyles = (theme: Theme): CSSObject => ({
     letterSpacing: '0.15em',
     textTransform: 'uppercase',
   },
-  '& h1': {
+  '& strong': {
+    display: 'block',
     margin: 0,
     fontFamily: theme.type.display,
     fontSize: 'clamp(1.05rem, 2vw, 1.35rem)',
     letterSpacing: '-0.025em',
   },
+  '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '2px' },
+  '&:hover': { background: theme.colors.surfaceSoft },
   '@media (max-width: 39.99rem), (max-height: 36rem)': {
-    display: 'block',
+    gridTemplateColumns: '2.1rem',
     '& img': { width: '2.1rem', height: '2.1rem' },
     '& > div': { display: 'none' },
   },
-  '@media (max-width: 22rem)': { display: 'none' },
+});
+
+export const mobileNavigationStyles = (theme: Theme): CSSObject => ({
+  display: 'none',
+  '@media (max-width: 39.99rem)': {
+    position: 'fixed',
+    zIndex: theme.layers.stageNotices + 2,
+    insetInline: `max(${theme.space.xs}, env(safe-area-inset-left)) max(${theme.space.xs}, env(safe-area-inset-right))`,
+    insetBlockEnd: `max(${theme.space.xs}, env(safe-area-inset-bottom))`,
+    minHeight: '3.7rem',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+    gap: theme.space.xxs,
+    padding: theme.space.xxs,
+    border: `1px solid ${theme.colors.borderStrong}`,
+    borderRadius: theme.radii.large,
+    background: theme.colors.overlaySurface,
+    boxShadow: theme.shadows.lifted,
+    backdropFilter: 'blur(16px)',
+    '& button': {
+      minWidth: 0,
+      minHeight: '3.1rem',
+      paddingInline: theme.space.xxs,
+      borderRadius: theme.radii.medium,
+      fontSize: '0.7rem',
+    },
+    '& button[aria-current="page"]': {
+      color: theme.colors.onAccent,
+      background: theme.colors.accent,
+    },
+  },
+});
+
+export const createMenuStyles = (theme: Theme): CSSObject => ({
+  position: 'relative',
+  flex: '0 0 auto',
+  '& [data-create-menu]': {
+    position: 'absolute',
+    zIndex: theme.layers.overlay,
+    insetBlockStart: 'calc(100% + .45rem)',
+    insetInlineEnd: 0,
+    width: 'min(17rem, calc(100vw - 1rem))',
+    display: 'grid',
+    gap: theme.space.xxs,
+    padding: theme.space.sm,
+    border: `1px solid ${theme.colors.borderStrong}`,
+    borderRadius: theme.radii.large,
+    background: theme.colors.overlaySurface,
+    boxShadow: theme.shadows.lifted,
+  },
+  '& [data-create-menu] > button': { width: '100%', justifyContent: 'flex-start' },
+  '& [data-create-menu] small': {
+    display: 'block',
+    padding: theme.space.xs,
+    color: theme.colors.textMuted,
+    lineHeight: 1.4,
+  },
+  '@media (max-width: 39.99rem)': {
+    '& > button': { minWidth: '2.75rem', paddingInline: theme.space.sm },
+    '& [data-create-label-long]': { display: 'none' },
+    '& [data-create-menu]': {
+      position: 'fixed',
+      insetBlockStart: '4rem',
+      insetInline: theme.space.xs,
+      width: 'auto',
+    },
+  },
 });
 
 export const capabilityStyles = (theme: Theme): CSSObject => ({

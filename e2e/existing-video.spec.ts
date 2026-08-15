@@ -78,7 +78,7 @@ const selectExistingVideo = async (
   filename = 'creator-source.mp4',
 ): Promise<void> => {
   await page.getByRole('button', { name: 'Upload Video' }).click();
-  await expect(page).toHaveURL(/\/studio$/u);
+  await expect(page).toHaveURL(/\/studio\/create$/u);
   const dialog = page.getByRole('dialog', { name: 'Use existing video' });
   await expect(dialog).toBeVisible();
   await dialog.locator('input[type="file"]').first().setInputFiles({
@@ -96,7 +96,7 @@ test('Record a local video closes the panel and keeps capture on the persistent 
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await page.getByRole('button', { name: 'Upload Video' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Use existing video' });
@@ -149,7 +149,7 @@ test('Record New Video starts only from the control bar and adopts the local tak
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   const controls = page.getByLabel('Studio session controls');
   await expect(page.getByLabel('Studio media stage')).toContainText(
@@ -176,7 +176,7 @@ test('provider-free upload previews and enters the existing take/save surface', 
 }) => {
   await installCameraSentinel(page);
   const network = await installProviderNetworkDriver(page, { videoProcessingAvailable: false });
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   const fixture = await loadH264VideoFixture();
 
   await selectExistingVideo(page, fixture, 'local-only.mp4');
@@ -188,7 +188,7 @@ test('provider-free upload previews and enters the existing take/save surface', 
   await expect(review).toBeVisible();
   await expect(review.getByRole('button', { name: 'Edit video' })).toBeVisible();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
-  await review.getByRole('button', { name: 'Save Video' }).click();
+  await review.getByRole('button', { name: 'Save to Assets' }).click();
   await confirmSaveVideo(page);
   await expect(review.getByRole('button', { name: 'Saved' })).toBeVisible();
   await expect(review.getByRole('link', { name: /Download/u })).toHaveCount(0);
@@ -206,7 +206,7 @@ test('provider-free Adjust video renders locally and atomically replaces the per
 }) => {
   await installCameraSentinel(page);
   const network = await installProviderNetworkDriver(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   const fixture = await loadDecodableH264VideoFixture();
 
   await selectExistingVideo(page, fixture, 'local-edit-source.mp4');
@@ -294,7 +294,7 @@ test('a selected upload ignores backdrop dismissal and can be reopened after an 
 }) => {
   await installCameraSentinel(page);
   await installProviderNetworkDriver(page, { videoProcessingAvailable: false });
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   const fixture = await loadH264VideoFixture();
 
   await selectExistingVideo(page, fixture, 'resume-source.mp4');
@@ -331,7 +331,7 @@ test('the upload editor and open saved-character chooser reflow at every support
 
   for (const viewport of Object.values(STUDIO_VIEWPORT_SIZES)) {
     await page.setViewportSize(viewport);
-    await page.goto('/studio');
+    await page.goto('/studio/create');
     await selectExistingVideo(page, fixture, 'responsive-source.mp4');
     const dialog = page.getByRole('dialog', { name: 'Use existing video' });
     await dialog.getByRole('button', { name: 'Character Swap', exact: true }).click();
@@ -403,7 +403,7 @@ test('Create A Character returns to the upload plan with the new character selec
 }) => {
   await installCameraSentinel(page);
   await installProviderNetworkDriver(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   const fixture = await loadH264VideoFixture();
 
   await selectExistingVideo(page, fixture, 'character-source.mp4');
@@ -447,7 +447,7 @@ for (const operation of ['character-swap', 'virtual-try-on'] as const) {
   test(`upload uses only ${operation} when that visual option is selected`, async ({ page }) => {
     await installCameraSentinel(page);
     await installProviderNetworkDriver(page);
-    await page.goto('/studio');
+    await page.goto('/studio/create');
     // This journey switches the persistent stage between both artifacts. Use the
     // deterministic decodable fixture so a codec error cannot trigger the stage's
     // intentional object-URL repair path and obscure source-identity assertions.
@@ -513,7 +513,7 @@ for (const operation of ['character-swap', 'virtual-try-on'] as const) {
       await dialog.getByRole('button', { name: 'Result', exact: true }).click();
       await expect(playback).toHaveAttribute('src', resultUrl!);
 
-      await dialog.getByRole('button', { name: 'Save Video' }).click();
+      await dialog.getByRole('button', { name: 'Save to Assets' }).click();
       await confirmSaveVideo(page);
       await expect(dialog.getByRole('button', { name: 'Saved' })).toBeVisible();
 

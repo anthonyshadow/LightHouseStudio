@@ -11,8 +11,8 @@ making Campaign setup a prerequisite for creative work.
    separate bounded lists; no Project revision or media bytes are loaded for these summaries.
 2. Choose **Create Campaign**, enter a required Name and optional Brief, and submit. Creation is
    idempotent and opens the new Campaign detail immediately.
-3. Choose **New Project** to create `Untitled Project` inside the active Campaign, or use the
-   equally prominent **Quick Start** in Projects to create a standalone Project.
+3. Choose **New Project**, enter a name with the active Campaign preselected, or use **Quick
+   project** in Projects to create a standalone `Untitled Project`.
 4. Campaign detail shows its active and archived Projects. Open one, move it to another active
    Campaign, or detach it to **No Campaign**. Membership changes use the Project version and never
    overwrite concurrent Project work silently.

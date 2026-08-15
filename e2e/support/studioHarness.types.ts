@@ -88,6 +88,7 @@ export type StudioHarnessOptions = {
   wardrobeAddOutfitAvailable?: boolean;
   elevenLabsAvailable?: boolean;
   realtimeVideoAvailable?: boolean;
+  realtimeBetaEnabled?: boolean;
   videoProcessingAvailable?: boolean;
   realtimeProvidesVideo?: boolean;
   capabilityFailuresBeforeSuccess?: number;

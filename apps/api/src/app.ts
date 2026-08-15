@@ -420,6 +420,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
   registerAuthRoutes(app, authService, dependencies.config);
   registerSystemRoutes(app, {
     decartAvailable: decartProvider !== null,
+    realtimeVideoBetaEnabled: dependencies.config.realtimeVideoBetaEnabled,
     videoProcessing: {
       characterSwap: videoJobProviders.characterSwap,
       defaultCharacterSwapProvider: videoJobProviders.defaultCharacterSwapProvider,
@@ -438,7 +439,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
     wardrobeAddOutfitAvailable: outfitTryOnService.available,
     directSavedVideoUploadAvailable: directSavedVideoUploadService !== undefined,
   });
-  registerRealtimeRoutes(app, decartProvider);
+  registerRealtimeRoutes(app, decartProvider, dependencies.config.realtimeVideoBetaEnabled);
   registerVideoJobRoutes(app, videoJobService);
   registerSavedVideoRoutes(app, savedVideoService, directSavedVideoUploadService);
   registerProjectRoutes(

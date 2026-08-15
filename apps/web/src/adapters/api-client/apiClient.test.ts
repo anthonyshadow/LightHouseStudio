@@ -228,7 +228,7 @@ describe('reference image API client', () => {
     mockApiServer.use(
       providerAvailabilityScenario({
         body: {
-          realtimeVideo: { available: true },
+          realtimeVideo: { available: true, betaEnabled: true },
           videoProcessing: {
             characterSwap: {
               available: true,

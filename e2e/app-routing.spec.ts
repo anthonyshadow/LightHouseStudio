@@ -9,7 +9,7 @@ import {
   readCreativeAssetStore,
   startLocalPreview,
 } from './support/studioHarness';
-import { ENTRY_PATH, STUDIO_PATH } from './support/studioRoutes';
+import { DASHBOARD_PATH, ENTRY_PATH, STUDIO_PATH } from './support/studioRoutes';
 import { installProjectHarness, TEST_PROJECT_ID } from './support/projectHarness';
 import { installCampaignHarness, TEST_CAMPAIGN_ID } from './support/campaignHarness';
 import { loadDecodableH264VideoFixture } from './support/existingVideoHarness';
@@ -71,12 +71,14 @@ const SEEDED_PROJECT_CREATIVE_STORE = {
   savedCharacterVariants: [],
 } satisfies CreativeAssetStore;
 
-test('entry stays provider-free and Login opens a focused Studio runtime', async ({ page }) => {
+test('entry stays provider-free and Login opens Dashboard without starting media', async ({
+  page,
+}) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto(ENTRY_PATH);
 
   await expect(page).toHaveTitle('Enter Lightframe Studio');
-  await expect(page.getByRole('heading', { name: 'Enter Lightframe Studio' })).toBeAttached();
+  await expect(page.getByRole('heading', { name: 'Lightframe' })).toBeAttached();
   const enter = page.getByRole('button', { name: 'Log in' });
   await expect(enter).toBeVisible();
   await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
@@ -93,10 +95,11 @@ test('entry stays provider-free and Login opens a focused Studio runtime', async
     });
 
   await loginFromEntry(page);
-  await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
-  await expect(page).toHaveTitle('Lightframe Studio');
+  await expect(page).toHaveURL(new RegExp(`${DASHBOARD_PATH}$`, 'u'));
+  await expect(page).toHaveTitle('Dashboard · Lightframe');
   await expect(page.locator('#studio-main')).toBeFocused();
-  await expect(page.getByLabel('Studio media stage')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.getByLabel('Studio media stage')).toBeHidden();
 });
 
 test('Back and Forward restore focus at each application boundary', async ({ page }) => {
@@ -107,10 +110,10 @@ test('Back and Forward restore focus at each application boundary', async ({ pag
 
   await page.goBack();
   await expect(page).toHaveURL(/\/$/u);
-  await expect(page.getByRole('button', { name: 'Enter Studio' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Open Dashboard' })).toBeFocused();
 
   await page.goForward();
-  await expect(page).toHaveURL(/\/studio$/u);
+  await expect(page).toHaveURL(new RegExp(`${DASHBOARD_PATH}$`, 'u'));
   await expect(page.locator('#studio-main')).toBeFocused();
 });
 
@@ -120,7 +123,7 @@ test('direct and refreshed Studio entries preserve one stage', async ({ page }) 
   await expect(page.getByLabel('Studio media stage')).toHaveCount(1);
 
   await page.reload();
-  await expect(page).toHaveURL(/\/studio$/u);
+  await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
   await expect(page.getByLabel('Studio media stage')).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Record New Video' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Upload Video' })).toBeVisible();
@@ -129,7 +132,7 @@ test('direct and refreshed Studio entries preserve one stage', async ({ page }) 
     .toMatchObject({ cameraCalls: 0, requirementModels: [], connections: [] });
 });
 
-test('saved video, character, and outfit routes preserve the shared Studio stage', async ({
+test('Video, Character, and Outfit Asset routes preserve the shared Studio stage', async ({
   page,
 }) => {
   await installSuccessfulStudioHarness(page);
@@ -140,17 +143,17 @@ test('saved video, character, and outfit routes preserve the shared Studio stage
       video as HTMLVideoElement;
   });
 
+  await page.getByRole('button', { name: 'Assets', exact: true }).click();
   for (const library of [
-    { label: 'Saved Videos', path: '/studio/videos', empty: 'No saved videos yet' },
-    { label: 'Saved Characters', path: '/studio/characters', empty: 'No saved characters yet' },
-    { label: 'Saved Outfits', path: '/studio/outfits', empty: 'No saved outfits yet' },
+    { label: 'Videos', path: '/studio/assets/videos', empty: 'No videos in Assets yet' },
+    { label: 'Characters', path: '/studio/assets/characters', empty: 'No saved characters yet' },
+    { label: 'Outfits', path: '/studio/assets/outfits', empty: 'No saved outfits yet' },
   ]) {
-    await page.getByRole('button', { name: 'Lightframe Demo account menu' }).click();
-    await page.getByRole('menuitem', { name: library.label }).click();
+    await page.getByRole('button', { name: `Open ${library.label}` }).click();
     await expect(page).toHaveURL(new RegExp(`${library.path}$`, 'u'));
     const dialog = page.getByRole('dialog', { name: library.label });
     await expect(dialog.getByRole('heading', { name: library.empty })).toBeVisible();
-    if (library.path === '/studio/characters') {
+    if (library.path === '/studio/assets/characters') {
       await expect(dialog.getByRole('button', { name: 'Create new character' })).toBeVisible();
     }
     expect(
@@ -161,11 +164,11 @@ test('saved video, character, and outfit routes preserve the shared Studio stage
       ),
     ).toBe(true);
     await dialog.getByRole('button', { name: 'Close panel' }).click();
-    await expect(page).toHaveURL(/\/studio$/u);
+    await expect(page).toHaveURL(/\/studio\/assets$/u);
   }
 });
 
-test('Projects Quick Start, lifecycle, refresh, and explicit library exit stay in one Studio shell', async ({
+test('Projects quick creation, lifecycle, refresh, and explicit Assets exit stay in one shell', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -176,10 +179,11 @@ test('Projects Quick Start, lifecycle, refresh, and explicit library exit stay i
   await expect(page.getByText('No active Projects yet', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Studio media stage')).toHaveCount(1);
   await expect(page.getByLabel('Studio media stage')).toBeHidden();
-  await page.getByRole('button', { name: 'Quick Start' }).click();
+  await page.getByRole('button', { name: 'Quick project' }).click();
 
   await expect(page).toHaveURL(new RegExp(`/studio/projects/${TEST_PROJECT_ID}$`, 'u'));
-  await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Untitled Project' })).toBeVisible();
+  await expect(page.getByText(/intentionally empty/u)).toBeVisible();
   expect(projects.operationKeys).toHaveLength(1);
   expect(projects.operationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
   await expect
@@ -207,13 +211,12 @@ test('Projects Quick Start, lifecycle, refresh, and explicit library exit stay i
     .click();
   await expect(page.getByText('Draft', { exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Lightframe Demo account menu' }).click();
-  await expect(page.getByText('Global libraries · exits Project')).toBeVisible();
-  await page.getByRole('menuitem', { name: 'Saved Videos (exits Project)' }).click();
-  await expect(page).toHaveURL(/\/studio\/videos$/u);
+  await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  await page.getByRole('button', { name: 'Open Videos' }).click();
+  await expect(page).toHaveURL(/\/studio\/assets\/videos$/u);
   await page.reload();
-  await expect(page).toHaveURL(/\/studio\/videos$/u);
-  await expect(page.getByRole('dialog', { name: 'Saved Videos' })).toBeVisible();
+  await expect(page).toHaveURL(/\/studio\/assets\/videos$/u);
+  await expect(page.getByRole('dialog', { name: 'Videos' })).toBeVisible();
   expectNoExternalProviderTraffic(network);
 });
 
@@ -223,7 +226,7 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   const network = await installSuccessfulStudioHarness(page);
   const projects = await installProjectHarness(page, true);
   const fixture = await loadDecodableH264VideoFixture();
-  await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+  await page.goto(`/studio/projects/${TEST_PROJECT_ID}/workspace`);
 
   const stage = page.getByLabel('Studio media stage');
   const stageVideo = stage.locator('video');
@@ -264,7 +267,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
     loseAppendOutputResponseOnce: true,
   });
   const fixture = await loadDecodableH264VideoFixture();
-  await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+  await page.goto(`/studio/projects/${TEST_PROJECT_ID}/workspace`);
   await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
     name: 'project-output-source.mp4',
     mimeType: 'video/mp4',
@@ -327,22 +330,22 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   await expect(page.getByRole('dialog', { name: 'Choose Add Version target' })).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await page.getByRole('button', { name: 'Lightframe Demo account menu' }).click();
-  await page.getByRole('menuitem', { name: 'Saved Videos (exits Project)' }).click();
-  const gallery = page.getByRole('dialog', { name: 'Saved Videos' });
+  await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  await page.getByRole('button', { name: 'Open Videos' }).click();
+  const gallery = page.getByRole('dialog', { name: 'Videos' });
   await expect(gallery.getByText('Unassigned Content').first()).toBeVisible();
   await expect(gallery.getByRole('heading', { name: 'Legacy unassigned' })).toBeVisible();
-  await expect(gallery.getByRole('button', { name: 'Load in Studio' }).first()).toBeEnabled();
+  await expect(gallery.getByRole('button', { name: 'Open in Studio' }).first()).toBeEnabled();
 
   await gallery.getByLabel('More actions for Launch master').click();
-  await gallery.getByRole('button', { name: 'Delete' }).click();
+  await gallery.getByRole('button', { name: 'Remove from Assets' }).click();
   await page
-    .getByRole('dialog', { name: 'Remove saved video' })
-    .getByRole('button', { name: 'Remove from Saved Videos' })
+    .getByRole('dialog', { name: 'Remove video from Assets' })
+    .getByRole('button', { name: 'Remove from Assets' })
     .click();
   await expect(gallery.getByRole('heading', { name: 'Launch master' })).toHaveCount(0);
 
-  await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+  await page.goto(`/studio/projects/${TEST_PROJECT_ID}/workspace`);
   const retainedHistory = page.getByRole('list', { name: 'Saved video Version history' });
   const retainedOlderVersion = retainedHistory
     .getByRole('listitem')
@@ -368,7 +371,7 @@ test('an accepted Project operation reconnects after refresh and presents its re
     { storageKey: CREATIVE_ASSET_STORAGE_KEY, store: SEEDED_PROJECT_CREATIVE_STORE },
   );
   const fixture = await loadDecodableH264VideoFixture();
-  await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+  await page.goto(`/studio/projects/${TEST_PROJECT_ID}/workspace`);
   await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
     name: 'project-processing-source.mp4',
     mimeType: 'video/mp4',
@@ -397,13 +400,15 @@ test('an accepted Project operation reconnects after refresh and presents its re
   await expect.poll(() => projects.processingOperationKeys).toHaveLength(1);
   expect(projects.processingOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
   expect(projects.processingProviderIntents).toEqual(['video']);
-  await existingVideo.getByRole('button', { name: 'Close panel' }).click();
+  await expect(existingVideo).toBeHidden();
+  await page.getByRole('button', { name: '← Project overview' }).click();
   await page.getByRole('button', { name: 'Archive' }).click();
   const archive = page.getByRole('dialog', { name: 'Archive Project' });
   await expect(archive.getByRole('button', { name: 'Archive Project' })).toBeDisabled();
   await expect(archive).toContainText('accepted provider work is active');
   await expect(archive).toContainText('accepted remote work may continue');
   await archive.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: 'Continue editing' }).click();
   await page.reload();
 
   await expect(page.getByText('Character Swap accepted / queued', { exact: true })).toBeVisible();
@@ -429,7 +434,7 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
     { storageKey: CREATIVE_ASSET_STORAGE_KEY, store: SEEDED_PROJECT_CREATIVE_STORE },
   );
   const fixture = await loadDecodableH264VideoFixture();
-  await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+  await page.goto(`/studio/projects/${TEST_PROJECT_ID}/workspace`);
   await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
     name: 'project-edit-source.mp4',
     mimeType: 'video/mp4',
@@ -514,8 +519,12 @@ test('Campaign creation reaches a Campaign Project without activating media or p
   await expect(page).toHaveURL(new RegExp(`/studio/campaigns/${TEST_CAMPAIGN_ID}$`, 'u'));
   await expect(page.getByRole('heading', { name: 'Summer launch' })).toBeVisible();
   await page.getByRole('button', { name: 'New Project' }).click();
+  const createProject = page.getByRole('dialog', { name: 'New Project' });
+  await createProject.getByLabel('Project name').fill('Launch social cut');
+  await createProject.getByRole('button', { name: 'Create Project' }).click();
   await expect(page).toHaveURL(new RegExp(`/studio/projects/${TEST_PROJECT_ID}$`, 'u'));
-  await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Launch social cut' })).toBeVisible();
+  await expect(page.getByText(/intentionally empty/u)).toBeVisible();
   expect(campaigns.campaignOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
   expect(campaigns.projectOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
   await expect
@@ -542,6 +551,9 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   await createCampaign.getByRole('textbox', { name: /Brief/u }).fill('Keep the launch focused.');
   await createCampaign.getByRole('button', { name: 'Create Campaign' }).click();
   await page.getByRole('button', { name: 'New Project' }).click();
+  const createProject = page.getByRole('dialog', { name: 'New Project' });
+  await createProject.getByLabel('Project name').fill('Campaign master Project');
+  await createProject.getByRole('button', { name: 'Create Project' }).click();
   await expect(page).toHaveURL(new RegExp(`/studio/projects/${TEST_PROJECT_ID}$`, 'u'));
   expect(campaigns.campaignOperationKeys).toHaveLength(1);
   expect(campaigns.campaignOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
@@ -557,6 +569,8 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   await page.reload();
   await expect(page.getByRole('button', { name: '← Summer launch' })).toBeVisible();
   await expect(page.getByText('Campaign: Summer launch', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue editing' }).click();
+  await expect(page).toHaveURL(new RegExp(`/studio/projects/${TEST_PROJECT_ID}/workspace$`, 'u'));
   await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
     name: 'campaign-project-source.mp4',
     mimeType: 'video/mp4',
@@ -589,7 +603,7 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   await expect.poll(() => projects.processingOperationKeys).toHaveLength(1);
   expect(projects.processingOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
   expect(projects.processingProviderIntents).toEqual(['video']);
-  await existingVideo.getByRole('button', { name: 'Close panel' }).click();
+  await expect(existingVideo).toBeHidden();
 
   await page.reload();
   await expect(page.getByText('Character Swap accepted / queued', { exact: true })).toBeVisible();
@@ -597,14 +611,12 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   expect(projects.processingOperationKeys).toHaveLength(1);
   expect(projects.processingReconcileCount).toBeGreaterThanOrEqual(1);
 
+  await page.getByRole('button', { name: '← Project overview' }).click();
   await page.getByRole('button', { name: '← Summer launch' }).click();
   const activeProjects = page.getByRole('list', { name: 'Active Projects in Summer launch' });
   await activeProjects.getByRole('button', { name: 'Open' }).click();
-  const resumeGuard = page.getByRole('dialog', {
-    name: 'Discard temporary Studio work and open this Project?',
-  });
-  await expect(resumeGuard).toBeVisible();
-  await resumeGuard.getByRole('button', { name: 'Discard and open Project' }).click();
+  await expect(page.getByRole('heading', { name: 'Untitled Project' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue editing' }).click();
   await expect(page.getByText('Result ready', { exact: true })).toBeVisible();
   expect(projects.processingOperationKeys).toHaveLength(1);
 
@@ -642,6 +654,7 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   ]);
   expect(download.suggestedFilename()).toBe('campaign-project-source.mp4');
 
+  await page.getByRole('button', { name: '← Project overview' }).click();
   await page.getByRole('button', { name: '← Summer launch' }).click();
   await page.getByRole('button', { name: 'Archive' }).click();
   await page
@@ -681,12 +694,12 @@ test('a protected Project deep link returns to the same URL after login', async 
       }),
     });
   });
-  await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+  await page.goto(`/studio/projects/${TEST_PROJECT_ID}/workspace`);
 
   const login = page.getByRole('dialog', { name: 'Log in to Lightframe' });
   await expect(login).toBeVisible();
   await login.getByRole('button', { name: 'Log in' }).click();
-  await expect(page).toHaveURL(new RegExp(`/studio/projects/${TEST_PROJECT_ID}$`, 'u'));
+  await expect(page).toHaveURL(new RegExp(`/studio/projects/${TEST_PROJECT_ID}/workspace$`, 'u'));
   await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
 });
 
@@ -694,14 +707,17 @@ test('recording and temporary-take work cannot be lost silently through Back', a
   await installSuccessfulStudioHarness(page);
   await page.goto(ENTRY_PATH);
   await loginFromEntry(page);
+  await page.getByRole('button', { name: 'Create video' }).click();
+  await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
   await startLocalPreview(page);
   await page.getByRole('button', { name: 'Record' }).click();
   await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
 
   await page.goBack();
-  await expect(page).toHaveURL(/\/studio$/u);
+  await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
   await expect(page.getByRole('dialog', { name: 'Finish the take before leaving' })).toBeVisible();
   await page.getByRole('button', { name: 'Stay in Studio' }).click();
+  await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
   await page.getByRole('button', { name: 'Stop recording' }).click();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
 
@@ -709,6 +725,6 @@ test('recording and temporary-take work cannot be lost silently through Back', a
   const discard = page.getByRole('dialog', { name: 'Discard temporary work and leave?' });
   await expect(discard).toBeVisible();
   await discard.getByRole('button', { name: 'Discard and leave' }).click();
-  await expect(page).toHaveURL(/\/$/u);
-  await expect(page.getByRole('button', { name: 'Enter Studio' })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`${DASHBOARD_PATH}$`, 'u'));
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 });

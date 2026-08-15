@@ -125,7 +125,7 @@ for (const viewport of exactViewports) {
   }) => {
     const network = await installSuccessfulStudioHarness(page);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await page.goto('/studio');
+    await page.goto('/studio/create');
     await expectNoDocumentOverflow(page);
     await expect(page.getByLabel('Studio session controls')).toBeVisible();
     await expectActionInsideViewport(page, 'Record New Video');
@@ -263,7 +263,7 @@ test('@cross-browser focused media smoke reaches record, Voice, and review recov
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   const controls = page.getByLabel('Studio session controls');
   await startLocalPreview(page);
@@ -303,7 +303,7 @@ test('@touch controls recover while recording Stop remains reachable', async ({ 
   test.setTimeout(45_000);
   const network = await installSuccessfulStudioHarness(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   const mediaStage = page.getByLabel('Studio media stage');
   const controls = page.locator('[aria-label="Studio session controls"]');
@@ -351,7 +351,7 @@ test('@touch controls recover while recording Stop remains reachable', async ({ 
 test('the independent recording maximum warns and safely opens take review', async ({ page }) => {
   await page.clock.install({ time: new Date('2026-07-28T12:00:00.000Z') });
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   const controls = page.getByLabel('Studio session controls');
   await startLocalPreview(page);
@@ -402,7 +402,7 @@ test('persistent controls preserve local media across VTON choice, AI stop, trac
 }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Virtual Try-On · VTON 3' }).click();
@@ -460,11 +460,11 @@ test('no-key Local Camera records and finalizes without provider HTTP, WebSocket
     realtimeVideoAvailable: false,
     referenceImagesAvailable: false,
   });
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   const availability = page.getByLabel('Integration availability');
   await availability.getByRole('button').click();
   const availabilityDetails = page.getByRole('region', { name: 'Studio availability details' });
-  await expect(availabilityDetails).toContainText('AI video not configured');
+  await expect(availabilityDetails).toContainText('Live AI Beta not configured');
   await expect(availabilityDetails).toContainText('Voice cloud not configured (optional)');
   await page.keyboard.press('Escape');
 
@@ -520,7 +520,7 @@ test('saved voice preview, Apply, remux, Save, and Restore Original stay explici
     elevenLabsAvailable: true,
     stubMediaPlayback: false,
   });
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   await createLocalTake(page);
   const takeDialog = page.getByRole('dialog', { name: 'Latest Take' });
@@ -585,7 +585,7 @@ test('saved voice preview, Apply, remux, Save, and Restore Original stay explici
     },
   ]);
 
-  await processedTakeDialog.getByRole('button', { name: 'Save Video' }).click();
+  await processedTakeDialog.getByRole('button', { name: 'Save to Assets' }).click();
   await confirmSaveVideo(page, 'Northstar narration');
   await expect(processedTakeDialog.getByRole('button', { name: 'Saved' })).toBeVisible();
   await expect(
@@ -609,7 +609,7 @@ test('Browse Voices adds once and confirmed Saved removal reconciles both librar
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page, { elevenLabsAvailable: true });
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await createLocalTake(page);
 
   const takeDialog = page.getByRole('dialog', { name: 'Latest Take' });
@@ -656,7 +656,7 @@ test('Save enables Release and clears the reviewed take without reacquiring medi
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Start local preview' }).click();
@@ -702,10 +702,10 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await page.getByLabel('Integration availability').getByRole('button').click();
   await expect(page.getByRole('region', { name: 'Studio availability details' })).toContainText(
-    'AI video configured',
+    'Live AI Beta enabled',
   );
   await page.keyboard.press('Escape');
 
@@ -773,7 +773,7 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
 
 test('a Lucy model take finalizes before the provider session is released', async ({ page }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
@@ -828,7 +828,7 @@ test('the Decart maximum warns and finalizes an active take before expected rele
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
@@ -867,10 +867,10 @@ test('VTON 3 accepts a valid ephemeral garment image and starts with image-only 
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await page.getByLabel('Integration availability').getByRole('button').click();
   await expect(page.getByRole('region', { name: 'Studio availability details' })).toContainText(
-    'AI video configured',
+    'Live AI Beta enabled',
   );
   await page.keyboard.press('Escape');
 
@@ -909,7 +909,7 @@ test('switches to a browser-exposed phone camera while Capture Settings stays op
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await page.evaluate(() => {
     Object.defineProperty(navigator.mediaDevices, 'enumerateDevices', {
       configurable: true,
@@ -962,7 +962,7 @@ test('switches to a browser-exposed phone camera while Capture Settings stays op
 test('Space records and finishes only outside editable controls', async ({ page }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.setViewportSize({ width: 1_280, height: 720 });
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Start local preview' }).click();

@@ -1,6 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { AuthenticatedUser } from '@studio/contracts';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccountMenu } from '../features/account/AccountMenu';
 import type { BrowserCapabilities, ProviderAvailability } from '../features/media-session';
 import { Button } from '../ui';
@@ -9,18 +9,19 @@ import {
   brandStyles,
   capabilityDetailStyles,
   capabilityStyles,
+  createMenuStyles,
   headerActionsStyles,
   headerStyles,
+  mobileNavigationStyles,
   primaryNavigationStyles,
   systemStatusDotStyles,
 } from './StudioApp.styles';
 
 export type CapabilityState = 'loading' | 'ready' | 'error';
 
-type HeaderMenu = 'account' | 'status';
+type HeaderMenu = 'account' | 'create' | 'status';
 
-export type StudioHeaderDestination =
-  'studio' | 'campaigns' | 'projects' | 'videos' | 'characters' | 'outfits';
+export type StudioHeaderDestination = 'dashboard' | 'studio' | 'campaigns' | 'projects' | 'assets';
 
 type StudioHeaderProps = {
   availability: ProviderAvailability;
@@ -29,13 +30,15 @@ type StudioHeaderProps = {
   user: AuthenticatedUser;
   accountBusy?: boolean;
   activeDestination: StudioHeaderDestination;
-  projectContextActive?: boolean;
+  organizationRouteActive?: boolean;
+  onOpenDashboard: () => void;
   onOpenStudio: () => void;
   onOpenProjects: () => void;
   onOpenCampaigns: () => void;
-  onOpenVideos: () => void;
-  onOpenCharacters: () => void;
-  onOpenOutfits: () => void;
+  onOpenAssets: () => void;
+  onCreateProject: () => void;
+  onCreateCampaign: () => void;
+  onOpenLive: () => void;
   onLogout: () => void;
 };
 
@@ -51,11 +54,11 @@ const capabilityLabel = (
 
 const systemStatusLabel = (
   capabilityState: CapabilityState,
-  systemState: 'loading' | 'ready' | 'limited',
+  localCaptureAvailable: boolean,
 ): string => {
   if (capabilityState === 'loading') return 'Checking integrations';
   if (capabilityState === 'error') return 'Integration status unavailable';
-  return systemState === 'ready' ? 'Studio available to try' : 'Studio limited';
+  return localCaptureAvailable ? 'Core Studio ready' : 'Studio limited';
 };
 
 type StatusMenuProps = {
@@ -64,7 +67,8 @@ type StatusMenuProps = {
   systemState: 'loading' | 'ready' | 'limited';
   systemLabel: string;
   localCaptureState: string;
-  aiVideoState: string;
+  liveAiState: string;
+  existingVideoAiState: string;
   voiceCloudState: string;
 };
 
@@ -74,7 +78,8 @@ const StatusMenu = ({
   systemState,
   systemLabel,
   localCaptureState,
-  aiVideoState,
+  liveAiState,
+  existingVideoAiState,
   voiceCloudState,
 }: StatusMenuProps) => {
   const theme = useTheme();
@@ -105,18 +110,119 @@ const StatusMenu = ({
         >
           <div data-capability-heading>
             <strong>Studio availability</strong>
-            <span>Browser support and configured integrations</span>
+            <span>Local support and configured integrations</span>
           </div>
           <span>
             Local capture <strong>{localCaptureState}</strong>
           </span>
           <span>
-            AI video <strong>{aiVideoState}</strong>
+            Existing-video AI <strong>{existingVideoAiState}</strong>
+          </span>
+          <span>
+            Live AI Beta <strong>{liveAiState}</strong>
           </span>
           <span>
             Voice cloud <strong>{voiceCloudState}</strong>
           </span>
-          <small>Provider configuration does not verify live service health.</small>
+          <small>Configuration does not verify live provider health.</small>
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+type CreateMenuProps = Readonly<{
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  liveEnabled: boolean;
+  onCreateVideo: () => void;
+  onCreateProject: () => void;
+  onCreateCampaign: () => void;
+  onOpenLive: () => void;
+}>;
+
+const CreateMenu = ({
+  open,
+  onOpenChange,
+  liveEnabled,
+  onCreateVideo,
+  onCreateProject,
+  onCreateCampaign,
+  onOpenLive,
+}: CreateMenuProps) => {
+  const theme = useTheme();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  useDismissiblePopover({ open, onOpenChange, rootRef, triggerRef });
+
+  useEffect(() => {
+    if (!open) return;
+    window.requestAnimationFrame(() => {
+      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    });
+  }, [open]);
+
+  const run = (action: () => void) => {
+    onOpenChange(false);
+    action();
+  };
+
+  return (
+    <div ref={rootRef} css={createMenuStyles(theme)}>
+      <Button
+        ref={triggerRef}
+        size="small"
+        variant="primary"
+        aria-label="Create"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => onOpenChange(!open)}
+      >
+        <span aria-hidden="true">＋</span>
+        <span data-create-label-long>Create</span>
+      </Button>
+      {open ? (
+        <div
+          ref={menuRef}
+          role="menu"
+          tabIndex={-1}
+          aria-label="Create"
+          data-create-menu
+          onKeyDown={(event) => {
+            if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+            const items = [
+              ...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []),
+            ];
+            if (items.length === 0) return;
+            event.preventDefault();
+            const current = items.indexOf(document.activeElement as HTMLElement);
+            const next =
+              event.key === 'Home'
+                ? 0
+                : event.key === 'End'
+                  ? items.length - 1
+                  : event.key === 'ArrowDown'
+                    ? (current + 1 + items.length) % items.length
+                    : (current - 1 + items.length) % items.length;
+            items[next]?.focus();
+          }}
+        >
+          <Button role="menuitem" variant="quiet" onClick={() => run(onCreateVideo)}>
+            New video
+          </Button>
+          <Button role="menuitem" variant="quiet" onClick={() => run(onCreateProject)}>
+            New Project
+          </Button>
+          <Button role="menuitem" variant="quiet" onClick={() => run(onCreateCampaign)}>
+            New Campaign
+          </Button>
+          {liveEnabled ? (
+            <Button role="menuitem" variant="quiet" onClick={() => run(onOpenLive)}>
+              Live AI · Beta
+            </Button>
+          ) : null}
+          <small>Projects and Campaigns are optional. Start with a standalone video anytime.</small>
         </div>
       ) : null}
     </div>
@@ -130,20 +236,40 @@ export const StudioHeader = ({
   user,
   accountBusy,
   activeDestination,
-  projectContextActive = false,
+  organizationRouteActive = false,
+  onOpenDashboard,
   onOpenStudio,
   onOpenProjects,
   onOpenCampaigns,
-  onOpenVideos,
-  onOpenCharacters,
-  onOpenOutfits,
+  onOpenAssets,
+  onCreateProject,
+  onCreateCampaign,
+  onOpenLive,
   onLogout,
 }: StudioHeaderProps) => {
   const theme = useTheme();
   const [openMenu, setOpenMenu] = useState<HeaderMenu | null>(null);
   const localCaptureAvailable = browser.mediaDevices && browser.secureContext;
   const localCaptureState = localCaptureAvailable ? 'available' : 'unavailable';
-  const aiVideoState = capabilityLabel(capabilityState, availability.decart, 'not configured');
+  const liveBetaEnabled = availability.realtimeBetaEnabled === true;
+  const liveProviderConfigured = availability.realtimeProviderConfigured ?? availability.decart;
+  const liveEnabled = liveBetaEnabled && liveProviderConfigured && availability.decart;
+  const liveAiState =
+    capabilityState === 'loading'
+      ? 'checking'
+      : !liveBetaEnabled
+        ? 'disabled'
+        : liveProviderConfigured
+          ? 'enabled'
+          : 'not configured';
+  const existingVideoAiState = capabilityLabel(
+    capabilityState,
+    Boolean(
+      availability.videoProcessing?.characterSwap.available ||
+      availability.videoProcessing?.virtualTryOn.available,
+    ),
+    'not configured',
+  );
   const voiceCloudState = capabilityLabel(
     capabilityState,
     availability.elevenLabs,
@@ -152,79 +278,92 @@ export const StudioHeader = ({
   const systemState =
     capabilityState === 'loading'
       ? 'loading'
-      : localCaptureAvailable && availability.decart
-        ? 'ready'
-        : 'limited';
-  const systemLabel = systemStatusLabel(capabilityState, systemState);
+      : capabilityState === 'error' || !localCaptureAvailable
+        ? 'limited'
+        : 'ready';
+  const systemLabel = systemStatusLabel(capabilityState, localCaptureAvailable);
   const setMenuOpen = useCallback((menu: HeaderMenu, open: boolean) => {
     setOpenMenu(open ? menu : null);
   }, []);
+  const destinations = [
+    { id: 'dashboard', label: 'Dashboard', open: onOpenDashboard },
+    { id: 'projects', label: 'Projects', open: onOpenProjects },
+    { id: 'campaigns', label: 'Campaigns', open: onOpenCampaigns },
+    { id: 'assets', label: 'Assets', open: onOpenAssets },
+  ] as const;
 
   return (
-    <header css={headerStyles(theme)}>
-      <div css={brandStyles(theme)}>
-        <img src="/favicon.svg" alt="" width="38" height="38" />
-        <div>
-          <h1>Lightframe Studio</h1>
-          <span>Local-first studio</span>
+    <>
+      <header css={headerStyles(theme)}>
+        <button
+          type="button"
+          aria-label="Open Lightframe Dashboard"
+          css={brandStyles(theme)}
+          onClick={onOpenDashboard}
+        >
+          <img src="/favicon.svg" alt="" width="38" height="38" />
+          <div>
+            <strong>Lightframe</strong>
+            <span>Local-first studio</span>
+          </div>
+        </button>
+        <nav aria-label="Primary" css={primaryNavigationStyles(theme)}>
+          {destinations.map(({ id, label, open }) => (
+            <Button
+              key={id}
+              size="small"
+              variant="quiet"
+              aria-current={activeDestination === id ? 'page' : undefined}
+              onClick={open}
+            >
+              {label}
+            </Button>
+          ))}
+        </nav>
+        <div css={headerActionsStyles(theme)}>
+          <CreateMenu
+            open={openMenu === 'create'}
+            onOpenChange={(open) => setMenuOpen('create', open)}
+            liveEnabled={liveEnabled}
+            onCreateVideo={onOpenStudio}
+            onCreateProject={onCreateProject}
+            onCreateCampaign={onCreateCampaign}
+            onOpenLive={onOpenLive}
+          />
+          <StatusMenu
+            open={openMenu === 'status'}
+            onOpenChange={(open) => setMenuOpen('status', open)}
+            systemState={systemState}
+            systemLabel={systemLabel}
+            localCaptureState={localCaptureState}
+            liveAiState={liveAiState}
+            existingVideoAiState={existingVideoAiState}
+            voiceCloudState={voiceCloudState}
+          />
+          <AccountMenu
+            user={user}
+            open={openMenu === 'account'}
+            onOpenChange={(open) => setMenuOpen('account', open)}
+            busy={accountBusy}
+            onLogout={onLogout}
+          />
         </div>
-      </div>
-      <nav aria-label="Primary" css={primaryNavigationStyles(theme)}>
-        <Button
-          size="small"
-          variant="quiet"
-          aria-label={projectContextActive ? 'Exit Project to Studio' : undefined}
-          aria-current={activeDestination === 'studio' ? 'page' : undefined}
-          onClick={onOpenStudio}
-        >
-          Studio
-        </Button>
-        <Button
-          size="small"
-          variant="quiet"
-          aria-current={activeDestination === 'projects' ? 'page' : undefined}
-          onClick={onOpenProjects}
-        >
-          Projects
-        </Button>
-        <Button
-          size="small"
-          variant="quiet"
-          aria-current={activeDestination === 'campaigns' ? 'page' : undefined}
-          onClick={onOpenCampaigns}
-        >
-          Campaigns
-        </Button>
-      </nav>
-      <div css={headerActionsStyles(theme)}>
-        <StatusMenu
-          open={openMenu === 'status'}
-          onOpenChange={(open) => setMenuOpen('status', open)}
-          systemState={systemState}
-          systemLabel={systemLabel}
-          localCaptureState={localCaptureState}
-          aiVideoState={aiVideoState}
-          voiceCloudState={voiceCloudState}
-        />
-        <AccountMenu
-          user={user}
-          open={openMenu === 'account'}
-          onOpenChange={(open) => setMenuOpen('account', open)}
-          busy={accountBusy}
-          projectContextActive={projectContextActive}
-          activeLibrary={
-            activeDestination === 'videos' ||
-            activeDestination === 'characters' ||
-            activeDestination === 'outfits'
-              ? activeDestination
-              : undefined
-          }
-          onOpenVideos={onOpenVideos}
-          onOpenCharacters={onOpenCharacters}
-          onOpenOutfits={onOpenOutfits}
-          onLogout={onLogout}
-        />
-      </div>
-    </header>
+      </header>
+      {organizationRouteActive ? (
+        <nav aria-label="Mobile primary" css={mobileNavigationStyles(theme)}>
+          {destinations.map(({ id, label, open }) => (
+            <Button
+              key={id}
+              size="small"
+              variant="quiet"
+              aria-current={activeDestination === id ? 'page' : undefined}
+              onClick={open}
+            >
+              {label}
+            </Button>
+          ))}
+        </nav>
+      ) : null}
+    </>
   );
 };

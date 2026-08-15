@@ -26,6 +26,7 @@ import {
 } from '../../adapters/api-client/savedVideosApi';
 import { Button, OverlayPanel, SelectField, StatusNotice, TextField } from '../../ui';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
+import { AddVideoToProjectDialog } from '../projects/AddVideoToProjectDialog';
 import {
   actionMenuPopoverStyles,
   actionMenuStyles,
@@ -105,6 +106,7 @@ const VideoGalleryGrid = ({
   onThumbnailError,
   onOpenPreview,
   onUse,
+  onAddToProject,
   onRename,
   onRemove,
 }: {
@@ -114,6 +116,7 @@ const VideoGalleryGrid = ({
   onThumbnailError: (videoId: string) => void;
   onOpenPreview: (video: SavedVideoSummary, trigger: HTMLButtonElement) => void;
   onUse: (video: SavedVideoSummary, intent: 'play' | 'edit') => Promise<void>;
+  onAddToProject: (video: SavedVideoSummary, trigger: HTMLElement) => void;
   onRename: (video: SavedVideoSummary, trigger: HTMLElement) => void;
   onRemove: (video: SavedVideoSummary, trigger: HTMLElement) => void;
 }) => {
@@ -199,7 +202,7 @@ const VideoGalleryGrid = ({
                   busy={busy}
                   onClick={() => void onUse(video, 'play')}
                 >
-                  Load in Studio
+                  Open in Studio
                 </Button>
                 <details css={actionMenuStyles(theme)}>
                   <summary aria-label={`More actions for ${video.title}`}>
@@ -212,6 +215,18 @@ const VideoGalleryGrid = ({
                       onClick={() => void onUse(video, 'edit')}
                     >
                       Edit video
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy || video.status !== 'ready'}
+                      onClick={(event) => {
+                        const details = event.currentTarget.closest('details');
+                        const trigger = details?.querySelector<HTMLElement>('summary');
+                        details?.removeAttribute('open');
+                        onAddToProject(video, trigger ?? event.currentTarget);
+                      }}
+                    >
+                      Add to Project
                     </button>
                     <a
                       href={downloadSavedVideoUrl(video.id, version.id)}
@@ -242,7 +257,7 @@ const VideoGalleryGrid = ({
                         onRemove(video, trigger ?? event.currentTarget);
                       }}
                     >
-                      Delete
+                      Remove from Assets
                     </button>
                   </div>
                 </details>
@@ -278,6 +293,7 @@ export const VideoGallery = ({
     readonly kind: 'rename' | 'remove';
     readonly video: SavedVideoSummary;
   } | null>(null);
+  const [projectTarget, setProjectTarget] = useState<SavedVideoSummary | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [brokenThumbnails, setBrokenThumbnails] = useState<ReadonlySet<string>>(() => new Set());
@@ -286,6 +302,7 @@ export const VideoGallery = ({
   const actionTriggerRef = useRef<HTMLElement | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const actionCancelRef = useRef<HTMLButtonElement | null>(null);
+  const projectTriggerRef = useRef<HTMLElement | null>(null);
 
   const videosQuery = useInfiniteQuery({
     queryKey: [
@@ -401,7 +418,7 @@ export const VideoGallery = ({
       setNotice({
         role: 'status',
         tone: 'success',
-        message: 'Video removed from Saved Videos. Referenced Project history remains preserved.',
+        message: 'Video removed from Assets. Referenced Project history remains preserved.',
       });
       setAction(null);
     } catch (error) {
@@ -471,7 +488,7 @@ export const VideoGallery = ({
   if (!libraryHasVideos) {
     return (
       <div>
-        <h2>No saved videos yet</h2>
+        <h2>No videos in Assets yet</h2>
         <p>
           Finish a Project with Save as New Video or Add Version, or save a standalone Studio video.
           Download always selects one exact ready Version.
@@ -554,6 +571,10 @@ export const VideoGallery = ({
           }
           onOpenPreview={openPreview}
           onUse={handleUseVideo}
+          onAddToProject={(video, trigger) => {
+            projectTriggerRef.current = trigger;
+            setProjectTarget(video);
+          }}
           onRename={(video, trigger) => openAction('rename', video, trigger)}
           onRemove={(video, trigger) => openAction('remove', video, trigger)}
         />
@@ -616,11 +637,19 @@ export const VideoGallery = ({
         </form>
       </OverlayPanel>
 
+      {projectTarget ? (
+        <AddVideoToProjectDialog
+          video={projectTarget}
+          returnFocusRef={projectTriggerRef}
+          onClose={() => setProjectTarget(null)}
+        />
+      ) : null}
+
       <OverlayPanel
         open={action?.kind === 'remove'}
         onClose={closeAction}
-        title="Remove saved video"
-        description="Hide this video from the global library without claiming physical erasure."
+        title="Remove video from Assets"
+        description="Hide this video from Assets without claiming physical erasure."
         placement="bottom"
         size="standard"
         closeDisabled={deleteMutation.isPending}
@@ -638,14 +667,14 @@ export const VideoGallery = ({
               Keep video
             </Button>
             <Button variant="danger" busy={deleteMutation.isPending} onClick={() => void remove()}>
-              Remove from Saved Videos
+              Remove from Assets
             </Button>
           </div>
         }
       >
         <p>
-          Remove “{action?.video.title}” from Saved Videos? Exact Versions and bytes remain
-          available from any retaining Project history.
+          Remove “{action?.video.title}” from Assets? Exact Versions and bytes remain available from
+          any retaining Project history.
         </p>
         {actionError ? (
           <StatusNotice role="alert" tone="danger" title="Video not removed">
@@ -669,6 +698,9 @@ export const VideoGallery = ({
         footer={
           previewVideo && selectedVersion ? (
             <div css={previewFooterStyles(theme)}>
+              <Button disabled aria-describedby="video-export-unavailable">
+                Export
+              </Button>
               <a
                 href={downloadSavedVideoUrl(previewVideo.id, selectedVersion.id)}
                 download={selectedVersion.filename}
@@ -689,10 +721,13 @@ export const VideoGallery = ({
                     busy={busyId === previewVideo.id}
                     onClick={() => void handleUseVideo(previewVideo, 'play')}
                   >
-                    Load in Studio
+                    Open in Studio
                   </Button>
                 </>
               ) : null}
+              <small id="video-export-unavailable">
+                Export formats and channels are not specified yet. Download remains available.
+              </small>
             </div>
           ) : null
         }

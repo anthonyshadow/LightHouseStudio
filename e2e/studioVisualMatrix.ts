@@ -38,6 +38,11 @@ export const ENTRY_VISUAL_SCENARIO = {
   baseline: '00-entry/initial.png',
 } as const;
 
+export const ORGANIZATION_VISUAL_SCENARIOS = [
+  { id: 'dashboard-overview', baseline: '11-dashboard/overview.png' },
+  { id: 'assets-overview', baseline: '12-assets/overview.png' },
+] as const;
+
 export const STUDIO_INITIAL_VISUAL_SCENARIO = {
   id: 'studio-initial-closed',
   baseline: '01-studio/initial-closed.png',
@@ -114,6 +119,7 @@ export const SMALL_MOBILE_VISUAL_SCENARIOS = [
 
 export type VisualScenarioId =
   | (typeof ENTRY_VISUAL_SCENARIO)['id']
+  | (typeof ORGANIZATION_VISUAL_SCENARIOS)[number]['id']
   | (typeof STUDIO_INITIAL_VISUAL_SCENARIO)['id']
   | (typeof STUDIO_PORTRAIT_INITIAL_VISUAL_SCENARIO)['id']
   | (typeof CORE_VISUAL_SCENARIOS)[number]['id']
@@ -132,6 +138,10 @@ if (!desktopViewport || !compactViewport || !smallMobileViewport) {
 
 export const VISUAL_CASE_MATRIX = [
   { viewport: smallMobileViewport, scenario: ENTRY_VISUAL_SCENARIO },
+  ...ORGANIZATION_VISUAL_SCENARIOS.flatMap((scenario) => [
+    { viewport: desktopViewport, scenario },
+    { viewport: smallMobileViewport, scenario },
+  ]),
   ...VISUAL_VIEWPORTS.flatMap((viewport) =>
     CORE_VISUAL_SCENARIOS.map((scenario) => ({ viewport, scenario })),
   ),
@@ -168,7 +178,7 @@ export const VISUAL_BASELINE_PATHS = VISUAL_CASE_MATRIX.map(
   ({ viewport, scenario }) => `${viewport.folder}/${scenario.baseline}`,
 );
 
-const VISUAL_CASE_BUDGET = 31;
+const VISUAL_CASE_BUDGET = 35;
 const coveredViewportIds = new Set(VISUAL_CASE_MATRIX.map(({ viewport }) => viewport.id));
 const corePairs = new Set(
   VISUAL_CASE_MATRIX.map(({ viewport, scenario }) => `${viewport.id}/${scenario.id}`),

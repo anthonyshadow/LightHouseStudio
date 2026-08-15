@@ -108,7 +108,7 @@ export const TakeReviewActions = ({
           disabled={locked || saving || saved}
           onClick={onSaveVideo}
         >
-          {saving ? 'Saving…' : saved ? 'Saved' : compact ? 'Save' : 'Save Video'}
+          {saving ? 'Saving…' : saved ? 'Saved to Assets' : compact ? 'Save' : 'Save to Assets'}
         </Button>
       ) : null}
       {onReplaceSavedVideo ? (

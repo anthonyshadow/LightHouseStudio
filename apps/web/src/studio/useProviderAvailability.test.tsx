@@ -15,7 +15,7 @@ import { providerAvailabilityScenario } from '../test/msw/handlers';
 import { mockApiServer } from '../test/msw/server';
 
 const capabilityPayload: CapabilitiesResponse = {
-  realtimeVideo: { available: true },
+  realtimeVideo: { available: true, betaEnabled: true },
   videoProcessing: {
     characterSwap: {
       available: true,
@@ -55,6 +55,8 @@ const capabilityPayload: CapabilitiesResponse = {
 
 const availableProviders: ProviderAvailability = {
   decart: true,
+  realtimeBetaEnabled: true,
+  realtimeProviderConfigured: true,
   videoProcessing: capabilityPayload.videoProcessing,
   elevenLabs: true,
   elevenLabsModel: 'eleven_multilingual_sts_v2',

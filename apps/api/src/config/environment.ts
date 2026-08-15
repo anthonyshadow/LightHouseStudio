@@ -182,6 +182,7 @@ const environmentSchema = z
     VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER: positiveLimitSchema(
       DEFAULT_VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER,
     ),
+    REALTIME_VIDEO_BETA_ENABLED: strictBooleanSchema(false),
     DECART_API_KEY: optionalSecretSchema,
     EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER: z.preprocess(
       normalizeOptionalString,
@@ -453,6 +454,7 @@ export interface RuntimeConfig {
   readonly otelTraceSampleRatio: number;
   readonly videoJobMaxActive: number;
   readonly videoJobMaxActivePerProvider: number;
+  readonly realtimeVideoBetaEnabled: boolean;
   readonly decartApiKey?: string;
   readonly existingVideoCharacterSwapProvider: 'decart' | 'pruna';
   readonly prunaVideoReplaceEnabled: boolean;
@@ -598,6 +600,7 @@ export const parseEnvironment = (
     otelTraceSampleRatio: result.data.OTEL_TRACE_SAMPLE_RATIO,
     videoJobMaxActive: result.data.VIDEO_JOB_MAX_ACTIVE,
     videoJobMaxActivePerProvider: result.data.VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER,
+    realtimeVideoBetaEnabled: result.data.REALTIME_VIDEO_BETA_ENABLED,
     ...(result.data.DECART_API_KEY === undefined
       ? {}
       : { decartApiKey: result.data.DECART_API_KEY }),

@@ -11,11 +11,12 @@ accessibility, physical-device, and live-provider behavior belongs to other test
 
 ## Matrix
 
-The current matrix has 31 Chromium cases:
+The current matrix has 35 Chromium cases:
 
 | Group             | States | Viewports                    | Cases |
 | ----------------- | -----: | ---------------------------- | ----: |
 | Entry             |      1 | small mobile                 |     1 |
+| Organization      |      2 | desktop and small mobile     |     4 |
 | Core Studio       |      2 | all five                     |    10 |
 | Studio idle       |      2 | desktop                      |     2 |
 | Focused high-risk |     10 | risk-selected viewport pairs |    12 |
@@ -23,7 +24,7 @@ The current matrix has 31 Chromium cases:
 | Small-mobile risk |      2 | small mobile                 |     2 |
 | Projects          |      2 | desktop and small mobile     |     2 |
 
-Thirty-one is the review budget, not the definition of correctness. The current matrix uses all 31
+Thirty-five is the review budget, not the definition of correctness. The current matrix uses all 35
 cases. The executable invariants require unique paths, all five viewport IDs, and every
 local-live/recording state/viewport pair.
 
@@ -40,6 +41,8 @@ local-live/recording state/viewport pair.
 | Scope                 | Baseline                                             |
 | --------------------- | ---------------------------------------------------- |
 | Small mobile          | `00-entry/initial.png`                               |
+| Desktop/small mobile  | `11-dashboard/overview.png`                          |
+| Desktop/small mobile  | `12-assets/overview.png`                             |
 | Desktop               | `01-studio/initial-closed.png`                       |
 | Desktop               | `01-studio/initial-portrait.png`                     |
 | All viewports         | `01-studio/local-camera-live.png`                    |
@@ -61,12 +64,13 @@ local-live/recording state/viewport pair.
 | Small mobile          | `01-studio/take-finalizing.png`                      |
 | Small mobile          | `01-studio/media-permission-error.png`               |
 
-The matrix intentionally emphasizes the record/upload first impression, neutral Local Camera
+The matrix intentionally emphasizes Dashboard orientation, Assets discovery, mobile organization
+navigation, the record/upload first impression, neutral Local Camera
 startup, provider-free live capture, dominant recording Stop, the densest Builder/review states,
 deterministic dirty Lighting/Crop editor layouts, the active/archived Campaigns workspace, the
-small-mobile Project output-review boundary, and representative loading/error states. These cases
-keep the review budget from 29 to 31 because durable Campaign navigation and exact-Version output
-review are protected composition contracts.
+small-mobile Project output-review boundary, and representative loading/error states. The four
+organization cases protect the new information architecture and mobile bottom navigation directly;
+durable Campaign navigation and exact-Version output review remain protected composition contracts.
 
 ## Determinism and readiness
 

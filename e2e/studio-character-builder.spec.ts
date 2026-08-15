@@ -44,7 +44,7 @@ const openConstraints = async (page: Page): Promise<void> => {
 
 test('character direction supports preview generation and save', async ({ page }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await openBuilder(page);
 
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
@@ -70,7 +70,7 @@ test('prompt-only save performs no image request and immediately preloads the Do
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
 
@@ -123,7 +123,7 @@ test('saved-character selection survives reload and completes Use through Start'
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
   await page.getByRole('button', { name: 'Save Character', exact: true }).click();
@@ -205,7 +205,7 @@ test('image-only upload saves and preloads without starting AI, then appears in 
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await openBuilder(page);
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
   await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
@@ -289,7 +289,7 @@ test('prompt plus upload saves the uploaded source directly with enhancement off
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await openBuilder(page);
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
   await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
@@ -326,7 +326,7 @@ test('uploaded draft references restore across reload and Detach does not contac
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await openBuilder(page);
   let dialog = page.getByRole('dialog', { name: 'Build Your Character' });
   await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
@@ -364,7 +364,7 @@ test('uploaded draft references restore across reload and Detach does not contac
 
 test('invalid device files fail accessibly before any upload request', async ({ page }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await openBuilder(page);
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
   await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
@@ -382,7 +382,7 @@ test('combined preview composes from the immutable upload and preloads the gener
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await openBuilder(page);
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
   await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
@@ -424,7 +424,7 @@ test('Generate Preview always optimizes, and stale form edits detach the image f
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
 
@@ -451,7 +451,7 @@ test('image-backed save preserves the exact generated asset and optimized Lucy p
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
   await page.getByRole('button', { name: 'Generate Preview' }).click();
@@ -501,7 +501,7 @@ test('regeneration distinguishes a fresh image from an instructed source-image e
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
   await page.getByRole('button', { name: 'Generate Preview' }).click();
@@ -537,7 +537,7 @@ test('regeneration distinguishes a fresh image from an instructed source-image e
 
 test('drafts survive close and reload, while Reset Draft starts fresh', async ({ page }) => {
   await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
   await openConstraints(page);
@@ -564,7 +564,7 @@ test('editing a character requires explicit discard of a different unfinished dr
   page,
 }) => {
   await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
 
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
@@ -617,7 +617,7 @@ test('unfinished Outfit Builder work requires confirmed discard before returning
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
+  await page.goto('/studio/create');
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();
   const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
   await shelf.getByRole('button', { name: 'Try-on recipes' }).click();
