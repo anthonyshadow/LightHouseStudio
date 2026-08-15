@@ -16,7 +16,7 @@ delivery tools.
 The implemented product is narrower than that vision. Today, Lightframe Studio is a local-first,
 single-operator studio centered on video creation and transformation. It records or imports video,
 supports local editing and optional creative transformations, maintains reusable characters,
-outfits, and voices, saves versioned video outputs, and downloads finished work from Saved Videos.
+outfits, and voices, saves versioned video outputs, and downloads finished work from Videos in Assets.
 It also provides resumable video Projects, atomic Project output save, lightweight optional Campaign
 organization, bounded Project history, and exact-Version preview, reuse, and Download. Multi-format
 creation, collaboration, and direct publishing do not exist yet.
@@ -26,6 +26,10 @@ The intended product lifecycle is:
 **Campaign → Project → Create or Import → Edit or Transform → Organize → Review → Export or Publish**
 
 This lifecycle is directional, not a description of the current navigation.
+
+The implemented navigation starts at an authenticated **Dashboard**, then offers explicit paths to
+**Create**, reusable **Assets**, **Projects**, and **Campaigns**. Dashboard is an orientation and
+resume surface, not another media runtime or persistence authority.
 
 ## Product mission
 
@@ -79,17 +83,19 @@ The current Studio supports:
 - local trim, crop, rotation, flip, lighting, filter, normalization, and export work;
 - optional Character Swap, Virtual Try On, live character transformation, and voice treatment that
   runs locally or through a configured provider;
-- reusable saved Characters, Character variants in Wardrobe, Outfits, recipes, and Voices;
+- an Assets hub for reusable Saved Videos, Characters, Character variants in Wardrobe, Outfits,
+  Voices, and recipes;
 - immutable reference media, explicit source/result handling, and non-destructive saved-video
   versions;
-- a Saved Videos gallery with metadata, filtering, preview, rename, delete, reuse, and download;
+- a Videos gallery in Assets with metadata, filtering, preview, rename, removal, reuse, and download;
   and
 - durable Projects with source/working-media resume, creative checkpoints, recoverable visual
   processing, exact output save, and lightweight optional Campaigns, with persistence parity across
   local/shadow and authoritative relational modes.
 
-Projects and Campaigns have authenticated browser and HTTP lifecycle surfaces. A Project can accept
-and resume one immutable video source, checkpoint intent, adopt or retain exact working media,
+Projects and Campaigns have authenticated browser and HTTP lifecycle surfaces. A Project may be
+intentionally empty as a collection-only organizer, or it can accept and resume one immutable video
+source, checkpoint intent, adopt or retain exact working media,
 recover visual processing, and explicitly save its ready current output. Standalone Studio creative
 work is not automatically placed in a Project, legacy Saved Videos are not backfilled, and
 Project history separates bounded revision, processing, and output-Version views; an exact retained
@@ -107,6 +113,12 @@ Project working context, creative state, processing jobs, Saved Video records, i
 Versions, and Project output relations stay distinct. Rich Campaign planning, search, tags, review
 states, and reusable defaults should be introduced only with validated value and explicit ownership
 and lifecycle rules. See the [MVP definition](MVP_DEFINITION.md) for the bounded target.
+
+The future user-facing name for independently editable Project children is **Videos**; the internal
+architecture term remains **Project Deliverable**. That deferred child model is not implemented, so
+the current Project workspace continues to represent one focused video workflow. One exact Saved
+Video Version may be reused by several Projects and, later, several Project Videos without copying
+bytes or inventing producer lineage.
 
 ### Long-term product vision
 
@@ -133,9 +145,9 @@ public-service, security, and operational gates.
 | Character         | A reusable creative identity with saved reference, prompt, and related selections                      | Implemented as a saved creative resource                                                                  |
 | Character variant | A saved Wardrobe child of one Character with an exact reusable reference                               | Implemented; not the same as a generic campaign Asset variation                                           |
 | Creative resource | A reusable input or direction such as a Character, Character variant, Outfit, Voice, recipe, or prompt | Characters, variants, Outfits, Voices, and recipes are implemented with different persistence lifecycles  |
-| Library           | An organized collection intended for finding and reusing retained records                              | Saved Videos, Saved Characters, Saved Outfits, Saved Voices, and Recipe Shelf exist                       |
-| Gallery           | A visual library view optimized for browsing and acting on media records                               | Saved Videos is the current gallery; Gallery is not a separate ownership model                            |
-| Export            | Producing a validated deliverable in a chosen file, format, size, or channel-ready specification       | Video rendering and download exist; broader export presets do not                                         |
+| Library           | An organized collection intended for finding and reusing retained records                              | Assets groups Videos, Characters, Outfits, Voices, and Recipes                                            |
+| Gallery           | A visual library view optimized for browsing and acting on media records                               | Videos in Assets is the current gallery; Gallery is not a separate ownership model                        |
+| Export            | Producing a validated deliverable in a chosen file, format, size, or channel-ready specification       | Reserved, visibly unavailable until formats/channels are specified; exact-Version Download remains        |
 | Publish           | Sending an approved asset to an external destination through an authorized integration                 | Vision only; no publishing or scheduling integration exists                                               |
 
 Campaigns and Projects are separate concepts. The MVP decision allows one Campaign to group many
@@ -210,11 +222,15 @@ Content** when it is not. Project history exposes exact producing revisions and 
 provide lightweight organization without taking output ownership. Future search or richer context
 must preserve those ownership and lineage boundaries.
 
-Download is the current delivery mechanism and is available from Saved Videos and exact retained
+Download is the current delivery mechanism and is available from Videos in Assets and exact retained
 Project output Versions. Future distribution may include channel-specific export presets,
 aspect-ratio and format adaptation, scheduling, direct publishing, and marketing-platform
 integrations. No particular integration is committed until its product, authentication, permission,
 failure, privacy, and support boundaries are approved.
+
+**Export** is therefore reserved in the current UI as a disabled, explained action. It must not be
+used as a synonym for the existing local render or Download behavior until at least one supported
+format/channel specification and its validation, failure, and delivery contract are approved.
 
 ## Product principles
 

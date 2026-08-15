@@ -207,20 +207,21 @@ describe('Project route surface', () => {
     expect(await screen.findByRole('heading', { name: 'Launch cut' })).toBeVisible();
     expect(await screen.findByRole('heading', { name: 'Archived concept' })).toBeVisible();
     expect(screen.queryByText('No source yet')).not.toBeInTheDocument();
-    expect(
-      screen.getByText(/Create resumable video work with an optional Campaign/u),
-    ).toBeVisible();
+    expect(screen.getByText(/Keep focused video work together/u)).toBeVisible();
 
     const activeList = screen.getByRole('list', { name: 'Active Projects' });
     await userEvent.click(within(activeList).getByRole('button', { name: 'Open' }));
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(`/studio/projects/${activeId}`),
     );
+    expect(await screen.findByRole('heading', { name: 'Focused video workspace' })).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Continue editing' }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/studio/projects/${activeId}/workspace`),
+    );
     expect(await screen.findByRole('heading', { name: 'No source yet' })).toBeVisible();
     expect(screen.getByText('All changes saved').closest('[role="status"]')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Record' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Upload' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Use Saved Video' })).toBeDisabled();
     expect(screen.queryByRole('video')).not.toBeInTheDocument();
   });
 
@@ -284,10 +285,10 @@ describe('Project route surface', () => {
     const { router } = renderProjects();
     const user = userEvent.setup();
 
-    expect(await screen.findByText(/Quick Start creates an Unassigned Project/u)).toBeVisible();
-    await user.click(await screen.findByRole('button', { name: 'Quick Start' }));
+    expect(await screen.findByText(/Quick project creates an unassigned Project/u)).toBeVisible();
+    await user.click(await screen.findByRole('button', { name: 'Quick project' }));
     expect(await screen.findByText('Project not created')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Retry Quick Start' }));
+    await user.click(screen.getByRole('button', { name: 'Retry quick project' }));
 
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(`/studio/projects/${activeId}`),
@@ -561,7 +562,7 @@ describe('Project route surface', () => {
         }),
       ),
     );
-    renderProjects(`/studio/projects/${activeId}`, {
+    renderProjects(`/studio/projects/${activeId}/workspace`, {
       sourceRuntime: { present, clear },
     });
 
@@ -593,7 +594,7 @@ describe('Project route surface', () => {
       }),
     );
     const user = userEvent.setup();
-    renderProjects(`/studio/projects/${activeId}`, {
+    renderProjects(`/studio/projects/${activeId}/workspace`, {
       sourceRuntime: { present, clear },
       recordingCandidate: { file, ready: true },
       onSourceActivityChange: (activity) => activities.push(activity),
@@ -654,7 +655,7 @@ describe('Project route surface', () => {
       ),
     );
     const inputClick = vi.spyOn(HTMLInputElement.prototype, 'click');
-    const view = renderProjects(`/studio/projects/${activeId}`, {
+    const view = renderProjects(`/studio/projects/${activeId}/workspace`, {
       sourceRuntime: { present, clear },
     });
     const user = userEvent.setup();
@@ -770,7 +771,7 @@ describe('Project route surface', () => {
       ),
     );
     const user = userEvent.setup();
-    renderProjects(`/studio/projects/${activeId}`, {
+    renderProjects(`/studio/projects/${activeId}/workspace`, {
       sourceRuntime: { present, clear },
     });
 
@@ -962,7 +963,7 @@ describe('Project route surface', () => {
       }),
     );
     const user = userEvent.setup();
-    renderProjects(`/studio/projects/${activeId}`, {
+    renderProjects(`/studio/projects/${activeId}/workspace`, {
       onSessionChange: (next) => {
         sessionPort = next;
       },
@@ -1003,7 +1004,7 @@ describe('Project route surface', () => {
       ),
     );
     const user = userEvent.setup();
-    renderProjects(`/studio/projects/${activeId}`, {
+    renderProjects(`/studio/projects/${activeId}/workspace`, {
       onSessionChange: (next) => {
         sessionPort = next;
       },

@@ -1809,7 +1809,7 @@ describe('ExistingVideoPanel', () => {
     expect(screen.getByRole('button', { name: 'Result' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Edit result' }));
     expect(editSelected).toHaveBeenCalledOnce();
-    fireEvent.click(screen.getByRole('button', { name: 'Save Video' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save to Assets' }));
     expect(saveVideo).toHaveBeenCalledOnce();
     expect(screen.queryByRole('link', { name: /Download/u })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Review Voice/u })).not.toBeInTheDocument();

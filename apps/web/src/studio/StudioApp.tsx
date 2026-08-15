@@ -4,7 +4,17 @@ import { useLocation, useNavigate } from 'react-router';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
 import { useAuth } from '../application/auth/AuthProvider';
 import { RemoteStateProvider } from '../application/remote-state/RemoteStateProvider';
-import { APP_PATHS, isCampaignsPath, isProjectsPath, projectIdFromPath } from '../app/paths';
+import {
+  APP_PATHS,
+  campaignPath,
+  isAssetsPath,
+  isCampaignsPath,
+  isProjectWorkspacePath,
+  isProjectsPath,
+  projectIdFromPath,
+  projectPath,
+  projectWorkspacePath,
+} from '../app/paths';
 import type { PromptCommittedHandler } from '../application/types';
 import type { RecipeShelfEntryIntent } from '../features/creative-assets/RecipeShelf.types';
 import { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
@@ -110,9 +120,19 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const location = useLocation();
   const projectRouteActive = isProjectsPath(location.pathname);
   const campaignRouteActive = isCampaignsPath(location.pathname);
-  const organizationRouteActive = projectRouteActive || campaignRouteActive;
+  const dashboardRouteActive = location.pathname === APP_PATHS.dashboard;
+  const assetsRouteActive = isAssetsPath(location.pathname);
+  const liveRouteActive = location.pathname === APP_PATHS.live;
+  const projectWorkspaceActive = isProjectWorkspacePath(location.pathname);
+  const projectOverviewActive = projectRouteActive && !projectWorkspaceActive;
+  const organizationRouteActive =
+    dashboardRouteActive ||
+    assetsRouteActive ||
+    liveRouteActive ||
+    projectOverviewActive ||
+    campaignRouteActive;
   const activeProjectId = projectIdFromPath(location.pathname);
-  const projectContextActive = activeProjectId !== null;
+  const projectContextActive = projectWorkspaceActive && activeProjectId !== null;
   const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const desktopStudioLayout = useDesktopStudioLayout();
@@ -125,6 +145,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const browser = useMemo(() => detectBrowserCapabilities(), []);
   const provider = useProviderAvailability();
   const { availability, state: capabilityState, retry: retryProviderAvailability } = provider;
+  const realtimeBetaEnabled = availability.realtimeBetaEnabled === true;
+  const realtimeProviderConfigured = availability.realtimeProviderConfigured ?? availability.decart;
+  const realtimeLiveEnabled =
+    realtimeBetaEnabled && realtimeProviderConfigured && availability.decart;
   const savedVideoSave = useSaveVideo(Boolean(availability.directSavedVideoUploadAvailable));
   const {
     active: activeOverlay,
@@ -135,9 +159,21 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   } = useStudioOverlayController(initialIntent === 'upload' ? 'video-upload' : null);
 
   useEffect(() => {
+    if (initialIntent !== 'upload' || location.pathname !== APP_PATHS.create) return;
+    openOverlay('video-upload');
+    void navigate(APP_PATHS.create, { replace: true, state: null });
+  }, [initialIntent, location.pathname, navigate, openOverlay]);
+
+  useEffect(() => {
+    if (!liveRouteActive || capabilityState !== 'ready' || !realtimeLiveEnabled) return;
+    openOverlay('ai-experience');
+    void navigate(APP_PATHS.create, { replace: true, state: null });
+  }, [capabilityState, liveRouteActive, navigate, openOverlay, realtimeLiveEnabled]);
+
+  useEffect(() => {
     if (desktopStudioLayout) closeOverlayIf(['capture-settings']);
   }, [closeOverlayIf, desktopStudioLayout]);
-  const [firstSuccessGuideVisible, setFirstSuccessGuideVisible] = useState(true);
+  const [firstSuccessGuideVisible, setFirstSuccessGuideVisible] = useState(false);
   const [recordingForExistingVideo, setRecordingForExistingVideo] = useState(false);
   const adoptingExistingVideoRecordingRef = useRef<string | null>(null);
   const [recipeShelfEntryIntent, setRecipeShelfEntryIntent] =
@@ -398,6 +434,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
 
   const openCharacterSelector = useCallback(() => openOverlay('character-selector'), [openOverlay]);
   const openOutfitSelector = useCallback(() => openOverlay('outfit-selector'), [openOverlay]);
+  const openLiveAiExperience = useCallback(() => {
+    if (!realtimeLiveEnabled) return;
+    openOverlay('ai-experience');
+  }, [openOverlay, realtimeLiveEnabled]);
 
   const creativePanel = creativePanelForOverlay(activeOverlay);
   const activeCreativeTool = creativeToolForOverlay(activeOverlay, creativePanel, videoEditing);
@@ -436,9 +476,18 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     setRecordingForExistingVideo(false);
     closeOverlay();
     recording.discard();
+    void navigate(projectWorkspacePath(activeProjectId));
     window.requestAnimationFrame(() => mainRef.current?.focus());
     void session.startLocal();
-  }, [activeProjectId, activeProjectSourceActivity, browser, closeOverlay, recording, session]);
+  }, [
+    activeProjectId,
+    activeProjectSourceActivity,
+    browser,
+    closeOverlay,
+    navigate,
+    recording,
+    session,
+  ]);
   const activeCharacterRecord = activeCharacter
     ? repositoryStore.savedCharacterPrompts.find((candidate) => candidate.id === activeCharacter.id)
     : undefined;
@@ -464,10 +513,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     );
   }, [clearActiveRecipe, closeOverlayIf, desktopStudioLayout]);
   const startAdvancedModel = useCallback(() => {
-    if (projectContextActive) return Promise.resolve();
+    if (projectContextActive || !realtimeLiveEnabled) return Promise.resolve();
     setRecordingForExistingVideo(false);
     return session.startModel();
-  }, [projectContextActive, session]);
+  }, [projectContextActive, realtimeLiveEnabled, session]);
   const advancedLiveSession = useMemo(
     () => ({ ...session, startModel: startAdvancedModel }),
     [session, startAdvancedModel],
@@ -500,11 +549,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     setRecipeShelfEntryIntent((current) => (current?.id === id ? null : current));
   }, []);
   const configureVirtualTryOn = () => {
+    if (!realtimeLiveEnabled) return;
     if (!selectExperienceMode('lucy-vton-latest')) return;
     openOverlay('recipe-dock');
   };
   const startPreparedAi = (mode: ModelMode) => {
-    if (projectContextActive) return;
+    if (projectContextActive || !realtimeLiveEnabled) return;
     if (!selectExperienceMode(mode)) return;
     closeOverlay();
     void startAdvancedModel();
@@ -537,7 +587,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     openOverlay('video-upload');
   }, [openOverlay]);
   const navigateToStudio = useCallback(() => {
-    void navigate(APP_PATHS.studio, { replace: true });
+    void navigate(APP_PATHS.create, { replace: true });
   }, [navigate]);
   const openVideoUpload = useCallback(() => openOverlay('video-upload'), [openOverlay]);
   const focusStudio = useCallback(() => {
@@ -764,7 +814,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     !activeProjectSourceActivity.busy;
 
   return (
-    <div css={pageStyles(theme)}>
+    <div
+      css={pageStyles(theme)}
+      data-organization-route={organizationRouteActive ? 'true' : undefined}
+    >
       <a href="#studio-main" css={skipLinkStyles(theme)}>
         Skip to studio
       </a>
@@ -777,25 +830,29 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             user={auth.session!.user}
             accountBusy={logout.busy || logout.preparing}
             activeDestination={
-              campaignRouteActive
-                ? 'campaigns'
-                : projectRouteActive
-                  ? 'projects'
-                  : location.pathname === APP_PATHS.videos
-                    ? 'videos'
-                    : location.pathname === APP_PATHS.characters
-                      ? 'characters'
-                      : location.pathname === APP_PATHS.outfits
-                        ? 'outfits'
-                        : 'studio'
+              dashboardRouteActive
+                ? 'dashboard'
+                : campaignRouteActive
+                  ? 'campaigns'
+                  : projectRouteActive
+                    ? 'projects'
+                    : assetsRouteActive
+                      ? 'assets'
+                      : 'studio'
             }
-            projectContextActive={projectContextActive}
-            onOpenStudio={() => void navigate(APP_PATHS.studio)}
+            organizationRouteActive={organizationRouteActive}
+            onOpenDashboard={() => void navigate(APP_PATHS.dashboard)}
+            onOpenStudio={() => void navigate(APP_PATHS.create)}
             onOpenProjects={() => void navigate(APP_PATHS.projects)}
             onOpenCampaigns={() => void navigate(APP_PATHS.campaigns)}
-            onOpenVideos={() => void navigate(APP_PATHS.videos)}
-            onOpenCharacters={() => void navigate(APP_PATHS.characters)}
-            onOpenOutfits={() => void navigate(APP_PATHS.outfits)}
+            onOpenAssets={() => void navigate(APP_PATHS.assets)}
+            onCreateProject={() =>
+              void navigate(APP_PATHS.projects, { state: { createIntent: 'project' } })
+            }
+            onCreateCampaign={() =>
+              void navigate(APP_PATHS.campaigns, { state: { createIntent: 'campaign' } })
+            }
+            onOpenLive={() => void navigate(APP_PATHS.live)}
             onLogout={() => void logout.request()}
           />
         </div>
@@ -808,8 +865,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           }}
           route={{
             organizationActive: organizationRouteActive,
+            dashboardActive: dashboardRouteActive,
+            assetsActive: assetsRouteActive,
+            liveUnavailableActive: liveRouteActive,
             projectContextActive,
             projectActive: projectRouteActive,
+            projectOverviewActive,
             campaignActive: campaignRouteActive,
             projectRecordingAvailable,
           }}
@@ -848,13 +909,53 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           }}
           creativeWorkspace={creativeWorkspace}
           projectCreativeCheckpoint={projectCreativeCheckpoint}
+          dashboard={{
+            displayName: auth.session!.user.displayName,
+            onCreateVideo: () => void navigate(APP_PATHS.create),
+            onCreateProject: () =>
+              void navigate(APP_PATHS.projects, { state: { createIntent: 'project' } }),
+            onCreateCampaign: () =>
+              void navigate(APP_PATHS.campaigns, { state: { createIntent: 'campaign' } }),
+            onOpenAssets: () => void navigate(APP_PATHS.assets),
+            onOpenProjects: () => void navigate(APP_PATHS.projects),
+            onOpenCampaigns: () => void navigate(APP_PATHS.campaigns),
+            onOpenProject: (projectId) => void navigate(projectPath(projectId)),
+            onOpenCampaign: (campaignId) => void navigate(campaignPath(campaignId)),
+            onOpenVideos: () => void navigate(APP_PATHS.videos),
+          }}
+          assets={{
+            characterCount: repositoryStore.savedCharacterPrompts.length,
+            outfitCount: repositoryStore.savedPrompts.filter(
+              (item) => item.modelModeId === 'lucy-vton-latest',
+            ).length,
+            recipeCount: repositoryStore.savedPrompts.length,
+            onOpen: (destination) => {
+              const paths = {
+                videos: APP_PATHS.videos,
+                characters: APP_PATHS.characters,
+                outfits: APP_PATHS.outfits,
+                voices: APP_PATHS.voices,
+                recipes: APP_PATHS.recipes,
+              } as const;
+              void navigate(paths[destination]);
+            },
+            onUploadVideo: () =>
+              void navigate(APP_PATHS.create, { state: { creationIntent: 'upload' } }),
+          }}
+          liveBeta={{
+            capabilityState,
+            betaEnabled: realtimeBetaEnabled,
+            providerConfigured: realtimeProviderConfigured,
+            onOpenStudio: () => void navigate(APP_PATHS.create),
+            onOpenDashboard: () => void navigate(APP_PATHS.dashboard),
+          }}
           saveVideoState={savedVideoSave.state}
           actions={{
             startExistingVideoRecording,
             closeTakeReview,
             discardExistingVideoSelection,
             openVoiceTreatments: () => openOverlay('voice-treatments'),
-            openAiExperience: () => openOverlay('ai-experience'),
+            openAiExperience: openLiveAiExperience,
             openExistingVideo,
             openCaptureSettings,
             startProjectRecording,
@@ -902,15 +1003,15 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           onNavigate={(path) => void navigate(path)}
           onUseVideo={savedVideo.useSavedVideo}
           onCreateCharacter={() => {
-            void navigate(APP_PATHS.studio);
+            void navigate(APP_PATHS.create);
             character.openNew();
           }}
           onCopyCharacter={(savedCharacter) => {
-            void navigate(APP_PATHS.studio);
+            void navigate(APP_PATHS.create);
             character.copy(savedCharacter);
           }}
           onOpenWardrobe={(savedCharacter) => {
-            void navigate(APP_PATHS.studio);
+            void navigate(APP_PATHS.create);
             character.openWardrobe(savedCharacter);
           }}
           onUseCharacter={(character) => {
@@ -923,15 +1024,19 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               referenceImageAssetId: character.referenceImageAssetId,
               ...(character.builderDraft ? { builderDraft: character.builderDraft } : {}),
             });
-            void navigate(APP_PATHS.studio);
+            void navigate(APP_PATHS.create);
           }}
           onCreateOutfit={() => {
-            void navigate(APP_PATHS.studio);
+            void navigate(APP_PATHS.create);
             outfit.openNew(false, 'library');
           }}
           onUseOutfit={(savedOutfit) => {
             outfit.selectSaved(savedOutfit);
-            void navigate(APP_PATHS.studio);
+            void navigate(APP_PATHS.create);
+          }}
+          onUseRecipe={(selection) => {
+            applyRecipeSelection(selection);
+            void navigate(APP_PATHS.create);
           }}
         />
 

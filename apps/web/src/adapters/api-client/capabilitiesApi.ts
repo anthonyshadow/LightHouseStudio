@@ -15,7 +15,9 @@ export const fetchProviderAvailability = async (
     invalidApiResponse('The capability response was invalid.', 'invalid-response'),
   );
   return {
-    decart: payload.realtimeVideo.available,
+    decart: payload.realtimeVideo.available && payload.realtimeVideo.betaEnabled,
+    realtimeBetaEnabled: payload.realtimeVideo.betaEnabled,
+    realtimeProviderConfigured: payload.realtimeVideo.available,
     videoProcessing: payload.videoProcessing,
     elevenLabs: payload.elevenLabs.available,
     elevenLabsModel: payload.elevenLabs.modelId ?? null,

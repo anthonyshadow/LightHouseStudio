@@ -153,7 +153,7 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          realtimeVideo: { available: true },
+          realtimeVideo: { available: true, betaEnabled: true },
           videoProcessing: {
             characterSwap: {
               available: false,
@@ -698,11 +698,11 @@ for (const viewport of VIEWPORTS) {
         value: JSON.stringify(SEEDED_SHELF),
       });
 
-      await page.goto('/studio');
+      await page.goto('/studio/create');
       await expect(page.getByRole('main')).toBeVisible();
       await page.getByLabel('Integration availability').getByRole('button').click();
       await expect(page.getByRole('region', { name: 'Studio availability details' })).toContainText(
-        'AI video configured',
+        'Live AI Beta enabled',
       );
       await page.keyboard.press('Escape');
       await page.addStyleTag({

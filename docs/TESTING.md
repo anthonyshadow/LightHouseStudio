@@ -72,8 +72,9 @@ The retained suite protects:
 - provider-free entry, accessible Login, correct/incorrect credentials, 24-hour cookie attributes,
   restore/revoke/expiry behavior, deny-by-default private APIs, trusted mutation Origin, and no
   automatic media/AI before authenticated Studio entry;
-- the shared `/studio`, `/studio/videos`, `/studio/characters`, and `/studio/outfits` runtime,
-  centralized logout cleanup, and one persistent media stage across library transitions;
+- Dashboard at `/studio`, the focused creator at `/studio/create`, Project overview/workspace
+  routing, and canonical `/studio/assets/*` libraries inside one mounted runtime; centralized logout
+  cleanup; and one persistent media stage that is hidden, not duplicated, on organization routes;
 - idempotent Save Video, immutable append-only replacement, cross-owner denial, metadata-first
   gallery pagination, lazy thumbnail fallback, range content delivery, tombstones, local-only byte
   retention, and relationship-safe retryable deletion of R2 versions/thumbnails;
@@ -109,9 +110,10 @@ The retained suite protects:
   Saved Video Version reuse without a byte copy or output target; owner/ready/inspection checks;
   local prepared-journal recovery; relational source transaction/replay; retention-aware losing
   cleanup; controlled metadata plus range/HEAD content; and response-loss idempotency;
-- recognized protected Project list/detail routes and Login return, one shared Studio/media-stage
-  owner, bounded Project controller pagination, replay-safe Quick Start, open/refresh, lifecycle
-  cache invalidation, stale-rename preservation, focus/announcements, explicit library exit,
+- recognized protected Project list/overview/workspace routes and Login return, one shared
+  Studio/media-stage owner, bounded Project controller pagination, replay-safe named and quick
+  creation, open/refresh, lifecycle cache invalidation, stale-rename preservation,
+  focus/announcements, explicit Assets exit,
   accepted-source fresh hydration/object-URL delegation, cancellable staging, Project-switch and
   late-completion isolation, and no implicit provider start;
 - URL-owned Project-session hydration, bounded semantic coalescing, exact response-loss

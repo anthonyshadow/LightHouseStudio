@@ -8,36 +8,37 @@ future features current.
 
 ## Journeys
 
-| Flow                                                   | Story                                                                          |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| Record or upload, then edit and save                   | [Existing video processing](12-existing-video-processing.md)                   |
-| Trim, crop, relight, filter, and replace a source      | [Local non-destructive video editing](13-local-video-editing.md)               |
-| Choose camera, microphone, local format, and quality   | [Configure capture settings](01-configure-capture-settings.md)                 |
-| Preview and record without provider work               | [Local camera capture](02-local-camera-capture.md)                             |
-| Run and record a live character transformation         | [Live character transformation](03-character-ai-session.md)                    |
-| Run and record live virtual try-on                     | [Virtual try-on session](04-virtual-try-on-session.md)                         |
-| Build Add, Replace, or Restyle directions              | [Structured prompt workshop](05-structured-prompt-workshop.md)                 |
-| Save and reuse recipes                                 | [Recipe Shelf](06-recipe-shelf.md)                                             |
-| Review, save, and release a take                       | [Take review and cleanup](07-take-review-and-cleanup.md)                       |
-| Apply browser-local voice effects                      | [Local voice treatments](08-local-voice-treatments.md)                         |
-| Browse, save, manage, and apply provider-backed voices | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                   |
-| Recover from missing capabilities                      | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md) |
-| Build and preload a reusable character                 | [Studio character builder](11-studio-character-builder.md)                     |
-| Log in, restore, and log out safely                    | [Login and local session](14-login-and-session.md)                             |
-| Save, browse, version, and reload local videos         | [Saved Video Gallery](15-saved-video-gallery.md)                               |
-| Reuse saved characters and outfits                     | [Saved creative libraries](16-saved-creative-libraries.md)                     |
-| Create, resume, process, and save one Project video    | [Project lifecycle and immutable source](17-empty-project-lifecycle.md)        |
-| Organize Projects with optional Campaigns              | [Campaign organization](18-campaign-organization.md)                           |
+| Flow                                                     | Story                                                                          |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Record or upload, then edit and save                     | [Existing video processing](12-existing-video-processing.md)                   |
+| Trim, crop, relight, filter, and replace a source        | [Local non-destructive video editing](13-local-video-editing.md)               |
+| Choose camera, microphone, local format, and quality     | [Configure capture settings](01-configure-capture-settings.md)                 |
+| Preview and record without provider work                 | [Local camera capture](02-local-camera-capture.md)                             |
+| Run and record a live character transformation           | [Live character transformation](03-character-ai-session.md)                    |
+| Run and record live virtual try-on                       | [Virtual try-on session](04-virtual-try-on-session.md)                         |
+| Build Add, Replace, or Restyle directions                | [Structured prompt workshop](05-structured-prompt-workshop.md)                 |
+| Save and reuse recipes                                   | [Recipe Shelf](06-recipe-shelf.md)                                             |
+| Review, save, and release a take                         | [Take review and cleanup](07-take-review-and-cleanup.md)                       |
+| Apply browser-local voice effects                        | [Local voice treatments](08-local-voice-treatments.md)                         |
+| Browse, save, manage, and apply provider-backed voices   | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                   |
+| Recover from missing capabilities                        | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md) |
+| Build and preload a reusable character                   | [Studio character builder](11-studio-character-builder.md)                     |
+| Log in, restore, and log out safely                      | [Login and local session](14-login-and-session.md)                             |
+| Orient, create, browse Assets, and navigate responsively | [Dashboard, Assets, and navigation](19-dashboard-and-navigation.md)            |
+| Save, browse, version, and reload local videos           | [Videos in Assets](15-saved-video-gallery.md)                                  |
+| Reuse saved characters, outfits, voices, and recipes     | [Creative Assets](16-saved-creative-libraries.md)                              |
+| Create, resume, process, and save one Project video      | [Project lifecycle and immutable source](17-empty-project-lifecycle.md)        |
+| Organize Projects with optional Campaigns                | [Campaign organization](18-campaign-organization.md)                           |
 
 ## Shared runtime rules
 
-- `/` is the provider-free entry and Login surface. `/studio`, `/studio/projects`,
-  `/studio/projects/:projectId`, `/studio/campaigns`, `/studio/campaigns/:campaignId`,
-  `/studio/videos`, `/studio/characters`, and `/studio/outfits` are authenticated views of one
-  active Studio runtime; every other path returns to `/`.
-- Studio begins in neutral Local Camera mode with camera and microphone off. Only an explicit
-  control-bar, upload-panel, or Dock action acquires media; only an explicit AI Start contacts a
-  provider.
+- `/` is the provider-free entry and Login surface. Dashboard (`/studio`), Create
+  (`/studio/create`), Project overview/workspace, Campaign, and `/studio/assets/*` routes are
+  authenticated views of one active Studio runtime; every other path returns to `/`.
+- Dashboard and other organization routes hide the persistent media stage and start no media or
+  provider work. Create and Project workspaces begin in neutral Local Camera mode with camera and
+  microphone off. Only an explicit control-bar, upload-panel, or Dock action acquires media; only
+  an explicit AI Start contacts a provider.
 - Retired Guided repositories and presentation code are removed. Their records are not imported
   into Saved Videos and cannot revive the retired Guided experience.
 - Browser navigation cannot abandon recording/finalization or an active video render. Leaving with
@@ -46,8 +47,8 @@ future features current.
 - Camera access, provider contact, and billable work require an explicit action. Local Camera does
   not request provider credentials, load the Decart SDK, or send media externally.
 - The primary flow records or uploads a source, reviews it, and optionally applies Character Swap,
-  Virtual Try On, and/or Voice, then saves the result before download from Saved Videos. Live
-  Character/VTO transformation and Workshop are advanced flows.
+  Virtual Try On, and/or Voice, then saves the result before exact Download from Videos in Assets.
+  Live Character/VTO transformation and Workshop are advanced flows.
 - Campaign and Project lifecycle/source management is user-facing, including optional membership,
   move/detach, the virtual No Campaign group, durable source resume, and guarded bounded session
   autosave. Creative/edit checkpoints, recoverable visual processing, and exact output save are
@@ -58,9 +59,9 @@ future features current.
   Restyle object recipes.
 - Saved Character Wardrobe owns normalized original/variant browsing and variant creation while
   reusing the same Shelf metadata, immutable reference store, and overlay/media ownership.
-- Studio keeps one mounted media stage and one temporary take pipeline. Its immutable source may
-  be recorded, uploaded, or a validated local edit; presentation selects the voiced, visual, or
-  source layer without mounting another player.
+- Studio keeps one mounted media stage and one temporary take pipeline. Organization pages hide
+  that stage; they do not mount another player. Its immutable source may be recorded, uploaded, or
+  a validated local edit; presentation selects the voiced, visual, or source layer.
 - An uploaded workflow may run either exact batch model once, never both. The creator may switch
   the single active model before submission; only the active choice is used.
 - The recording and Decart session limits are independent: each warns at 270 seconds and ends

@@ -9,6 +9,7 @@ import type { ExistingVideoOperationBinding } from '../../providers/video-jobs/v
 
 export interface CapabilityAvailability {
   readonly decartAvailable: boolean;
+  readonly realtimeVideoBetaEnabled: boolean;
   readonly videoProcessing: {
     readonly characterSwap: Readonly<
       Partial<Record<VideoCharacterSwapProviderId, ExistingVideoOperationBinding>>
@@ -59,6 +60,7 @@ export const registerSystemRoutes = (
     capabilitiesResponseSchema.parse({
       realtimeVideo: {
         available: availability.decartAvailable,
+        betaEnabled: availability.realtimeVideoBetaEnabled,
       },
       videoProcessing: {
         characterSwap: {

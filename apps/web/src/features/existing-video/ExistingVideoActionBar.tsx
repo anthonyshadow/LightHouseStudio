@@ -121,7 +121,7 @@ export const ExistingVideoActionBar = ({
               disabled={saving || saved}
               onClick={onSaveVideo}
             >
-              {saving ? 'Saving…' : saved ? 'Saved' : 'Save Video'}
+              {saving ? 'Saving…' : saved ? 'Saved to Assets' : 'Save to Assets'}
             </Button>
           ) : null}
           <Button variant="secondary" onClick={onEditSelected}>

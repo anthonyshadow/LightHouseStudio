@@ -5,6 +5,8 @@ import type { CapabilityState } from './StudioHeader';
 
 const unavailableProviders: ProviderAvailability = {
   decart: false,
+  realtimeBetaEnabled: false,
+  realtimeProviderConfigured: false,
   videoProcessing: {
     characterSwap: {
       available: false,

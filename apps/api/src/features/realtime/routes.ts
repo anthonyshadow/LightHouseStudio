@@ -20,11 +20,19 @@ const verifyProviderOrigin = (request: HttpRequest): Promise<void> => {
 export const registerRealtimeRoutes = (
   app: ApplicationRuntime,
   provider: DecartTokenProvider | null,
+  betaEnabled: boolean,
 ): void => {
   app.post(
     '/api/realtime-token',
     { bodyLimit: 16 * 1024, onRequest: verifyProviderOrigin },
     async (request, reply) => {
+      if (!betaEnabled) {
+        throw new AppError(
+          503,
+          'feature_unavailable',
+          'Live AI Beta is not enabled on this Lightframe installation.',
+        );
+      }
       const parsed = realtimeTokenRequestSchema.safeParse(request.body);
       if (!parsed.success) {
         throw new AppError(

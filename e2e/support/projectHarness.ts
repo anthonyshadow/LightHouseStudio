@@ -725,10 +725,16 @@ export const installProjectHarness = async (
     }
     if (url.pathname === '/api/projects' && method === 'POST') {
       operationKeys.push(request.headers()['idempotency-key'] ?? '');
-      const body = request.postDataJSON() as { campaignId?: string | null };
-      current ??= emptyProjectFixture(
-        body.campaignId === undefined ? (options.campaignId ?? null) : body.campaignId,
-      );
+      const body = request.postDataJSON() as { campaignId?: string | null; title?: string };
+      if (current === null) {
+        const created = emptyProjectFixture(
+          body.campaignId === undefined ? (options.campaignId ?? null) : body.campaignId,
+        );
+        current = {
+          ...created,
+          project: { ...created.project, title: body.title ?? created.project.title },
+        };
+      }
       await route.fulfill({
         status: 201,
         contentType: 'application/json',

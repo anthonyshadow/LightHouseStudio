@@ -111,11 +111,9 @@ describe('AppRouter', () => {
     const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
     renderApplication();
 
-    expect(screen.getByRole('heading', { name: 'Enter Lightframe Studio' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Enter Studio' })).toBeInTheDocument();
-    expect(
-      screen.getByText(/use a Project for resumable work; Campaigns are optional/u),
-    ).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Lightframe' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open Dashboard' })).toBeInTheDocument();
+    expect(screen.getByText(/Create a video quickly/u)).toBeVisible();
     expect(screen.queryByText('Studio route')).not.toBeInTheDocument();
     expect(appHarness.renderCount).toBe(0);
     expect(document.title).toBe('Enter Lightframe Studio');
@@ -123,15 +121,15 @@ describe('AppRouter', () => {
     expect(description?.content).toContain('Record or upload a video');
   });
 
-  it('pushes Studio from the authenticated entry and hands focus to its main landmark', async () => {
+  it('pushes Dashboard from the authenticated entry and hands focus to its main landmark', async () => {
     const { router } = renderApplication();
-    fireEvent.click(screen.getByRole('button', { name: 'Enter Studio' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Dashboard' }));
 
     expect(await screen.findByText('Studio route')).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/studio');
     await waitFor(() => expect(document.activeElement).toHaveAttribute('id', 'studio-main'));
     expect(appHarness.latestProps).toEqual({ focusMainOnMount: true });
-    expect(document.title).toBe('Lightframe Studio');
+    expect(document.title).toBe('Dashboard · Lightframe');
   });
 
   it('keeps unauthenticated entry provider-free and exposes only login', () => {
@@ -176,17 +174,17 @@ describe('AppRouter', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Complete login' }));
 
     expect(await screen.findByText('Studio route')).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/studio/videos');
+    expect(router.state.location.pathname).toBe('/studio/assets/videos');
   });
 
   it('restores focus to the camera entry after browser Back', async () => {
     const { router } = renderApplication();
-    fireEvent.click(screen.getByRole('button', { name: 'Enter Studio' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Dashboard' }));
     await screen.findByText('Studio route');
 
     await router.navigate(-1);
 
-    const enter = await screen.findByRole('button', { name: 'Enter Studio' });
+    const enter = await screen.findByRole('button', { name: 'Open Dashboard' });
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     await waitFor(() => expect(enter).toHaveFocus());
   });
@@ -199,20 +197,28 @@ describe('AppRouter', () => {
     expect(document.activeElement).toBe(document.body);
   });
 
-  it.each(['/studio/videos', '/studio/characters', '/studio/outfits'])(
-    'keeps the persistent Studio runtime for %s',
-    async (path) => {
-      renderApplication(path);
+  it.each([
+    ['/studio/videos', '/studio/assets/videos'],
+    ['/studio/characters', '/studio/assets/characters'],
+    ['/studio/outfits', '/studio/assets/outfits'],
+  ])('redirects the legacy route %s inside the persistent Studio runtime', async (path, target) => {
+    const { router } = renderApplication(path);
 
-      expect(await screen.findByText('Studio route')).toBeInTheDocument();
-      expect(appHarness.renderCount).toBe(1);
-      expect(appHarness.latestProps?.focusMainOnMount).toBe(false);
-    },
-  );
+    expect(await screen.findByText('Studio route')).toBeInTheDocument();
+    expect(appHarness.renderCount).toBe(1);
+    expect(appHarness.latestProps?.focusMainOnMount).toBe(true);
+    await waitFor(() => expect(router.state.location.pathname).toBe(target));
+  });
 
   it.each([
     ['/studio/projects', 'Projects · Lightframe Studio'],
     ['/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391', 'Project · Lightframe Studio'],
+    [
+      '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace',
+      'Project Studio · Lightframe',
+    ],
+    ['/studio/create', 'Studio · Lightframe'],
+    ['/studio/assets', 'Assets · Lightframe'],
   ])(
     'protects the canonical Project route %s with the shared Studio runtime',
     async (path, title) => {
@@ -235,7 +241,7 @@ describe('AppRouter', () => {
   ])('replaces the noncanonical path %s with the entry page', async (path) => {
     const { router } = renderApplication(path);
 
-    expect(await screen.findByRole('button', { name: 'Enter Studio' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Open Dashboard' })).toBeInTheDocument();
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     expect(router.state.location.search).toBe('');
     expect(appHarness.renderCount).toBe(0);
@@ -246,7 +252,7 @@ describe('AppRouter', () => {
     async (path) => {
       renderApplication(path);
 
-      expect(await screen.findByRole('button', { name: 'Enter Studio' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Open Dashboard' })).toBeInTheDocument();
       expect(appHarness.renderCount).toBe(0);
     },
   );

@@ -12,9 +12,10 @@ browser for up to 24 hours, and log out with temporary work safely cleaned up.
 2. Development may prefill both configured demo credentials. Production never returns or displays
    that prefill. The password field clears when the dialog closes or login succeeds.
 3. Incorrect credentials return one generic error. Correct credentials establish an HTTP-only
-   cookie and navigate to the same lazy Studio runtime.
-4. Direct access to `/studio` or a Studio library restores through `/api/auth/me`. An absent,
-   invalid, revoked, or expired session returns to `/` and offers Login.
+   cookie and navigate to Dashboard in the same lazy Studio runtime.
+4. Direct access to Dashboard, Create, a Project workspace, Campaign, or Assets route restores
+   through `/api/auth/me`. An absent, invalid, revoked, or expired session returns to `/`, offers
+   Login, and preserves the recognized destination for post-login return.
 5. The 24-hour cookie can survive browser closure; it never enters browser storage or a URL.
 6. **Log out** is blocked while recording/finalization cannot be abandoned. Discardable work asks
    for confirmation, then cleanup cancels temporary work, releases media, clears user caches,

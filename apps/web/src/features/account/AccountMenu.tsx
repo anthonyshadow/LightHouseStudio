@@ -9,11 +9,6 @@ interface AccountMenuProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly busy?: boolean | undefined;
-  readonly projectContextActive?: boolean | undefined;
-  readonly activeLibrary?: 'videos' | 'characters' | 'outfits' | undefined;
-  readonly onOpenVideos: () => void;
-  readonly onOpenCharacters: () => void;
-  readonly onOpenOutfits: () => void;
   readonly onLogout: () => void;
 }
 
@@ -22,11 +17,6 @@ export const AccountMenu = ({
   open,
   onOpenChange,
   busy = false,
-  projectContextActive = false,
-  activeLibrary,
-  onOpenVideos,
-  onOpenCharacters,
-  onOpenOutfits,
   onLogout,
 }: AccountMenuProps) => {
   const theme = useTheme();
@@ -52,12 +42,6 @@ export const AccountMenu = ({
     onOpenChange(false);
     action();
   };
-  const libraryItems = [
-    { id: 'videos', label: 'Saved Videos', open: onOpenVideos },
-    { id: 'characters', label: 'Saved Characters', open: onOpenCharacters },
-    { id: 'outfits', label: 'Saved Outfits', open: onOpenOutfits },
-  ] as const;
-
   return (
     <div
       ref={rootRef}
@@ -80,17 +64,13 @@ export const AccountMenu = ({
             background: theme.colors.surfaceStrong,
           },
         },
-        '& > button[data-library-active="true"]': {
-          borderColor: theme.colors.accent,
-          background: theme.colors.accentSoft,
-        },
-        '& [data-library-label]': {
+        '& [data-account-label]': {
           fontSize: theme.fontSizes.metadata,
           whiteSpace: 'nowrap',
         },
         '@media (max-width: 39.99rem)': {
           '& > button': { width: '2.75rem', padding: 0 },
-          '& [data-library-label]': { display: 'none' },
+          '& [data-account-label]': { display: 'none' },
         },
       }}
     >
@@ -101,7 +81,6 @@ export const AccountMenu = ({
         aria-label={`${user.displayName} account menu`}
         aria-haspopup="menu"
         aria-expanded={open}
-        data-library-active={activeLibrary !== undefined}
         disabled={busy}
         onClick={() => onOpenChange(!open)}
         onKeyDown={(event) => {
@@ -111,8 +90,8 @@ export const AccountMenu = ({
         }}
       >
         <span aria-hidden="true">{initials || 'U'}</span>
-        <span data-library-label aria-hidden="true">
-          Libraries
+        <span data-account-label aria-hidden="true">
+          Account
         </span>
       </Button>
       {open ? (
@@ -120,7 +99,7 @@ export const AccountMenu = ({
           ref={menuRef}
           role="menu"
           tabIndex={-1}
-          aria-label="Account and saved libraries"
+          aria-label="Account"
           onKeyDown={(event) => {
             if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
             const items = [
@@ -160,14 +139,6 @@ export const AccountMenu = ({
               fontSize: theme.fontSizes.metadata,
               lineHeight: 1.45,
             },
-            '& [data-menu-section-label]': {
-              padding: `${theme.space.xs} ${theme.space.sm} ${theme.space.xxs}`,
-              color: theme.colors.textFaint,
-              fontSize: theme.fontSizes.caption,
-              fontWeight: 800,
-              letterSpacing: '0.08em',
-              textTransform: 'uppercase',
-            },
             '& > button': { justifyContent: 'flex-start', width: '100%' },
             '& > button[role="menuitem"]': { minHeight: '2.75rem' },
             '& > button[aria-current="page"]': {
@@ -193,21 +164,6 @@ export const AccountMenu = ({
             <strong css={{ display: 'block', color: theme.colors.text }}>{user.displayName}</strong>
             {user.login}
           </p>
-          <span role="presentation" data-menu-section-label>
-            {projectContextActive ? 'Global libraries · exits Project' : 'Saved libraries'}
-          </span>
-          {libraryItems.map(({ id, label, open: openLibrary }) => (
-            <Button
-              key={id}
-              role="menuitem"
-              variant="quiet"
-              aria-label={projectContextActive ? `${label} (exits Project)` : undefined}
-              aria-current={activeLibrary === id ? 'page' : undefined}
-              onClick={() => run(openLibrary)}
-            >
-              {label}
-            </Button>
-          ))}
           <Button data-logout role="menuitem" variant="danger" onClick={() => run(onLogout)}>
             Log out
           </Button>

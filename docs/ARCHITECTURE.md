@@ -11,8 +11,8 @@ Character variants, Outfits, Voices, recipes, and reference media. The generic w
 describing byte storage, media ownership, or future product direction, but it must not obscure an
 actual video-, image-, audio-, or feature-specific contract and lifecycle.
 
-The intended product hierarchy is **Workspace → Campaign → Project → Assets**, with two important
-current-state qualifications:
+The intended product hierarchy is **Workspace → Campaign → Project → Assets**, with current-state
+qualifications:
 
 - Campaign is a deliberately lightweight optional organizer with name, optional brief, lifecycle,
   version CAS, and non-cascading Project membership.
@@ -24,6 +24,8 @@ current-state qualifications:
   provider Voice remains gated. Explicit Saved Video output save and immutable Version append are
   implemented. Bounded Project changes, processing attempts/results, and output-Version history
   plus exact-Version preview/reuse/Download are implemented without a restore or Export aggregate.
+- Dashboard, Create, and Assets are browser information-architecture surfaces over existing owners;
+  they are not new domain aggregates or persistence authorities.
 
 One Campaign may group multiple Projects, while a Project represents a focused resumable production
 effort and may remain independent. Campaign never owns Project/media processing state. Multi-format support
@@ -75,9 +77,13 @@ JWT secret and password hash.
 ## Studio composition
 
 `AppRouter.tsx` is the browser URL boundary. React Router's data browser router renders the
-provider-free entry at `/` and protects the recognized lazy Studio route family: `/studio`,
-`/studio/projects`, `/studio/projects/:projectId`, `/studio/campaigns`,
-`/studio/campaigns/:campaignId`, `/studio/videos`, `/studio/characters`, and `/studio/outfits`.
+provider-free entry at `/` and protects the recognized lazy route family. `/studio` is Dashboard;
+`/studio/create` is standard video creation; `/studio/create/live` is Live AI Beta;
+`/studio/assets` and its `/videos`, `/characters`, `/outfits`, `/voices`, and `/recipes` children
+are reusable-resource surfaces; and Projects/Campaigns use `/studio/projects`,
+`/studio/projects/:projectId`, `/studio/projects/:projectId/workspace`, `/studio/campaigns`, and
+`/studio/campaigns/:campaignId`. Legacy top-level library and `/studio/live` URLs redirect to their
+canonical replacements.
 The data-router form is required for route blocking. Route metadata, protected
 Login return, focus handoff, and loading/error surfaces remain router-owned; unknown paths return
 to `/`. All Studio children render the same `StudioApp` instance so moving between a workspace and
@@ -88,7 +94,8 @@ WebSocket, or contact a provider. `StudioApp.tsx` remains the sole runtime compo
 There is no second product shell, media session, global client store, or provider client.
 
 Studio initializes the session draft in Local Camera mode and the media lifecycle at `idle`.
-Entry intent may open the upload panel, but it never starts camera, microphone, AI, or provider
+Dashboard and organization routes hide the stage but retain the same composition owner. Entry
+intent on `/studio/create` may open the upload panel, but it never starts camera, microphone, AI, or provider
 work. The control-bar **Record New Video** action and upload-panel **Record a local video** action
 both explicitly acquire local media and mark the finalized local artifact for adoption by the
 existing-video editor. Dock-started local preview and Character/VTO starts retain the advanced
@@ -127,7 +134,7 @@ mutations do not retry by default and do not refetch on window focus or reconnec
 non-billable capability read is the only bounded automatic retry. Project summary/current reads,
 saved-video metadata/cursor pages, voice-library metadata pages, and accepted video-job status reads
 use Query cancellation and targeted cache updates or invalidation. Project lists use separate
-bounded active/archived cursor pages. Quick Start retains one operation key through an uncertain
+bounded active/archived cursor pages. Quick project retains one operation key through an uncertain
 response; rename/archive/restore reconcile server CAS before invalidating the current Project and
 list caches. Voice pages remain fresh for five minutes. Video-job status
 polling follows the server-provided cadence and never retries a failed read automatically. Video
@@ -135,13 +142,25 @@ bytes and Blobs, editor and camera state, current timeline edits, temporary UI s
 creative-asset repositories, provider submission, result retrieval, and finalization remain under
 their existing owners and never enter this cache.
 
+Dashboard composes three bounded, independently cached reads—active Projects, active Campaigns, and
+recent Saved Videos—in parallel, then limits each presentation list. It deliberately has no new
+aggregate/count endpoint: the existing calls do not create an N+1 path, already preserve feature
+ownership, and are appropriate for the loopback runtime. Add an aggregate only if measured latency
+or future cross-resource counts justify a versioned contract and cache lifecycle of its own.
+
+The dismissible Dashboard orientation card stores only a versioned environment-and-user-scoped
+browser preference. It is account-based within this local installation, clears on logout/site-data
+cleanup as other browser preferences do, never authorizes ownership, and is not claimed to sync
+across devices.
+
 Saved-video character attribution is pinned when a live recording or completed Character Swap
 artifact is created. Each immutable video version stores the parent character name as its gallery
 filter key and an optional exact variant name as display-only metadata. Voice and later local edits
 inherit that pinned attribution; the gallery never treats variants as separate character facets.
 
-`MediaStage` stays mounted once and owns one `<video>` element. Campaign and Project-list routes
-hide it. An open Project renders its workspace beside this existing stage and hydrates its accepted
+`MediaStage` stays mounted once and owns one `<video>` element. Dashboard, Assets, Campaign, Project
+list, and Project overview routes hide it. A Project's explicit `/workspace` route renders its
+workspace beside this existing stage and hydrates its accepted
 source through the recording-artifact owner; it never creates another player, media session, object
 URL owner, or Project authority. A discriminated presentation state
 switches among idle, live, finalizing, and playback. Live media uses `srcObject`; playback uses
@@ -224,6 +243,13 @@ overlay the video frame rather than changing its geometry.
 
 `useStudioSession` coordinates the session; pure domain rules decide valid modes and transitions.
 The three modes are Local, `lucy-latest`, and pinned `lucy-vton-latest`.
+
+Realtime modes are additionally controlled by the strict server-only
+`REALTIME_VIDEO_BETA_ENABLED` flag, which defaults to `false`. Capability metadata reports provider
+configuration (`available`) separately from product admission (`betaEnabled`). The browser may show
+Live AI Beta entry only when both are true, and the realtime-token route repeats the gate before it
+parses submission data or contacts the provider. A direct `/studio/create/live` visit while gated
+renders a safe unavailable surface and cannot mint a token.
 
 1. The user edits a mode-specific in-memory draft. Text and enhancement survive mode switches;
    every departing reference relationship is cleared, and owned object URLs are revoked.
@@ -516,14 +542,21 @@ errors. The URL is neither persisted nor forwarded to a visual provider.
 
 The Project aggregate is implemented in domain, contracts, versioned local metadata, authoritative
 relational persistence, and feature-local browser adapters/controllers. Authenticated routes back
-`/studio/projects` and `/studio/projects/:projectId`, where the operator can list, Quick Start, open,
-rename, archive, restore, attach one immutable source, checkpoint creative intent, adopt working
+`/studio/projects`, `/studio/projects/:projectId`, and the focused
+`/studio/projects/:projectId/workspace`, where the operator can list, create named or quick
+Projects, inspect, open, rename, archive, restore, attach one immutable source, checkpoint creative intent, adopt working
 media, reconnect visual processing, save exact outputs, and browse bounded history. `Project` is the
 owner-scoped durable workspace for one focused production effort; Saved Videos remain outputs and
-immutable output versions rather than work-in-progress authority. One Project can link any number of
-Saved Video outputs while its current revision keeps one active working context. The separately
+immutable output versions rather than work-in-progress authority. One Project can link any number
+of Saved Video outputs while its current revision keeps one active working context. The separately
 documented deferred Deliverable model is required only when several child video workflows must
 remain independently editable and resumable at once.
+
+A Project may intentionally remain empty and collection-only. The deferred UI name for future
+independent children is **Videos**, while `Project Deliverable` remains the proposed internal model
+term. One exact Saved Video Version may be related to several Projects or future Project Videos;
+each reuse relationship is owner-checked and role-specific, copies no bytes, and does not create
+false producer provenance.
 
 Campaign is a separate owner-scoped aggregate containing only normalized name, optional bounded
 brief, lifecycle timestamps, and version CAS. Project has a nullable `campaignId`; create-in,

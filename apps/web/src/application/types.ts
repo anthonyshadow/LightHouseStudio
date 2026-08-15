@@ -28,6 +28,8 @@ export type RealtimeSessionTiming = Readonly<{
 
 export type ProviderAvailability = {
   decart: boolean;
+  realtimeBetaEnabled?: boolean;
+  realtimeProviderConfigured?: boolean;
   videoProcessing?: CapabilitiesResponse['videoProcessing'];
   elevenLabs: boolean;
   elevenLabsModel: string | null;

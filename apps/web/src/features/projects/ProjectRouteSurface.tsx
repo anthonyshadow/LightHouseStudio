@@ -10,10 +10,18 @@ import {
   type ReactNode,
 } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { APP_PATHS, campaignPath, projectIdFromPath, projectPath } from '../../app/paths';
+import {
+  APP_PATHS,
+  campaignPath,
+  isProjectWorkspacePath,
+  projectIdFromPath,
+  projectPath,
+  projectWorkspacePath,
+} from '../../app/paths';
 import { Button, StatusNotice } from '../../ui';
 import { useCampaignDetail } from '../campaigns/useCampaignsController';
 import {
+  NewProjectDialog,
   ProjectCampaignDialog,
   ProjectLifecycleDialog,
   RenameProjectDialog,
@@ -116,7 +124,7 @@ const ProjectListSection = ({
           <p>
             {archived
               ? 'Archived work appears here and can be restored.'
-              : 'Quick Start creates an Unassigned Project. Add one inspected source, reuse saved creative resources, then save outputs as Versions you can download exactly. Move it into an optional Campaign whenever that helps.'}
+              : 'Quick project creates an unassigned Project immediately. Name one instead when the work already has a clear purpose.'}
           </p>
         </div>
       ) : null}
@@ -183,6 +191,7 @@ const ProjectListSection = ({
 const ProjectsWorkspace = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const controller = useProjectsController();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const dialogReturnRef = useRef<HTMLElement | null>(null);
@@ -194,6 +203,16 @@ const ProjectsWorkspace = () => {
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [activeGroup, setActiveGroup] = useState<'all' | 'none'>('all');
+  const [creating, setCreating] = useState(false);
+  const routeCreateRequested =
+    (location.state as { readonly createIntent?: string } | null)?.createIntent === 'project';
+  const setHeadingRef = useCallback(
+    (node: HTMLHeadingElement | null) => {
+      headingRef.current = node;
+      if (routeCreateRequested) dialogReturnRef.current = node;
+    },
+    [routeCreateRequested],
+  );
 
   const quickStart = async () => {
     setCreateError(null);
@@ -209,6 +228,12 @@ const ProjectsWorkspace = () => {
   const closeDialog = () => {
     setRenameProject(null);
     setLifecycleDialog(null);
+  };
+  const closeCreateDialog = () => {
+    setCreating(false);
+    if (routeCreateRequested) {
+      void navigate(location.pathname, { replace: true, state: null });
+    }
   };
   const openProject = (project: ProjectContract) => {
     void navigate(projectPath(project.id));
@@ -230,30 +255,35 @@ const ProjectsWorkspace = () => {
     <div css={workspaceInnerStyles(theme)}>
       <header css={workspaceHeaderStyles(theme)}>
         <div>
-          <h2 ref={headingRef} tabIndex={-1}>
+          <h1 ref={setHeadingRef} tabIndex={-1}>
             Projects
-          </h2>
+          </h1>
           <p>
-            Create resumable video work with an optional Campaign. Each Project retains one
-            inspected immutable source, durable working media and creative checkpoints, and can
-            reuse saved resources. Provider work stays explicit; save outputs as Versions and
-            download any exact Version.
+            Keep focused video work together, with or without a Campaign. A Project can start as an
+            empty collection and become a resumable workspace when you are ready.
           </p>
         </div>
-        <Button
-          variant="primary"
-          busy={controller.createMutation.isPending}
-          onClick={() => void quickStart()}
-        >
-          Quick Start
-        </Button>
+        <div css={dialogActionsStyles(theme)}>
+          <Button
+            variant="primary"
+            onClick={(event) => {
+              dialogReturnRef.current = event.currentTarget;
+              setCreating(true);
+            }}
+          >
+            New Project
+          </Button>
+          <Button busy={controller.createMutation.isPending} onClick={() => void quickStart()}>
+            Quick project
+          </Button>
+        </div>
       </header>
 
       {createError ? (
         <StatusNotice role="alert" tone="danger" title="Project not created">
           <p>{createError}</p>
           <Button size="small" onClick={() => void quickStart()}>
-            Retry Quick Start
+            Retry quick project
           </Button>
         </StatusNotice>
       ) : null}
@@ -307,6 +337,13 @@ const ProjectsWorkspace = () => {
           }}
         />
       ) : null}
+      {creating || routeCreateRequested ? (
+        <NewProjectDialog
+          returnFocusRef={dialogReturnRef}
+          onClose={closeCreateDialog}
+          onCreated={(current) => void navigate(projectPath(current.project.id))}
+        />
+      ) : null}
       {lifecycleDialog ? (
         <ProjectLifecycleDialog
           action={lifecycleDialog.action}
@@ -332,6 +369,7 @@ export interface ProjectRecordingCandidate {
 }
 
 export interface ProjectRouteSurfaceProps {
+  readonly workspaceMode?: boolean;
   readonly ownerUserId?: string;
   readonly creativeCheckpoint?: ReactNode;
   readonly sourceRuntime?: ProjectSourceRuntime;
@@ -604,6 +642,7 @@ const ProjectSessionNotice = ({
 
 const ProjectDetail = ({
   projectId,
+  workspaceMode = false,
   sourceRuntime = unavailableSourceRuntime,
   recordingCandidate,
   recordingActive,
@@ -691,21 +730,27 @@ const ProjectDetail = ({
           variant="quiet"
           onClick={() =>
             void navigate(
-              project.campaignId === null ? APP_PATHS.projects : campaignPath(project.campaignId),
+              workspaceMode
+                ? projectPath(project.id)
+                : project.campaignId === null
+                  ? APP_PATHS.projects
+                  : campaignPath(project.campaignId),
             )
           }
         >
-          {project.campaignId === null
-            ? '← All Projects'
-            : campaignName === null
-              ? '← Campaign'
-              : `← ${campaignName}`}
+          {workspaceMode
+            ? '← Project overview'
+            : project.campaignId === null
+              ? '← All Projects'
+              : campaignName === null
+                ? '← Campaign'
+                : `← ${campaignName}`}
         </Button>
         <div data-detail-identity>
           <div>
-            <h2 ref={headingRef} tabIndex={-1}>
+            <h1 ref={headingRef} tabIndex={-1}>
               {project.title}
-            </h2>
+            </h1>
             <div data-detail-meta>
               <span css={statusPillStyles(theme, archived)}>
                 {projectStatusLabel(project.status)}
@@ -729,33 +774,45 @@ const ProjectDetail = ({
             </div>
           </div>
           <div data-detail-actions>
-            <Button
-              onClick={(event) => {
-                dialogReturnRef.current = event.currentTarget;
-                setCampaignDialog(true);
-              }}
-            >
-              Move Project
-            </Button>
-            {!archived ? (
+            {!workspaceMode ? (
               <Button
-                onClick={(event) => {
-                  dialogReturnRef.current = event.currentTarget;
-                  setRenameTarget(project);
-                }}
+                variant="primary"
+                onClick={() => void navigate(projectWorkspacePath(project.id))}
               >
-                Rename
+                {archived ? 'View workspace' : 'Continue editing'}
               </Button>
             ) : null}
-            <Button
-              variant={archived ? 'primary' : 'danger'}
-              onClick={(event) => {
-                dialogReturnRef.current = event.currentTarget;
-                setLifecycleDialog({ action: archived ? 'restore' : 'archive', project });
-              }}
-            >
-              {archived ? 'Restore' : 'Archive'}
-            </Button>
+            {!workspaceMode ? (
+              <>
+                <Button
+                  onClick={(event) => {
+                    dialogReturnRef.current = event.currentTarget;
+                    setCampaignDialog(true);
+                  }}
+                >
+                  Move Project
+                </Button>
+                {!archived ? (
+                  <Button
+                    onClick={(event) => {
+                      dialogReturnRef.current = event.currentTarget;
+                      setRenameTarget(project);
+                    }}
+                  >
+                    Rename
+                  </Button>
+                ) : null}
+                <Button
+                  variant={archived ? 'secondary' : 'danger'}
+                  onClick={(event) => {
+                    dialogReturnRef.current = event.currentTarget;
+                    setLifecycleDialog({ action: archived ? 'restore' : 'archive', project });
+                  }}
+                >
+                  {archived ? 'Restore' : 'Archive'}
+                </Button>
+              </>
+            ) : null}
           </div>
         </div>
       </header>
@@ -764,48 +821,64 @@ const ProjectDetail = ({
         {announcement}
       </div>
 
-      <ProjectSessionNotice session={session} sourceBusy={sourceActivity?.busy ?? false} />
-
-      {creativeCheckpoint}
-
-      {processing ? (
-        <ProjectProcessingStatusPanel controller={processing} />
+      {workspaceMode ? (
+        <>
+          <ProjectSessionNotice session={session} sourceBusy={sourceActivity?.busy ?? false} />
+          {creativeCheckpoint}
+          <ProjectSourceSection
+            key={current.project.id}
+            current={current}
+            runtime={sourceRuntime}
+            recordingCandidate={recordingCandidate}
+            recordingActive={recordingActive}
+            onStartRecording={onStartRecording}
+            onActivityChange={handleSourceActivity}
+            onCurrentChange={session.acceptCurrent}
+          />
+          <ProjectWorkingMediaSection
+            current={current}
+            session={session.port}
+            archived={archived}
+            {...(onWorkingMediaActivityChange
+              ? { onActivityChange: onWorkingMediaActivityChange }
+              : {})}
+          />
+          {processing ? (
+            <ProjectProcessingStatusPanel controller={processing} />
+          ) : (
+            <StatusNotice role="status" tone="neutral" title="Processing unavailable">
+              No provider work can be submitted from this workspace.
+            </StatusNotice>
+          )}
+          <ProjectOutputSaveSection
+            current={current}
+            session={session.port}
+            archived={archived}
+            ownerUserId={ownerUserId}
+          />
+          <ProjectHistorySection current={current} session={session.port} archived={archived} />
+        </>
       ) : (
-        <StatusNotice role="status" tone="neutral" title="Project processing unavailable">
-          Project processing authority is not mounted. Configuration submits no provider work.
-        </StatusNotice>
+        <section css={emptyProjectStyles(theme)} aria-labelledby="project-focus-heading">
+          <div>
+            <h3 id="project-focus-heading">Focused video workspace</h3>
+            <p>
+              {current.revision.snapshot.sourceAssetId === null
+                ? 'This Project is intentionally empty. Keep it collection-only, or open the workspace when you are ready to add a source.'
+                : `Source ready · workflow ${current.revision.snapshot.workflowPhase}. Continue editing to resume the exact saved state.`}
+            </p>
+            <p>
+              Saved Videos remain reusable assets. Adding one here does not remove it from Assets or
+              prevent another Project from using it.
+            </p>
+          </div>
+          <div data-source-actions>
+            <small>Projects and Campaigns organize work; they do not own reusable Assets.</small>
+          </div>
+        </section>
       )}
 
-      <ProjectSourceSection
-        key={current.project.id}
-        current={current}
-        runtime={sourceRuntime}
-        recordingCandidate={recordingCandidate}
-        recordingActive={recordingActive}
-        onStartRecording={onStartRecording}
-        onActivityChange={handleSourceActivity}
-        onCurrentChange={session.acceptCurrent}
-      />
-
-      <ProjectWorkingMediaSection
-        current={current}
-        session={session.port}
-        archived={archived}
-        {...(onWorkingMediaActivityChange
-          ? { onActivityChange: onWorkingMediaActivityChange }
-          : {})}
-      />
-
-      <ProjectOutputSaveSection
-        current={current}
-        session={session.port}
-        archived={archived}
-        ownerUserId={ownerUserId}
-      />
-
-      <ProjectHistorySection current={current} session={session.port} archived={archived} />
-
-      {renameTarget ? (
+      {!workspaceMode && renameTarget ? (
         <RenameProjectDialog
           project={renameTarget}
           returnFocusRef={dialogReturnRef}
@@ -817,7 +890,7 @@ const ProjectDetail = ({
           }}
         />
       ) : null}
-      {campaignDialog ? (
+      {!workspaceMode && campaignDialog ? (
         <ProjectCampaignDialog
           project={project}
           returnFocusRef={dialogReturnRef}
@@ -829,7 +902,7 @@ const ProjectDetail = ({
           }}
         />
       ) : null}
-      {lifecycleDialog ? (
+      {!workspaceMode && lifecycleDialog ? (
         <ProjectLifecycleDialog
           action={lifecycleDialog.action}
           project={lifecycleDialog.project}
@@ -860,6 +933,7 @@ export const ProjectRouteSurface = (props: ProjectRouteSurfaceProps = {}) => {
   const theme = useTheme();
   const location = useLocation();
   const projectId = projectIdFromPath(location.pathname);
+  const workspaceMode = props.workspaceMode ?? isProjectWorkspacePath(location.pathname);
   const routeRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
@@ -871,7 +945,7 @@ export const ProjectRouteSurface = (props: ProjectRouteSurfaceProps = {}) => {
       {projectId === null ? (
         <ProjectsWorkspace />
       ) : (
-        <ProjectDetail projectId={projectId} {...props} />
+        <ProjectDetail projectId={projectId} {...props} workspaceMode={workspaceMode} />
       )}
     </div>
   );

@@ -35,6 +35,7 @@ export const capabilitiesResponseSchema = z
     realtimeVideo: z
       .object({
         available: z.boolean(),
+        betaEnabled: z.boolean(),
       })
       .strict(),
     videoProcessing: z

@@ -63,7 +63,7 @@ describe('health and capabilities contracts', () => {
   it('normalizes provider availability without exposing credentials', () => {
     expect(
       capabilitiesResponseSchema.parse({
-        realtimeVideo: { available: true },
+        realtimeVideo: { available: true, betaEnabled: true },
         videoProcessing: {
           characterSwap: {
             available: true,
@@ -113,7 +113,7 @@ describe('health and capabilities contracts', () => {
         savedVideos: { directMultipartUpload: true },
       }),
     ).toEqual({
-      realtimeVideo: { available: true },
+      realtimeVideo: { available: true, betaEnabled: true },
       videoProcessing: {
         characterSwap: {
           available: true,
@@ -164,7 +164,7 @@ describe('health and capabilities contracts', () => {
     });
     expect(
       capabilitiesResponseSchema.safeParse({
-        realtimeVideo: { available: true },
+        realtimeVideo: { available: true, betaEnabled: true },
         videoProcessing: { available: false, models: [] },
         elevenLabs: { available: false, modelId: null },
         referenceImages: {

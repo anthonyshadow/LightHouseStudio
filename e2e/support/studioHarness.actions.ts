@@ -23,11 +23,11 @@ export const expectNoDocumentOverflow = async (page: Page): Promise<void> => {
 };
 
 export const confirmSaveVideo = async (page: Page, name?: string): Promise<void> => {
-  const dialog = page.getByRole('dialog', { name: 'Save video' });
+  const dialog = page.getByRole('dialog', { name: 'Save to Assets' });
   await expect(dialog).toBeVisible();
   const nameField = dialog.getByRole('textbox', { name: 'Video name (optional)' });
   if (name !== undefined) await nameField.fill(name);
-  await dialog.getByRole('button', { name: 'Save Video' }).click();
+  await dialog.getByRole('button', { name: 'Save to Assets' }).click();
   await expect(dialog).toBeHidden();
 };
 

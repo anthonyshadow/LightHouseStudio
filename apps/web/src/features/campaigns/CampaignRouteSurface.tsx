@@ -1,6 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { CampaignContract, ProjectContract } from '@studio/contracts';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { APP_PATHS, campaignIdFromPath, campaignPath, projectPath } from '../../app/paths';
 import { Button, OverlayPanel, StatusNotice } from '../../ui';
@@ -14,7 +14,8 @@ import {
   workspaceInnerStyles,
   workspaceStyles,
 } from '../projects/ProjectRouteSurface.styles';
-import { useProjectList, useProjectsController } from '../projects/useProjectsController';
+import { NewProjectDialog } from '../projects/ProjectDialogs';
+import { useProjectList } from '../projects/useProjectsController';
 import {
   campaignBriefStyles,
   campaignCardStyles,
@@ -32,6 +33,9 @@ import {
   useCampaignList,
   useCampaignsController,
 } from './useCampaignsController';
+
+const formatUpdatedAt = (value: string): string =>
+  new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value));
 
 const CampaignListSection = ({ lifecycle }: { readonly lifecycle: 'active' | 'archived' }) => {
   const theme = useTheme();
@@ -78,6 +82,10 @@ const CampaignListSection = ({ lifecycle }: { readonly lifecycle: 'active' | 'ar
                 <div>
                   <h4>{campaign.name}</h4>
                   <p>{campaign.brief ?? 'No brief yet.'}</p>
+                  <small>
+                    Updated{' '}
+                    <time dateTime={campaign.updatedAt}>{formatUpdatedAt(campaign.updatedAt)}</time>
+                  </small>
                 </div>
                 <div data-campaign-actions>
                   <Button
@@ -112,13 +120,33 @@ const CampaignListSection = ({ lifecycle }: { readonly lifecycle: 'active' | 'ar
 const CampaignsWorkspace = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const [creating, setCreating] = useState(false);
+  const routeCreateRequested =
+    (location.state as { readonly createIntent?: string } | null)?.createIntent === 'campaign';
+  const setHeadingRef = useCallback(
+    (node: HTMLHeadingElement | null) => {
+      headingRef.current = node;
+      if (routeCreateRequested) returnFocusRef.current = node;
+    },
+    [routeCreateRequested],
+  );
+  const closeCreateDialog = () => {
+    setCreating(false);
+    if (routeCreateRequested) {
+      void navigate(location.pathname, { replace: true, state: null });
+    }
+  };
+
   return (
     <div css={workspaceInnerStyles(theme)}>
       <header css={workspaceHeaderStyles(theme)}>
         <div>
-          <h2 tabIndex={-1}>Campaigns</h2>
+          <h1 ref={setHeadingRef} tabIndex={-1}>
+            Campaigns
+          </h1>
           <p>
             Group related Projects around an initiative with only a name and optional brief.
             Campaigns stay optional, so standalone Quick Start remains available in Projects.
@@ -136,10 +164,10 @@ const CampaignsWorkspace = () => {
       </header>
       <CampaignListSection lifecycle="active" />
       <CampaignListSection lifecycle="archived" />
-      {creating ? (
+      {creating || routeCreateRequested ? (
         <CampaignFormDialog
           returnFocusRef={returnFocusRef}
-          onClose={() => setCreating(false)}
+          onClose={closeCreateDialog}
           onSaved={(campaign) => void navigate(campaignPath(campaign.id))}
         />
       ) : null}
@@ -230,13 +258,13 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
   const navigate = useNavigate();
   const query = useCampaignDetail(campaignId);
   const campaigns = useCampaignsController();
-  const projects = useProjectsController();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const [dialog, setDialog] = useState<CampaignDialog | null>(null);
   const [moveProject, setMoveProject] = useState<ProjectContract | null>(null);
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [creatingProject, setCreatingProject] = useState(false);
   if (query.isPending)
     return (
       <div css={workspaceInnerStyles(theme)}>
@@ -296,15 +324,6 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
       );
     }
   };
-  const quickStart = async () => {
-    setActionError(null);
-    try {
-      const current = await projects.createMutation.mutateAsync(campaign.id);
-      void navigate(projectPath(current.project.id));
-    } catch (caught) {
-      setActionError(safeError(caught));
-    }
-  };
   return (
     <div css={workspaceInnerStyles(theme)}>
       <header css={detailHeaderStyles(theme)}>
@@ -317,14 +336,17 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
         </Button>
         <div data-detail-identity>
           <div>
-            <h2 ref={headingRef} tabIndex={-1}>
+            <h1 ref={headingRef} tabIndex={-1}>
               {campaign.name}
-            </h2>
+            </h1>
             <div data-detail-meta>
               <span css={statusPillStyles(theme, archived)}>
                 {archived ? 'Archived' : 'Active'}
               </span>
-              <span>Version {campaign.version}</span>
+              <span>
+                Updated{' '}
+                <time dateTime={campaign.updatedAt}>{formatUpdatedAt(campaign.updatedAt)}</time>
+              </span>
             </div>
             <p css={campaignBriefStyles(theme)}>{campaign.brief ?? 'No brief yet.'}</p>
           </div>
@@ -332,8 +354,10 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
             {!archived ? (
               <Button
                 variant="primary"
-                busy={projects.createMutation.isPending}
-                onClick={() => void quickStart()}
+                onClick={(event) => {
+                  returnFocusRef.current = event.currentTarget;
+                  setCreatingProject(true);
+                }}
               >
                 New Project
               </Button>
@@ -485,6 +509,14 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
             setAnnouncement(message);
             setMoveProject(null);
           }}
+        />
+      ) : null}
+      {creatingProject ? (
+        <NewProjectDialog
+          defaultCampaignId={campaign.id}
+          returnFocusRef={returnFocusRef}
+          onClose={() => setCreatingProject(false)}
+          onCreated={(current) => void navigate(projectPath(current.project.id))}
         />
       ) : null}
     </div>

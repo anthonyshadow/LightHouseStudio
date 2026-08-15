@@ -355,6 +355,7 @@ export const installProviderNetworkDriver = async (
         body: JSON.stringify({
           realtimeVideo: {
             available: options.realtimeVideoAvailable ?? true,
+            betaEnabled: options.realtimeBetaEnabled ?? true,
           },
           videoProcessing: {
             characterSwap: {

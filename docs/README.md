@@ -19,14 +19,14 @@ describe implemented behavior and constraints.
 | [Repository working guide](../AGENTS.md)                                                | Current    | Engineering         | Repository-wide work, validation, and stop conditions                         | 2026-08-14    |
 | [Security policy](../SECURITY.md)                                                       | Current    | Repository owner    | Private vulnerability reporting scope and expectations                        | 2026-08-08    |
 | [Architecture](ARCHITECTURE.md)                                                         | Current    | Engineering         | Dependency, ownership, lifecycle, persistence, API, and deployment boundaries | 2026-08-14    |
-| [User stories](userStories/README.md)                                                   | Current    | Product/QA          | Observable current journeys and manual validation limits                      | 2026-08-14    |
+| [User stories](userStories/README.md)                                                   | Current    | Product/QA          | Observable current journeys and manual validation limits                      | 2026-08-15    |
 | [Privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md)                             | Current    | Product/engineering | Data location, provider contact, retention, deletion, and cost boundaries     | 2026-08-14    |
-| [Testing strategy](TESTING.md)                                                          | Current    | Engineering/QA      | Test layers, commands, CI scope, visual policy, and release validation        | 2026-08-14    |
-| [Manual QA](MANUAL_QA.md)                                                               | Current    | QA                  | Physical device, touch, accessibility, media, and cleanup checks              | 2026-08-14    |
+| [Testing strategy](TESTING.md)                                                          | Current    | Engineering/QA      | Test layers, commands, CI scope, visual policy, and release validation        | 2026-08-15    |
+| [Manual QA](MANUAL_QA.md)                                                               | Current    | QA                  | Physical device, touch, accessibility, media, and cleanup checks              | 2026-08-15    |
 | [Live provider smoke](LIVE_PROVIDER_SMOKE.md)                                           | Current    | Engineering/QA      | Authorized, opt-in, cost-bearing provider validation                          | 2026-08-08    |
 | [Recording memory policy](RECORDING_MEMORY_POLICY.md)                                   | Current    | Engineering/QA      | Real 300-second memory measurement and support limits                         | 2026-08-08    |
 | [Browser support](BROWSER_SUPPORT.md)                                                   | Current    | Engineering/QA      | Claimed browser/device support and remaining manual checks                    | 2026-08-14    |
-| [Screenshot coverage](screenshot-test-coverage.md)                                      | Current    | Engineering/QA      | Curated visual matrix, platform baselines, and readiness rules                | 2026-08-14    |
+| [Screenshot coverage](screenshot-test-coverage.md)                                      | Current    | Engineering/QA      | Curated visual matrix, platform baselines, and readiness rules                | 2026-08-15    |
 
 ## Account foundation and deferred infrastructure
 

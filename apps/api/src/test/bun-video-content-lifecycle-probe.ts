@@ -268,7 +268,7 @@ export const runBunVideoContentLifecycleProbe =
     const application = new ApplicationRuntime({ logger: false });
     installTestAuthentication(application);
     registerVideoJobRoutes(application, videoService);
-    registerRealtimeRoutes(application, stalledProvider);
+    registerRealtimeRoutes(application, stalledProvider, true);
 
     try {
       await application.listen({ host: '127.0.0.1', port: 0 });

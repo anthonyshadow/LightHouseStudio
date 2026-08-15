@@ -33,57 +33,33 @@ const AccountMenuHarness = (props: HarnessProps) => {
 describe('AccountMenu', () => {
   afterEach(cleanup);
 
-  it('supports menu keyboard movement, escape focus return, and every action', async () => {
+  it('shows account identity, supports keyboard focus return, and logs out', async () => {
     const userInput = userEvent.setup();
-    const actions = {
-      onOpenVideos: vi.fn(),
-      onOpenCharacters: vi.fn(),
-      onOpenOutfits: vi.fn(),
-      onLogout: vi.fn(),
-    };
+    const onLogout = vi.fn();
     render(
       <StudioDesignProvider>
-        <AccountMenuHarness user={user} {...actions} />
+        <AccountMenuHarness user={user} onLogout={onLogout} />
       </StudioDesignProvider>,
     );
     const trigger = screen.getByRole('button', { name: 'Lightframe Demo account menu' });
-    expect(screen.getByText('Libraries')).toBeVisible();
 
     await userInput.click(trigger);
-    await waitFor(() =>
-      expect(screen.getByRole('menuitem', { name: 'Saved Videos' })).toHaveFocus(),
-    );
-    await userInput.keyboard('{End}');
-    expect(screen.getByRole('menuitem', { name: 'Log out' })).toHaveFocus();
-    await userInput.keyboard('{Home}');
-    await userInput.keyboard('{ArrowUp}');
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: 'Log out' })).toHaveFocus());
+    expect(screen.getByText('demo@lightframe.local')).toBeVisible();
     expect(screen.getByRole('menuitem', { name: 'Log out' })).toHaveFocus();
     await userInput.keyboard('{Escape}');
     expect(trigger).toHaveFocus();
 
-    for (const [label, callback] of [
-      ['Saved Videos', actions.onOpenVideos],
-      ['Saved Characters', actions.onOpenCharacters],
-      ['Saved Outfits', actions.onOpenOutfits],
-      ['Log out', actions.onLogout],
-    ] as const) {
-      await userInput.click(trigger);
-      await userInput.click(screen.getByRole('menuitem', { name: label }));
-      expect(callback).toHaveBeenCalledOnce();
-    }
+    await userInput.click(trigger);
+    await userInput.click(screen.getByRole('menuitem', { name: 'Log out' }));
+    expect(onLogout).toHaveBeenCalledOnce();
   });
 
   it('opens from ArrowDown and closes on an outside pointer', async () => {
     const userInput = userEvent.setup();
     render(
       <StudioDesignProvider>
-        <AccountMenuHarness
-          user={user}
-          onOpenVideos={vi.fn()}
-          onOpenCharacters={vi.fn()}
-          onOpenOutfits={vi.fn()}
-          onLogout={vi.fn()}
-        />
+        <AccountMenuHarness user={user} onLogout={vi.fn()} />
         <button type="button">Outside</button>
       </StudioDesignProvider>,
     );
@@ -93,52 +69,5 @@ describe('AccountMenu', () => {
     expect(await screen.findByRole('menu')).toBeVisible();
     await userInput.click(screen.getByRole('button', { name: 'Outside' }));
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-  });
-
-  it('labels global-library navigation as an explicit Project-context exit', async () => {
-    const userInput = userEvent.setup();
-    render(
-      <StudioDesignProvider>
-        <AccountMenuHarness
-          user={user}
-          projectContextActive
-          onOpenVideos={vi.fn()}
-          onOpenCharacters={vi.fn()}
-          onOpenOutfits={vi.fn()}
-          onLogout={vi.fn()}
-        />
-      </StudioDesignProvider>,
-    );
-
-    await userInput.click(screen.getByRole('button', { name: 'Lightframe Demo account menu' }));
-    expect(screen.getByText('Global libraries · exits Project')).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Saved Videos (exits Project)' })).toBeVisible();
-  });
-
-  it('marks the exact current saved library without changing the compact account control name', async () => {
-    const userInput = userEvent.setup();
-    render(
-      <StudioDesignProvider>
-        <AccountMenuHarness
-          user={user}
-          activeLibrary="characters"
-          onOpenVideos={vi.fn()}
-          onOpenCharacters={vi.fn()}
-          onOpenOutfits={vi.fn()}
-          onLogout={vi.fn()}
-        />
-      </StudioDesignProvider>,
-    );
-
-    const trigger = screen.getByRole('button', { name: 'Lightframe Demo account menu' });
-    expect(trigger).toHaveAttribute('data-library-active', 'true');
-    await userInput.click(trigger);
-    expect(screen.getByRole('menuitem', { name: 'Saved Characters' })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
-    expect(screen.getByRole('menuitem', { name: 'Saved Videos' })).not.toHaveAttribute(
-      'aria-current',
-    );
   });
 });

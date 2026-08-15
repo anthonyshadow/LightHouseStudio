@@ -214,14 +214,14 @@ const prepareVisualPage = async (page: Page, entryRoute: boolean): Promise<Netwo
     { storageKey: CREATIVE_ASSET_STORAGE_KEY, store: SEEDED_CHARACTER_STORE },
   );
 
-  await page.goto(entryRoute ? '/' : '/studio');
+  await page.goto(entryRoute ? '/' : '/studio/create');
   await expect(page.getByRole('main')).toBeVisible();
   if (entryRoute) {
     await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
   } else {
     await page.getByLabel('Integration availability').getByRole('button').click();
     await expect(page.getByRole('region', { name: 'Studio availability details' })).toContainText(
-      'AI video configured',
+      'Live AI Beta enabled',
     );
     await page.keyboard.press('Escape');
   }
@@ -311,9 +311,34 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
   'entry-initial': {
     id: 'entry-initial',
     setup: async (page) => {
-      await expect(page.getByRole('heading', { name: 'Enter Lightframe Studio' })).toBeAttached();
+      await expect(page.getByRole('heading', { name: 'Lightframe' })).toBeAttached();
       await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
+    },
+  },
+  'dashboard-overview': {
+    id: 'dashboard-overview',
+    setup: async (page) => {
+      await installProjectHarness(page, true);
+      await installCampaignHarness(page, true);
+      await page.goto('/studio');
+      await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: 'Start with the outcome you need' }),
+      ).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Campaigns' })).toBeVisible();
+      await expect(page.getByLabel('Studio media stage')).toBeHidden();
+    },
+  },
+  'assets-overview': {
+    id: 'assets-overview',
+    setup: async (page) => {
+      await page.goto('/studio/assets');
+      await expect(page.getByRole('heading', { name: 'Assets' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Open Videos' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Open Recipes' })).toBeVisible();
+      await expect(page.getByLabel('Studio media stage')).toBeHidden();
     },
   },
   'studio-initial-closed': {
@@ -337,31 +362,10 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
         element.scrollTop = 0;
       });
       await expect(stage.getByText('Your private creative stage.')).toBeVisible();
-      await expect(stage.getByText('Create a video', { exact: true })).toBeVisible();
       await expect(
-        stage.getByText('Record New Video or Upload Video → review', { exact: true }),
+        stage.getByText('Camera and microphone remain off until you start local preview.'),
       ).toBeVisible();
-      await expect(
-        stage.getByText('Virtual Try On · Character Swap · Voice → Save', { exact: true }),
-      ).toBeVisible();
-      const guideTitle = stage.locator('[data-guide-title]');
-      await expect(guideTitle).toHaveCSS('white-space', 'nowrap');
-      const guideTitleBox = await guideTitle.evaluate((element) => ({
-        clientWidth: element.clientWidth,
-        clientHeight: element.clientHeight,
-        scrollWidth: element.scrollWidth,
-        scrollHeight: element.scrollHeight,
-      }));
-      expect(guideTitleBox.scrollWidth).toBe(guideTitleBox.clientWidth);
-      expect(guideTitleBox.scrollHeight).toBe(guideTitleBox.clientHeight);
-      const frameBox = await stage.locator('[data-stage-frame]').boundingBox();
-      const guideBox = await stage.locator('[data-first-success-guide]').boundingBox();
-      expect(frameBox).not.toBeNull();
-      expect(guideBox).not.toBeNull();
-      expect(guideBox!.x).toBeGreaterThanOrEqual(frameBox!.x);
-      expect(guideBox!.x + guideBox!.width).toBeLessThanOrEqual(frameBox!.x + frameBox!.width);
-      expect(guideBox!.y).toBeGreaterThanOrEqual(frameBox!.y);
-      expect(guideBox!.y + guideBox!.height).toBeLessThanOrEqual(frameBox!.y + frameBox!.height);
+      await expect(stage.locator('[data-first-success-guide]')).toHaveCount(0);
     },
   },
   'local-camera-live': {
@@ -479,7 +483,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await createLocalTake(page);
       const review = page.getByRole('dialog', { name: 'Latest Take' });
       await expect(review.getByRole('heading', { name: 'Latest take', exact: true })).toBeVisible();
-      await expect(review.getByRole('button', { name: 'Save Video' })).toBeVisible();
+      await expect(review.getByRole('button', { name: 'Save to Assets' })).toBeVisible();
       await expect(review.getByText('Loading studio tool…', { exact: true })).toHaveCount(0);
     },
   },
@@ -565,7 +569,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'project-output-review',
     setup: async (page) => {
       await installProjectHarness(page, true);
-      await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+      await page.goto(`/studio/projects/${TEST_PROJECT_ID}/workspace`);
       const fixture = await loadDecodableH264VideoFixture();
       await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
         name: 'project-output-review.mp4',

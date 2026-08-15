@@ -1,7 +1,8 @@
-# Deferred Project Deliverable child model
+# Deferred Project Video child model
 
 **Status:** design note for later; not implemented  
 **Created:** 2026-08-11
+**Decisions updated:** 2026-08-14
 
 ## Purpose
 
@@ -12,9 +13,16 @@ launch video, a 15-second social cut, and a vertical teaser after those outputs 
 That Project can belong to a separate **Summer Product Launch** Campaign through the implemented
 optional, non-cascading Campaign membership.
 
-A `Project Deliverable` becomes useful when all three videos must also remain independently
-editable and resumable at the same time. For example, each may need its own source, edit history,
-selected Character/Outfit/Voice, active job, export target, and last-opened phase.
+A user-facing Project **Video**—represented internally by a `Project Deliverable`—becomes useful
+when all three videos must also remain independently editable and resumable at the same time. For
+example, each may need its own source, edit history, selected Character/Outfit/Voice, active job,
+export target, and last-opened phase.
+
+**Videos** is the approved future UI name because it matches the current product medium and is
+clearer to creators than the production term “Deliverables.” `Project Deliverable` remains the
+proposed internal contract and schema term because it leaves room for an exact output purpose and
+delivery specification without weakening the current video-specific lifecycle. This naming
+decision does not authorize implementation or a schema migration.
 
 This document preserves that future direction. It does not authorize schema, API, UI, migration,
 provider, or background-work changes today.
@@ -24,13 +32,13 @@ provider, or background-work changes today.
 ```text
 Campaign: Summer Product Launch (implemented optional organizer)
 └── Project: Summer Launch Video Set
-    ├── Deliverable: 30-second launch video
+    ├── Video: 30-second launch video (internal Project Deliverable)
     │   ├── immutable deliverable revisions
     │   ├── source/working assets and processing jobs
     │   └── one or more Saved Video output versions
-    ├── Deliverable: 15-second social cut
+    ├── Video: 15-second social cut (internal Project Deliverable)
     │   └── independent revision, resume, job, and output state
-    └── Deliverable: Vertical teaser
+    └── Video: Vertical teaser (internal Project Deliverable)
         └── independent revision, resume, job, and output state
 ```
 
@@ -51,8 +59,12 @@ names should follow the schema conventions in force when implementation begins.
 
 ## Rules to preserve
 
-- A Project may have zero or more Deliverables. Empty Projects remain valid.
+- A Project may intentionally remain collection-only with zero Videos. Empty Projects are valid,
+  not incomplete records that require automatic child creation.
 - A Saved Video is still an output/version, not editable working state.
+- One exact Saved Video Version may be referenced by several Projects or future Project Videos.
+  Each relationship preserves its own role and provenance; reuse does not copy bytes or imply that
+  every referencing workflow produced the Version.
 - Each Deliverable has one active snapshot, but a Project may have several active Deliverables.
 - Editing or processing one Deliverable must not change the snapshot, status, playback, or CAS token
   of another.
@@ -82,8 +94,8 @@ acceptance, revision insert, role links, and current-pointer advance remain one 
 
 ## Possible API and UI shape
 
-A later Project detail screen could show an accessible Deliverables/Outputs list. Selecting a row
-would open that Deliverable's current workspace; Preview would open one scoped authenticated player
+A later Project detail screen could show an accessible Videos/Outputs list. Selecting a row would
+open that Video's current workspace; Preview would open one scoped authenticated player
 and release it on close. Several outputs may be listed, but only the explicitly opened video should
 load bytes. Keyboard order, focus return, reduced motion, and small-viewport behavior must follow
 the existing overlay and media ownership system.
@@ -105,8 +117,9 @@ These are illustrative only. They are not current contracts.
 Implementation should be additive and staged:
 
 1. Create Deliverable tables and constraints without changing existing Project reads/writes.
-2. Create one **Primary video** Deliverable for each existing Project by copying, not moving, the
-   current Project revision lineage and links under an idempotent migration receipt.
+2. Create one **Primary video** Deliverable only for each existing Project that already has reliable
+   working or output lineage, by copying rather than moving that lineage under an idempotent
+   migration receipt. Leave collection-only Projects empty.
 3. Verify owner, revision, asset, job, and output counts plus current pointers before switching any
    read authority.
 4. Dual-read or compare in a reviewed compatibility window; never dual-submit provider work.
@@ -117,16 +130,17 @@ Implementation should be additive and staged:
 Existing unassigned Saved Videos remain unassigned. No inferred Deliverable should be created when
 reliable Project lineage does not exist.
 
-## Decision gate before implementation
+## Decisions recorded before implementation
 
-Before building this model, confirm:
+The following product decisions are approved but do not make this model current runtime authority:
 
-1. Whether every Project automatically starts with one Deliverable or may remain collection-only.
-2. Whether a Saved Video may appear in more than one Deliverable/Project.
-3. Whether Deliverables may be archived independently or only removed from an archived Project.
-4. Whether ordering is manual, creation-based, or both.
-5. Whether Project-level creative defaults are copied into new Deliverables or referenced live.
-6. Whether the UI calls these children **Videos**, **Deliverables**, **Cuts**, or another exact name.
+1. A Project may intentionally remain collection-only; it does not automatically require a child.
+2. One Saved Video Version may appear in more than one Project or future Project Video.
+3. The UI name is **Videos**; the proposed internal model remains `Project Deliverable`.
+
+Before implementation, independently decide whether children archive separately, how ordering
+works, and whether Project-level creative defaults are copied or referenced. Those lifecycle
+choices must be reflected in contracts and migrations rather than inferred from the approved name.
 
 Campaign membership is an implemented separate product and architecture decision. Do not make a
 future Deliverable implementation the point where Campaign ownership, cardinality, or lifecycle is
