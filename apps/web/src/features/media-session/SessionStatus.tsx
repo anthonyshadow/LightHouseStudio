@@ -99,7 +99,7 @@ export const SessionStatus = ({ session }: { session: StudioSessionController })
     return (
       <StatusNotice tone="success" title={`${label} AI session completed`} role="status">
         The expected {formatSeconds(timing.maximumSeconds)} provider session ended. Local preview
-        and the working recipe remain available.
+        and the working settings remain available.
       </StatusNotice>
     );
   }
@@ -122,11 +122,11 @@ export const AppliedRecipeSummary = ({ session }: { session: StudioSessionContro
   return (
     <section aria-labelledby={headingId} css={sessionSummaryStyles(theme)}>
       <header>
-        <h3 id={headingId}>Applied recipe</h3>
+        <h3 id={headingId}>Applied settings</h3>
         <span>{session.lifecycle === 'generating' ? 'Live' : 'Active'}</span>
       </header>
-      <p title={session.applied.prompt || 'Reference-led recipe'}>
-        {session.applied.prompt || 'Reference-led recipe'}
+      <p title={session.applied.prompt || 'Reference-led settings'}>
+        {session.applied.prompt || 'Reference-led settings'}
       </p>
       <dl>
         <div>

@@ -140,6 +140,80 @@ describe('Project lifecycle routes', () => {
     expect(restored.json()).toMatchObject({ project: { status: 'draft', version: 4 } });
   });
 
+  it('attaches browser-local Assets idempotently, detaches only memberships, and locks archived Projects', async () => {
+    const app = localApp();
+    const created = (await create(app, 'Asset collection')).response;
+    const projectId = json<{ project: { id: string } }>(created).project.id;
+    const resourceId = randomUUID();
+    const attach = () =>
+      app.inject({
+        method: 'POST',
+        url: `/api/projects/${projectId}/assets`,
+        headers: { ...browserHeaders, 'content-type': 'application/json' },
+        payload: { kind: 'character', resourceId },
+      });
+
+    const first = await attach();
+    expect(first.statusCode).toBe(201);
+    expect(first.json()).toMatchObject({
+      membership: { projectId, kind: 'character', resourceId },
+      created: true,
+    });
+    const membershipId = json<{ membership: { id: string } }>(first).membership.id;
+
+    const duplicate = await attach();
+    expect(duplicate.statusCode).toBe(200);
+    expect(duplicate.json()).toMatchObject({
+      membership: { id: membershipId },
+      created: false,
+    });
+
+    const listed = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/assets?pageSize=24`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(listed.statusCode).toBe(200);
+    expect(listed.json()).toEqual({
+      assets: [expect.objectContaining({ id: membershipId, kind: 'character', resourceId })],
+      videoSummaries: [],
+      nextCursor: null,
+    });
+
+    const detached = await app.inject({
+      method: 'DELETE',
+      url: `/api/projects/${projectId}/assets/${membershipId}`,
+      headers: { host: browserHeaders.host },
+    });
+    const detachedAgain = await app.inject({
+      method: 'DELETE',
+      url: `/api/projects/${projectId}/assets/${membershipId}`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(detached.statusCode).toBe(200);
+    expect(detachedAgain.statusCode).toBe(200);
+    expect(detached.json()).toEqual({ detached: true });
+
+    const archived = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/archive`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { expectedVersion: 1 },
+    });
+    expect(archived.statusCode).toBe(200);
+    const archivedAttach = await attach();
+    expect(archivedAttach.statusCode).toBe(409);
+    expect(archivedAttach.json()).toMatchObject({ error: { code: 'conflict' } });
+
+    const recipe = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/assets`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { kind: 'recipe', resourceId: randomUUID() },
+    });
+    expect(recipe.statusCode).toBe(400);
+  });
+
   it('checkpoints bounded session metadata, converges exact replay, and preserves CAS conflicts', async () => {
     const app = localApp();
     const created = (await create(app, 'Session checkpoint')).response;

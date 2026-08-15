@@ -182,7 +182,7 @@ export const ExistingVideoVisualEditor = ({
             <Surface tone="soft" padding="compact">
               <p>
                 This Character Swap configuration requires one identity reference image. Prompt-only
-                recipes need a reference before processing can start.
+                saved Characters need a reference before processing can start.
               </p>
             </Surface>
           ) : null}

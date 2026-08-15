@@ -80,7 +80,7 @@ export const SessionActions = ({
   if (active) {
     let applyReason: string | null = null;
     if (recording)
-      applyReason = lockReason ?? 'Finish the current take before changing the live recipe.';
+      applyReason = lockReason ?? 'Finish the current take before changing the live AI settings.';
     else if (!hasStartContent) {
       applyReason = 'Add a direction or reference image before applying this draft.';
     } else if (!session.pendingChanges) {

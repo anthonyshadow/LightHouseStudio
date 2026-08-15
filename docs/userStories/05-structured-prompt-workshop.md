@@ -9,22 +9,22 @@ Character creation, editing, upload, and reference generation belong to
 
 ## Journey
 
-1. Select **Workshop**, or open a compatible legacy object-edit record from Recipe Shelf.
+1. Select **Workshop**.
 2. Choose **Add one object**, **Replace one object**, or **Restyle one object**. Each intent keeps
    its own in-tab draft.
 3. Enter the visible target/change and optional guardrails.
-4. Review **Generated recipe summary** and resolve blocking feedback.
+4. Review **Generated direction summary** and resolve blocking feedback.
 5. Select **Use in working draft** to replace the Lucy 2.5 text draft atomically.
-6. Optionally name and **Save to Recipe Shelf**.
 
 ## Guards and recovery
 
-- Validation blocks Use and Save without changing the Studio draft.
+- Validation blocks Use without changing the Studio draft.
 - Reset confirms only when the current intent has content and never clears the other two drafts.
 - Ordinary close preserves all three drafts for the current tab.
-- True character records never expose **Open workshop**.
 - Workshop never starts camera, token, optimizer, image-generation, or realtime provider work.
 - In an open Project, **Use in working draft** still changes only the Studio draft. The separate
-  **Save creative setup** action captures one exact applied prompt/recipe label, durable reference
+  **Save creative setup** action captures one exact applied configuration label, durable reference
   ID, resource revision, and treatment checkpoint through the existing Project session. Workshop
   remains independently owned and no Project provider Start is enabled.
+- Historical saved-prompt records remain readable compatibility data for supported Character and
+  Outfit workflows, but Workshop exposes no Recipe chooser or save action.

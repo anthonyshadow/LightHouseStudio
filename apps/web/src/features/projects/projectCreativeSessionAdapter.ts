@@ -435,37 +435,6 @@ export const resolveProjectCreativeResourceIssues = (
     }
   }
 
-  const recipeId = snapshot.creativeIntent.recipeId;
-  const selectedRecipeIds = new Set(
-    selectedCharacter === null
-      ? []
-      : [selectedCharacter.characterId, selectedCharacter.variantId].filter(
-          (value): value is string => value !== null,
-        ),
-  );
-  if (recipeId !== null && !selectedRecipeIds.has(recipeId)) {
-    const recipe =
-      store.savedCharacterVariants.find((candidate) => candidate.id === recipeId) ??
-      store.savedCharacterPrompts.find((candidate) => candidate.id === recipeId) ??
-      store.savedPrompts.find((candidate) => candidate.id === recipeId) ??
-      null;
-    const label = snapshot.creativeIntent.recipeLabel ?? 'Previously selected Recipe';
-    if (recipe === null) {
-      issues.push({
-        kind: 'recipe',
-        historicalLabel: label,
-        reason: 'missing',
-        message: `${label} is no longer available in this workspace. Its exact historical applied values remain in the Project.`,
-      });
-    } else if (!revisionMatches(snapshot.creativeIntent.resourceRevision, recipe.updatedAt)) {
-      issues.push({
-        kind: 'recipe',
-        historicalLabel: label,
-        reason: 'changed',
-        message: `${label} changed after this checkpoint. The Project retains the exact historical applied values.`,
-      });
-    }
-  }
   return issues;
 };
 

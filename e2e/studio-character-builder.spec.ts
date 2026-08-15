@@ -10,10 +10,20 @@ import { REFERENCE_PNG } from './support/mediaFixtures';
 
 const openBuilder = async (page: Page): Promise<void> => {
   await openCharacterOptions(page);
-  await page
-    .getByRole('button', { name: /^(Create new character|New character recipe)$/u })
-    .click();
+  await page.getByRole('button', { name: 'Create new character' }).click();
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
+};
+
+const selectSavedCharacter = async (page: Page, name: string): Promise<void> => {
+  await openCharacterOptions(page);
+  await page.getByRole('button', { name: 'Choose saved character' }).click();
+  const characters = page.getByRole('dialog', { name: 'Characters' });
+  await characters
+    .getByRole('article')
+    .filter({ hasText: name })
+    .getByRole('button', { name: 'Use in Studio' })
+    .click();
+  await expect(characters).toBeHidden();
 };
 
 const chooseAdultCharacterDirection = async (
@@ -66,7 +76,7 @@ test('character direction supports preview generation and save', async ({ page }
   });
 });
 
-test('prompt-only save performs no image request and immediately preloads the Dock', async ({
+test('prompt-only save performs no image request and immediately selects the Character', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -84,8 +94,11 @@ test('prompt-only save performs no image request and immediately preloads the Do
   expect(network.referenceWorkflowCalls).toEqual([]);
   expect(network.referenceImageGenerations).toEqual([]);
 
-  await page.getByRole('button', { name: 'Dock', exact: true }).click();
-  await expect(page.getByText('Field Presenter is preloaded.')).toBeVisible();
+  await expect(
+    page.getByRole('button', {
+      name: 'Selected character: Field Presenter. Open character options',
+    }),
+  ).toBeVisible();
   const savedStore = await readCreativeAssetStore(page);
   const saved = {
     count: savedStore?.savedCharacterPrompts.length ?? 0,
@@ -100,16 +113,13 @@ test('prompt-only save performs no image request and immediately preloads the Do
     },
   });
 
-  const dock = page.getByRole('dialog', { name: 'Recipe Dock' });
-  await dock.getByRole('button', { name: 'Close panel' }).click();
-  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
-  const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
-  await shelf.getByRole('button', { name: /^Characters/u }).click();
-  await expect(shelf.getByRole('button', { name: 'Field Presenter', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await shelf.getByRole('button', { name: 'Close creative tool' }).click();
+  await openCharacterOptions(page);
+  await page.getByRole('button', { name: 'Choose saved character' }).click();
+  const characters = page.getByRole('dialog', { name: 'Characters' });
+  await expect(
+    characters.getByRole('article').filter({ hasText: 'Field Presenter' }),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
 
   await openBuilder(page);
   await expect(
@@ -127,7 +137,7 @@ test('saved-character selection survives reload and completes Use through Start'
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
   await page.getByRole('button', { name: 'Save Character', exact: true }).click();
-  await confirmCharacterName(page, 'Shelf Field Host');
+  await confirmCharacterName(page, 'Saved Field Host');
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
 
   const savedPrompt =
@@ -138,28 +148,27 @@ test('saved-character selection survives reload and completes Use through Start'
   await expect(page.getByRole('button', { name: 'Select Character', exact: true })).toBeVisible();
   await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Choose saved character' }).click();
-  let shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
-  await expect(shelf.getByRole('button', { name: /^Characters/u })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  let characters = page.getByRole('dialog', { name: 'Characters' });
+  await expect(
+    characters.getByRole('article').filter({ hasText: 'Saved Field Host' }),
+  ).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(shelf).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Shelf', exact: true })).toBeFocused();
+  await expect(characters).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Select Character', exact: true })).toBeFocused();
 
   await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Choose saved character' }).click();
-  shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
-  await expect(shelf.getByRole('button', { name: /^Characters/u })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await shelf.getByRole('button', { name: 'Use Shelf Field Host' }).click();
+  characters = page.getByRole('dialog', { name: 'Characters' });
+  await characters
+    .getByRole('article')
+    .filter({ hasText: 'Saved Field Host' })
+    .getByRole('button', { name: 'Use in Studio' })
+    .click();
 
-  await expect(shelf).toBeHidden();
+  await expect(characters).toBeHidden();
   await expect(
     page.getByRole('button', {
-      name: 'Selected character: Shelf Field Host. Open character options',
+      name: 'Selected character: Saved Field Host. Open character options',
     }),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Record New Video' }).click();
@@ -168,7 +177,7 @@ test('saved-character selection survives reload and completes Use through Start'
   let chooser = page.getByRole('dialog', { name: 'Choose live AI experience' });
   await expect(chooser.getByLabel('Decart start disclosure')).toContainText('at most 300 seconds');
   expect(network.apiRequests.filter(({ path }) => path === '/api/realtime-token')).toHaveLength(0);
-  await chooser.getByRole('button', { name: 'Start with Shelf Field Host' }).click();
+  await chooser.getByRole('button', { name: 'Start with Saved Field Host' }).click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
 
   expect((await readBrowserState(page)).connections).toEqual([
@@ -187,16 +196,16 @@ test('saved-character selection survives reload and completes Use through Start'
   await expect(page.getByLabel('Live local camera preview', { exact: true })).toBeVisible();
   await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Choose saved character' }).click();
-  shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
-  await expect(shelf.getByRole('button', { name: /^Characters/u })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await shelf.getByRole('button', { name: 'Use Shelf Field Host' }).click();
+  characters = page.getByRole('dialog', { name: 'Characters' });
+  await characters
+    .getByRole('article')
+    .filter({ hasText: 'Saved Field Host' })
+    .getByRole('button', { name: 'Use in Studio' })
+    .click();
   await page.getByRole('button', { name: 'Start AI', exact: true }).click();
   chooser = page.getByRole('dialog', { name: 'Choose live AI experience' });
   await expect(chooser.getByLabel('Decart start disclosure')).toContainText('Stop AI ends usage');
-  await chooser.getByRole('button', { name: 'Start with Shelf Field Host' }).click();
+  await chooser.getByRole('button', { name: 'Start with Saved Field Host' }).click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
   expect((await readBrowserState(page)).connections[0]?.model).toBe('lucy-latest');
 });
@@ -248,12 +257,12 @@ test('image-only upload saves and preloads without starting AI, then appears in 
     },
   });
 
-  await page.getByRole('button', { name: 'Dock', exact: true }).click();
-  const dock = page.getByRole('dialog', { name: 'Recipe Dock' });
-  await expect(dock.getByLabel('Character direction')).toHaveValue('');
-  await expect(dock.getByAltText('Current persisted reference preview')).toBeVisible();
-  await expect(dock.getByRole('checkbox')).not.toBeChecked();
-  await dock.getByRole('button', { name: 'Start Character AI' }).click();
+  await page.getByRole('button', { name: 'Record New Video' }).click();
+  await page.getByRole('button', { name: 'Start AI', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Choose live AI experience' })
+    .getByRole('button', { name: 'Start with Portrait Coach' })
+    .click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
 
   expect((await readBrowserState(page)).connections).toEqual([
@@ -274,15 +283,8 @@ test('image-only upload saves and preloads without starting AI, then appears in 
     savedCharacterPromptId: beforeStart?.character?.id,
   });
 
-  await dock.getByRole('button', { name: 'Stop AI' }).click();
-  await expect(dock.getByRole('button', { name: 'Start Character AI' })).toBeVisible();
-  await dock.getByRole('button', { name: 'Close panel' }).click();
-  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
-  const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
-  await shelf.getByRole('button', { name: /^Recent\b/u }).click();
-  await expect(shelf.getByText('Portrait Coach', { exact: true })).toBeVisible();
-  await expect(shelf.getByText('Image only', { exact: true })).toBeVisible();
-  await expect(shelf.getByAltText('Recent character reference')).toBeVisible();
+  await page.getByRole('button', { name: 'Stop AI' }).click();
+  await expect(page.getByRole('button', { name: /Recipe|Shelf|Dock/u })).toHaveCount(0);
 });
 
 test('prompt plus upload saves the uploaded source directly with enhancement off', async ({
@@ -312,13 +314,11 @@ test('prompt plus upload saves the uploaded source directly with enhancement off
     finalReferenceKind: 'uploaded',
   });
 
-  await page.getByRole('button', { name: 'Dock', exact: true }).click();
-  const dock = page.getByRole('dialog', { name: 'Recipe Dock' });
-  await expect(dock.getByLabel('Character direction')).toHaveValue(
-    /Substitute the character in the video with/u,
-  );
-  await expect(dock.getByAltText('Current persisted reference preview')).toBeVisible();
-  await expect(dock.getByRole('checkbox')).not.toBeChecked();
+  await expect(
+    page.getByRole('button', {
+      name: 'Selected character: Direct Source Presenter. Open character options',
+    }),
+  ).toBeVisible();
   expect((await readBrowserState(page)).connections).toEqual([]);
 });
 
@@ -378,7 +378,7 @@ test('invalid device files fail accessibly before any upload request', async ({ 
   expect(network.referenceWorkflowCalls).toEqual([]);
 });
 
-test('combined preview composes from the immutable upload and preloads the generated recipe', async ({
+test('combined preview composes from the immutable upload and selects the generated Character', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -411,12 +411,11 @@ test('combined preview composes from the immutable upload and preloads the gener
     finalReferenceKind: 'generated',
   });
 
-  await page.getByRole('button', { name: 'Dock', exact: true }).click();
-  const dock = page.getByRole('dialog', { name: 'Recipe Dock' });
-  await expect(dock.getByLabel('Character direction')).toHaveValue(
-    network.referencePromptOptimizations[0]?.response.result.lucy25CharacterPrompt ?? '',
-  );
-  await expect(dock.getByRole('checkbox')).toBeChecked();
+  await expect(
+    page.getByRole('button', {
+      name: 'Selected character: Combined Presenter. Open character options',
+    }),
+  ).toBeVisible();
   expect((await readBrowserState(page)).connections).toEqual([]);
 });
 
@@ -472,15 +471,12 @@ test('image-backed save preserves the exact generated asset and optimized Lucy p
     useCount: 0,
   });
 
-  await page.getByRole('button', { name: 'Dock', exact: true }).click();
-  const dock = page.getByRole('dialog', { name: 'Recipe Dock' });
-  await expect(dock.getByLabel('Character direction')).toHaveValue(
-    optimized?.lucy25CharacterPrompt ?? '',
-  );
-  await expect(dock.getByAltText('Current persisted reference preview')).toBeVisible();
-  await expect(dock.getByRole('checkbox')).toBeChecked();
+  await expect(
+    page.getByRole('button', {
+      name: 'Selected character: Generated Presenter. Open character options',
+    }),
+  ).toBeVisible();
 
-  await dock.getByRole('button', { name: 'Close panel' }).click();
   await page.getByRole('button', { name: 'Workshop', exact: true }).click();
   const workshop = page.getByRole('dialog', { name: 'Prompt Workshop' });
   await expect(workshop.getByRole('button', { name: 'Transform character' })).toHaveCount(0);
@@ -489,9 +485,16 @@ test('image-backed save preserves the exact generated asset and optimized Lucy p
   );
   await workshop.getByRole('button', { name: 'Close creative tool' }).click();
 
-  await page.getByRole('button', { name: 'Dock', exact: true }).click();
-  await page.getByRole('button', { name: 'Start Character AI' }).click();
+  await page.getByRole('button', { name: 'Record New Video' }).click();
+  await page.getByRole('button', { name: 'Start AI', exact: true }).click();
+  await page
+    .getByRole('dialog', { name: 'Choose live AI experience' })
+    .getByRole('button', { name: 'Start with Generated Presenter' })
+    .click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
+  expect((await readBrowserState(page)).connections[0]?.initial.prompt).toBe(
+    optimized?.lucy25CharacterPrompt,
+  );
   await expect
     .poll(async () => (await readCreativeAssetStore(page))?.savedCharacterPrompts[0]?.useCount ?? 0)
     .toBe(1);
@@ -578,18 +581,17 @@ test('editing a character requires explicit discard of a different unfinished dr
   await page.getByLabel('Optional Custom Constraints').fill('unfinished draft marker');
   await page.getByRole('button', { name: 'Close character builder' }).click();
 
-  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
-  let shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
-  await shelf.getByRole('button', { name: /^Characters/u }).click();
-  await shelf.getByRole('button', { name: 'Edit Saved Field Host' }).click();
+  await selectSavedCharacter(page, 'Saved Field Host');
+  await openCharacterOptions(page);
+  await page.getByRole('button', { name: 'Edit Saved Field Host' }).click();
 
   const discardPrompt = page.getByRole('dialog', { name: 'Unfinished character draft' });
   await expect(discardPrompt).toContainText('An unfinished character draft exists');
   await discardPrompt.getByRole('button', { name: 'Cancel' }).click();
   await expect(discardPrompt).toBeHidden();
-  await expect(shelf).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Character' })).toBeVisible();
 
-  await shelf.getByRole('button', { name: 'New character recipe' }).click();
+  await page.getByRole('button', { name: 'Create new character' }).click();
   const resumedCreate = page.getByRole('dialog', { name: 'Build Your Character' });
   await expect(resumedCreate).toBeVisible();
   await openConstraints(page);
@@ -598,10 +600,8 @@ test('editing a character requires explicit discard of a different unfinished dr
   );
   await page.getByRole('button', { name: 'Close character builder' }).click();
 
-  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
-  shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
-  await shelf.getByRole('button', { name: /^Characters/u }).click();
-  await shelf.getByRole('button', { name: 'Edit Saved Field Host' }).click();
+  await openCharacterOptions(page);
+  await page.getByRole('button', { name: 'Edit Saved Field Host' }).click();
   await page
     .getByRole('dialog', { name: 'Unfinished character draft' })
     .getByRole('button', { name: 'Continue' })
@@ -613,15 +613,14 @@ test('editing a character requires explicit discard of a different unfinished dr
   await expect(page.getByLabel('Optional Custom Constraints')).toHaveValue('');
 });
 
-test('unfinished Outfit Builder work requires confirmed discard before returning to Shelf', async ({
+test('unfinished Outfit Builder work requires confirmed discard before returning to Outfit selection', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/studio/create');
-  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
-  const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
-  await shelf.getByRole('button', { name: 'Try-on recipes' }).click();
-  await shelf.getByRole('button', { name: 'New garment recipe' }).click();
+  await page.getByRole('button', { name: 'Select Outfit' }).click();
+  const selector = page.getByRole('dialog', { name: 'Outfit' });
+  await selector.getByRole('button', { name: 'Create new outfit' }).click();
   const builder = page.getByRole('dialog', { name: 'Create a new outfit' });
   await builder.getByLabel('Garment direction').fill('An unfinished garment direction.');
   await expect(builder.locator('[data-outfit-builder-dirty]')).toHaveAttribute(
@@ -650,7 +649,7 @@ test('unfinished Outfit Builder work requires confirmed discard before returning
     window.confirm = () => true;
   });
   await builder.getByRole('button', { name: 'Close panel' }).click();
-  await expect(shelf).toBeVisible();
+  await expect(selector).toBeVisible();
   expect((await readBrowserState(page)).cameraCalls).toBe(0);
   expectNoExternalProviderTraffic(network);
 });

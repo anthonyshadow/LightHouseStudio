@@ -339,8 +339,9 @@ export const ExistingVideoPanel = ({
           ) : null}
           {workflow.phase === 'error' && workflow.acceptedSubmission && workflow.retryJob ? (
             <StatusNotice tone="warning">
-              Visual processing accepted the original recipe. Changes below are saved for a possible
-              later submission; resuming checks the accepted job without submitting those changes.
+              Visual processing accepted the original configuration. Changes below are saved for a
+              possible later submission; resuming checks the accepted job without submitting those
+              changes.
             </StatusNotice>
           ) : null}
 

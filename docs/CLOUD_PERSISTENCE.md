@@ -1,7 +1,7 @@
 # PostgreSQL, Neon, Drizzle, and Cloudflare R2
 
 **Status:** implemented, configuration-gated infrastructure; local remains the default  
-**Reviewed:** 2026-08-14
+**Reviewed:** 2026-08-15
 
 This is the canonical setup, migration, rollback, and limitation guide for cloud persistence. It
 does not authorize public exposure: Elysia on Bun still binds only to `127.0.0.1`, and the seeded demo
@@ -14,8 +14,8 @@ recorded there.
 ## What is implemented
 
 - Drizzle migrations for users/credentials, durable sessions, Campaigns, Projects/revisions/
-  relationships, nullable same-owner Campaign membership, and owner-scoped operation receipts,
-  saved voices, saved videos and versions, private media assets, reference images,
+  relationships, nullable same-owner Campaign membership, non-owning Project asset memberships,
+  and owner-scoped operation receipts, saved voices, saved videos and versions, private media assets, reference images,
   creative-library records, processing jobs, leases, resource references, idempotency receipts,
   and an outbox.
 - Transactional PostgreSQL repositories behind the existing application ports. Development uses
@@ -57,9 +57,15 @@ recorded there.
   producing revision, appends the completed `output-save` revision and hydration record, advances
   Project/Saved Video pointers, and stores the original replay result. It creates no new byte
   object, and exact replay returns that stored result after response loss; changed replay conflicts.
-- A schema-version-6 local Campaign/Project repository is authoritative in `local` and `shadow`.
+- Project asset membership uses additive migration `0021`: a same-owner Project relation accepts
+  only Video, Character, Outfit, or Voice IDs and has a unique owner/Project/kind/resource key.
+  Membership is organizational and has no byte-retention authority. Owner-scoped application
+  migration `project-asset-memberships-v1` deterministically derives distinct supported relations
+  from historical sources, working media, outputs, and resolvable snapshot IDs on first access.
+  It never creates Recipe membership or fabricates a resource ID from a label.
+- A schema-version-7 local Campaign/Project repository is authoritative in `local` and `shadow`.
   It uses one owner namespace/shared lock, atomic primary/backup replacement, strict
-  v1/v2/v3/v4/v5→v6 startup migration, durable operation receipts, and prepared source-acceptance,
+  v1/v2/v3/v4/v5/v6→v7 startup migration, durable operation receipts, and prepared source-acceptance,
   working-media, Project-job, result-retention, and composite Project-output envelopes that
   reconcile metadata after interruption. The output envelope carries complete next Project and
   Saved Video libraries and commits them in a recoverable order. `shadow` does not make Drizzle
@@ -99,10 +105,14 @@ recorded there.
 - Additive migration `0020` adds the `output-save` Project revision enum value and
   `project_output_operation_receipts`. It does not backfill output ownership, rewrite existing
   content, copy bytes, or apply automatically to production.
+- Additive migration `0021` adds `project_asset_memberships`, its four-value kind enum,
+  same-owner Project foreign key, idempotency constraint, and bounded newest-first list index. It
+  does not rewrite Project source/output/history, copy bytes, delete compatibility records, or
+  apply automatically to production.
 - The isolated PostgreSQL compatibility fixture starts from valid pre-`0010` Project rows, includes
   an independent legacy Saved Video, Saved Voice, and creative prompt, applies the remaining chain
-  through `0020`, and verifies that the legacy resources remain readable and unassigned without
-  fabricated Project/source/output lineage. Local Project fixtures exercise v1/v4/v5→v6 reopen and
+  through `0021`, and verifies that the legacy resources remain readable and unassigned without
+  fabricated Project/source/output lineage. Local Project fixtures exercise v1/v4/v5/v6→v7 reopen and
   prepared-journal recovery; Saved Video fixtures exercise legacy v1/v3→v4 unassigned reopen. These
   are test capabilities, not a claim that the exact candidate or production data was migrated; the
   recorded isolated-database result belongs in [MVP acceptance](MVP_ACCEPTANCE.md).
@@ -281,8 +291,9 @@ verification, lifecycle, or cleanup contracts above.
   remove these objects as an automatic rollback. Additive migration `0016` owns immutable Project
   source rows; `0018` owns snapshot-v2 admission and working-media adoption receipts. Additive
   `0019` owns Project-processing retry/result identity and exact retained-result relations. Migration
-  `0020` owns Project-output replay authority and the `output-save` enum value. Dropping any of these
-  would discard replay/lineage authority and is not an automatic rollback. Local schema v6 is
+  `0020` owns Project-output replay authority and the `output-save` enum value. Migration `0021`
+  owns non-owning Project asset membership and its owner migration marker. Dropping any of these
+  would discard replay/lineage or organizational authority and is not an automatic rollback. Local schema v7 is
   not readable by older parsers; downgrade requires restoring a verified pre-upgrade metadata
   backup or deploying compatible reader code, never ad hoc field stripping.
 

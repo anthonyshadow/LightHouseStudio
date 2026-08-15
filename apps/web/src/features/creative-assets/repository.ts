@@ -171,10 +171,10 @@ class LazyIndexedDbCreativeAssetPersistence implements CreativeAssetPersistence 
 
 const storageNotice = (health: CreativeAssetRepositoryState['health']) => {
   if (health === 'recovered') {
-    return 'Some damaged or outdated Recipe Shelf data was removed. Your library is safe to keep using.';
+    return 'Some damaged or outdated creative-library data was removed. Your library is safe to keep using.';
   }
   if (health === 'session-only') {
-    return 'IndexedDB is unavailable. Recipe Shelf changes will last only until this tab closes.';
+    return 'IndexedDB is unavailable. Creative-library changes will last only until this tab closes.';
   }
   return null;
 };
@@ -465,7 +465,7 @@ export const createCreativeAssetRepository = (
         health = 'session-only';
         notice =
           error instanceof CreativeAssetPersistenceConflictError
-            ? 'Recipe Shelf persistence paused because another browser context changed the library. This tab kept its in-memory copy.'
+            ? 'Creative-library persistence paused because another browser context changed the library. This tab kept its in-memory copy.'
             : storageNotice(health);
       }
     }
@@ -754,10 +754,7 @@ export const createCreativeAssetRepository = (
 
   const deleteSavedCharacterPrompt = async (id: string) => {
     if (!state.store.savedCharacterPrompts.some((item) => item.id === id)) {
-      throw new CreativeAssetError(
-        'not-found',
-        'That character recipe is no longer in this library.',
-      );
+      throw new CreativeAssetError('not-found', 'That Character is no longer in this library.');
     }
     await commit(deleteDomainCharacterPrompt(state.store, id));
   };

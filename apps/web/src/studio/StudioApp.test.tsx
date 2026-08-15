@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
-import type { AuthenticatedSessionResponse, ReferenceImageAsset } from '@studio/contracts';
+import type {
+  AuthenticatedSessionResponse,
+  ReferenceImageAsset,
+  SavedVideoDetail,
+} from '@studio/contracts';
 import { createPhaseOneEntitlements } from '@studio/domain';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { InputHTMLAttributes, PropsWithChildren, ReactNode } from 'react';
@@ -15,6 +19,8 @@ import type { PersistedSessionReference } from '../features/media-session';
 import type { ProjectRouteSurfaceProps } from '../features/projects/ProjectRouteSurface';
 import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 import type { StudioHeaderDestination } from './StudioHeader';
+import type * as SavedVideosApiModule from '../adapters/api-client/savedVideosApi';
+import type * as ProjectsApiModule from '../features/projects/projectsApi';
 
 type WorkspaceHarnessProps = {
   state: CreativeWorkspaceState;
@@ -197,6 +203,44 @@ const harness = vi.hoisted(() => {
     },
     active: false,
     providerActive: false,
+    phase: 'idle' as 'idle' | 'ready',
+    completedStepCount: 0,
+    selectFile: vi.fn((file: File) => {
+      const artifact = {
+        id: 'direct-saved-video',
+        name: file.name,
+        createdAt: '2026-08-11T16:00:00.000Z',
+        kind: 'uploaded' as const,
+        parentArtifactId: null,
+        media: file,
+        objectUrl: 'blob:direct-saved-video',
+        mimeType: file.type,
+        filename: file.name,
+        sourceModeId: 'local' as const,
+        startedAt: '2026-08-11T16:00:00.000Z',
+        durationMs: 10_000,
+        sizeBytes: file.size,
+      };
+      recording.presented = artifact;
+      existingVideo.phase = 'ready';
+      existingVideo.selection = {
+        metadata: {
+          kind: 'uploaded',
+          mode: 'local',
+          selectedAt: '2026-08-11T16:00:00.000Z',
+          displayName: file.name,
+          container: 'mp4',
+          videoCodec: 'avc',
+          audioCodec: null,
+          durationMs: 10_000,
+          width: 1_280,
+          height: 720,
+          sizeBytes: file.size,
+          hasAudio: false,
+        },
+      };
+      return Promise.resolve(artifact);
+    }),
     adoptRecordedArtifact: vi.fn(() => Promise.resolve()),
     cancelBeforeAcceptance: vi.fn(),
     cleanup: vi.fn(() => Promise.resolve()),
@@ -220,6 +264,13 @@ const harness = vi.hoisted(() => {
     latestHeaderDestination: null as StudioHeaderDestination | null,
     fetchReferenceImageMetadata: vi.fn(),
     hydrateReferenceImage: vi.fn(),
+    getSavedVideo: vi.fn(),
+    apiFetch: vi.fn(),
+    getProject: vi.fn(),
+    attachProjectAsset: vi.fn(),
+    savedVideoState: ((): { status: 'idle' } | { status: 'saved'; video: SavedVideoDetail } => ({
+      status: 'idle',
+    }))(),
     saveVideo: vi.fn(() => Promise.resolve(null)),
     replaceSavedVideo: vi.fn(() => Promise.resolve(null)),
     resetSavedVideo: vi.fn(),
@@ -257,13 +308,18 @@ vi.mock('../adapters/api-client/apiClient', () => ({
   },
   fetchReferenceImageMetadata: harness.fetchReferenceImageMetadata,
   hydrateReferenceImage: harness.hydrateReferenceImage,
+  apiFetch: harness.apiFetch,
 }));
+
+vi.mock('../adapters/api-client/savedVideosApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof SavedVideosApiModule>();
+  return { ...actual, getSavedVideo: harness.getSavedVideo };
+});
 
 vi.mock('../features/creative-assets/repository', () => ({
   createCreativeAssetRepository: () => harness.repository,
 }));
 vi.mock('../features/creative-assets/useCreativeAssetRepository', () => ({
-  useCreativeAssetRepository: () => harness.repository.getSnapshot(),
   useCreativeAssetSelector: (
     _repository: unknown,
     selector: (state: ReturnType<typeof harness.repository.getSnapshot>) => unknown,
@@ -274,22 +330,37 @@ vi.mock('../features/saved-videos/useSaveVideo', () => ({
   defaultSavedVideoName: (artifact: { name?: string; filename: string }) =>
     artifact.name?.trim() || artifact.filename.replace(/\.[^.]+$/u, ''),
   useSaveVideo: () => ({
-    state: { status: 'idle' as const },
+    state: harness.savedVideoState,
     save: harness.saveVideo,
     replace: harness.replaceSavedVideo,
     reset: harness.resetSavedVideo,
   }),
 }));
 
+vi.mock('../features/projects/projectsApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof ProjectsApiModule>();
+  return {
+    ...actual,
+    getProject: harness.getProject,
+    attachProjectAsset: harness.attachProjectAsset,
+  };
+});
+
 vi.mock('../features/live-stage', () => ({
   MediaStage: ({
     presentation,
     editPreview,
     controls,
+    notices = [],
   }: {
     presentation: { kind: string };
     editPreview?: unknown;
     controls?: (options: { visible: boolean }) => ReactNode;
+    notices?: readonly {
+      title: string;
+      message: string;
+      action?: { label: string; onAction: () => void };
+    }[];
   }) => (
     <div>
       <div
@@ -297,6 +368,16 @@ vi.mock('../features/live-stage', () => ({
         data-presentation={presentation.kind}
         data-edit-preview={editPreview ? 'true' : 'false'}
       />
+      {notices.map((notice) => (
+        <aside key={notice.title} aria-label={notice.title}>
+          {notice.message}
+          {notice.action ? (
+            <button type="button" onClick={notice.action.onAction}>
+              {notice.action.label}
+            </button>
+          ) : null}
+        </aside>
+      ))}
       {controls?.({ visible: true })}
     </div>
   ),
@@ -332,6 +413,19 @@ vi.mock('../features/existing-video/ExistingVideoPanel', () => ({
   ),
 }));
 
+vi.mock('../features/take-review/TakeDock', () => ({
+  TakeDock: ({ onEditVideo }: { onEditVideo?: () => void }) => (
+    <div>
+      Saved Video review controls
+      {onEditVideo ? (
+        <button type="button" onClick={onEditVideo}>
+          Adjust video
+        </button>
+      ) : null}
+    </div>
+  ),
+}));
+
 vi.mock('../features/creative-assets/OutfitSelector', () => ({
   OutfitSelector: ({ onCreate }: { onCreate: () => void }) => (
     <div>
@@ -348,7 +442,27 @@ vi.mock('../features/creative-assets/OutfitBuilder', () => ({
 }));
 
 vi.mock('../features/account-library/SavedCreativeLibrary', () => ({
-  SavedCharacterLibrary: () => <div>Deferred saved characters</div>,
+  SavedCharacterLibrary: ({ onUse }: { onUse?: (character: Record<string, unknown>) => void }) => (
+    <div>
+      Deferred saved characters
+      {onUse ? (
+        <button
+          type="button"
+          onClick={() =>
+            onUse({
+              id: 'character-1',
+              name: 'Documentary presenter',
+              prompt: 'A calm documentary presenter',
+              modelModeId: 'lucy-latest',
+              referenceImageAssetId: '28d0b01f-70aa-4db6-ac65-379cdd916113',
+            })
+          }
+        >
+          Apply saved Character
+        </button>
+      ) : null}
+    </div>
+  ),
   SavedOutfitLibrary: () => <div>Deferred saved outfits</div>,
 }));
 
@@ -373,7 +487,7 @@ vi.mock('../features/media-session', async () => {
   return {
     confirmModeReplacement,
     hasDraftContent,
-    SessionComposer: () => <div>Recipe dock content</div>,
+    SessionComposer: () => <div>AI configuration content</div>,
   };
 });
 
@@ -548,9 +662,6 @@ vi.mock('./CreativeWorkspace', () => ({
     return (
       <div>
         <output data-testid="creative-panel">{props.state.panel}</output>
-        <button type="button" onClick={props.actions.onOpenDock}>
-          Open dock
-        </button>
         <button
           type="button"
           disabled={!props.state.hasPlaybackVideo}
@@ -558,31 +669,11 @@ vi.mock('./CreativeWorkspace', () => ({
         >
           Edit Video rail
         </button>
-        <button type="button" onClick={props.actions.onToggleShelf}>
-          Toggle shelf
-        </button>
         <button type="button" onClick={props.actions.onOpenCharacter}>
           Open character options
         </button>
         <button type="button" onClick={props.actions.onOpenOutfit}>
           Open outfit options
-        </button>
-        <button type="button" onClick={() => props.actions.onShelfDirtyChange(true)}>
-          Mark shelf dirty
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            props.actions.onUseRecipe({
-              origin: 'character-prompt',
-              assetId: 'character-1',
-              modelModeId: 'lucy-latest',
-              prompt: referenceAsset.originalPrompt,
-              referenceImageAssetId: referenceAsset.assetId,
-            })
-          }
-        >
-          Apply reference recipe
         </button>
         <button type="button" onClick={() => props.state.referenceUseFailure?.onRetry()}>
           Retry reference handoff
@@ -622,24 +713,65 @@ const testSession: AuthenticatedSessionResponse = {
   expiresAt: '2099-08-06T12:00:00.000Z',
 };
 
+const directVideoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
+const directVideoVersionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
+const directVideoVersion: SavedVideoDetail['currentVersion'] = {
+  id: directVideoVersionId,
+  videoId: directVideoId,
+  ordinal: 2,
+  origin: 'editor',
+  characterName: null,
+  characterVariantName: null,
+  sourceVersionId: null,
+  mimeType: 'video/mp4',
+  filename: 'launch-review.mp4',
+  sizeBytes: 6,
+  durationMs: 10_000,
+  width: 1_280,
+  height: 720,
+  createdAt: '2026-08-11T16:00:00.000Z',
+};
+const directSavedVideo: SavedVideoDetail = {
+  id: directVideoId,
+  title: 'Launch review',
+  status: 'ready',
+  currentVersion: directVideoVersion,
+  sourceVideoId: null,
+  versionCount: 2,
+  thumbnailAvailable: false,
+  createdAt: '2026-08-11T15:00:00.000Z',
+  updatedAt: '2026-08-11T16:00:00.000Z',
+  versions: [directVideoVersion],
+};
+
 const renderStudio = (initialIntent?: 'upload', initialPath = '/studio/create') =>
-  render(
-    <StudioDesignProvider>
-      <AuthProvider initialSession={testSession}>
-        <RouterProvider
-          router={createMemoryRouter(
-            [
-              {
-                path: '/studio/*',
-                element: <StudioApp {...(initialIntent ? { initialIntent } : {})} />,
-              },
-            ],
-            { initialEntries: [initialPath] },
-          )}
-        />
-      </AuthProvider>
-    </StudioDesignProvider>,
-  );
+  (() => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: '*',
+          element: <StudioApp {...(initialIntent ? { initialIntent } : {})} />,
+        },
+      ],
+      { initialEntries: [initialPath] },
+    );
+    return {
+      ...render(
+        <StudioDesignProvider>
+          <AuthProvider initialSession={testSession}>
+            <RouterProvider router={router} />
+          </AuthProvider>
+        </StudioDesignProvider>,
+      ),
+      router,
+    };
+  })();
+
+const applySavedCharacter = async () => {
+  fireEvent.click(screen.getByRole('button', { name: 'Open character options' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Choose saved character' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Apply saved Character' }));
+};
 
 describe('StudioApp composition lifecycle', () => {
   afterEach(cleanup);
@@ -653,10 +785,12 @@ describe('StudioApp composition lifecycle', () => {
     harness.recording.original = null;
     harness.recording.presented = null;
     harness.existingVideo.selection = null;
+    harness.existingVideo.phase = 'idle';
     harness.takeStagePresentation = { kind: 'idle', mode: 'lucy-latest' };
     harness.session.startLocal.mockClear();
     harness.session.startLocal.mockImplementation(() => Promise.resolve());
     harness.existingVideo.adoptRecordedArtifact.mockClear();
+    harness.existingVideo.selectFile.mockClear();
     harness.session.replaceRecipeDraft.mockClear();
     harness.repository.recordSuccessfulPrompt.mockClear();
     harness.repository.enrichNewestMatchingRecent.mockClear();
@@ -668,6 +802,21 @@ describe('StudioApp composition lifecycle', () => {
       contentUrl: referenceAsset.contentUrl,
     };
     harness.hydrateReferenceImage.mockReset().mockResolvedValue(harness.hydratedReference);
+    harness.getSavedVideo.mockReset().mockResolvedValue(directSavedVideo);
+    harness.apiFetch.mockReset().mockResolvedValue(
+      new Response('video!', {
+        status: 200,
+        headers: { 'Content-Type': 'video/mp4', 'Content-Length': '6' },
+      }),
+    );
+    harness.getProject.mockReset().mockResolvedValue({
+      project: { id: '18b120ac-1578-46e3-8c3d-42307772f391', status: 'draft' },
+    });
+    harness.attachProjectAsset.mockReset().mockResolvedValue({
+      membership: { id: '08707aa5-7b7f-4ce1-a48e-647370f6d3ab' },
+      created: true,
+    });
+    harness.savedVideoState = { status: 'idle' };
     harness.saveVideo.mockClear();
     harness.replaceSavedVideo.mockClear();
     harness.resetSavedVideo.mockClear();
@@ -676,16 +825,6 @@ describe('StudioApp composition lifecycle', () => {
   it('keeps the mounted stage node stable while overlays and deferred tools change', async () => {
     renderStudio();
     const stage = screen.getByTestId('media-stage');
-    expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open dock' }));
-    expect(screen.getByRole('region', { name: 'Recipe Dock' })).toBeInTheDocument();
-    expect(screen.getByTestId('media-stage')).toBe(stage);
-    expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle shelf' }));
-    expect(screen.getByTestId('creative-panel')).toHaveTextContent('shelf');
-    expect(screen.getByTestId('media-stage')).toBe(stage);
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Upload Video' }));
@@ -729,17 +868,101 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it.each([
-    ['/studio/assets/videos', 'assets'],
-    ['/studio/assets/characters', 'assets'],
-    ['/studio/assets/outfits', 'assets'],
+    ['/assets/videos', 'assets'],
+    ['/assets/characters', 'assets'],
+    ['/assets/outfits', 'assets'],
   ] as const)('reports %s under the Assets destination', (path, destination) => {
     renderStudio(undefined, path);
 
     expect(harness.latestHeaderDestination).toBe(destination);
   });
 
+  it('hydrates a direct Saved Video route into review while preserving the route and stage owner', async () => {
+    const { router } = renderStudio(undefined, `/studio/${directVideoId}`);
+    const stage = screen.getByTestId('media-stage');
+
+    expect(await screen.findByRole('region', { name: 'Latest Take' })).toBeVisible();
+    expect(harness.getSavedVideo).toHaveBeenCalledWith(directVideoId, expect.any(AbortSignal));
+    expect(harness.existingVideo.selectFile).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'launch-review.mp4', type: 'video/mp4' }),
+    );
+    expect(router.state.location.pathname).toBe(`/studio/${directVideoId}`);
+    expect(screen.getByTestId('media-stage')).toBe(stage);
+    expect(await screen.findByRole('button', { name: 'Adjust video' })).toBeVisible();
+    expect(
+      screen.queryByRole('navigation', { name: 'Video editing tools' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows a safe direct-route failure and returns to the canonical Video library', async () => {
+    harness.getSavedVideo.mockRejectedValueOnce(new Error('private upstream detail'));
+    const { router } = renderStudio(undefined, `/studio/${directVideoId}`);
+
+    expect(await screen.findByLabelText('Saved Video unavailable')).toHaveTextContent(
+      'The Saved Video could not be loaded safely. Your Assets are unchanged.',
+    );
+    expect(screen.queryByText('private upstream detail')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Assets' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/assets/videos'));
+  });
+
+  it('attaches an explicitly saved Project-launched Video and returns to Project detail', async () => {
+    const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
+    harness.savedVideoState = { status: 'saved', video: directSavedVideo };
+    const { router } = renderStudio(
+      undefined,
+      `/studio/create?intent=upload&projectId=${projectId}`,
+    );
+
+    await waitFor(() =>
+      expect(harness.attachProjectAsset).toHaveBeenCalledWith(
+        projectId,
+        { kind: 'video', resourceId: directVideoId },
+        expect.any(AbortSignal),
+      ),
+    );
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/projects/${projectId}`));
+  });
+
+  it('preserves a saved Video and offers attachment retry after a partial Project failure', async () => {
+    const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
+    harness.savedVideoState = { status: 'saved', video: directSavedVideo };
+    harness.attachProjectAsset
+      .mockRejectedValueOnce(new Error('temporary association failure'))
+      .mockResolvedValueOnce({
+        membership: { id: '08707aa5-7b7f-4ce1-a48e-647370f6d3ab' },
+        created: true,
+      });
+    const { router } = renderStudio(
+      undefined,
+      `/studio/create?intent=upload&projectId=${projectId}`,
+    );
+
+    expect(await screen.findByLabelText('Project attachment needs attention')).toHaveTextContent(
+      'The Video was saved to Assets, but its Project association could not be completed.',
+    );
+    expect(router.state.location.pathname).toBe('/studio/create');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry attachment' }));
+    await waitFor(() => expect(harness.attachProjectAsset).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/projects/${projectId}`));
+  });
+
+  it('degrades an inaccessible Project creation context to standalone creation', async () => {
+    const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
+    harness.getProject.mockRejectedValueOnce(new Error('not found'));
+    const { router } = renderStudio(
+      undefined,
+      `/studio/create?intent=upload&projectId=${projectId}`,
+    );
+
+    await waitFor(() => expect(router.state.location.search).toBe('?intent=upload'));
+    expect(router.state.location.pathname).toBe('/studio/create');
+    expect(harness.attachProjectAsset).not.toHaveBeenCalled();
+    expect(screen.getByRole('region', { name: 'Use existing video' })).toBeVisible();
+  });
+
   it('keeps one hidden media-stage owner while the full Projects workspace is active', async () => {
-    renderStudio(undefined, '/studio/projects');
+    renderStudio(undefined, '/projects');
     const stage = screen.getByTestId('media-stage');
 
     expect(await screen.findByText('Deferred Projects workspace')).toBeInTheDocument();
@@ -756,7 +979,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('keeps the same media-stage owner visible in an open Project and supplies source lifecycle seams', async () => {
-    renderStudio(undefined, '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
+    renderStudio(undefined, '/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
     const stage = screen.getByTestId('media-stage');
 
     expect(await screen.findByText('Deferred Projects workspace')).toBeInTheDocument();
@@ -770,7 +993,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('flushes the active Project session before logout cleanup', async () => {
-    renderStudio(undefined, '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
+    renderStudio(undefined, '/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
     await screen.findByText('Deferred Projects workspace');
     const flush = vi.fn(() => Promise.resolve(true));
     const sessionPort: ProjectSessionPort = {
@@ -826,7 +1049,7 @@ describe('StudioApp composition lifecycle', () => {
     );
   });
 
-  it('opens the existing-video chooser for finalized playback without adopting a Dock take', () => {
+  it('opens the existing-video chooser for finalized playback without adopting the current take', () => {
     harness.recording.presented = { id: 'dock-take' };
     harness.takeStagePresentation = { kind: 'playback', mode: 'local' };
     renderStudio();
@@ -925,9 +1148,9 @@ describe('StudioApp composition lifecycle', () => {
     context.mockRestore();
   });
 
-  it('hydrates and atomically hands a saved reference recipe to the session', async () => {
+  it('hydrates and atomically applies saved Character settings to the session', async () => {
     renderStudio();
-    fireEvent.click(screen.getByRole('button', { name: 'Apply reference recipe' }));
+    await applySavedCharacter();
 
     await waitFor(() => expect(harness.session.replaceRecipeDraft).toHaveBeenCalledOnce());
     expect(harness.fetchReferenceImageMetadata).toHaveBeenCalledWith(
@@ -957,7 +1180,7 @@ describe('StudioApp composition lifecycle', () => {
       .mockRejectedValueOnce(new Error('missing'))
       .mockResolvedValueOnce(referenceAsset);
     renderStudio();
-    fireEvent.click(screen.getByRole('button', { name: 'Apply reference recipe' }));
+    await applySavedCharacter();
     await waitFor(() => expect(screen.getByTestId('handoff-error')).not.toBeEmptyDOMElement());
 
     fireEvent.click(screen.getByRole('button', { name: 'Retry reference handoff' }));
@@ -974,7 +1197,7 @@ describe('StudioApp composition lifecycle', () => {
   it('continues a failed handoff without silently retaining the missing reference', async () => {
     harness.fetchReferenceImageMetadata.mockRejectedValueOnce(new Error('missing'));
     renderStudio();
-    fireEvent.click(screen.getByRole('button', { name: 'Apply reference recipe' }));
+    await applySavedCharacter();
     await waitFor(() => expect(screen.getByTestId('handoff-error')).not.toBeEmptyDOMElement());
 
     fireEvent.click(
@@ -1005,19 +1228,10 @@ describe('StudioApp composition lifecycle', () => {
     });
   });
 
-  it('cancels saved-character entry before replacing hidden Shelf edits', () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('does not expose Recipe, Dock, or Shelf controls in the Studio workspace', () => {
     renderStudio();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Mark shelf dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Open character options' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Choose saved character' }));
-
-    expect(window.confirm).toHaveBeenCalledWith(
-      'Discard the unsaved Recipe Shelf changes and open saved characters?',
-    );
-    expect(screen.getByRole('region', { name: 'Character' })).toBeInTheDocument();
-    expect(harness.latestWorkspace?.state.panel).toBe('closed');
-    expect(harness.latestWorkspace?.state.recipeShelfEntryIntent).toBeNull();
+    expect(screen.queryByRole('button', { name: /Recipe|Dock|Shelf/u })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Recipe|Dock|Shelf/u)).not.toBeInTheDocument();
   });
 });

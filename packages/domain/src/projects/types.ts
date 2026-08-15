@@ -28,6 +28,10 @@ export const PROJECT_ASSET_ROLES = [
 
 export type ProjectAssetRole = (typeof PROJECT_ASSET_ROLES)[number];
 
+export const PROJECT_ASSET_KINDS = ['video', 'character', 'outfit', 'voice'] as const;
+
+export type ProjectAssetKind = (typeof PROJECT_ASSET_KINDS)[number];
+
 export const PROJECT_WORKFLOW_PHASES = [
   'source',
   'creative',
@@ -204,6 +208,16 @@ export interface ProjectAssetLink {
   readonly role: ProjectAssetRole;
   readonly revisionId: string;
   readonly revisionNumber: number;
+  readonly createdAt: string;
+}
+
+/** Non-owning organizational membership; it never replaces revision-scoped media lineage. */
+export interface ProjectAssetMembership {
+  readonly id: string;
+  readonly projectId: string;
+  readonly ownerUserId: string;
+  readonly kind: ProjectAssetKind;
+  readonly resourceId: string;
   readonly createdAt: string;
 }
 

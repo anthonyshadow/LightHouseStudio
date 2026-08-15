@@ -168,7 +168,11 @@ const CampaignsWorkspace = () => {
         <CampaignFormDialog
           returnFocusRef={returnFocusRef}
           onClose={closeCreateDialog}
-          onSaved={(campaign) => void navigate(campaignPath(campaign.id))}
+          onSaved={(campaign) =>
+            void navigate(campaignPath(campaign.id), {
+              state: { campaignCreated: campaign.id },
+            })
+          }
         />
       ) : null}
     </div>
@@ -256,6 +260,7 @@ type CampaignDialog = 'edit' | 'archive' | 'restore' | 'tombstone';
 const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const query = useCampaignDetail(campaignId);
   const campaigns = useCampaignsController();
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -265,6 +270,13 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [creatingProject, setCreatingProject] = useState(false);
+  const [creatingCampaign, setCreatingCampaign] = useState(false);
+  const createdCampaignId = (location.state as { readonly campaignCreated?: unknown } | null)
+    ?.campaignCreated;
+  const showCreatedNextStep = createdCampaignId === campaignId;
+  const dismissCreatedNextStep = () => {
+    void navigate(location.pathname, { replace: true, state: null });
+  };
   if (query.isPending)
     return (
       <div css={workspaceInnerStyles(theme)}>
@@ -362,6 +374,14 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
                 New Project
               </Button>
             ) : null}
+            <Button
+              onClick={(event) => {
+                returnFocusRef.current = event.currentTarget;
+                setCreatingCampaign(true);
+              }}
+            >
+              Create another Campaign
+            </Button>
             <Button onClick={(event) => openDialog('edit', event.currentTarget)}>Edit</Button>
             <Button
               variant={archived ? 'primary' : 'danger'}
@@ -383,6 +403,26 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
       <div role="status" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
+      {showCreatedNextStep && !archived ? (
+        <StatusNotice tone="success" title="Campaign created">
+          <p>Create the first Project in {campaign.name}, or continue organizing later.</p>
+          <div css={{ display: 'flex', flexWrap: 'wrap', gap: theme.space.sm }}>
+            <Button
+              variant="primary"
+              onClick={(event) => {
+                returnFocusRef.current = event.currentTarget;
+                dismissCreatedNextStep();
+                setCreatingProject(true);
+              }}
+            >
+              Create Project in Campaign
+            </Button>
+            <Button variant="quiet" onClick={dismissCreatedNextStep}>
+              Not now
+            </Button>
+          </div>
+        </StatusNotice>
+      ) : null}
       {actionError && dialog === null ? (
         <StatusNotice role="alert" tone="danger" title="Action not completed">
           {actionError}
@@ -514,9 +554,21 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
       {creatingProject ? (
         <NewProjectDialog
           defaultCampaignId={campaign.id}
+          campaignLocked
           returnFocusRef={returnFocusRef}
           onClose={() => setCreatingProject(false)}
           onCreated={(current) => void navigate(projectPath(current.project.id))}
+        />
+      ) : null}
+      {creatingCampaign ? (
+        <CampaignFormDialog
+          returnFocusRef={returnFocusRef}
+          onClose={() => setCreatingCampaign(false)}
+          onSaved={(created) =>
+            void navigate(campaignPath(created.id), {
+              state: { campaignCreated: created.id },
+            })
+          }
         />
       ) : null}
     </div>

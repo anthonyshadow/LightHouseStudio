@@ -5,10 +5,10 @@ describe('studioOverlayReducer', () => {
   it('opens, closes, and toggles one overlay at a time', () => {
     expect(studioOverlayReducer(null, { type: 'open', overlay: 'workshop' })).toBe('workshop');
     expect(studioOverlayReducer('workshop', { type: 'toggle', overlay: 'workshop' })).toBeNull();
-    expect(studioOverlayReducer('workshop', { type: 'toggle', overlay: 'recipe-shelf' })).toBe(
-      'recipe-shelf',
+    expect(studioOverlayReducer('workshop', { type: 'toggle', overlay: 'outfit-selector' })).toBe(
+      'outfit-selector',
     );
-    expect(studioOverlayReducer('recipe-shelf', { type: 'close' })).toBeNull();
+    expect(studioOverlayReducer('outfit-selector', { type: 'close' })).toBeNull();
   });
 
   it('closes lifecycle-owned overlays without replacing unrelated overlays', () => {

@@ -72,7 +72,7 @@ export const referenceIdentity = (reference: SessionReferenceImage | null): stri
   return reference.kind === 'persisted' ? reference.assetId : EPHEMERAL_REFERENCE_IDENTITY;
 };
 
-/** Active shelf identity is retained only while both the draft and stored asset remain exact. */
+/** Active creative identity is retained only while both the draft and stored asset remain exact. */
 export const isExactActiveRecipe = ({
   fingerprint,
   asset,

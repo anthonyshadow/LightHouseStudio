@@ -66,7 +66,7 @@ export const createPendingReferenceRecipeUse = (
     vtonInputKind: selectedVtonInputKind,
     enhancePrompt: selectedEnhancePrompt,
     preserveCurrentReference: false,
-    destination: 'shelf',
+    destination: 'selection',
     ...(selection.builderDraft ? { builderDraft: selection.builderDraft } : {}),
     ...(selection.characterName ? { characterName: selection.characterName } : {}),
     ...(selection.origin === 'saved-prompt' && selection.assetId
@@ -85,24 +85,19 @@ export const createPendingReferenceRecipeUse = (
 
 export const characterBuilderSaveBlockedReason = ({
   openBlockedReason,
-  shelfDirty,
   canReplaceLucyRecipe,
   referenceUsePending,
 }: {
   readonly openBlockedReason: string | undefined;
-  readonly shelfDirty: boolean;
   readonly canReplaceLucyRecipe: boolean;
   readonly referenceUsePending: boolean;
 }): string | undefined => {
   if (openBlockedReason) return openBlockedReason;
-  if (shelfDirty) {
-    return 'Save or discard the unfinished Recipe Shelf changes before saving this character.';
-  }
   if (!canReplaceLucyRecipe) {
     return 'Release the active camera or AI session before Studio can preload Lucy 2.5.';
   }
   return referenceUsePending
-    ? 'Wait for the current recipe handoff to finish before saving this character.'
+    ? 'Wait for the current creative setup to finish before saving this character.'
     : undefined;
 };
 
@@ -121,7 +116,6 @@ type UseReferenceRecipeAttributionOptions = {
   readonly activeCharacterName: string | undefined;
   readonly dispatchActiveRecipe: Dispatch<ActiveRecipeAction>;
   readonly characterBuilderOpenBlockedReason: string | undefined;
-  readonly shelfDirty: boolean;
   readonly referenceUsePending: boolean;
 };
 
@@ -137,7 +131,6 @@ export const useReferenceRecipeAttribution = ({
   activeCharacterName,
   dispatchActiveRecipe,
   characterBuilderOpenBlockedReason,
-  shelfDirty,
   referenceUsePending,
 }: UseReferenceRecipeAttributionOptions) => {
   const selectedSavedPromptRef = useRef<string | undefined>(undefined);
@@ -345,7 +338,6 @@ export const useReferenceRecipeAttribution = ({
 
   const saveBlockedReason = characterBuilderSaveBlockedReason({
     openBlockedReason: characterBuilderOpenBlockedReason,
-    shelfDirty,
     canReplaceLucyRecipe: session.canReplaceRecipeDraft('lucy-latest'),
     referenceUsePending,
   });

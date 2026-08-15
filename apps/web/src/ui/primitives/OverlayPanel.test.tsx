@@ -316,17 +316,17 @@ describe('OverlayPanel', () => {
       <StudioDesignProvider>
         <OverlayPanel
           open
-          title="Recipe Shelf"
-          headerActions={<button type="button">Character recipes</button>}
+          title="Asset library"
+          headerActions={<button type="button">Characters</button>}
           onClose={vi.fn()}
         >
-          Shelf contents
+          Asset contents
         </OverlayPanel>
       </StudioDesignProvider>,
     );
 
-    const dialog = screen.getByRole('dialog', { name: 'Recipe Shelf' });
-    expect(within(dialog).getByRole('button', { name: 'Character recipes' })).toBeInTheDocument();
+    const dialog = screen.getByRole('dialog', { name: 'Asset library' });
+    expect(within(dialog).getByRole('button', { name: 'Characters' })).toBeInTheDocument();
   });
 
   it('portals into the active fullscreen element without isolating its ancestor', async () => {

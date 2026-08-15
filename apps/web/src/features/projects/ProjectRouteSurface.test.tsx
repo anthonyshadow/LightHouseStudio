@@ -2,6 +2,7 @@
 
 import type {
   CampaignContract,
+  ProjectAssetsResponse,
   ProjectCurrentResponse,
   ProjectSourceResponse,
   SavedVideoSummary,
@@ -27,6 +28,39 @@ const sourceAssetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
 const savedVideoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
 const videoVersionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
 const now = '2026-08-11T16:00:00.000Z';
+
+const savedVideoSummary = (): SavedVideoSummary => ({
+  id: savedVideoId,
+  title: 'Library source',
+  status: 'ready',
+  currentVersion: {
+    id: videoVersionId,
+    videoId: savedVideoId,
+    ordinal: 2,
+    origin: 'uploaded',
+    characterName: null,
+    characterVariantName: null,
+    sourceVersionId: null,
+    mimeType: 'video/mp4',
+    filename: 'library-source.mp4',
+    sizeBytes: 4,
+    durationMs: 1_000,
+    width: 640,
+    height: 360,
+    createdAt: now,
+  },
+  sourceVideoId: null,
+  versionCount: 2,
+  thumbnailAvailable: false,
+  createdAt: now,
+  updatedAt: now,
+});
+
+let projectAssetsResponse: ProjectAssetsResponse = {
+  assets: [],
+  videoSummaries: [],
+  nextCursor: null,
+};
 
 const campaign = (): CampaignContract => ({
   id: campaignId,
@@ -145,7 +179,7 @@ const acceptedSourceResponse = (): ProjectSourceResponse => ({
   },
 });
 
-const renderProjects = (path = '/studio/projects', props: ProjectRouteSurfaceProps = {}) => {
+const renderProjects = (path = '/projects', props: ProjectRouteSurfaceProps = {}) => {
   mockApiServer.use(
     http.get('*/api/projects/:projectId/history', () =>
       HttpResponse.json({ revisions: [], nextCursor: null }),
@@ -156,11 +190,13 @@ const renderProjects = (path = '/studio/projects', props: ProjectRouteSurfacePro
     http.get('*/api/projects/:projectId/processing/history', () =>
       HttpResponse.json({ attempts: [], nextCursor: null }),
     ),
+    http.get('*/api/projects/:projectId/assets', () => HttpResponse.json(projectAssetsResponse)),
   );
   const router = createMemoryRouter(
     [
-      { path: '/studio/projects/*', element: <ProjectRouteSurface {...props} /> },
-      { path: '/studio/campaigns/:campaignId', element: <div>Campaign return</div> },
+      { path: '/projects/*', element: <ProjectRouteSurface {...props} /> },
+      { path: '/campaign/:campaignId', element: <div>Campaign return</div> },
+      { path: '/studio/:videoId', element: <div>Studio direct</div> },
     ],
     { initialEntries: [path] },
   );
@@ -192,6 +228,7 @@ const installProjectLists = (
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  projectAssetsResponse = { assets: [], videoSummaries: [], nextCursor: null };
 });
 
 describe('Project route surface', () => {
@@ -211,13 +248,11 @@ describe('Project route surface', () => {
 
     const activeList = screen.getByRole('list', { name: 'Active Projects' });
     await userEvent.click(within(activeList).getByRole('button', { name: 'Open' }));
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe(`/studio/projects/${activeId}`),
-    );
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/projects/${activeId}`));
     expect(await screen.findByRole('heading', { name: 'Focused video workspace' })).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Continue editing' }));
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe(`/studio/projects/${activeId}/workspace`),
+      expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`),
     );
     expect(await screen.findByRole('heading', { name: 'No source yet' })).toBeVisible();
     expect(screen.getByText('All changes saved').closest('[role="status"]')).toBeInTheDocument();
@@ -234,7 +269,7 @@ describe('Project route surface', () => {
         return HttpResponse.json(campaign());
       }),
     );
-    const { router } = renderProjects(`/studio/projects/${activeId}`);
+    const { router } = renderProjects(`/projects/${activeId}`);
     const user = userEvent.setup();
 
     expect(await screen.findByText('Campaign: loading…')).toBeVisible();
@@ -242,9 +277,7 @@ describe('Project route surface', () => {
     const campaignReturn = screen.getByRole('button', { name: '← Summer launch' });
     await user.click(campaignReturn);
 
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe(`/studio/campaigns/${campaignId}`),
-    );
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/campaign/${campaignId}`));
     expect(screen.getByText('Campaign return')).toBeVisible();
   });
 
@@ -259,14 +292,63 @@ describe('Project route surface', () => {
         ),
       ),
     );
-    const { router } = renderProjects(`/studio/projects/${activeId}`);
+    const { router } = renderProjects(`/projects/${activeId}`);
     const user = userEvent.setup();
 
     expect(await screen.findByText('Campaign unavailable')).toBeVisible();
     await user.click(screen.getByRole('button', { name: '← Campaign' }));
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe(`/studio/campaigns/${campaignId}`),
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/campaign/${campaignId}`));
+  });
+
+  it('shows bounded Saved Video memberships, previews in place, and detaches only the association', async () => {
+    const membershipId = '08707aa5-7b7f-4ce1-a48e-647370f6d3ab';
+    const summary = savedVideoSummary();
+    projectAssetsResponse = {
+      assets: [
+        {
+          id: membershipId,
+          projectId: activeId,
+          kind: 'video',
+          resourceId: savedVideoId,
+          createdAt: now,
+        },
+      ],
+      videoSummaries: [summary],
+      nextCursor: null,
+    };
+    let detachCalls = 0;
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(currentProject(activeId))),
+      http.get(`*/api/videos/${savedVideoId}`, () =>
+        HttpResponse.json({ ...summary, versions: [summary.currentVersion] }),
+      ),
+      http.delete(`*/api/projects/${activeId}/assets/${membershipId}`, () => {
+        detachCalls += 1;
+        projectAssetsResponse = { assets: [], videoSummaries: [], nextCursor: null };
+        return HttpResponse.json({ detached: true });
+      }),
     );
+    const user = userEvent.setup();
+    const { router } = renderProjects(`/projects/${activeId}`);
+
+    expect(await screen.findByRole('heading', { name: 'Project Assets' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Library source' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    expect(await screen.findByRole('dialog', { name: 'Library source' })).toBeVisible();
+    expect(router.state.location.pathname).toBe(`/projects/${activeId}`);
+    await user.click(screen.getByRole('button', { name: 'Back to Project' }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: /Saved Video preview|Library source/u }),
+      ).not.toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Detach from Project' }));
+    await waitFor(() => expect(detachCalls).toBe(1));
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Library source' })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText(/Detaching never deletes an Asset or Project history/u)).toBeVisible();
   });
 
   it('reuses the Quick Start operation key after response failure and reconciles replay', async () => {
@@ -290,9 +372,7 @@ describe('Project route surface', () => {
     expect(await screen.findByText('Project not created')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Retry quick project' }));
 
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe(`/studio/projects/${activeId}`),
-    );
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/projects/${activeId}`));
     expect(operationKeys).toHaveLength(2);
     expect(operationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
     expect(operationKeys[1]).toBe(operationKeys[0]);
@@ -433,7 +513,7 @@ describe('Project route surface', () => {
         return HttpResponse.json(renamed);
       }),
     );
-    renderProjects(`/studio/projects/${activeId}`);
+    renderProjects(`/projects/${activeId}`);
     const user = userEvent.setup();
 
     const renameTrigger = await screen.findByRole('button', { name: 'Rename' });
@@ -514,7 +594,7 @@ describe('Project route surface', () => {
       }),
     );
     const user = userEvent.setup();
-    renderProjects(`/studio/projects/${activeId}`);
+    renderProjects(`/projects/${activeId}`);
 
     expect(screen.getByRole('status')).toHaveTextContent('Loading Project…');
     const alert = await screen.findByRole('alert');
@@ -536,12 +616,12 @@ describe('Project route surface', () => {
       ),
     );
     const user = userEvent.setup();
-    const { router } = renderProjects(`/studio/projects/${activeId}`);
+    const { router } = renderProjects(`/projects/${activeId}`);
 
     const alert = await screen.findByRole('alert');
     await user.click(within(alert).getByRole('button', { name: 'Back to Projects' }));
 
-    await waitFor(() => expect(router.state.location.pathname).toBe('/studio/projects'));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/projects'));
     expect(await screen.findByRole('heading', { name: 'Projects' })).toBeVisible();
   });
 
@@ -562,7 +642,7 @@ describe('Project route surface', () => {
         }),
       ),
     );
-    renderProjects(`/studio/projects/${activeId}/workspace`, {
+    renderProjects(`/projects/${activeId}/workspace`, {
       sourceRuntime: { present, clear },
     });
 
@@ -594,7 +674,7 @@ describe('Project route surface', () => {
       }),
     );
     const user = userEvent.setup();
-    renderProjects(`/studio/projects/${activeId}/workspace`, {
+    renderProjects(`/projects/${activeId}/workspace`, {
       sourceRuntime: { present, clear },
       recordingCandidate: { file, ready: true },
       onSourceActivityChange: (activity) => activities.push(activity),
@@ -655,7 +735,7 @@ describe('Project route surface', () => {
       ),
     );
     const inputClick = vi.spyOn(HTMLInputElement.prototype, 'click');
-    const view = renderProjects(`/studio/projects/${activeId}/workspace`, {
+    const view = renderProjects(`/projects/${activeId}/workspace`, {
       sourceRuntime: { present, clear },
     });
     const user = userEvent.setup();
@@ -677,32 +757,7 @@ describe('Project route surface', () => {
   });
 
   it('recovers and pages the Saved Video picker before reusing one exact Version', async () => {
-    const selectedVideo: SavedVideoSummary = {
-      id: savedVideoId,
-      title: 'Library source',
-      status: 'ready',
-      currentVersion: {
-        id: videoVersionId,
-        videoId: savedVideoId,
-        ordinal: 2,
-        origin: 'uploaded',
-        characterName: null,
-        characterVariantName: null,
-        sourceVersionId: null,
-        mimeType: 'video/mp4',
-        filename: 'library-source.mp4',
-        sizeBytes: 4,
-        durationMs: 1_000,
-        width: 640,
-        height: 360,
-        createdAt: now,
-      },
-      sourceVideoId: null,
-      versionCount: 2,
-      thumbnailAvailable: false,
-      createdAt: now,
-      updatedAt: now,
-    };
+    const selectedVideo = savedVideoSummary();
     const sourceReference = {
       kind: 'saved-video-version' as const,
       savedVideoId,
@@ -771,7 +826,7 @@ describe('Project route surface', () => {
       ),
     );
     const user = userEvent.setup();
-    renderProjects(`/studio/projects/${activeId}/workspace`, {
+    renderProjects(`/projects/${activeId}/workspace`, {
       sourceRuntime: { present, clear },
     });
 
@@ -823,7 +878,7 @@ describe('Project route surface', () => {
       }),
     );
     const user = userEvent.setup();
-    renderProjects(`/studio/projects/${activeId}`);
+    renderProjects(`/projects/${activeId}`);
 
     await user.click(await screen.findByRole('button', { name: 'Move Project' }));
     const dialog = screen.getByRole('dialog', { name: 'Project Campaign' });
@@ -877,7 +932,7 @@ describe('Project route surface', () => {
       }),
     );
     const user = userEvent.setup();
-    renderProjects(`/studio/projects/${activeId}`);
+    renderProjects(`/projects/${activeId}`);
 
     await user.click(await screen.findByRole('button', { name: 'Archive' }));
     const dialog = screen.getByRole('dialog', { name: 'Archive Project' });
@@ -963,7 +1018,7 @@ describe('Project route surface', () => {
       }),
     );
     const user = userEvent.setup();
-    renderProjects(`/studio/projects/${activeId}/workspace`, {
+    renderProjects(`/projects/${activeId}/workspace`, {
       onSessionChange: (next) => {
         sessionPort = next;
       },
@@ -1004,7 +1059,7 @@ describe('Project route surface', () => {
       ),
     );
     const user = userEvent.setup();
-    renderProjects(`/studio/projects/${activeId}/workspace`, {
+    renderProjects(`/projects/${activeId}/workspace`, {
       onSessionChange: (next) => {
         sessionPort = next;
       },

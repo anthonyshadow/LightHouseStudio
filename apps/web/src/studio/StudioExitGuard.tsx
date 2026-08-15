@@ -11,7 +11,7 @@ export interface StudioExitGuardProps {
   readonly videoRenderingActive: boolean;
   readonly hasTemporaryTake: boolean;
   readonly voiceProcessingActive: boolean;
-  readonly shelfDirty: boolean;
+  readonly creativeWorkDirty: boolean;
   readonly projectContextDirty?: boolean;
   readonly projectSourceActivity?: Readonly<{
     projectId: string;
@@ -71,7 +71,7 @@ export const StudioExitGuard = ({
   videoRenderingActive,
   hasTemporaryTake,
   voiceProcessingActive,
-  shelfDirty,
+  creativeWorkDirty,
   projectContextDirty = false,
   projectSourceActivity = null,
   projectSession = null,
@@ -84,7 +84,7 @@ export const StudioExitGuard = ({
   const hasDiscardableWork =
     hasTemporaryTake ||
     voiceProcessingActive ||
-    shelfDirty ||
+    creativeWorkDirty ||
     projectContextDirty ||
     projectSourceStaging;
   const unsafeWorkActive =
@@ -187,7 +187,7 @@ export const StudioExitGuard = ({
       !recordingOrFinalizing &&
       !videoRenderingActive &&
       !voiceProcessingActive &&
-      !shelfDirty &&
+      !creativeWorkDirty &&
       !projectContextDirty &&
       !projectSourceStaging &&
       !projectSavePending
@@ -205,7 +205,7 @@ export const StudioExitGuard = ({
     projectContextDirty,
     projectSavePending,
     recordingOrFinalizing,
-    shelfDirty,
+    creativeWorkDirty,
     videoRenderingActive,
     voiceProcessingActive,
   ]);
@@ -374,7 +374,7 @@ export const StudioExitGuard = ({
       <ConfirmationDialog
         open={discardConfirmationOpen}
         title="Discard temporary work and leave?"
-        description="Leaving Studio discards the current temporary take, active Project source staging, active Voice work, unsaved video edits, and Recipe Shelf changes. Saved browser-local items remain available."
+        description="Leaving Studio discards the current temporary take, active Project source staging, active Voice work, unsaved video edits, and unsaved creative settings. Saved browser-local items remain available."
         confirmLabel="Discard and leave"
         cancelLabel="Stay in Studio"
         danger

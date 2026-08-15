@@ -57,12 +57,6 @@ export type CharacterVersionSelection = DomainCharacterVersionSelection;
 export type CreativeAssetStore = DomainCreativeAssetStore;
 export type CreativeAssetSearchResults = DomainCreativeAssetSearchResults;
 
-/** Legacy Workshop object-edit records share the historical character collection. */
-export const isBuilderOwnedCharacter = (asset: SavedCharacterPrompt): boolean =>
-  asset.builderDraft?.intent !== 'add-object' &&
-  asset.builderDraft?.intent !== 'replace-object' &&
-  asset.builderDraft?.intent !== 'change-attribute';
-
 export interface CreativeAssetRepositoryState {
   readonly store: CreativeAssetStore;
   readonly health: StorageHealth;

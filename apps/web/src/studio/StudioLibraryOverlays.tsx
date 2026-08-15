@@ -1,5 +1,5 @@
 import type { SavedVideoSummary } from '@studio/contracts';
-import { lazy, Suspense, useState, type RefObject } from 'react';
+import { lazy, Suspense, type RefObject } from 'react';
 import { APP_PATHS } from '../app/paths';
 import type {
   CreativeAssetRepository,
@@ -7,8 +7,7 @@ import type {
   SavedCharacterPrompt,
   SavedPrompt,
 } from '../features/creative-assets/types';
-import type { RecipeSelection } from '../features/creative-assets/RecipeShelf.types';
-import { Button, OverlayPanel, SegmentedControl } from '../ui';
+import { Button, OverlayPanel } from '../ui';
 
 const SavedCharacterLibrary = lazy(() =>
   import('../features/account-library/SavedCreativeLibrary').then((module) => ({
@@ -30,12 +29,6 @@ const VoiceLibrary = lazy(() =>
     default: module.VoiceLibrary,
   })),
 );
-const RecipeShelf = lazy(() =>
-  import('../features/creative-assets/RecipeShelf').then((module) => ({
-    default: module.RecipeShelf,
-  })),
-);
-
 const deferredLibraryFallback = <p role="status">Loading studio tool…</p>;
 
 interface StudioLibraryOverlaysProps {
@@ -51,7 +44,6 @@ interface StudioLibraryOverlaysProps {
   readonly onUseCharacter: (character: SavedCharacterPrompt) => void;
   readonly onCreateOutfit: () => void;
   readonly onUseOutfit: (outfit: SavedPrompt) => void;
-  readonly onUseRecipe: (selection: RecipeSelection) => void;
 }
 
 export const StudioLibraryOverlays = ({
@@ -67,9 +59,7 @@ export const StudioLibraryOverlays = ({
   onUseCharacter,
   onCreateOutfit,
   onUseOutfit,
-  onUseRecipe,
 }: StudioLibraryOverlaysProps) => {
-  const [recipeMode, setRecipeMode] = useState<'lucy-latest' | 'lucy-vton-latest'>('lucy-latest');
   return (
     <>
       <OverlayPanel
@@ -166,42 +156,6 @@ export const StudioLibraryOverlays = ({
         {pathname === APP_PATHS.voices ? (
           <Suspense fallback={deferredLibraryFallback}>
             <VoiceLibrary disabled onSelect={() => undefined} />
-          </Suspense>
-        ) : null}
-      </OverlayPanel>
-
-      <OverlayPanel
-        open={pathname === APP_PATHS.recipes}
-        onClose={() => onNavigate(APP_PATHS.assets)}
-        title="Recipes"
-        description="Manage reusable Character and Virtual Try-On recipes, then open one in Studio when you want to apply it."
-        placement="fullscreen"
-        size="wide"
-        bodyMode="scroll"
-        initialFocus="heading"
-        returnFocusRef={mainRef}
-        headerActions={
-          <SegmentedControl
-            label="Recipe type"
-            value={recipeMode}
-            options={[
-              { value: 'lucy-latest', label: 'Character recipes', shortLabel: 'Characters' },
-              { value: 'lucy-vton-latest', label: 'Outfit recipes', shortLabel: 'Outfits' },
-            ]}
-            onChange={setRecipeMode}
-          />
-        }
-      >
-        {pathname === APP_PATHS.recipes ? (
-          <Suspense fallback={deferredLibraryFallback}>
-            <RecipeShelf
-              repository={repository}
-              activeMode={recipeMode}
-              onUsePrompt={onUseRecipe}
-              onCreateCharacter={onCreateCharacter}
-              onOpenWardrobe={onOpenWardrobe}
-              onCreateOutfit={onCreateOutfit}
-            />
           </Suspense>
         ) : null}
       </OverlayPanel>

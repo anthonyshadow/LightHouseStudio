@@ -82,7 +82,7 @@ export const toProviderSnapshot = (
     image: toImageDescriptor(draft.referenceImage),
     enhancePrompt: draft.enhance,
   });
-  if (!snapshot) throw new Error('A valid model recipe is required before connecting.');
+  if (!snapshot) throw new Error('Valid model settings are required before connecting.');
   return {
     prompt: snapshot.prompt,
     image: draft.referenceImage?.file ?? null,
@@ -93,7 +93,7 @@ export const toProviderSnapshot = (
 export const toAppliedState = (draft: SessionDraft): AppliedRealtimeState => {
   if (draft.mode === 'local') throw new Error('Local preview has no provider state.');
   const snapshot = buildRealtimeStateSnapshot(toDomainDraft(draft));
-  if (!snapshot) throw new Error('A valid model recipe is required before applying.');
+  if (!snapshot) throw new Error('Valid model settings are required before applying.');
   return {
     mode: snapshot.modeId,
     prompt: snapshot.prompt,

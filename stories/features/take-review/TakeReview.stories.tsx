@@ -9,7 +9,7 @@ import {
 import { StoryColumn, StorySection } from '../../support/StoryLayout';
 
 const meta = {
-  title: 'Features/Take Review/Take Dock',
+  title: 'Features/Take Review/Review Panel',
   component: TakeDock,
   subcomponents: { TakeReviewActions },
   args: {

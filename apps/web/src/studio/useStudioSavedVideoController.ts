@@ -50,6 +50,7 @@ interface UseStudioSavedVideoControllerOptions {
   readonly recordingCharacterAttribution: SavedVideoCharacterAttribution | null;
   readonly navigateToStudio: () => void;
   readonly openVideoUpload: () => void;
+  readonly openTakeReview: () => void;
   readonly closeOverlay: () => void;
   readonly focusStudio: () => void;
   readonly focusEditVideo: () => void;
@@ -66,6 +67,7 @@ export const useStudioSavedVideoController = ({
   recordingCharacterAttribution,
   navigateToStudio,
   openVideoUpload,
+  openTakeReview,
   closeOverlay,
   focusStudio,
   focusEditVideo,
@@ -101,12 +103,23 @@ export const useStudioSavedVideoController = ({
     videoEditor,
   ]);
 
-  const useSavedVideo = useCallback(
-    async (video: SavedVideoSummary, intent: 'play' | 'edit') => {
+  const loadSavedVideo = useCallback(
+    async (
+      video: SavedVideoSummary,
+      intent: 'play' | 'edit',
+      options: Readonly<{
+        preserveRoute?: boolean;
+        enterReview?: boolean;
+        signal?: AbortSignal;
+      }> = {},
+    ) => {
       if (recordingActive || existingVideo.providerActive) return;
       gallerySourceLoadControllerRef.current?.abort('replaced');
       const controller = new AbortController();
       gallerySourceLoadControllerRef.current = controller;
+      const abortFromCaller = () => controller.abort(options.signal?.reason ?? 'cancelled');
+      if (options.signal?.aborted) abortFromCaller();
+      else options.signal?.addEventListener('abort', abortFromCaller, { once: true });
       try {
         const response = await apiFetch(savedVideoContentUrl(video.id), {
           cache: 'no-store',
@@ -133,7 +146,7 @@ export const useStudioSavedVideoController = ({
           lastModified: new Date(video.currentVersion.createdAt).getTime(),
         });
         galleryEditRequestedRef.current = intent === 'edit';
-        navigateToStudio();
+        if (!options.preserveRoute) navigateToStudio();
         openVideoUpload();
         const artifact = await existingVideo.selectFile(file);
         if (artifact && !controller.signal.aborted) {
@@ -144,14 +157,43 @@ export const useStudioSavedVideoController = ({
             characterName: video.currentVersion.characterName,
             characterVariantName: video.currentVersion.characterVariantName,
           });
+          if (options.enterReview) openTakeReview();
+          return true;
         }
+        return false;
       } finally {
+        options.signal?.removeEventListener('abort', abortFromCaller);
         if (gallerySourceLoadControllerRef.current === controller) {
           gallerySourceLoadControllerRef.current = null;
         }
       }
     },
-    [existingVideo, navigateToStudio, openVideoUpload, recordingActive],
+    [existingVideo, navigateToStudio, openTakeReview, openVideoUpload, recordingActive],
+  );
+
+  const useSavedVideo = useCallback(
+    async (video: SavedVideoSummary, intent: 'play' | 'edit') => {
+      await loadSavedVideo(video, intent);
+    },
+    [loadSavedVideo],
+  );
+
+  const loadSavedVideoRoute = useCallback(
+    async (video: SavedVideoSummary, signal: AbortSignal) => {
+      const loaded = await loadSavedVideo(video, 'play', {
+        preserveRoute: true,
+        enterReview: true,
+        signal,
+      });
+      if (!loaded && !signal.aborted) {
+        throw new ApiClientError(
+          'The saved video could not be prepared for review.',
+          422,
+          'video_invalid',
+        );
+      }
+    },
+    [loadSavedVideo],
   );
 
   useEffect(() => {
@@ -381,6 +423,7 @@ export const useStudioSavedVideoController = ({
     pendingSave,
     discardPromptOpen,
     useSavedVideo,
+    loadSavedVideoRoute,
     openVideoAdjust,
     replaceLoadedSavedVideo,
     requestSavePresentedVideo,

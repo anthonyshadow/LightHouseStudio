@@ -83,6 +83,7 @@ export type NetworkJourneyState = {
 };
 
 export type StudioHarnessOptions = {
+  initiallyAuthenticated?: boolean;
   stubMediaPlayback?: boolean;
   referenceImagesAvailable?: boolean;
   wardrobeAddOutfitAvailable?: boolean;

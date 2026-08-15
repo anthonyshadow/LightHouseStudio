@@ -75,7 +75,7 @@ export const useCharacterStudioPreload = ({
         (canonicalPrompt(session.draft.prompt) !== canonicalPrompt(studioPrompt) ||
           currentReferenceId !== incomingReferenceId) &&
         !window.confirm(
-          'Replace the current Lucy latest recipe in the Dock with this saved character? Your current Dock values will be replaced.',
+          'Replace the current Character settings with this saved Character? Your current AI settings will be replaced.',
         )
       ) {
         throw new Error('Character save was cancelled. The resumable draft is unchanged.');

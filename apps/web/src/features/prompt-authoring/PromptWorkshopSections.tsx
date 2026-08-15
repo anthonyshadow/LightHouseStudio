@@ -123,7 +123,7 @@ export const PromptWorkshopReview = ({
   const summaryId = `${componentId}-recipe-summary`;
 
   return (
-    <aside css={reviewColumnStyles(theme)} aria-label="Recipe review">
+    <aside css={reviewColumnStyles(theme)} aria-label="Creative direction review">
       <button
         type="button"
         aria-expanded={showSummary}
@@ -131,7 +131,7 @@ export const PromptWorkshopReview = ({
         css={reviewToggleStyles(theme)}
         onClick={onToggleSummary}
       >
-        <span>Generated recipe summary</span>
+        <span>Generated direction summary</span>
         <span aria-hidden="true">{showSummary ? '−' : '+'}</span>
       </button>
       {showSummary ? (

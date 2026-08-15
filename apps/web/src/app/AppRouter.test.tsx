@@ -1,47 +1,67 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { useLayoutEffect, useRef } from 'react';
-import { createMemoryRouter, RouterProvider, type InitialEntry } from 'react-router';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthenticatedSessionResponse } from '@studio/contracts';
 import { createPhaseOneEntitlements } from '@studio/domain';
-import { AuthProvider } from '../application/auth/AuthProvider';
-import { StudioDesignProvider } from '../ui';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
+import { createMemoryRouter, RouterProvider, type InitialEntry } from 'react-router';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AuthProvider, useAuth } from '../application/auth/AuthProvider';
 import type { StudioAppProps } from '../studio/StudioApp';
+import { StudioDesignProvider } from '../ui';
 
 const appHarness = vi.hoisted(() => ({
-  renderCount: 0,
+  mountCount: 0,
   latestProps: null as StudioAppProps | null,
 }));
 
-vi.mock('../features/auth/LoginDialog', () => ({
-  LoginDialog: ({
-    message,
-    onClose,
-    onSuccess,
-  }: {
-    message?: string | null;
-    onClose: () => void;
-    onSuccess: () => void;
-  }) => (
-    <div role="dialog" aria-label="Log in to Lightframe">
-      {message ? <p role="status">{message}</p> : null}
-      <button type="button" onClick={onClose}>
-        Cancel login
-      </button>
-      <button type="button" onClick={onSuccess}>
-        Complete login
-      </button>
-    </div>
-  ),
+const authApi = vi.hoisted(() => ({
+  fetchCurrentSession: vi.fn(),
+  login: vi.fn(),
+  logout: vi.fn(),
 }));
+
+vi.mock('../adapters/api-client/authApi', () => authApi);
+
+vi.mock('../features/auth/LoginDialog', () => {
+  return {
+    LoginDialog: ({
+      message,
+      onClose,
+      onSuccess,
+    }: {
+      message?: string | null;
+      onClose: () => void;
+      onSuccess: () => void;
+    }) => {
+      const auth = useAuth();
+      return (
+        <div role="dialog" aria-label="Log in to Lightframe">
+          {message ? <p role="status">{message}</p> : null}
+          <button type="button" onClick={onClose}>
+            Cancel login
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void auth.login('demo@lightframe.local', 'password').then(onSuccess);
+            }}
+          >
+            Complete login
+          </button>
+        </div>
+      );
+    },
+  };
+});
 
 vi.mock('../studio/StudioApp', () => ({
   StudioApp: (props: StudioAppProps) => {
-    appHarness.renderCount += 1;
     appHarness.latestProps = props;
     const mainRef = useRef<HTMLElement>(null);
+    useEffect(() => {
+      appHarness.mountCount += 1;
+    }, []);
     useLayoutEffect(() => {
       if (props.focusMainOnMount) mainRef.current?.focus();
     }, [props.focusMainOnMount]);
@@ -98,8 +118,11 @@ describe('AppRouter', () => {
     const description = document.createElement('meta');
     description.name = 'description';
     document.head.append(description);
-    appHarness.renderCount = 0;
+    appHarness.mountCount = 0;
     appHarness.latestProps = null;
+    authApi.fetchCurrentSession.mockReset();
+    authApi.login.mockReset().mockResolvedValue(testSession);
+    authApi.logout.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -107,57 +130,46 @@ describe('AppRouter', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the semantic entry without mounting Studio and updates metadata in place', () => {
+  it('keeps the public entry provider-free while session restoration is pending', () => {
+    authApi.fetchCurrentSession.mockReturnValue(new Promise(() => undefined));
     const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
-    renderApplication();
+    renderApplication('/', null);
 
     expect(screen.getByRole('heading', { name: 'Lightframe' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Open Dashboard' })).toBeInTheDocument();
-    expect(screen.getByText(/Create a video quickly/u)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Restoring…' })).toBeDisabled();
     expect(screen.queryByText('Studio route')).not.toBeInTheDocument();
-    expect(appHarness.renderCount).toBe(0);
+    expect(appHarness.mountCount).toBe(0);
     expect(document.title).toBe('Enter Lightframe Studio');
-    expect(document.querySelectorAll('meta[name="description"]')).toHaveLength(1);
     expect(description?.content).toContain('Record or upload a video');
   });
 
-  it('pushes Dashboard from the authenticated entry and hands focus to its main landmark', async () => {
+  it('restores an authenticated entry directly to Dashboard', async () => {
     const { router } = renderApplication();
-    fireEvent.click(screen.getByRole('button', { name: 'Open Dashboard' }));
 
     expect(await screen.findByText('Studio route')).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/studio');
-    await waitFor(() => expect(document.activeElement).toHaveAttribute('id', 'studio-main'));
-    expect(appHarness.latestProps).toEqual({ focusMainOnMount: true });
+    expect(router.state.location.pathname).toBe('/dashboard');
+    expect(appHarness.mountCount).toBe(1);
     expect(document.title).toBe('Dashboard · Lightframe');
   });
 
-  it('keeps unauthenticated entry provider-free and exposes only login', () => {
-    renderApplication('/', null);
+  it('shows login after an unauthenticated restore and logs in to Dashboard', async () => {
+    authApi.fetchCurrentSession.mockRejectedValue(new Error('No session'));
+    const { router } = renderApplication('/', null);
 
-    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
-    expect(screen.queryByText('Studio route')).not.toBeInTheDocument();
-    expect(appHarness.renderCount).toBe(0);
+    fireEvent.click(await screen.findByRole('button', { name: 'Log in' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Complete login' }));
+
+    expect(await screen.findByText('Studio route')).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/dashboard');
   });
 
-  it('opens and dismisses local login from an unauthenticated entry', async () => {
-    renderApplication('/', null);
+  it('clears a protected-route login request when login is dismissed', async () => {
+    authApi.fetchCurrentSession.mockRejectedValue(new Error('No session'));
+    const { router } = renderApplication('/assets/videos?sort=latest', null);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Log in' }));
-    expect(await screen.findByRole('dialog', { name: 'Log in to Lightframe' })).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel login' }));
-    expect(screen.queryByRole('dialog', { name: 'Log in to Lightframe' })).not.toBeInTheDocument();
-  });
-
-  it('clears a stale protected-route login request when login is dismissed', async () => {
-    const { router } = renderApplication({
-      pathname: '/',
-      state: { loginRequired: true, from: '/studio/videos' },
-    });
-
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Your session is required to continue.',
+    expect(await screen.findByText('Your session is required to continue.')).toHaveAttribute(
+      'role',
+      'status',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Cancel login' }));
 
@@ -165,95 +177,78 @@ describe('AppRouter', () => {
     expect(router.state.location.pathname).toBe('/');
   });
 
-  it('restores an allowed Studio destination after successful login', async () => {
-    const { router } = renderApplication({
-      pathname: '/',
-      state: { loginRequired: true, from: '/studio/videos' },
-    });
+  it('restores and canonicalizes a protected destination after login', async () => {
+    authApi.fetchCurrentSession.mockRejectedValue(new Error('No session'));
+    const { router } = renderApplication('/studio/videos?sort=latest', null);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Complete login' }));
 
     expect(await screen.findByText('Studio route')).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/studio/assets/videos');
+    expect(router.state.location.pathname).toBe('/assets/videos');
+    expect(router.state.location.search).toBe('?sort=latest');
   });
 
-  it('restores focus to the camera entry after browser Back', async () => {
-    const { router } = renderApplication();
-    fireEvent.click(screen.getByRole('button', { name: 'Open Dashboard' }));
+  it('keeps one Studio runtime while navigating between canonical surfaces', async () => {
+    const { router } = renderApplication('/dashboard');
     await screen.findByText('Studio route');
 
-    await router.navigate(-1);
+    await router.navigate('/projects');
+    await waitFor(() => expect(document.title).toBe('Projects · Lightframe Studio'));
 
-    const enter = await screen.findByRole('button', { name: 'Open Dashboard' });
-    await waitFor(() => expect(router.state.location.pathname).toBe('/'));
-    await waitFor(() => expect(enter).toHaveFocus());
-  });
-
-  it('supports a direct canonical Studio entry without moving initial focus', async () => {
-    renderApplication('/studio');
-
-    expect(await screen.findByText('Studio route')).toBeInTheDocument();
-    expect(appHarness.latestProps?.focusMainOnMount).toBe(false);
-    expect(document.activeElement).toBe(document.body);
+    expect(appHarness.mountCount).toBe(1);
+    expect(appHarness.latestProps?.focusMainOnMount).toBe(true);
+    await waitFor(() => expect(document.activeElement).toHaveAttribute('id', 'studio-main'));
   });
 
   it.each([
-    ['/studio/videos', '/studio/assets/videos'],
-    ['/studio/characters', '/studio/assets/characters'],
-    ['/studio/outfits', '/studio/assets/outfits'],
-  ])('redirects the legacy route %s inside the persistent Studio runtime', async (path, target) => {
+    ['/studio', '/dashboard'],
+    ['/studio/projects', '/projects'],
+    [
+      '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace',
+      '/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace',
+    ],
+    ['/studio/campaigns', '/campaign'],
+    ['/studio/assets', '/assets'],
+    ['/studio/videos', '/assets/videos'],
+    ['/studio/assets/recipes', '/assets'],
+  ])('redirects the legacy route %s to %s', async (path, target) => {
     const { router } = renderApplication(path);
 
     expect(await screen.findByText('Studio route')).toBeInTheDocument();
-    expect(appHarness.renderCount).toBe(1);
-    expect(appHarness.latestProps?.focusMainOnMount).toBe(true);
     await waitFor(() => expect(router.state.location.pathname).toBe(target));
+    expect(appHarness.mountCount).toBe(1);
   });
 
   it.each([
-    ['/studio/projects', 'Projects · Lightframe Studio'],
-    ['/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391', 'Project · Lightframe Studio'],
-    [
-      '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace',
-      'Project Studio · Lightframe',
-    ],
+    ['/projects', 'Projects · Lightframe Studio'],
+    ['/projects/18b120ac-1578-46e3-8c3d-42307772f391', 'Project · Lightframe Studio'],
+    ['/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace', 'Project Studio · Lightframe'],
+    ['/campaign', 'Campaigns · Lightframe Studio'],
     ['/studio/create', 'Studio · Lightframe'],
-    ['/studio/assets', 'Assets · Lightframe'],
-  ])(
-    'protects the canonical Project route %s with the shared Studio runtime',
-    async (path, title) => {
-      renderApplication(path);
+    ['/assets', 'Assets · Lightframe'],
+  ])('protects canonical route %s with the shared Studio runtime', async (path, title) => {
+    renderApplication(path);
 
-      expect(await screen.findByText('Studio route')).toBeInTheDocument();
-      expect(appHarness.renderCount).toBe(1);
-      expect(appHarness.latestProps?.focusMainOnMount).toBe(false);
-      expect(document.title).toBe(title);
-    },
-  );
+    expect(await screen.findByText('Studio route')).toBeInTheDocument();
+    expect(appHarness.mountCount).toBe(1);
+    expect(appHarness.latestProps?.focusMainOnMount).toBe(false);
+    expect(document.title).toBe(title);
+  });
 
   it.each([
     '/advanced',
     '/guided',
-    '/projects?project=project-42',
+    '/projects/project-42/history',
     '/studio/not-a-route',
-    '/studio/projects/project-42/history',
+    '/assets/recipes',
     '/not-a-route?project=untrusted',
   ])('replaces the noncanonical path %s with the entry page', async (path) => {
-    const { router } = renderApplication(path);
+    authApi.fetchCurrentSession.mockRejectedValue(new Error('No session'));
+    const { router } = renderApplication(path, null);
 
-    expect(await screen.findByRole('button', { name: 'Open Dashboard' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Log in' })).toBeInTheDocument();
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     expect(router.state.location.search).toBe('');
-    expect(appHarness.renderCount).toBe(0);
+    expect(appHarness.mountCount).toBe(0);
   });
-
-  it.each(['/?new=1', '/?characterFlow=guided', '/?project=project-42'])(
-    'does not activate Studio from the obsolete entry query %s',
-    async (path) => {
-      renderApplication(path);
-
-      expect(await screen.findByRole('button', { name: 'Open Dashboard' })).toBeInTheDocument();
-      expect(appHarness.renderCount).toBe(0);
-    },
-  );
 });

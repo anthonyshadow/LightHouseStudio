@@ -870,7 +870,7 @@ describe('reference recipe handoff', () => {
     });
   });
 
-  it('preserves Character Builder blocking precedence across Shelf and hydration state', () => {
+  it('preserves Character Builder blocking precedence across session state and hydration', () => {
     const externalBlock = renderHandoff({
       store: {
         schemaVersion: 7,
@@ -885,23 +885,6 @@ describe('reference recipe handoff', () => {
     });
     expect(externalBlock.result.current.state.characterBuilderSaveBlockedReason).toBe(
       'Finish the current take first.',
-    );
-
-    const shelfBlock = renderHandoff({
-      store: {
-        schemaVersion: 7,
-        savedPrompts: [],
-        recentPrompts: [],
-        savedCharacterPrompts: [],
-        savedCharacterVariants: [],
-      },
-      referenceAsset: uploadedAsset,
-    });
-    act(() => {
-      shelfBlock.result.current.actions.setShelfDirty(true);
-    });
-    expect(shelfBlock.result.current.state.characterBuilderSaveBlockedReason).toContain(
-      'unfinished Recipe Shelf changes',
     );
 
     const sessionBlock = renderHandoff({
@@ -947,7 +930,7 @@ describe('reference recipe handoff', () => {
       });
     });
     expect(pendingBlock.result.current.state.characterBuilderSaveBlockedReason).toContain(
-      'current recipe handoff',
+      'current creative setup',
     );
     pendingBlock.unmount();
   });

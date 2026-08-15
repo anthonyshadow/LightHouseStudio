@@ -4,7 +4,7 @@ import type {
   CreativeAssetStore,
   SavedCharacterVariant,
 } from '../features/creative-assets/types';
-import type { ModelMode } from './CreativeWorkspace';
+import type { ModelMode } from '../application/types';
 
 export interface AcceptedExistingVideoBatchStep {
   readonly modelId: ModelMode;

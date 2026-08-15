@@ -7,13 +7,13 @@
 1. Optionally stage sources in **Device settings**, including **Landscape · 16:9** or
    **Portrait · 9:16** for both local preview and recording.
 2. Entering Studio leaves camera and microphone off. Select **Record New Video** in the control
-   bar (or Dock **Start local preview**) and grant browser permission.
+   bar and grant browser permission.
 3. Confirm **Live local camera preview**. Use the mic/camera toggles and any capability-gated
    front/rear or zoom controls.
 4. Confirm that the session control bar is directly beneath the video frame in either landscape or
    portrait format. On large desktops the creative tools and session/device information flank the
    centered stage; tablet and mobile stack those same regions without duplicating controls.
-5. With no Character or Virtual Try-On recipe selected, the stage control bar presents **Record**
+5. With no Character or Virtual Try-On configuration selected, the stage control bar presents **Record**
    as its primary action and does not present **Start AI**. Select **Record**, or press Space while
    focus is outside interactive/editable content.
 6. Select the dominant **Stop recording** action. It remains visible and focusable throughout
@@ -22,12 +22,9 @@
    at 5:00.
 8. Wait for the main recorder and optional audio sidecar to settle. Studio releases live tracks
    and shows **Recorded take playback** on the same stage.
-9. Every finalized playback enables **Edit Video** in the creative tool rail. A control-bar
-   **Record New Video** take is already retained as the post-recording editor source, where
-   Character Swap, Virtual Try On, and Voice are available. A Dock-started local take keeps the
-   compact Save, Discard, Voice, Release, and [detailed review](07-take-review-and-cleanup.md)
-   path used by advanced live sessions; **Edit Video** opens the existing-video source chooser
-   without silently adopting that take.
+9. Every finalized playback enables **Edit Video** in the creative tool rail and keeps the compact
+   Save, Discard, Voice, Release, and [detailed review](07-take-review-and-cleanup.md) path.
+   **Edit Video** opens the existing-video source chooser without silently adopting that take.
 10. In an open empty Project, **Record** uses this same local preview, recorder, Stop/finalization,
     and artifact owner. The Project remains **No source yet** until the operator chooses **Use
     finalized recording** and the API durably stores, inspects, and atomically accepts it. A failed

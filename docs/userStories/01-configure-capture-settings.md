@@ -41,7 +41,7 @@ for browser-reported front/rear modes and hardware zoom only when the track repo
   safely instead of silently recording the previous format. Active capture reports the
   browser-negotiated result.
 - Settings are disabled during AI start/live, recording/finalization, and take review.
-- Preferences are in-memory for the tab; device IDs are not written to Recipe Shelf storage.
+- Preferences are in-memory for the tab; device IDs are not written to creative-library storage.
 - In an open Project, **Save creative setup** may checkpoint only the applied format class and
   app-owned audio-source mode as live metadata. It never stores device IDs, starts media, or writes
   per-control changes; Capture Settings keeps its existing session owner.

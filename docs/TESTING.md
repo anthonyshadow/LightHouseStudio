@@ -72,9 +72,11 @@ The retained suite protects:
 - provider-free entry, accessible Login, correct/incorrect credentials, 24-hour cookie attributes,
   restore/revoke/expiry behavior, deny-by-default private APIs, trusted mutation Origin, and no
   automatic media/AI before authenticated Studio entry;
-- Dashboard at `/studio`, the focused creator at `/studio/create`, Project overview/workspace
-  routing, and canonical `/studio/assets/*` libraries inside one mounted runtime; centralized logout
-  cleanup; and one persistent media stage that is hidden, not duplicated, on organization routes;
+- Dashboard at `/dashboard`, the focused creator at `/studio/create`, direct Saved Video review at
+  UUID-only `/studio/:videoId`, canonical Campaign/Project routes, and `/assets/*` libraries inside
+  one mounted runtime; legacy organization and Recipe URLs replace-normalize without loops,
+  centralized logout cleanup remains intact, and one persistent media stage is hidden rather than
+  duplicated on organization routes;
 - idempotent Save Video, immutable append-only replacement, cross-owner denial, metadata-first
   gallery pagination, lazy thumbnail fallback, range content delivery, tombstones, local-only byte
   retention, and relationship-safe retryable deletion of R2 versions/thumbnails;
@@ -92,8 +94,9 @@ The retained suite protects:
   latest-result cleanup; and post-generation MP4 validation;
 - advanced live AI entry, Start/Apply behavior, Latest Take review, and cleanup remain independent
   from the primary post-recording workflow;
-- versioned/sanitized user-scoped Recipe Shelf and Character Builder persistence, recovery,
-  legacy-key migration, Neon creative-library CAS conflict safety, and destructive actions;
+- versioned/sanitized user-scoped creative-library and Character Builder persistence, recovery,
+  legacy Recipe-shaped record/key compatibility, Neon creative-library CAS conflict safety, and
+  destructive actions without any user-facing Recipe route, card, chooser, count, or Studio tool;
 - storage-neutral byte streams, private opaque R2 keys, lifecycle registration, range reads,
   exact-scope direct-part signing, staged upload ownership/expiry, post-upload declaration and
   media verification, abandoned multipart cleanup, local/shadow path preservation,
@@ -155,11 +158,22 @@ The retained suite protects:
   denial of unexpected external HTTP and WebSocket traffic;
 - Campaign domain/contract parity, v1→v2 local migration, restart-safe receipts, owner/CAS and
   active-membership rules, relational same-owner/restrict constraints, authenticated routes,
-  create/detail/New Project, move/detach, virtual No Campaign filtering, non-cascading lifecycle,
-  blocked nonempty tombstone, and archived-empty tombstone;
-- pre-`0010`→`0020` PostgreSQL compatibility with valid historical Project rows, independent legacy
+  create/detail/post-create offer/New Project/Create another Campaign, move/detach, virtual No
+  Campaign filtering, non-cascading lifecycle, blocked nonempty tombstone, and archived-empty
+  tombstone;
+- Project asset-membership domain/contract parity, deterministic local and relational backfill,
+  unique attach replay, cursor bounds, owner isolation, archived read-only behavior, unavailable
+  resources, bounded Saved Video summary resolution, and detach without source/history/resource
+  deletion;
+- Project-context Video save/attach/return and recoverable partial attachment failure,
+  Character/Outfit creation and Voice attachment without leaving Project context, route-stable
+  Saved Video preview, refresh-safe direct review, current-Version selection, explicit Edit, stale
+  request abort, size limits, and safe missing/wrong-owner navigation;
+- Quick Create accessibility and Project-context propagation for only Videos, Characters, Outfits,
+  and Voices, with provider gating and no Recipe entry;
+- pre-`0010`→`0021` PostgreSQL compatibility with valid historical Project rows, independent legacy
   Saved Video/Voice/creative-resource usability, truthful unassigned lineage, and current
-  source/processing/output authorities; local Project v1–5→v6 and Saved Video legacy-format
+  source/processing/output authorities; local Project v1–6→v7 and Saved Video legacy-format
   idempotent reopen/recovery without fabricated relations;
 - app-owned saved-voice membership, first-read claim, owner-checked preview/conversion, and proof
   that relationship removal never calls provider voice deletion;
@@ -203,7 +217,7 @@ every desktop journey under every engine by default.
 
 The current visual matrix contains 31 cases within the 31-case review budget. It retains Local live
 and recording at all five canonical viewports, plus selected entry, idle, Character, Builder,
-Shelf, playback, existing-video setup at all five viewports, processing/result, VTO, Voice,
+creative-library, playback, existing-video setup at all five viewports, processing/result, VTO, Voice,
 finalizing, permission-error, desktop Campaigns workspace, and small-mobile Project output-review
 compositions. Visual
 tests are not part of `bun run test`, `bun run quality`, or ordinary push/pull-request CI.

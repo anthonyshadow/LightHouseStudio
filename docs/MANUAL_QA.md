@@ -40,16 +40,16 @@ Wardrobe try-on is separately enabled and is never inferred from Character Swap.
 Run these before physical/provider work so later evidence uses the intended owner and clean local
 state:
 
-| Check                    | Pass condition                                                                                                                                                                                                                                                          |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `entry-login`            | `/` requests no media/capability/provider work; Login traps focus; development prefills both configured credentials; incorrect credentials use one generic error and clear no unrelated data                                                                            |
-| `session-restore`        | Correct login opens Dashboard; closing/reopening the browser restores direct Dashboard, Create, Project workspace, and Assets routes within 24 hours without exposing a token to URL or browser storage                                                                 |
-| `session-expiry-logout`  | Expired/revoked session returns to entry; logout blocks non-discardable work, confirms discardable work, releases indicators/resources, clears the cookie, and returns to Login                                                                                         |
-| `studio-library-routing` | `/studio/assets` and its Videos, Characters, Outfits, Voices, and Recipes routes keep one mounted runtime; the stage is hidden on organization pages; browser Back/Forward, Escape, bottom navigation, and return focus behave correctly                                |
-| `local-mvp-journey`      | Campaign, named Project, or Quick project → workspace → durable source → reusable creative choice/local edit → synthetic recoverable processing → Save/Add Version → history/exact Download → leave/resume/archive stays coherent and contacts no external provider     |
-| `save-video`             | Save is idempotent and is the only review durability action; optional thumbnail failure is non-fatal; replace confirms and appends a version; download/rename/delete operate on the selected owner gallery record; R2 deletion removes its unshared versions/thumbnails |
-| `video-gallery-states`   | Empty/loading/error/missing/placeholder/populated/load-more states avoid eager video requests; thumbnail Preview darkens the gallery, traps/returns focus, detaches on close, and remains usable at all five viewports and 200% text                                    |
-| `saved-character-outfit` | Character and Outfit Assets show user-scoped records; Use follows the existing handoff; delete removes relationships without provider work or unintended immutable-byte deletion                                                                                        |
+| Check                    | Pass condition                                                                                                                                                                                                                                                                                |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `entry-login`            | `/` requests no media/capability/provider work; Login traps focus; development prefills both configured credentials; incorrect credentials use one generic error and clear no unrelated data                                                                                                  |
+| `session-restore`        | Correct login opens Dashboard; closing/reopening the browser restores direct Dashboard, Create, Project workspace, and Assets routes within 24 hours without exposing a token to URL or browser storage                                                                                       |
+| `session-expiry-logout`  | Expired/revoked session returns to entry; logout blocks non-discardable work, confirms discardable work, releases indicators/resources, clears the cookie, and returns to Login                                                                                                               |
+| `studio-library-routing` | `/dashboard`, `/campaign`, `/projects`, and `/assets` with Videos, Characters, Outfits, and Voices keep one mounted runtime; legacy organization/Recipe URLs normalize; the stage is hidden on organization pages; Back/Forward, Escape, bottom navigation, and return focus behave correctly |
+| `local-mvp-journey`      | Campaign, named Project, or Quick project → workspace → durable source → reusable creative choice/local edit → synthetic recoverable processing → Save/Add Version → history/exact Download → leave/resume/archive stays coherent and contacts no external provider                           |
+| `save-video`             | Save is idempotent and is the only review durability action; optional thumbnail failure is non-fatal; replace confirms and appends a version; download/rename/delete operate on the selected owner gallery record; R2 deletion removes its unshared versions/thumbnails                       |
+| `video-gallery-states`   | Empty/loading/error/missing/placeholder/populated/load-more states avoid eager video requests; thumbnail Preview darkens the gallery, traps/returns focus, detaches on close, and remains usable at all five viewports and 200% text                                                          |
+| `saved-character-outfit` | Character and Outfit Assets show user-scoped records; Use follows the existing handoff; delete removes relationships without provider work or unintended immutable-byte deletion                                                                                                              |
 
 Local-only Saved Video deletion conservatively retains detached bytes. With R2 selected, manual
 deletion must remove each unshared version/thumbnail object; force one failed delete in a disposable
@@ -202,7 +202,7 @@ focus return, reduced motion, and overlay stacking at every canonical viewport a
 - In Character Swap, choose a saved image character and confirm only its reference is attached;
   Prompt stays empty but accepts a different manual direction. Choose a prompt-only character and
   confirm its prompt fills the field. In the reference-required configuration, confirm prompt-only
-  recipes cannot Start until a reference is attached and Enhance Prompt is disabled with generic
+  saved Characters cannot Start until a reference is attached and Enhance Prompt is disabled with generic
   guidance. Confirm compatible MOV/WebM converts locally at Start, MP4 passes through, the source
   remains immutable, and no provider name/selector appears. Import both Character and VTO references through the hidden
   public-HTTPS URL control and confirm the resulting local preview can be replaced or removed.
@@ -310,8 +310,8 @@ checks exercise local authenticated routes only and must not be converted into p
 
 Using keyboard and a screen reader:
 
-- traverse skip link, Start/AI choices, fields/files, Apply, settings, Record/Stop, Shelf, Take,
-  Voice, Save, Release/Discard;
+- traverse skip link, Quick Create, Start/AI choices, Character and Outfit selectors,
+  fields/files, Apply, settings, Record/Stop, Latest Take, Voice, Save, Release/Discard;
 - verify names, roles, states, validation, live/status announcements, logical focus, visible focus,
   reduced motion, and approximately 44 px touch actions;
 - ensure topmost overlays alone are active, Tab wraps inside, Escape closes one layer, background

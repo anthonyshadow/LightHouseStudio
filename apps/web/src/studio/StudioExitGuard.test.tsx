@@ -47,7 +47,7 @@ const GuardHarness = (props: StudioExitGuardProps) => {
       <button
         type="button"
         onClick={() => {
-          void navigate('/studio/projects/730c73ca-a6af-4509-83c0-b3c18c1ee81a');
+          void navigate('/projects/730c73ca-a6af-4509-83c0-b3c18c1ee81a');
         }}
       >
         Switch Project
@@ -55,7 +55,7 @@ const GuardHarness = (props: StudioExitGuardProps) => {
       <button
         type="button"
         onClick={() => {
-          void navigate('/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391');
+          void navigate('/projects/18b120ac-1578-46e3-8c3d-42307772f391');
         }}
       >
         Open Project overview
@@ -71,18 +71,18 @@ const renderProjectGuard = (overrides: Partial<StudioExitGuardProps> = {}) => {
     videoRenderingActive: false,
     hasTemporaryTake: false,
     voiceProcessingActive: false,
-    shelfDirty: false,
+    creativeWorkDirty: false,
     onDiscardTemporaryWork: vi.fn(),
     ...overrides,
   };
   const router = createMemoryRouter(
     [
-      { path: '/studio/projects/:projectId', element: <GuardHarness {...props} /> },
-      { path: '/studio/projects/:projectId/workspace', element: <GuardHarness {...props} /> },
+      { path: '/projects/:projectId', element: <GuardHarness {...props} /> },
+      { path: '/projects/:projectId/workspace', element: <GuardHarness {...props} /> },
       { path: '/studio/create/live', element: <h1>Live AI route</h1> },
     ],
     {
-      initialEntries: ['/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace'],
+      initialEntries: ['/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace'],
     },
   );
   const view = render(
@@ -99,7 +99,7 @@ const renderGuard = (overrides: Partial<StudioExitGuardProps> = {}) => {
     videoRenderingActive: false,
     hasTemporaryTake: false,
     voiceProcessingActive: false,
-    shelfDirty: false,
+    creativeWorkDirty: false,
     onDiscardTemporaryWork: vi.fn(),
     ...overrides,
   };
@@ -148,7 +148,10 @@ describe('StudioExitGuard', () => {
   });
 
   it('requires explicit worker cancellation before a route exit can discard edits', async () => {
-    const { props, router } = renderGuard({ videoRenderingActive: true, shelfDirty: true });
+    const { props, router } = renderGuard({
+      videoRenderingActive: true,
+      creativeWorkDirty: true,
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Leave Studio' }));
 
     expect(
@@ -158,25 +161,26 @@ describe('StudioExitGuard', () => {
     expect(props.onDiscardTemporaryWork).not.toHaveBeenCalled();
   });
 
-  it.each([{ hasTemporaryTake: true }, { voiceProcessingActive: true }, { shelfDirty: true }])(
-    'confirms and discards transient work before leaving: %#',
-    async (unsafeState) => {
-      const onDiscardTemporaryWork = vi.fn();
-      renderGuard({ ...unsafeState, onDiscardTemporaryWork });
-      fireEvent.click(screen.getByRole('button', { name: 'Leave Studio' }));
+  it.each([
+    { hasTemporaryTake: true },
+    { voiceProcessingActive: true },
+    { creativeWorkDirty: true },
+  ])('confirms and discards transient work before leaving: %#', async (unsafeState) => {
+    const onDiscardTemporaryWork = vi.fn();
+    renderGuard({ ...unsafeState, onDiscardTemporaryWork });
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Studio' }));
 
-      expect(
-        await screen.findByRole('heading', { name: 'Discard temporary work and leave?' }),
-      ).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'Discard and leave' }));
+    expect(
+      await screen.findByRole('heading', { name: 'Discard temporary work and leave?' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Discard and leave' }));
 
-      expect(await screen.findByRole('heading', { name: 'Entry route' })).toBeInTheDocument();
-      expect(onDiscardTemporaryWork).toHaveBeenCalledOnce();
-    },
-  );
+    expect(await screen.findByRole('heading', { name: 'Entry route' })).toBeInTheDocument();
+    expect(onDiscardTemporaryWork).toHaveBeenCalledOnce();
+  });
 
   it('does not block Live AI activation within the create workspace', async () => {
-    renderGuard({ shelfDirty: true });
+    renderGuard({ creativeWorkDirty: true });
     fireEvent.click(screen.getByRole('button', { name: 'Open Live AI' }));
 
     expect(await screen.findByRole('heading', { name: 'Live AI route' })).toBeInTheDocument();
@@ -194,7 +198,7 @@ describe('StudioExitGuard', () => {
     expect(router.state.location.pathname).toBe('/studio/create');
   });
 
-  it('protects hard unloads during recording, voice work, or dirty Shelf work', () => {
+  it('protects hard unloads during recording, voice work, or dirty creative work', () => {
     renderGuard({ voiceProcessingActive: true });
     const event = new Event('beforeunload', { cancelable: true });
 
@@ -312,9 +316,7 @@ describe('StudioExitGuard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Project overview' }));
 
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe(
-        '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391',
-      ),
+      expect(router.state.location.pathname).toBe('/projects/18b120ac-1578-46e3-8c3d-42307772f391'),
     );
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });

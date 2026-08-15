@@ -192,6 +192,7 @@ export const installProviderNetworkDriver = async (
   const uploadedAssetsByRequestId = new Map<string, UploadedReferenceImageAsset>();
   const outfitAssetsByRequestId = new Map<string, DerivedReferenceImageAsset>();
   let assetSequence = 0;
+  let authenticated = options.initiallyAuthenticated ?? true;
 
   await page.routeWebSocket(
     (url) => !['127.0.0.1', 'localhost'].includes(url.hostname),
@@ -217,6 +218,16 @@ export const installProviderNetworkDriver = async (
     }
 
     if (requestUrl.pathname === '/api/auth/me' && route.request().method() === 'GET') {
+      if (!authenticated) {
+        await route.fulfill({
+          status: 401,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: { code: 'authentication_required', message: 'Sign in to continue.' },
+          }),
+        });
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -235,6 +246,7 @@ export const installProviderNetworkDriver = async (
     }
 
     if (requestUrl.pathname === '/api/auth/login' && route.request().method() === 'POST') {
+      authenticated = true;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -244,6 +256,7 @@ export const installProviderNetworkDriver = async (
     }
 
     if (requestUrl.pathname === '/api/auth/logout' && route.request().method() === 'POST') {
+      authenticated = false;
       await route.fulfill({ status: 204, body: '' });
       return;
     }

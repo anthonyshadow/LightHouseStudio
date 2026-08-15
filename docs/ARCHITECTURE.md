@@ -6,10 +6,12 @@ pure domain rules, and runtime API contracts. Its design is local-first and sing
 ## Product model boundary
 
 The implemented runtime is a video-focused creative Studio. Current user-facing durable concepts
-are Campaigns, source-bearing Projects, Saved Videos and their immutable versions, reusable Characters and
-Character variants, Outfits, Voices, recipes, and reference media. The generic word **asset** is appropriate when
-describing byte storage, media ownership, or future product direction, but it must not obscure an
-actual video-, image-, audio-, or feature-specific contract and lifecycle.
+are Campaigns, source-bearing Projects, Saved Videos and their immutable versions, reusable
+Characters and Character variants, Outfits, Voices, reference media, and non-owning Project asset
+memberships. The generic word **asset** is appropriate for the supported Videos, Characters,
+Outfits, and Voices collection and when describing byte storage or media ownership, but it must not
+obscure an actual video-, image-, audio-, or feature-specific contract and lifecycle. Recipe data is
+retained only as an internal compatibility/provider concept and is not a user-facing asset type.
 
 The intended product hierarchy is **Workspace → Campaign → Project → Assets**, with current-state
 qualifications:
@@ -24,6 +26,9 @@ qualifications:
   provider Voice remains gated. Explicit Saved Video output save and immutable Version append are
   implemented. Bounded Project changes, processing attempts/results, and output-Version history
   plus exact-Version preview/reuse/Download are implemented without a restore or Export aggregate.
+  A separately persisted non-owning collection can associate Videos, Characters, Outfits, and
+  Voices without changing the immutable source, active snapshot, output, history, or retention
+  authorities.
 - Dashboard, Create, and Assets are browser information-architecture surfaces over existing owners;
   they are not new domain aggregates or persistence authorities.
 
@@ -77,13 +82,14 @@ JWT secret and password hash.
 ## Studio composition
 
 `AppRouter.tsx` is the browser URL boundary. React Router's data browser router renders the
-provider-free entry at `/` and protects the recognized lazy route family. `/studio` is Dashboard;
-`/studio/create` is standard video creation; `/studio/create/live` is Live AI Beta;
-`/studio/assets` and its `/videos`, `/characters`, `/outfits`, `/voices`, and `/recipes` children
-are reusable-resource surfaces; and Projects/Campaigns use `/studio/projects`,
-`/studio/projects/:projectId`, `/studio/projects/:projectId/workspace`, `/studio/campaigns`, and
-`/studio/campaigns/:campaignId`. Legacy top-level library and `/studio/live` URLs redirect to their
-canonical replacements.
+provider-free entry at `/` and protects the recognized lazy route family. `/dashboard` is
+Dashboard; `/studio/create` is standard video creation; `/studio/create/live` is Live AI Beta;
+`/studio/:videoId` directly loads the current version of an owner-checked Saved Video into review;
+`/assets` and its `/videos`, `/characters`, `/outfits`, and `/voices` children are reusable-resource
+surfaces; and Projects/Campaigns use `/projects`, `/projects/:projectId`,
+`/projects/:projectId/workspace`, `/campaign`, and `/campaign/:campaignId`. The reserved create
+routes are matched before the UUID-only Saved Video route. Legacy organization, library, Recipe,
+and `/studio/live` URLs replace-navigate to their canonical replacements.
 The data-router form is required for route blocking. Route metadata, protected
 Login return, focus handoff, and loading/error surfaces remain router-owned; unknown paths return
 to `/`. All Studio children render the same `StudioApp` instance so moving between a workspace and
@@ -95,19 +101,19 @@ There is no second product shell, media session, global client store, or provide
 
 Studio initializes the session draft in Local Camera mode and the media lifecycle at `idle`.
 Dashboard and organization routes hide the stage but retain the same composition owner. Entry
-intent on `/studio/create` may open the upload panel, but it never starts camera, microphone, AI, or provider
-work. The control-bar **Record New Video** action and upload-panel **Record a local video** action
-both explicitly acquire local media and mark the finalized local artifact for adoption by the
-existing-video editor. Dock-started local preview and Character/VTO starts retain the advanced
-live-session and Latest Take paths; post-recording workflow state is not mixed into provider
-session orchestration.
+intent on `/studio/create` may open the upload panel or start the explicit local-recording flow,
+but it never starts AI or provider work. The control-bar **Record New Video** action starts a normal
+local take and enters Latest Take review after finalization. The upload panel's **Record a local
+video** action separately marks the finalized artifact for adoption by the existing-video editor.
+Character and Virtual Try-On starts retain the advanced live-session and Latest Take paths;
+post-recording workflow state is not mixed into provider session orchestration.
 
 The mounted Studio owns focused controllers for:
 
 - local/realtime media and per-mode drafts;
 - recording, review, and voice processing;
 - existing-video selection, local inspection, and one mutually exclusive batch transformation;
-- Character Builder, Outfit Builder, Prompt Workshop, and Recipe Shelf handoff;
+- Character Builder, Outfit Builder, Prompt Workshop, and compatibility prompt-library handoff;
 - Campaign/Project lifecycle queries and mutations, plus Saved Videos, Saved Characters, and Saved
   Outfits library presentation and handoff;
 - account navigation and ordered logout cleanup;
@@ -205,12 +211,11 @@ footer remains sticky and safe-area-aware. `useVideoEditSession` is the sole own
 source, baseline, draft, 50-entry grouped history, generation, candidate, and worker cancellation.
 
 At the existing `64rem` desktop breakpoint, the header has no AI selection control. The
-creative-tool rail owns **Select Character**, **Select Outfit**, then **Workshop** as three ordered
-preparation actions. The header contains only the brand plus mutually exclusive integration and
-account popovers, with the account trigger anchored at the far right. Below the desktop breakpoint
-the four-button bottom tool row remains Dock, Take, Workshop, and Shelf: Dock owns direct
-Character/VTO recipe preparation, while Shelf owns saved character/outfit selection and builder
-entry. These responsive presentations share the same overlay controller, recipe handoff, activity
+creative-tool rail owns **Edit Video**, **Select Character**, **Select Outfit**, and **Workshop**.
+The header contains the brand, **Quick Create**, organization navigation, and mutually exclusive
+integration/account popovers. Below the desktop breakpoint, Character and Outfit choices use the
+same AI chooser and creation overlays while the compact tool rail retains Edit Video and Workshop.
+All responsive presentations share one overlay controller, creative-selection handoff, activity
 locks, and return-focus behavior. They never mount duplicate stateful selectors or start
 media/provider work.
 
@@ -224,9 +229,9 @@ Character Builder is fullscreen and uses one preview/generation DOM.
 Narrow screens reveal that same region through **Review & Generate** instead of duplicating
 stateful controls.
 
-`StudioExitGuard` blocks navigation leaving `/studio` while recording, finalization, local video
+`StudioExitGuard` blocks navigation leaving the protected application route family while recording, finalization, local video
 render/validation, or Project working-media adoption is active. A temporary take, active Voice process, dirty video-edit draft, or
-dirty Shelf or Outfit Builder form requires confirmed discard before the route proceeds. Rendering
+dirty AI-settings or Outfit Builder form requires confirmed discard before the route proceeds. Rendering
 must be cancelled before discard; navigation cannot abandon the worker. A URL-owned Project
 session removes the prior blanket exemption for `/studio/*` navigation: changing Project identity
 or entering Studio/global-library context first flushes its semantic proposal, stays on failure or
@@ -281,13 +286,13 @@ borrow that same negotiated source track. Apply during local preview performs at
 replacement. Source changes are blocked while AI or recording owns the source. Facing-mode and
 track zoom controls appear only when the active camera exposes those capabilities.
 
-## Character and recipe ownership
+## Character and creative-library ownership
 
 Character Builder exclusively owns character create/edit, its resumable IndexedDB draft,
 reference upload, prompt optimization, image generation/edit/composition, durable save journal,
-and Shelf persistence. Its completion handoff is destination-specific: general Studio entry
-atomically preloads the Lucy Dock, while uploaded-video entry hydrates and selects the saved
-character in the originating unsubmitted Character Swap step. For an editable-prompt binding, a
+and creative-library persistence. Its completion handoff is destination-specific: general Studio
+entry selects the saved Character for the current session, while uploaded-video entry hydrates and
+selects it in the originating unsubmitted Character Swap step. For an editable-prompt binding, a
 saved character with a reference hydrates only that image and a prompt-only character copies its
 prompt. For a server-default binding such as Pruna, only image-backed choices are offered and the
 step prompt is always empty.
@@ -299,9 +304,12 @@ neutral gray for optimize, generate, edit, and composition routes, while the fin
 requires one centered character, even lighting, no scene/depth cues, and no unrelated props.
 Existing uploaded or immutable references are not rewritten.
 
-Prompt Workshop owns only Add, Replace, and Restyle structured object recipes. Recipe Shelf owns
-saved/recent/character metadata and atomic reuse. Neither owns Character generation or a media
-session.
+Prompt Workshop owns only Add, Replace, and Restyle structured object settings. The creative
+library owns saved/recent/character metadata and atomic reuse. Retained internal recipe-shaped
+records support compatibility and provider requests but have no Assets route, card, chooser, count,
+or Studio presentation as Recipes. Character, Outfit, and AI Settings surfaces use the retained
+data only through their own product vocabulary. Neither owner controls Character generation or a
+media session.
 
 Saved Character Wardrobe extends that repository with normalized version metadata, not another
 character store. Each variant points to one parent and one immutable result asset. A pure resolver
@@ -321,7 +329,7 @@ saved character hydrates the source into a new Builder create target rather than
 source ID.
 
 Wardrobe **Add Outfit** is an independent optional Pruna operation. Its garment may be an explicit
-upload/import or an existing image-backed saved outfit; prompt-only outfits remain editor recipes
+upload/import or an existing image-backed saved outfit; prompt-only outfits remain editor settings
 and are not treated as garment images. The server uploads the owner-scoped person and one garment,
 submits one pinned `p-image-try-on` prediction, polls bounded
 starting/processing states, downloads through the authenticated allowlisted delivery path,
@@ -335,14 +343,14 @@ still points directly to the original parent character as a sibling Wardrobe var
 default-off major-departure option also selects the image-only contract for an original source and
 adds explicit server-owned prompt policy allowing identity and other defining traits to change.
 
-Outfit Builder exclusively owns reusable VTO recipe creation, edit, copy, naming, prompt/image mode
+Outfit Builder exclusively owns reusable Outfit creation, edit, copy, naming, prompt/image mode
 exclusion, prompt enhancement, temporary reference files, and idempotent final-save upload. It
 uses the same validated JPEG/PNG/WebP picker and explicit public-HTTPS importer as the
-existing-video Character Swap/VTO reference fields. New outfits are prompt-or-image; migrated combined prompt/reference outfits remain usable and
-editable. Selector-originated Save creates and selects the recipe without acquiring media,
-loading Decart, or contacting a provider. Shelf edit updates the existing ID; Save a copy creates a
-new ID. Recipe Shelf remains the metadata repository and immutable reference storage remains the
-local broker's responsibility.
+existing-video Character Swap/VTO reference fields. New outfits are prompt-or-image; migrated
+combined prompt/reference outfits remain usable and editable. Selector-originated Save creates and
+selects the Outfit without acquiring media, loading Decart, or contacting a provider. Editing
+updates the existing ID; Save a copy creates a new ID. The creative library remains the metadata
+repository and immutable reference storage remains the local broker's responsibility.
 
 Character references follow these rules:
 
@@ -368,11 +376,10 @@ Recording composes a new stream from borrowed live tracks:
 The chosen track identities and take metadata are pinned at Start. Recording never owns or stops
 source tracks.
 
-For the primary record flow, a healthy normalized local artifact is adopted by the existing-video
-workflow after finalization and the editor reopens with Character Swap, Virtual Try On, and Voice.
-For Dock-started local and live AI recordings, the existing Latest Take review remains
-authoritative. Both paths borrow the same stage-owned recording lifecycle and preserve its
-cleanup ordering.
+For the primary record flow and live AI recordings, the existing Latest Take review remains
+authoritative. Recording from inside the existing-video upload flow instead adopts a healthy,
+normalized local artifact into that editor after finalization. Both paths borrow the same
+stage-owned recording lifecycle and preserve its cleanup ordering.
 
 Recording orchestration owns the `MediaRecorder` instances, chunks, optional audio sidecar,
 warning/cap timer, MediaBunny conversion, and finalization:
@@ -463,13 +470,13 @@ container/track/codec/duration/aspect/size inspection before visual-provider con
 runs at a time. An uploaded workflow can switch its single active choice between Character Swap
 and VTO before submission, and only that active operation is submitted. Browser and HTTP contracts
 use `character-swap` and `virtual-try-on`; Lucy model identifiers remain inside Decart/live and
-saved-recipe mappings.
+retained creative-configuration mappings.
 
 The workflow coordinator delegates reducer/state policy, source adoption, accepted-job lifetime,
 result finalization, Voice composition, and recipe hydration to feature-local owners. These are
 ownership boundaries, not parallel workflows: one coordinator still controls the selected source,
 one retained provider job, one pending visual, and ordered artifact cleanup. The panel separately
-owns only tool selection, focus, saved-recipe recovery presentation, and confirmation UI.
+owns only tool selection, focus, saved Character/Outfit recovery presentation, and confirmation UI.
 
 Before the potentially billable `PUT`, the browser creates one operation UUID in `submitting`
 state. A valid success response advances it to `accepted`; an aborted, malformed, or lost success
@@ -542,8 +549,8 @@ errors. The URL is neither persisted nor forwarded to a visual provider.
 
 The Project aggregate is implemented in domain, contracts, versioned local metadata, authoritative
 relational persistence, and feature-local browser adapters/controllers. Authenticated routes back
-`/studio/projects`, `/studio/projects/:projectId`, and the focused
-`/studio/projects/:projectId/workspace`, where the operator can list, create named or quick
+`/projects`, `/projects/:projectId`, and the focused `/projects/:projectId/workspace`, where the
+operator can list, create named or quick
 Projects, inspect, open, rename, archive, restore, attach one immutable source, checkpoint creative intent, adopt working
 media, reconnect visual processing, save exact outputs, and browse bounded history. `Project` is the
 owner-scoped durable workspace for one focused production effort; Saved Videos remain outputs and
@@ -565,6 +572,17 @@ One Project belongs to zero or one Campaign, and “No Campaign” is a virtual 
 synthetic row. Campaign archive leaves Projects unchanged and rejects new membership. Tombstone
 requires an archived Campaign with zero attached active or archived Projects and never deletes
 Project, revision, job, output, resource, or media data.
+
+Project asset membership is a separate organizational relation with kind `video`, `character`,
+`outfit`, or `voice`. Its unique owner/Project/kind/resource key makes attach idempotent. Detach
+removes only the membership and never deletes or changes the underlying resource, Project source,
+working media, output, revision, or retained Version. Archived Projects remain readable and reject
+membership mutations. Missing resources remain unavailable memberships until explicit detach.
+Server-owned Videos and Voices are owner-validated; relational creative records are validated when
+that authority is active. In local-file mode Character and Outfit IDs are opaque authenticated
+references resolved only from the current owner's namespaced IndexedDB and grant no server media
+access. Visible Videos are summary-resolved in one bounded query; Characters and Outfits use one
+owner-scoped browser snapshot and Voices use one existing saved-library query.
 
 Every Project starts with an immutable revision 1, including an empty named Project. Snapshot V2
 stores validated creative intent and durable IDs: source and working/presented media, exact applied
@@ -657,7 +675,7 @@ appending another revision. A different stale CAS preserves the proposal, fetche
 and waits for explicit reapply or discard; there is no collaborative merge. The controller
 publishes a narrow proposal/flush/retry/discard port to `StudioApp` and delegates fresh source and
 working-media Blobs to the existing recording-artifact owner. Active Project identity exists only
-in `/studio/projects/:projectId`; global-library URLs are explicit guarded exits. No dormant
+in `/projects/:projectId/workspace`; global-library URLs are explicit guarded exits. No dormant
 IndexedDB Project store is activated, so only the current tab retains an unsaved proposal and
 confirmed reload/crash may discard it. A feature-local Project-processing controller reads current
 authority on Project hydration, routes Character Swap/VTO Start through one app-owned command,
@@ -702,10 +720,14 @@ owner-bound `job-output` asset on that initiating revision and cannot change cur
 Neither path creates a Saved Video, Video Version, or `project_outputs` producer relation.
 
 `local` and `shadow` use one owner-namespaced Campaign/Project metadata file as authority. Schema
-version 6 explicitly migrates v1/v2/v3/v4/v5 metadata, preserves Campaigns/receipts, immutable
-source, working-media adoption, and processing records, and adds Project-output operation receipts
-plus a composite Saved Video/Project prepared journal. It is atomically replaced with a validated
-backup. Create, membership, source acceptance, working-media adoption, processing admission,
+version 7 explicitly migrates v1/v2/v3/v4/v5/v6 metadata, preserves Campaigns/receipts, immutable
+source, working-media adoption, and processing records, and adds Project asset memberships while
+retaining Project-output operation receipts plus a composite Saved Video/Project prepared journal.
+The deterministic v6→v7 loader backfills distinct supported memberships from Saved Video sources,
+working-media references, outputs, and resolvable Character, Outfit, and saved-Voice snapshot IDs;
+it neither fabricates IDs from labels nor exposes retained Recipe records. The metadata is
+atomically replaced with a validated backup. Create, Campaign membership, Project asset membership,
+source acceptance, working-media adoption, processing admission,
 result retention, and output save mutations publish a
 versioned prepared journal containing the next metadata and owner-scoped operation receipt;
 startup either observes the committed receipt or reconciles that journal before serving reads.
@@ -743,20 +765,25 @@ revision, and adds only the constraints/indexes needed for transactional admissi
 idempotent result retention. Additive migration `0020` adds the `output-save` revision source and
 one owner/operation-key Project-output receipt containing the exact original public result. It
 rewrites no Project, Saved Video, Version, or output row and is never applied automatically to
-production. Existing unlinked content remains unassigned. See
+production. Additive migration `0021` adds the Project asset-kind enum, non-owning membership table,
+same-owner Project foreign key, unique owner/Project/kind/resource constraint, and bounded list
+index. Owner-scoped application migration `project-asset-memberships-v1` deterministically derives
+legacy memberships on first membership access and records completion atomically; it does not
+rewrite source/output/history rows or create Recipe memberships. Existing unlinked content remains
+unassigned. See
 [ADR 0002](decisions/0002-durable-project-aggregate.md).
 
 ## Persistence
 
-| Store                       | Data                                                                                                                                                                                                                                                                | Lifetime and trust boundary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Recipe Shelf IndexedDB      | Environment-and-user-namespaced v7 prompt, character, outfit, wardrobe metadata, voice preferences, and opaque asset IDs                                                                                                                                            | The `idb` adapter stores owner-scoped logical records and indexes in strict transactions. Production alone migrates pre-separation browser keys and may initialize an empty remote library from that browser copy. Development treats local PostgreSQL as authoritative on startup, including when empty. Later changes synchronize through an owner-derived revision CAS; divergence pauses sync and preserves the browser copy. Never stores media bytes or credentials.                                                                                                                                                                                                                                                                                                                                                                                    |
-| Character Builder IndexedDB | Environment-and-user-scoped resumable draft and save journal                                                                                                                                                                                                        | Compare-and-swap autosave prevents duplicate save/preload after retry or reload. Drafts remain device-local, production alone retains access to the pre-separation database name, and development starts in a distinct database.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Local persistence           | Campaign/Project metadata and create/source/working-media/processing/output journals, Project source, adopted local renders, retained processing/results/outputs, saved-video aggregates/versions, thumbnails, references, saved voices, and safe processing traces | Default `local` authority under `LIGHTFRAME_DATA_DIR`; Campaign/Project and saved-video metadata use versioned owner namespaces, atomic publication, validated recovery, durable idempotent receipts, and owner checks. One shared owner lock and schema-v6 prepared envelope converge composite output metadata after interruption. `shadow` retains local Campaign/Project authority; configured relational traces remain best-effort side effects. Accepted source, adopted working media, retained Project-job results, and Project outputs are private assets protected by Project retention. Sessions, unadopted render candidates, and the browser retry coordinator are not metadata authority.                                                                                                                                                       |
-| PostgreSQL / Neon           | Users/credentials, sessions, Campaigns, Projects/revisions/relationships, videos/versions/receipts, voices, references, creative records, jobs, media lifecycle, and outbox                                                                                         | Standard `node-postgres` transport supports Docker PostgreSQL in authoritative `postgres` development and Neon in `shadow`/`neon` production. Neon URLs explicitly require TLS through `sslmode=require`, `verify-ca`, or `verify-full`. Transactions protect Campaign/Project CAS and membership, Project revision append, exact link replay, Project-job admission/result retention, composite Saved Video/Version/output/post-save revision receipt, byte-deletion claims, and creative revision replacement. Campaign/Project persistence is not authoritative in `shadow`.                                                                                                                                                                                                                                                                               |
-| Cloudflare R2               | Private video, thumbnail, and reference bytes selected through `AssetByteStore`                                                                                                                                                                                     | Opaque app keys, server-mediated range reads, SHA-256 verification, multipart abort, and database pending/ready/deleting/deleted states. Authoritative PostgreSQL/R2 and Neon/R2 Saved Video writes use owner-scoped one-hour staged rows and five-minute exact-part presigned URLs; only the browser-to-R2 part PUT bypasses the API. The API verifies object metadata, bounded bytes, checksum, and media structure before registration and attachment. Deletion claims the persisted provider/key identity and interrupted cleanup remains retryable. Provider, account, bucket, or prefix changes require a reviewed migration. Unsaved references remain subject to relationship-safe discard and 24-hour inactive-orphan cleanup. Credentials remain server-only; bucket, key, and provider multipart scope appear only inside short-lived signed URLs. |
-| Session memory              | Auth snapshot, URL-owned Project semantic proposal/base token, edit history/candidate, streams, tokens, files, direct-import outfit recents, device IDs, takes, and sidecars                                                                                        | JWT remains only in the HTTP-only cookie. The bounded Project proposal contains validated creative/live/edit values but no bytes, mutable records, or provider state; it is cleared after server save, explicit discard, Project exit, logout, or tab close and is never browser authority. Render candidates remain creator-owned until explicit adoption. Other state is cleaned on auth change, replacement, release/discard, unmount, or tab close as applicable.                                                                                                                                                                                                                                                                                                                                                                                         |
-| Video-job temp root         | Streamed input/reference and inspected provider output                                                                                                                                                                                                              | Process-temporary. A Project record/link exists before submission in every mode. Jobs with a durable provider identity can resume status/retrieval after restart without resubmission; an unconfirmed submission becomes ambiguous. Valid current or stale output is moved into the configured durable byte store before this temporary owner releases it. The fixed accepted-at-plus-60-minute deadline remains authoritative.                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Store                       | Data                                                                                                                                                                                                                                                                                                | Lifetime and trust boundary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Creative library IndexedDB  | Environment-and-user-namespaced v7 prompt compatibility data, Character, Outfit, Wardrobe metadata, voice preferences, and opaque asset IDs                                                                                                                                                         | The `idb` adapter stores owner-scoped logical records and indexes in strict transactions. Production alone migrates pre-separation browser keys and may initialize an empty remote library from that browser copy. Development treats local PostgreSQL as authoritative on startup, including when empty. Later changes synchronize through an owner-derived revision CAS; divergence pauses sync and preserves the browser copy. Never stores media bytes or credentials. Retained Recipe-shaped records are compatibility data and are not presented as assets.                                                                                                                                                                                                                                                                                             |
+| Character Builder IndexedDB | Environment-and-user-scoped resumable draft and save journal                                                                                                                                                                                                                                        | Compare-and-swap autosave prevents duplicate save/preload after retry or reload. Drafts remain device-local, production alone retains access to the pre-separation database name, and development starts in a distinct database.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Local persistence           | Campaign/Project metadata and create/source/working-media/processing/output journals, non-owning Project memberships, Project source, adopted local renders, retained processing/results/outputs, saved-video aggregates/versions, thumbnails, references, saved voices, and safe processing traces | Default `local` authority under `LIGHTFRAME_DATA_DIR`; Campaign/Project and saved-video metadata use versioned owner namespaces, atomic publication, validated recovery, durable idempotent receipts, and owner checks. One shared owner lock and schema-v7 prepared envelope converge composite output metadata after interruption. Membership rows have no media-retention authority and cascade only with Project tombstoning. `shadow` retains local Campaign/Project authority; configured relational traces remain best-effort side effects. Accepted source, adopted working media, retained Project-job results, and Project outputs are private assets protected by Project retention. Sessions, unadopted render candidates, and the browser retry coordinator are not metadata authority.                                                          |
+| PostgreSQL / Neon           | Users/credentials, sessions, Campaigns, Projects/revisions/relationships and non-owning asset memberships, videos/versions/receipts, voices, references, creative records, jobs, media lifecycle, and outbox                                                                                        | Standard `node-postgres` transport supports Docker PostgreSQL in authoritative `postgres` development and Neon in `shadow`/`neon` production. Neon URLs explicitly require TLS through `sslmode=require`, `verify-ca`, or `verify-full`. Transactions protect Campaign/Project CAS and membership, Project revision append, exact link replay, Project-job admission/result retention, composite Saved Video/Version/output/post-save revision receipt, byte-deletion claims, and creative revision replacement. Campaign/Project persistence is not authoritative in `shadow`.                                                                                                                                                                                                                                                                               |
+| Cloudflare R2               | Private video, thumbnail, and reference bytes selected through `AssetByteStore`                                                                                                                                                                                                                     | Opaque app keys, server-mediated range reads, SHA-256 verification, multipart abort, and database pending/ready/deleting/deleted states. Authoritative PostgreSQL/R2 and Neon/R2 Saved Video writes use owner-scoped one-hour staged rows and five-minute exact-part presigned URLs; only the browser-to-R2 part PUT bypasses the API. The API verifies object metadata, bounded bytes, checksum, and media structure before registration and attachment. Deletion claims the persisted provider/key identity and interrupted cleanup remains retryable. Provider, account, bucket, or prefix changes require a reviewed migration. Unsaved references remain subject to relationship-safe discard and 24-hour inactive-orphan cleanup. Credentials remain server-only; bucket, key, and provider multipart scope appear only inside short-lived signed URLs. |
+| Session memory              | Auth snapshot, URL-owned Project semantic proposal/base token, edit history/candidate, streams, tokens, files, direct-import outfit recents, device IDs, takes, and sidecars                                                                                                                        | JWT remains only in the HTTP-only cookie. The bounded Project proposal contains validated creative/live/edit values but no bytes, mutable records, or provider state; it is cleared after server save, explicit discard, Project exit, logout, or tab close and is never browser authority. Render candidates remain creator-owned until explicit adoption. Other state is cleaned on auth change, replacement, release/discard, unmount, or tab close as applicable.                                                                                                                                                                                                                                                                                                                                                                                         |
+| Video-job temp root         | Streamed input/reference and inspected provider output                                                                                                                                                                                                                                              | Process-temporary. A Project record/link exists before submission in every mode. Jobs with a durable provider identity can resume status/retrieval after restart without resubmission; an unconfirmed submission becomes ambiguous. Valid current or stale output is moved into the configured durable byte store before this temporary owner releases it. The fixed accepted-at-plus-60-minute deadline remains authoritative.                                                                                                                                                                                                                                                                                                                                                                                                                               |
 
 Browser storage is untrusted, schema-migrated, and user-namespaced. Opaque IDs, provenance, and
 timestamps are preserved. The filesystem store uses atomic publication and never exposes internal paths,
@@ -851,6 +878,7 @@ provider path and never causes provider fallback.
 | Local status                | `GET /api/health`, authenticated `GET /api/capabilities`                                                                                                                                                                                                                                                                                                                                                          |
 | Campaigns                   | `GET/POST /api/campaigns`, `GET/PATCH /api/campaigns/:campaignId`, and `POST` archive/restore/tombstone subroutes; create requires `Idempotency-Key`, mutations use Campaign-version CAS, lists are bounded, and tombstone is archived-empty only                                                                                                                                                                 |
 | Projects                    | `GET/POST /api/projects`, `GET/PATCH /api/projects/:projectId`, `POST /api/projects/:projectId/revisions`, archive/restore subroutes, and `POST /api/projects/:projectId/campaign`; create requires `Idempotency-Key`, semantic checkpoints use Project/revision CAS, metadata mutations use Project-version CAS, and lists support bounded lifecycle plus Campaign/No Campaign filtering                         |
+| Project asset membership    | Cursor-bounded `GET /api/projects/:projectId/assets`, idempotent `POST /api/projects/:projectId/assets`, and idempotent `DELETE /api/projects/:projectId/assets/:membershipId`; ownership is server-derived, archived Projects reject mutation, visible Saved Videos resolve in one bounded summary read, and detach never deletes an underlying resource or retained relation                                    |
 | Project media               | `POST/GET /api/projects/:projectId/source`, `POST /source/reuse`, `GET /source/content`, `POST/GET /working-media`, `POST /working-media/reuse`, and exact revision content; uploads are bounded and inspected, replays are idempotent, reuse is exact/same-owner, and every content response is owner-checked                                                                                                    |
 | Project history and output  | `POST /api/projects/:projectId/outputs` performs the composite output save; cursor-bounded metadata-only `GET /history` and `/outputs`, exact output metadata at `/outputs/:videoVersionId`, and owner-checked range/HEAD/download content at `/outputs/:videoVersionId/content` keep producing/reference revisions distinct and authorize tombstoned Saved Videos only through exact retaining Project relations |
 | Project processing          | `POST /api/projects/:projectId/processing/submit`, `GET` current/history and retained result content, and `POST` reconcile/retry/cancel; provider-contact routes require trusted Origin plus video intent, admission pre-links the exact revision, history/content are owner-checked, retry is explicit, and cancellation reports only verified support                                                           |

@@ -28,11 +28,11 @@ export const ModelRecipeFields = ({
     <section aria-labelledby={`${mode}-recipe-fields-heading`} css={recipeFieldsStyles(theme)}>
       <header css={recipeFieldsHeadingStyles(theme)}>
         <h3 id={`${mode}-recipe-fields-heading`}>
-          {mode === 'lucy-latest' ? 'Character recipe' : 'Try-On recipe'}
+          {mode === 'lucy-latest' ? 'Character settings' : 'Try-On settings'}
         </h3>
         <p>
           {session.applied
-            ? 'Refine the working draft, then apply the complete recipe when ready.'
+            ? 'Refine the working draft, then apply the complete settings when ready.'
             : 'A direction, reference image, or both can start the session.'}
         </p>
       </header>
@@ -87,8 +87,8 @@ export const ModelRecipeFields = ({
       {session.pendingChanges ? (
         <StatusNotice tone="warning" title="Changes are pending" role="status">
           {session.applied?.referenceImage && !session.draft.referenceImage
-            ? 'Reference removal is pending. Apply sends the complete recipe and explicitly clears the live image.'
-            : 'The working draft differs from the live recipe. Nothing changes until Apply.'}
+            ? 'Reference removal is pending. Apply sends the complete settings and explicitly clears the live image.'
+            : 'The working draft differs from the live settings. Nothing changes until Apply.'}
         </StatusNotice>
       ) : null}
     </section>

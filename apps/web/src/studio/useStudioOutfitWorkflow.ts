@@ -1,14 +1,20 @@
 import { useCallback, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { savedPromptToRecipeSelection } from '../features/creative-assets/recipeSelection';
 import type { RecentPrompt, SavedPrompt } from '../features/creative-assets/types';
 import type { ActiveOverlay } from './useStudioOverlayController';
+import { attachProjectAsset } from '../features/projects/projectsApi';
+import { projectAssetQueryKeys } from '../features/projects/useProjectAssetsController';
 
 export type OutfitBuilderLaunch = Readonly<{
   outfit?: SavedPrompt;
   saveAsCopy: boolean;
   saveAndSelect: boolean;
-  destination: 'selector' | 'shelf' | 'library';
-}>;
+}> &
+  (
+    | Readonly<{ destination: 'selector' | 'library' }>
+    | Readonly<{ destination: 'project'; projectId: string }>
+  );
 
 interface UseStudioOutfitWorkflowOptions {
   readonly blockedReason: string | undefined;
@@ -25,6 +31,7 @@ export const useStudioOutfitWorkflow = ({
   onOpenLibrary,
   applySavedOutfit,
 }: UseStudioOutfitWorkflowOptions) => {
+  const queryClient = useQueryClient();
   const [launch, setLaunch] = useState<OutfitBuilderLaunch>({
     saveAsCopy: false,
     saveAndSelect: true,
@@ -39,7 +46,7 @@ export const useStudioOutfitWorkflow = ({
   }, []);
 
   const openNew = useCallback(
-    (saveAndSelect: boolean, destination: OutfitBuilderLaunch['destination']) => {
+    (saveAndSelect: boolean, destination: 'selector' | 'library') => {
       if (blockedReason) return;
       setLaunch({ saveAsCopy: false, saveAndSelect, destination });
       updateDirty(false);
@@ -49,7 +56,7 @@ export const useStudioOutfitWorkflow = ({
   );
 
   const openEditor = useCallback(
-    (outfit: SavedPrompt, saveAsCopy: boolean, destination: OutfitBuilderLaunch['destination']) => {
+    (outfit: SavedPrompt, saveAsCopy: boolean, destination: 'selector' | 'library') => {
       if (blockedReason) return;
       setLaunch({ outfit, saveAsCopy, saveAndSelect: false, destination });
       updateDirty(false);
@@ -58,8 +65,23 @@ export const useStudioOutfitWorkflow = ({
     [blockedReason, openOverlay, updateDirty],
   );
 
+  const openNewForProject = useCallback(
+    (projectId: string) => {
+      if (blockedReason) return;
+      setLaunch({
+        saveAsCopy: false,
+        saveAndSelect: false,
+        destination: 'project',
+        projectId,
+      });
+      updateDirty(false);
+      openOverlay('outfit-builder');
+    },
+    [blockedReason, openOverlay, updateDirty],
+  );
+
   const openCopy = useCallback(
-    (outfit: SavedPrompt | RecentPrompt, destination: OutfitBuilderLaunch['destination']) => {
+    (outfit: SavedPrompt | RecentPrompt, destination: 'selector' | 'library') => {
       if ('title' in outfit) {
         openEditor(outfit, true, destination);
         return;
@@ -100,7 +122,11 @@ export const useStudioOutfitWorkflow = ({
       onOpenLibrary();
       return;
     }
-    openOverlay(launch.destination === 'shelf' ? 'recipe-shelf' : 'outfit-selector');
+    if (launch.destination === 'project') {
+      closeOverlay();
+      return;
+    }
+    openOverlay('outfit-selector');
   }, [closeOverlay, launch.destination, onOpenLibrary, openOverlay, updateDirty]);
 
   const selectSaved = useCallback(
@@ -112,7 +138,19 @@ export const useStudioOutfitWorkflow = ({
   );
 
   const completeSave = useCallback(
-    (savedOutfit: SavedPrompt) => {
+    async (savedOutfit: SavedPrompt) => {
+      if (launch.destination === 'project') {
+        await attachProjectAsset(launch.projectId, {
+          kind: 'outfit',
+          resourceId: savedOutfit.id,
+        });
+        await queryClient.invalidateQueries({
+          queryKey: projectAssetQueryKeys.project(launch.projectId),
+        });
+        updateDirty(false);
+        closeOverlay();
+        return;
+      }
       if (launch.saveAndSelect) {
         selectSaved(savedOutfit);
         return;
@@ -123,17 +161,9 @@ export const useStudioOutfitWorkflow = ({
         onOpenLibrary();
         return;
       }
-      openOverlay(launch.destination === 'shelf' ? 'recipe-shelf' : 'outfit-selector');
+      openOverlay('outfit-selector');
     },
-    [
-      closeOverlay,
-      launch.destination,
-      launch.saveAndSelect,
-      onOpenLibrary,
-      openOverlay,
-      selectSaved,
-      updateDirty,
-    ],
+    [closeOverlay, launch, onOpenLibrary, openOverlay, queryClient, selectSaved, updateDirty],
   );
 
   return {
@@ -141,6 +171,7 @@ export const useStudioOutfitWorkflow = ({
     dirty,
     updateDirty,
     openNew,
+    openNewForProject,
     openEditor,
     openCopy,
     close,
