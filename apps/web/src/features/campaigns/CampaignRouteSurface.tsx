@@ -3,6 +3,7 @@ import type { CampaignContract, ProjectContract } from '@studio/contracts';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { APP_PATHS, campaignIdFromPath, campaignPath, projectPath } from '../../app/paths';
+import { useRouteBack } from '../../app/useRouteBack';
 import { Button, OverlayPanel, StatusNotice } from '../../ui';
 import {
   detailHeaderStyles,
@@ -24,6 +25,7 @@ import {
 } from './CampaignRouteSurface.styles';
 import {
   CampaignFormDialog,
+  DeleteCampaignDialog,
   MoveProjectDialog,
   safeCampaignError as safeError,
 } from './CampaignDialogs';
@@ -41,6 +43,10 @@ const CampaignListSection = ({ lifecycle }: { readonly lifecycle: 'active' | 'ar
   const theme = useTheme();
   const navigate = useNavigate();
   const query = useCampaignList(lifecycle);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const [deleteCampaign, setDeleteCampaign] = useState<CampaignContract | null>(null);
+  const [announcement, setAnnouncement] = useState<string | null>(null);
   const campaigns = useMemo(
     () => query.data?.pages.flatMap((page) => page.campaigns) ?? [],
     [query.data],
@@ -49,7 +55,9 @@ const CampaignListSection = ({ lifecycle }: { readonly lifecycle: 'active' | 'ar
   return (
     <section css={listSectionStyles(theme)} aria-labelledby={`${lifecycle}-campaigns-heading`}>
       <header>
-        <h3 id={`${lifecycle}-campaigns-heading`}>{archived ? 'Archived' : 'Active Campaigns'}</h3>
+        <h3 ref={headingRef} tabIndex={-1} id={`${lifecycle}-campaigns-heading`}>
+          {archived ? 'Archived' : 'Active Campaigns'}
+        </h3>
         <span>{campaigns.length} loaded</span>
       </header>
       {query.isPending ? <p role="status">Loading {lifecycle} Campaigns…</p> : null}
@@ -98,6 +106,18 @@ const CampaignListSection = ({ lifecycle }: { readonly lifecycle: 'active' | 'ar
                   <span css={statusPillStyles(theme, archived)}>
                     {archived ? 'Archived' : 'Active'}
                   </span>
+                  {archived ? (
+                    <Button
+                      size="small"
+                      variant="danger"
+                      onClick={(event) => {
+                        returnFocusRef.current = event.currentTarget;
+                        setDeleteCampaign(campaign);
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  ) : null}
                 </div>
               </article>
             </li>
@@ -112,6 +132,21 @@ const CampaignListSection = ({ lifecycle }: { readonly lifecycle: 'active' | 'ar
         >
           Load more {lifecycle} Campaigns
         </Button>
+      ) : null}
+      <div role="status" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
+      {deleteCampaign ? (
+        <DeleteCampaignDialog
+          campaign={deleteCampaign}
+          returnFocusRef={returnFocusRef}
+          onClose={() => setDeleteCampaign(null)}
+          onDeleted={(name) => {
+            setAnnouncement(`${name} deleted.`);
+            setDeleteCampaign(null);
+            window.requestAnimationFrame(() => headingRef.current?.focus());
+          }}
+        />
       ) : null}
     </section>
   );
@@ -260,6 +295,7 @@ type CampaignDialog = 'edit' | 'archive' | 'restore' | 'tombstone';
 const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const goBack = useRouteBack();
   const location = useLocation();
   const query = useCampaignDetail(campaignId);
   const campaigns = useCampaignsController();
@@ -288,7 +324,7 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
       <div css={workspaceInnerStyles(theme)}>
         <StatusNotice role="alert" tone="danger" title="Campaign unavailable">
           <p>{safeError(query.error)}</p>
-          <Button variant="quiet" onClick={() => void navigate(APP_PATHS.campaigns)}>
+          <Button variant="quiet" onClick={() => goBack(APP_PATHS.campaigns)}>
             Back to Campaigns
           </Button>
         </StatusNotice>
@@ -339,11 +375,7 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
   return (
     <div css={workspaceInnerStyles(theme)}>
       <header css={detailHeaderStyles(theme)}>
-        <Button
-          data-detail-breadcrumb
-          variant="quiet"
-          onClick={() => void navigate(APP_PATHS.campaigns)}
-        >
+        <Button data-detail-breadcrumb variant="quiet" onClick={() => goBack(APP_PATHS.campaigns)}>
           ← All Campaigns
         </Button>
         <div data-detail-identity>

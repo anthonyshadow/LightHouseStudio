@@ -85,6 +85,14 @@ export const useStudioSavedVideoController = ({
     recording.original.parentArtifactId === loadedSource.artifactId
       ? loadedSource
       : null;
+  const presentedHasUnsavedChanges = Boolean(
+    recording.presented &&
+    !(
+      saveController.state.status === 'saved' &&
+      saveController.state.artifactId === recording.presented.id
+    ) &&
+    recording.presented.id !== activeLoadedSource?.artifactId,
+  );
   const openVideoAdjust = useCallback(() => {
     const sourceArtifact = comparedExistingVideoArtifact ?? recording.presented;
     const metadata = existingVideo.currentMetadata;
@@ -418,6 +426,7 @@ export const useStudioSavedVideoController = ({
 
   return {
     activeLoadedSource,
+    presentedHasUnsavedChanges,
     comparedExistingVideoArtifact,
     presentedCharacter,
     pendingSave,

@@ -2,10 +2,11 @@ import { useTheme } from '@emotion/react';
 import type { CampaignContract, ProjectContract } from '@studio/contracts';
 import { useState, type FormEvent, type RefObject } from 'react';
 import { ApiClientError } from '../../adapters/api-client/apiClient';
-import { Button, OverlayPanel, TextAreaField, TextField } from '../../ui';
+import { Button, OverlayPanel, StatusNotice, TextAreaField, TextField } from '../../ui';
 import { dialogActionsStyles } from '../projects/ProjectRouteSurface.styles';
 import { useProjectsController } from '../projects/useProjectsController';
 import { ProjectCampaignPicker, projectCampaignId } from './ProjectCampaignPicker';
+import { CampaignApiConflictError } from './campaignsApi';
 import { useCampaignsController } from './useCampaignsController';
 
 export const safeCampaignError = (error: unknown): string =>
@@ -174,6 +175,71 @@ export const MoveProjectDialog = ({
           setTargetLabel(label);
         }}
       />
+    </OverlayPanel>
+  );
+};
+
+export const DeleteCampaignDialog = ({
+  campaign,
+  returnFocusRef,
+  onClose,
+  onDeleted,
+}: {
+  readonly campaign: CampaignContract;
+  readonly returnFocusRef: RefObject<HTMLElement | null>;
+  readonly onClose: () => void;
+  readonly onDeleted: (name: string) => void;
+}) => {
+  const theme = useTheme();
+  const controller = useCampaignsController();
+  const [error, setError] = useState<string | null>(null);
+  const busy = controller.tombstoneMutation.isPending;
+
+  const remove = async () => {
+    setError(null);
+    try {
+      await controller.tombstoneMutation.mutateAsync({
+        campaignId: campaign.id,
+        expectedVersion: campaign.version,
+      });
+      onDeleted(campaign.name);
+    } catch (caught) {
+      setError(
+        caught instanceof CampaignApiConflictError && caught.conflict.kind === 'campaign-not-empty'
+          ? 'Move or detach every active and archived Project before deleting this Campaign.'
+          : safeCampaignError(caught),
+      );
+    }
+  };
+
+  return (
+    <OverlayPanel
+      open
+      onClose={onClose}
+      title="Delete Campaign"
+      description="Only an archived empty Campaign can be deleted. No Project or content bytes are erased."
+      placement="bottom"
+      size="standard"
+      closeDisabled={busy}
+      closeOnBackdrop={false}
+      returnFocusRef={returnFocusRef}
+      footer={
+        <div css={dialogActionsStyles(theme)}>
+          <Button variant="quiet" disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="danger" busy={busy} onClick={() => void remove()}>
+            Confirm Delete Campaign
+          </Button>
+        </div>
+      }
+    >
+      <p>Delete “{campaign.name}” as an organizer? This does not erase Project or content bytes.</p>
+      {error ? (
+        <StatusNotice role="alert" tone="warning" title="Campaign not deleted">
+          {error}
+        </StatusNotice>
+      ) : null}
     </OverlayPanel>
   );
 };

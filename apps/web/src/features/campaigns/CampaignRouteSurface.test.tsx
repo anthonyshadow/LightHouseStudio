@@ -87,13 +87,14 @@ const currentProject = (
   },
 });
 
-const renderCampaigns = (path = '/campaign') => {
+const renderCampaigns = (path = '/campaign', previousPath?: string) => {
   const router = createMemoryRouter(
     [
       { path: '/campaign/*', element: <CampaignRouteSurface /> },
       { path: '/projects/:projectId', element: <div>Project route</div> },
+      { path: '/dashboard', element: <div>Dashboard previous</div> },
     ],
-    { initialEntries: [path] },
+    { initialEntries: previousPath ? [previousPath, path] : [path] },
   );
   const view = render(
     <StudioDesignProvider>
@@ -114,6 +115,7 @@ const installEmptyProjects = () => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  window.history.replaceState({ idx: 0 }, '');
 });
 
 describe('Campaign route surface', () => {
@@ -226,6 +228,40 @@ describe('Campaign route surface', () => {
     expect(screen.getByText('No brief yet.')).toBeVisible();
   });
 
+  it('deletes the selected archived Campaign directly from its list', async () => {
+    let archived = [
+      campaign({ name: 'Archived organizer', status: 'archived', version: 2, archivedAt: now }),
+    ];
+    let requestBody: unknown;
+    mockApiServer.use(
+      http.get('*/api/campaigns', ({ request }) =>
+        HttpResponse.json({
+          campaigns:
+            new URL(request.url).searchParams.get('lifecycle') === 'archived' ? archived : [],
+          nextCursor: null,
+        }),
+      ),
+      http.post(`*/api/campaigns/${campaignId}/tombstone`, async ({ request }) => {
+        requestBody = await request.json();
+        archived = [];
+        return HttpResponse.json(
+          campaign({ status: 'deleted', version: 3, archivedAt: now, deletedAt: now }),
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderCampaigns();
+
+    const archivedList = await screen.findByRole('list', { name: 'Archived Campaigns' });
+    await user.click(within(archivedList).getByRole('button', { name: 'Delete' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Campaign' });
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm Delete Campaign' }));
+
+    expect(requestBody).toEqual({ expectedVersion: 2, confirmation: 'tombstone' });
+    expect(await screen.findByText('Archived organizer deleted.')).toBeVisible();
+    expect(await screen.findByText('No archived Campaigns')).toBeVisible();
+  });
+
   it('retries an unavailable Campaign list and lets creation be cancelled safely', async () => {
     let activeAttempts = 0;
     mockApiServer.use(
@@ -326,6 +362,20 @@ describe('Campaign route surface', () => {
 
     await user.click(screen.getByRole('button', { name: '← All Campaigns' }));
     expect(await screen.findByRole('heading', { name: 'Campaigns' })).toBeVisible();
+  });
+
+  it('uses the actual prior route for Back instead of the Campaign list', async () => {
+    mockApiServer.use(
+      http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(campaign())),
+    );
+    installEmptyProjects();
+    window.history.replaceState({ idx: 1 }, '');
+    const { router } = renderCampaigns(`/campaign/${campaignId}`, '/dashboard');
+
+    await userEvent.click(await screen.findByRole('button', { name: '← All Campaigns' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard'));
+    expect(screen.getByText('Dashboard previous')).toBeVisible();
   });
 
   it('shows a recoverable New Project error without exposing an upstream body', async () => {

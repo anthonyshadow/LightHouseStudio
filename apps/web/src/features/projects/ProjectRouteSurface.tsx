@@ -19,10 +19,12 @@ import {
   projectPath,
   projectWorkspacePath,
 } from '../../app/paths';
+import { useRouteBack } from '../../app/useRouteBack';
 import { Button, StatusNotice } from '../../ui';
 import { useCampaignDetail } from '../campaigns/useCampaignsController';
 import {
   NewProjectDialog,
+  DeleteProjectDialog,
   ProjectCampaignDialog,
   ProjectLifecycleDialog,
   RenameProjectDialog,
@@ -82,6 +84,7 @@ interface ProjectListSectionProps {
     project: ProjectContract,
     trigger: HTMLButtonElement,
   ) => void;
+  readonly onDelete: (project: ProjectContract, trigger: HTMLButtonElement) => void;
 }
 
 const ProjectListSection = ({
@@ -91,6 +94,7 @@ const ProjectListSection = ({
   onOpen,
   onRename,
   onLifecycle,
+  onDelete,
 }: ProjectListSectionProps) => {
   const theme = useTheme();
   const query = useProjectList(lifecycle, campaignId);
@@ -171,6 +175,15 @@ const ProjectListSection = ({
                   >
                     {archived ? 'Restore' : 'Archive'}
                   </Button>
+                  {archived ? (
+                    <Button
+                      size="small"
+                      variant="danger"
+                      onClick={(event) => onDelete(project, event.currentTarget)}
+                    >
+                      Delete
+                    </Button>
+                  ) : null}
                 </div>
               </article>
             </li>
@@ -202,6 +215,7 @@ const ProjectsWorkspace = () => {
     readonly action: LifecycleAction;
     readonly project: ProjectContract;
   } | null>(null);
+  const [deleteProject, setDeleteProject] = useState<ProjectContract | null>(null);
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
   const [activeGroup, setActiveGroup] = useState<'all' | 'none'>('all');
@@ -230,6 +244,7 @@ const ProjectsWorkspace = () => {
   const closeDialog = () => {
     setRenameProject(null);
     setLifecycleDialog(null);
+    setDeleteProject(null);
   };
   const closeCreateDialog = () => {
     setCreating(false);
@@ -251,6 +266,10 @@ const ProjectsWorkspace = () => {
   ) => {
     dialogReturnRef.current = trigger;
     setLifecycleDialog({ action, project });
+  };
+  const openDeleteDialog = (project: ProjectContract, trigger: HTMLButtonElement) => {
+    dialogReturnRef.current = trigger;
+    setDeleteProject(project);
   };
 
   return (
@@ -319,12 +338,14 @@ const ProjectsWorkspace = () => {
           onOpen={openProject}
           onRename={openRenameDialog}
           onLifecycle={openLifecycleDialog}
+          onDelete={openDeleteDialog}
         />
         <ProjectListSection
           lifecycle="archived"
           onOpen={openProject}
           onRename={openRenameDialog}
           onLifecycle={openLifecycleDialog}
+          onDelete={openDeleteDialog}
         />
       </div>
 
@@ -356,6 +377,18 @@ const ProjectsWorkspace = () => {
             setAnnouncement(
               `${current.project.title} ${action === 'archive' ? 'archived' : 'restored'}.`,
             );
+            closeDialog();
+            window.requestAnimationFrame(() => headingRef.current?.focus());
+          }}
+        />
+      ) : null}
+      {deleteProject ? (
+        <DeleteProjectDialog
+          project={deleteProject}
+          returnFocusRef={dialogReturnRef}
+          onClose={closeDialog}
+          onDeleted={(title) => {
+            setAnnouncement(`${title} deleted.`);
             closeDialog();
             window.requestAnimationFrame(() => headingRef.current?.focus());
           }}
@@ -664,6 +697,7 @@ const ProjectDetail = ({
 }: { readonly projectId: string } & ProjectRouteSurfaceProps) => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const goBack = useRouteBack();
   const session = useProjectSession(projectId);
   const campaign = useCampaignDetail(session.current?.project.campaignId ?? null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -673,6 +707,7 @@ const ProjectDetail = ({
     readonly action: LifecycleAction;
     readonly project: ProjectContract;
   } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectContract | null>(null);
   const [campaignDialog, setCampaignDialog] = useState(false);
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [sourceActivity, setSourceActivity] = useState<ProjectSourceActivity | null>(null);
@@ -708,7 +743,7 @@ const ProjectDetail = ({
             {session.message ?? 'Projects could not be loaded. Check the local API and try again.'}
           </p>
           <div css={dialogActionsStyles(theme)}>
-            <Button variant="quiet" onClick={() => void navigate(APP_PATHS.projects)}>
+            <Button variant="quiet" onClick={() => goBack(APP_PATHS.projects)}>
               Back to Projects
             </Button>
             <Button variant="primary" onClick={() => void session.retry()}>
@@ -727,6 +762,7 @@ const ProjectDetail = ({
   const closeDialog = () => {
     setRenameTarget(null);
     setLifecycleDialog(null);
+    setDeleteTarget(null);
     setCampaignDialog(false);
   };
 
@@ -737,7 +773,7 @@ const ProjectDetail = ({
           data-detail-breadcrumb
           variant="quiet"
           onClick={() =>
-            void navigate(
+            goBack(
               workspaceMode
                 ? projectPath(project.id)
                 : project.campaignId === null
@@ -819,6 +855,17 @@ const ProjectDetail = ({
                 >
                   {archived ? 'Restore' : 'Archive'}
                 </Button>
+                {archived ? (
+                  <Button
+                    variant="danger"
+                    onClick={(event) => {
+                      dialogReturnRef.current = event.currentTarget;
+                      setDeleteTarget(project);
+                    }}
+                  >
+                    Delete Project
+                  </Button>
+                ) : null}
               </>
             ) : null}
           </div>
@@ -940,6 +987,19 @@ const ProjectDetail = ({
             closeDialog();
             window.requestAnimationFrame(() => headingRef.current?.focus());
           }}
+        />
+      ) : null}
+      {!workspaceMode && deleteTarget ? (
+        <DeleteProjectDialog
+          project={deleteTarget}
+          returnFocusRef={dialogReturnRef}
+          onClose={closeDialog}
+          onDeleted={() =>
+            void navigate(
+              project.campaignId === null ? APP_PATHS.projects : campaignPath(project.campaignId),
+              { replace: true },
+            )
+          }
         />
       ) : null}
     </div>

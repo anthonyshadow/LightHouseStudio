@@ -302,6 +302,72 @@ export const ProjectLifecycleDialog = ({
   );
 };
 
+export const DeleteProjectDialog = ({
+  project,
+  returnFocusRef,
+  onClose,
+  onDeleted,
+}: {
+  readonly project: ProjectContract;
+  readonly returnFocusRef: RefObject<HTMLElement | null>;
+  readonly onClose: () => void;
+  readonly onDeleted: (title: string) => void;
+}) => {
+  const theme = useTheme();
+  const controller = useProjectsController();
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const busy = controller.tombstoneMutation.isPending;
+
+  const remove = async () => {
+    setError(null);
+    try {
+      await controller.tombstoneMutation.mutateAsync({
+        projectId: project.id,
+        expectedVersion: project.version,
+      });
+      onDeleted(project.title);
+    } catch (caught) {
+      setError(safeProjectError(caught));
+    }
+  };
+
+  return (
+    <OverlayPanel
+      open
+      onClose={onClose}
+      title="Delete Project"
+      description="The Project disappears from the workspace, while retained lineage continues protecting referenced media."
+      placement="bottom"
+      size="standard"
+      closeDisabled={busy}
+      closeOnBackdrop={false}
+      initialFocusRef={cancelRef}
+      returnFocusRef={returnFocusRef}
+      footer={
+        <div css={dialogActionsStyles(theme)}>
+          <Button ref={cancelRef} variant="quiet" disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="danger" busy={busy} onClick={() => void remove()}>
+            Confirm Delete Project
+          </Button>
+        </div>
+      }
+    >
+      <p>
+        Delete “{project.title}”? This removes only this archived Project from visible Project and
+        Campaign lists. It does not claim physical erasure of retained history or media.
+      </p>
+      {error ? (
+        <StatusNotice role="alert" tone="warning" title="Project not deleted">
+          {error}
+        </StatusNotice>
+      ) : null}
+    </OverlayPanel>
+  );
+};
+
 export const ProjectCampaignDialog = ({
   project,
   returnFocusRef,

@@ -179,7 +179,11 @@ const acceptedSourceResponse = (): ProjectSourceResponse => ({
   },
 });
 
-const renderProjects = (path = '/projects', props: ProjectRouteSurfaceProps = {}) => {
+const renderProjects = (
+  path = '/projects',
+  props: ProjectRouteSurfaceProps = {},
+  previousPath?: string,
+) => {
   mockApiServer.use(
     http.get('*/api/projects/:projectId/history', () =>
       HttpResponse.json({ revisions: [], nextCursor: null }),
@@ -196,9 +200,10 @@ const renderProjects = (path = '/projects', props: ProjectRouteSurfaceProps = {}
     [
       { path: '/projects/*', element: <ProjectRouteSurface {...props} /> },
       { path: '/campaign/:campaignId', element: <div>Campaign return</div> },
+      { path: '/dashboard', element: <div>Dashboard previous</div> },
       { path: '/studio/:videoId', element: <div>Studio direct</div> },
     ],
-    { initialEntries: [path] },
+    { initialEntries: previousPath ? [previousPath, path] : [path] },
   );
   const view = render(
     <StudioDesignProvider>
@@ -228,6 +233,7 @@ const installProjectLists = (
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  window.history.replaceState({ idx: 0 }, '');
   projectAssetsResponse = { assets: [], videoSummaries: [], nextCursor: null };
 });
 
@@ -298,6 +304,21 @@ describe('Project route surface', () => {
     expect(await screen.findByText('Campaign unavailable')).toBeVisible();
     await user.click(screen.getByRole('button', { name: '← Campaign' }));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/campaign/${campaignId}`));
+  });
+
+  it('uses the actual prior route for Back instead of the Project hierarchy', async () => {
+    const assigned = currentProject(activeId, { campaignId });
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(assigned)),
+      http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(campaign())),
+    );
+    window.history.replaceState({ idx: 1 }, '');
+    const { router } = renderProjects(`/projects/${activeId}`, {}, '/dashboard');
+
+    await userEvent.click(await screen.findByRole('button', { name: '← Summer launch' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard'));
+    expect(screen.getByText('Dashboard previous')).toBeVisible();
   });
 
   it('shows bounded Saved Video memberships, previews in place, and detaches only the association', async () => {
@@ -479,6 +500,44 @@ describe('Project route surface', () => {
     expect(await screen.findByRole('list', { name: 'Active Projects' })).toHaveTextContent(
       'Launch cut',
     );
+  });
+
+  it('deletes only the selected archived Project after explicit confirmation', async () => {
+    let archived = [currentProject(archivedId).project];
+    let requestBody: unknown;
+    mockApiServer.use(
+      http.get('*/api/projects', ({ request }) =>
+        HttpResponse.json({
+          projects:
+            new URL(request.url).searchParams.get('lifecycle') === 'archived' ? archived : [],
+          nextCursor: null,
+        }),
+      ),
+      http.post(`*/api/projects/${archivedId}/tombstone`, async ({ request }) => {
+        requestBody = await request.json();
+        archived = [];
+        return HttpResponse.json(
+          currentProject(archivedId, {
+            status: 'deleted',
+            version: 2,
+            deletedAt: now,
+          }),
+        );
+      }),
+    );
+    const user = userEvent.setup();
+    renderProjects();
+
+    const archivedList = await screen.findByRole('list', { name: 'Archived Projects' });
+    await user.click(within(archivedList).getByRole('button', { name: 'Delete' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete Project' });
+    expect(dialog).toHaveTextContent('It does not claim physical erasure');
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm Delete Project' }));
+
+    expect(requestBody).toEqual({ expectedVersion: 1, confirmation: 'permanent-delete' });
+    expect(await screen.findByText('Archived concept deleted.')).toBeVisible();
+    expect(await screen.findByText('No archived Projects')).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Archived concept' })).not.toBeInTheDocument();
   });
 
   it('preserves a proposed rename across stale CAS and requires explicit reload/retry', async () => {

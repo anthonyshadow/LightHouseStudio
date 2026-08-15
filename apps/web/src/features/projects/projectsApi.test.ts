@@ -13,6 +13,7 @@ import {
   ProjectApiConflictError,
   renameProject,
   restoreProject,
+  tombstoneProject,
 } from './projectsApi';
 
 const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
@@ -124,7 +125,7 @@ describe('Projects API adapter', () => {
     });
   });
 
-  it('maps get, rename, archive, and restore through strict current-state responses', async () => {
+  it('maps get, rename, archive, restore, and guarded tombstone through strict responses', async () => {
     const renamed = currentProject({ title: 'Launch final', version: 2 });
     const archived = currentProject({
       title: 'Launch final',
@@ -133,17 +134,36 @@ describe('Projects API adapter', () => {
       archivedAt: now,
     });
     const restored = currentProject({ title: 'Launch final', status: 'draft', version: 4 });
+    const deleted = currentProject({
+      title: 'Launch final',
+      status: 'deleted',
+      version: 5,
+      archivedAt: now,
+      deletedAt: now,
+    });
+    const observed = captureRequests();
     mockApiServer.use(
       jsonScenario('GET', `/api/projects/${projectId}`, { body: currentProject() }),
       jsonScenario('PATCH', `/api/projects/${projectId}`, { body: renamed }),
       jsonScenario('POST', `/api/projects/${projectId}/archive`, { body: archived }),
       jsonScenario('POST', `/api/projects/${projectId}/restore`, { body: restored }),
+      jsonScenario(
+        'POST',
+        `/api/projects/${projectId}/tombstone`,
+        { body: deleted },
+        observed.observe,
+      ),
     );
 
     await expect(getProject(projectId)).resolves.toEqual(currentProject());
     await expect(renameProject(projectId, 'Launch final', 1)).resolves.toEqual(renamed);
     await expect(archiveProject(projectId, 2)).resolves.toEqual(archived);
     await expect(restoreProject(projectId, 3)).resolves.toEqual(restored);
+    await expect(tombstoneProject(projectId, 4)).resolves.toEqual(deleted);
+    expect(await observed.requests[0]!.json()).toEqual({
+      expectedVersion: 4,
+      confirmation: 'permanent-delete',
+    });
   });
 
   it('sends a strict semantic checkpoint with both CAS tokens', async () => {

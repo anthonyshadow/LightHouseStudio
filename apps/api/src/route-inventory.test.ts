@@ -31,6 +31,7 @@ const alwaysRegisteredRoutes: readonly Route[] = [
   'DELETE /api/projects/:projectId/assets/:membershipId',
   'POST /api/projects/:projectId/archive',
   'POST /api/projects/:projectId/restore',
+  'POST /api/projects/:projectId/tombstone',
   'POST /api/projects/:projectId/campaign',
   'POST /api/projects/:projectId/revisions',
   'POST /api/projects/:projectId/processing/submit',
