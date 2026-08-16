@@ -7,9 +7,9 @@ required automated gates are recorded as passed
 
 **Current evidence and go/no-go:** [MVP acceptance runbook](MVP_ACCEPTANCE.md)
 
-**Historical basis:** [MVP alignment audit](MVP_ALIGNMENT_AUDIT.md)
+**Historical basis:** [MVP alignment audit](archived/MVP_ALIGNMENT_AUDIT.md)
 
-**Delivery plan:** [Lightframe MVP implementation sequence](implementation/LIGHTFRAME_MVP_IMPLEMENTATION_SEQUENCE.md)
+**Delivery plan:** [Lightframe MVP implementation sequence](archived/LIGHTFRAME_MVP_IMPLEMENTATION_SEQUENCE.md)
 
 ## MVP product statement
 

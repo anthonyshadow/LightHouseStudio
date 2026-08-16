@@ -3,7 +3,7 @@
 > **Historical planning record (fully superseded by the Prompt 02–13 implementation program).** The
 > gaps, current-state tables, and recommendations below describe the repository audited on
 > 2026-08-11, not the shipped Campaign/Project workspace. Use the current README, Architecture, user
-> stories, Product Roadmap, and [MVP acceptance runbook](MVP_ACCEPTANCE.md) for current behavior and
+> stories, Product Roadmap, and [MVP acceptance runbook](../MVP_ACCEPTANCE.md) for current behavior and
 > evidence. The recommendation below to remove the direct Neon SDK was explicitly declined:
 > production uses Neon PostgreSQL, development uses local PostgreSQL, and
 > `@neondatabase/serverless` remains intentionally retained.
@@ -12,9 +12,9 @@
 
 **Audit date:** 2026-08-11
 
-**Related documents:** [MVP definition](MVP_DEFINITION.md),
-[implementation sequence](implementation/LIGHTFRAME_MVP_IMPLEMENTATION_SEQUENCE.md), and
-[product roadmap](PRODUCT_ROADMAP.md)
+**Related documents:** [MVP definition](../MVP_DEFINITION.md),
+[implementation sequence](LIGHTFRAME_MVP_IMPLEMENTATION_SEQUENCE.md), and
+[product roadmap](../PRODUCT_ROADMAP.md)
 
 ## Executive summary
 
@@ -483,7 +483,7 @@ creative tools, leave and resume safely, observe and recover accepted processing
 resubmission, preserve the original, save immutable output Versions linked to exact Project
 Revisions, find prior work and legacy unassigned videos, and download an exact finished Version.
 
-The full objective criteria and lifecycle decisions are in [MVP definition](MVP_DEFINITION.md).
+The full objective criteria and lifecycle decisions are in [MVP definition](../MVP_DEFINITION.md).
 
 ## Deferred beyond MVP
 

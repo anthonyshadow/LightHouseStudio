@@ -1,10 +1,16 @@
 # Maintainability audit
 
-**Current as of:** 2026-08-12
+**Cleanup records current as of:** 2026-08-12
+**Status:** mixed — the dated cleanup sections below are historical records; the placement rules
+and the sections titled _Current deferred and approval-required findings_ and _Deferred findings_
+remain **open** and are why this document was not archived in the 2026-08-16 restructure.
 
 This document records the repository-wide behavior-preserving cleanup and the placement rules that
 follow from it. Product behavior remains defined by the [project README](../README.md),
-[Architecture](ARCHITECTURE.md), and the [user stories](userStories/README.md).
+[Architecture](ARCHITECTURE.md), and the [user flows](user-flows/README.md). Product- and
+UX-level findings are tracked separately in
+[gaps and usability audit](user-flows/gaps-and-usability-audit.md); this document stays focused on
+code maintainability.
 
 ## 2026-08-12 architecture and performance cleanup
 

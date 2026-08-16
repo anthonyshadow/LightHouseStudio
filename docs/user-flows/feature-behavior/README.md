@@ -1,9 +1,17 @@
-# Lightframe Studio user stories
+# Feature behaviour (user stories)
+
+> Relocated from `docs/userStories/` on 2026-08-16 so that all user-flow documentation lives under
+> [`docs/user-flows/`](../README.md). Content is unchanged apart from link depth.
+>
+> **Scope split:** [`../README.md`](../README.md) and its sibling documents own _route-level
+> journeys, navigation and the UX audit_. The files in this directory own _per-capability
+> observable behaviour_ — the finer-grained contract for one feature. When the two disagree, the
+> code is authoritative and both should be corrected.
 
 These stories describe observable behavior in the current local-first Studio. They are journey
 references, not release-readiness claims or future requirements. They use **video** and current
 feature names deliberately where the implemented contract is video-specific; the broader
-Campaign, Project, and Asset vocabulary in [Product Vision](../PRODUCT_VISION.md) does not make
+Campaign, Project, and Asset vocabulary in [Product Vision](../../PRODUCT_VISION.md) does not make
 future features current.
 
 ## Journeys
@@ -75,10 +83,10 @@ future features current.
 ## Evidence boundary
 
 Deterministic tests cover the implemented journeys, including synthetic provider and 300-second
-cases. The [testing strategy](../TESTING.md) maps those critical journeys to the smallest useful
+cases. The [testing strategy](../../TESTING.md) maps those critical journeys to the smallest useful
 domain, controller, API, browser, or visual layer. It does not qualify physical devices,
 accessibility tools, codecs, memory behavior, live provider entitlement/output, or cleanup.
-The [MVP acceptance runbook](../MVP_ACCEPTANCE.md) is the only current go/no-go record for the
+The [MVP acceptance runbook](../../MVP_ACCEPTANCE.md) is the only current go/no-go record for the
 complete local Campaign/Project journey; the presence of these stories is not release evidence.
-Use [Manual QA](../MANUAL_QA.md) and the authorized
-[live-provider procedure](../LIVE_PROVIDER_SMOKE.md) for those environment-dependent checks.
+Use [Manual QA](../../MANUAL_QA.md) and the authorized
+[live-provider procedure](../../LIVE_PROVIDER_SMOKE.md) for those environment-dependent checks.

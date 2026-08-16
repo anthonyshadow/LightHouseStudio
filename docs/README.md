@@ -1,73 +1,100 @@
 # Documentation map
 
-Use the narrowest authoritative document. Do not copy detailed rules into several files. Product
-direction does not override current implementation authority: Product Vision and Product Roadmap
-describe intent, while the README, Architecture, user stories, privacy guide, and accepted ADRs
-describe implemented behavior and constraints.
+Use the narrowest authoritative document. Do not copy detailed rules into several files.
 
-## Start here
+Documentation is separated into five kinds. Never mix them in one document without labelling:
 
-| Document                                                                                | Status     | Owner               | Source of truth for                                                           | Last reviewed |
-| --------------------------------------------------------------------------------------- | ---------- | ------------------- | ----------------------------------------------------------------------------- | ------------- |
-| [Product Vision](PRODUCT_VISION.md)                                                     | Current    | Product             | Positioning, audiences, product hierarchy, principles, and terminology        | 2026-08-15    |
-| [Product Roadmap](PRODUCT_ROADMAP.md)                                                   | Current    | Product/engineering | Directional phases and future architecture considerations                     | 2026-08-14    |
-| [MVP alignment audit](MVP_ALIGNMENT_AUDIT.md)                                           | Historical | Product/engineering | Superseded post-Prompt-01 audit and implementation rationale                  | 2026-08-14    |
-| [Campaign and Project MVP definition](MVP_DEFINITION.md)                                | Current    | Product/engineering | Bounded Campaign/Project/video MVP model and objective completion criteria    | 2026-08-15    |
-| [MVP acceptance runbook](MVP_ACCEPTANCE.md)                                             | Current    | Engineering/QA      | Criterion evidence, release commands, manual limits, and local-MVP go/no-go   | 2026-08-14    |
-| [MVP implementation sequence](implementation/LIGHTFRAME_MVP_IMPLEMENTATION_SEQUENCE.md) | Historical | Product/engineering | Completed Prompt 02–13 implementation and local-MVP acceptance record         | 2026-08-14    |
-| [Project README](../README.md)                                                          | Current    | Product/engineering | Current product overview, setup, configuration, commands, and release posture | 2026-08-15    |
-| [Repository working guide](../AGENTS.md)                                                | Current    | Engineering         | Repository-wide work, validation, and stop conditions                         | 2026-08-14    |
-| [Security policy](../SECURITY.md)                                                       | Current    | Repository owner    | Private vulnerability reporting scope and expectations                        | 2026-08-08    |
-| [Architecture](ARCHITECTURE.md)                                                         | Current    | Engineering         | Dependency, ownership, lifecycle, persistence, API, and deployment boundaries | 2026-08-15    |
-| [User stories](userStories/README.md)                                                   | Current    | Product/QA          | Observable current journeys and manual validation limits                      | 2026-08-15    |
-| [Privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md)                             | Current    | Product/engineering | Data location, provider contact, retention, deletion, and cost boundaries     | 2026-08-15    |
-| [Testing strategy](TESTING.md)                                                          | Current    | Engineering/QA      | Test layers, commands, CI scope, visual policy, and release validation        | 2026-08-15    |
-| [Manual QA](MANUAL_QA.md)                                                               | Current    | QA                  | Physical device, touch, accessibility, media, and cleanup checks              | 2026-08-15    |
-| [Live provider smoke](LIVE_PROVIDER_SMOKE.md)                                           | Current    | Engineering/QA      | Authorized, opt-in, cost-bearing provider validation                          | 2026-08-08    |
-| [Recording memory policy](RECORDING_MEMORY_POLICY.md)                                   | Current    | Engineering/QA      | Real 300-second memory measurement and support limits                         | 2026-08-08    |
-| [Browser support](BROWSER_SUPPORT.md)                                                   | Current    | Engineering/QA      | Claimed browser/device support and remaining manual checks                    | 2026-08-14    |
-| [Screenshot coverage](screenshot-test-coverage.md)                                      | Current    | Engineering/QA      | Curated visual matrix, platform baselines, and readiness rules                | 2026-08-15    |
+| Kind                     | Where                                                                                                                                                                                                                                                                    | Authority                                  |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------ |
+| **Current system**       | [`ARCHITECTURE.md`](ARCHITECTURE.md), [`CLOUD_PERSISTENCE.md`](CLOUD_PERSISTENCE.md), [`PRIVACY_AND_TEMPORARY_DATA.md`](PRIVACY_AND_TEMPORARY_DATA.md)                                                                                                                   | How the product is built today             |
+| **Product / user flows** | [`user-flows/`](user-flows/README.md)                                                                                                                                                                                                                                    | How a user moves through the product today |
+| **Development guidance** | [`../CLAUDE.md`](../CLAUDE.md), [`../AGENTS.md`](../AGENTS.md), [`TESTING.md`](TESTING.md)                                                                                                                                                                               | How to change the product safely           |
+| **Future plans**         | [`PRODUCT_ROADMAP.md`](PRODUCT_ROADMAP.md), [`PROJECT_DELIVERABLE_MODEL.md`](PROJECT_DELIVERABLE_MODEL.md), [`REMOTE_BACKEND_HANDOFF.md`](REMOTE_BACKEND_HANDOFF.md), [`deferred-account-and-infrastructure-roadmap.md`](deferred-account-and-infrastructure-roadmap.md) | Not implemented; never current authority   |
+| **Archived**             | [`archived/`](archived/README.md)                                                                                                                                                                                                                                        | Historical context only                    |
 
-## Account foundation and deferred infrastructure
+Product direction does not override implementation authority. Product Vision and Product Roadmap
+describe intent; the README, Architecture, user flows, privacy guide and accepted ADRs describe
+implemented behaviour and constraints.
 
-Phase 1 remains the default local runtime. The database/R2 implementation is configuration-gated
-and does not authorize public deployment or relax the loopback boundary.
+## Where to find things
 
-| Document                                                                                      | Status     | Owner               | Use                                                                                    |
-| --------------------------------------------------------------------------------------------- | ---------- | ------------------- | -------------------------------------------------------------------------------------- |
-| [User Accounts Phase 1 audit and plan](user-accounts-phase-1-audit-and-plan.md)               | Historical | Product/engineering | Implemented Phase 1 decision and cutover record; not current product positioning       |
-| [Neon, Drizzle, and Cloudflare R2](CLOUD_PERSISTENCE.md)                                      | Current    | Engineering         | Implemented persistence modes, setup, backfill, rollback, and remaining launch gates   |
-| [Deferred account and infrastructure roadmap](deferred-account-and-infrastructure-roadmap.md) | Partial    | Product/engineering | Service-readiness path for real accounts, operations, retention, and public deployment |
+| I need…                                                     | Read                                                                               |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| What the product does, and how a user moves through it      | [`user-flows/README.md`](user-flows/README.md)                                     |
+| The complete route table and redirects                      | [`user-flows/navigation-map.md`](user-flows/navigation-map.md)                     |
+| Known usability problems, gaps and likely bugs              | [`user-flows/gaps-and-usability-audit.md`](user-flows/gaps-and-usability-audit.md) |
+| The observable contract for one capability                  | [`user-flows/feature-behavior/README.md`](user-flows/feature-behavior/README.md)   |
+| Module boundaries, ownership, lifecycle, API and deployment | [`ARCHITECTURE.md`](ARCHITECTURE.md)                                               |
+| Setup, scripts, configuration and release posture           | [`../README.md`](../README.md)                                                     |
+| How to work in this repository as an agent                  | [`../CLAUDE.md`](../CLAUDE.md), then [`../AGENTS.md`](../AGENTS.md)                |
+| Which tests to run for a change                             | [`TESTING.md`](TESTING.md)                                                         |
+| Data location, provider contact, retention, cost boundaries | [`PRIVACY_AND_TEMPORARY_DATA.md`](PRIVACY_AND_TEMPORARY_DATA.md)                   |
+| Database and object-storage modes, migrations, rollback     | [`CLOUD_PERSISTENCE.md`](CLOUD_PERSISTENCE.md)                                     |
+| Reference-image generation and provider selection           | [`Image_Generation.md`](Image_Generation.md)                                       |
+| An expensive-to-reverse decision and its rationale          | [`decisions/README.md`](decisions/README.md)                                       |
+| Why something is the way it is, historically                | [`archived/README.md`](archived/README.md)                                         |
 
-## Focused technical references
+## Current system
 
-| Document                                                           | Use                                                                                                      |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| [Architecture decisions](decisions/README.md)                      | Accepted, proposed, pending, rejected, and superseded expensive-to-reverse decisions                     |
-| [Deferred Project Deliverable model](PROJECT_DELIVERABLE_MODEL.md) | Future child aggregate for independently resumable video work inside one Project; not implemented        |
-| [Maintainability audit](MAINTAINABILITY_AUDIT.md)                  | Current repository-wide cleanup record, placement rules, deferred findings, and validation record        |
-| [Reference image generation](Image_Generation.md)                  | Optimizer, upload, provider selection, immutable asset, retry, and cleanup flow                          |
-| [Remote backend handoff](REMOTE_BACKEND_HANDOFF.md)                | Deferred design boundary for a separately approved remote product; not current behavior or authorization |
+| Document                                                    | Owner               | Source of truth for                                                           |
+| ----------------------------------------------------------- | ------------------- | ----------------------------------------------------------------------------- |
+| [Architecture](ARCHITECTURE.md)                             | Engineering         | Dependency, ownership, lifecycle, persistence, API, and deployment boundaries |
+| [Project README](../README.md)                              | Product/engineering | Product overview, setup, configuration, commands, release posture             |
+| [Neon, Drizzle, and Cloudflare R2](CLOUD_PERSISTENCE.md)    | Engineering         | Persistence modes, setup, backfill, rollback, remaining launch gates          |
+| [Privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) | Product/engineering | Data location, provider contact, retention, deletion, cost boundaries         |
+| [Reference image generation](Image_Generation.md)           | Engineering         | Optimizer, upload, provider selection, immutable asset, retry, cleanup        |
+| [Browser support](BROWSER_SUPPORT.md)                       | Engineering/QA      | Claimed browser/device support and remaining manual checks                    |
+| [Recording memory policy](RECORDING_MEMORY_POLICY.md)       | Engineering/QA      | Measured 300-second memory limits and support boundaries                      |
+| [Security policy](../SECURITY.md)                           | Repository owner    | Private vulnerability reporting scope                                         |
 
-## Rationale and UI catalog
+## Product and user flows
 
-| Document                                      | Use                                                                                    |
-| --------------------------------------------- | -------------------------------------------------------------------------------------- |
-| [Product evolution](PRODUCT_EVOLUTION.md)     | Historical rationale for major product changes; not the roadmap or current positioning |
-| [Engineering lessons](../LESSONS.md)          | Reusable constraints learned from implementation                                       |
-| [Storybook catalog](../stories/README.md)     | Story organization and test expectations                                               |
-| [Storybook overview](../stories/Overview.mdx) | In-catalog orientation for reviewers                                                   |
+| Document                                                           | Owner               | Source of truth for                                                         |
+| ------------------------------------------------------------------ | ------------------- | --------------------------------------------------------------------------- |
+| [User flows](user-flows/README.md)                                 | Product/engineering | Current route-level journeys, entry points, system behaviour, exit points   |
+| [Navigation map](user-flows/navigation-map.md)                     | Engineering         | Routes, redirects, route-driven side effects, reachability                  |
+| [Gaps and usability audit](user-flows/gaps-and-usability-audit.md) | Product/engineering | Known flow gaps, missing/redundant UI, likely bugs, prioritised remediation |
+| [Feature behaviour](user-flows/feature-behavior/README.md)         | Product/QA          | Per-capability observable behaviour and manual validation limits            |
+| [Product Vision](PRODUCT_VISION.md)                                | Product             | Positioning, audiences, hierarchy, principles, terminology                  |
+| [Campaign and Project MVP definition](MVP_DEFINITION.md)           | Product/engineering | Bounded Campaign/Project/video MVP model and completion criteria            |
 
-The duplicate product-state document and historical project-audit snapshots were removed after
-their current requirements were consolidated into the project README, architecture, user stories,
-testing strategy, manual QA, and focused current plans. Git history remains the archive. Product
-Vision owns the durable product narrative and terminology; Product Roadmap owns capability
-progression. The infrastructure roadmap remains separate because public-service readiness is not
-the same as product capability direction.
+## Development guidance
 
-Current documents and accepted ADRs describe implemented authority. Proposed or
-decision-pending ADRs are not current behavior. Dated audit outcomes and
-validation records are historical; maintained placement rules and explicitly
-open audit findings remain current. Product evolution records historical
-rationale, while the infrastructure roadmap owns explicitly deferred
-public-production work.
+| Document                                           | Owner          | Source of truth for                                                                      |
+| -------------------------------------------------- | -------------- | ---------------------------------------------------------------------------------------- |
+| [Agent quick guide](../CLAUDE.md)                  | Engineering    | Task routing, hard rules, scoped validation                                              |
+| [Repository working guide](../AGENTS.md)           | Engineering    | Long-form repository work, boundaries, and stop conditions                               |
+| [Testing strategy](TESTING.md)                     | Engineering/QA | Test layers, commands, CI scope, visual policy, release validation                       |
+| [Manual QA](MANUAL_QA.md)                          | QA             | Physical device, touch, accessibility, media, and cleanup checks                         |
+| [Live provider smoke](LIVE_PROVIDER_SMOKE.md)      | Engineering/QA | Authorized, opt-in, cost-bearing provider validation                                     |
+| [Screenshot coverage](screenshot-test-coverage.md) | Engineering/QA | Curated visual matrix, platform baselines, readiness rules                               |
+| [MVP acceptance runbook](MVP_ACCEPTANCE.md)        | Engineering/QA | Criterion evidence, release commands, manual limits, local go/no-go                      |
+| [Maintainability audit](MAINTAINABILITY_AUDIT.md)  | Engineering    | Placement rules and **open** deferred findings; its dated cleanup records are historical |
+| [Architecture decisions](decisions/README.md)      | Engineering    | Accepted, proposed, pending, rejected, superseded decisions                              |
+| [Engineering lessons](../LESSONS.md)               | Engineering    | Reusable constraints learned from implementation                                         |
+| [Storybook catalog](../stories/README.md)          | Engineering    | Story organization and test expectations                                                 |
+
+## Future plans — not implemented
+
+| Document                                                                                      | Use                                                                                |
+| --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| [Product Roadmap](PRODUCT_ROADMAP.md)                                                         | Directional phases and future architecture considerations                          |
+| [Deferred Project Deliverable model](PROJECT_DELIVERABLE_MODEL.md)                            | Future child aggregate for independently resumable video work inside one Project   |
+| [Deferred account and infrastructure roadmap](deferred-account-and-infrastructure-roadmap.md) | Service-readiness path for real accounts, operations, retention, public deployment |
+| [Remote backend handoff](REMOTE_BACKEND_HANDOFF.md)                                           | Deferred design boundary for a separately approved remote product                  |
+
+Configuration-gated cloud infrastructure does not authorize public deployment or relax the loopback
+boundary. Phase 1 remains the default local runtime.
+
+## Archived
+
+See [`archived/README.md`](archived/README.md) for the ledger and the reason each document was
+archived. Nothing in `archived/` is implementation authority.
+
+## Maintaining this map
+
+- One topic, one owner. If two documents both claim a topic, consolidate before adding a third.
+- Update a document only when behaviour, contracts, commands, environment, privacy, persistence,
+  provider or support boundaries change. Link instead of duplicating.
+- `bun run check:docs` validates every relative link and anchor in `README.md`, `AGENTS.md` and
+  everything under `docs/`. Run it after any documentation move.

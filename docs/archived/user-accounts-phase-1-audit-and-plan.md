@@ -14,9 +14,9 @@ and public deployment remain deferred.
 
 This file preserves the original audit, sequencing, and cutover rationale, so proposed paths and
 pre-migration findings remain in historical tense below. It is not current product positioning or
-the product roadmap. Use the [README](../README.md), [Architecture](ARCHITECTURE.md),
-[Product Vision](PRODUCT_VISION.md), [Product Roadmap](PRODUCT_ROADMAP.md), and
-[cloud persistence runbook](CLOUD_PERSISTENCE.md) for current authority.
+the product roadmap. Use the [README](../../README.md), [Architecture](../ARCHITECTURE.md),
+[Product Vision](../PRODUCT_VISION.md), [Product Roadmap](../PRODUCT_ROADMAP.md), and
+[cloud persistence runbook](../CLOUD_PERSISTENCE.md) for current authority.
 
 ## Executive decision
 
