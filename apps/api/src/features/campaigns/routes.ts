@@ -16,23 +16,11 @@ import type {
 } from '../../application/application-runtime.js';
 import { AppError } from '../../http/app-error.js';
 import { ownerUserIdForRequest } from '../../http/authentication.js';
+import { requestHeader, requireConfiguredService } from '../../http/request-helpers.js';
 import type { CampaignService, CampaignServiceMutationResult } from './campaign-service.js';
 
-const header = (request: HttpRequest, name: string): string | undefined => {
-  const value = request.headers[name];
-  return typeof value === 'string' ? value : undefined;
-};
-
-const requireService = (service: CampaignService | undefined): CampaignService => {
-  if (service === undefined) {
-    throw new AppError(
-      503,
-      'feature_unavailable',
-      'Campaign persistence is unavailable in the configured mode.',
-    );
-  }
-  return service;
-};
+const requireService = (service: CampaignService | undefined): CampaignService =>
+  requireConfiguredService(service, 'Campaign persistence is unavailable in the configured mode.');
 
 const conflictMessage = (conflict: CampaignConflict): string => {
   switch (conflict.kind) {
@@ -75,7 +63,9 @@ export const registerCampaignRoutes = (
 
   app.post('/api/campaigns', async (request, reply) => {
     const body = createCampaignRequestSchema.safeParse(request.body);
-    const operationKey = campaignOperationKeySchema.safeParse(header(request, 'idempotency-key'));
+    const operationKey = campaignOperationKeySchema.safeParse(
+      requestHeader(request, 'idempotency-key'),
+    );
     if (!body.success || !operationKey.success) {
       throw new AppError(
         400,

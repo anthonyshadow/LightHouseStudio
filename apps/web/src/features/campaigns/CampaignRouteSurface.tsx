@@ -1,5 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { CampaignContract, ProjectContract } from '@studio/contracts';
+import { formatDate } from '@studio/domain';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { APP_PATHS, campaignIdFromPath, campaignPath, projectPath } from '../../app/paths';
@@ -35,9 +36,6 @@ import {
   useCampaignList,
   useCampaignsController,
 } from './useCampaignsController';
-
-const formatUpdatedAt = (value: string): string =>
-  new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value));
 
 const CampaignListSection = ({ lifecycle }: { readonly lifecycle: 'active' | 'archived' }) => {
   const theme = useTheme();
@@ -92,7 +90,7 @@ const CampaignListSection = ({ lifecycle }: { readonly lifecycle: 'active' | 'ar
                   <p>{campaign.brief ?? 'No brief yet.'}</p>
                   <small>
                     Updated{' '}
-                    <time dateTime={campaign.updatedAt}>{formatUpdatedAt(campaign.updatedAt)}</time>
+                    <time dateTime={campaign.updatedAt}>{formatDate(campaign.updatedAt)}</time>
                   </small>
                 </div>
                 <div data-campaign-actions>
@@ -388,8 +386,7 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
                 {archived ? 'Archived' : 'Active'}
               </span>
               <span>
-                Updated{' '}
-                <time dateTime={campaign.updatedAt}>{formatUpdatedAt(campaign.updatedAt)}</time>
+                Updated <time dateTime={campaign.updatedAt}>{formatDate(campaign.updatedAt)}</time>
               </span>
             </div>
             <p css={campaignBriefStyles(theme)}>{campaign.brief ?? 'No brief yet.'}</p>

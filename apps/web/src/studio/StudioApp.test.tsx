@@ -307,6 +307,8 @@ vi.mock('../adapters/api-client/apiClient', () => ({
       this.name = 'ApiClientError';
     }
   },
+  invalidApiResponse: (message: string, code: string) => (): Error =>
+    Object.assign(new Error(message), { name: 'ApiClientError', status: 502, code }),
   fetchReferenceImageMetadata: harness.fetchReferenceImageMetadata,
   hydrateReferenceImage: harness.hydrateReferenceImage,
   apiFetch: harness.apiFetch,

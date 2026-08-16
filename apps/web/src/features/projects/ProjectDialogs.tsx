@@ -1,7 +1,7 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectContract, ProjectCurrentResponse } from '@studio/contracts';
 import { useRef, useState, type FormEvent, type RefObject } from 'react';
-import { ApiClientError } from '../../adapters/api-client/apiClient';
+import { apiErrorMessage } from '../../adapters/api-client/apiClient';
 import { Button, OverlayPanel, StatusNotice, TextField } from '../../ui';
 import { ProjectCampaignPicker, projectCampaignId } from '../campaigns/ProjectCampaignPicker';
 import { dialogActionsStyles } from './ProjectRouteSurface.styles';
@@ -9,9 +9,7 @@ import { ProjectApiConflictError } from './projectsApi';
 import { useProjectsController } from './useProjectsController';
 
 export const safeProjectError = (error: unknown): string =>
-  error instanceof ApiClientError
-    ? error.message
-    : 'Projects could not be loaded. Check the local API and try again.';
+  apiErrorMessage(error, 'Projects could not be loaded. Check the local API and try again.');
 
 export type ProjectLifecycleAction = 'archive' | 'restore';
 

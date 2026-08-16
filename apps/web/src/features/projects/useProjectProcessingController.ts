@@ -4,7 +4,7 @@ import type {
   ProjectProcessingMutationResponse,
 } from '@studio/contracts';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { ApiClientError } from '../../adapters/api-client/apiClient';
+import { ApiClientError, apiErrorMessage } from '../../adapters/api-client/apiClient';
 import {
   cancelProjectProcessing,
   getCurrentProjectProcessing,
@@ -54,9 +54,10 @@ const attemptNeedsProjectRefresh = (attempt: ProjectProcessingAttempt): boolean 
   attempt.phase === 'cancelled';
 
 const commandErrorMessage = (error: unknown): string =>
-  error instanceof ApiClientError
-    ? error.message
-    : 'Project processing status could not be verified. Check this operation again; do not start another submission.';
+  apiErrorMessage(
+    error,
+    'Project processing status could not be verified. Check this operation again; do not start another submission.',
+  );
 
 const operationStatusIsUnverified = (error: unknown): boolean =>
   !(error instanceof ApiClientError) || error.status >= 500 || error.code === 'invalid-response';
@@ -548,11 +549,9 @@ export const useProjectProcessingController = ({
     return () => controller.abort('project-processing-hydration-replaced');
   }, [loadAuthority, projectId, replaceState, revisionId, sessionProjectId]);
 
-  const attempt = state.projectId === projectId ? state.attempt : null;
-  const phase =
-    state.projectId === projectId ? state.phase : projectId === null ? 'idle' : 'loading';
-  const message = state.projectId === projectId ? state.message : null;
-  const unverifiedOperationId = state.projectId === projectId ? state.unverifiedOperationId : null;
+  // State belonging to another Project is not a partial view of this one — discard all of it.
+  const { attempt, phase, message, unverifiedOperationId } =
+    state.projectId === projectId ? state : initialState(projectId);
 
   useEffect(() => {
     if (

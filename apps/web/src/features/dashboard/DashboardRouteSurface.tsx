@@ -5,6 +5,7 @@ import type {
   SavedVideoSummary,
   VideoJobQueueItem,
 } from '@studio/contracts';
+import { formatDate, formatDateTime } from '@studio/domain';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { listSavedVideos } from '../../adapters/api-client/savedVideosApi';
@@ -34,14 +35,6 @@ import {
 } from './DashboardRouteSurface.styles';
 
 const RECENT_LIMIT = 4;
-
-const formatUpdatedAt = (value: string): string =>
-  new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value));
-
-const formatJobCreatedAt = (value: string): string =>
-  new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
-    new Date(value),
-  );
 
 const jobOperationLabel = (operation: VideoJobQueueItem['operation']): string =>
   operation === 'virtual-try-on' ? 'Virtual Try-On' : 'Character Swap';
@@ -323,7 +316,7 @@ export const DashboardRouteSurface = ({
                 <span data-job-details>
                   <strong>{jobOperationLabel(job.operation)}</strong>
                   <span>
-                    {job.provider} · Started {formatJobCreatedAt(job.createdAt)}
+                    {job.provider} · Started {formatDateTime(job.createdAt)}
                   </span>
                 </span>
                 <Button
@@ -366,7 +359,7 @@ export const DashboardRouteSurface = ({
                 </span>
                 <h3>{continueProject.title}</h3>
                 <time dateTime={continueProject.updatedAt}>
-                  Updated {formatUpdatedAt(continueProject.updatedAt)}
+                  Updated {formatDate(continueProject.updatedAt)}
                 </time>
                 <Button
                   variant="primary"
@@ -450,7 +443,7 @@ export const DashboardRouteSurface = ({
                         {recentKindLabel[item.kind]} · {item.meta}
                       </span>
                     </span>
-                    <time dateTime={item.updatedAt}>{formatUpdatedAt(item.updatedAt)}</time>
+                    <time dateTime={item.updatedAt}>{formatDate(item.updatedAt)}</time>
                   </button>
                 </li>
               ))}

@@ -4,11 +4,13 @@ import type {
   ProjectCurrentResponse,
   ProjectOutputHistoryItem,
 } from '@studio/contracts';
+import { formatDateTime } from '@studio/domain';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Button, OverlayPanel, StatusNotice } from '../../ui';
 import { getProjectProcessingHistory } from './projectProcessingApi';
 import { projectProcessingCapabilityLabel } from './projectProcessingPresentation';
+import { ProjectVideoPreviewPlayer } from './ProjectVideoPreviewPlayer';
 import {
   getProjectHistory,
   getProjectOutputs,
@@ -17,11 +19,6 @@ import {
   reuseProjectWorkingMedia,
 } from './projectsApi';
 import type { ProjectSessionPort } from './useProjectSession';
-
-const formatTimestamp = (value: string): string =>
-  new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
-    new Date(value),
-  );
 
 const revisionSourceLabel: Record<ProjectCurrentResponse['revision']['source'], string> = {
   create: 'Project created',
@@ -75,10 +72,9 @@ export const ProjectHistorySection = ({
   const projectId = current.project.id;
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busySignature, setBusySignature] = useState<string | null>(null);
+  const [busyItemKey, setBusyItemKey] = useState<string | null>(null);
   const [preview, setPreview] = useState<ProjectOutputHistoryItem | null>(null);
   const previewTriggerRef = useRef<HTMLElement | null>(null);
-  const playerRef = useRef<HTMLVideoElement | null>(null);
   const operationRef = useRef<{ readonly signature: string; readonly key: string } | null>(null);
 
   const revisions = useInfiniteQuery({
@@ -111,17 +107,8 @@ export const ProjectHistorySection = ({
     getNextPageParam: (page) => page.nextCursor,
   });
 
-  useEffect(() => {
-    if (preview === null) return;
-    const player = playerRef.current;
-    return () => {
-      player?.pause();
-      player?.removeAttribute('src');
-    };
-  }, [preview]);
-
   const adoptMedia = useCallback(
-    async (media: AdoptProjectWorkingMediaRequest['media'], label: string) => {
+    async (media: AdoptProjectWorkingMediaRequest['media'], label: string, itemKey: string) => {
       setError(null);
       setMessage(null);
       if (!(await session.flush())) {
@@ -141,7 +128,7 @@ export const ProjectHistorySection = ({
           ? operationRef.current.key
           : crypto.randomUUID();
       operationRef.current = { signature, key: operationKey };
-      setBusySignature(signature);
+      setBusyItemKey(itemKey);
       try {
         const response = await reuseProjectWorkingMedia({
           projectId,
@@ -172,7 +159,7 @@ export const ProjectHistorySection = ({
             : 'This historical media could not be validated for current Project use.',
         );
       } finally {
-        setBusySignature(null);
+        setBusyItemKey(null);
       }
     },
     [projectId, queryClient, session],
@@ -244,12 +231,6 @@ export const ProjectHistorySection = ({
               savedVideoId: item.savedVideo.id,
               videoVersionId: item.version.id,
             };
-            const signature = JSON.stringify({
-              projectId,
-              expectedVersion: current.project.version,
-              expectedRevisionNumber: current.revision.revisionNumber,
-              media,
-            });
             return (
               <li key={item.version.id} css={itemStyles}>
                 <strong>
@@ -261,7 +242,7 @@ export const ProjectHistorySection = ({
                 <span>
                   {item.version.origin} · {item.version.width}×{item.version.height} ·{' '}
                   <time dateTime={item.version.createdAt}>
-                    {formatTimestamp(item.version.createdAt)}
+                    {formatDateTime(item.version.createdAt)}
                   </time>
                 </span>
                 <span>
@@ -295,13 +276,15 @@ export const ProjectHistorySection = ({
                   </Button>
                   <Button
                     size="small"
-                    busy={busySignature === signature}
+                    busy={busyItemKey === item.version.id}
                     disabled={
                       archived ||
                       item.savedVideo.libraryStatus === 'missing' ||
-                      busySignature !== null
+                      busyItemKey !== null
                     }
-                    onClick={() => void adoptMedia(media, `Version ${item.version.ordinal}`)}
+                    onClick={() =>
+                      void adoptMedia(media, `Version ${item.version.ordinal}`, item.version.id)
+                    }
                   >
                     Use in Project
                   </Button>
@@ -354,7 +337,7 @@ export const ProjectHistorySection = ({
               </strong>
               <span>
                 Revision {attempt.initiatingRevisionNumber} · {attempt.phase} ·{' '}
-                <time dateTime={attempt.createdAt}>{formatTimestamp(attempt.createdAt)}</time>
+                <time dateTime={attempt.createdAt}>{formatDateTime(attempt.createdAt)}</time>
               </span>
               {attempt.result?.historical ? (
                 <>
@@ -364,11 +347,13 @@ export const ProjectHistorySection = ({
                   </span>
                   <Button
                     size="small"
-                    disabled={archived || busySignature !== null}
+                    busy={busyItemKey === attempt.result.assetId}
+                    disabled={archived || busyItemKey !== null}
                     onClick={() =>
                       void adoptMedia(
                         { kind: 'asset', assetId: attempt.result!.assetId },
                         `${projectProcessingCapabilityLabel(attempt.capability)} retained result`,
+                        attempt.result!.assetId,
                       )
                     }
                   >
@@ -409,7 +394,7 @@ export const ProjectHistorySection = ({
               </strong>
               <span>
                 {revision.workflowPhase} · {revision.authorKind} ·{' '}
-                <time dateTime={revision.createdAt}>{formatTimestamp(revision.createdAt)}</time>
+                <time dateTime={revision.createdAt}>{formatDateTime(revision.createdAt)}</time>
               </span>
               {revision.outputReference ? (
                 <span>This revision references one exact retained output Version.</span>
@@ -454,7 +439,8 @@ export const ProjectHistorySection = ({
               </a>
               <Button
                 variant="primary"
-                disabled={archived || busySignature !== null}
+                busy={busyItemKey === preview.version.id}
+                disabled={archived || busyItemKey !== null}
                 onClick={() =>
                   void adoptMedia(
                     {
@@ -463,6 +449,7 @@ export const ProjectHistorySection = ({
                       videoVersionId: preview.version.id,
                     },
                     `Version ${preview.version.ordinal}`,
+                    preview.version.id,
                   )
                 }
               >
@@ -473,21 +460,23 @@ export const ProjectHistorySection = ({
         }
       >
         {preview ? (
-          <div css={{ display: 'grid', gap: theme.space.md }}>
-            {/* Saved local videos may not include a captions track. */}
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <video
-              ref={playerRef}
+          <div
+            css={{
+              height: '100%',
+              minWidth: 0,
+              minHeight: 0,
+              display: 'grid',
+              gridTemplateRows: 'minmax(0, 1fr) auto',
+              gap: theme.space.md,
+            }}
+          >
+            <ProjectVideoPreviewPlayer
               src={projectOutputContentUrl(projectId, preview.version.id)}
-              controls
-              playsInline
-              preload="metadata"
-              aria-label={`Preview ${preview.savedVideo.title}, Version ${preview.version.ordinal}`}
-              css={{ width: '100%', maxHeight: '65vh', background: '#000' }}
+              title={`${preview.savedVideo.title}, Version ${preview.version.ordinal}`}
             />
-            <p>
+            <p css={{ margin: 0 }}>
               Version {preview.version.ordinal} · {preview.version.origin} · {preview.version.width}
-              ×{preview.version.height} · {formatTimestamp(preview.version.createdAt)}
+              ×{preview.version.height} · {formatDateTime(preview.version.createdAt)}
               {preview.savedVideo.currentVersionId === preview.version.id
                 ? ' · Current in Saved Videos'
                 : ' · Older Version'}
