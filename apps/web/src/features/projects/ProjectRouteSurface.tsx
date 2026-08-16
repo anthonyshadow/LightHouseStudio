@@ -8,6 +8,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type KeyboardEvent,
   type ReactNode,
 } from 'react';
 import { useLocation, useNavigate } from 'react-router';
@@ -32,7 +33,6 @@ import {
   type ProjectLifecycleAction as LifecycleAction,
 } from './ProjectDialogs';
 import {
-  detailHeaderStyles,
   dialogActionsStyles,
   emptyProjectStyles,
   projectsGroupFilterStyles,
@@ -45,12 +45,16 @@ import {
   projectsLedgerSectionStyles,
   projectsWorkspaceHeaderStyles,
   projectsWorkspaceInnerStyles,
+  projectWorkspaceRouteStyles,
   projectOverviewHeaderStyles,
   projectOverviewInnerStyles,
   projectOverviewRouteStyles,
-  statusPillStyles,
+  taskBodyStyles,
+  taskInspectorStyles,
+  taskNavigationStyles,
+  taskPanelStyles,
   workspaceInnerStyles,
-  workspaceStyles,
+  workspaceMastheadStyles,
 } from './ProjectRouteSurface.styles';
 import { useProjectList, useProjectsController } from './useProjectsController';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
@@ -83,6 +87,19 @@ const formatUpdatedAt = (value: string): string =>
 const projectWorkflowLabel = (
   phase: ProjectCurrentResponse['revision']['snapshot']['workflowPhase'],
 ): string => phase.charAt(0).toUpperCase() + phase.slice(1);
+
+type ProjectWorkspaceTask = 'source' | 'create' | 'save' | 'history';
+
+const projectWorkspaceTasks = [
+  { id: 'source', label: 'Source', icon: 'source' },
+  { id: 'create', label: 'Create', icon: 'wand' },
+  { id: 'save', label: 'Save', icon: 'save' },
+  { id: 'history', label: 'History', icon: 'history' },
+] as const satisfies ReadonlyArray<{
+  readonly id: ProjectWorkspaceTask;
+  readonly label: string;
+  readonly icon: 'source' | 'wand' | 'save' | 'history';
+}>;
 
 interface ProjectListSectionProps {
   readonly lifecycle: 'active' | 'archived';
@@ -547,16 +564,10 @@ const ProjectSourceSection = ({
               </p>
             </>
           ) : (
-            <>
-              <p>
-                Choose one video as this Project&apos;s immutable original. Upload and finalized
-                recording previews stay local while the server stores and inspects the source.
-              </p>
-              <p>
-                A failed or cancelled staging attempt can be replaced. After acceptance, a different
-                original always starts a new Project.
-              </p>
-            </>
+            <p>
+              Choose one video as this Project&apos;s immutable original. A failed staging attempt
+              can be replaced until the source is accepted.
+            </p>
           )}
           {stateNotice ? (
             <StatusNotice
@@ -691,13 +702,20 @@ const ProjectSessionNotice = ({
         </StatusNotice>
       );
     case 'saved':
-      return (
-        <StatusNotice role="status" tone="success" title="All changes saved">
-          Project identity, durable media references, creative intent, local edit provenance,
-          workflow phase, and session metadata match server authority.
-        </StatusNotice>
-      );
+      return null;
   }
+};
+
+const projectWorkspaceSaveStatus = (
+  session: ReturnType<typeof useProjectSession>,
+  sourceBusy: boolean,
+): { readonly label: string; readonly tone: 'success' | 'warning' | 'danger' } => {
+  if (sourceBusy || session.phase === 'dirty' || session.phase === 'saving') {
+    return { label: 'Saving changes', tone: 'warning' };
+  }
+  if (session.phase === 'conflict') return { label: 'Resolve conflict', tone: 'warning' };
+  if (session.phase === 'error') return { label: 'Changes not saved', tone: 'danger' };
+  return { label: 'All changes saved', tone: 'success' };
 };
 
 const ProjectDetail = ({
@@ -733,6 +751,7 @@ const ProjectDetail = ({
   const [campaignDialog, setCampaignDialog] = useState(false);
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [sourceActivity, setSourceActivity] = useState<ProjectSourceActivity | null>(null);
+  const [activeWorkspaceTask, setActiveWorkspaceTask] = useState<ProjectWorkspaceTask>('source');
   const handleSourceActivity = useCallback(
     (activity: ProjectSourceActivity) => {
       setSourceActivity(activity);
@@ -789,29 +808,203 @@ const ProjectDetail = ({
     setCampaignDialog(false);
   };
 
+  if (workspaceMode) {
+    const saveStatus = projectWorkspaceSaveStatus(session, sourceActivity?.busy ?? false);
+    const focusWorkspaceTask = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+      const lastIndex = projectWorkspaceTasks.length - 1;
+      const nextIndex =
+        event.key === 'ArrowRight'
+          ? index === lastIndex
+            ? 0
+            : index + 1
+          : event.key === 'ArrowLeft'
+            ? index === 0
+              ? lastIndex
+              : index - 1
+            : event.key === 'Home'
+              ? 0
+              : event.key === 'End'
+                ? lastIndex
+                : null;
+      if (nextIndex === null) return;
+      event.preventDefault();
+      const nextTask = projectWorkspaceTasks[nextIndex];
+      if (!nextTask) return;
+      setActiveWorkspaceTask(nextTask.id);
+      window.requestAnimationFrame(() => {
+        document.getElementById(`project-task-${nextTask.id}-tab`)?.focus();
+      });
+    };
+
+    return (
+      <>
+        <header css={workspaceMastheadStyles(theme)} data-project-workspace-masthead="">
+          <Button
+            data-detail-breadcrumb
+            variant="quiet"
+            aria-label="← Project overview"
+            onClick={() => goBack(projectPath(project.id))}
+          >
+            <AppIcon name="chevronLeft" />
+            Overview
+          </Button>
+          <span data-workspace-divider aria-hidden="true" />
+          <div data-workspace-title>
+            <h1 ref={headingRef} tabIndex={-1}>
+              {project.title}
+            </h1>
+            <span data-workspace-project-status>{projectStatusLabel(project.status)}</span>
+          </div>
+          <span
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            data-workspace-save-status=""
+            data-tone={saveStatus.tone}
+          >
+            <span data-workspace-save-status-dot aria-hidden="true" />
+            <span data-workspace-save-label>{saveStatus.label}</span>
+          </span>
+        </header>
+
+        <aside css={taskInspectorStyles(theme)} aria-label="Guided task inspector">
+          <div css={taskNavigationStyles(theme)} role="tablist" aria-label="Project tasks">
+            {projectWorkspaceTasks.map((task, index) => (
+              <button
+                key={task.id}
+                id={`project-task-${task.id}-tab`}
+                type="button"
+                role="tab"
+                tabIndex={activeWorkspaceTask === task.id ? 0 : -1}
+                aria-selected={activeWorkspaceTask === task.id}
+                aria-controls={`project-task-${task.id}-panel`}
+                onClick={() => setActiveWorkspaceTask(task.id)}
+                onKeyDown={(event) => focusWorkspaceTask(event, index)}
+              >
+                <AppIcon name={task.icon} />
+                <span>{task.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div css={taskBodyStyles(theme)}>
+            <div role="status" aria-live="polite" aria-atomic="true">
+              {announcement}
+            </div>
+            <ProjectSessionNotice session={session} sourceBusy={sourceActivity?.busy ?? false} />
+
+            <section
+              id="project-task-source-panel"
+              role="tabpanel"
+              tabIndex={0}
+              aria-labelledby="project-task-source-tab"
+              hidden={activeWorkspaceTask !== 'source'}
+              css={taskPanelStyles(theme)}
+            >
+              <header>
+                <h2>Project Source</h2>
+                <p>Select the immutable original video.</p>
+              </header>
+              <ProjectSourceSection
+                key={current.project.id}
+                current={current}
+                runtime={sourceRuntime}
+                recordingCandidate={recordingCandidate}
+                recordingActive={recordingActive}
+                onStartRecording={onStartRecording}
+                onActivityChange={handleSourceActivity}
+                onCurrentChange={session.acceptCurrent}
+              />
+            </section>
+
+            <section
+              id="project-task-create-panel"
+              role="tabpanel"
+              tabIndex={0}
+              aria-labelledby="project-task-create-tab"
+              hidden={activeWorkspaceTask !== 'create'}
+              css={taskPanelStyles(theme)}
+            >
+              <header>
+                <h2>Create</h2>
+                <p>Build from the current source and manage durable working media.</p>
+                <span data-task-revision>Revision {project.currentRevisionNumber}</span>
+              </header>
+              {creativeCheckpoint}
+              <ProjectWorkingMediaSection
+                current={current}
+                session={session.port}
+                archived={archived}
+                {...(onWorkingMediaActivityChange
+                  ? { onActivityChange: onWorkingMediaActivityChange }
+                  : {})}
+              />
+              {processing ? (
+                <ProjectProcessingStatusPanel controller={processing} />
+              ) : (
+                <StatusNotice role="status" tone="neutral" title="Processing unavailable">
+                  No provider work can be submitted from this workspace.
+                </StatusNotice>
+              )}
+            </section>
+
+            <section
+              id="project-task-save-panel"
+              role="tabpanel"
+              tabIndex={0}
+              aria-labelledby="project-task-save-tab"
+              hidden={activeWorkspaceTask !== 'save'}
+              css={taskPanelStyles(theme)}
+            >
+              <header>
+                <h2>Save</h2>
+                <p>Retain the current result as a new Video or an explicit Version.</p>
+              </header>
+              <ProjectOutputSaveSection
+                current={current}
+                session={session.port}
+                archived={archived}
+                ownerUserId={ownerUserId}
+              />
+            </section>
+
+            <section
+              id="project-task-history-panel"
+              role="tabpanel"
+              tabIndex={0}
+              aria-labelledby="project-task-history-tab"
+              hidden={activeWorkspaceTask !== 'history'}
+              css={taskPanelStyles(theme)}
+            >
+              <header>
+                <h2>History</h2>
+                <p>Review retained revisions, outputs, and processing activity.</p>
+              </header>
+              <ProjectHistorySection current={current} session={session.port} archived={archived} />
+            </section>
+          </div>
+        </aside>
+      </>
+    );
+  }
+
   return (
-    <div css={detailContentStyles(theme)} data-project-overview={workspaceMode ? undefined : ''}>
-      <header css={workspaceMode ? detailHeaderStyles(theme) : projectOverviewHeaderStyles(theme)}>
+    <div css={projectOverviewInnerStyles(theme)} data-project-overview="">
+      <header css={projectOverviewHeaderStyles(theme)}>
         <Button
           data-detail-breadcrumb
           variant="quiet"
           onClick={() =>
             goBack(
-              workspaceMode
-                ? projectPath(project.id)
-                : project.campaignId === null
-                  ? APP_PATHS.projects
-                  : campaignPath(project.campaignId),
+              project.campaignId === null ? APP_PATHS.projects : campaignPath(project.campaignId),
             )
           }
         >
-          {workspaceMode
-            ? '← Project overview'
-            : project.campaignId === null
-              ? '← All Projects'
-              : campaignName === null
-                ? '← Campaign'
-                : `← ${campaignName}`}
+          {project.campaignId === null
+            ? '← All Projects'
+            : campaignName === null
+              ? '← Campaign'
+              : `← ${campaignName}`}
         </Button>
         <div data-detail-identity>
           <div>
@@ -819,13 +1012,7 @@ const ProjectDetail = ({
               {project.title}
             </h1>
             <div data-detail-meta>
-              {workspaceMode ? (
-                <span css={statusPillStyles(theme, archived)}>
-                  {projectStatusLabel(project.status)}
-                </span>
-              ) : (
-                <span data-project-overview-status>{projectStatusLabel(project.status)}</span>
-              )}
+              <span data-project-overview-status>{projectStatusLabel(project.status)}</span>
               <span>
                 Updated{' '}
                 <time dateTime={project.updatedAt}>{formatUpdatedAt(project.updatedAt)}</time>
@@ -843,72 +1030,64 @@ const ProjectDetail = ({
                 </span>
               )}
             </div>
-            {!workspaceMode ? (
-              <div data-project-workspace-status>
-                <AppIcon name="info" />
-                <span>
-                  {current.revision.snapshot.sourceAssetId === null
-                    ? 'No source yet • This Project is ready whenever you want to begin.'
-                    : `Source ready • ${projectWorkflowLabel(current.revision.snapshot.workflowPhase)} workflow active.`}
-                </span>
-              </div>
-            ) : null}
+            <div data-project-workspace-status>
+              <AppIcon name="info" />
+              <span>
+                {current.revision.snapshot.sourceAssetId === null
+                  ? 'No source yet • This Project is ready whenever you want to begin.'
+                  : `Source ready • ${projectWorkflowLabel(current.revision.snapshot.workflowPhase)} workflow active.`}
+              </span>
+            </div>
           </div>
           <div data-detail-actions>
-            {!workspaceMode ? (
+            <Button
+              variant="primary"
+              data-detail-action="continue"
+              onClick={() => void navigate(projectWorkspacePath(project.id))}
+            >
+              {archived ? 'View workspace' : 'Continue editing'}
+            </Button>
+            <Button
+              data-detail-action="move"
+              onClick={(event) => {
+                dialogReturnRef.current = event.currentTarget;
+                setCampaignDialog(true);
+              }}
+            >
+              Move Project
+            </Button>
+            {!archived ? (
               <Button
-                variant="primary"
-                data-detail-action="continue"
-                onClick={() => void navigate(projectWorkspacePath(project.id))}
+                data-detail-action="rename"
+                onClick={(event) => {
+                  dialogReturnRef.current = event.currentTarget;
+                  setRenameTarget(project);
+                }}
               >
-                {archived ? 'View workspace' : 'Continue editing'}
+                Rename
               </Button>
             ) : null}
-            {!workspaceMode ? (
-              <>
-                <Button
-                  data-detail-action="move"
-                  onClick={(event) => {
-                    dialogReturnRef.current = event.currentTarget;
-                    setCampaignDialog(true);
-                  }}
-                >
-                  Move Project
-                </Button>
-                {!archived ? (
-                  <Button
-                    data-detail-action="rename"
-                    onClick={(event) => {
-                      dialogReturnRef.current = event.currentTarget;
-                      setRenameTarget(project);
-                    }}
-                  >
-                    Rename
-                  </Button>
-                ) : null}
-                <Button
-                  variant={archived ? 'secondary' : 'danger'}
-                  data-detail-action="archive"
-                  onClick={(event) => {
-                    dialogReturnRef.current = event.currentTarget;
-                    setLifecycleDialog({ action: archived ? 'restore' : 'archive', project });
-                  }}
-                >
-                  {archived ? 'Restore' : 'Archive'}
-                </Button>
-                {archived ? (
-                  <Button
-                    variant="danger"
-                    data-detail-action="delete"
-                    onClick={(event) => {
-                      dialogReturnRef.current = event.currentTarget;
-                      setDeleteTarget(project);
-                    }}
-                  >
-                    Delete Project
-                  </Button>
-                ) : null}
-              </>
+            <Button
+              variant={archived ? 'secondary' : 'danger'}
+              data-detail-action="archive"
+              onClick={(event) => {
+                dialogReturnRef.current = event.currentTarget;
+                setLifecycleDialog({ action: archived ? 'restore' : 'archive', project });
+              }}
+            >
+              {archived ? 'Restore' : 'Archive'}
+            </Button>
+            {archived ? (
+              <Button
+                variant="danger"
+                data-detail-action="delete"
+                onClick={(event) => {
+                  dialogReturnRef.current = event.currentTarget;
+                  setDeleteTarget(project);
+                }}
+              >
+                Delete Project
+              </Button>
             ) : null}
           </div>
         </div>
@@ -918,56 +1097,16 @@ const ProjectDetail = ({
         {announcement}
       </div>
 
-      {workspaceMode ? (
-        <>
-          <ProjectSessionNotice session={session} sourceBusy={sourceActivity?.busy ?? false} />
-          {creativeCheckpoint}
-          <ProjectSourceSection
-            key={current.project.id}
-            current={current}
-            runtime={sourceRuntime}
-            recordingCandidate={recordingCandidate}
-            recordingActive={recordingActive}
-            onStartRecording={onStartRecording}
-            onActivityChange={handleSourceActivity}
-            onCurrentChange={session.acceptCurrent}
-          />
-          <ProjectWorkingMediaSection
-            current={current}
-            session={session.port}
-            archived={archived}
-            {...(onWorkingMediaActivityChange
-              ? { onActivityChange: onWorkingMediaActivityChange }
-              : {})}
-          />
-          {processing ? (
-            <ProjectProcessingStatusPanel controller={processing} />
-          ) : (
-            <StatusNotice role="status" tone="neutral" title="Processing unavailable">
-              No provider work can be submitted from this workspace.
-            </StatusNotice>
-          )}
-          <ProjectOutputSaveSection
-            current={current}
-            session={session.port}
-            archived={archived}
-            ownerUserId={ownerUserId}
-          />
-          <ProjectHistorySection current={current} session={session.port} archived={archived} />
-        </>
-      ) : (
-        <>
-          <ProjectAssetsSection
-            projectId={project.id}
-            archived={archived}
-            {...(creativeStore ? { creativeStore } : {})}
-            {...(onCreateProjectCharacter ? { onCreateCharacter: onCreateProjectCharacter } : {})}
-            {...(onCreateProjectOutfit ? { onCreateOutfit: onCreateProjectOutfit } : {})}
-          />
-        </>
-      )}
+      <ProjectAssetsSection
+        projectId={project.id}
+        archived={archived}
+        session={session.port}
+        {...(creativeStore ? { creativeStore } : {})}
+        {...(onCreateProjectCharacter ? { onCreateCharacter: onCreateProjectCharacter } : {})}
+        {...(onCreateProjectOutfit ? { onCreateOutfit: onCreateProjectOutfit } : {})}
+      />
 
-      {!workspaceMode && renameTarget ? (
+      {renameTarget ? (
         <RenameProjectDialog
           project={renameTarget}
           returnFocusRef={dialogReturnRef}
@@ -979,7 +1118,7 @@ const ProjectDetail = ({
           }}
         />
       ) : null}
-      {!workspaceMode && campaignDialog ? (
+      {campaignDialog ? (
         <ProjectCampaignDialog
           project={project}
           returnFocusRef={dialogReturnRef}
@@ -991,7 +1130,7 @@ const ProjectDetail = ({
           }}
         />
       ) : null}
-      {!workspaceMode && lifecycleDialog ? (
+      {lifecycleDialog ? (
         <ProjectLifecycleDialog
           action={lifecycleDialog.action}
           project={lifecycleDialog.project}
@@ -1014,7 +1153,7 @@ const ProjectDetail = ({
           }}
         />
       ) : null}
-      {!workspaceMode && deleteTarget ? (
+      {deleteTarget ? (
         <DeleteProjectDialog
           project={deleteTarget}
           returnFocusRef={dialogReturnRef}
@@ -1049,7 +1188,7 @@ export const ProjectRouteSurface = (props: ProjectRouteSurfaceProps = {}) => {
         projectId === null
           ? projectsIndexRouteStyles(theme)
           : workspaceMode
-            ? workspaceStyles(theme)
+            ? projectWorkspaceRouteStyles()
             : projectOverviewRouteStyles(theme)
       }
       data-project-route=""

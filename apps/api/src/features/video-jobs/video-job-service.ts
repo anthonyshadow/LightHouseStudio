@@ -3,9 +3,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, rm } from 'node:fs/promises';
 import {
   VIDEO_JOB_TTL_MS,
+  videoJobQueueResponseSchema,
   videoJobStatusResponseSchema,
   type InspectedVideo,
   type VideoJobErrorCode,
+  type VideoJobQueueResponse,
   type VideoJobStatus,
   type VideoJobStatusResponse,
   type VideoOutputResolution,
@@ -85,6 +87,7 @@ type VideoJobRecord = {
   refreshPromise: Promise<void> | null;
   readonly operationController: AbortController;
   activeDeliveries: number;
+  abandonRequested: boolean;
   admissionsClosed: boolean;
   cleanupPending: boolean;
   deleteAfterCleanup: boolean;
@@ -185,8 +188,9 @@ const safeProviderFailure = (
   }
   if (error.reason === 'billing') {
     return {
-      code: 'provider_rejected',
-      message: 'Visual processing stopped because the configured service account needs attention.',
+      code: 'provider_billing',
+      message:
+        'Visual processing is blocked by the configured provider account. Resolve its billing or credit balance before retrying.',
     };
   }
   if (error.reason === 'quota') {
@@ -334,6 +338,7 @@ export class VideoJobService {
         refreshPromise: null,
         operationController: new AbortController(),
         activeDeliveries: 0,
+        abandonRequested: false,
         admissionsClosed: false,
         cleanupPending: false,
         deleteAfterCleanup: false,
@@ -478,6 +483,7 @@ export class VideoJobService {
       refreshPromise: null,
       operationController: new AbortController(),
       activeDeliveries: 0,
+      abandonRequested: false,
       admissionsClosed: false,
       cleanupPending: false,
       deleteAfterCleanup: false,
@@ -499,6 +505,42 @@ export class VideoJobService {
     await this.#expireDueJobs();
     const job = this.#jobs.get(jobId);
     return job?.ownerId === ownerId ? this.#snapshot(job) : null;
+  }
+
+  async reconcileActiveJob(ownerId: string): Promise<boolean> {
+    await this.#ready;
+    await this.#expireDueJobs();
+    const activeJobId = this.#activeJobByOwner.get(ownerId);
+    if (activeJobId === undefined) return false;
+    const job = this.#jobs.get(activeJobId);
+    if (job === undefined || job.ownerId !== ownerId || terminal(job.status)) {
+      if (this.#activeJobByOwner.get(ownerId) === activeJobId) {
+        this.#activeJobByOwner.delete(ownerId);
+      }
+      return false;
+    }
+    await this.#refresh(job);
+    if (terminal(job.status)) await this.#traceTails.get(job.jobId);
+    await this.#expireDueJobs();
+    return !terminal(job.status);
+  }
+
+  async listActiveJobs(ownerId: string): Promise<VideoJobQueueResponse> {
+    await this.reconcileActiveJob(ownerId);
+    const jobs = [...this.#jobs.values()]
+      .filter((job) => job.ownerId === ownerId && !terminal(job.status))
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .map((job) => ({
+        jobId: job.jobId,
+        operation: job.operation,
+        provider: job.providerId,
+        status: job.status,
+        createdAt: job.createdAt,
+        updatedAt: job.updatedAt,
+        expiresAt: job.expiresAt,
+        providerCancellationSupported: false,
+      }));
+    return videoJobQueueResponseSchema.parse({ jobs });
   }
 
   async prepareJobDirectory(jobId: string): Promise<{
@@ -549,7 +591,10 @@ export class VideoJobService {
       requestFingerprint: job.requestFingerprint,
       outputResolution: job.outputResolution,
       providerOutputLocation: job.providerOutputLocation,
-      sourceDurationMs: job.sourceDurationMs,
+      // Inspection can report sub-millisecond precision, while durable Project records own an
+      // integer-millisecond contract.
+      sourceDurationMs:
+        job.sourceDurationMs === null ? null : Math.max(1, Math.round(job.sourceDurationMs)),
       sourceOrientation: job.sourceOrientation,
       status: job.status,
       safeErrorCode: job.error?.code ?? null,
@@ -646,7 +691,8 @@ export class VideoJobService {
     return (
       !this.#closed &&
       this.#jobs.get(job.jobId) === job &&
-      job.status !== 'expired' &&
+      !terminal(job.status) &&
+      !job.abandonRequested &&
       !job.admissionsClosed &&
       job.expiresAtMs > this.#now()
     );
@@ -847,12 +893,7 @@ export class VideoJobService {
     const providerId = resolved.providerId;
     const binding = this.#bindingFor(input.recipe.operation, providerId)!;
     const outputResolution = resolved.outputResolution;
-    const activeJobId = this.#activeJobByOwner.get(input.ownerId);
-    const active = activeJobId ? this.#jobs.get(activeJobId) : undefined;
-    if (activeJobId && (!active || terminal(active.status))) {
-      this.#activeJobByOwner.delete(input.ownerId);
-    }
-    if (active) {
+    if (await this.reconcileActiveJob(input.ownerId)) {
       await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
       throw new AppError(
         409,
@@ -946,9 +987,7 @@ export class VideoJobService {
         'Character Swap requires a durably prepared H.264 MP4 Project input in this configuration.',
       );
     }
-    const activeJobId = this.#activeJobByOwner.get(input.ownerId);
-    const active = activeJobId === undefined ? undefined : this.#jobs.get(activeJobId);
-    if (active !== undefined && !terminal(active.status)) {
+    if (await this.reconcileActiveJob(input.ownerId)) {
       throw new AppError(
         409,
         'generation_in_progress',
@@ -1100,6 +1139,12 @@ export class VideoJobService {
         error instanceof AppError
           ? { code: error.code as VideoJobErrorCode, message: error.message }
           : safeProviderFailure(error);
+      console.warn('[video-jobs] Provider submission failed.', {
+        jobId: job.jobId,
+        provider: job.providerId,
+        operation: job.operation,
+        reason: error instanceof VideoJobProviderError ? error.reason : job.error.code,
+      });
       void this.#touch(job, 'failed');
       await this.#cleanupFiles(job);
     }
@@ -1245,6 +1290,9 @@ export class VideoJobService {
       throw new AppError(404, 'not_found', 'That temporary video job is unavailable.');
     }
     await this.#refresh(job);
+    // A provider callback can make the in-memory job terminal before its Project trace finishes.
+    // Do not let reconciliation observe that stale durable state and schedule another poll.
+    if (terminal(job.status)) await this.#traceTails.get(jobId);
     await this.#expireDueJobs();
     return this.#snapshot(job);
   }
@@ -1315,6 +1363,35 @@ export class VideoJobService {
         'generation_in_progress',
         'An active provider job cannot be cancelled or released.',
       );
+    }
+    await this.#requestCleanup(job, true);
+    this.#scheduleNextDeadline();
+  }
+
+  async abandon(jobId: string, ownerId: string): Promise<void> {
+    await this.#ready;
+    await this.#expireDueJobs();
+    const job = this.#jobs.get(jobId);
+    if (!job || job.ownerId !== ownerId) {
+      throw new AppError(404, 'not_found', 'That temporary video job is unavailable.');
+    }
+    if (!terminal(job.status) || job.status === 'ready') {
+      const previousStatus = job.status;
+      const previousUpdatedAt = job.updatedAt;
+      const previousError = job.error;
+      job.abandonRequested = true;
+      job.operationController.abort();
+      job.result = null;
+      job.error = null;
+      try {
+        await this.#touch(job, 'cancelled', true);
+      } catch (error) {
+        job.status = previousStatus;
+        job.updatedAt = previousUpdatedAt;
+        job.error = previousError;
+        this.#activeJobByOwner.set(job.ownerId, job.jobId);
+        throw error;
+      }
     }
     await this.#requestCleanup(job, true);
     this.#scheduleNextDeadline();

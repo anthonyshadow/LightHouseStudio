@@ -53,6 +53,15 @@ import type { VideoJobService } from '../video-jobs/video-job-service.js';
 
 const PROCESSING_SYSTEM_AUTHOR = 'project-processing';
 const PROCESSING_POLL_AFTER_MS = 2_000;
+const LOCALLY_STOPPABLE_PROCESSING_STATUSES = new Set([
+  'pending',
+  'validating',
+  'submitting',
+  'accepted',
+  'queued',
+  'processing',
+  'retrieving',
+]);
 
 const sourceMediaReference = (source: ProjectSourceRecord): ProjectMediaReference =>
   source.kind === 'saved-video-version'
@@ -80,6 +89,7 @@ type ProcessingInputRecord = Pick<
 
 const safeErrorMessage = (
   code: ProjectProcessingAttemptRecord['safeErrorCode'],
+  provider: ProjectProcessingAttemptRecord['provider'],
 ): {
   readonly code: NonNullable<ProjectProcessingAttempt['error']>['code'];
   readonly message: string;
@@ -98,6 +108,14 @@ const safeErrorMessage = (
       };
     case 'provider_timeout':
       return { code, message: 'Processing did not respond within the bounded deadline.' };
+    case 'provider_billing': {
+      const providerLabel =
+        provider === 'decart' ? 'Decart' : provider === 'pruna' ? 'Pruna' : 'The provider';
+      return {
+        code,
+        message: `${providerLabel} rejected this attempt because the configured account needs billing or credits. Resolve the provider account before retrying.`,
+      };
+    }
     case 'result_invalid':
       return { code, message: 'The returned video did not pass the app-owned media checks.' };
     case 'result_too_large':
@@ -112,8 +130,17 @@ const safeErrorMessage = (
     case 'unsupported_aspect_ratio':
     case 'duration_exceeded':
     case 'payload_too_large':
+      return {
+        code: 'provider_rejected',
+        message:
+          'The saved video or setup did not pass processing validation. Review it before starting another provider attempt.',
+      };
     case 'provider_rejected':
-      return { code: 'provider_rejected', message: 'Processing rejected this input or intent.' };
+      return {
+        code,
+        message:
+          'The provider rejected the submitted media or replacement instructions. Review the saved setup before retrying.',
+      };
     case null:
       return { code: 'processing_failed', message: 'Processing needs attention.' };
   }
@@ -338,6 +365,13 @@ export class ProjectProcessingService {
           'Use the explicit retry command for the current processing attempt.',
         );
       }
+      if (await this.videoJobs.reconcileActiveJob(input.ownerUserId)) {
+        throw new AppError(
+          409,
+          'generation_in_progress',
+          'Another video edit is still processing. Wait for it to finish, then start this Project edit again.',
+        );
+      }
       let previous: ProjectProcessingAttemptRecord | null = null;
       if (input.retryOfOperationId !== undefined) {
         previous = await this.processing.getProjectAttempt(
@@ -469,6 +503,13 @@ export class ProjectProcessingService {
           throw new AppError(404, 'not_found', 'That Project is unavailable.');
         }
         if (admission.kind === 'conflict') {
+          if (admission.conflict.kind === 'active-attempt') {
+            throw new AppError(
+              409,
+              'generation_in_progress',
+              'Another video edit is still processing. Wait for it to finish, then start this Project edit again.',
+            );
+          }
           throw new AppError(409, 'conflict', 'Project processing admission conflicted.');
         }
         if (admission.kind === 'admitted') {
@@ -501,9 +542,12 @@ export class ProjectProcessingService {
               status: 'failed',
               safeErrorCode:
                 error instanceof AppError &&
-                ['provider_unavailable', 'provider_rejected', 'provider_timeout'].includes(
-                  error.code,
-                )
+                [
+                  'provider_unavailable',
+                  'provider_billing',
+                  'provider_rejected',
+                  'provider_timeout',
+                ].includes(error.code)
                   ? error.code
                   : 'processing_failed',
               createdAt: attempt.createdAt,
@@ -750,16 +794,24 @@ export class ProjectProcessingService {
     });
   }
 
-  async cancel(ownerUserId: string, projectId: string, operationId: string): Promise<never> {
-    const attempt = await this.processing.getProjectAttempt(ownerUserId, projectId, operationId);
+  async cancel(
+    ownerUserId: string,
+    projectId: string,
+    operationId: string,
+  ): Promise<ProjectProcessingMutationResponse> {
+    let attempt = await this.processing.getProjectAttempt(ownerUserId, projectId, operationId);
     if (attempt === null) {
       throw new AppError(404, 'not_found', 'That Project processing attempt is unavailable.');
     }
-    throw new AppError(
-      409,
-      'conflict',
-      'This provider does not expose verified cancellation. Leaving cannot be described as stopping cost.',
-    );
+    if (LOCALLY_STOPPABLE_PROCESSING_STATUSES.has(attempt.status)) {
+      await this.videoJobs.abandon(operationId, ownerUserId);
+      attempt =
+        (await this.processing.getProjectAttempt(ownerUserId, projectId, operationId)) ?? attempt;
+    }
+    return projectProcessingMutationResponseSchema.parse({
+      replayed: true,
+      attempt: await this.#publicAttempt(ownerUserId, projectId, attempt),
+    });
   }
 
   async history(
@@ -773,14 +825,14 @@ export class ProjectProcessingService {
       pageSize: query.pageSize,
     });
     if (page === null) throw new AppError(404, 'not_found', 'That Project is unavailable.');
-    const retriedOperationIds = new Set(page.retriedOperationIds);
+    const supersededOperationIds = new Set(page.supersededOperationIds);
     return projectProcessingHistoryResponseSchema.parse({
       attempts: page.attempts.map((attempt) =>
         this.#formatPublicAttempt(
           projectId,
           attempt,
           page.currentOperationId,
-          retriedOperationIds.has(attempt.operationId),
+          supersededOperationIds.has(attempt.operationId),
         ),
       ),
       nextCursor: page.nextCursor === null ? null : historyCursor(page.nextCursor),
@@ -809,14 +861,18 @@ export class ProjectProcessingService {
     attempt: ProjectProcessingAttemptRecord,
   ): Promise<ProjectProcessingAttempt> {
     const currentAttempt = await this.processing.getCurrentProjectAttempt(ownerUserId, projectId);
-    const ambiguityAcknowledged =
+    const ambiguitySuperseded =
       attempt.status === 'ambiguous' &&
-      (await this.processing.hasProjectAttemptRetry(ownerUserId, projectId, attempt.operationId));
+      (await this.processing.isProjectAttemptSuperseded(
+        ownerUserId,
+        projectId,
+        attempt.operationId,
+      ));
     return this.#formatPublicAttempt(
       projectId,
       attempt,
       currentAttempt?.operationId ?? null,
-      ambiguityAcknowledged,
+      ambiguitySuperseded,
     );
   }
 
@@ -824,11 +880,14 @@ export class ProjectProcessingService {
     projectId: string,
     attempt: ProjectProcessingAttemptRecord,
     currentOperationId: string | null,
-    ambiguityAcknowledged: boolean,
+    ambiguitySuperseded: boolean,
   ): ProjectProcessingAttempt {
     const isCurrent = currentOperationId === attempt.operationId;
     const phase = projectProcessingPhase(attempt);
-    const error = phase === 'needs-attention' ? safeErrorMessage(attempt.safeErrorCode) : null;
+    const error =
+      phase === 'needs-attention'
+        ? safeErrorMessage(attempt.safeErrorCode, attempt.provider)
+        : null;
     return projectProcessingAttemptSchema.parse({
       operationId: attempt.operationId,
       projectId: attempt.projectId,
@@ -840,9 +899,14 @@ export class ProjectProcessingService {
       phase,
       isCurrent,
       ambiguous: attempt.status === 'ambiguous',
-      cancellation: attempt.status === 'cancelled' ? 'cancelled' : 'unsupported',
+      cancellation:
+        attempt.status === 'cancelled'
+          ? 'cancelled'
+          : LOCALLY_STOPPABLE_PROCESSING_STATUSES.has(attempt.status)
+            ? 'available'
+            : 'unsupported',
       retryPolicy: projectProcessingRetryPolicy(attempt.status),
-      blocksArchive: projectProcessingBlocksArchive(attempt.status) && !ambiguityAcknowledged,
+      blocksArchive: projectProcessingBlocksArchive(attempt.status) && !ambiguitySuperseded,
       createdAt: attempt.createdAt,
       updatedAt: attempt.updatedAt,
       acceptedAt: attempt.acceptedAt,

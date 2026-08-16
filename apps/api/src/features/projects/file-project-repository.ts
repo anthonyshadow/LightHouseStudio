@@ -4,6 +4,8 @@ import path from 'node:path';
 import type { InspectedVideo } from '@studio/contracts';
 import {
   currentProjectProcessingAttempt,
+  projectProcessingAmbiguityIsSuperseded,
+  projectProcessingAttemptBlocksArchive,
   projectProcessingBlocksArchive,
   projectProcessingNeedsAttention,
   projectProcessingRestartTransition,
@@ -817,14 +819,18 @@ export class FileProjectRepository
         );
   }
 
-  async hasProjectAttemptRetry(
+  async isProjectAttemptSuperseded(
     ownerUserId: string,
     projectId: string,
     operationId: string,
   ): Promise<boolean> {
     const library = await this.#read(ownerUserId);
-    return library.processingJobs.some(
-      (attempt) => attempt.projectId === projectId && attempt.retryOfOperationId === operationId,
+    const projectAttempts = library.processingJobs.filter(
+      (attempt) => attempt.projectId === projectId,
+    );
+    const attempt = projectAttempts.find((candidate) => candidate.operationId === operationId);
+    return (
+      attempt !== undefined && projectProcessingAmbiguityIsSuperseded(attempt, projectAttempts)
     );
   }
 
@@ -859,22 +865,15 @@ export class FileProjectRepository
       );
     const page = attempts.slice(0, input.pageSize) as ProjectProcessingAttemptRecord[];
     const last = page.at(-1);
-    const ambiguousOperationIds = new Set(
-      page.filter(({ status }) => status === 'ambiguous').map(({ operationId }) => operationId),
-    );
     return {
       attempts: page,
       currentOperationId:
         currentAttemptForAggregate(aggregate, projectAttempts)?.operationId ?? null,
-      retriedOperationIds: [
-        ...new Set(
-          projectAttempts.flatMap(({ retryOfOperationId }) =>
-            retryOfOperationId !== null && ambiguousOperationIds.has(retryOfOperationId)
-              ? [retryOfOperationId]
-              : [],
-          ),
-        ),
-      ],
+      supersededOperationIds: page.flatMap((attempt) =>
+        projectProcessingAmbiguityIsSuperseded(attempt, projectAttempts)
+          ? [attempt.operationId]
+          : [],
+      ),
       nextCursor:
         attempts.length > input.pageSize && last !== undefined
           ? { createdAt: last.createdAt, operationId: last.operationId }
@@ -1800,20 +1799,15 @@ export class FileProjectRepository
       ) {
         throw new Error('A Project metadata update changed immutable identity.');
       }
+      const projectAttempts = library.processingJobs.filter(
+        (attempt) => attempt.projectId === aggregate.project.id,
+      );
       if (
         aggregate.project.archivedAt === null &&
         nextProject.archivedAt !== null &&
         (aggregate.project.status === 'processing' ||
-          library.processingJobs.some(
-            (attempt) =>
-              attempt.projectId === aggregate.project.id &&
-              projectProcessingBlocksArchive(attempt.status) &&
-              !(
-                attempt.status === 'ambiguous' &&
-                library.processingJobs.some(
-                  (candidate) => candidate.retryOfOperationId === attempt.operationId,
-                )
-              ),
+          projectAttempts.some((attempt) =>
+            projectProcessingAttemptBlocksArchive(attempt, projectAttempts),
           ))
       ) {
         return {

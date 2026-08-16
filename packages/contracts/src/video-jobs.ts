@@ -43,6 +43,14 @@ export const VIDEO_JOB_STATUSES = [
   'cancelled',
 ] as const;
 export const videoJobStatusSchema = z.enum(VIDEO_JOB_STATUSES);
+export const VIDEO_ACTIVE_JOB_STATUSES = [
+  'validating',
+  'submitting',
+  'queued',
+  'processing',
+  'retrieving',
+] as const;
+export const activeVideoJobStatusSchema = z.enum(VIDEO_ACTIVE_JOB_STATUSES);
 
 export const VIDEO_JOB_ERROR_CODES = [
   'invalid_video',
@@ -52,6 +60,7 @@ export const VIDEO_JOB_ERROR_CODES = [
   'duration_exceeded',
   'payload_too_large',
   'provider_unavailable',
+  'provider_billing',
   'provider_rejected',
   'provider_timeout',
   'submission_ambiguous',
@@ -183,6 +192,31 @@ export const videoJobStatusResponseSchema = z
   })
   .strict();
 
+export const videoJobQueueItemSchema = z
+  .object({
+    jobId: z.uuid(),
+    operation: videoTransformOperationIdSchema,
+    provider: z.string().trim().min(1).max(80),
+    status: activeVideoJobStatusSchema,
+    createdAt: z.iso.datetime(),
+    updatedAt: z.iso.datetime(),
+    expiresAt: z.iso.datetime(),
+    providerCancellationSupported: z.literal(false),
+  })
+  .strict();
+
+export const videoJobQueueResponseSchema = z
+  .object({
+    jobs: z.array(videoJobQueueItemSchema).max(25),
+  })
+  .strict();
+
+export const abandonVideoJobRequestSchema = z
+  .object({
+    acknowledgeProviderMayContinue: z.literal(true),
+  })
+  .strict();
+
 export type VideoTransformModelId = z.infer<typeof videoTransformModelIdSchema>;
 export type VideoTransformOperationId = z.infer<typeof videoTransformOperationIdSchema>;
 export type VideoCharacterSwapProviderId = z.infer<typeof videoCharacterSwapProviderIdSchema>;
@@ -195,3 +229,6 @@ export type VideoJobErrorCode = z.infer<typeof videoJobErrorCodeSchema>;
 export type VideoJobSafeError = z.infer<typeof videoJobSafeErrorSchema>;
 export type InspectedVideo = z.infer<typeof inspectedVideoSchema>;
 export type VideoJobStatusResponse = z.infer<typeof videoJobStatusResponseSchema>;
+export type VideoJobQueueItem = z.infer<typeof videoJobQueueItemSchema>;
+export type VideoJobQueueResponse = z.infer<typeof videoJobQueueResponseSchema>;
+export type AbandonVideoJobRequest = z.infer<typeof abandonVideoJobRequestSchema>;

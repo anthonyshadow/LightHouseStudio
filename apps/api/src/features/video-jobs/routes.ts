@@ -1,6 +1,7 @@
 import { createReadStream } from 'node:fs';
 import { readFile, rm } from 'node:fs/promises';
 import {
+  abandonVideoJobRequestSchema,
   REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
   VIDEO_INPUT_MAX_BYTES,
   videoJobParamsSchema,
@@ -23,6 +24,10 @@ const verifyVideoProviderIntent = (request: HttpRequest): Promise<void> => {
 };
 
 export const registerVideoJobRoutes = (app: ApplicationRuntime, service: VideoJobService): void => {
+  app.get('/api/video-jobs', { onRequest: verifyVideoProviderIntent }, async (request) =>
+    service.listActiveJobs(ownerUserIdForRequest(request)),
+  );
+
   app.put(
     '/api/video-jobs/:jobId',
     {
@@ -130,6 +135,27 @@ export const registerVideoJobRoutes = (app: ApplicationRuntime, service: VideoJo
       const parsed = videoJobParamsSchema.safeParse(request.params);
       if (!parsed.success) throw new AppError(400, 'validation_error', 'Use a valid video job ID.');
       await service.release(parsed.data.jobId, ownerUserIdForRequest(request));
+      reply.status(204).send();
+    },
+  );
+
+  app.post(
+    '/api/video-jobs/:jobId/abandon',
+    { onRequest: verifyVideoProviderIntent },
+    async (request, reply) => {
+      const parsedParams = videoJobParamsSchema.safeParse(request.params);
+      if (!parsedParams.success) {
+        throw new AppError(400, 'validation_error', 'Use a valid video job ID.');
+      }
+      const parsedBody = abandonVideoJobRequestSchema.safeParse(request.body);
+      if (!parsedBody.success) {
+        throw new AppError(
+          400,
+          'validation_error',
+          'Confirm that provider work and cost may continue before removing this job.',
+        );
+      }
+      await service.abandon(parsedParams.data.jobId, ownerUserIdForRequest(request));
       reply.status(204).send();
     },
   );

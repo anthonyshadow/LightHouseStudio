@@ -4,7 +4,7 @@ import type { CampaignContract, ProjectContract, SavedVideoSummary } from '@stud
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HttpResponse, http } from 'msw';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import { mockApiServer } from '../../test/msw/server';
 import { StudioDesignProvider } from '../../ui';
@@ -87,6 +87,10 @@ const renderDashboard = (ownerUserId: string, actions = callbacks()) => {
 };
 
 describe('DashboardRouteSurface', () => {
+  beforeEach(() => {
+    mockApiServer.use(http.get('*/api/video-jobs', () => HttpResponse.json({ jobs: [] })));
+  });
+
   afterEach(() => {
     cleanup();
     window.localStorage.clear();
@@ -182,5 +186,59 @@ describe('DashboardRouteSurface', () => {
     expect(emptyState).not.toBeNull();
     await user.click(within(emptyState!).getByRole('button', { name: 'New Campaign' }));
     expect(actions.onCreateCampaign).toHaveBeenCalledOnce();
+  });
+
+  it('shows active processing and requires an upstream-cost warning before releasing its slot', async () => {
+    const jobId = '9f5664cf-1d2f-4248-b809-b2369ad42dd5';
+    let active = true;
+    let abandonBody: unknown = null;
+    mockApiServer.use(
+      http.get('*/api/video-jobs', () =>
+        HttpResponse.json({
+          jobs: active
+            ? [
+                {
+                  jobId,
+                  operation: 'virtual-try-on',
+                  provider: 'decart',
+                  status: 'queued',
+                  createdAt: now,
+                  updatedAt: now,
+                  expiresAt: '2026-08-11T17:00:00.000Z',
+                  providerCancellationSupported: false,
+                },
+              ]
+            : [],
+        }),
+      ),
+      http.post(`*/api/video-jobs/${jobId}/abandon`, async ({ request }) => {
+        abandonBody = await request.json();
+        active = false;
+        return new HttpResponse(null, { status: 204 });
+      }),
+      http.get('*/api/projects', () => HttpResponse.json({ projects: [], nextCursor: null })),
+      http.get('*/api/campaigns', () => HttpResponse.json({ campaigns: [], nextCursor: null })),
+      http.get('*/api/videos', () =>
+        HttpResponse.json({
+          videos: [],
+          nextCursor: null,
+          total: 0,
+          facets: { characterNames: [], formats: [] },
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
+
+    expect(await screen.findByRole('heading', { name: 'Processing Queue' })).toBeVisible();
+    expect(await screen.findByText('Virtual Try-On')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Remove from queue' }));
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText(/provider has no verified cancellation API/i)).toBeVisible();
+    await user.click(within(dialog).getByRole('button', { name: 'Remove from queue' }));
+
+    await waitFor(() => expect(abandonBody).toEqual({ acknowledgeProviderMayContinue: true }));
+    expect(await screen.findByText('No queued or active video jobs.')).toBeVisible();
+    expect(screen.getByText(/processing slot is available/i)).toBeVisible();
   });
 });

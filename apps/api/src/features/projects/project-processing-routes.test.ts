@@ -12,7 +12,10 @@ import {
   type ProjectProcessingMutationResponse,
 } from '@studio/contracts';
 import { createApp } from '../../app.js';
-import type { ExistingVideoJobProvider } from '../../providers/video-jobs/video-job-provider.js';
+import {
+  type ExistingVideoJobProvider,
+  VideoJobProviderError,
+} from '../../providers/video-jobs/video-job-provider.js';
 import { testConfig } from '../../test/fakes.js';
 import { FileProjectRepository } from './file-project-repository.js';
 
@@ -32,11 +35,13 @@ class DeterministicVideoProvider implements ExistingVideoJobProvider {
   statusCalls = 0;
   nextStatus: 'pending' | 'processing' | 'completed' | 'failed' = 'pending';
   rejectSubmission = false;
+  submissionFailure: VideoJobProviderError | null = null;
   observeSubmission?: () => Promise<void>;
 
   async submit(): Promise<{ providerJobId: string; status: 'pending' }> {
     this.submissions += 1;
     await this.observeSubmission?.();
+    if (this.submissionFailure !== null) throw this.submissionFailure;
     if (this.rejectSubmission) throw new TypeError('private response loss');
     return { providerJobId: `provider-job-${this.submissions}`, status: 'pending' };
   }
@@ -190,6 +195,30 @@ describe('Project processing route authority', () => {
       },
     });
 
+  const submitStandalone = (app: ReturnType<typeof createApp>, jobId: string) => {
+    const form = new FormData();
+    const bytes = new Uint8Array(fixture.byteLength);
+    bytes.set(fixture);
+    form.append(
+      'request',
+      JSON.stringify({
+        operation: 'character-swap',
+        inputKind: 'character',
+        prompt: 'Change the lighting',
+        enhancePrompt: false,
+        hasReferenceImage: false,
+        outputResolution: '720p',
+      }),
+    );
+    form.append('data', new Blob([bytes], { type: 'video/mp4' }), 'standalone-source.mp4');
+    return app.inject({
+      method: 'PUT',
+      url: `/api/video-jobs/${jobId}`,
+      headers: providerHeaders,
+      payload: form,
+    });
+  };
+
   const current = (app: ReturnType<typeof createApp>, projectId: string) =>
     app.inject({
       method: 'GET',
@@ -252,15 +281,6 @@ describe('Project processing route authority', () => {
     expect(projectProcessingMutationResponseSchema.parse(replay.json()).replayed).toBe(true);
     expect(provider.submissions).toBe(1);
 
-    const cancellation = await first.app.inject({
-      method: 'POST',
-      url: `/api/projects/${projectId}/processing/cancel`,
-      headers: { ...providerHeaders, 'content-type': 'application/json' },
-      payload: { operationId },
-    });
-    expect(cancellation.statusCode).toBe(409);
-    expect(cancellation.json()).toMatchObject({ error: { code: 'conflict' } });
-
     await first.app.close();
     provider.nextStatus = 'completed';
     const restarted = application(provider, new FileProjectRepository(directory));
@@ -318,6 +338,80 @@ describe('Project processing route authority', () => {
         revisionNumber: 3,
       }),
     );
+  });
+
+  it('removes an accepted Project operation from the local queue without claiming provider cancellation', async () => {
+    const provider = new DeterministicVideoProvider();
+    const { app, repository } = application(provider);
+    const { projectId } = await prepareProject(app);
+    const operationId = randomUUID();
+
+    expect((await submit(app, projectId, operationId)).statusCode).toBe(202);
+    await vi.waitFor(async () =>
+      expect(
+        (await repository.getProjectAttempt(ownerUserId, projectId, operationId))?.providerJobId,
+      ).toBe('provider-job-1'),
+    );
+
+    const cancellation = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/processing/cancel`,
+      headers: { ...providerHeaders, 'content-type': 'application/json' },
+      payload: { operationId },
+    });
+
+    expect(cancellation.statusCode).toBe(200);
+    expect(projectProcessingMutationResponseSchema.parse(cancellation.json())).toMatchObject({
+      replayed: true,
+      attempt: {
+        operationId,
+        phase: 'cancelled',
+        cancellation: 'cancelled',
+        blocksArchive: false,
+        nextPollAfterMs: null,
+      },
+    });
+    expect(provider.statusCalls).toBe(0);
+    expect((await repository.getCurrent(ownerUserId, projectId))?.project).toMatchObject({
+      status: 'ready',
+    });
+  });
+
+  it('reconciles an abandoned standalone edit before admitting Project processing', async () => {
+    const provider = new DeterministicVideoProvider();
+    const { app } = application(provider);
+    const standaloneJobId = randomUUID();
+    const standalone = await submitStandalone(app, standaloneJobId);
+    expect(standalone.statusCode).toBe(202);
+    await vi.waitFor(() => expect(provider.submissions).toBe(1));
+
+    const { projectId } = await prepareProject(app);
+    provider.nextStatus = 'failed';
+    const projectSubmission = await submit(app, projectId, randomUUID());
+
+    expect(projectSubmission.statusCode).toBe(202);
+    expect(provider.statusCalls).toBeGreaterThan(0);
+    await vi.waitFor(() => expect(provider.submissions).toBe(2));
+  });
+
+  it('returns one actionable active-job conflict without admitting duplicate Project work', async () => {
+    const provider = new DeterministicVideoProvider();
+    const { app } = application(provider);
+    expect((await submitStandalone(app, randomUUID())).statusCode).toBe(202);
+    await vi.waitFor(() => expect(provider.submissions).toBe(1));
+    const { projectId } = await prepareProject(app);
+
+    const blocked = await submit(app, projectId, randomUUID());
+
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json()).toEqual({
+      error: {
+        code: 'generation_in_progress',
+        message:
+          'Another video edit is still processing. Wait for it to finish, then start this Project edit again.',
+      },
+    });
+    expect(provider.submissions).toBe(1);
   });
 
   it('retains an obsolete paid success as history without promoting current Project media', async () => {
@@ -563,7 +657,7 @@ describe('Project processing route authority', () => {
     expect(provider.submissions).toBe(2);
 
     const currentAttemptReads = vi.spyOn(repository, 'getCurrentProjectAttempt');
-    const retryReads = vi.spyOn(repository, 'hasProjectAttemptRetry');
+    const supersessionReads = vi.spyOn(repository, 'isProjectAttemptSuperseded');
     const history = await app.inject({
       method: 'GET',
       url: `/api/projects/${projectId}/processing/history?pageSize=20`,
@@ -579,7 +673,7 @@ describe('Project processing route authority', () => {
       historyBody.attempts.find(({ operationId }) => operationId === retryOperationId),
     ).toMatchObject({ isCurrent: true });
     expect(currentAttemptReads).not.toHaveBeenCalled();
-    expect(retryReads).not.toHaveBeenCalled();
+    expect(supersessionReads).not.toHaveBeenCalled();
 
     const firstPage = projectProcessingHistoryResponseSchema.parse(
       (
@@ -607,7 +701,79 @@ describe('Project processing route authority', () => {
       attempts: [{ operationId: firstOperationId, isCurrent: false, blocksArchive: false }],
     });
     expect(currentAttemptReads).not.toHaveBeenCalled();
-    expect(retryReads).not.toHaveBeenCalled();
+    expect(supersessionReads).not.toHaveBeenCalled();
+  });
+
+  it('lets a later durable attempt release an older-revision ambiguity before archive', async () => {
+    const provider = new DeterministicVideoProvider();
+    provider.rejectSubmission = true;
+    const { app } = application(provider);
+    const { projectId } = await prepareProject(app);
+    const ambiguousOperationId = randomUUID();
+
+    await submit(app, projectId, ambiguousOperationId);
+    const ambiguous = await waitForPhase(app, projectId, 'needs-attention');
+    expect(ambiguous.attempt).toMatchObject({
+      operationId: ambiguousOperationId,
+      ambiguous: true,
+      blocksArchive: true,
+    });
+
+    const nextRevisionResponse = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/revisions`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: {
+        expectedVersion: ambiguous.currentProjectVersion,
+        expectedRevisionNumber: ambiguous.currentRevisionNumber,
+        proposal: proposal('Continue with a newer exact intent'),
+      },
+    });
+    expect(nextRevisionResponse.statusCode).toBe(200);
+    const nextRevision = projectCurrentResponseSchema.parse(nextRevisionResponse.json());
+
+    provider.rejectSubmission = false;
+    provider.submissionFailure = new VideoJobProviderError('billing', 402);
+    const laterOperationId = randomUUID();
+    const laterSubmission = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/processing/submit`,
+      headers: {
+        ...providerHeaders,
+        'content-type': 'application/json',
+        'idempotency-key': laterOperationId,
+      },
+      payload: {
+        expectedVersion: nextRevision.project.version,
+        expectedRevisionNumber: nextRevision.revision.revisionNumber,
+        capability: 'character-swap',
+      },
+    });
+    expect(laterSubmission.statusCode).toBe(202);
+    const later = await waitForPhase(app, projectId, 'needs-attention');
+    expect(later.attempt).toMatchObject({ operationId: laterOperationId, ambiguous: false });
+
+    const history = projectProcessingHistoryResponseSchema.parse(
+      (
+        await app.inject({
+          method: 'GET',
+          url: `/api/projects/${projectId}/processing/history?pageSize=20`,
+          headers: browserHeaders,
+        })
+      ).json(),
+    );
+    expect(
+      history.attempts.find(({ operationId }) => operationId === ambiguousOperationId),
+    ).toMatchObject({ blocksArchive: false });
+
+    const archive = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/archive`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { expectedVersion: later.currentProjectVersion },
+    });
+    expect(archive.statusCode).toBe(200);
+    expect(archive.json()).toMatchObject({ project: { status: 'archived' } });
   });
 
   it('marks a restarted submitting record without provider identity ambiguous without resubmitting', async () => {
@@ -674,5 +840,37 @@ describe('Project processing route authority', () => {
       error: { code: 'submission_ambiguous' },
     });
     expect(provider.submissions).toBe(0);
+  });
+
+  it('surfaces provider billing with actionable safe copy and a normalized server diagnostic', async () => {
+    const provider = new DeterministicVideoProvider();
+    provider.submissionFailure = new VideoJobProviderError('billing', 402);
+    const { app } = application(provider);
+    const { projectId } = await prepareProject(app);
+    const operationId = randomUUID();
+    const report = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await submit(app, projectId, operationId);
+    const rejected = await waitForPhase(app, projectId, 'needs-attention');
+
+    expect(rejected.attempt).toMatchObject({
+      operationId,
+      ambiguous: false,
+      retryPolicy: 'explicit',
+      nextPollAfterMs: null,
+      error: {
+        code: 'provider_billing',
+        message:
+          'Decart rejected this attempt because the configured account needs billing or credits. Resolve the provider account before retrying.',
+      },
+    });
+    expect(provider.submissions).toBe(1);
+    expect(report).toHaveBeenCalledWith('[video-jobs] Provider submission failed.', {
+      jobId: operationId,
+      provider: 'decart',
+      operation: 'character-swap',
+      reason: 'billing',
+    });
+    report.mockRestore();
   });
 });

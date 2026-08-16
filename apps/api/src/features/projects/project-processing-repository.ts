@@ -77,7 +77,7 @@ export type ProjectProcessingAdmissionResult =
 export interface ProjectProcessingHistoryPage {
   readonly attempts: readonly ProjectProcessingAttemptRecord[];
   readonly currentOperationId: string | null;
-  readonly retriedOperationIds: readonly string[];
+  readonly supersededOperationIds: readonly string[];
   readonly nextCursor: { readonly createdAt: string; readonly operationId: string } | null;
 }
 
@@ -110,7 +110,7 @@ export interface ProjectProcessingRepository {
     ownerUserId: string,
     projectId: string,
   ): Promise<ProjectProcessingAttemptRecord | null>;
-  hasProjectAttemptRetry(
+  isProjectAttemptSuperseded(
     ownerUserId: string,
     projectId: string,
     operationId: string,
@@ -217,7 +217,7 @@ export const isProjectProcessingRepository = (
   value !== null &&
   'admitProjectAttempt' in value &&
   typeof value.admitProjectAttempt === 'function' &&
-  'hasProjectAttemptRetry' in value &&
-  typeof value.hasProjectAttemptRetry === 'function' &&
+  'isProjectAttemptSuperseded' in value &&
+  typeof value.isProjectAttemptSuperseded === 'function' &&
   'retainProjectResult' in value &&
   typeof value.retainProjectResult === 'function';

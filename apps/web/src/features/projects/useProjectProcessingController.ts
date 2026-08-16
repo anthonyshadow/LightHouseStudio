@@ -236,7 +236,7 @@ export const useProjectProcessingController = ({
       try {
         return await run();
       } catch (firstError) {
-        if (signal.aborted) throw firstError;
+        if (signal.aborted || !operationStatusIsUnverified(firstError)) throw firstError;
         try {
           return await run();
         } catch (replayError) {

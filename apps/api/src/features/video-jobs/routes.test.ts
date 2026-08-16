@@ -5,6 +5,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../app.js';
 import { ApplicationRuntime, type HttpRequest } from '../../application/application-runtime.js';
+import { installErrorHandling } from '../../http/errors.js';
 import { testConfig } from '../../test/fakes.js';
 import { registerVideoJobRoutes } from './routes.js';
 import type { VideoJobService } from './video-job-service.js';
@@ -17,6 +18,7 @@ const trustedHeaders = {
 };
 
 const installRouteTestAuth = (app: ApplicationRuntime) => {
+  installErrorHandling(app);
   app.decorateRequest('auth', null);
   app.addHook('onRequest', async (request: HttpRequest) => {
     await Promise.resolve();
@@ -58,9 +60,11 @@ describe('video job route boundary', () => {
 
     for (const request of [
       { method: 'PUT' as const, url: `/api/video-jobs/${jobId}` },
+      { method: 'GET' as const, url: '/api/video-jobs' },
       { method: 'GET' as const, url: `/api/video-jobs/${jobId}` },
       { method: 'GET' as const, url: `/api/video-jobs/${jobId}/content` },
       { method: 'DELETE' as const, url: `/api/video-jobs/${jobId}` },
+      { method: 'POST' as const, url: `/api/video-jobs/${jobId}/abandon` },
     ]) {
       const response = await app.inject({
         ...request,
@@ -140,6 +144,49 @@ describe('video job route boundary', () => {
 
     expect(response.statusCode).toBe(403);
     expect(response.json<ApiErrorResponse>().error.code).toBe('forbidden_origin');
+  });
+
+  it('lists owner jobs and requires an explicit upstream-cost acknowledgement to abandon one', async () => {
+    const jobId = crypto.randomUUID();
+    const listActiveJobs = vi.fn().mockResolvedValue({ jobs: [] });
+    const abandon = vi.fn().mockResolvedValue(undefined);
+    const service = {
+      available: true,
+      listActiveJobs,
+      abandon,
+    } as unknown as VideoJobService;
+    const app = new ApplicationRuntime();
+    installRouteTestAuth(app);
+    registerVideoJobRoutes(app, service);
+    apps.push(app);
+
+    const list = await app.inject({
+      method: 'GET',
+      url: '/api/video-jobs',
+      headers: trustedHeaders,
+    });
+    expect(list.statusCode).toBe(200);
+    expect(list.json()).toEqual({ jobs: [] });
+    expect(listActiveJobs).toHaveBeenCalledWith('2d7914b2-f912-4b96-b17d-54100a2ffea3');
+
+    const unacknowledged = await app.inject({
+      method: 'POST',
+      url: `/api/video-jobs/${jobId}/abandon`,
+      headers: { ...trustedHeaders, 'content-type': 'application/json' },
+      payload: { acknowledgeProviderMayContinue: false },
+    });
+    expect(unacknowledged.statusCode).toBe(400);
+    expect(unacknowledged.json<ApiErrorResponse>().error.code).toBe('validation_error');
+    expect(abandon).not.toHaveBeenCalled();
+
+    const acknowledged = await app.inject({
+      method: 'POST',
+      url: `/api/video-jobs/${jobId}/abandon`,
+      headers: { ...trustedHeaders, 'content-type': 'application/json' },
+      payload: { acknowledgeProviderMayContinue: true },
+    });
+    expect(acknowledged.statusCode).toBe(204);
+    expect(abandon).toHaveBeenCalledWith(jobId, '2d7914b2-f912-4b96-b17d-54100a2ffea3');
   });
 
   it('requires explicit video intent and reports provider unavailability without parsing media', async () => {

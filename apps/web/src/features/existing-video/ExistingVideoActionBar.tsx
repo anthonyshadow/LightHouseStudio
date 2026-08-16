@@ -98,6 +98,8 @@ export const ExistingVideoActionBar = ({
         visualUnavailable={visualUnavailable}
         retryConfirmationOpen={retryConfirmationOpen}
         onRetryConfirmationOpenChange={setRetryConfirmationOpen}
+        onRequestDiscard={onRequestDiscard}
+        {...(discardButtonRef ? { discardButtonRef } : {})}
       />
     );
   }

@@ -111,6 +111,24 @@ describe('ProjectProcessingStatusPanel', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
+  it('offers an explicit local queue removal for an active Project attempt', async () => {
+    const cancel = vi.fn(() => Promise.resolve(true));
+    renderPanel(
+      processingController({
+        phase: 'idle',
+        attempt: attempt({ cancellation: 'available' }),
+        cancel,
+      }),
+    );
+    const user = userEvent.setup();
+
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'The provider may still finish remote work or charge',
+    );
+    await user.click(screen.getByRole('button', { name: 'Remove from processing queue' }));
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
   it('refreshes a current completed result when the Project summary needs another read', async () => {
     const refresh = vi.fn(() => Promise.resolve(true));
     renderPanel(

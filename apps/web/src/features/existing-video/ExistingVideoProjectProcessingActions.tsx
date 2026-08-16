@@ -1,4 +1,5 @@
 import type { Theme } from '@emotion/react';
+import type { RefObject } from 'react';
 import { Button, ConfirmationDialog } from '../../ui';
 import {
   projectProcessingCapabilityLabel,
@@ -74,6 +75,8 @@ export const ExistingVideoProjectProcessingActions = ({
   visualUnavailable,
   retryConfirmationOpen,
   onRetryConfirmationOpenChange,
+  onRequestDiscard,
+  discardButtonRef,
 }: {
   readonly theme: Theme;
   readonly workflow: ExistingVideoWorkflow;
@@ -83,6 +86,8 @@ export const ExistingVideoProjectProcessingActions = ({
   readonly visualUnavailable: boolean;
   readonly retryConfirmationOpen: boolean;
   readonly onRetryConfirmationOpenChange: (open: boolean) => void;
+  readonly onRequestDiscard: () => void;
+  readonly discardButtonRef?: RefObject<HTMLButtonElement | null>;
 }) => {
   const projectAttempt = projectProcessing.attempt;
   const commandTitle = projectProcessingCommandTitle(projectProcessing.phase);
@@ -213,7 +218,14 @@ export const ExistingVideoProjectProcessingActions = ({
           <strong>{summaryTitle}</strong>
           <span>{summaryDetail}</span>
         </div>
-        <div css={actionButtonsStyles(theme)}>{renderAction()}</div>
+        <div css={actionButtonsStyles(theme)}>
+          {renderAction()}
+          {projectAttempt !== null && projectAttempt.nextPollAfterMs !== null ? (
+            <Button ref={discardButtonRef} variant="danger" onClick={onRequestDiscard}>
+              Clear local editor
+            </Button>
+          ) : null}
+        </div>
       </div>
       <ConfirmationDialog
         open={retryConfirmationOpen}

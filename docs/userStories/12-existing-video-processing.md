@@ -195,7 +195,9 @@ source, then edit either base, save, start over, or discard.
 - A failed provider status may contain private diagnostics. The server reduces those diagnostics to
   an allowlisted failure class (content safeguards, account attention/limit, submitted media,
   cancellation, timeout, or upstream failure), discards the provider text, and exposes only
-  provider-neutral guidance. No class triggers an automatic submission retry.
+  provider-neutral guidance. Provider billing/credit failure is a distinct terminal class with
+  account-recovery guidance; terminal status waits for its durable Project trace before the browser
+  receives it, so reconciliation stops polling. No class triggers an automatic submission retry.
 - Original/variant identity stays local metadata until explicit selection. Character Swap hydrates
   the exact selected asset; Virtual Try-On outfit/input selection remains unchanged.
 - Selecting an exact saved character version initially leaves Character Swap Prompt empty so its
@@ -267,9 +269,14 @@ owned.
 The Project action presents submitting, accepted/queued, processing, retrieving, retaining-result,
 result-ready, needs-attention, and verified-cancelled states. Current Decart/Pruna visual adapters
 do not expose verified cancellation, so closing or switching stops browser status checks but never
-claims provider work or cost stopped. Failure retry is a new explicit potentially billable attempt;
+claims provider work or cost stopped. While an accepted Project operation remains active, **Clear
+local editor** releases the panel's temporary source and setup after confirmation without claiming
+to cancel the provider operation; durable Project status continues to track it. Failure retry is a
+new explicit potentially billable attempt;
 ambiguous submission requires an additional possible-duplicate-cost acknowledgement and never
-auto-resubmits. A current result is stored and inspected before a `job-result` revision makes it
+auto-resubmits. A historical ambiguous attempt no longer creates an invisible archive dead end
+after the Project has durably recorded a later attempt; its history remains visible, and any newest
+active or ambiguous attempt still blocks archive. A current result is stored and inspected before a `job-result` revision makes it
 Project working/presented media. It is **Result ready**, not Project `completed`, a Saved Video, or a
 Video Version. A valid obsolete success is **Retained in this Project** as historical `job-output`
 media and never replaces the current stage. Project ElevenLabs Start remains disabled because the
