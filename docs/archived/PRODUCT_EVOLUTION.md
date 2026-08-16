@@ -1,9 +1,9 @@
 # Product evolution
 
 This file preserves durable rationale for intentional product changes. Current behavior belongs in
-[Architecture](ARCHITECTURE.md) and the [observable user stories](userStories/README.md). Current
-positioning and future direction belong in [Product Vision](PRODUCT_VISION.md) and
-[Product Roadmap](PRODUCT_ROADMAP.md); this historical record is neither.
+[Architecture](../ARCHITECTURE.md) and the [observable user stories](../user-flows/feature-behavior/README.md). Current
+positioning and future direction belong in [Product Vision](../PRODUCT_VISION.md) and
+[Product Roadmap](../PRODUCT_ROADMAP.md); this historical record is neither.
 
 ## Local ownership added accounts and saved libraries
 

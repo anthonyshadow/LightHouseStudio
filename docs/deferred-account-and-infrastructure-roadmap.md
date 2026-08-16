@@ -5,7 +5,7 @@ Status: partially implemented infrastructure roadmap; public-product phases rema
 Original planning date: 2026-08-07
 
 Prerequisite: every completion requirement in
-[`user-accounts-phase-1-audit-and-plan.md`](user-accounts-phase-1-audit-and-plan.md) must pass.
+[`user-accounts-phase-1-audit-and-plan.md`](archived/user-accounts-phase-1-audit-and-plan.md) must pass.
 
 ## Purpose and boundary
 

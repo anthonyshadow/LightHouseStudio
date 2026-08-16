@@ -2,14 +2,14 @@
 
 **Status:** directional product roadmap; no calendar commitment
 
-**Current behavior:** [README](../README.md) and [user stories](userStories/README.md)
+**Current behavior:** [README](../README.md) and [user stories](user-flows/feature-behavior/README.md)
 
 **Product model and principles:** [Product vision](PRODUCT_VISION.md)
 
 **Current MVP boundary:** [Campaign and Project MVP definition](MVP_DEFINITION.md)
 
 **Acceptance status:** [MVP acceptance runbook](MVP_ACCEPTANCE.md); Prompt 02–13 history remains in the
-[implementation sequence](implementation/LIGHTFRAME_MVP_IMPLEMENTATION_SEQUENCE.md)
+[implementation sequence](archived/LIGHTFRAME_MVP_IMPLEMENTATION_SEQUENCE.md)
 
 This roadmap describes how Lightframe Studio can grow from the implemented video-focused Studio
 into a broader content creation and campaign workspace. Phases express product dependency and
@@ -52,7 +52,7 @@ unassigned.
 
 The Prompt 02–12 implementation corrected the historical revision-lineage,
 exact-Version-reference, output-replay, retention, current-status, bounded-read, and
-local-persistence gaps recorded in the [historical MVP alignment audit](MVP_ALIGNMENT_AUDIT.md).
+local-persistence gaps recorded in the [historical MVP alignment audit](archived/MVP_ALIGNMENT_AUDIT.md).
 The foundation represents a focused production effort, not a Campaign, and remains the authority
 under the browser workspace.
 

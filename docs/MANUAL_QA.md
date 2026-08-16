@@ -58,7 +58,7 @@ environment and confirm the repeated request completes cleanup without restoring
 ## Per-target physical protocol
 
 Use non-sensitive disposable media. Start from a fresh browser profile and stopped media. Run the
-primary flows in [user stories](userStories/README.md) and complete every applicable check.
+primary flows in [user stories](user-flows/feature-behavior/README.md) and complete every applicable check.
 
 ### Common checks
 

@@ -469,18 +469,21 @@ persistence, and HTTP boundaries.
 
 Start with the [documentation map](docs/README.md). Key references:
 
+- [Current user flows and navigation](docs/user-flows/README.md)
+- [Known flow gaps and usability findings](docs/user-flows/gaps-and-usability-audit.md)
+- [Per-capability behaviour](docs/user-flows/feature-behavior/README.md)
+- [Architecture and ownership](docs/ARCHITECTURE.md)
 - [Product vision and terminology](docs/PRODUCT_VISION.md)
 - [Product roadmap](docs/PRODUCT_ROADMAP.md)
 - [Local MVP acceptance and evidence](docs/MVP_ACCEPTANCE.md)
-- [Implemented journeys](docs/userStories/README.md)
-- [Architecture and ownership](docs/ARCHITECTURE.md)
 - [Privacy and temporary data](docs/PRIVACY_AND_TEMPORARY_DATA.md)
 - [Maintainability audit](docs/MAINTAINABILITY_AUDIT.md)
 - [Browser support](docs/BROWSER_SUPPORT.md)
 - [Manual QA](docs/MANUAL_QA.md)
 - [Testing strategy](docs/TESTING.md)
-- [Repository working guide](AGENTS.md)
+- [Agent quick guide](CLAUDE.md) and the [repository working guide](AGENTS.md)
+- [Archived documentation](docs/archived/README.md)
 
-Before changing behavior, read the working guide, trace the owning presentation, orchestration,
+Before changing behavior, read the agent quick guide, trace the owning presentation, orchestration,
 domain/contract, provider boundary, and tests, then update the affected canonical document and
-user story.
+user-flow document.

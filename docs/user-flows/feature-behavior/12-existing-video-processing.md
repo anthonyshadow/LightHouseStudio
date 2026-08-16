@@ -293,4 +293,4 @@ owner isolation, and protection against late-result resurrection. Live model ent
 Pruna pricing approval and 720p/1080p dimensions, real mobile pickers, H.264 MOV/WebM preparation,
 five-minute memory, and physical gallery downloads remain
 gates in
-[Manual QA](../MANUAL_QA.md) and [Live provider smoke](../LIVE_PROVIDER_SMOKE.md).
+[Manual QA](../../MANUAL_QA.md) and [Live provider smoke](../../LIVE_PROVIDER_SMOKE.md).

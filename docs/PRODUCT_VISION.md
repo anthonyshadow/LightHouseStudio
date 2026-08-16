@@ -3,7 +3,7 @@
 **Document type:** product direction; current behavior is identified explicitly
 
 **Current product authority:** [README](../README.md),
-[Architecture](ARCHITECTURE.md), and [user stories](userStories/README.md)
+[Architecture](ARCHITECTURE.md), and [user stories](user-flows/feature-behavior/README.md)
 
 ## Vision
 
