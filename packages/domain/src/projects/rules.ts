@@ -423,17 +423,24 @@ export const moveProjectToCampaign = (
   };
 };
 
+/** The single constructor for the optimistic-concurrency conflict on a Project row. */
+export const projectVersionConflictDetail = (
+  projectId: string,
+  expectedVersion: number,
+  actualVersion: number,
+): Extract<ProjectConflict, { readonly kind: 'project-version' }> => ({
+  kind: 'project-version',
+  projectId,
+  expectedVersion,
+  actualVersion,
+});
+
 const projectVersionConflict = (
   project: Project,
   expectedVersion: number,
 ): ProjectMutationResult<never> => ({
   ok: false,
-  conflict: {
-    kind: 'project-version',
-    projectId: project.id,
-    expectedVersion,
-    actualVersion: project.version,
-  },
+  conflict: projectVersionConflictDetail(project.id, expectedVersion, project.version),
 });
 
 export const renameProject = (

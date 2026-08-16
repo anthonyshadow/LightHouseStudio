@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { opaquePageTokenSchema } from './common';
 import {
   savedVideoDetailSchema,
   savedVideoSummarySchema,
@@ -491,7 +492,7 @@ export const projectAssetMembershipSchema = z
 export const projectAssetsQuerySchema = z
   .object({
     kind: projectAssetKindSchema.optional(),
-    cursor: z.string().trim().min(1).max(1_000).optional(),
+    cursor: opaquePageTokenSchema.optional(),
     pageSize: z.coerce.number().int().min(1).max(50).default(24),
   })
   .strict();
@@ -629,7 +630,7 @@ export const projectOutputVersionParamsSchema = z
   .strict();
 export const projectHistoryQuerySchema = z
   .object({
-    cursor: z.string().trim().min(1).max(1_000).optional(),
+    cursor: opaquePageTokenSchema.optional(),
     pageSize: z.coerce.number().int().min(1).max(40).default(20),
   })
   .strict();
@@ -693,7 +694,7 @@ export const projectsQuerySchema = z
   .object({
     lifecycle: z.enum(['active', 'archived']).default('active'),
     campaignId: z.union([z.uuid(), z.literal('none')]).optional(),
-    cursor: z.string().trim().min(1).max(500).optional(),
+    cursor: opaquePageTokenSchema.optional(),
     pageSize: z.coerce.number().int().min(1).max(40).default(20),
   })
   .strict();

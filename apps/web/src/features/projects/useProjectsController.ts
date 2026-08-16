@@ -133,8 +133,9 @@ export const useProjectsController = () => {
   const latestProject = useCallback(
     async (projectId: string): Promise<ProjectCurrentResponse> => {
       const current = await getProject(projectId);
+      // Lists are invalidated by `reconcile` once the follow-up mutation lands; a read
+      // that changes nothing does not need to refetch them.
       queryClient.setQueryData(projectQueryKeys.detail(projectId), current);
-      await queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
       return current;
     },
     [queryClient],

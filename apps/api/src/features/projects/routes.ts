@@ -35,12 +35,13 @@ import type {
   ApplicationRuntime,
   HttpReply,
   HttpRequest,
+  RouteHandler,
 } from '../../application/application-runtime.js';
 import { ownerUserIdForRequest } from '../../http/authentication.js';
 import { AppError } from '../../http/app-error.js';
+import { requestHeader, requireConfiguredService } from '../../http/request-helpers.js';
 import { isSpooledAudioUpload } from '../../application/spooled-upload.js';
-import type { AssetReadHandle } from '../../storage/asset-byte-store.js';
-import { contentRangeHeaders, parseByteRange } from '../saved-videos/byte-range.js';
+import { sendRangedAsset } from '../saved-videos/byte-range.js';
 import type { ProjectService, ProjectServiceMutationResult } from './project-service.js';
 import type {
   ProjectSourceMutationResult,
@@ -57,32 +58,14 @@ import type {
 import type { ProjectHistoryService } from './project-history-service.js';
 import type { ProjectAssetService } from './project-asset-service.js';
 
-const header = (request: HttpRequest, name: string): string | undefined => {
-  const value = request.headers[name];
-  return typeof value === 'string' ? value : undefined;
-};
+const requireService = (service: ProjectService | undefined): ProjectService =>
+  requireConfiguredService(service, 'Project persistence is unavailable in the configured mode.');
 
-const requireService = (service: ProjectService | undefined): ProjectService => {
-  if (service === undefined) {
-    throw new AppError(
-      503,
-      'feature_unavailable',
-      'Project persistence is unavailable in the configured mode.',
-    );
-  }
-  return service;
-};
-
-const requireAssetService = (service: ProjectAssetService | undefined): ProjectAssetService => {
-  if (service === undefined) {
-    throw new AppError(
-      503,
-      'feature_unavailable',
-      'Project asset persistence is unavailable in the configured mode.',
-    );
-  }
-  return service;
-};
+const requireAssetService = (service: ProjectAssetService | undefined): ProjectAssetService =>
+  requireConfiguredService(
+    service,
+    'Project asset persistence is unavailable in the configured mode.',
+  );
 
 const operationKeyConflictMessages = {
   create: 'That Idempotency-Key was already used for a different Project create request.',
@@ -155,48 +138,13 @@ const sendProjectOutputMutation = (reply: HttpReply, result: ProjectOutputSaveMu
   );
 };
 
-const sendProjectMediaContent = (
-  request: HttpRequest,
-  reply: HttpReply,
-  media: {
-    readonly asset: AssetReadHandle;
-    readonly mimeType: string;
-    readonly filename: string;
-  },
-) => {
-  const size = media.asset.manifest.sizeBytes;
-  const range = parseByteRange(header(request, 'range'), size);
-  const filename = media.filename.replaceAll(/["\\\r\n]/gu, '_');
-  reply.header('Accept-Ranges', 'bytes');
-  reply.header('Content-Type', media.mimeType);
-  reply.header('X-Content-Type-Options', 'nosniff');
-  const download =
-    typeof request.query === 'object' &&
-    request.query !== null &&
-    'download' in request.query &&
-    request.query.download === 'true';
-  reply.header(
-    'Content-Disposition',
-    `${download ? 'attachment' : 'inline'}; filename="${filename}"`,
-  );
-  if (range === null) {
-    reply.header('Content-Length', size);
-    return reply.send(media.asset.createReadStream());
-  }
-  const headers = contentRangeHeaders(range, size);
-  reply.status(206);
-  reply.header('Content-Range', headers.contentRange);
-  reply.header('Content-Length', headers.contentLength);
-  return reply.send(media.asset.createReadStream(range));
-};
-
 const parseUploadMetadata = <Output>(
   request: HttpRequest,
   headerName: string,
   schema: { readonly parse: (value: unknown) => Output },
   message: string,
 ): Output => {
-  const encoded = header(request, headerName);
+  const encoded = requestHeader(request, headerName);
   try {
     return schema.parse(JSON.parse(decodeURIComponent(encoded ?? '')) as unknown);
   } catch {
@@ -239,7 +187,9 @@ export const registerProjectRoutes = (
 
   app.post('/api/projects', async (request, reply) => {
     const body = createProjectRequestSchema.safeParse(request.body);
-    const operationKey = projectOperationKeySchema.safeParse(header(request, 'idempotency-key'));
+    const operationKey = projectOperationKeySchema.safeParse(
+      requestHeader(request, 'idempotency-key'),
+    );
     if (!body.success || !operationKey.success) {
       throw new AppError(
         400,
@@ -340,7 +290,7 @@ export const registerProjectRoutes = (
       async (request, reply) => {
         const params = projectParamsSchema.safeParse(request.params);
         const operationKey = projectOperationKeySchema.safeParse(
-          header(request, 'idempotency-key'),
+          requestHeader(request, 'idempotency-key'),
         );
         const upload = isSpooledAudioUpload(request.body) ? request.body : null;
         try {
@@ -370,7 +320,9 @@ export const registerProjectRoutes = (
 
     app.post('/api/projects/:projectId/source/reuse', async (request, reply) => {
       const params = projectParamsSchema.safeParse(request.params);
-      const operationKey = projectOperationKeySchema.safeParse(header(request, 'idempotency-key'));
+      const operationKey = projectOperationKeySchema.safeParse(
+        requestHeader(request, 'idempotency-key'),
+      );
       const body = reuseProjectSourceRequestSchema.safeParse(request.body);
       if (!params.success || !operationKey.success || !body.success) {
         throw new AppError(400, 'validation_error', 'Choose a valid exact Saved Video Version.');
@@ -401,7 +353,7 @@ export const registerProjectRoutes = (
         ownerUserIdForRequest(request),
         params.data.projectId,
       );
-      return sendProjectMediaContent(request, reply, {
+      return sendRangedAsset(request, reply, {
         asset: result.asset,
         mimeType: result.source.mimeType,
         filename: result.source.filename,
@@ -425,7 +377,7 @@ export const registerProjectRoutes = (
       async (request, reply) => {
         const params = projectParamsSchema.safeParse(request.params);
         const operationKey = projectOperationKeySchema.safeParse(
-          header(request, 'idempotency-key'),
+          requestHeader(request, 'idempotency-key'),
         );
         const upload = isSpooledAudioUpload(request.body) ? request.body : null;
         try {
@@ -459,7 +411,9 @@ export const registerProjectRoutes = (
 
     app.post('/api/projects/:projectId/working-media/reuse', async (request, reply) => {
       const params = projectParamsSchema.safeParse(request.params);
-      const operationKey = projectOperationKeySchema.safeParse(header(request, 'idempotency-key'));
+      const operationKey = projectOperationKeySchema.safeParse(
+        requestHeader(request, 'idempotency-key'),
+      );
       const body = adoptProjectWorkingMediaRequestSchema.safeParse(request.body);
       if (!params.success || !operationKey.success || !body.success) {
         throw new AppError(400, 'validation_error', 'Choose valid retained Project media.');
@@ -495,7 +449,7 @@ export const registerProjectRoutes = (
           params.data.projectId,
           params.data.revisionId,
         );
-        return sendProjectMediaContent(request, reply, {
+        return sendRangedAsset(request, reply, {
           asset: result.asset,
           mimeType: result.media.mimeType,
           filename: result.media.filename,
@@ -507,7 +461,9 @@ export const registerProjectRoutes = (
   if (outputService !== undefined) {
     app.post('/api/projects/:projectId/outputs', async (request, reply) => {
       const params = projectParamsSchema.safeParse(request.params);
-      const operationId = projectOperationKeySchema.safeParse(header(request, 'idempotency-key'));
+      const operationId = projectOperationKeySchema.safeParse(
+        requestHeader(request, 'idempotency-key'),
+      );
       const body = saveProjectOutputRequestSchema.safeParse(request.body);
       if (!params.success || !operationId.success || !body.success) {
         throw new AppError(
@@ -537,7 +493,7 @@ export const registerProjectRoutes = (
         params.data.projectId,
         params.data.videoVersionId,
       );
-      return sendProjectMediaContent(request, reply, {
+      return sendRangedAsset(request, reply, {
         asset: result.asset,
         mimeType: result.version.mimeType,
         filename: result.version.filename,
@@ -591,90 +547,78 @@ export const registerProjectRoutes = (
     });
   }
 
-  app.patch('/api/projects/:projectId', async (request, reply) => {
-    const params = projectParamsSchema.safeParse(request.params);
-    const body = renameProjectRequestSchema.safeParse(request.body);
-    if (!params.success || !body.success) {
-      throw new AppError(400, 'validation_error', 'Provide a valid Project title and version.');
-    }
-    return sendMutation(
-      reply,
-      await requireService(service).rename(
-        ownerUserIdForRequest(request),
-        params.data.projectId,
-        body.data.expectedVersion,
-        body.data.title,
-      ),
-    );
-  });
-
-  app.post('/api/projects/:projectId/archive', async (request, reply) => {
-    const params = projectParamsSchema.safeParse(request.params);
-    const body = projectLifecycleRequestSchema.safeParse(request.body);
-    if (!params.success || !body.success) {
-      throw new AppError(400, 'validation_error', 'Provide a valid Project and version.');
-    }
-    return sendMutation(
-      reply,
-      await requireService(service).archive(
-        ownerUserIdForRequest(request),
-        params.data.projectId,
-        body.data.expectedVersion,
-      ),
-    );
-  });
-
-  app.post('/api/projects/:projectId/restore', async (request, reply) => {
-    const params = projectParamsSchema.safeParse(request.params);
-    const body = projectLifecycleRequestSchema.safeParse(request.body);
-    if (!params.success || !body.success) {
-      throw new AppError(400, 'validation_error', 'Provide a valid Project and version.');
-    }
-    return sendMutation(
-      reply,
-      await requireService(service).restore(
-        ownerUserIdForRequest(request),
-        params.data.projectId,
-        body.data.expectedVersion,
-      ),
-    );
-  });
-
-  app.post('/api/projects/:projectId/tombstone', async (request, reply) => {
-    const params = projectParamsSchema.safeParse(request.params);
-    const body = tombstoneProjectRequestSchema.safeParse(request.body);
-    if (!params.success || !body.success) {
-      throw new AppError(400, 'validation_error', 'Confirm deletion of an archived Project.');
-    }
-    return sendMutation(
-      reply,
-      await requireService(service).tombstone(
-        ownerUserIdForRequest(request),
-        params.data.projectId,
-        body.data.expectedVersion,
-        body.data.confirmation,
-      ),
-    );
-  });
-
-  app.post('/api/projects/:projectId/campaign', async (request, reply) => {
-    const params = projectParamsSchema.safeParse(request.params);
-    const body = moveProjectCampaignRequestSchema.safeParse(request.body);
-    if (!params.success || !body.success) {
-      throw new AppError(
-        400,
-        'validation_error',
-        'Provide a valid Project, Campaign, and version.',
+  /**
+   * Every versioned Project mutation shares one shape: validate params + body together, then
+   * hand the owner, the Project id and the caller's expected version to one service method.
+   */
+  const versionedProjectMutation = <Body extends { readonly expectedVersion: number }>(
+    register: (handler: RouteHandler) => void,
+    bodySchema: {
+      readonly safeParse: (value: unknown) => { success: true; data: Body } | { success: false };
+    },
+    validationMessage: string,
+    run: (
+      projects: ProjectService,
+      ownerUserId: string,
+      projectId: string,
+      body: Body,
+    ) => Promise<ProjectServiceMutationResult>,
+  ): void => {
+    register(async (request, reply) => {
+      const params = projectParamsSchema.safeParse(request.params);
+      const body = bodySchema.safeParse(request.body);
+      if (!params.success || !body.success) {
+        throw new AppError(400, 'validation_error', validationMessage);
+      }
+      return sendMutation(
+        reply,
+        await run(
+          requireService(service),
+          ownerUserIdForRequest(request),
+          params.data.projectId,
+          body.data,
+        ),
       );
-    }
-    return sendMutation(
-      reply,
-      await requireService(service).moveToCampaign(
-        ownerUserIdForRequest(request),
-        params.data.projectId,
-        body.data.expectedVersion,
-        body.data.campaignId,
-      ),
-    );
-  });
+    });
+  };
+
+  versionedProjectMutation(
+    (handler) => app.patch('/api/projects/:projectId', handler),
+    renameProjectRequestSchema,
+    'Provide a valid Project title and version.',
+    (projects, ownerUserId, projectId, body) =>
+      projects.rename(ownerUserId, projectId, body.expectedVersion, body.title),
+  );
+
+  versionedProjectMutation(
+    (handler) => app.post('/api/projects/:projectId/archive', handler),
+    projectLifecycleRequestSchema,
+    'Provide a valid Project and version.',
+    (projects, ownerUserId, projectId, body) =>
+      projects.archive(ownerUserId, projectId, body.expectedVersion),
+  );
+
+  versionedProjectMutation(
+    (handler) => app.post('/api/projects/:projectId/restore', handler),
+    projectLifecycleRequestSchema,
+    'Provide a valid Project and version.',
+    (projects, ownerUserId, projectId, body) =>
+      projects.restore(ownerUserId, projectId, body.expectedVersion),
+  );
+
+  versionedProjectMutation(
+    (handler) => app.post('/api/projects/:projectId/tombstone', handler),
+    tombstoneProjectRequestSchema,
+    'Confirm deletion of an archived Project.',
+    (projects, ownerUserId, projectId, body) =>
+      projects.tombstone(ownerUserId, projectId, body.expectedVersion, body.confirmation),
+  );
+
+  versionedProjectMutation(
+    (handler) => app.post('/api/projects/:projectId/campaign', handler),
+    moveProjectCampaignRequestSchema,
+    'Provide a valid Project, Campaign, and version.',
+    (projects, ownerUserId, projectId, body) =>
+      projects.moveToCampaign(ownerUserId, projectId, body.expectedVersion, body.campaignId),
+  );
 };

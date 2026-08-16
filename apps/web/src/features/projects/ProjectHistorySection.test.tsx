@@ -293,7 +293,7 @@ describe('ProjectHistorySection', () => {
 
     await user.click(screen.getByRole('button', { name: 'Preview Version 1' }));
     const dialog = screen.getByRole('dialog', { name: 'Removed master · Version 1' });
-    expect(within(dialog).getByLabelText('Preview Removed master, Version 1')).toHaveAttribute(
+    expect(within(dialog).getByLabelText('Preview of Removed master, Version 1')).toHaveAttribute(
       'src',
       `/api/projects/${projectId}/outputs/${versionId}/content`,
     );

@@ -69,6 +69,13 @@ export const apiFetch = async (
 export const invalidApiResponse = (message: string, code: string) => () =>
   new ApiClientError(message, 502, code);
 
+/**
+ * The safe, owner-facing message for a failed request. Only an `ApiClientError` carries a message
+ * the transport has already vetted; anything else falls back to the caller's own copy.
+ */
+export const apiErrorMessage = (error: unknown, fallback: string): string =>
+  error instanceof ApiClientError ? error.message : fallback;
+
 /** Same-origin JSON transport with one error and runtime-validation contract. */
 export const requestJson = async <T>(
   input: RequestInfo | URL,

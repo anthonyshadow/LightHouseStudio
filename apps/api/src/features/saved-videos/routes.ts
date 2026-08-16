@@ -25,17 +25,13 @@ import type {
 import { isSpooledAudioUpload } from '../../application/spooled-upload.js';
 import { ownerUserIdForRequest } from '../../http/authentication.js';
 import { AppError } from '../../http/app-error.js';
+import { requestHeader } from '../../http/request-helpers.js';
 import type { SavedVideoService } from './saved-video-service.js';
 import type { DirectSavedVideoUploadService } from './direct-upload-service.js';
-import { contentRangeHeaders, parseByteRange } from './byte-range.js';
-
-const header = (request: HttpRequest, name: string): string | undefined => {
-  const value = request.headers[name];
-  return typeof value === 'string' ? value : undefined;
-};
+import { sendRangedAsset } from './byte-range.js';
 
 const uploadMetadata = (request: HttpRequest) => {
-  const encoded = header(request, 'x-lightframe-video-metadata');
+  const encoded = requestHeader(request, 'x-lightframe-video-metadata');
   try {
     return savedVideoUploadMetadataSchema.parse(
       JSON.parse(decodeURIComponent(encoded ?? '')) as unknown,
@@ -46,7 +42,9 @@ const uploadMetadata = (request: HttpRequest) => {
 };
 
 const idempotencyKey = (request: HttpRequest): string => {
-  const parsed = savedVideoIdempotencyKeySchema.safeParse(header(request, 'idempotency-key'));
+  const parsed = savedVideoIdempotencyKeySchema.safeParse(
+    requestHeader(request, 'idempotency-key'),
+  );
   if (!parsed.success)
     throw new AppError(400, 'validation_error', 'Provide a UUID Idempotency-Key.');
   return parsed.data;
@@ -60,30 +58,11 @@ const sendContent = async (
   versionId?: string,
 ) => {
   const result = await service.content(ownerUserIdForRequest(request), videoId, versionId);
-  const size = result.asset.manifest.sizeBytes;
-  const range = parseByteRange(header(request, 'range'), size);
-  const download =
-    typeof request.query === 'object' &&
-    request.query !== null &&
-    'download' in request.query &&
-    request.query.download === 'true';
-  const filename = result.version.filename.replaceAll(/["\\\r\n]/gu, '_');
-  void reply.header('Accept-Ranges', 'bytes');
-  void reply.header('Content-Type', result.version.mimeType);
-  void reply.header('X-Content-Type-Options', 'nosniff');
-  void reply.header(
-    'Content-Disposition',
-    `${download ? 'attachment' : 'inline'}; filename="${filename}"`,
-  );
-  if (range === null) {
-    void reply.header('Content-Length', size);
-    return reply.send(result.asset.createReadStream());
-  }
-  const rangeHeaders = contentRangeHeaders(range, size);
-  void reply.status(206);
-  void reply.header('Content-Range', rangeHeaders.contentRange);
-  void reply.header('Content-Length', rangeHeaders.contentLength);
-  return reply.send(result.asset.createReadStream(range));
+  return sendRangedAsset(request, reply, {
+    asset: result.asset,
+    mimeType: result.version.mimeType,
+    filename: result.version.filename,
+  });
 };
 
 const THUMBNAIL_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
@@ -196,7 +175,7 @@ export const registerSavedVideoRoutes = (
     },
     async (request, reply) => {
       const params = savedVideoParamsSchema.safeParse(request.params);
-      const expectedVersionId = header(request, 'if-match')?.replaceAll('"', '');
+      const expectedVersionId = requestHeader(request, 'if-match')?.replaceAll('"', '');
       if (!params.success || !savedVideoIdempotencyKeySchema.safeParse(expectedVersionId).success) {
         throw new AppError(
           400,

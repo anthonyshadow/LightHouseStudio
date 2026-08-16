@@ -26,6 +26,7 @@ import {
 } from '@studio/contracts';
 import {
   ApiClientError,
+  invalidApiResponse,
   requestJson,
   type ApiErrorPayloadParser,
 } from '../../adapters/api-client/apiClient';
@@ -53,8 +54,10 @@ const parseProjectConflict: ApiErrorPayloadParser = (payload, status) => {
     : null;
 };
 
-const invalidProjectResponse = () =>
-  new ApiClientError('The Project response was invalid.', 502, 'invalid-response');
+const invalidProjectResponse = invalidApiResponse(
+  'The Project response was invalid.',
+  'invalid-response',
+);
 
 const jsonHeaders = { Accept: 'application/json', 'Content-Type': 'application/json' } as const;
 

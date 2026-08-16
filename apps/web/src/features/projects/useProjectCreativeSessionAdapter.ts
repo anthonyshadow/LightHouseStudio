@@ -91,13 +91,10 @@ export const useProjectCreativeSessionAdapter = ({
       : null;
   const phase = checkpointState.projectId === projectId ? checkpointState.phase : 'idle';
   const message = checkpointState.projectId === projectId ? checkpointState.message : null;
-  const setPhase = useCallback(
-    (nextPhase: ProjectCreativeCheckpointPhase) => {
-      setCheckpointState((currentState) => ({
-        projectId,
-        phase: nextPhase,
-        message: currentState.projectId === projectId ? currentState.message : null,
-      }));
+  /** Both fields belong to one Project; a state left over from another Project is discarded. */
+  const setCheckpoint = useCallback(
+    (nextPhase: ProjectCreativeCheckpointPhase, nextMessage: string | null) => {
+      setCheckpointState({ projectId, phase: nextPhase, message: nextMessage });
     },
     [projectId],
   );
@@ -370,14 +367,16 @@ export const useProjectCreativeSessionAdapter = ({
       return false;
     }
     if (studioSession.draft.referenceImage?.kind === 'ephemeral') {
-      setPhase('error');
-      setMessage(
+      setCheckpoint(
+        'error',
         'This reference is still temporary. Choose a reusable saved reference, or remove it, before saving the Project checkpoint.',
       );
       return false;
     }
-    setPhase('saving');
-    setMessage('Queuing one semantic creative checkpoint through the Project session.');
+    setCheckpoint(
+      'saving',
+      'Queuing one semantic creative checkpoint through the Project session.',
+    );
     const proposal = createProjectCreativeProposal({
       current: latest,
       draft: studioSession.draft,
@@ -388,13 +387,12 @@ export const useProjectCreativeSessionAdapter = ({
       voiceSelection: existingVideo.voiceSelection,
     });
     if (!projectSession.propose(proposal)) {
-      setPhase('error');
-      setMessage('The Project session is not ready for this checkpoint.');
+      setCheckpoint('error', 'The Project session is not ready for this checkpoint.');
       return false;
     }
     const saved = await projectSession.flush();
-    setPhase(saved ? 'saved' : 'error');
-    setMessage(
+    setCheckpoint(
+      saved ? 'saved' : 'error',
       saved
         ? 'Creative setup saved as one Project checkpoint. Saving setup alone submitted no provider work.'
         : 'The creative proposal remains preserved in the Project session. Resolve its save state before retrying.',
@@ -407,8 +405,7 @@ export const useProjectCreativeSessionAdapter = ({
     projectId,
     projectSession,
     repository,
-    setMessage,
-    setPhase,
+    setCheckpoint,
     studioSession,
   ]);
 
