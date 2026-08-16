@@ -12,8 +12,7 @@ const options = (overrides: Record<string, unknown> = {}) => ({
   projectSession: null,
   hasTemporaryWork: false,
   hasActiveWork: false,
-  cleanupTemporaryState: vi.fn(() => Promise.resolve()),
-  releaseMedia: vi.fn(() => Promise.resolve()),
+  runCleanup: vi.fn(() => Promise.resolve()),
   logout: vi.fn(() => Promise.resolve()),
   onLoggedOut: vi.fn(),
   ...overrides,
@@ -21,16 +20,16 @@ const options = (overrides: Record<string, unknown> = {}) => ({
 
 describe('useStudioLogoutController', () => {
   it('blocks logout during active work and lets the user return to Studio', async () => {
-    const cleanupTemporaryState = vi.fn(() => Promise.resolve());
+    const runCleanup = vi.fn(() => Promise.resolve());
     const logout = vi.fn(() => Promise.resolve());
     const { result } = renderHook(() =>
-      useStudioLogoutController(options({ hasActiveWork: true, cleanupTemporaryState, logout })),
+      useStudioLogoutController(options({ hasActiveWork: true, runCleanup, logout })),
     );
 
     await act(async () => result.current.request());
 
     expect(result.current.blockedOpen).toBe(true);
-    expect(cleanupTemporaryState).not.toHaveBeenCalled();
+    expect(runCleanup).not.toHaveBeenCalled();
     expect(logout).not.toHaveBeenCalled();
 
     act(() => result.current.dismissBlocked());
@@ -63,16 +62,14 @@ describe('useStudioLogoutController', () => {
       flush: vi.fn(() => Promise.resolve(true)),
       discard: vi.fn(),
     } as unknown as ProjectSessionPort;
-    const cleanupTemporaryState = vi.fn(() => Promise.resolve());
-    const releaseMedia = vi.fn(() => Promise.resolve());
+    const runCleanup = vi.fn(() => Promise.resolve());
     const logout = vi.fn(() => Promise.resolve());
     const onLoggedOut = vi.fn();
     const { result } = renderHook(() =>
       useStudioLogoutController(
         options({
           projectSession,
-          cleanupTemporaryState,
-          releaseMedia,
+          runCleanup,
           logout,
           onLoggedOut,
         }),
@@ -84,8 +81,7 @@ describe('useStudioLogoutController', () => {
 
     expect(projectSession.flush).toHaveBeenCalledOnce();
     expect(projectSession.discard).not.toHaveBeenCalled();
-    expect(cleanupTemporaryState).toHaveBeenCalledOnce();
-    expect(releaseMedia).toHaveBeenCalledOnce();
+    expect(runCleanup).toHaveBeenCalledOnce();
     expect(logout).toHaveBeenCalledOnce();
     expect(result.current.promptOpen).toBe(false);
   });
@@ -132,7 +128,7 @@ describe('useStudioLogoutController', () => {
   });
 
   it('keeps the user in Studio after cleanup failure and retries the same explicit intent', async () => {
-    const cleanupTemporaryState = vi
+    const runCleanup = vi
       .fn<() => Promise<void>>()
       .mockRejectedValueOnce(new Error('sensitive cleanup detail'))
       .mockResolvedValueOnce();
@@ -140,7 +136,7 @@ describe('useStudioLogoutController', () => {
     const onLoggedOut = vi.fn();
     const { result } = renderHook(() =>
       useStudioLogoutController(
-        options({ cleanupTemporaryState, logout, onLoggedOut, hasTemporaryWork: false }),
+        options({ runCleanup, logout, onLoggedOut, hasTemporaryWork: false }),
       ),
     );
 
@@ -154,7 +150,7 @@ describe('useStudioLogoutController', () => {
 
     act(() => result.current.confirmDiscard());
     await waitFor(() => expect(onLoggedOut).toHaveBeenCalledOnce());
-    expect(cleanupTemporaryState).toHaveBeenCalledTimes(2);
+    expect(runCleanup).toHaveBeenCalledTimes(2);
     expect(logout).toHaveBeenCalledOnce();
   });
 

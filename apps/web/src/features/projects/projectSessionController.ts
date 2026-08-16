@@ -49,13 +49,13 @@ const proposalsMatch = (
 
 const safeSessionMessage = (error: unknown): string => {
   if (error instanceof ProjectApiConflictError) {
-    return 'This Project changed in another session. Your local proposal was preserved.';
+    return 'This Project changed somewhere else. Your unsaved changes are still here.';
   }
   if (error instanceof ApiClientError) return error.message;
   if (error instanceof DOMException && error.name === 'AbortError') {
     return 'Project saving was cancelled.';
   }
-  return 'Lightframe could not reach Project authority. Your local proposal was preserved.';
+  return 'Lightframe could not be reached. Your unsaved changes are still here.';
 };
 
 export class ProjectSessionController {

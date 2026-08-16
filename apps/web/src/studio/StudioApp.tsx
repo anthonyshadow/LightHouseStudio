@@ -60,6 +60,8 @@ import { useTakeReviewFlow } from './useTakeReviewFlow';
 import { useDesktopStudioLayout } from './useDesktopStudioLayout';
 import { useStudioOverlayController, type ActiveOverlay } from './useStudioOverlayController';
 import { useStudioLogoutController } from './useStudioLogoutController';
+import { useStudioSessionCleanup } from './useStudioSessionCleanup';
+import { useStudioSessionExpiryController } from './useStudioSessionExpiryController';
 import { useStudioProjectBridge } from './useStudioProjectBridge';
 import { useStudioSavedVideoController } from './useStudioSavedVideoController';
 import { StudioLibraryOverlays } from './StudioLibraryOverlays';
@@ -940,15 +942,30 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const handleLoggedOut = useCallback(() => {
     void navigate(APP_PATHS.entry, { replace: true });
   }, [navigate]);
+  const runSessionCleanup = useStudioSessionCleanup({ cleanupTemporaryState, releaseMedia });
   const logout = useStudioLogoutController({
     projectSourceActivity: activeProjectSourceActivity,
     projectSession: activeProjectSession,
     hasTemporaryWork: logoutHasTemporaryWork,
     hasActiveWork: logoutHasActiveWork,
-    cleanupTemporaryState,
-    releaseMedia,
+    runCleanup: runSessionCleanup,
     logout: auth.logout,
     onLoggedOut: handleLoggedOut,
+  });
+  // Holding session teardown is what keeps this shell — and the in-memory work it owns — mounted
+  // long enough to say what is about to be lost. Releasing on unmount is the backstop: if the
+  // shell goes away for any other reason, the session finalizes and the redirect proceeds.
+  const holdSessionEnd = auth.holdSessionEnd;
+  useEffect(() => holdSessionEnd(), [holdSessionEnd]);
+  const sessionEnding = auth.status === 'expiring';
+  const sessionExpiry = useStudioSessionExpiryController({
+    expiring: sessionEnding,
+    projectSourceActivity: activeProjectSourceActivity,
+    projectSession: activeProjectSession,
+    hasTemporaryWork: logoutHasTemporaryWork,
+    hasActiveWork: logoutHasActiveWork,
+    runCleanup: runSessionCleanup,
+    completeSessionEnd: auth.completeSessionEnd,
   });
   const discardExistingVideoSelection = useCallback(() => {
     if (existingVideo.selection) existingVideo.reset(false);
@@ -988,11 +1005,15 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const handledRecordIntentRef = useRef<string | null>(null);
   useEffect(() => {
     if (location.pathname !== APP_PATHS.create || creationIntent !== 'record') return;
-    const intentKey = `${location.pathname}${location.search}`;
+    // The Studio shell never unmounts, so this ref outlives every "navigation". Keying on
+    // location.key scopes it to one history entry: returning to the same URL later is a new entry
+    // and records again. It also bounds the case where startLocalRecording bails on an unsupported
+    // browser — that entry is spent, but the next one is not.
+    const intentKey = `${location.key}:${location.pathname}${location.search}`;
     if (handledRecordIntentRef.current === intentKey) return;
     handledRecordIntentRef.current = intentKey;
     startLocalRecording();
-  }, [creationIntent, location.pathname, location.search, startLocalRecording]);
+  }, [creationIntent, location.key, location.pathname, location.search, startLocalRecording]);
   const closeExistingVideo = useCallback(() => {
     if (existingVideo.providerActive) return;
     if (existingVideo.active) existingVideo.cancelBeforeAcceptance();
@@ -1299,12 +1320,14 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           }
           projectSourceActivity={activeProjectSourceActivity}
           projectSession={activeProjectSession}
+          sessionEnding={sessionEnding}
           onDiscardTemporaryWork={discardTemporaryWork}
         />
 
         <StudioLifecycleDialogs
           mainRef={mainRef}
           logout={logout}
+          sessionExpiry={sessionExpiry}
           savedVideo={savedVideo}
           videoEditor={videoEditor}
           projectContextActive={projectContextActive}

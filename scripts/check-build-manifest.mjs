@@ -5,8 +5,13 @@ import { pathToFileURL } from 'node:url';
 export const BUILD_CLOSURE_BUDGETS = {
   'index.html': 345_000,
   // The authenticated Studio owns the intentionally shared TanStack Query remote-state runtime.
-  // Optional creative surfaces stay lazy; this budget leaves about 10% headroom over the measured closure.
-  'src/studio/StudioApp.tsx': 1_000_000,
+  // The guardrail's job is to keep optional surfaces lazy, not to freeze the shell: dialogs and
+  // panels reachable only after a specific outcome belong in their own chunks (SaveVideoSuccessPanel,
+  // SessionExpiryNotice, ConfirmationDialog), while session-lifecycle code that must run before any
+  // of them — auth state, teardown holds, exit guards — is necessarily static.
+  // Raised from 1_000_000 when session-expiry handling landed; the previous value had drifted to
+  // 0.1% headroom, so it fired on any shell change at all rather than on a real regression.
+  'src/studio/StudioApp.tsx': 1_050_000,
 };
 
 const forbiddenEntryDependencies = [

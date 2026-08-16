@@ -25,6 +25,13 @@ const dialogProps = (overrides: Partial<DialogProps> = {}): DialogProps => ({
     dismissBlocked: vi.fn(),
     confirmDiscard: vi.fn(),
   },
+  sessionExpiry: {
+    noticeOpen: false,
+    hasActiveWork: false,
+    hasProjectProposal: false,
+    busy: false,
+    acknowledge: vi.fn(),
+  },
   savedVideo: {
     pendingSave: null,
     saveOutcome: null,
@@ -236,5 +243,48 @@ describe('StudioLifecycleDialogs', () => {
     renderDialogs(dialogProps({ savedVideo, saveSuccessSuppressed: true }));
 
     expect(screen.queryByRole('heading', { name: 'Saved to Assets' })).not.toBeInTheDocument();
+  });
+
+  it('names what an expiring session discards and offers exactly one way out', () => {
+    const acknowledge = vi.fn();
+    renderDialogs(
+      dialogProps({
+        sessionExpiry: {
+          noticeOpen: true,
+          hasActiveWork: false,
+          hasProjectProposal: true,
+          busy: false,
+          acknowledge,
+        },
+      }),
+    );
+
+    const notice = screen.getByRole('dialog', { name: 'Your session ended' });
+    expect(notice).toHaveTextContent('The current temporary take');
+    expect(notice).toHaveTextContent('Unsaved Project changes cannot be saved without a session');
+    // There is no session left to stay in, so a cancel affordance would be a false promise.
+    expect(screen.queryByRole('button', { name: /Stay/u })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Log in again' }));
+
+    expect(acknowledge).toHaveBeenCalledOnce();
+  });
+
+  it('tells an active-work expiry that the running operation stops', () => {
+    renderDialogs(
+      dialogProps({
+        sessionExpiry: {
+          noticeOpen: true,
+          hasActiveWork: true,
+          hasProjectProposal: false,
+          busy: false,
+          acknowledge: vi.fn(),
+        },
+      }),
+    );
+
+    const notice = screen.getByRole('dialog', { name: 'Your session ended' });
+    expect(notice).toHaveTextContent('will stop');
+    expect(notice).not.toHaveTextContent('Unsaved Project changes');
   });
 });

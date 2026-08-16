@@ -957,6 +957,21 @@ export const projectWorkflowProgressStyles = (theme: Theme): CSSObject => ({
     color: theme.colors.textFaint,
     fontWeight: 640,
   },
+  // The workspace masthead is a fixed 3rem row shared with the title and save status, so the
+  // compact variant must never wrap or claim flexible width. Below the tablet breakpoint the
+  // labels drop and each step is left with its ordinal plus its own aria-label.
+  '&[data-variant="masthead"]': {
+    flex: '0 0 auto',
+    flexWrap: 'nowrap',
+    gap: theme.space.xxs,
+    '& li': {
+      padding: `0.15rem ${theme.space.xs}`,
+      fontSize: theme.fontSizes.metadata,
+    },
+    '@media (max-width: 63.99rem)': {
+      '& li span[data-step-label]': { display: 'none' },
+    },
+  },
 });
 
 export const dialogActionsStyles = (theme: Theme): CSSObject => ({

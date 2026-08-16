@@ -318,6 +318,96 @@ describe('Project route surface', () => {
     );
   });
 
+  it('opens the workspace on the step the Project is up to and marks it in the masthead', async () => {
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(acceptedProject())),
+    );
+    renderProjects(`/projects/${activeId}/workspace`);
+
+    const tabs = await screen.findByRole('tablist', { name: 'Project tasks' });
+    // A source exists, so Source is behind the user and Create is the live task.
+    expect(within(tabs).getByRole('tab', { name: 'Create' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    const progress = screen.getByRole('list', { name: 'Project workflow progress' });
+    expect(progress.closest('[data-project-workspace-masthead]')).not.toBeNull();
+    expect(within(progress).getByText('Create').closest('li')).toHaveAttribute(
+      'aria-current',
+      'step',
+    );
+    expect(within(progress).getByText('Source').closest('li')).toHaveAttribute(
+      'data-state',
+      'done',
+    );
+  });
+
+  it('deep-links a workspace task and pins it against the Project phase', async () => {
+    const user = userEvent.setup();
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(acceptedProject())),
+    );
+    const { router } = renderProjects(`/projects/${activeId}/workspace?task=history`);
+
+    const tabs = await screen.findByRole('tablist', { name: 'Project tasks' });
+    expect(within(tabs).getByRole('tab', { name: 'History' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+
+    await user.click(within(tabs).getByRole('tab', { name: 'Save' }));
+
+    expect(router.state.location.search).toBe('?task=save');
+    // Replace, not push: the masthead Overview button must leave the workspace, not walk tasks.
+    expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`);
+  });
+
+  it('reads a completed Project as finished in the workflow progress', async () => {
+    const completed = acceptedProject();
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () =>
+        HttpResponse.json({
+          ...completed,
+          revision: {
+            ...completed.revision,
+            snapshot: { ...completed.revision.snapshot, workflowPhase: 'complete' },
+          },
+        }),
+      ),
+    );
+    renderProjects(`/projects/${activeId}`);
+
+    const progress = await screen.findByRole('list', { name: 'Project workflow progress' });
+    expect(within(progress).getByText('History').closest('li')).toHaveAttribute(
+      'aria-current',
+      'step',
+    );
+    expect(within(progress).getByText('Save').closest('li')).toHaveAttribute('data-state', 'done');
+  });
+
+  it('reads a review-phase Project as waiting on Save', async () => {
+    const reviewing = acceptedProject();
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () =>
+        HttpResponse.json({
+          ...reviewing,
+          revision: {
+            ...reviewing.revision,
+            snapshot: { ...reviewing.revision.snapshot, workflowPhase: 'review' },
+          },
+        }),
+      ),
+    );
+    renderProjects(`/projects/${activeId}`);
+
+    const progress = await screen.findByRole('list', { name: 'Project workflow progress' });
+    expect(within(progress).getByText('Save').closest('li')).toHaveAttribute(
+      'aria-current',
+      'step',
+    );
+  });
+
   it('shows the assigned Campaign name and returns safely to its detail route', async () => {
     const assigned = currentProject(activeId, { campaignId });
     mockApiServer.use(
@@ -522,7 +612,10 @@ describe('Project route surface', () => {
       expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`),
     );
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
-    expect(screen.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+    // The workspace now opens on the step the Project is up to, so reach back to Source to
+    // confirm what landed.
+    await userEvent.click(screen.getByRole('tab', { name: 'Source' }));
+    expect(screen.getByRole('heading', { name: 'Source video' })).toBeVisible();
   });
 
   it("opens an attached Video's exact current Version as working media without replacing the source", async () => {
@@ -629,7 +722,10 @@ describe('Project route surface', () => {
       expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`),
     );
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
-    expect(screen.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+    // The workspace now opens on the step the Project is up to, so reach back to Source to
+    // confirm what landed.
+    await userEvent.click(screen.getByRole('tab', { name: 'Source' }));
+    expect(screen.getByRole('heading', { name: 'Source video' })).toBeVisible();
   });
 
   it('shows retained images and type-specific visuals for attached creative Assets', async () => {
@@ -1055,15 +1151,15 @@ describe('Project route surface', () => {
         }),
       ),
     );
-    renderProjects(`/projects/${activeId}/workspace`, {
+    renderProjects(`/projects/${activeId}/workspace?task=source`, {
       sourceRuntime: { present, clear },
     });
 
-    expect(await screen.findByText(/Restoring the durable Project source/u)).toBeVisible();
+    expect(await screen.findByText(/Loading this Project.s saved source video/u)).toBeVisible();
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
     expect(present.mock.calls[0]?.[0]).toBe(activeId);
     expect(present.mock.calls[0]?.[1].blob).toBeInstanceOf(File);
-    const sourceHeading = screen.getByRole('heading', { name: 'Immutable original' });
+    const sourceHeading = screen.getByRole('heading', { name: 'Source video' });
     expect(sourceHeading.parentElement).toHaveTextContent(
       'accepted-source.mp4 · 640×360 · 1 seconds',
     );
@@ -1087,17 +1183,17 @@ describe('Project route surface', () => {
       }),
     );
     const user = userEvent.setup();
-    renderProjects(`/projects/${activeId}/workspace`, {
+    renderProjects(`/projects/${activeId}/workspace?task=source`, {
       sourceRuntime: { present, clear },
       recordingCandidate: { file, ready: true },
       onSourceActivityChange: (activity) => activities.push(activity),
     });
 
     await user.click(await screen.findByRole('button', { name: 'Use finalized recording' }));
-    expect(await screen.findByText(/Transferring and inspecting source media/u)).toBeVisible();
+    expect(await screen.findByText(/Uploading and checking your video/u)).toBeVisible();
     expect(screen.queryByText('All changes saved')).not.toBeInTheDocument();
 
-    expect(await screen.findByRole('heading', { name: 'Immutable original' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Source video' })).toBeVisible();
     expect(present).toHaveBeenCalledWith(activeId, expect.objectContaining({ blob: file }));
     expect(activities).toContainEqual(
       expect.objectContaining({ phase: 'preparing', busy: true, accepted: false }),
@@ -1239,7 +1335,7 @@ describe('Project route surface', () => {
       ),
     );
     const user = userEvent.setup();
-    renderProjects(`/projects/${activeId}/workspace`, {
+    renderProjects(`/projects/${activeId}/workspace?task=source`, {
       sourceRuntime: { present, clear },
     });
 
@@ -1264,9 +1360,9 @@ describe('Project route surface', () => {
     expect(present.mock.calls[0]?.[0]).toBe(activeId);
     expect(present.mock.calls[0]?.[1].blob).toBeInstanceOf(File);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(
-      screen.getByRole('heading', { name: 'Immutable original' }).parentElement,
-    ).toHaveTextContent('This Project references the exact Saved Video Version');
+    expect(screen.getByRole('heading', { name: 'Source video' }).parentElement).toHaveTextContent(
+      'This Project references the exact Saved Video Version',
+    );
   });
 
   it('moves a standalone Project after a recoverable Campaign assignment failure', async () => {
@@ -1442,18 +1538,18 @@ describe('Project route surface', () => {
     act(() => {
       sessionPort?.propose({ workflowPhase: 'creative' });
     });
-    expect(screen.getByText(/semantic Project checkpoint is queued/u)).toBeVisible();
+    expect(screen.getByText(/changes are queued and save automatically/u)).toBeVisible();
     await act(async () => {
       expect(await sessionPort?.flush()).toBe(false);
     });
 
     const conflict = await screen.findByRole('alert');
     expect(conflict).toHaveTextContent(
-      'This Project changed in another session. Your local proposal was preserved.',
+      'This Project changed somewhere else. Your unsaved changes are still here.',
     );
     await user.click(within(conflict).getByRole('button', { name: 'Reapply changes' }));
     expect(
-      await screen.findByText(/Committing one coalesced semantic Project revision/u),
+      await screen.findByText(/Saving your recent changes together as one change/u),
     ).toBeVisible();
     expect(await screen.findByText('All changes saved')).toBeVisible();
     expect(revisionWrites).toBe(2);

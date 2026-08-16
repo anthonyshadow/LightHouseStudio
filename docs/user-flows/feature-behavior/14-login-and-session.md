@@ -17,7 +17,13 @@ browser for up to 24 hours, and log out with temporary work safely cleaned up.
    through `/api/auth/me`. An absent, invalid, revoked, or expired session returns to `/`, offers
    Login, and preserves the recognized destination for post-login return.
 5. The 24-hour cookie can survive browser closure; it never enters browser storage or a URL.
-6. **Log out** is blocked while recording/finalization cannot be abandoned. Discardable work asks
+6. A session that ends mid-use — its 24 hours elapse, or any request returns `401` — never discards
+   in-memory work silently. With nothing unsaved, the return to `/` is immediate. With an unsaved
+   take, an active recording or render, unsaved edits, or unsaved Project changes, Studio stays on
+   screen behind one notice naming exactly what will be lost and offering one way out; the work is
+   discarded only when the operator acknowledges. Nothing is saved on this path — the session is
+   already gone — and `/` then says the session ended rather than that login is required.
+7. **Log out** is blocked while recording/finalization cannot be abandoned. Discardable work asks
    for confirmation, then cleanup cancels temporary work, releases media, clears user caches,
    revokes the session, and returns to `/`.
 

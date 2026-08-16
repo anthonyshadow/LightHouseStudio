@@ -236,7 +236,10 @@ stateful controls.
 `StudioExitGuard` blocks navigation leaving the protected application route family while recording, finalization, local video
 render/validation, or Project working-media adoption is active. A temporary take, active Voice process, dirty video-edit draft, or
 dirty AI-settings or Outfit Builder form requires confirmed discard before the route proceeds. Rendering
-must be cancelled before discard; navigation cannot abandon the worker. A URL-owned Project
+must be cancelled before discard; navigation cannot abandon the worker. A session that ends
+underneath the operator is the third exit path alongside in-app navigation and hard unload: the shell
+holds teardown, `useStudioSessionExpiryController` names what is about to be lost, and the guard
+stands aside for the redirect that follows so the operator never faces two prompts for one exit. A URL-owned Project
 session removes the prior blanket exemption for `/studio/*` navigation: changing Project identity
 or entering Studio/global-library context first flushes its semantic proposal, stays on failure or
 conflict, or requires explicit discard. Hard unload receives the matching browser warning for
