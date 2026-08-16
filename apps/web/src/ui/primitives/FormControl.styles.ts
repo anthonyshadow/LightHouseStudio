@@ -35,7 +35,7 @@ export const controlStyles = (theme: Theme, invalid: boolean): CSSObject => ({
 
 export const messageStyles = (theme: Theme, invalid: boolean): CSSObject => ({
   margin: 0,
-  color: invalid ? theme.colors.danger : theme.colors.textFaint,
+  color: invalid ? theme.colors.danger : theme.colors.textMuted,
   fontSize: '0.78rem',
   lineHeight: 1.45,
 });

@@ -236,6 +236,47 @@ describe('useProjectProcessingController', () => {
     });
   });
 
+  it('does not replay a deterministic active-job conflict and preserves its actionable reason', async () => {
+    const { session } = createSession();
+    let submitCount = 0;
+    mockApiServer.use(
+      jsonScenario('GET', currentPath, { body: currentResponse(null) }),
+      jsonScenario('GET', historyPath, { body: { attempts: [], nextCursor: null } }),
+      http.post(`*/api/projects/${ids.project}/processing/submit`, () => {
+        submitCount += 1;
+        return HttpResponse.json(
+          {
+            error: {
+              code: 'generation_in_progress',
+              message:
+                'Another video edit is still processing. Wait for it to finish, then start this Project edit again.',
+            },
+          },
+          { status: 409 },
+        );
+      }),
+    );
+    const hook = renderHook(() =>
+      useProjectProcessingController({
+        projectId: ids.project,
+        session,
+        checkpointCreative: vi.fn(() => Promise.resolve(true)),
+      }),
+    );
+    await waitFor(() => expect(hook.result.current.phase).toBe('idle'));
+
+    await act(async () => {
+      await hook.result.current.start('character-swap');
+    });
+
+    expect(submitCount).toBe(1);
+    expect(hook.result.current.phase).toBe('error');
+    expect(hook.result.current.message).toBe(
+      'Another video edit is still processing. Wait for it to finish, then start this Project edit again.',
+    );
+    expect(hook.result.current.unverifiedOperationId).toBeNull();
+  });
+
   it('locks an unverified server failure after exact replay so Start cannot create another operation', async () => {
     const { session } = createSession();
     let submitCount = 0;

@@ -15,6 +15,7 @@ export const ExistingVideoConfirmationDialogs = ({
   replaceButtonRef,
   discardOpen,
   discardButtonRef,
+  projectOperationActive = false,
   onCancelVisualSwitch,
   onConfirmVisualSwitch,
   onCancelReplace,
@@ -29,6 +30,7 @@ export const ExistingVideoConfirmationDialogs = ({
   readonly replaceButtonRef: RefObject<HTMLButtonElement | null>;
   readonly discardOpen: boolean;
   readonly discardButtonRef: RefObject<HTMLButtonElement | null>;
+  readonly projectOperationActive?: boolean;
   readonly onCancelVisualSwitch: () => void;
   readonly onConfirmVisualSwitch: () => void;
   readonly onCancelReplace: () => void;
@@ -69,9 +71,13 @@ export const ExistingVideoConfirmationDialogs = ({
     />
     <ConfirmationDialog
       open={discardOpen}
-      title="Discard this video?"
-      description="The source, edit setup, and generated result are temporary and cannot be recovered after this tab releases them."
-      confirmLabel="Discard video"
+      title={projectOperationActive ? 'Clear the local editor?' : 'Discard this video?'}
+      description={
+        projectOperationActive
+          ? 'This releases the local editor source and setup. The accepted Project provider operation is not cancelled; it may continue and remains tracked in Project status.'
+          : 'The source, edit setup, and generated result are temporary and cannot be recovered after this tab releases them.'
+      }
+      confirmLabel={projectOperationActive ? 'Clear local editor' : 'Discard video'}
       cancelLabel="Keep video"
       danger
       returnFocusRef={discardButtonRef}

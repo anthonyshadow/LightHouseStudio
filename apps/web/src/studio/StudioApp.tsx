@@ -185,6 +185,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     dashboardRouteActive ||
     assetsRouteActive ||
     liveRouteActive ||
+    projectWorkspaceActive ||
     projectOverviewActive ||
     campaignRouteActive;
   const activeProjectId = projectIdFromPath(location.pathname);
@@ -380,6 +381,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     processing,
     publishUploadedVideo: publishValidatedVideo,
     onSubmissionAccepted: recordAcceptedBatchStep,
+    ...(activeProjectId !== null
+      ? {
+          standaloneVisualSubmissionBlockedReason:
+            'Project visual processing must start through the recoverable Project command.',
+        }
+      : {}),
     ...(availability.videoProcessing
       ? { videoProcessingCapabilities: availability.videoProcessing }
       : {}),

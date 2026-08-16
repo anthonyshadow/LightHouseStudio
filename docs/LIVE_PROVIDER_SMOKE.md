@@ -106,7 +106,7 @@ For each exact batch model:
    bytes—not the URL—reach the later submission. Confirm VTO rights, retention, input limitations,
    and submission disclosure are visible before action.
 3. Submit once. Confirm the broker's multipart input maps to Decart's documented `data`, `prompt`,
-   optional `reference_image`, `resolution=720p`, and `enhance_prompt` fields; uses synthetic
+   optional `reference_image.0`, `resolution=720p`, and `enhance_prompt` fields; uses synthetic
    filenames and the selected exact model (`lucy-latest` or `lucy-vton-latest`); and makes no
    provider request before authoritative server inspection.
 4. Observe validating, submitting, queued, processing, retrieving, and ready as applicable. The UI

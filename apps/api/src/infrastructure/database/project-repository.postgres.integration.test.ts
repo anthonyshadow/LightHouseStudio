@@ -1236,7 +1236,7 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
       ).resolves.toMatchObject({
         attempts: [{ operationId: processingOperationId }],
         currentOperationId: processingOperationId,
-        retriedOperationIds: [],
+        supersededOperationIds: [],
         nextCursor: null,
       });
 

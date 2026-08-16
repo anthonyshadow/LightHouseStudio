@@ -1,9 +1,15 @@
 import { useTheme } from '@emotion/react';
-import type { CampaignContract, ProjectContract, SavedVideoSummary } from '@studio/contracts';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import type {
+  CampaignContract,
+  ProjectContract,
+  SavedVideoSummary,
+  VideoJobQueueItem,
+} from '@studio/contracts';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { listSavedVideos } from '../../adapters/api-client/savedVideosApi';
-import { AppIcon, Button, StatusNotice } from '../../ui';
+import { abandonVideoJob, listActiveVideoJobs } from '../../adapters/api-client/videoJobsApi';
+import { AppIcon, Button, ConfirmationDialog, StatusNotice } from '../../ui';
 import { useCampaignList } from '../campaigns/useCampaignsController';
 import { useProjectList } from '../projects/useProjectsController';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
@@ -19,6 +25,7 @@ import {
   dashboardStyles,
   emptyRecentStyles,
   onboardingStyles,
+  processingQueueStyles,
   quickActionsStyles,
   recentFilterStyles,
   recentListStyles,
@@ -30,6 +37,25 @@ const RECENT_LIMIT = 4;
 
 const formatUpdatedAt = (value: string): string =>
   new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value));
+
+const formatJobCreatedAt = (value: string): string =>
+  new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(
+    new Date(value),
+  );
+
+const jobOperationLabel = (operation: VideoJobQueueItem['operation']): string =>
+  operation === 'virtual-try-on' ? 'Virtual Try-On' : 'Character Swap';
+
+const jobStatusLabel = (status: VideoJobQueueItem['status']): string => {
+  if (status === 'validating' || status === 'submitting' || status === 'queued') return 'Queued';
+  if (status === 'retrieving') return 'Finalizing';
+  return 'Active';
+};
+
+const jobActionLabel = (status: VideoJobQueueItem['status']): string =>
+  status === 'validating' || status === 'submitting' || status === 'queued'
+    ? 'Remove from queue'
+    : 'Stop tracking';
 
 type DashboardRouteSurfaceProps = Readonly<{
   ownerUserId: string;
@@ -88,11 +114,14 @@ export const DashboardRouteSurface = ({
   onOpenVideos,
 }: DashboardRouteSurfaceProps) => {
   const theme = useTheme();
+  const queryClient = useQueryClient();
   const [onboardingVisible, setOnboardingVisible] = useState(
     () => !loadDashboardOnboardingDismissed(ownerUserId),
   );
   const [onboardingStorageWarning, setOnboardingStorageWarning] = useState(false);
   const [recentKind, setRecentKind] = useState<RecentKind>('all');
+  const [selectedJob, setSelectedJob] = useState<VideoJobQueueItem | null>(null);
+  const [queueNotice, setQueueNotice] = useState<string | null>(null);
   const projectsQuery = useProjectList('active');
   const campaignsQuery = useCampaignList('active');
   const videosQuery = useInfiniteQuery({
@@ -105,6 +134,21 @@ export const DashboardRouteSurface = ({
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
+  });
+  const processingQueueQuery = useQuery({
+    queryKey: ['video-jobs', 'active', ownerUserId],
+    queryFn: ({ signal }) => listActiveVideoJobs(signal),
+    refetchInterval: (query) => (query.state.data?.jobs.length ? 3_000 : false),
+  });
+  const abandonMutation = useMutation({
+    mutationFn: (jobId: string) => abandonVideoJob(jobId),
+    onSuccess: async () => {
+      setSelectedJob(null);
+      setQueueNotice('The job was removed from Lightframe and the processing slot is available.');
+      await queryClient.invalidateQueries({
+        queryKey: ['video-jobs', 'active', ownerUserId],
+      });
+    },
   });
   const projects = useMemo(
     () => (projectsQuery.data?.pages.flatMap((page) => page.projects) ?? []).slice(0, RECENT_LIMIT),
@@ -239,6 +283,68 @@ export const DashboardRouteSurface = ({
         </StatusNotice>
       ) : null}
 
+      <section css={processingQueueStyles(theme)} aria-labelledby="processing-queue-heading">
+        <header>
+          <div>
+            <h2 id="processing-queue-heading">Processing Queue</h2>
+            <p>Queued and active provider video edits for this account.</p>
+          </div>
+          <Button
+            size="small"
+            variant="quiet"
+            disabled={processingQueueQuery.isFetching}
+            onClick={() => void processingQueueQuery.refetch()}
+          >
+            Refresh
+          </Button>
+        </header>
+        {processingQueueQuery.isLoading ? <p role="status">Checking processing jobs…</p> : null}
+        {processingQueueQuery.isError ? (
+          <StatusNotice role="alert" tone="danger" title="Processing queue unavailable">
+            <Button
+              size="small"
+              variant="quiet"
+              onClick={() => void processingQueueQuery.refetch()}
+            >
+              Retry
+            </Button>
+          </StatusNotice>
+        ) : null}
+        {queueNotice ? (
+          <StatusNotice role="status" tone="success" title="Processing slot released">
+            {queueNotice}
+          </StatusNotice>
+        ) : null}
+        {processingQueueQuery.data?.jobs.length ? (
+          <ul>
+            {processingQueueQuery.data.jobs.map((job) => (
+              <li key={job.jobId}>
+                <span data-job-status>{jobStatusLabel(job.status)}</span>
+                <span data-job-details>
+                  <strong>{jobOperationLabel(job.operation)}</strong>
+                  <span>
+                    {job.provider} · Started {formatJobCreatedAt(job.createdAt)}
+                  </span>
+                </span>
+                <Button
+                  size="small"
+                  variant="danger"
+                  onClick={() => {
+                    abandonMutation.reset();
+                    setQueueNotice(null);
+                    setSelectedJob(job);
+                  }}
+                >
+                  {jobActionLabel(job.status)}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : !processingQueueQuery.isLoading && !processingQueueQuery.isError ? (
+          <p data-empty-queue>No queued or active video jobs.</p>
+        ) : null}
+      </section>
+
       <div css={dashboardBodyStyles(theme)}>
         <div data-dashboard-primary-column>
           <section aria-labelledby="continue-heading">
@@ -371,6 +477,31 @@ export const DashboardRouteSurface = ({
           </footer>
         </section>
       </div>
+
+      <ConfirmationDialog
+        open={selectedJob !== null}
+        title={selectedJob ? `${jobActionLabel(selectedJob.status)}?` : 'Remove job?'}
+        description="This releases Lightframe's processing slot and discards any result that arrives later."
+        alert={
+          abandonMutation.isError
+            ? abandonMutation.error instanceof Error
+              ? abandonMutation.error.message
+              : 'The job could not be removed.'
+            : 'The configured provider has no verified cancellation API. Provider work and cost may continue after removal.'
+        }
+        confirmLabel={selectedJob ? jobActionLabel(selectedJob.status) : 'Remove job'}
+        cancelLabel="Keep job"
+        danger
+        busy={abandonMutation.isPending}
+        onCancel={() => {
+          if (abandonMutation.isPending) return;
+          abandonMutation.reset();
+          setSelectedJob(null);
+        }}
+        onConfirm={() => {
+          if (selectedJob) abandonMutation.mutate(selectedJob.jobId);
+        }}
+      />
     </section>
   );
 };

@@ -584,6 +584,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
         mimeType: 'video/mp4',
         buffer: fixture,
       });
+      await page.getByRole('tab', { name: 'Save', exact: true }).click();
       const outputHeading = page.getByRole('heading', { name: 'Review and save output' });
       await expect(outputHeading).toBeVisible();
       await page.getByRole('button', { name: 'Add Version' }).scrollIntoViewIfNeeded();

@@ -1,5 +1,5 @@
 import { VIDEO_JOB_TTL_MS } from '@studio/contracts';
-import { and, eq, gt, inArray, isNotNull, isNull, lte, notExists, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lte, notExists, sql } from 'drizzle-orm';
 import { toIsoTimestamp } from '../../application/timestamps.js';
 import type {
   DurableProcessingJobRepository,
@@ -17,6 +17,24 @@ interface DrizzleProcessingJobTraceWriterOptions {
 
 const persistedDurationMs = (durationMs: number | null): number | null =>
   durationMs === null ? null : Math.round(durationMs);
+
+const activeStatuses = [
+  'pending',
+  'validating',
+  'submitting',
+  'accepted',
+  'queued',
+  'processing',
+  'retrieving',
+] as const;
+
+const isOwnerActiveConflict = (error: unknown): boolean =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  error.code === '23505' &&
+  'constraint' in error &&
+  error.constraint === 'processing_jobs_owner_active_unique';
 
 const valuesForTrace = (trace: VideoProcessingJobTrace) => ({
   id: trace.jobId,
@@ -166,9 +184,11 @@ export class DrizzleProcessingJobTraceWriter
           standaloneScope,
         ),
       );
-    await this.db
-      .update(processingJobs)
-      .set({ status: 'retrieving', safeErrorCode: null, completedAt: null, updatedAt: now })
+    // `ready` is terminal for admission, so an owner may have several undelivered rows. Restart
+    // recovery makes one row active again as `retrieving`; promote only the newest idle-owner row.
+    const readyCandidates = await this.db
+      .select({ id: processingJobs.id, ownerUserId: processingJobs.ownerUserId })
+      .from(processingJobs)
       .where(
         and(
           eq(processingJobs.status, 'ready'),
@@ -177,7 +197,30 @@ export class DrizzleProcessingJobTraceWriter
           gt(processingJobs.expiresAt, now),
           standaloneScope,
         ),
-      );
+      )
+      .orderBy(processingJobs.ownerUserId, desc(processingJobs.updatedAt), desc(processingJobs.id));
+    const activeOwners = new Set(
+      (
+        await this.db
+          .select({ ownerUserId: processingJobs.ownerUserId })
+          .from(processingJobs)
+          .where(inArray(processingJobs.status, activeStatuses))
+      ).map(({ ownerUserId }) => ownerUserId),
+    );
+    for (const candidate of readyCandidates) {
+      if (activeOwners.has(candidate.ownerUserId)) continue;
+      activeOwners.add(candidate.ownerUserId);
+      try {
+        await this.db
+          .update(processingJobs)
+          .set({ status: 'retrieving', safeErrorCode: null, completedAt: null, updatedAt: now })
+          .where(and(eq(processingJobs.id, candidate.id), eq(processingJobs.status, 'ready')));
+      } catch (error) {
+        // Another server may have admitted owner work after the read above. The database remains
+        // authoritative; leave this ready result terminal and let the winning active job resume.
+        if (!isOwnerActiveConflict(error)) throw error;
+      }
+    }
     await this.db
       .update(processingJobs)
       .set({ status: 'queued', safeErrorCode: null, completedAt: null, updatedAt: now })

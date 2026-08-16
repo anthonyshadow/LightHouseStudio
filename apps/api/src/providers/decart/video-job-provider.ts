@@ -124,7 +124,7 @@ export class DecartHttpVideoJobProvider implements ExistingVideoJobProvider {
     form.append('enhance_prompt', String(input.recipe.enhancePrompt));
     if (input.referenceImagePath && input.referenceImageMimeType) {
       form.append(
-        'reference_image',
+        'reference_image.0',
         await openAsBlob(input.referenceImagePath, { type: input.referenceImageMimeType }),
         `reference.${imageFileExtension(input.referenceImageMimeType)}`,
       );

@@ -15,7 +15,7 @@ import {
   savedVideoContentUrl,
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
-import { studioCreatePath, studioVideoPath } from '../../app/paths';
+import { studioCreatePath } from '../../app/paths';
 import { AppIcon, Button, OverlayPanel, StatusNotice } from '../../ui';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
 import { safeProjectError } from './ProjectDialogs';
@@ -36,6 +36,11 @@ import {
 } from './ProjectAssetsSection.styles';
 import { ProjectVideoPreviewPlayer } from './ProjectVideoPreviewPlayer';
 import { useProjectAssetsController } from './useProjectAssetsController';
+import {
+  projectAssetVideoWorkspaceError,
+  useProjectAssetVideoWorkspaceLauncher,
+} from './useProjectAssetVideoWorkspaceLauncher';
+import type { ProjectSessionPort } from './useProjectSession';
 
 const VoiceLibrary = lazy(() =>
   import('../voice-effects/VoiceLibrary').then((module) => ({ default: module.VoiceLibrary })),
@@ -190,18 +195,21 @@ const AssetThumbnail = ({
 };
 
 const ProjectVideoPreview = ({
-  projectId,
   videoId,
+  opening,
+  openDisabled,
   onClose,
+  onOpenInWorkspace,
   returnFocusRef,
 }: {
-  readonly projectId: string;
   readonly videoId: string;
+  readonly opening: boolean;
+  readonly openDisabled: boolean;
   readonly onClose: () => void;
+  readonly onOpenInWorkspace: (video: SavedVideoDetail) => void;
   readonly returnFocusRef: RefObject<HTMLElement | null>;
 }) => {
   const theme = useTheme();
-  const navigate = useNavigate();
   const [detail, setDetail] = useState<SavedVideoDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -242,13 +250,11 @@ const ProjectVideoPreview = ({
             </Button>
             <Button
               variant="primary"
-              onClick={() =>
-                void navigate(studioVideoPath(videoId), {
-                  state: { fromProjectId: projectId },
-                })
-              }
+              busy={opening}
+              disabled={opening || openDisabled}
+              onClick={() => onOpenInWorkspace(detail)}
             >
-              Open in Studio
+              Open in Workspace
             </Button>
           </div>
         ) : null
@@ -288,12 +294,14 @@ const ProjectVideoPreview = ({
 export const ProjectAssetsSection = ({
   projectId,
   archived,
+  session,
   creativeStore,
   onCreateCharacter,
   onCreateOutfit,
 }: {
   readonly projectId: string;
   readonly archived: boolean;
+  readonly session: ProjectSessionPort;
   readonly creativeStore?: CreativeAssetStore;
   readonly onCreateCharacter?: (projectId: string) => void;
   readonly onCreateOutfit?: (projectId: string) => void;
@@ -310,6 +318,7 @@ export const ProjectAssetsSection = ({
   const addTriggerRef = useRef<HTMLButtonElement>(null);
   const previewTriggerRef = useRef<HTMLElement | null>(null);
   const controller = useProjectAssetsController(projectId, filter);
+  const videoWorkspace = useProjectAssetVideoWorkspaceLauncher(projectId, archived, session);
   const memberships = useMemo(
     () => controller.query.data?.pages.flatMap(({ assets }) => assets) ?? [],
     [controller.query.data],
@@ -325,10 +334,14 @@ export const ProjectAssetsSection = ({
   );
   const busy = controller.attachMutation.isPending || controller.detachMutation.isPending;
 
-  const openVideoInStudio = (videoId: string) =>
-    void navigate(studioVideoPath(videoId), {
-      state: { fromProjectId: projectId },
-    });
+  const openVideoInWorkspace = async (video: SavedVideoSummary) => {
+    setNotice(null);
+    try {
+      await videoWorkspace.open(video);
+    } catch (caught) {
+      setNotice({ tone: 'danger', message: projectAssetVideoWorkspaceError(caught) });
+    }
+  };
 
   const attach = async (kind: ProjectAssetKindContract, resourceId: string) => {
     setNotice(null);
@@ -449,9 +462,14 @@ export const ProjectAssetsSection = ({
                           size="small"
                           variant="primary"
                           data-project-asset-action="open"
-                          onClick={() => openVideoInStudio(membership.resourceId)}
+                          busy={videoWorkspace.busyVideoId === membership.resourceId}
+                          disabled={archived || videoWorkspace.busyVideoId !== null}
+                          onClick={() => {
+                            const video = videoSummaries.get(membership.resourceId);
+                            if (video) void openVideoInWorkspace(video);
+                          }}
                         >
-                          Open in Studio
+                          Open in Workspace
                         </Button>
                       ) : null}
                       {membership.kind === 'video' && !resolved.unavailable ? (
@@ -613,9 +631,14 @@ export const ProjectAssetsSection = ({
       {previewVideoId !== null ? (
         <ProjectVideoPreview
           key={previewVideoId}
-          projectId={projectId}
           videoId={previewVideoId}
+          opening={videoWorkspace.busyVideoId === previewVideoId}
+          openDisabled={archived || videoWorkspace.busyVideoId !== null}
           onClose={() => setPreviewVideoId(null)}
+          onOpenInWorkspace={(video) => {
+            setPreviewVideoId(null);
+            void openVideoInWorkspace(video);
+          }}
           returnFocusRef={previewTriggerRef}
         />
       ) : null}

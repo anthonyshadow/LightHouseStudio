@@ -510,6 +510,7 @@ export const ExistingVideoPanel = ({
         replaceButtonRef={replaceButtonRef}
         discardOpen={discardConfirmationOpen}
         discardButtonRef={discardButtonRef}
+        projectOperationActive={projectProcessing?.active === true}
         onCancelVisualSwitch={() => setVisualSwitchConfirmationOpen(false)}
         onConfirmVisualSwitch={() => {
           const pending = pendingVisualSwitch;
