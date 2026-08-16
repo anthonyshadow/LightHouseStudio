@@ -196,7 +196,7 @@ test('Projects quick creation, lifecycle, refresh, and explicit Assets exit stay
   await expect(page).toHaveURL(new RegExp(`/projects/${TEST_PROJECT_ID}$`, 'u'));
   await expect(page.getByRole('heading', { name: 'Untitled Project' })).toBeVisible();
   await expect(
-    page.getByText('No source yet • This Project is ready whenever you want to begin.'),
+    page.getByText('No source yet • Choose the original video below to begin.'),
   ).toBeVisible();
   expect(projects.operationKeys).toHaveLength(1);
   expect(projects.operationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
@@ -244,7 +244,7 @@ test('Project overview gives the title the full tablet content width', async ({ 
   const identity = page.locator('[data-detail-identity]');
   const actions = page.locator('[data-detail-actions]');
   await expect(title).toBeVisible();
-  await expect(actions.getByRole('button', { name: 'Continue editing' })).toBeVisible();
+  await expect(actions.getByRole('button', { name: 'Add source' })).toBeVisible();
 
   const [titleBox, identityBox, actionsBox] = await Promise.all([
     title.boundingBox(),
@@ -579,7 +579,7 @@ test('Campaign creation reaches a Campaign Project without activating media or p
   await expect(page).toHaveURL(new RegExp(`/projects/${TEST_PROJECT_ID}$`, 'u'));
   await expect(page.getByRole('heading', { name: 'Launch social cut' })).toBeVisible();
   await expect(
-    page.getByText('No source yet • This Project is ready whenever you want to begin.'),
+    page.getByText('No source yet • Choose the original video below to begin.'),
   ).toBeVisible();
   expect(campaigns.campaignOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
   expect(campaigns.projectOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
@@ -625,9 +625,13 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   await page.reload();
   await expect(page.getByRole('button', { name: '← Summer launch' })).toBeVisible();
   await expect(page.getByText('Campaign: Summer launch', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Continue editing' }).click();
+  await page.getByRole('button', { name: 'Add source' }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${TEST_PROJECT_ID}/workspace$`, 'u'));
-  await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
+  // Both the overview and the workspace expose a Source file input, so scope to the workspace task
+  // panel rather than racing the route transition.
+  const workspaceSource = page.getByRole('tabpanel', { name: 'Source' });
+  await expect(workspaceSource).toBeVisible();
+  await workspaceSource.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
     name: 'campaign-project-source.mp4',
     mimeType: 'video/mp4',
     buffer: fixture,

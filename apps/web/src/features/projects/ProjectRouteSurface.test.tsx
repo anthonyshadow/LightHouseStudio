@@ -270,9 +270,17 @@ describe('Project route surface', () => {
     await userEvent.click(within(activeList).getByRole('button', { name: 'Open' }));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/projects/${activeId}`));
     expect(
-      await screen.findByText('No source yet • This Project is ready whenever you want to begin.'),
+      await screen.findByText('No source yet • Choose the original video below to begin.'),
     ).toBeVisible();
-    await userEvent.click(screen.getByRole('button', { name: 'Continue editing' }));
+    const progress = screen.getByRole('list', { name: 'Project workflow progress' });
+    expect(within(progress).getByText('Source').closest('li')).toHaveAttribute(
+      'aria-current',
+      'step',
+    );
+    const overviewSource = screen.getByRole('region', { name: 'Project source' });
+    expect(within(overviewSource).getByRole('heading', { name: 'No source yet' })).toBeVisible();
+    expect(within(overviewSource).getByRole('button', { name: 'Upload' })).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Add source' }));
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`),
     );
@@ -403,7 +411,7 @@ describe('Project route surface', () => {
       'src',
       `/api/videos/${savedVideoId}/thumbnail`,
     );
-    expect(screen.getByRole('button', { name: 'Open in Workspace' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Use as Project source' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Preview' }));
     const dialog = await screen.findByRole('dialog', { name: 'Library source' });
     const previewBody = dialog.querySelector<HTMLElement>('[data-overlay-body-mode="contained"]');
@@ -411,7 +419,7 @@ describe('Project route surface', () => {
     expect(previewBody).toHaveStyle({ overflow: 'hidden' });
     expect(within(dialog).getByRole('group', { name: 'Video controls' })).toBeVisible();
     expect(within(dialog).getByRole('button', { name: 'Play video' })).toBeVisible();
-    expect(within(dialog).getByRole('button', { name: 'Open in Workspace' })).toBeVisible();
+    expect(within(dialog).getByRole('button', { name: 'Use as Project source' })).toBeVisible();
     expect(within(dialog).getByRole('slider', { name: 'Video position' })).toBeVisible();
     expect(within(dialog).getByLabelText('Preview of Library source')).toHaveStyle({
       width: '100%',
@@ -500,7 +508,15 @@ describe('Project route surface', () => {
       sourceRuntime: { present, clear: vi.fn() },
     });
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Open in Workspace' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Use as Project source' }));
+
+    const confirmation = await screen.findByRole('dialog', {
+      name: 'Make this the Project source?',
+    });
+    expect(confirmation).toHaveTextContent('this cannot be undone or replaced');
+    await userEvent.click(
+      within(confirmation).getByRole('button', { name: 'Use as Project source' }),
+    );
 
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`),
@@ -604,8 +620,11 @@ describe('Project route surface', () => {
       sourceRuntime: { present, clear: vi.fn() },
     });
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Open in Workspace' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Use as working media' }));
 
+    expect(
+      screen.queryByRole('dialog', { name: 'Make this the Project source?' }),
+    ).not.toBeInTheDocument();
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`),
     );
@@ -1225,7 +1244,7 @@ describe('Project route surface', () => {
     });
 
     await user.click(await screen.findByRole('button', { name: 'Use Saved Video' }));
-    let dialog = screen.getByRole('dialog', { name: 'Use Saved Video' });
+    let dialog = screen.getByRole('dialog', { name: 'Choose the Project source' });
     const unavailable = await within(dialog).findByRole('alert');
     await user.click(within(unavailable).getByRole('button', { name: 'Retry' }));
     await user.click(await within(dialog).findByRole('button', { name: 'Load more Saved Videos' }));
@@ -1238,7 +1257,7 @@ describe('Project route surface', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: 'Use Saved Video' }));
-    dialog = screen.getByRole('dialog', { name: 'Use Saved Video' });
+    dialog = screen.getByRole('dialog', { name: 'Choose the Project source' });
     await user.click(within(dialog).getByRole('button', { name: /Library source/u }));
 
     await waitFor(() => expect(present).toHaveBeenCalledOnce());

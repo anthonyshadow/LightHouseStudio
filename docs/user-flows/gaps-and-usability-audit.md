@@ -1,8 +1,10 @@
 # User-Flow Gaps and Usability Audit
 
 Consolidated findings from the code-first audit. Every item cites the code that produced it.
-Severities are **Critical / High / Medium / Low / Observation**. Nothing here was fixed — this is a
-findings register.
+Severities are **Critical / High / Medium / Low / Observation**.
+
+**Status:** the four **High** product gaps — G1, G2, G3 and G4 — have been closed. Each entry below
+records what shipped. Everything else remains an open finding.
 
 Two framing notes before the list:
 
@@ -19,54 +21,79 @@ Two framing notes before the list:
 **None found.** No flow was found that cannot be completed end-to-end when its provider is
 configured. The two flows that cannot be completed at all are gated rather than broken:
 
-| Flow                                    | Why                                                                                                                          |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Live AI realtime session                | Requires `REALTIME_VIDEO_BETA_ENABLED` + a Decart key; otherwise `/studio/create/live` renders an honest unavailable surface |
-| Selecting a voice from `/assets/voices` | `VoiceLibrary` is mounted with `disabled` and `onSelect={() => undefined}` (`StudioLibraryOverlays.tsx:158`)                 |
+| Flow                                        | Why                                                                                                                          |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Live AI realtime session                    | Requires `REALTIME_VIDEO_BETA_ENABLED` + a Decart key; otherwise `/studio/create/live` renders an honest unavailable surface |
+| ~~Selecting a voice from `/assets/voices`~~ | **Resolved (G1).** The library is interactive and hands a saved voice to Studio                                              |
 
 ## 2. Major product gaps
 
-### G1 — The Assets ▸ Voices library cannot do anything (High)
+### G1 — The Assets ▸ Voices library cannot do anything (High) — **Resolved**
 
-`/assets/voices` is one of four equally-weighted cards on the Assets hub, but the overlay it opens
-is read-only. The description tells the user to "Select a voice from an active video workflow when
+`/assets/voices` was one of four equally-weighted cards on the Assets hub, but the overlay it opened
+was read-only. The description told the user to "Select a voice from an active video workflow when
 you are ready to use it." A library the user is told not to use from the library is a dead end.
 
-_Expectation:_ parity with Characters and Outfits (preview, save, remove, and "Use in Studio").
-_Direction:_ either wire `onSelect` to the same handoff the other libraries use, or demote Voices
-from a top-level Assets card to a contextual picker.
+The audit's `Unverified` question about the `disabled` prop is now answered: it suppressed
+**Select, Remove _and_ Add to Saved** together (`VoiceList.tsx:228, 240, 261`), leaving only preview,
+search and paging. The surface could not even manage saved voices, contradicting its own card copy.
 
-### G2 — Saving a video has no destination (High)
+_Shipped:_ the overlay mounts `VoiceLibrary` interactively, labels the per-voice action **Use in
+Studio** through a new `selectLabel` prop (the four in-workflow mounts keep "Select"), and is
+disabled with an explanation only when ElevenLabs is unconfigured. **Use in Studio** navigates to
+`/studio/create` and opens the upload overlay; the voice is applied immediately when a source
+exists, otherwise held by the existing-video workflow as `pendingVoiceSelection` and promoted by the
+`source-ready` reducer case — that case resets the rest of the workflow, so an early write to
+`voiceSelection` would be discarded. Keeping the hold inside the workflow leaves one owner for voice
+selection and needs no cross-component effect. A stage notice names the held voice; reset drops it.
 
-After **Save to Assets** succeeds in Studio, the user stays exactly where they were. There is no
-success screen, no "View in Assets" link, no download button, and no "create another". The only
-confirmation is the button's own state, and
-`ExistingVideoActionBar.tsx:114` tells the user to "Open Saved Videos when you are ready to
-download."
+### G2 — Saving a video has no destination (High) — **Resolved**
 
-_Expectation:_ the end of the core creation loop should acknowledge completion and offer the two
-obvious next actions (download, open in Assets) plus a third (start another).
-_Impact:_ the primary product loop terminates without closure; users must know to navigate to
-Assets ▸ Videos and find their own file.
+After **Save to Assets** succeeded in Studio, the user stayed exactly where they were. There was no
+success screen, no "View in Assets" link, no download button, and no "create another".
 
-### G3 — Project overview hides the entire workflow (High)
+_Shipped:_ `SaveVideoSuccessPanel` opens from `StudioLifecycleDialogs` on an explicitly requested
+save, naming the Saved Video and its Version, with **Download** · **View in Assets** · **Create
+another** · **Stay in Studio**. The same three actions render inline through
+`SavedVideoSuccessActions` in the take-review dock and the existing-video result bar, so they
+survive dismissing the panel. Download reuses `downloadSavedVideoUrl` and the retained filename;
+**Create another** reuses `discardTemporaryWork` rather than routing through `?intent=record`, which
+would hit B1. The panel is suppressed while a Project video context owns the save, and a pre-edit
+save inside **Replace and Save** does not trigger it (`useStudioSavedVideoController.saveOutcome`).
+This also closes **M1** and **M2**.
 
-`/projects/{id}` shows a header and an attached-assets list. Source, Create, Save and History exist
-only behind **Continue editing** at `/projects/{id}/workspace`
-(`ProjectRouteSurface.tsx:1043-1049`). A user who opens a brand-new empty project sees an empty
-asset list and one primary button whose label ("Continue editing") implies resuming something that
-does not exist yet.
+### G3 — Project overview hides the entire workflow (High) — **Resolved**
 
-_Direction:_ for a project with no source, the overview should present the Source task directly, or
-the primary button should read "Add source" / "Start".
+`/projects/{id}` showed a header and an attached-assets list. Source, Create, Save and History
+existed only behind **Continue editing**, whose label implied resuming work that did not exist yet.
 
-### G4 — "Source" and "attached asset" are different things and nothing says so (High)
+_Shipped:_ an active Project with no source now renders the Source task directly on the overview —
+the same `ProjectSourceSection` the workspace uses, with Record · Upload · Use Saved Video — and the
+primary action reads **Add source** until a source exists. A `ProjectWorkflowProgress` strip shows
+Source → Create → Save → History with the current step marked. The strip is intentionally not
+clickable, because workspace tasks are not deep-linkable; that belongs with **G7**.
 
-Adding a video from the overview's Assets section, from the Videos library's **Add to Project**, or
-from Quick Create creates an _asset membership_. It does **not** give the Project a source. Only
-the workspace's Source task does that. Both are labelled with the word "video".
+The mount condition is load-bearing: the section renders **only** while `sourceAssetId === null`.
+`useProjectSourceController` hydrates a source-bearing Project by downloading the full source bytes,
+which on the overview would stream into a hidden stage.
 
-_Impact:_ a user can attach three videos to a project and still see "No source yet".
+### G4 — "Source" and "attached asset" are different things and nothing says so (High) — **Resolved**
+
+**Correction to the original finding.** The Videos library's **Add to Project** never created a
+membership. `AddVideoToProjectDialog` calls `reuseSavedVideoAsProjectSource`, sets the immutable
+source, refuses any Project that already has one, and navigates to that Project's workspace. The
+original entry — and `projects.md` and `assets-and-libraries.md` — described it backwards. The
+membership paths are the overview's **Import Saved Video**, the creative builders with a Project
+destination, and a Studio save made with `?projectId=`.
+
+_Shipped:_ the misleading label is gone — the Videos library action and its dialog now read **Use as
+Project source**. The attached-assets section carries a standing line stating that memberships never
+change the Project source, instead of burying it in an empty state. Adopting an attached Video is
+labelled by consequence: **Use as Project source** on an empty Project, **Use as working media** once
+it has one, replacing the single ambiguous "Open in Workspace". The source branch is irreversible
+(`acceptProjectSource` is one-shot), so it is now confirmed through `ConfirmationDialog`. With G3 in
+place, "Project source" and "Project Assets" sit as adjacent, differently-named sections on the
+overview.
 
 ### G5 — No account or settings surface (Medium)
 
@@ -176,20 +203,20 @@ Both list surfaces show `{items.length} loaded` (`ProjectRouteSurface.tsx:145`,
 
 ## 4. Missing UI
 
-| #   | Missing                                                                                                                       | Where                                     | Severity |
-| --- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | -------- |
-| M1  | Success state after saving a video (see G2)                                                                                   | Studio take review / action bar           | High     |
-| M2  | Download affordance anywhere except the Videos gallery and Project History                                                    | Studio review, project workspace Save tab | High     |
-| M3  | Empty-state call to action on the Outfits library (the create button is above the empty state, not in it)                     | `SavedCreativeLibrary.tsx:394-398`        | Low      |
-| M4  | Loading/error state for the Assets hub counts (they silently read 0 before the local repository hydrates)                     | `AssetsRouteSurface.tsx:139-143`          | Low      |
-| M5  | Breadcrumbs anywhere except Project detail, Project workspace and Campaign detail                                             | Assets libraries, Studio                  | Medium   |
-| M6  | Progress indication for the Project workflow phase                                                                            | Project workspace masthead                | Medium   |
-| M7  | A "what is a Project / Campaign / Asset" explanation reachable after onboarding is dismissed                                  | Global                                    | Medium   |
-| M8  | Confirmation before a project-source upload replaces a previously _failed_ staging attempt                                    | `ProjectRouteSurface.tsx:585-621`         | Low      |
-| M9  | Any surfacing of `entitlements` returned by `/api/auth/me`                                                                    | Account menu                              | Low      |
-| M10 | An error boundary message that distinguishes a chunk-load failure from an application crash                                   | `AppRouter.tsx:104-112`                   | Low      |
-| M11 | Retry affordance for the Assets hub when the creative repository fails to open                                                | `useStudioCreativeRepository.ts`          | Low      |
-| M12 | Visible indication that `/assets/*` libraries are overlays over the hub (Escape closes to `/assets`, which is not signposted) | `StudioLibraryOverlays.tsx`               | Low      |
+| #      | Missing                                                                                                                                                                | Where                              | Severity |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
+| ~~M1~~ | ~~Success state after saving a video~~ — **resolved with G2**                                                                                                          | Studio take review / action bar    | High     |
+| ~~M2~~ | ~~Download affordance anywhere except the Videos gallery and Project History~~ — **resolved with G2** for Studio review; the project workspace Save tab still has none | Studio review                      | High     |
+| M3     | Empty-state call to action on the Outfits library (the create button is above the empty state, not in it)                                                              | `SavedCreativeLibrary.tsx:394-398` | Low      |
+| M4     | Loading/error state for the Assets hub counts (they silently read 0 before the local repository hydrates)                                                              | `AssetsRouteSurface.tsx:139-143`   | Low      |
+| M5     | Breadcrumbs anywhere except Project detail, Project workspace and Campaign detail                                                                                      | Assets libraries, Studio           | Medium   |
+| M6     | Progress indication for the Project workflow phase                                                                                                                     | Project workspace masthead         | Medium   |
+| M7     | A "what is a Project / Campaign / Asset" explanation reachable after onboarding is dismissed                                                                           | Global                             | Medium   |
+| M8     | Confirmation before a project-source upload replaces a previously _failed_ staging attempt                                                                             | `ProjectRouteSurface.tsx:585-621`  | Low      |
+| M9     | Any surfacing of `entitlements` returned by `/api/auth/me`                                                                                                             | Account menu                       | Low      |
+| M10    | An error boundary message that distinguishes a chunk-load failure from an application crash                                                                            | `AppRouter.tsx:104-112`            | Low      |
+| M11    | Retry affordance for the Assets hub when the creative repository fails to open                                                                                         | `useStudioCreativeRepository.ts`   | Low      |
+| M12    | Visible indication that `/assets/*` libraries are overlays over the hub (Escape closes to `/assets`, which is not signposted)                                          | `StudioLibraryOverlays.tsx`        | Low      |
 
 ## 5. Unnecessary or redundant UI
 
@@ -320,12 +347,13 @@ not for the person trying to make a video.
 2. **The first-take guide never appears** (`firstSuccessGuideVisible` is initialised `false` and
    never set — `StudioApp.tsx:329`), so the Studio's only inline coaching is dead code from the
    user's perspective.
-3. **"Continue editing" on an empty project** implies prior work that does not exist (G3).
+3. ~~**"Continue editing" on an empty project** implies prior work that does not exist~~ —
+   resolved (G3): the label reads **Add source** and the Source task is on the overview.
 4. **Nothing explains that Studio work is temporary** until the user tries to leave and hits a
    discard dialog. The stage looks like a document editor; it behaves like a scratchpad.
 5. **Campaign creation is the only guided next step in the product** — every other create action
    drops the user somewhere with no suggestion of what to do next.
-6. **The Assets hub promises four libraries; one is inert** (G1).
+6. ~~The Assets hub promises four libraries; one is inert~~ — resolved (G1).
 
 ## 9. Mobile and responsive concerns
 
@@ -360,18 +388,23 @@ independent.
 
 **Tier 1 — close the core loop (do these first)**
 
-1. **G2/M1/M2** — add a post-save success state in Studio with Download, Open in Assets, and Create
-   another. This is the single highest-value change in the list.
+1. ~~**G2/M1/M2** — add a post-save success state in Studio with Download, Open in Assets, and
+   Create another.~~ **Done.**
 2. **B1** — include `location.key` in the record-intent guard so "Record Video" always records.
-3. **G1** — make `/assets/voices` functional or remove it from the Assets hub.
+   Still open; the G2 "Create another" action deliberately avoids `?intent=record` because of it.
+3. ~~**G1** — make `/assets/voices` functional or remove it from the Assets hub.~~ **Done** — made
+   functional.
 4. **B3** — flush or warn about in-memory work before an expiry-driven redirect.
 
 **Tier 2 — make the model legible**
 
-5. **G3** — show the Source task (or an "Add source" primary action) on an empty project overview.
-6. **G4** — one sentence and a visual distinction between "Project source" and "Attached assets".
+5. ~~**G3** — show the Source task (or an "Add source" primary action) on an empty project
+   overview.~~ **Done** — both.
+6. ~~**G4** — one sentence and a visual distinction between "Project source" and "Attached
+   assets".~~ **Done**, plus the label corrections the finding's own premise turned out to need.
 7. **G7/M6** — surface `workflowPhase` as progress in the workspace masthead and mark the current
-   task.
+   task. Partially addressed: the **overview** now carries a non-interactive progress strip. The
+   workspace masthead and deep-linkable tasks remain open.
 8. **§7** — a terminology pass: pick one word per concept and rewrite the six worst strings listed
    above into user language. Keep the precision; change the register.
 
@@ -408,6 +441,7 @@ independent.
 | Cross-tab session invalidation                                                      | No code or test found either way                                                        |
 | Whether any repository actually returns a `total` for projects                      | Contract forbids it; UI compensates                                                     |
 
-No lint, type-check, unit, integration or e2e suite was executed during this audit — the working
-copy staged for analysis excludes `node_modules`, so tooling could not run. All findings are from
-static reading of source, tests and SQL.
+No lint, type-check, unit, integration or e2e suite was executed during the original audit — the
+working copy staged for analysis excluded `node_modules`, so tooling could not run. All findings
+were from static reading of source, tests and SQL. The G1–G4 fixes recorded above were validated
+with targeted component and E2E runs.

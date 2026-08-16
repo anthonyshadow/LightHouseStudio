@@ -8,6 +8,9 @@ import { StudioLifecycleDialogs } from './StudioLifecycleDialogs';
 
 type DialogProps = ComponentProps<typeof StudioLifecycleDialogs>;
 
+const savedVideoId = 'a2b0dfe8-2b1f-4c07-a2a9-2d3d94d9f6a1';
+const savedVersionId = 'c5b9b3ab-6c2f-4c1c-92c4-6f2b0e19f0d2';
+
 const dialogProps = (overrides: Partial<DialogProps> = {}): DialogProps => ({
   mainRef: createRef<HTMLElement>(),
   logout: {
@@ -24,8 +27,10 @@ const dialogProps = (overrides: Partial<DialogProps> = {}): DialogProps => ({
   },
   savedVideo: {
     pendingSave: null,
+    saveOutcome: null,
     discardPromptOpen: false,
     dismissPendingSave: vi.fn(),
+    dismissSaveOutcome: vi.fn(),
     confirmPendingSave: vi.fn(),
     dismissVideoEditDiscard: vi.fn(),
     returnFromVideoEditor: vi.fn(),
@@ -43,6 +48,9 @@ const dialogProps = (overrides: Partial<DialogProps> = {}): DialogProps => ({
     cancel: vi.fn(),
     adoptRenderPreview: vi.fn(() => Promise.resolve()),
   } as unknown as DialogProps['projectWorkingMedia'],
+  saveSuccessSuppressed: false,
+  onOpenSavedVideosLibrary: vi.fn(),
+  onCreateAnotherVideo: vi.fn(),
   ...overrides,
 });
 
@@ -174,5 +182,59 @@ describe('StudioLifecycleDialogs', () => {
     expect(commitVideoEdit).toHaveBeenCalledWith(false);
     expect(requestSaveAndCommitVideoEdit).toHaveBeenCalledOnce();
     expect(resumeEditing).toHaveBeenCalledOnce();
+  });
+  it('closes the creation loop after an explicit save and stays silent inside a Project context', async () => {
+    const dismissSaveOutcome = vi.fn();
+    const onOpenSavedVideosLibrary = vi.fn();
+    const onCreateAnotherVideo = vi.fn();
+    const savedVideo = {
+      ...dialogProps().savedVideo,
+      saveOutcome: {
+        id: savedVideoId,
+        title: 'Launch cut',
+        status: 'ready',
+        currentVersion: {
+          id: savedVersionId,
+          videoId: savedVideoId,
+          ordinal: 1,
+          origin: 'recorded',
+          characterName: null,
+          characterVariantName: null,
+          sourceVersionId: null,
+          mimeType: 'video/mp4',
+          filename: 'launch-cut.mp4',
+          sizeBytes: 4,
+          durationMs: 1_000,
+          width: 1280,
+          height: 720,
+          createdAt: '2026-08-16T10:00:00.000Z',
+        },
+        versions: [],
+        sourceVideoId: null,
+        versionCount: 1,
+        thumbnailAvailable: false,
+        createdAt: '2026-08-16T10:00:00.000Z',
+        updatedAt: '2026-08-16T10:00:00.000Z',
+      },
+      dismissSaveOutcome,
+    } as unknown as DialogProps['savedVideo'];
+
+    renderDialogs(dialogProps({ savedVideo, onOpenSavedVideosLibrary, onCreateAnotherVideo }));
+
+    expect(await screen.findByRole('heading', { name: 'Saved to Assets' })).toBeVisible();
+    expect(screen.getByRole('link', { name: /Download/u })).toHaveAttribute(
+      'href',
+      `/api/videos/${savedVideoId}/versions/${savedVersionId}/content?download=true`,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'View in Assets' }));
+    expect(onOpenSavedVideosLibrary).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Create another' }));
+    expect(onCreateAnotherVideo).toHaveBeenCalledOnce();
+    expect(dismissSaveOutcome).toHaveBeenCalledTimes(2);
+
+    cleanup();
+    renderDialogs(dialogProps({ savedVideo, saveSuccessSuppressed: true }));
+
+    expect(screen.queryByRole('heading', { name: 'Saved to Assets' })).not.toBeInTheDocument();
   });
 });

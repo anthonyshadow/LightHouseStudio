@@ -123,6 +123,7 @@ type VoiceListProps = {
   selected: VoiceLibraryItem | null;
   loading: boolean;
   disabled: boolean;
+  selectLabel?: string;
   previewVoiceId: string | null;
   previewLoadingVoiceId: string | null;
   previewPlaying: boolean;
@@ -138,6 +139,7 @@ export const VoiceList = ({
   selected,
   loading,
   disabled,
+  selectLabel = 'Select',
   previewVoiceId,
   previewLoadingVoiceId,
   previewPlaying,
@@ -226,10 +228,10 @@ export const VoiceList = ({
                   size="small"
                   variant="secondary"
                   disabled={disabled}
-                  aria-label={`Select ${voice.name}`}
+                  aria-label={`${selectLabel} ${voice.name}`}
                   onClick={() => onSelect(item)}
                 >
-                  Select
+                  {selectLabel}
                 </Button>
               ) : null}
               {item.kind === 'workspace' && item.voice.removable ? (

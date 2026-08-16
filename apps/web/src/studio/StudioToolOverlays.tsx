@@ -66,6 +66,7 @@ interface StudioToolOverlaysProps {
   readonly onOpenExistingVideo: () => void;
   readonly onOpenSavedCharacters: () => void;
   readonly onOpenSavedOutfits: () => void;
+  readonly onOpenSavedVideosLibrary: () => void;
   readonly onConfigureVirtualTryOn: () => void;
   readonly onStartPreparedAi: (mode: ModelMode) => void;
   readonly onUnselectCharacter: () => void;
@@ -111,6 +112,7 @@ export const StudioToolOverlays = ({
   onOpenExistingVideo,
   onOpenSavedCharacters,
   onOpenSavedOutfits,
+  onOpenSavedVideosLibrary,
   onConfigureVirtualTryOn,
   onStartPreparedAi,
   onUnselectCharacter,
@@ -132,6 +134,7 @@ export const StudioToolOverlays = ({
         takeReview={takeReview}
         savedVideo={savedVideo}
         saveVideoState={saveVideoState}
+        onOpenSavedVideosLibrary={onOpenSavedVideosLibrary}
         editVideoToggleRef={editVideoToggleRef}
         uploadToggleRef={uploadToggleRef}
         onClose={onCloseExistingVideo}
@@ -260,6 +263,7 @@ export const StudioToolOverlays = ({
         onBackToTakeReview={() => onOpenOverlay('take-review')}
         {...(recording.presented ? { onSaveVideo: savedVideo.requestSavePresentedVideo } : {})}
         saveVideoState={saveVideoState}
+        onOpenSavedVideosLibrary={onOpenSavedVideosLibrary}
         hasUnsavedChanges={savedVideo.presentedHasUnsavedChanges}
         {...(savedVideo.activeLoadedSource &&
         recording.presented?.id !== savedVideo.activeLoadedSource.artifactId

@@ -102,7 +102,7 @@ const assetCards: ReadonlyArray<{
   {
     destination: 'voices',
     title: 'Voices',
-    description: 'Preview the voice catalog and manage the voices retained for this account.',
+    description: 'Preview the catalog, keep the voices you want, and send one to Studio.',
   },
 ];
 

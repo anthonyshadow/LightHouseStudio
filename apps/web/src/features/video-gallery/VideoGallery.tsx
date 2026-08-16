@@ -226,7 +226,7 @@ const VideoGalleryGrid = ({
                         onAddToProject(video, trigger ?? event.currentTarget);
                       }}
                     >
-                      Add to Project
+                      Use as Project source
                     </button>
                     <a
                       href={downloadSavedVideoUrl(video.id, version.id)}

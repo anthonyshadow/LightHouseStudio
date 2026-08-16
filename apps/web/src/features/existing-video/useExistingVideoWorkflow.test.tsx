@@ -246,6 +246,40 @@ describe('useExistingVideoWorkflow', () => {
     expect(result.current.message).toBe(blockedReason);
   });
 
+  it('carries a Voice chosen before any source into the workflow once one is ready', async () => {
+    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+    adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+    const recording = recordingController();
+    const hook = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording,
+        processing: processingController(),
+        publishUploadedVideo: vi.fn().mockReturnValue(recording.original),
+      }),
+    );
+
+    act(() => hook.result.current.preselectVoice('saved-voice', 'Saved Star'));
+    expect(hook.result.current.pendingVoiceSelection).toEqual({
+      kind: 'elevenlabs',
+      voiceId: 'saved-voice',
+      voiceName: 'Saved Star',
+    });
+    expect(hook.result.current.voiceSelection).toBeNull();
+
+    await act(async () => hook.result.current.selectFile(sourceFile));
+
+    expect(hook.result.current.voiceSelection).toEqual({
+      kind: 'elevenlabs',
+      voiceId: 'saved-voice',
+      voiceName: 'Saved Star',
+    });
+    expect(hook.result.current.pendingVoiceSelection).toBeNull();
+
+    act(() => hook.result.current.clearVoice());
+    expect(hook.result.current.voiceSelection).toBeNull();
+    expect(hook.result.current.pendingVoiceSelection).toBeNull();
+  });
+
   it('uses a saved character reference without its stored prompt', () => {
     const reference = new File(['portrait'], 'portrait.png', { type: 'image/png' });
 

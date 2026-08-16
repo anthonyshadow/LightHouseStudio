@@ -126,19 +126,31 @@ deep link.
    `session.current === null && phase === 'hydrating'`, a `role="status"` "Loading Project…" renders.
    On failure a danger notice offers **Back to Projects** and **Retry** (`:773-798`).
 2. Header: a breadcrumb button labelled "← All Projects" or "← {campaign name}", the title, status,
-   "Updated", "Revision N", campaign state, and a one-line workflow hint —
-   _"No source yet • This Project is ready whenever you want to begin."_ or
-   _"Source ready • {Phase} workflow active."_ (`:1033-1040`).
-3. Actions: **Continue editing** (or **View workspace** when archived) · **Move Project** ·
-   **Rename** · **Archive/Restore** · **Delete Project** (archived only).
-4. Below the header, `ProjectAssetsSection` lists attached asset memberships with a kind filter
-   (All / Videos / Characters / Outfits / Voices), thumbnails, and an add flow per kind. Videos can
-   be attached from Saved Videos or created via `/studio/create?projectId={id}`.
+   "Updated", "Revision N", campaign state, a one-line workflow hint —
+   _"No source yet • Choose the original video below to begin."_ or
+   _"Source ready • {Phase} workflow active."_ — and a `ProjectWorkflowProgress` strip showing
+   **Source → Create → Save → History** with the current step marked `aria-current="step"`. The
+   strip is deliberately not clickable: workspace tasks are not deep-linkable.
+3. Actions: **Add source** when the Project has no source, **Continue editing** once it does, or
+   **View workspace** when archived · **Move Project** · **Rename** · **Archive/Restore** ·
+   **Delete Project** (archived only).
+4. **Project source.** An active Project with no source renders the Source task directly on the
+   overview: Record · Upload · Use Saved Video, the same `ProjectSourceSection` the workspace uses.
+   **Record** routes through `startProjectRecording`, which navigates to the workspace before
+   opening the camera, and accepting a source from the overview also lands in the workspace, where
+   the media stage holding the accepted original is visible. The section is mounted **only** while
+   `sourceAssetId === null`; mounting it on a source-bearing Project would make the overview
+   re-download the source bytes into a hidden stage.
+5. Below that, `ProjectAssetsSection` lists attached asset memberships with a kind filter
+   (All / Videos / Characters / Outfits / Voices), thumbnails, and an add flow per kind. A standing
+   line under the heading states that attached Assets are not the Project source.
 
-**Important:** the overview does **not** contain Source, Create, Save or History. Those exist only
-in the workspace behind **Continue editing**.
+**Create, Save and History still exist only in the workspace.** The overview surfaces the Source
+task and the workflow shape; the rest is behind the primary action.
 
-**Exit** — `/projects/{id}/workspace`, `/campaign/{id}`, `/projects`, `/studio/create?projectId=…`.
+**Exit** — `/projects/{id}/workspace` (via **Add source** / **Continue editing**, or automatically
+once a source is accepted from the overview), `/campaign/{id}`, `/projects`,
+`/studio/create?projectId=…`.
 
 ## Flow: Project workspace (`/projects/{id}/workspace`)
 
@@ -242,13 +254,17 @@ Project provider **voice** and **live** starts are deliberately unavailable
 | Workspace ▸ Source ▸ Upload                       | `/projects/{id}/workspace`        | Immutable source                                                                                     |
 | Workspace ▸ Source ▸ Record                       | `/projects/{id}/workspace`        | Immutable source from a finalized take                                                               |
 | Workspace ▸ Source ▸ Use Saved Video              | `/projects/{id}/workspace`        | Immutable source referencing an exact Version                                                        |
-| Overview ▸ Assets ▸ add video ▸ existing          | `/projects/{id}`                  | Asset **membership** only — not the source                                                           |
+| Overview ▸ Source ▸ Record/Upload/Use Saved Video | `/projects/{id}` (empty Project)  | Immutable source; then lands in the workspace                                                        |
+| Overview ▸ Assets ▸ Import Saved Video            | `/projects/{id}`                  | Asset **membership** only — not the source                                                           |
 | Overview ▸ Assets ▸ add video ▸ new/record/upload | → `/studio/create?projectId={id}` | Saves to Assets, then auto-attaches and redirects back to `/projects/{id}` (`StudioApp.tsx:788-826`) |
-| Videos library ▸ ⋯ ▸ Add to Project               | `/assets/videos`                  | Asset membership only                                                                                |
+| Overview ▸ Assets ▸ attached Video ▸ adopt        | `/projects/{id}`                  | **Use as Project source** on an empty Project (confirmed), **Use as working media** once it has one  |
+| Videos library ▸ ⋯ ▸ Use as Project source        | `/assets/videos`                  | Immutable source of an empty Project — **not** a membership                                          |
 | Quick Create ▸ Video (with a project in context)  | anywhere on a project route       | Same as the Studio path above                                                                        |
 
-The distinction between _source_ and _attached asset_ is real and load-bearing, but the UI never
-explains it in one place.
+The distinction between _source_ and _attached asset_ is load-bearing, so the UI now names it:
+every action that sets the immutable original says "source", the attached-assets section states
+that memberships never change the source, and adopting an attached Video as a source is confirmed
+because `acceptProjectSource` is one-shot.
 
 ## State and persistence map
 

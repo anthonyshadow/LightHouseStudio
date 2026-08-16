@@ -824,6 +824,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       });
     return () => controller.abort('project-video-context-changed');
   }, [contextualProjectId, navigate, newlySavedVideoId, projectVideoAttachmentRetry, queryClient]);
+  const existingVideoPendingVoiceName = existingVideo.pendingVoiceSelection?.voiceName ?? null;
   const contextualStageNotices = useMemo<readonly StageNotice[]>(() => {
     const notices: StageNotice[] = [];
     if (directVideoLoad.status === 'loading') {
@@ -848,6 +849,15 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         },
       });
     }
+    if (existingVideoPendingVoiceName !== null) {
+      notices.push({
+        id: 'pending-voice-handoff',
+        severity: 'info',
+        title: 'Voice ready',
+        message: `${existingVideoPendingVoiceName} will be applied once you record or upload a video.`,
+        priority: 200,
+      });
+    }
     if (projectVideoAttachment.status === 'attaching') {
       notices.push({
         id: 'project-video-attachment',
@@ -870,7 +880,13 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       });
     }
     return notices;
-  }, [directVideoLoad, goBack, projectVideoAttachment, routeOriginProjectId]);
+  }, [
+    directVideoLoad,
+    existingVideoPendingVoiceName,
+    goBack,
+    projectVideoAttachment,
+    routeOriginProjectId,
+  ]);
   const effectiveStageNotices = useMemo(
     () => [...stageNotices, ...contextualStageNotices],
     [contextualStageNotices, stageNotices],
@@ -1293,6 +1309,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           videoEditor={videoEditor}
           projectContextActive={projectContextActive}
           projectWorkingMedia={projectWorkingMedia}
+          saveSuccessSuppressed={contextualProjectId !== null}
+          onOpenSavedVideosLibrary={() => void navigate(APP_PATHS.videos)}
+          onCreateAnotherVideo={() => {
+            discardTemporaryWork();
+            focusStudio();
+          }}
         />
 
         <StudioLibraryOverlays
@@ -1333,6 +1355,21 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           onUseOutfit={(savedOutfit) => {
             outfit.selectSaved(savedOutfit);
             void navigate(APP_PATHS.create);
+          }}
+          voiceLibraryUnavailableReason={
+            availability.elevenLabs
+              ? null
+              : 'Saving, removing, and using voices needs a configured ElevenLabs provider. Browsing and previewing stay available.'
+          }
+          onUseVoice={(voice) => {
+            // A Voice is meaningless without a video, so land on the surface that supplies one.
+            // With a source already loaded it applies now; otherwise the workflow holds it until
+            // one is ready.
+            if (existingVideo.selection === null)
+              existingVideo.preselectVoice(voice.voiceId, voice.name);
+            else existingVideo.selectVoice(voice.voiceId, voice.name);
+            void navigate(APP_PATHS.create);
+            openVideoUpload();
           }}
         />
 
@@ -1377,6 +1414,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           onOpenExistingVideo={openExistingVideo}
           onOpenSavedCharacters={openSavedCharacters}
           onOpenSavedOutfits={openOutfitSelector}
+          onOpenSavedVideosLibrary={() => void navigate(APP_PATHS.videos)}
           onConfigureVirtualTryOn={configureVirtualTryOn}
           onStartPreparedAi={startPreparedAi}
           onUnselectCharacter={unselectCharacter}

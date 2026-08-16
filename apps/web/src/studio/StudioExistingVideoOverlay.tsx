@@ -26,6 +26,7 @@ export const StudioExistingVideoOverlay = ({
   takeReview,
   savedVideo,
   saveVideoState,
+  onOpenSavedVideosLibrary,
   editVideoToggleRef,
   uploadToggleRef,
   onClose,
@@ -43,6 +44,7 @@ export const StudioExistingVideoOverlay = ({
   readonly takeReview: ReturnType<typeof useTakeReviewFlow>;
   readonly savedVideo: ReturnType<typeof useStudioSavedVideoController>;
   readonly saveVideoState: SaveVideoState;
+  readonly onOpenSavedVideosLibrary: () => void;
   readonly editVideoToggleRef: RefObject<HTMLButtonElement | null>;
   readonly uploadToggleRef: RefObject<HTMLButtonElement | null>;
   readonly onClose: () => void;
@@ -89,6 +91,7 @@ export const StudioExistingVideoOverlay = ({
             ? { onSaveVideo: savedVideo.requestSavePresentedVideo }
             : {})}
           saveVideoState={saveVideoState}
+          onOpenSavedVideosLibrary={onOpenSavedVideosLibrary}
           onAdjustVideo={savedVideo.openVideoAdjust}
           recordingSupported={
             browser.mediaRecorder && browser.mediaDevices && browser.secureContext

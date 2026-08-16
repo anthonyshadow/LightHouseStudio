@@ -8,8 +8,11 @@ Studio stage.
 
 ## Observable behavior
 
-1. A healthy review artifact exposes **Save to Assets**, never a direct Download action. Saving first
-   prompts for an optional video name; a blank field keeps the existing generated artifact name.
+1. A healthy review artifact exposes **Save to Assets** and no Download action **before** it is
+   saved. Saving first prompts for an optional video name; a blank field keeps the existing
+   generated artifact name. Once that exact artifact is retained, review acknowledges completion and
+   offers **Download**, **View in Assets** and **Create another** for that exact Version; a Project
+   video context keeps its own attach-and-return behavior instead.
    Saving is explicit, reports progress/result, and repeated submission of the same artifact is
    idempotent. An artifact with unsaved changes shows **Discard** but not **Release**. Once that
    artifact is saved, or when an unchanged Saved Video is opened in Studio, the same control slot
@@ -46,8 +49,9 @@ Studio stage.
    current Version bytes, enforces the 300 MB bound, and opens the existing review workspace.
    Direct entry, refresh, and pasted URLs work without navigation state; **Adjust video** remains
    an explicit action from review rather than opening the editor automatically.
-   **Add to Project** links the exact ready Version to a selected empty same-owner Project through
-   the existing source-acceptance contract; the Video remains reusable and no bytes are copied.
+   **Use as Project source** links the exact ready Version to a selected empty same-owner Project
+   through the existing source-acceptance contract; the Video remains reusable and no bytes are
+   copied. It is named for that consequence and refuses a Project that already has a source.
    Separately, **Import Saved Video** can add a non-owning Project Asset membership without
    replacing that Project's immutable source.
 8. Rename changes metadata. **Remove from Assets** confirms, tombstones only the chosen record, and

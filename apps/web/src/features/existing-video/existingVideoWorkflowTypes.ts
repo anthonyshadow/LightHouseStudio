@@ -92,5 +92,11 @@ export interface ExistingVideoWorkflowState {
   resultMetadata: ValidatedExistingVideo['metadata'] | null;
   resultHasServerApprovedVisual: boolean;
   voiceSelection: ExistingVideoVoiceSelection | null;
+  /**
+   * A Voice chosen before any source exists — for example from the Assets Voices library. It
+   * survives `source-ready`, which resets the rest of the workflow, and is promoted to
+   * `voiceSelection` at that point.
+   */
+  pendingVoiceSelection: ExistingVideoVoiceSelection | null;
   elapsedSeconds: number;
 }

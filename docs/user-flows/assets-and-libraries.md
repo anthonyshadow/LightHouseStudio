@@ -26,8 +26,7 @@ so closing an overlay adds a history entry.
 2. **Upload video** navigates to `/studio/create` with router state `{ creationIntent: 'upload' }`,
    which the Studio shell converts into an open video-upload overlay (`StudioApp.tsx:304-318`).
 3. Four cards: Videos · Characters · Outfits · Voices. Characters and Outfits show a live "N saved"
-   count sourced from the local creative repository (`StudioApp.tsx:1192-1196`); Videos and Voices
-   show no count.
+   count sourced from the local creative repository; Videos and Voices show no count.
 4. Each card has an **Open {name}** button.
 
 **Missing** — the hub has no loading or error state of its own, because the two counts come from
@@ -48,17 +47,19 @@ Rendered by `apps/web/src/features/video-gallery/VideoGallery.tsx` — the riche
    - **Preview** (the poster button) — opens a preview overlay with a version selector and a
      download link for the selected version
    - **Open in Studio** — primary
-   - ⋯ menu: **Edit video** · **Add to Project** · **Download** · **Rename** · **Remove from
-     Assets**
+   - ⋯ menu: **Edit video** · **Use as Project source** · **Download** · **Rename** · **Remove
+     from Assets**
 4. **Open in Studio** / **Edit video** run `useStudioSavedVideoController.loadSavedVideo`
    (`useStudioSavedVideoController.ts:114-180`): abort any prior load → `GET /api/videos/{id}/content`
    with a 300 MB bound and a strict content-type check → build a `File` →
    **`navigate('/studio/create', { replace: true })`** → open the video-upload overlay → hand the
    file to the existing-video workflow. `intent: 'edit'` additionally opens the local video editor
    once the workflow reaches `ready` (`:207-217`).
-5. **Add to Project** opens `AddVideoToProjectDialog`, which posts
-   `/api/projects/{projectId}/assets` with `{ kind: 'video', resourceId }` — an asset _membership_,
-   not a project source.
+5. **Use as Project source** opens `AddVideoToProjectDialog`, which calls
+   `reuseSavedVideoAsProjectSource` — `POST /api/projects/{projectId}/source/reuse`. It sets the
+   Project's **immutable source** and navigates to that Project's workspace. It is _not_ an asset
+   membership, and it refuses any Project that already has a source. Attaching a Video as a
+   membership is a different action, available from the Project overview as **Import Saved Video**.
 6. **Download** is a plain anchor to `/api/videos/{id}/content?download=true`.
 7. **Rename** and **Remove** are dialog-confirmed mutations with in-place cache updates.
 
@@ -92,18 +93,25 @@ Rendered by `SavedOutfitLibrary` (`SavedCreativeLibrary.tsx:352`).
 
 ## Flow: Voices library (`/assets/voices`)
 
-Rendered by `VoiceLibrary` **with `disabled` hard-coded and a no-op `onSelect`**
-(`StudioLibraryOverlays.tsx:158`).
+Rendered by `VoiceLibrary` with the same interactive contract as every other mount
+(`StudioLibraryOverlays.tsx:145-166`).
 
-- The overlay description tells the user to _"Select a voice from an active video workflow when you
-  are ready to use it."_
-- Browsing the provider catalog, previewing, saving a voice to the account and removing a saved
-  voice are all implemented in `VoiceLibrary`/`useVoiceLibrary`, and the e2e suite exercises "Browse
-  Voices adds once and confirmed Saved removal reconciles both library views". Whether add/remove
-  remain interactive under `disabled` depends on `VoiceLibrary`'s handling of that prop; **selection
-  is definitely inert here**.
+- Browse the provider catalog, preview a sample, **Add to Saved**, **Remove**, and **Use in Studio**
+  are all available. The per-voice action is labelled by the hosting surface through
+  `VoiceLibrary`'s `selectLabel` prop; the in-workflow mounts keep the default "Select".
+- **Use in Studio** appears on saved voices only, because a catalog voice must be saved to the
+  account first (`VoiceList.tsx:224-234`).
+- **Use in Studio** navigates to `/studio/create` and opens the video-upload overlay. When the
+  existing-video workflow already has a source, the voice is applied immediately. When Studio is
+  empty the voice is **held by the existing-video workflow itself** as `pendingVoiceSelection` and
+  promoted to `voiceSelection` by the `source-ready` reducer case — that case resets the rest of the
+  workflow, so writing `voiceSelection` early would be discarded. A stage notice names the held
+  voice, and reset or **Clear Voice setup** drops it.
+- The library is disabled only when ElevenLabs is not configured. In that state it explains why
+  instead of failing: browsing and previewing stay available, and `disabled` suppresses **Select,
+  Remove and Add to Saved** together (`VoiceList.tsx:228, 240, 261`).
 - The same component is used interactively in three other places: the project asset section
-  (`ProjectAssetsSection.tsx:606`), the Quick-Create voice attach view
+  (`ProjectAssetsSection.tsx`), the Quick-Create voice attach view
   (`AssetCreationLauncher.tsx:170`), and the character default-voice panel
   (`CharacterDefaultVoicePanel.tsx:48`).
 
@@ -140,12 +148,9 @@ import, upload, edit, composition and outfit try-on all have dedicated routes
 - Any library overlay → `/assets` (push)
 - Videos → `/studio/create` (replace) with the video loaded
 - Characters / Outfits → `/studio/create` with a builder overlay open
-- Videos ⋯ ▸ Add to Project → stays, mutates a project
+- Videos ⋯ ▸ Use as Project source → `/projects/{id}/workspace` with the source accepted
 
 ## Unverified
 
-- Whether `VoiceLibrary`'s `disabled` prop suppresses only selection or also the add/remove
-  actions on `/assets/voices`. Establishing this needs a runtime check of `VoiceLibrary.tsx`
-  behaviour under `disabled`, which was not performed.
 - Whether `Unassigned Content` on a video chip is a user-facing concept anywhere else. The string
   appears only in `VideoGallery.tsx:190`.

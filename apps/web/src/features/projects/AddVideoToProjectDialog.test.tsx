@@ -195,7 +195,8 @@ describe('AddVideoToProjectDialog', () => {
     );
     const user = userEvent.setup();
 
-    expect(await screen.findByText(/Asset remains reusable in other Projects/u)).toBeVisible();
+    expect(await screen.findByText(/This is not an attachment/u)).toBeVisible();
+    expect(screen.getByText(/The Asset stays reusable everywhere/u)).toBeVisible();
     await user.click(await screen.findByRole('button', { name: /Launch cut/u }));
 
     await waitFor(() =>
