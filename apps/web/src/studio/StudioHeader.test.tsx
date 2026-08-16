@@ -73,9 +73,11 @@ afterEach(() => {
 describe('StudioHeader', () => {
   it('exposes Dashboard, Projects, Campaigns, and Assets as primary navigation', async () => {
     const user = userEvent.setup();
-    renderHeader();
+    const { container } = renderHeader();
     const navigation = screen.getByRole('navigation', { name: 'Primary' });
 
+    // The Studio destination shares the rail and the mobile navigation with every other surface.
+    expect(container.querySelector('nav[aria-label="Mobile primary"]')).not.toBeNull();
     expect(within(navigation).queryByRole('button', { name: 'Studio' })).not.toBeInTheDocument();
     await user.click(within(navigation).getByRole('button', { name: 'Dashboard' }));
     expect(headerProps.onOpenDashboard).toHaveBeenCalledOnce();
@@ -88,17 +90,13 @@ describe('StudioHeader', () => {
   });
 
   it('uses one shared organization rail with a mirrored mobile navigation', () => {
-    const { container } = renderHeader({
-      organizationRouteActive: true,
-      activeDestination: 'dashboard',
-    });
+    const { container } = renderHeader({ activeDestination: 'dashboard' });
     const header = screen.getByRole('banner');
     const desktopNavigation = screen.getByRole('navigation', { name: 'Primary' });
     const mobileNavigation = container.querySelector<HTMLElement>(
       'nav[aria-label="Mobile primary"]',
     );
 
-    expect(header).toHaveAttribute('data-organization-navigation', 'true');
     expect(within(desktopNavigation).getByRole('button', { name: 'Dashboard' })).toHaveAttribute(
       'aria-current',
       'page',

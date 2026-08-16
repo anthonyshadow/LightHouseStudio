@@ -60,13 +60,14 @@ an in-progress edit survive navigation between Dashboard, Projects and Assets.
 
 ## Navigation model
 
-Two chromes exist, chosen by `organizationRouteActive` in `StudioApp.tsx:184-190`:
+One chrome serves every protected surface — Dashboard, Projects, Campaigns, Assets, Live-beta, the
+Project workspace, and the focused Studio routes (`/studio/create`, `/studio/{videoId}`). It is a
+left rail from `48rem` up, and a compact top bar plus a fixed four-destination bottom bar below it.
+Both carry Dashboard, Projects, Campaigns and Assets; the rail also holds the Quick Create menu, the
+integration-status menu, and the account menu.
 
-- **Organization chrome** — Dashboard, Projects, Campaigns, Assets, Live-beta, and the Project
-  workspace. A left rail (desktop) plus a bottom bar (mobile) with four destinations, a Quick
-  Create menu, an integration-status menu, and the account menu.
-- **Studio chrome** — `/studio/create` and `/studio/{videoId}`. The media stage fills the viewport;
-  navigation collapses to the header.
+`organizationRouteActive` in `StudioApp.tsx` no longer selects a chrome. It only decides which
+surface renders inside the shell — specifically, whether the persistent media stage is hidden.
 
 ```text
 /  (Entry)
