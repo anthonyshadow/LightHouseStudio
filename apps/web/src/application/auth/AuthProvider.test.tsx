@@ -72,6 +72,45 @@ const Probe = () => {
   );
 };
 
+/** Stands in for the Studio shell: it holds session teardown for as long as it is mounted. */
+const HoldingProbe = () => {
+  const auth = useAuth();
+  const holdSessionEnd = auth.holdSessionEnd;
+  useEffect(() => holdSessionEnd(), [holdSessionEnd]);
+  return (
+    <div>
+      <output aria-label="auth status">{auth.status}</output>
+      <output aria-label="session user">{auth.session?.user.displayName ?? 'none'}</output>
+      <output aria-label="session end reason">{auth.sessionEndReason ?? 'none'}</output>
+      <button type="button" onClick={() => auth.completeSessionEnd()}>
+        Finish
+      </button>
+      <button
+        type="button"
+        onClick={() => void auth.login('demo@lightframe.local', 'lightframe-demo')}
+      >
+        Login
+      </button>
+      <button type="button" onClick={() => void auth.logout()}>
+        Logout
+      </button>
+    </div>
+  );
+};
+
+/** Sits outside the holder so it can observe the status after the holder has unmounted. */
+const ReleaseControl = ({ onRelease }: { readonly onRelease: () => void }) => {
+  const auth = useAuth();
+  return (
+    <div>
+      <output aria-label="release status">{auth.status}</output>
+      <button type="button" onClick={onRelease}>
+        Release
+      </button>
+    </div>
+  );
+};
+
 const AutoRestoreProbe = () => {
   const auth = useAuth();
   useEffect(() => {
@@ -173,6 +212,103 @@ describe('AuthProvider', () => {
     );
     fireEvent(window, new Event('lightframe:authentication-required'));
     expect(screen.getByLabelText('auth status')).toHaveTextContent('unauthenticated');
+  });
+
+  it('parks expiry while a holder is registered and keeps the session readable meanwhile', () => {
+    render(
+      <AuthProvider initialSession={session}>
+        <HoldingProbe />
+      </AuthProvider>,
+    );
+
+    fireEvent(window, new Event('lightframe:authentication-required'));
+
+    expect(screen.getByLabelText('auth status')).toHaveTextContent('expiring');
+    expect(screen.getByLabelText('session end reason')).toHaveTextContent('expired');
+    // The holder still renders, so anything reading the session must not see null underneath it.
+    expect(screen.getByLabelText('session user')).toHaveTextContent('Demo Creator');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+
+    expect(screen.getByLabelText('auth status')).toHaveTextContent('unauthenticated');
+    expect(screen.getByLabelText('session user')).toHaveTextContent('none');
+  });
+
+  it('collapses repeated 401 signals from background pollers into one expiry', () => {
+    render(
+      <AuthProvider initialSession={session}>
+        <HoldingProbe />
+      </AuthProvider>,
+    );
+
+    fireEvent(window, new Event('lightframe:authentication-required'));
+    fireEvent(window, new Event('lightframe:authentication-required'));
+    fireEvent(window, new Event('lightframe:authentication-required'));
+
+    expect(screen.getByLabelText('auth status')).toHaveTextContent('expiring');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+
+    expect(screen.getByLabelText('auth status')).toHaveTextContent('unauthenticated');
+  });
+
+  it('finalizes a parked expiry when the last holder unmounts', () => {
+    const Host = () => {
+      const [held, setHeld] = useState(true);
+      return (
+        <AuthProvider initialSession={session}>
+          {held ? <HoldingProbe /> : null}
+          <ReleaseControl onRelease={() => setHeld(false)} />
+        </AuthProvider>
+      );
+    };
+    render(<Host />);
+
+    fireEvent(window, new Event('lightframe:authentication-required'));
+    expect(screen.getByLabelText('auth status')).toHaveTextContent('expiring');
+
+    // A holder that goes away for any other reason — crash, error boundary — must not strand the
+    // app in 'expiring' with no route to login.
+    fireEvent.click(screen.getByRole('button', { name: 'Release' }));
+
+    expect(screen.getByLabelText('release status')).toHaveTextContent('unauthenticated');
+  });
+
+  it('lets a logout in flight finish rather than parking on its own 401', async () => {
+    const request = deferred<void>();
+    api.logout.mockReturnValue(request.promise);
+    render(
+      <AuthProvider initialSession={session}>
+        <HoldingProbe />
+      </AuthProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+    expect(screen.getByLabelText('auth status')).toHaveTextContent('logging-out');
+    fireEvent(window, new Event('lightframe:authentication-required'));
+
+    expect(screen.getByLabelText('auth status')).toHaveTextContent('unauthenticated');
+    request.resolve();
+    await request.promise;
+  });
+
+  it('clears the expiry reason once the user logs back in', async () => {
+    api.login.mockResolvedValue(session);
+    render(
+      <AuthProvider initialSession={session}>
+        <HoldingProbe />
+      </AuthProvider>,
+    );
+
+    fireEvent(window, new Event('lightframe:authentication-required'));
+    expect(screen.getByLabelText('session end reason')).toHaveTextContent('expired');
+    fireEvent.click(screen.getByRole('button', { name: 'Finish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('auth status')).toHaveTextContent('authenticated'),
+    );
+    expect(screen.getByLabelText('session end reason')).toHaveTextContent('none');
   });
 
   it('prevents late restore and login results from reviving an expired or logging-out session', async () => {

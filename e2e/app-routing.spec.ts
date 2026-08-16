@@ -276,7 +276,7 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
     buffer: fixture,
   });
 
-  await expect(page.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Source video' })).toBeVisible();
   await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();
   await expect(stageVideo).toHaveAttribute('src', /^blob:/u);
   const firstObjectUrl = await stageVideo.getAttribute('src');
@@ -284,7 +284,10 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   expect(projects.sourceOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
 
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+  // Reopening a Project with a source lands on Create, the step it is now up to, so ask for the
+  // Source task explicitly to check what the refresh restored.
+  await openProjectTask(page, 'Source');
+  await expect(page.getByRole('heading', { name: 'Source video' })).toBeVisible();
   await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();
   await expect(stageVideo).toHaveAttribute('src', /^blob:/u);
   expect(await stageVideo.getAttribute('src')).not.toBe(firstObjectUrl);
@@ -420,7 +423,7 @@ test('an accepted Project operation reconnects after refresh and presents its re
     mimeType: 'video/mp4',
     buffer: fixture,
   });
-  await expect(page.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Source video' })).toBeVisible();
 
   await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Choose saved character' }).click();
@@ -487,7 +490,7 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
     mimeType: 'video/mp4',
     buffer: fixture,
   });
-  await expect(page.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Source video' })).toBeVisible();
 
   await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Choose saved character' }).click();
@@ -544,7 +547,7 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
   await openProjectTask(page, 'Create');
   await expect(page.getByText('Revision 5', { exact: true })).toBeVisible();
   await openProjectTask(page, 'Source');
-  await expect(page.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Source video' })).toBeVisible();
   await expect(page.getByLabel('Studio media stage').locator('video')).toHaveAttribute(
     'src',
     /^blob:/u,
@@ -636,7 +639,7 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
     mimeType: 'video/mp4',
     buffer: fixture,
   });
-  await expect(page.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Source video' })).toBeVisible();
   expect(projects.sourceOperationKeys).toHaveLength(1);
   expect(projects.sourceOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
 
@@ -707,10 +710,12 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   expect(pendingAppendKey).not.toBe(projects.outputOperationKeys[0]);
 
   await page.reload();
+  await openProjectTask(page, 'Save');
   await expect(page.getByText('Added Version 2 to “Campaign master”.')).toBeVisible();
   expect(projects.outputOperationKeys).toHaveLength(3);
   expect(projects.outputOperationKeys[2]).toBe(pendingAppendKey);
   expect(projects.outputRequests[2]).toEqual(projects.outputRequests[1]);
+  await openProjectTask(page, 'History');
   const history = page.getByRole('list', { name: 'Saved video Version history' });
   const firstVersion = history.getByRole('listitem').filter({ hasText: 'Version 1' });
   await expect(history).toContainText('Version 2 · Current in Saved Videos');
@@ -793,4 +798,35 @@ test('recording and temporary-take work cannot be lost silently through Back', a
   await discard.getByRole('button', { name: 'Discard and leave' }).click();
   await expect(page).toHaveURL(new RegExp(`${DASHBOARD_PATH}$`, 'u'));
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+});
+
+test('an expiring session explains what an unsaved take loses before returning to login', async ({
+  page,
+}) => {
+  await installSuccessfulStudioHarness(page, { initiallyAuthenticated: false });
+  await page.goto(ENTRY_PATH);
+  await loginFromEntry(page);
+  await page.getByRole('button', { name: 'Create video' }).click();
+  await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
+  await startLocalPreview(page);
+  await page.getByRole('button', { name: 'Record' }).click();
+  await page.getByRole('button', { name: 'Stop recording' }).click();
+  await expect(page.getByLabel('Recorded take playback')).toBeVisible();
+
+  // The exact signal the API transport raises on any same-origin 401 (see
+  // apps/web/src/adapters/api-client/transport.ts). Overriding /api/auth/me would not reach this
+  // path: it is only called during restore, not mid-session.
+  await page.evaluate(() => window.dispatchEvent(new Event('lightframe:authentication-required')));
+
+  const expiry = page.getByRole('dialog', { name: 'Your session ended' });
+  await expect(expiry).toBeVisible();
+  await expect(expiry).toContainText('The current temporary take');
+  // Holding the redirect is the whole point: the work is still in memory while this is open.
+  await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
+
+  await expiry.getByRole('button', { name: 'Log in again' }).click();
+  await expect(page).toHaveURL(new RegExp(`${ENTRY_PATH}$`, 'u'));
+  await expect(
+    page.getByText('Your session ended. Log in again to pick up where you left off.'),
+  ).toBeVisible();
 });

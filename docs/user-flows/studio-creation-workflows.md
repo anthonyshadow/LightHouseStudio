@@ -167,7 +167,9 @@ in the take-review dock and in the existing-video result bar, so they survive di
 - **View in Assets** navigates to `/assets/videos`, which opens the Videos overlay.
 - **Create another** reuses `discardTemporaryWork`: it releases the take, resets the save state and
   closes overlays, leaving the operator on `/studio/create`. It deliberately does not route through
-  `?intent=record`.
+  `?intent=record` — the panel opens after any explicit save, including one that began as an upload,
+  so auto-starting the camera would demand a permission prompt nobody asked for and would push a
+  history entry back onto the just-saved state.
 - The panel is **suppressed while a Project video context owns the save** (`?projectId=` verified).
   That path keeps its existing behaviour: attach the new Video to the Project, then replace the URL
   with `/projects/{id}`.

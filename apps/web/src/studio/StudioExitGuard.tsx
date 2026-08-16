@@ -20,6 +20,12 @@ export interface StudioExitGuardProps {
     abort: (() => void) | null;
   }> | null;
   readonly projectSession?: ProjectSessionPort | null;
+  /**
+   * True while the session is ending underneath the user. The expiry notice already names what is
+   * about to be lost and owns the discard, so this guard must not raise a second prompt over the
+   * redirect that follows it.
+   */
+  readonly sessionEnding?: boolean;
   readonly onDiscardTemporaryWork: () => void;
 }
 
@@ -75,6 +81,7 @@ export const StudioExitGuard = ({
   projectContextDirty = false,
   projectSourceActivity = null,
   projectSession = null,
+  sessionEnding = false,
   onDiscardTemporaryWork,
 }: StudioExitGuardProps) => {
   const location = useLocation();
@@ -90,6 +97,7 @@ export const StudioExitGuard = ({
   const unsafeWorkActive =
     recordingOrFinalizing || videoRenderingActive || hasDiscardableWork || projectSavePending;
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    if (sessionEnding) return false;
     const currentProjectId = projectIdFromPath(currentLocation.pathname);
     const projectDraftActive = hasUnacceptedProjectDraft(
       currentProjectId,
@@ -340,7 +348,7 @@ export const StudioExitGuard = ({
         open={projectSaveFailed}
         onClose={stayInStudio}
         title={projectSession?.phase === 'conflict' ? 'Project save conflict' : 'Project not saved'}
-        description="The destination was not opened. Your local semantic proposal remains available in this Project."
+        description="Lightframe did not open that destination. Your unsaved changes are still here."
         placement="bottom"
         size="standard"
         closeOnBackdrop={false}
@@ -356,7 +364,7 @@ export const StudioExitGuard = ({
       >
         <p role="alert">
           {projectSession?.message ??
-            'Project authority is unavailable. Retry the preserved proposal or explicitly discard it.'}
+            'Lightframe could not be reached. Try saving again, or discard these changes.'}
         </p>
       </OverlayPanel>
 

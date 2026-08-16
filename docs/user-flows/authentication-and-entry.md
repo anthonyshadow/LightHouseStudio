@@ -24,7 +24,8 @@
 unknown ──restore()──► authenticated | unauthenticated
 unauthenticated ──login()──► authenticating ──► authenticated | unauthenticated
 authenticated ──logout()──► logging-out ──► unauthenticated
-authenticated ──expire()──► unauthenticated        (401 event or TTL timer)
+authenticated ──expire()──► unauthenticated        (401 event or TTL timer, nothing holding)
+authenticated ──expire()──► expiring ──► unauthenticated   (a holder explains first)
 ```
 
 `restore()` is de-duplicated by a promise ref, and every operation carries a generation counter so
@@ -136,16 +137,30 @@ Two independent mechanisms end a session client-side:
 2. **Proactive expiry timer.** While a session exists, `AuthProvider` schedules `expire()` at
    `session.expiresAt` (`AuthProvider.tsx:147-152`).
 
-`expire()` bumps an operation generation, aborts in-flight auth requests, clears the session, and
-sets `status = 'unauthenticated'`. `ProtectedRoute` then immediately renders
-`<Navigate to="/" state={{ loginRequired: true, from }} />`, so the user is returned to the entry
-page with a "Your session is required to continue." message and their original destination
-preserved.
+`expire()` bumps an operation generation and aborts in-flight auth requests. What happens next
+depends on whether anything has claimed a hold on teardown:
 
-**Consequence worth knowing:** because `ProtectedRoute` stops rendering its children, the whole
-Studio shell — including `StudioExitGuard` — unmounts in the same commit. Any in-memory recording,
-unsaved take, or dirty editor state is discarded without a prompt. See
-[`gaps-and-usability-audit.md`](gaps-and-usability-audit.md#6-potential-bugs).
+- **No holder** (the entry page, a lazy-loading shell, an error boundary): the session is cleared
+  and `status` becomes `'unauthenticated'` immediately. `ProtectedRoute` renders
+  `<Navigate to="/" state={{ loginRequired: true, from }} />`, returning the user to the entry page
+  with their original destination preserved.
+- **A holder is registered** (the mounted Studio shell): `status` becomes `'expiring'` and the
+  session stays readable. `ProtectedRoute` keeps rendering its children in this state, so the shell
+  and the in-memory work it owns survive. `useStudioSessionExpiryController` then decides: with no
+  unsaved work it finalizes at once, indistinguishable from the case above; with work it opens a
+  single-action notice naming what ends. Acknowledging discards the work, releases media, and
+  finalizes.
+
+The hold is registered by the Studio shell for as long as it is mounted, and releasing it while
+`'expiring'` finalizes — so a shell that goes away for any reason cannot strand the app without a
+route to login. Repeated 401s from background pollers collapse into one expiry, and a 401 raised by
+`POST /api/auth/logout` finalizes immediately rather than opening a notice over the logout flow.
+
+Because the session ended rather than never existing, the entry page reads `sessionEndReason` from
+auth and shows "Your session ended. Log in again to pick up where you left off." in place of the
+generic "Your session is required to continue.". Nothing is saved on this path: the session is gone,
+so a Project flush would return `401` like every other request. The notice warns; it does not
+pretend to rescue.
 
 ## Exit points
 
@@ -153,6 +168,8 @@ unsaved take, or dirty editor state is discarded without a prompt. See
 - Cancel the login dialog while `loginRequired` was set → `navigate('/', { replace: true })`,
   clearing the "session required" message (`EntryPage.tsx:112-117`).
 - Logout → `/`.
+- Session expiry with unsaved Studio work → a "Your session ended" notice, then `/` with the
+  expiry-specific message and the original destination preserved.
 
 ## Unverified
 

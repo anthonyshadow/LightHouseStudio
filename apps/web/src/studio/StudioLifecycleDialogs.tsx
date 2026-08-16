@@ -6,6 +6,7 @@ import type { useVideoEditSession } from '../features/video-editor/useVideoEditS
 import { Button, OverlayPanel } from '../ui';
 import type { useStudioLogoutController } from './useStudioLogoutController';
 import type { useStudioSavedVideoController } from './useStudioSavedVideoController';
+import type { useStudioSessionExpiryController } from './useStudioSessionExpiryController';
 
 const ConfirmationDialog = lazy(() =>
   import('../ui/primitives/ConfirmationDialog').then((module) => ({
@@ -19,10 +20,14 @@ const SaveVideoSuccessPanel = lazy(() =>
     default: module.SaveVideoSuccessPanel,
   })),
 );
+const SessionExpiryNotice = lazy(() =>
+  import('./SessionExpiryNotice').then((module) => ({ default: module.SessionExpiryNotice })),
+);
 
 interface StudioLifecycleDialogsProps {
   readonly mainRef: RefObject<HTMLElement | null>;
   readonly logout: ReturnType<typeof useStudioLogoutController>;
+  readonly sessionExpiry: ReturnType<typeof useStudioSessionExpiryController>;
   readonly savedVideo: ReturnType<typeof useStudioSavedVideoController>;
   readonly videoEditor: ReturnType<typeof useVideoEditSession>;
   readonly projectContextActive: boolean;
@@ -39,6 +44,7 @@ interface StudioLifecycleDialogsProps {
 export const StudioLifecycleDialogs = ({
   mainRef,
   logout,
+  sessionExpiry,
   savedVideo,
   videoEditor,
   projectContextActive,
@@ -69,6 +75,24 @@ export const StudioLifecycleDialogs = ({
           savedVideo.dismissSaveOutcome();
           onCreateAnotherVideo();
         }}
+      />
+    </Suspense>
+
+    {/*
+      Deferred like the other end-of-session surfaces: it is only reachable once a session actually
+      expires, and the Studio shell's static closure has a hard byte budget. The chunk is a
+      same-origin asset, not an API call, so the expired session does not block it; if it failed to
+      load, the route error boundary would unmount the shell, which releases the teardown hold and
+      completes the redirect — the pre-fix behaviour, not a stuck app.
+    */}
+    <Suspense fallback={null}>
+      <SessionExpiryNotice
+        open={sessionExpiry.noticeOpen}
+        activeWork={sessionExpiry.hasActiveWork}
+        projectProposal={sessionExpiry.hasProjectProposal}
+        busy={sessionExpiry.busy}
+        returnFocusRef={mainRef}
+        onAcknowledge={sessionExpiry.acknowledge}
       />
     </Suspense>
 
@@ -133,7 +157,7 @@ export const StudioLifecycleDialogs = ({
           title="Adopt Render preview as Project working media?"
           description={
             projectWorkingMedia.message ??
-            'The validated render is temporary until adoption stores, inspects, and checksums it. Adoption advances working/presented media without replacing the immutable original or creating a Saved Video or Version.'
+            'This render only exists on your device until you keep it. Keeping it stores and checks the file, then makes it the video this Project works from. Your original source stays as it is, and no Saved Video or Version is created.'
           }
           confirmLabel={
             projectWorkingMedia.busy ? 'Adopting working media…' : 'Adopt as working media'
@@ -148,7 +172,7 @@ export const StudioLifecycleDialogs = ({
         <ConfirmationDialog
           open={videoEditor.phase === 'awaiting-replacement'}
           title="Replace the current video?"
-          description="The validated edit will become the new immutable source for Voice and later video tools. You can save the current source to Saved Videos first."
+          description="The edited video becomes the source that Voice and the other video tools work from, and it cannot be changed back. You can save the current one to Assets first."
           confirmLabel="Replace and Save"
           cancelLabel="Cancel"
           busy={videoEditor.phase === 'committing'}

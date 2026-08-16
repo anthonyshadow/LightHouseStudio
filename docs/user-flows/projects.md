@@ -130,7 +130,8 @@ deep link.
    _"No source yet • Choose the original video below to begin."_ or
    _"Source ready • {Phase} workflow active."_ — and a `ProjectWorkflowProgress` strip showing
    **Source → Create → Save → History** with the current step marked `aria-current="step"`. The
-   strip is deliberately not clickable: workspace tasks are not deep-linkable.
+   strip reports where the Project stands; it is deliberately not a control, because the workspace
+   tablist already owns moving between those four tasks.
 3. Actions: **Add source** when the Project has no source, **Continue editing** once it does, or
    **View workspace** when archived · **Move Project** · **Rename** · **Archive/Restore** ·
    **Delete Project** (archived only).
@@ -157,10 +158,29 @@ once a source is accepted from the overview), `/campaign/{id}`, `/projects`,
 This is the only organization route where the media stage stays visible
 (`StudioWorkspace.tsx:223`), so recording and preview happen in place.
 
-**Layout** — a masthead (Overview breadcrumb, title, status, and a live "All changes saved /
-Saving changes / Resolve conflict / Changes not saved" indicator) plus a four-tab inspector:
-**Source · Create · Save · History** (`ProjectRouteSurface.tsx:93-102, 839-987`). The tabs are a
-proper ARIA tablist with arrow/Home/End keyboard support.
+**Layout** — a masthead (Overview breadcrumb, title, status, a compact `ProjectWorkflowProgress`
+strip, and a live "All changes saved / Saving changes / Resolve conflict / Changes not saved"
+indicator) plus a four-tab inspector: **Source · Create · Save · History**. The tabs are a proper
+ARIA tablist with arrow/Home/End keyboard support.
+
+The masthead strip is the compact `variant="masthead"` of the same component the overview uses, and
+the tablist derives its four tasks from the same `PROJECT_WORKFLOW_STEPS` list, so progress and
+navigation cannot drift apart. The masthead row is a fixed `3rem`, so the compact variant never
+wraps and drops its step labels below `64rem`, leaving ordinals plus per-step `aria-label`.
+
+**Which task opens.** The workspace opens on the step the Project is actually up to, derived from
+`workflowPhase` by `stepForSnapshot` — a Project with no source opens on Source, one with a source
+on Create, one in `review` on Save, one `complete` on History. That choice is latched on entry: a
+phase change mid-session does not move the open panel out from under the operator. An explicit
+choice writes `?task=<id>` and outranks both.
+
+`?task=` is a query parameter rather than a path segment because `PROJECT_WORKSPACE_PATH` is
+anchored — a `/workspace/create` segment would break `projectIdFromPath`, `isProjectWorkspacePath`,
+`isProtectedAppPath` and `canonicalizeLegacyAppPath` at once. It is also invisible to
+`StudioExitGuard`, which keys on pathname alone, so switching task cannot read as leaving a Project
+with unsaved changes. Task changes `replace` rather than push, or `useRouteBack` would walk back
+through tasks instead of leaving the workspace. The parameter survives the login round-trip, so a
+deep link to a task returns to that task after re-authenticating.
 
 ### Task 1 — Source
 
@@ -172,10 +192,10 @@ Three ways to give the Project its immutable original (`ProjectSourceSection`, `
 | **Upload**          | Hidden `<input type="file" accept="video/mp4,video/quicktime,video/webm">`; the file is validated and posted to `/api/projects/{id}/source` with `x-lightframe-project-source` metadata and an Idempotency-Key                                                                                               |
 | **Use Saved Video** | `ProjectSavedVideoPicker` → `POST /api/projects/{id}/source/reuse` with the exact `savedVideoId` + `videoVersionId`                                                                                                                                                                                          |
 
-Phases render as notices: `hydrating` → "Preparing source", `preparing` → "Transferring and
-inspecting source media…", `saving` → "Committing the immutable original and Project revision",
-`conflict` → warning, `error` → danger (`:473-513`). Once accepted, all three controls are disabled
-and the panel explains the original cannot be replaced.
+Phases render as notices: `hydrating` → "Preparing source", `preparing` → "Uploading and checking
+your video…", `saving` → "Saving the source video and this change to your Project", `conflict` →
+warning, `error` → danger. Once accepted, all three controls are disabled and the panel explains the
+source cannot be swapped out.
 
 On reload, an accepted source is re-hydrated: `GET /api/projects/{id}/source`, then the bytes are
 fetched with a 300 MB bound and pushed onto the stage as a recording artifact

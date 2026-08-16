@@ -52,8 +52,16 @@ const LEGACY_CAMPAIGN_DETAIL_PATH = /^\/studio\/campaigns\/([^/]+)$/u;
 export const projectPath = (projectId: string): string =>
   `${APP_PATHS.projects}/${encodeURIComponent(projectId)}`;
 
-export const projectWorkspacePath = (projectId: string): string =>
-  `${projectPath(projectId)}/workspace`;
+/**
+ * The task rides in the query string rather than the path: `PROJECT_WORKSPACE_PATH` is anchored,
+ * so a `/workspace/<task>` segment would break `projectIdFromPath`, `isProjectWorkspacePath`,
+ * `isProtectedAppPath` and `canonicalizeLegacyAppPath` at once. A query param is also invisible to
+ * `StudioExitGuard`, which keys on pathname alone — switching tasks must not read as leaving.
+ */
+export const projectWorkspacePath = (projectId: string, task?: string): string => {
+  const base = `${projectPath(projectId)}/workspace`;
+  return task ? `${base}?task=${encodeURIComponent(task)}` : base;
+};
 
 const decodedPathId = (match: RegExpExecArray | null): string | null => {
   if (!match?.[1]) return null;

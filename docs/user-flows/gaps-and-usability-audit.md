@@ -3,8 +3,9 @@
 Consolidated findings from the code-first audit. Every item cites the code that produced it.
 Severities are **Critical / High / Medium / Low / Observation**.
 
-**Status:** the four **High** product gaps — G1, G2, G3 and G4 — have been closed. Each entry below
-records what shipped. Everything else remains an open finding.
+**Status:** the four **High** product gaps — G1, G2, G3 and G4 — are closed, and so are all of
+**Tier 1** and **Tier 2**: B1, B3, G7/M6 and the §7 terminology pass. Each entry below records what
+shipped. Everything else remains an open finding.
 
 Two framing notes before the list:
 
@@ -57,8 +58,11 @@ save, naming the Saved Video and its Version, with **Download** · **View in Ass
 another** · **Stay in Studio**. The same three actions render inline through
 `SavedVideoSuccessActions` in the take-review dock and the existing-video result bar, so they
 survive dismissing the panel. Download reuses `downloadSavedVideoUrl` and the retained filename;
-**Create another** reuses `discardTemporaryWork` rather than routing through `?intent=record`, which
-would hit B1. The panel is suppressed while a Project video context owns the save, and a pre-edit
+**Create another** reuses `discardTemporaryWork` rather than routing through `?intent=record`: the
+panel opens after any explicit save, including one that began as an upload, so auto-starting the
+camera would demand a permission prompt nobody asked for and would push a history entry back onto
+the just-saved state. (It was also a B1 workaround; B1 is now fixed, and the behaviour stands on its
+own merits.) The panel is suppressed while a Project video context owns the save, and a pre-edit
 save inside **Replace and Save** does not trigger it (`useStudioSavedVideoController.saveOutcome`).
 This also closes **M1** and **M2**.
 
@@ -108,12 +112,35 @@ The Projects list offers Rename, Archive, Restore and Delete inline
 **Delete** (`CampaignRouteSurface.tsx:98-121`). Editing or archiving a campaign requires opening it
 first. Two comparable entities behave differently for no discoverable reason.
 
-### G7 — Nothing guides a user from a Project to its output (Medium)
+### G7 — Nothing guides a user from a Project to its output (Medium) — **Resolved**
 
-The workspace tabs are static; nothing marks the current task, nothing advances to the next one
-after a step completes, and the derived `workflowPhase` (`source → creative → processing → review →
-export → complete`) is never shown as progress. The user must know that Source → Create → Save is
-the order.
+The workspace tabs were static; nothing marked the current task, nothing advanced to the next one
+after a step completed, and the derived `workflowPhase` was never shown as progress. The user had to
+know that Source → Create → Save is the order. The active tab was `useState('source')`, so it reset
+on every remount and never moved.
+
+A correction the fix turned up: the phase sequence in the original finding is the _contract enum_,
+not a reachable path. No domain rule ever writes `processing` or `export`; the reachable sequence is
+`source → creative → review → complete`.
+
+_Shipped:_ `ProjectWorkflowProgress` gained a compact `variant="masthead"` and now renders in the
+workspace masthead as well as the overview, and it became the single owner of the step list —
+`projectWorkspaceTasks` derives its four tabs from `PROJECT_WORKFLOW_STEPS`, so progress and
+navigation cannot drift. The strip stays **non-interactive** deliberately: the tablist already owns
+moving between those tasks, and a clickable strip would give one piece of state two competing owners
+(the exact complaint §5 makes about other surfaces). The masthead is a fixed `3rem` row, so the
+compact variant never wraps and drops its labels below `64rem`, keeping ordinals and per-step
+`aria-label`.
+
+The workspace now opens on the step the Project is up to, via an exported `stepForSnapshot`, and
+tasks are deep-linkable through `?task=<id>`. The initial choice is **latched on entry** — a phase
+change mid-session does not pull the open panel out from under the user — and any explicit choice
+outranks it. A query parameter rather than a path segment because the anchored
+`PROJECT_WORKSPACE_PATH` regex would otherwise break `projectIdFromPath`, `isProjectWorkspacePath`,
+`isProtectedAppPath` and `canonicalizeLegacyAppPath` at once; it is also invisible to
+`StudioExitGuard`, which keys on pathname alone, so changing task cannot read as leaving a Project
+with unsaved changes. Task changes `replace` rather than push, or `useRouteBack` would walk back
+through tasks instead of leaving. This also closes **M6**.
 
 ### G8 — First-time-user guidance is one dismissible card (Medium)
 
@@ -210,7 +237,7 @@ Both list surfaces show `{items.length} loaded` (`ProjectRouteSurface.tsx:145`,
 | M3     | Empty-state call to action on the Outfits library (the create button is above the empty state, not in it)                                                              | `SavedCreativeLibrary.tsx:394-398` | Low      |
 | M4     | Loading/error state for the Assets hub counts (they silently read 0 before the local repository hydrates)                                                              | `AssetsRouteSurface.tsx:139-143`   | Low      |
 | M5     | Breadcrumbs anywhere except Project detail, Project workspace and Campaign detail                                                                                      | Assets libraries, Studio           | Medium   |
-| M6     | Progress indication for the Project workflow phase                                                                                                                     | Project workspace masthead         | Medium   |
+| ~~M6~~ | ~~Progress indication for the Project workflow phase~~ — **resolved with G7**                                                                                          | Project workspace masthead         | Medium   |
 | M7     | A "what is a Project / Campaign / Asset" explanation reachable after onboarding is dismissed                                                                           | Global                             | Medium   |
 | M8     | Confirmation before a project-source upload replaces a previously _failed_ staging attempt                                                                             | `ProjectRouteSurface.tsx:585-621`  | Low      |
 | M9     | Any surfacing of `entitlements` returned by `/api/auth/me`                                                                                                             | Account menu                       | Low      |
@@ -233,18 +260,24 @@ Deliberately conservative — each item was verified before listing.
 
 ## 6. Potential bugs
 
-### B1 — `?intent=record` only ever starts recording once per session (Medium)
+### B1 — `?intent=record` only ever started recording once per session (Medium) — **Resolved**
 
-`handledRecordIntentRef` is keyed on `${location.pathname}${location.search}`
-(`StudioApp.tsx:972-979`). Because the Studio shell never unmounts while the user moves between
-protected routes, the ref survives navigation.
-
-_Repro:_ Quick Create ▸ Create Asset ▸ Video ▸ **Record Video** (capture starts) → navigate to
-Dashboard → Quick Create ▸ Create Asset ▸ Video ▸ **Record Video** again. The URL is identical, the
-ref already holds it, and **capture never starts**. The user lands on an idle Studio with no
+`handledRecordIntentRef` was keyed on `${location.pathname}${location.search}`. Because the Studio
+shell never unmounts while the user moves between protected routes, the ref survived navigation, so
+a second visit to the identical URL was a no-op and the user landed on an idle Studio with no
 explanation.
 
-_Fix direction:_ include `location.key` in the guard key.
+_Shipped:_ the guard key is now `` `${location.key}:${location.pathname}${location.search}` ``, with
+`location.key` added to the effect dependencies — the CLAUDE.md gotcha verbatim, and the pattern
+`creationContextRequestKey` and `directVideoRequestKey` already use in the same file. Scoping the
+ref to one history entry also bounds a second, smaller defect: the ref is written before
+`startLocalRecording`'s capability check, so an unsupported browser used to poison the key for the
+whole session and now spends only that entry.
+
+Not changed, deliberately: with an invalid or archived `projectId`, the verification effect replaces
+the URL and fires capture twice. That predates this fix — the search string changes too, so the old
+key changed as well — and it is bounded, because `startLocal` aborts its predecessor. It belongs
+with **B5**, which owns the re-verification behaviour.
 
 ### B2 — Browser Back re-opens the create dialog (Medium)
 
@@ -255,13 +288,38 @@ that state. Pressing Back returns to the list entry with the state intact, so
 list that already contains the just-created record
 (`ProjectRouteSurface.tsx:258, 402-408`; `CampaignRouteSurface.tsx:161, 191-201`).
 
-### B3 — Session expiry silently discards in-memory work (Medium)
+### B3 — Session expiry silently discarded in-memory work (Medium) — **Resolved**
 
-When `expire()` fires (401 event or TTL timer), `ProtectedRoute` immediately returns `<Navigate>`
-instead of its children (`ProtectedRoute.tsx:20-27`). The Studio shell — and with it
-`StudioExitGuard` — unmounts in the same commit, so an unsaved take, an active render or a dirty
-editor is discarded with no prompt. The exit guard protects in-app navigation and unload, but not
-this path.
+When `expire()` fired (401 event or TTL timer), `ProtectedRoute` immediately returned `<Navigate>`
+instead of its children. The Studio shell — and with it `StudioExitGuard` — unmounted in the same
+commit, so an unsaved take, an active render or a dirty editor was discarded with no prompt. The
+exit guard protects in-app navigation and unload, but expiry is neither a navigation nor an unload,
+so neither mechanism ever saw it.
+
+_Shipped:_ `AuthStatus` gained `'expiring'`, and `expire()` parks there — keeping the session
+readable — **only while a hold is registered**. `holdSessionEnd()` is the seam; the Studio shell
+holds for as long as it is mounted. Without a holder, teardown stays exactly as immediate as before,
+which is what keeps the lazy-load, `legacyRedirect` and error-boundary paths from stranding the user
+in a dead app with no route to login. Releasing the last hold while `'expiring'` finalizes, so a
+shell that disappears for any other reason cannot strand it either — the same guarantee a timeout
+backstop would give, without a wall clock.
+
+`ProtectedRoute` renders children while `'expiring'`, which is what keeps the in-memory work alive.
+`useStudioSessionExpiryController` reuses the aggregate signals the voluntary-logout path already
+computes: with no work it finalizes at once, byte-identical to the old behaviour; with work it opens
+a single-action `OverlayPanel` naming what ends. The decision is latched, because a poller failing
+mid-notice can otherwise flip the work flags underneath it. `StudioExitGuard` takes a `sessionEnding`
+prop and stands aside, so one exit never raises two prompts — an invariant that previously held only
+by React's passive-effect flush ordering, and is now explicit and tested.
+
+**Nothing is flushed, and that is the answer, not a shortcut.** The audit's remediation said "flush
+or warn"; the session is genuinely gone, so a Project flush would return `401` like everything else.
+The panel warns instead, and `sessionEndReason` lets the entry page say the session ended rather
+than the generic "your session is required".
+
+The keeping-the-session-readable part is load-bearing: three call sites use `auth.session!.user.id`
+and must never see `null` while the shell is mounted. `useStudioSessionCleanup` was extracted so
+logout and expiry share one `SessionCleanupCoordinator` rather than registering against two.
 
 ### B4 — `/studio/{videoId}` is outside the exit guard (Low, low reachability)
 
@@ -276,6 +334,13 @@ typing a URL.
 `creationContextRequestKey` embeds `location.key` (`StudioApp.tsx:219-222`), so returning to the
 same `/studio/create?projectId=…` URL issues a fresh `GET /api/projects/{id}` each time. Correct
 but redundant; on a slow link the Studio renders in an unverified state until it resolves.
+
+Also owned here, surfaced while fixing **B1**: when the verified `projectId` is invalid, archived or
+unreachable, this effect replaces the URL with `studioCreatePath({ intent: 'record' })`, which fires
+capture a second time. It predates the B1 fix — the search string changes too, so the old
+`pathname+search` key changed as well — and it is bounded, because `startLocal` aborts its
+predecessor. The real fix is not to auto-start until the project context resolves, which is this
+finding's territory rather than B1's.
 
 ### B6 — Cloud creative-library sync has no recovery path (Medium)
 
@@ -325,20 +390,45 @@ The product uses several vocabularies at once. Every term below is user-visible.
 | Creating a project         | "Quick project", "New Project", "Untitled Project"                                                                     |
 | The app itself             | "Lightframe", "Lightframe Studio", "Studio", "Momentum Workspace", "Authenticated Studio"                              |
 
-Domain vocabulary that leaks directly into user-facing copy:
+~~Domain vocabulary that leaks directly into user-facing copy:~~ — **the six worst strings are
+rewritten.** They were _accurate_, and also written for the person who implemented the aggregate
+rather than the person trying to make a video. What shipped, and why the list needed correcting:
 
-- "Committing the immutable original and Project revision." (`ProjectRouteSurface.tsx:494`)
-- "A semantic Project checkpoint is queued for the bounded autosave interval." (`:677`)
-- "Committing one coalesced semantic Project revision." (`:683`)
-- "Project authority is unavailable. Your proposal was preserved." (`:699`)
-- "The validated render is temporary until adoption stores, inspects, and checksums it. Adoption
-  advances working/presented media without replacing the immutable original…"
-  (`StudioLifecycleDialogs.tsx:103`)
-- "No provider starts from source selection, hydration, recording acceptance, or resume."
-  (`ProjectRouteSurface.tsx:629-631`)
+| Was                                                                                     | Now                                                                                                                                                 |
+| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Committing the immutable original and Project revision."                               | "Saving the source video and this change to your Project."                                                                                          |
+| "A semantic Project checkpoint is queued for the bounded autosave interval."            | "Your changes are queued and save automatically in a moment."                                                                                       |
+| "Committing one coalesced semantic Project revision."                                   | "Saving your recent changes together as one change."                                                                                                |
+| "Project authority is unavailable. Your proposal was preserved."                        | "Lightframe could not be reached. Your unsaved changes are still here."                                                                             |
+| "The validated render is temporary until adoption stores, inspects, and checksums it…"  | "This render only exists on your device until you keep it. Keeping it stores and checks the file, then makes it the video this Project works from…" |
+| "No provider starts from source selection, hydration, recording acceptance, or resume." | "Choosing, recording, or reopening a source never starts paid AI work."                                                                             |
 
-These sentences are _accurate_. They are also written for the person who implemented the aggregate,
-not for the person trying to make a video.
+Three of the six were **fallbacks the user rarely actually saw**, so the reachable copy was fixed
+too: the "proposal was preserved" text users hit comes from `projectSessionController`, with a
+user-reachable twin in `StudioExitGuard`; the adoption text is usually overridden by
+`useProjectWorkingMediaController`. The sibling notices in the same source-phase mapper moved with
+string 1, or the panel would have read as two different products, and the workspace source heading
+went from "Immutable original" to "Source video" — the most exposed instance of the worst offender.
+
+Words now absent from rendered copy: **coalesced**, **semantic**, **hydration**, **presented media**.
+One word per concept, for the concepts these strings touch: **source** for the Project's first video,
+**saved change** in prose (keeping "Revision _n_" only where it is an identifier the user can cite),
+**unsaved changes** for local state, **Lightframe** for the server. **provider** is kept on purpose —
+it is honest, and **T4** depends on the user understanding that provider work costs money.
+
+**Correction to this table:** "candidate" is listed above as a user-facing term for work in progress.
+It is not. Every occurrence in `apps/web/src` is an identifier (`recordingCandidate`,
+`deleteCandidate`, `.find((candidate) => …)`); zero are rendered.
+
+**Still open — the wider consolidation.** This pass deliberately did not unify the vocabulary tables
+above, because that is a product decision wearing a copy-edit's clothes. "A retained video" alone has
+five competing nouns across roughly 45 rendered strings in 10 files; "make this durable" has eight
+verbs; "work in progress" is three different objects wearing eight names, and consolidating it
+requires first deciding whether the recorded clip, the unsaved settings form and the Project media
+pointer are one user-facing thing or three. `ProjectOutputSaveSection` already contains a sentence
+whose only job is to disambiguate three of those verbs — the argument for the work, in the product's
+own words. Doing it half-way across 45 strings would leave the vocabulary _more_ inconsistent, not
+less.
 
 ## 8. First-time-user problems
 
@@ -352,7 +442,9 @@ not for the person trying to make a video.
 4. **Nothing explains that Studio work is temporary** until the user tries to leave and hits a
    discard dialog. The stage looks like a document editor; it behaves like a scratchpad.
 5. **Campaign creation is the only guided next step in the product** — every other create action
-   drops the user somewhere with no suggestion of what to do next.
+   drops the user somewhere with no suggestion of what to do next. Partly eased by G7: a Project
+   workspace now opens on the step it is up to and marks it, so at least within a Project the order
+   is visible rather than remembered.
 6. ~~The Assets hub promises four libraries; one is inert~~ — resolved (G1).
 
 ## 9. Mobile and responsive concerns
@@ -386,27 +478,30 @@ concerns:
 Ordered so that navigation and flow integrity are fixed before polish. Each is small and
 independent.
 
-**Tier 1 — close the core loop (do these first)**
+**Tier 1 — close the core loop (do these first)** — **complete**
 
 1. ~~**G2/M1/M2** — add a post-save success state in Studio with Download, Open in Assets, and
    Create another.~~ **Done.**
-2. **B1** — include `location.key` in the record-intent guard so "Record Video" always records.
-   Still open; the G2 "Create another" action deliberately avoids `?intent=record` because of it.
+2. ~~**B1** — include `location.key` in the record-intent guard so "Record Video" always records.~~
+   **Done.** The G2 "Create another" action still avoids `?intent=record`, now on its own merits
+   rather than as a workaround.
 3. ~~**G1** — make `/assets/voices` functional or remove it from the Assets hub.~~ **Done** — made
    functional.
-4. **B3** — flush or warn about in-memory work before an expiry-driven redirect.
+4. ~~**B3** — flush or warn about in-memory work before an expiry-driven redirect.~~ **Done** —
+   warn. A flush is impossible on this path: the session is gone, so any save would `401`.
 
-**Tier 2 — make the model legible**
+**Tier 2 — make the model legible** — **complete**
 
 5. ~~**G3** — show the Source task (or an "Add source" primary action) on an empty project
    overview.~~ **Done** — both.
 6. ~~**G4** — one sentence and a visual distinction between "Project source" and "Attached
    assets".~~ **Done**, plus the label corrections the finding's own premise turned out to need.
-7. **G7/M6** — surface `workflowPhase` as progress in the workspace masthead and mark the current
-   task. Partially addressed: the **overview** now carries a non-interactive progress strip. The
-   workspace masthead and deep-linkable tasks remain open.
-8. **§7** — a terminology pass: pick one word per concept and rewrite the six worst strings listed
-   above into user language. Keep the precision; change the register.
+7. ~~**G7/M6** — surface `workflowPhase` as progress in the workspace masthead and mark the current
+   task.~~ **Done** — masthead strip, phase-derived entry task latched on entry, and `?task=`
+   deep links. The strip stays non-interactive so it does not compete with the tablist.
+8. ~~**§7** — a terminology pass: pick one word per concept and rewrite the six worst strings listed
+   above into user language.~~ **Done** for the six and their reachable twins. The wider vocabulary
+   consolidation is now tracked as an open finding in §7 — it needs a product decision first.
 
 **Tier 3 — navigation consistency**
 
@@ -443,5 +538,6 @@ independent.
 
 No lint, type-check, unit, integration or e2e suite was executed during the original audit — the
 working copy staged for analysis excluded `node_modules`, so tooling could not run. All findings
-were from static reading of source, tests and SQL. The G1–G4 fixes recorded above were validated
-with targeted component and E2E runs.
+were from static reading of source, tests and SQL. The G1–G4 fixes were validated with targeted
+component and E2E runs. The Tier 1 and Tier 2 fixes (B1, B3, G7/M6, §7) were validated with the full
+`apps/web` unit suite, the full Chromium E2E suite, and `bun run quality`.

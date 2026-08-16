@@ -12,7 +12,10 @@ export const ProtectedRoute = ({ children }: { readonly children: ReactNode }) =
     if (status === 'unknown') void restore();
   }, [restore, status]);
 
-  if (status === 'authenticated' && session) return children;
+  // 'expiring' keeps rendering children on purpose: the shell below holds in-memory work, and
+  // unmounting it here is what used to discard that work without a prompt. It parks here only
+  // while a holder is registered, and finalizing flips the status to 'unauthenticated'.
+  if ((status === 'authenticated' || status === 'expiring') && session) return children;
   if (status === 'unauthenticated') {
     return (
       <Navigate
