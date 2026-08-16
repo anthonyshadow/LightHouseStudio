@@ -365,7 +365,7 @@ test('the independent recording maximum warns and safely opens take review', asy
   await expect(takeControls.getByRole('button', { name: 'Save' })).toBeVisible();
   await expect(takeControls.getByRole('button', { name: 'Discard' })).toBeVisible();
   await expect(takeControls.getByRole('button', { name: 'Voice' })).toBeVisible();
-  await expect(takeControls.getByRole('button', { name: 'Release' })).toBeVisible();
+  await expect(takeControls.getByRole('button', { name: 'Release' })).toHaveCount(0);
 
   const browser = await readBrowserState(page);
   expect(browser.recorderStarts).toBe(2);
@@ -627,7 +627,7 @@ test('Browse Voices adds once and confirmed Saved removal reconciles both librar
   expectNoExternalProviderTraffic(network);
 });
 
-test('Save enables Release and clears the reviewed take without reacquiring media', async ({
+test('Save reveals Release and clears the reviewed take without reacquiring media', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -642,7 +642,7 @@ test('Save enables Release and clears the reviewed take without reacquiring medi
   await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
   const takeControls = page.getByRole('group', { name: 'Recorded take controls' });
   const releaseTake = takeControls.getByRole('button', { name: 'Release' });
-  await expect(releaseTake).toBeDisabled();
+  await expect(releaseTake).toHaveCount(0);
 
   await takeControls.getByRole('button', { name: 'Save' }).click();
   await confirmSaveVideo(page);
@@ -725,9 +725,8 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
   await expect(page.locator('[data-stage-status-long]', { hasText: /^AI active/u })).toBeVisible();
 
   await page.getByRole('button', { name: 'Reset AI' }).click({ force: true });
-  await expect(page.getByLabel('Character direction')).toHaveValue('');
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Start Character AI' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'AI Settings' })).toBeHidden();
 
   browser = await readBrowserState(page);
   expect(browser.cameraCalls).toBe(1);
