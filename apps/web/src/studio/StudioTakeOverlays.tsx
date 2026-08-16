@@ -26,6 +26,7 @@ export const StudioTakeOverlays = ({
   onBackToTakeReview,
   onSaveVideo,
   saveVideoState,
+  onOpenSavedVideosLibrary,
   onReplaceSavedVideo,
   hasUnsavedChanges,
 }: {
@@ -43,6 +44,7 @@ export const StudioTakeOverlays = ({
   onBackToTakeReview: () => void;
   onSaveVideo?: () => void;
   saveVideoState?: SaveVideoState;
+  onOpenSavedVideosLibrary?: () => void;
   onReplaceSavedVideo?: () => void;
   hasUnsavedChanges?: boolean;
 }) => {
@@ -73,6 +75,7 @@ export const StudioTakeOverlays = ({
             onOpenVoiceTreatments={onOpenVoiceTreatments}
             {...(onSaveVideo ? { onSaveVideo } : {})}
             {...(saveVideoState ? { saveVideoState } : {})}
+            {...(onOpenSavedVideosLibrary ? { onOpenSavedVideosLibrary } : {})}
             {...(onReplaceSavedVideo ? { onReplaceSavedVideo } : {})}
             {...(hasUnsavedChanges !== undefined ? { hasUnsavedChanges } : {})}
           />

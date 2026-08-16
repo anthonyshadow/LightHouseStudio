@@ -95,6 +95,7 @@ export const useExistingVideoWorkflow = ({
     resultMetadata,
     resultHasServerApprovedVisual,
     voiceSelection,
+    pendingVoiceSelection,
     elapsedSeconds,
   } = workflowState;
   const {
@@ -113,6 +114,7 @@ export const useExistingVideoWorkflow = ({
     setResultMetadata,
     setResultHasServerApprovedVisual,
     setVoiceSelection,
+    setPendingVoiceSelection,
     setElapsedSeconds,
   } = workflowStateSetters;
   const controllerRef = useRef<AbortController | null>(null);
@@ -821,6 +823,7 @@ export const useExistingVideoWorkflow = ({
       editBaseMetadata,
       currentMetadata,
       voiceSelection,
+      pendingVoiceSelection,
       voiceAvailable: recording.sidecar.state === 'ready' && recording.sidecar.blob !== null,
       visualProviderCompatibility,
       comparison,
@@ -847,7 +850,14 @@ export const useExistingVideoWorkflow = ({
         setVoiceSelection({ kind: 'local', effect, voiceName }),
       selectVoice: (voiceId: string, voiceName: string) =>
         setVoiceSelection({ kind: 'elevenlabs', voiceId, voiceName }),
-      clearVoice: () => setVoiceSelection(null),
+      // Chosen before any source exists. `source-ready` promotes it, so a Voice picked in the
+      // Assets library is not silently discarded by the reset that accepting a source performs.
+      preselectVoice: (voiceId: string, voiceName: string) =>
+        setPendingVoiceSelection({ kind: 'elevenlabs', voiceId, voiceName }),
+      clearVoice: () => {
+        setVoiceSelection(null);
+        setPendingVoiceSelection(null);
+      },
       editSelected,
       showOriginal: () => setComparison('original'),
       showResult: () => {
@@ -888,6 +898,7 @@ export const useExistingVideoWorkflow = ({
       replaceSource,
       selection,
       setComparison,
+      setPendingVoiceSelection,
       setVoiceSelection,
       status,
       steps,
@@ -895,6 +906,7 @@ export const useExistingVideoWorkflow = ({
       submitPlan,
       updateStep,
       voiceSelection,
+      pendingVoiceSelection,
       visualProviderCompatibility,
       workflowActive,
     ],

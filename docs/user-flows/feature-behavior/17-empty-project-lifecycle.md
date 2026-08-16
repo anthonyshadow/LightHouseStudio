@@ -35,8 +35,12 @@ Project` without requiring a Campaign, brief, source, tag, or provider choice. E
    response-loss replay is reconciled when the requested result is already current.
 6. Refreshing or directly opening an empty Project fetches its identity and current revision from
    server authority. The overview truthfully explains that an intentionally empty collection is
-   valid. **Continue editing** opens the workspace, where **No source yet** offers **Record**,
-   **Upload**, and **Use Saved Video** without a wizard. Upload previews immediately on the stage;
+   valid, names the workflow as Source → Create → Save → History with the current step marked, and
+   presents the Source task itself: **No source yet** offers **Record**, **Upload**, and **Use Saved
+   Video** without a wizard. The primary action reads **Add source** until a source exists and
+   **Continue editing** afterwards. Accepting a source from the overview continues into the
+   workspace, and **Record** starts capture only after navigating there. A source-bearing Project
+   does not mount the Source task on the overview, so opening it never re-reads source bytes. Upload previews immediately on the stage;
    Record starts local media only after the explicit action and offers a finalized take for
    acceptance; Use Saved Video selects the current exact active Version. The inspector groups the
    existing lifecycle into keyboard-operable **Source**, **Create**, **Save**, and **History** tasks
@@ -139,13 +143,15 @@ Project` without requiring a Campaign, brief, source, tag, or provider choice. E
     never promoted automatically. A removed global Saved Video remains reachable only through an
     exact same-owner retaining Project relation with truthful retention copy.
 27. Project overview also exposes a separate non-owning Asset collection for Videos, Characters,
-    Outfits, and Voices. Memberships are newest-first cursor pages and idempotent by
-    Project/kind/resource. Membership alone does not create a source, working media, output, or
-    retention claim. Archived Projects show the collection read-only. Missing underlying records
-    remain visible as unavailable until explicitly detached. **Open in Workspace** adopts the
-    attached Video's exact current Version before navigating to `/projects/:projectId/workspace`: it
-    becomes the immutable source for an empty Project or current working media for a source-bearing
-    Project without changing that immutable source.
+    Outfits, and Voices, stated in place as not being the Project source. Memberships are
+    newest-first cursor pages and idempotent by Project/kind/resource. Membership alone does not
+    create a source, working media, output, or retention claim. Archived Projects show the
+    collection read-only. Missing underlying records remain visible as unavailable until explicitly
+    detached. Adopting an attached Video is named for its consequence: **Use as Project source** on
+    a Project without one, confirmed because the original cannot be replaced afterwards, and **Use
+    as working media** once a source exists. Either adopts the exact current Version before
+    navigating to `/projects/:projectId/workspace`, and the working-media path never changes the
+    immutable source.
 28. **Add Asset** can attach existing records or launch Project-aware creation. Record/Upload uses
     `/studio/create?intent=...&projectId=...`; only an explicit Save to Assets attempts attachment,
     then returns to Project detail. A successful save plus failed attachment preserves the Video

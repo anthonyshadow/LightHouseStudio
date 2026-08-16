@@ -12,6 +12,13 @@ const ConfirmationDialog = lazy(() =>
     default: module.ConfirmationDialog,
   })),
 );
+// Deferred with the other post-review surfaces: it is only reachable after a save completes, and
+// the Studio shell's static closure has a hard byte budget.
+const SaveVideoSuccessPanel = lazy(() =>
+  import('../features/saved-videos/SaveVideoSuccessPanel').then((module) => ({
+    default: module.SaveVideoSuccessPanel,
+  })),
+);
 
 interface StudioLifecycleDialogsProps {
   readonly mainRef: RefObject<HTMLElement | null>;
@@ -20,6 +27,13 @@ interface StudioLifecycleDialogsProps {
   readonly videoEditor: ReturnType<typeof useVideoEditSession>;
   readonly projectContextActive: boolean;
   readonly projectWorkingMedia: ReturnType<typeof useProjectWorkingMediaController>;
+  /**
+   * Suppressed while a Project video context owns the save: that path attaches the new Video and
+   * redirects to the Project, so a second completion surface would compete with it.
+   */
+  readonly saveSuccessSuppressed: boolean;
+  readonly onOpenSavedVideosLibrary: () => void;
+  readonly onCreateAnotherVideo: () => void;
 }
 
 export const StudioLifecycleDialogs = ({
@@ -29,6 +43,9 @@ export const StudioLifecycleDialogs = ({
   videoEditor,
   projectContextActive,
   projectWorkingMedia,
+  saveSuccessSuppressed,
+  onOpenSavedVideosLibrary,
+  onCreateAnotherVideo,
 }: StudioLifecycleDialogsProps) => (
   <>
     {savedVideo.pendingSave ? (
@@ -38,6 +55,22 @@ export const StudioLifecycleDialogs = ({
         onSave={savedVideo.confirmPendingSave}
       />
     ) : null}
+
+    <Suspense fallback={null}>
+      <SaveVideoSuccessPanel
+        video={saveSuccessSuppressed ? null : savedVideo.saveOutcome}
+        returnFocusRef={mainRef}
+        onDismiss={savedVideo.dismissSaveOutcome}
+        onOpenInAssets={() => {
+          savedVideo.dismissSaveOutcome();
+          onOpenSavedVideosLibrary();
+        }}
+        onCreateAnother={() => {
+          savedVideo.dismissSaveOutcome();
+          onCreateAnotherVideo();
+        }}
+      />
+    </Suspense>
 
     <Suspense fallback={null}>
       <ConfirmationDialog

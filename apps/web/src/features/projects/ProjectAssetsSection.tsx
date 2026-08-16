@@ -16,7 +16,7 @@ import {
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
 import { studioCreatePath } from '../../app/paths';
-import { AppIcon, Button, OverlayPanel, StatusNotice } from '../../ui';
+import { AppIcon, Button, ConfirmationDialog, OverlayPanel, StatusNotice } from '../../ui';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
 import { safeProjectError } from './ProjectDialogs';
 import {
@@ -63,6 +63,16 @@ const kindLabel = (kind: ProjectAssetKindContract): string =>
 
 const abbreviatedId = (value: string): string =>
   value.length > 16 ? `${value.slice(0, 8)}…${value.slice(-6)}` : value;
+
+// Opening an attached Video in the workspace means two materially different things depending on
+// whether the Project already has its immutable original, so the control has to say which one.
+const projectWorkspaceAdoptionLabel = (projectHasSource: boolean): string =>
+  projectHasSource ? 'Use as working media' : 'Use as Project source';
+
+const projectWorkspaceAdoptionHint = (projectHasSource: boolean): string =>
+  projectHasSource
+    ? 'Loads this Video as the current editable media. The Project source stays unchanged.'
+    : 'This Project has no source yet, so this Video becomes its immutable original.';
 
 const labelForMembership = (
   membership: ProjectAssetMembershipContract,
@@ -198,6 +208,7 @@ const ProjectVideoPreview = ({
   videoId,
   opening,
   openDisabled,
+  projectHasSource,
   onClose,
   onOpenInWorkspace,
   returnFocusRef,
@@ -205,6 +216,7 @@ const ProjectVideoPreview = ({
   readonly videoId: string;
   readonly opening: boolean;
   readonly openDisabled: boolean;
+  readonly projectHasSource: boolean;
   readonly onClose: () => void;
   readonly onOpenInWorkspace: (video: SavedVideoDetail) => void;
   readonly returnFocusRef: RefObject<HTMLElement | null>;
@@ -252,9 +264,10 @@ const ProjectVideoPreview = ({
               variant="primary"
               busy={opening}
               disabled={opening || openDisabled}
+              title={projectWorkspaceAdoptionHint(projectHasSource)}
               onClick={() => onOpenInWorkspace(detail)}
             >
-              Open in Workspace
+              {projectWorkspaceAdoptionLabel(projectHasSource)}
             </Button>
           </div>
         ) : null
@@ -294,6 +307,7 @@ const ProjectVideoPreview = ({
 export const ProjectAssetsSection = ({
   projectId,
   archived,
+  projectHasSource,
   session,
   creativeStore,
   onCreateCharacter,
@@ -301,6 +315,7 @@ export const ProjectAssetsSection = ({
 }: {
   readonly projectId: string;
   readonly archived: boolean;
+  readonly projectHasSource: boolean;
   readonly session: ProjectSessionPort;
   readonly creativeStore?: CreativeAssetStore;
   readonly onCreateCharacter?: (projectId: string) => void;
@@ -311,6 +326,9 @@ export const ProjectAssetsSection = ({
   const [filter, setFilter] = useState<AssetFilter>('all');
   const [picker, setPicker] = useState<Picker>(null);
   const [previewVideoId, setPreviewVideoId] = useState<string | null>(null);
+  const [sourceAdoptionCandidate, setSourceAdoptionCandidate] = useState<SavedVideoSummary | null>(
+    null,
+  );
   const [notice, setNotice] = useState<{
     readonly tone: 'success' | 'danger';
     readonly message: string;
@@ -341,6 +359,16 @@ export const ProjectAssetsSection = ({
     } catch (caught) {
       setNotice({ tone: 'danger', message: projectAssetVideoWorkspaceError(caught) });
     }
+  };
+
+  // Accepting a source is one-shot and cannot be undone, so that branch is confirmed. Adopting
+  // working media stays a single click because it can be replaced at any time.
+  const requestVideoInWorkspace = (video: SavedVideoSummary) => {
+    if (projectHasSource) {
+      void openVideoInWorkspace(video);
+      return;
+    }
+    setSourceAdoptionCandidate(video);
   };
 
   const attach = async (kind: ProjectAssetKindContract, resourceId: string) => {
@@ -396,6 +424,11 @@ export const ProjectAssetsSection = ({
         )}
       </header>
 
+      <p data-project-assets-explainer css={projectAssetsOwnershipStyles(theme)}>
+        Attached Assets are reusable records kept alongside this Project. They are not its source —
+        that is the one original video the Project is built from.
+      </p>
+
       <div role="group" aria-label="Filter Project Assets" css={projectAssetFiltersStyles(theme)}>
         {FILTERS.map(({ value, label }) => (
           <Button
@@ -427,7 +460,7 @@ export const ProjectAssetsSection = ({
       {!controller.query.isPending && !controller.query.isError && memberships.length === 0 ? (
         <div css={projectAssetsEmptyStyles(theme)}>
           <strong>No {filter === 'all' ? '' : `${kindLabel(filter)} `}Assets attached</strong>
-          <p>Add an existing Asset or create one while keeping the Project source unchanged.</p>
+          <p>Attach an existing Asset or create one. Attaching never changes the Project source.</p>
         </div>
       ) : null}
       {memberships.length > 0 ? (
@@ -464,12 +497,13 @@ export const ProjectAssetsSection = ({
                           data-project-asset-action="open"
                           busy={videoWorkspace.busyVideoId === membership.resourceId}
                           disabled={archived || videoWorkspace.busyVideoId !== null}
+                          title={projectWorkspaceAdoptionHint(projectHasSource)}
                           onClick={() => {
                             const video = videoSummaries.get(membership.resourceId);
-                            if (video) void openVideoInWorkspace(video);
+                            if (video) requestVideoInWorkspace(video);
                           }}
                         >
-                          Open in Workspace
+                          {projectWorkspaceAdoptionLabel(projectHasSource)}
                         </Button>
                       ) : null}
                       {membership.kind === 'video' && !resolved.unavailable ? (
@@ -634,14 +668,36 @@ export const ProjectAssetsSection = ({
           videoId={previewVideoId}
           opening={videoWorkspace.busyVideoId === previewVideoId}
           openDisabled={archived || videoWorkspace.busyVideoId !== null}
+          projectHasSource={projectHasSource}
           onClose={() => setPreviewVideoId(null)}
           onOpenInWorkspace={(video) => {
             setPreviewVideoId(null);
-            void openVideoInWorkspace(video);
+            requestVideoInWorkspace(video);
           }}
           returnFocusRef={previewTriggerRef}
         />
       ) : null}
+
+      <ConfirmationDialog
+        open={sourceAdoptionCandidate !== null}
+        title="Make this the Project source?"
+        description={
+          sourceAdoptionCandidate
+            ? `“${sourceAdoptionCandidate.title}” becomes this Project's immutable original. A Project keeps one original for its whole life, so this cannot be undone or replaced — a different original needs a new Project. The Asset stays reusable everywhere.`
+            : ''
+        }
+        confirmLabel="Use as Project source"
+        cancelLabel="Keep this Project empty"
+        busy={videoWorkspace.busyVideoId !== null}
+        returnFocusRef={previewTriggerRef}
+        onCancel={() => setSourceAdoptionCandidate(null)}
+        onConfirm={() => {
+          const candidate = sourceAdoptionCandidate;
+          if (!candidate) return;
+          setSourceAdoptionCandidate(null);
+          void openVideoInWorkspace(candidate);
+        }}
+      />
     </section>
   );
 };

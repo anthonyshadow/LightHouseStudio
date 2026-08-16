@@ -34,9 +34,12 @@ deliberately release or discard it.
    artifact name. Save reports progress and publishes the final validated artifact to the
    authenticated local gallery without changing review ownership. Repeated submission of the same
    artifact is idempotent.
-9. After Save succeeds, select **Release**. The durable gallery copy remains available for preview,
-   reuse, and download. Or select **Discard** and confirm irreversible removal of the temporary
-   take without saving it.
+9. After Save succeeds, review acknowledges completion by name and Version and offers **Download**
+   and **View in Assets** for that exact retained Version, plus **Create another**, which releases
+   the take and clears save state so the next recording starts from a clean stage. A Project video
+   context keeps its own attach-and-return behavior and shows no completion surface.
+10. Select **Release**. The durable gallery copy remains available for preview, reuse, and download.
+    Or select **Discard** and confirm irreversible removal of the temporary take without saving it.
 
 ## Guards and recovery
 

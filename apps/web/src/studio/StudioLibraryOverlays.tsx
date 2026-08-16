@@ -1,4 +1,4 @@
-import type { SavedVideoSummary } from '@studio/contracts';
+import type { SavedVideoSummary, VoiceSummary } from '@studio/contracts';
 import { lazy, Suspense, type RefObject } from 'react';
 import { APP_PATHS } from '../app/paths';
 import type {
@@ -44,6 +44,8 @@ interface StudioLibraryOverlaysProps {
   readonly onUseCharacter: (character: SavedCharacterPrompt) => void;
   readonly onCreateOutfit: () => void;
   readonly onUseOutfit: (outfit: SavedPrompt) => void;
+  readonly voiceLibraryUnavailableReason: string | null;
+  readonly onUseVoice: (voice: VoiceSummary) => void;
 }
 
 export const StudioLibraryOverlays = ({
@@ -59,6 +61,8 @@ export const StudioLibraryOverlays = ({
   onUseCharacter,
   onCreateOutfit,
   onUseOutfit,
+  voiceLibraryUnavailableReason,
+  onUseVoice,
 }: StudioLibraryOverlaysProps) => {
   return (
     <>
@@ -146,7 +150,7 @@ export const StudioLibraryOverlays = ({
         open={pathname === APP_PATHS.voices}
         onClose={() => onNavigate(APP_PATHS.assets)}
         title="Voices"
-        description="Preview the provider catalog and manage voices saved for this account. Select a voice from an active video workflow when you are ready to use it."
+        description="Preview the provider catalog, keep the voices you want for this account, and send a saved voice to Studio."
         placement="fullscreen"
         size="wide"
         bodyMode="scroll"
@@ -155,7 +159,12 @@ export const StudioLibraryOverlays = ({
       >
         {pathname === APP_PATHS.voices ? (
           <Suspense fallback={deferredLibraryFallback}>
-            <VoiceLibrary disabled onSelect={() => undefined} />
+            <VoiceLibrary
+              disabled={voiceLibraryUnavailableReason !== null}
+              unavailableReason={voiceLibraryUnavailableReason}
+              selectLabel="Use in Studio"
+              onSelect={onUseVoice}
+            />
           </Suspense>
         ) : null}
       </OverlayPanel>

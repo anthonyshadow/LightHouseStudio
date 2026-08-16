@@ -5,6 +5,7 @@ import type { RecordedTakeMetadata, RecordingController, TakeMetadata } from '..
 import type { VoiceProcessingController } from '../voice-effects/types';
 import type { VoiceBrowserCapabilities } from '../voice-effects/voiceCapabilities';
 import { VoiceEffectsPanel } from '../voice-effects/VoiceEffectsPanel';
+import { SavedVideoSuccessActions } from '../saved-videos/SavedVideoSuccessActions';
 import { TakeReviewActions } from './TakeReviewActions';
 import type { SaveVideoState } from '../saved-videos/useSaveVideo';
 
@@ -21,6 +22,7 @@ export type TakeDockProps = {
   onOpenVoiceTreatments?: () => void;
   onSaveVideo?: () => void;
   saveVideoState?: SaveVideoState;
+  onOpenSavedVideosLibrary?: () => void;
   onReplaceSavedVideo?: () => void;
   hasUnsavedChanges?: boolean;
 };
@@ -205,6 +207,7 @@ export const TakeDock = ({
   onOpenVoiceTreatments,
   onSaveVideo,
   saveVideoState,
+  onOpenSavedVideosLibrary,
   onReplaceSavedVideo,
   hasUnsavedChanges,
 }: TakeDockProps) => {
@@ -293,8 +296,22 @@ export const TakeDock = ({
           </div>
           {saveVideoState?.status === 'saved' &&
           saveVideoState.artifactId === recording.presented?.id ? (
-            <StatusNotice role="status" aria-live="polite" tone="success">
-              Saved to your video gallery. This tab still owns the temporary take.
+            <StatusNotice
+              role="status"
+              aria-live="polite"
+              tone="success"
+              title={`“${saveVideoState.video.title}” is in Assets`}
+            >
+              <p>
+                Saved as Version {saveVideoState.video.currentVersion.ordinal}. This tab still owns
+                the temporary take until you release it.
+              </p>
+              {onOpenSavedVideosLibrary ? (
+                <SavedVideoSuccessActions
+                  video={saveVideoState.video}
+                  onOpenInAssets={onOpenSavedVideosLibrary}
+                />
+              ) : null}
             </StatusNotice>
           ) : null}
         </div>

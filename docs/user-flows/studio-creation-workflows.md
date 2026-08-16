@@ -119,7 +119,10 @@ Voice is independent of the visual edit and can be applied alone
   returns transformed audio which is remuxed into the video.
 - Every treatment starts from the immutable original audio sidecar, and "Restore Original" is
   always available (`StudioTakeOverlays.tsx`, voice-treatments overlay).
-- The voice catalog (`VoiceLibrary`) supports browse, preview, save-to-account and remove.
+- The voice catalog (`VoiceLibrary`) supports browse, preview, save-to-account and remove, in the
+  Voice treatments overlay and in Assets ▸ Voices alike. A voice chosen from Assets ▸ Voices is
+  carried into the next video workflow — see
+  [Assets and Libraries](assets-and-libraries.md#flow-voices-library-assetsvoices).
 
 ## Flow: Local video adjust
 
@@ -146,16 +149,31 @@ Voice is independent of the visual edit and can be applied alone
    - posts the blob, then generates and uploads a thumbnail (`PUT /api/videos/{id}/versions/{versionId}/thumbnail`),
      tolerating thumbnail failure
    - invalidates the saved-video lists
-4. When the video was loaded from an existing Saved Video, **Replace saved version** is offered
-   instead of a plain save; it calls `POST /api/videos/{videoId}/versions` after a
-   `window.confirm` (`useStudioSavedVideoController.ts:264-292`).
+4. When the video was loaded from an existing Saved Video, **Replace Saved Version** is offered
+   alongside the plain save; it calls `POST /api/videos/{videoId}/versions` after a
+   `window.confirm` (`useStudioSavedVideoController.ts`).
 5. If the Studio was entered with `?projectId=`, the newly saved video is auto-attached to the
    project and the app redirects to `/projects/{id}` (`StudioApp.tsx:788-826`), with retry handling
    on the attach step.
 
-**After a successful standalone save the user stays in Studio.** There is no confirmation
-destination, no "view in Assets" link, and no download affordance — `ExistingVideoActionBar.tsx:114`
-tells the user to "Open Saved Videos when you are ready to download."
+**A successful standalone save ends with a completion surface.** `SaveVideoSuccessPanel`
+(`features/saved-videos/SaveVideoSuccessPanel.tsx`) opens from `StudioLifecycleDialogs`, naming the
+Saved Video and its Version, and offers **Download** · **View in Assets** · **Create another** ·
+**Stay in Studio**. The same three actions are also rendered inline by `SavedVideoSuccessActions`
+in the take-review dock and in the existing-video result bar, so they survive dismissing the panel.
+
+- **Download** is an anchor to `/api/videos/{id}/versions/{versionId}/content?download=true` with
+  the retained `filename` — the same affordance the Videos gallery and Project history use.
+- **View in Assets** navigates to `/assets/videos`, which opens the Videos overlay.
+- **Create another** reuses `discardTemporaryWork`: it releases the take, resets the save state and
+  closes overlays, leaving the operator on `/studio/create`. It deliberately does not route through
+  `?intent=record`.
+- The panel is **suppressed while a Project video context owns the save** (`?projectId=` verified).
+  That path keeps its existing behaviour: attach the new Video to the Project, then replace the URL
+  with `/projects/{id}`.
+- Saving the pre-edit video as part of **Replace and Save** in the video editor does not open the
+  panel; only an explicitly requested save or an explicit **Replace Saved Version** does
+  (`useStudioSavedVideoController.saveOutcome`).
 
 ## Flow: Live AI (realtime) — gated
 

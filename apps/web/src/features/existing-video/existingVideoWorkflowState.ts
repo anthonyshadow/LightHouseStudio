@@ -44,6 +44,7 @@ export const initialExistingVideoWorkflowState: ExistingVideoWorkflowState = {
   resultMetadata: null,
   resultHasServerApprovedVisual: false,
   voiceSelection: null,
+  pendingVoiceSelection: null,
   elapsedSeconds: 0,
 };
 
@@ -72,6 +73,7 @@ export const existingVideoWorkflowReducer = (
         phase: 'ready',
         message: action.selection.audioUnavailableReason,
         comparison: 'original',
+        voiceSelection: state.pendingVoiceSelection,
       };
     case 'start-over':
       return {
@@ -126,5 +128,6 @@ export const createWorkflowStateSetters = (
   setResultMetadata: stateSetter(dispatch, 'resultMetadata'),
   setResultHasServerApprovedVisual: stateSetter(dispatch, 'resultHasServerApprovedVisual'),
   setVoiceSelection: stateSetter(dispatch, 'voiceSelection'),
+  setPendingVoiceSelection: stateSetter(dispatch, 'pendingVoiceSelection'),
   setElapsedSeconds: stateSetter(dispatch, 'elapsedSeconds'),
 });
