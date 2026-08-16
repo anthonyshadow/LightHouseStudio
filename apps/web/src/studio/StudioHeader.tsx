@@ -30,7 +30,6 @@ type StudioHeaderProps = {
   user: AuthenticatedUser;
   accountBusy?: boolean;
   activeDestination: StudioHeaderDestination;
-  organizationRouteActive?: boolean;
   onOpenDashboard: () => void;
   onOpenStudio: () => void;
   onOpenProjects: () => void;
@@ -71,7 +70,6 @@ type StatusMenuProps = {
   liveAiState: string;
   existingVideoAiState: string;
   voiceCloudState: string;
-  railPresentation: boolean;
 };
 
 const StatusMenu = ({
@@ -83,7 +81,6 @@ const StatusMenu = ({
   liveAiState,
   existingVideoAiState,
   voiceCloudState,
-  railPresentation,
 }: StatusMenuProps) => {
   const theme = useTheme();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -92,11 +89,7 @@ const StatusMenu = ({
   useDismissiblePopover({ open, onOpenChange, rootRef, triggerRef });
 
   return (
-    <div
-      ref={rootRef}
-      css={capabilityStyles(theme, railPresentation)}
-      aria-label="Integration availability"
-    >
+    <div ref={rootRef} css={capabilityStyles(theme)} aria-label="Integration availability">
       <button
         ref={triggerRef}
         type="button"
@@ -113,7 +106,7 @@ const StatusMenu = ({
           id="studio-availability-details"
           role="region"
           aria-label="Studio availability details"
-          css={capabilityDetailStyles(theme, railPresentation)}
+          css={capabilityDetailStyles(theme)}
         >
           <div data-capability-heading>
             <strong>Studio availability</strong>
@@ -147,7 +140,6 @@ type CreateMenuProps = Readonly<{
   onCreateCampaign: () => void;
   onCreateAsset: (trigger: HTMLButtonElement | null) => void;
   onOpenLive: () => void;
-  railPresentation: boolean;
 }>;
 
 const CreateMenu = ({
@@ -159,7 +151,6 @@ const CreateMenu = ({
   onCreateCampaign,
   onCreateAsset,
   onOpenLive,
-  railPresentation,
 }: CreateMenuProps) => {
   const theme = useTheme();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -180,7 +171,7 @@ const CreateMenu = ({
   };
 
   return (
-    <div ref={rootRef} css={createMenuStyles(theme, railPresentation)}>
+    <div ref={rootRef} css={createMenuStyles(theme)}>
       <Button
         ref={triggerRef}
         size="small"
@@ -254,7 +245,6 @@ export const StudioHeader = ({
   user,
   accountBusy,
   activeDestination,
-  organizationRouteActive = false,
   onOpenDashboard,
   onOpenStudio,
   onOpenProjects,
@@ -301,7 +291,6 @@ export const StudioHeader = ({
         ? 'limited'
         : 'ready';
   const systemLabel = systemStatusLabel(capabilityState, localCaptureAvailable);
-  const railPresentation = organizationRouteActive;
   const setMenuOpen = useCallback((menu: HeaderMenu, open: boolean) => {
     setOpenMenu(open ? menu : null);
   }, []);
@@ -319,23 +308,20 @@ export const StudioHeader = ({
 
   return (
     <>
-      <header
-        css={headerStyles(theme, railPresentation)}
-        data-organization-navigation={railPresentation ? 'true' : undefined}
-      >
+      <header css={headerStyles(theme)}>
         <button
           type="button"
           aria-label="Open Lightframe Dashboard"
-          css={brandStyles(theme, railPresentation)}
+          css={brandStyles(theme)}
           onClick={onOpenDashboard}
         >
           <img src="/favicon.svg" alt="" width="38" height="38" />
           <div>
             <strong>Lightframe</strong>
-            <span>{railPresentation ? 'Studio' : 'Local-first studio'}</span>
+            <span>Studio</span>
           </div>
         </button>
-        <nav aria-label="Primary" css={primaryNavigationStyles(theme, railPresentation)}>
+        <nav aria-label="Primary" css={primaryNavigationStyles(theme)}>
           {destinations.map(({ id, label, icon, open }) => (
             <Button
               key={id}
@@ -349,7 +335,7 @@ export const StudioHeader = ({
             </Button>
           ))}
         </nav>
-        <div css={headerActionsStyles(theme, railPresentation)}>
+        <div css={headerActionsStyles(theme)}>
           <div data-create-action>
             <CreateMenu
               open={openMenu === 'create'}
@@ -360,7 +346,6 @@ export const StudioHeader = ({
               onCreateCampaign={onCreateCampaign}
               onCreateAsset={onCreateAsset}
               onOpenLive={onOpenLive}
-              railPresentation={railPresentation}
             />
           </div>
           <div data-utility-actions>
@@ -373,35 +358,32 @@ export const StudioHeader = ({
               liveAiState={liveAiState}
               existingVideoAiState={existingVideoAiState}
               voiceCloudState={voiceCloudState}
-              railPresentation={railPresentation}
             />
             <AccountMenu
               user={user}
               open={openMenu === 'account'}
               onOpenChange={(open) => setMenuOpen('account', open)}
               busy={accountBusy}
-              presentation={railPresentation ? 'rail' : 'header'}
+              presentation="rail"
               onLogout={onLogout}
             />
           </div>
         </div>
       </header>
-      {organizationRouteActive ? (
-        <nav aria-label="Mobile primary" css={mobileNavigationStyles(theme)}>
-          {destinations.map(({ id, label, icon, open }) => (
-            <Button
-              key={id}
-              size="small"
-              variant="quiet"
-              aria-current={activeDestination === id ? 'page' : undefined}
-              onClick={open}
-            >
-              <AppIcon name={icon} width="1.05rem" height="1.05rem" />
-              <span>{label}</span>
-            </Button>
-          ))}
-        </nav>
-      ) : null}
+      <nav aria-label="Mobile primary" css={mobileNavigationStyles(theme)}>
+        {destinations.map(({ id, label, icon, open }) => (
+          <Button
+            key={id}
+            size="small"
+            variant="quiet"
+            aria-current={activeDestination === id ? 'page' : undefined}
+            onClick={open}
+          >
+            <AppIcon name={icon} width="1.05rem" height="1.05rem" />
+            <span>{label}</span>
+          </Button>
+        ))}
+      </nav>
     </>
   );
 };

@@ -224,6 +224,13 @@ for (const viewport of representativeViewports) {
       'Live AI Beta enabled',
     );
 
+    // Studio shares the shell navigation: the rail from 48rem up, the bottom bar below it.
+    const desktopNavigation = page.getByRole('navigation', { name: 'Primary', exact: true });
+    const mobileNavigation = page.getByRole('navigation', { name: 'Mobile primary', exact: true });
+    const railLayout = viewport.width >= 768;
+    await expect(desktopNavigation).toBeVisible({ visible: railLayout });
+    await expect(mobileNavigation).toBeVisible({ visible: !railLayout });
+
     const statusTrigger = availability.getByRole('button');
     const accountTrigger = page.getByRole('button', { name: 'Lightframe Demo account menu' });
     await expect(accountTrigger).toBeVisible();
@@ -231,11 +238,19 @@ for (const viewport of representativeViewports) {
     const accountTriggerBox = await accountTrigger.boundingBox();
     expect(statusTriggerBox).not.toBeNull();
     expect(accountTriggerBox).not.toBeNull();
-    expect(accountTriggerBox!.x).toBeGreaterThan(statusTriggerBox!.x);
+    // Account stays last: below status in the rail, right of it in the compact top bar.
+    if (railLayout) {
+      expect(accountTriggerBox!.y).toBeGreaterThan(statusTriggerBox!.y);
+    } else {
+      expect(accountTriggerBox!.x).toBeGreaterThan(statusTriggerBox!.x);
+    }
     expect(accountTriggerBox!.x + accountTriggerBox!.width).toBeLessThanOrEqual(viewport.width);
-    expect(
-      await accountTrigger.evaluate((trigger) => getComputedStyle(trigger).backgroundColor),
-    ).not.toBe('rgba(0, 0, 0, 0)');
+    if (!railLayout) {
+      // The compact top bar keeps a filled account trigger; the rail places it on the rail surface.
+      expect(
+        await accountTrigger.evaluate((trigger) => getComputedStyle(trigger).backgroundColor),
+      ).not.toBe('rgba(0, 0, 0, 0)');
+    }
 
     await accountTrigger.click();
     const accountMenu = page.getByRole('menu', { name: 'Account' });
@@ -323,7 +338,7 @@ for (const viewport of dashboardViewports) {
       name: 'Mobile primary',
       exact: true,
     });
-    const organizationHeader = page.locator('header[data-organization-navigation="true"]');
+    const organizationHeader = page.getByRole('banner');
     const main = page.getByRole('main');
 
     if (viewport.width >= 768) {

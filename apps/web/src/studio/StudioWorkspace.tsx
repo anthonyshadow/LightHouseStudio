@@ -216,7 +216,7 @@ export const StudioWorkspace = ({
       ref={mainRef}
       id="studio-main"
       tabIndex={-1}
-      css={mainGridStyles(projectContextActive, organizationRouteActive, dashboardActive)}
+      css={mainGridStyles(projectContextActive, dashboardActive)}
     >
       <div
         ref={fullscreenWorkspaceRef}

@@ -212,12 +212,12 @@ source, baseline, draft, 50-entry grouped history, generation, candidate, and wo
 
 At the existing `64rem` desktop breakpoint, the focused Studio header has no AI selection control.
 The creative-tool rail owns **Edit Video**, **Select Character**, **Select Outfit**, and
-**Workshop**. On organization routes, the same persistent header owner reflows into a left rail at
-`48rem` and above; smaller viewports use its compact top bar and four-item bottom navigation. The
-rail contains the brand, **Quick Create**, organization navigation, and mutually exclusive
-integration/account popovers. Project workspaces share that organization shell: they use the rail at
-`48rem` and above and the compact top bar plus bottom navigation below it. Focused Create remains
-standalone and does not mount the organization bottom navigation. Character and Outfit choices use
+**Workshop**. The persistent header owner renders one navigation chrome for every protected surface:
+a left rail at `48rem` and above, and a compact top bar plus four-item bottom navigation below it.
+The rail contains the brand, **Quick Create**, primary navigation, and mutually exclusive
+integration/account popovers. Dashboard, Assets, Projects, Campaigns and focused Create all mount
+that same shell, so the studio surfaces keep the rail and the bottom navigation rather than a
+standalone header. Character and Outfit choices use
 the same AI chooser and creation overlays while the compact tool rail retains Edit Video and
 Workshop. All responsive
 presentations share one overlay controller, creative-selection handoff, activity locks, and
