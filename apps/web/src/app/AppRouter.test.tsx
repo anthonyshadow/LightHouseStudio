@@ -177,6 +177,21 @@ describe('AppRouter', () => {
     expect(router.state.location.pathname).toBe('/');
   });
 
+  it('returns to entry immediately when a session expires with nothing holding it', async () => {
+    // StudioApp is mocked here, so no holder registers — the same situation as an expiry during
+    // lazy-load or an error boundary. Teardown must stay immediate rather than parking with no
+    // route to login.
+    const { router } = renderApplication('/dashboard');
+    await screen.findByText('Studio route');
+
+    fireEvent(window, new Event('lightframe:authentication-required'));
+
+    expect(
+      await screen.findByText('Your session ended. Log in again to pick up where you left off.'),
+    ).toHaveAttribute('role', 'status');
+    expect(router.state.location.pathname).toBe('/');
+  });
+
   it('restores and canonicalizes a protected destination after login', async () => {
     authApi.fetchCurrentSession.mockRejectedValue(new Error('No session'));
     const { router } = renderApplication('/studio/videos?sort=latest', null);

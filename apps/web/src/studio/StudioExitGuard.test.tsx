@@ -147,6 +147,32 @@ describe('StudioExitGuard', () => {
     expect(router.state.location.pathname).toBe('/studio/create');
   });
 
+  it('treats a workspace task change as staying put, not leaving', async () => {
+    // Workspace tasks live in the query string. The guard keys on pathname alone, so switching
+    // task must not read as an exit while a Project proposal is pending.
+    const { router } = renderProjectGuard({
+      hasTemporaryTake: true,
+      projectContextDirty: true,
+    });
+
+    await router.navigate('/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace?task=history');
+
+    expect(router.state.location.search).toBe('?task=history');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('stands aside for the expiry redirect instead of raising a second prompt', async () => {
+    // The session-expiry notice already named what is ending and owns the discard; blocking the
+    // redirect that follows it would trap the user behind a dialog they cannot satisfy.
+    renderGuard({ recordingOrFinalizing: true, hasTemporaryTake: true, sessionEnding: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Studio' }));
+
+    expect(await screen.findByRole('heading', { name: 'Entry route' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Finish the take before leaving' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('requires explicit worker cancellation before a route exit can discard edits', async () => {
     const { props, router } = renderGuard({
       videoRenderingActive: true,
@@ -261,7 +287,7 @@ describe('StudioExitGuard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Switch Project' }));
 
     expect(await screen.findByRole('heading', { name: 'Project not saved' })).toBeVisible();
-    expect(screen.getByRole('alert')).toHaveTextContent('Project authority is unavailable');
+    expect(screen.getByRole('alert')).toHaveTextContent('Lightframe could not be reached');
     fireEvent.click(screen.getByRole('button', { name: 'Reapply and leave' }));
 
     await waitFor(() => expect(session.retry).toHaveBeenCalledOnce());

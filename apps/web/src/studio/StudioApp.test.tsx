@@ -794,6 +794,8 @@ describe('StudioApp composition lifecycle', () => {
     harness.takeStagePresentation = { kind: 'idle', mode: 'lucy-latest' };
     harness.session.startLocal.mockClear();
     harness.session.startLocal.mockImplementation(() => Promise.resolve());
+    harness.session.stopCamera.mockClear();
+    harness.recording.discard.mockClear();
     harness.existingVideo.adoptRecordedArtifact.mockClear();
     harness.existingVideo.selectFile.mockClear();
     harness.session.replaceRecipeDraft.mockClear();
@@ -966,6 +968,32 @@ describe('StudioApp composition lifecycle', () => {
     expect(screen.getByRole('region', { name: 'Use existing video' })).toBeVisible();
   });
 
+  it('starts capture from a record intent once per visit, not once per session', async () => {
+    const { router } = renderStudio(undefined, '/studio/create?intent=record');
+
+    await waitFor(() => expect(harness.session.startLocal).toHaveBeenCalledOnce());
+
+    // The Studio shell stays mounted across protected routes, so the guard must not treat a later
+    // visit to the identical URL as already handled.
+    await act(async () => {
+      await router.navigate('/dashboard');
+    });
+    await act(async () => {
+      await router.navigate('/studio/create?intent=record');
+    });
+
+    await waitFor(() => expect(harness.session.startLocal).toHaveBeenCalledTimes(2));
+  });
+
+  it('does not restart capture when the record-intent entry re-renders', async () => {
+    renderStudio(undefined, '/studio/create?intent=record');
+
+    await waitFor(() => expect(harness.session.startLocal).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button', { name: 'Open character options' }));
+
+    await waitFor(() => expect(harness.session.startLocal).toHaveBeenCalledOnce());
+  });
+
   it('keeps one hidden media-stage owner while the full Projects workspace is active', async () => {
     renderStudio(undefined, '/projects');
     const stage = screen.getByTestId('media-stage');
@@ -1054,6 +1082,22 @@ describe('StudioApp composition lifecycle', () => {
         'Post-recording editor',
       ),
     );
+  });
+
+  it('holds an expiring session open to say what an unsaved take loses', async () => {
+    harness.recording.presented = { id: 'expiring-take' };
+    renderStudio();
+
+    fireEvent(window, new Event('lightframe:authentication-required'));
+
+    const notice = await screen.findByRole('region', { name: 'Your session ended' });
+    expect(notice).toHaveTextContent('The current temporary take');
+    expect(harness.session.stopCamera).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Log in again' }));
+
+    await waitFor(() => expect(harness.session.stopCamera).toHaveBeenCalledOnce());
+    expect(harness.recording.discard).toHaveBeenCalled();
   });
 
   it('opens the existing-video chooser for finalized playback without adopting the current take', () => {

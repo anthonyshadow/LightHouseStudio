@@ -99,7 +99,13 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
           <LoginDialog
             open
             message={
-              routeState?.loginRequired === true ? 'Your session is required to continue.' : null
+              // Read the reason from auth, not route state: ProtectedRoute sends `loginRequired`
+              // for a voluntary logout too, so route state cannot tell the two apart.
+              auth.sessionEndReason === 'expired'
+                ? 'Your session ended. Log in again to pick up where you left off.'
+                : routeState?.loginRequired === true
+                  ? 'Your session is required to continue.'
+                  : null
             }
             returnFocusRef={enterRef}
             onClose={() => {

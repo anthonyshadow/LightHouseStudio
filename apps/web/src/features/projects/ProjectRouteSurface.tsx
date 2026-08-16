@@ -73,7 +73,12 @@ import type { ProjectProcessingController } from './useProjectProcessingControll
 import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
 import { ProjectHistorySection } from './ProjectHistorySection';
 import { ProjectAssetsSection } from './ProjectAssetsSection';
-import { ProjectWorkflowProgress } from './ProjectWorkflowProgress';
+import {
+  PROJECT_WORKFLOW_STEPS,
+  ProjectWorkflowProgress,
+  stepForSnapshot,
+  type ProjectWorkflowStepId,
+} from './ProjectWorkflowProgress';
 
 const projectStatusLabel = (status: ProjectContract['status']): string =>
   status === 'needs-attention'
@@ -90,18 +95,23 @@ const projectWorkflowLabel = (
   phase: ProjectCurrentResponse['revision']['snapshot']['workflowPhase'],
 ): string => phase.charAt(0).toUpperCase() + phase.slice(1);
 
-type ProjectWorkspaceTask = 'source' | 'create' | 'save' | 'history';
+type ProjectWorkspaceTask = ProjectWorkflowStepId;
 
-const projectWorkspaceTasks = [
-  { id: 'source', label: 'Source', icon: 'source' },
-  { id: 'create', label: 'Create', icon: 'wand' },
-  { id: 'save', label: 'Save', icon: 'save' },
-  { id: 'history', label: 'History', icon: 'history' },
-] as const satisfies ReadonlyArray<{
-  readonly id: ProjectWorkspaceTask;
-  readonly label: string;
-  readonly icon: 'source' | 'wand' | 'save' | 'history';
-}>;
+const projectWorkspaceTaskIcons = {
+  source: 'source',
+  create: 'wand',
+  save: 'save',
+  history: 'history',
+} as const satisfies Record<ProjectWorkspaceTask, 'source' | 'wand' | 'save' | 'history'>;
+
+// Derived from the workflow steps so the tablist and the progress strip cannot drift apart.
+const projectWorkspaceTasks = PROJECT_WORKFLOW_STEPS.map((step) => ({
+  ...step,
+  icon: projectWorkspaceTaskIcons[step.id],
+}));
+
+const isProjectWorkspaceTask = (value: string | null): value is ProjectWorkspaceTask =>
+  value !== null && PROJECT_WORKFLOW_STEPS.some(({ id }) => id === value);
 
 interface ProjectListSectionProps {
   readonly lifecycle: 'active' | 'archived';
@@ -481,19 +491,19 @@ const projectSourceNotice = (
       return {
         title: 'Preparing source',
         tone: 'neutral',
-        body: 'Restoring the durable Project source into the media stage.',
+        body: 'Loading this Project’s saved source video onto the stage.',
       };
     case 'preparing':
       return {
         title: 'Preparing source',
         tone: 'neutral',
-        body: 'Transferring and inspecting source media. This Project is not resumable until acceptance completes.',
+        body: 'Uploading and checking your video. You can reopen this Project once it is saved.',
       };
     case 'saving':
       return {
         title: 'Saving changes',
         tone: 'neutral',
-        body: 'Committing the immutable original and Project revision.',
+        body: 'Saving the source video and this change to your Project.',
       };
     case 'saved':
       return null;
@@ -551,7 +561,7 @@ const ProjectSourceSection = ({
       <section css={emptyProjectStyles(theme)} aria-labelledby="project-source-heading">
         <div>
           <h3 id="project-source-heading">
-            {controller.accepted ? 'Immutable original' : 'No source yet'}
+            {controller.accepted ? 'Source video' : 'No source yet'}
           </h3>
           {controller.accepted && controller.source ? (
             <>
@@ -562,13 +572,13 @@ const ProjectSourceSection = ({
               <p>
                 {controller.source.kind === 'saved-video-version'
                   ? 'This Project references the exact Saved Video Version and its existing bytes; it does not claim to have produced it.'
-                  : 'The accepted original is retained by this Project and cannot be replaced. Start a new Project for a different original.'}
+                  : 'This Project keeps this video as its source and it cannot be swapped out. Start a new Project to work from a different video.'}
               </p>
             </>
           ) : (
             <p>
-              Choose one video as this Project&apos;s immutable original. A failed staging attempt
-              can be replaced until the source is accepted.
+              Choose the one video this Project works from. You can try again if an upload fails,
+              but once a source is saved it cannot be changed.
             </p>
           )}
           {stateNotice ? (
@@ -628,9 +638,7 @@ const ProjectSourceSection = ({
           >
             Use Saved Video
           </Button>
-          <small>
-            No provider starts from source selection, hydration, recording acceptance, or resume.
-          </small>
+          <small>Choosing, recording, or reopening a source never starts paid AI work.</small>
         </div>
       </section>
       <ProjectSavedVideoPicker
@@ -670,19 +678,19 @@ const ProjectSessionNotice = ({
     case 'hydrating':
       return (
         <StatusNotice role="status" tone="neutral" title="Opening Project">
-          Checking the current Project revision with server authority.
+          Checking for changes saved elsewhere.
         </StatusNotice>
       );
     case 'dirty':
       return (
         <StatusNotice role="status" tone="neutral" title="Saving changes">
-          A semantic Project checkpoint is queued for the bounded autosave interval.
+          Your changes are queued and save automatically in a moment.
         </StatusNotice>
       );
     case 'saving':
       return (
         <StatusNotice role="status" tone="neutral" title="Saving changes">
-          Committing one coalesced semantic Project revision.
+          Saving your recent changes together as one change.
         </StatusNotice>
       );
     case 'conflict':
@@ -690,7 +698,7 @@ const ProjectSessionNotice = ({
         <StatusNotice role="alert" tone="warning" title="Conflict">
           <p>
             {session.message ??
-              'The Project changed in another session. Your local proposal was preserved.'}
+              'This Project changed somewhere else. Your unsaved changes are still here.'}
           </p>
           {actions}
         </StatusNotice>
@@ -699,7 +707,8 @@ const ProjectSessionNotice = ({
       return (
         <StatusNotice role="alert" tone="danger" title="Changes not saved">
           <p>
-            {session.message ?? 'Project authority is unavailable. Your proposal was preserved.'}
+            {session.message ??
+              'Lightframe could not be reached. Your unsaved changes are still here.'}
           </p>
           {actions}
         </StatusNotice>
@@ -740,6 +749,7 @@ const ProjectDetail = ({
 }: { readonly projectId: string } & ProjectRouteSurfaceProps) => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const goBack = useRouteBack();
   const session = useProjectSession(projectId);
   const campaign = useCampaignDetail(session.current?.project.campaignId ?? null);
@@ -754,7 +764,32 @@ const ProjectDetail = ({
   const [campaignDialog, setCampaignDialog] = useState(false);
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [sourceActivity, setSourceActivity] = useState<ProjectSourceActivity | null>(null);
-  const [activeWorkspaceTask, setActiveWorkspaceTask] = useState<ProjectWorkspaceTask>('source');
+  const requestedWorkspaceTask = new URLSearchParams(location.search).get('task');
+  const pinnedWorkspaceTask = isProjectWorkspaceTask(requestedWorkspaceTask)
+    ? requestedWorkspaceTask
+    : null;
+  const workspacePhaseTask = session.current
+    ? stepForSnapshot(session.current.revision.snapshot)
+    : null;
+  // Latched on entry, deliberately: the workspace should open on the step the Project is up to,
+  // but a phase change mid-session must not pull the open panel out from under the user. Their own
+  // choice pins itself in the URL and outranks both. Adjusted during render rather than in an
+  // effect so the first paint already shows the right task — the latch resets on leaving the
+  // workspace, so reopening derives afresh.
+  const [enteredWorkspaceTask, setEnteredWorkspaceTask] = useState<ProjectWorkspaceTask | null>(
+    null,
+  );
+  if (!workspaceMode && enteredWorkspaceTask !== null) setEnteredWorkspaceTask(null);
+  else if (workspaceMode && enteredWorkspaceTask === null && workspacePhaseTask !== null)
+    setEnteredWorkspaceTask(workspacePhaseTask);
+  // Replace rather than push: an entry per tab click would make the masthead's Overview button
+  // (useRouteBack) walk back through tasks instead of leaving the workspace.
+  const selectWorkspaceTask = useCallback(
+    (task: ProjectWorkspaceTask) => {
+      void navigate(projectWorkspacePath(projectId, task), { replace: true });
+    },
+    [navigate, projectId],
+  );
   const handleSourceActivity = useCallback(
     (activity: ProjectSourceActivity) => {
       setSourceActivity(activity);
@@ -827,6 +862,8 @@ const ProjectDetail = ({
 
   if (workspaceMode) {
     const saveStatus = projectWorkspaceSaveStatus(session, sourceActivity?.busy ?? false);
+    const activeWorkspaceTask =
+      pinnedWorkspaceTask ?? enteredWorkspaceTask ?? stepForSnapshot(current.revision.snapshot);
     const focusWorkspaceTask = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
       const lastIndex = projectWorkspaceTasks.length - 1;
       const nextIndex =
@@ -847,7 +884,7 @@ const ProjectDetail = ({
       event.preventDefault();
       const nextTask = projectWorkspaceTasks[nextIndex];
       if (!nextTask) return;
-      setActiveWorkspaceTask(nextTask.id);
+      selectWorkspaceTask(nextTask.id);
       window.requestAnimationFrame(() => {
         document.getElementById(`project-task-${nextTask.id}-tab`)?.focus();
       });
@@ -872,6 +909,7 @@ const ProjectDetail = ({
             </h1>
             <span data-workspace-project-status>{projectStatusLabel(project.status)}</span>
           </div>
+          <ProjectWorkflowProgress snapshot={current.revision.snapshot} variant="masthead" />
           <span
             role="status"
             aria-live="polite"
@@ -895,7 +933,7 @@ const ProjectDetail = ({
                 tabIndex={activeWorkspaceTask === task.id ? 0 : -1}
                 aria-selected={activeWorkspaceTask === task.id}
                 aria-controls={`project-task-${task.id}-panel`}
-                onClick={() => setActiveWorkspaceTask(task.id)}
+                onClick={() => selectWorkspaceTask(task.id)}
                 onKeyDown={(event) => focusWorkspaceTask(event, index)}
               >
                 <AppIcon name={task.icon} />
