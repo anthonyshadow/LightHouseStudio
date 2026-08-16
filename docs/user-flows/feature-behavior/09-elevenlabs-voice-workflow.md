@@ -84,4 +84,4 @@ original on failure.
 Configuration availability is not entitlement, pricing, or retention evidence. Automated tests
 use synthetic providers and make no catalog mutation. Live catalog visibility, eligibility,
 preview, add, remove, conversion, retention, billing, codecs, and physical playback require the
-owner-authorized procedure in [Live provider smoke](../LIVE_PROVIDER_SMOKE.md).
+owner-authorized procedure in [Live provider smoke](../../LIVE_PROVIDER_SMOKE.md).

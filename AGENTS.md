@@ -11,19 +11,21 @@ authority, provider, or deployment model only when explicitly in scope.
 
 ## Read selectively
 
-Start with affected source and tests. Open only what the task needs:
+`CLAUDE.md` at the repository root is the short routing layer; this file is the long-form policy it
+points to. Start with affected source and tests. Open only what the task needs:
 
 - `README.md`: setup, scripts, and product overview;
 - `docs/README.md`: documentation ownership;
+- `docs/user-flows/`: current route-level user journeys, navigation, and known gaps;
+- affected file in `docs/user-flows/feature-behavior/`: observable per-capability behavior;
 - `docs/PRODUCT_VISION.md`: product positioning, hierarchy, principles, and terminology;
 - `docs/PRODUCT_ROADMAP.md`: current-to-future capability direction and future architecture notes;
 - `docs/ARCHITECTURE.md`: architecture and lifecycle ownership;
-- affected file in `docs/userStories/`: observable behavior;
 - `docs/TESTING.md`: testing and release validation;
 - `docs/PRIVACY_AND_TEMPORARY_DATA.md`: provider, privacy, and temporary data;
 - `docs/CLOUD_PERSISTENCE.md`: cloud persistence and migrations;
 - `docs/MANUAL_QA.md` and `docs/LIVE_PROVIDER_SMOKE.md`: live/device checks; and
-- `docs/PRODUCT_EVOLUTION.md` and `LESSONS.md`: historical rationale only.
+- `docs/archived/` and `LESSONS.md`: historical rationale only.
 
 Do not read every document by default. Historical plans are not current
 implementation authority.

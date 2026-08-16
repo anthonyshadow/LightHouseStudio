@@ -8,7 +8,7 @@
 
 **Product target:** [Campaign and Project MVP definition](../MVP_DEFINITION.md)
 
-**Audit evidence:** [MVP alignment audit](../MVP_ALIGNMENT_AUDIT.md)
+**Audit evidence:** [MVP alignment audit](MVP_ALIGNMENT_AUDIT.md)
 
 ## How to use this sequence
 
