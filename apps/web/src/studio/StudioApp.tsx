@@ -1,48 +1,22 @@
 import { useTheme } from '@emotion/react';
-import { projectIdSchema } from '@studio/contracts';
-import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { useRouteBack } from '../app/useRouteBack';
-import { ApiClientError } from '../adapters/api-client/apiClient';
-import { getSavedVideo } from '../adapters/api-client/savedVideosApi';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
 import { useAuth } from '../application/auth/AuthProvider';
 import { RemoteStateProvider } from '../application/remote-state/RemoteStateProvider';
-import {
-  APP_PATHS,
-  campaignPath,
-  isAssetsPath,
-  isCampaignsPath,
-  isProjectWorkspacePath,
-  isProjectsPath,
-  projectIdFromPath,
-  projectPath,
-  projectWorkspacePath,
-  studioCreatePath,
-  studioVideoIdFromPath,
-} from '../app/paths';
-import type { ModelMode, PromptCommittedHandler } from '../application/types';
+import { APP_PATHS, studioCreatePath } from '../app/paths';
+import type { PromptCommittedHandler } from '../application/types';
 import { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
-import { isVideoEditBusy } from '../features/video-editor/types';
 import { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
 import { useProjectCreativeSessionAdapter } from '../features/projects/useProjectCreativeSessionAdapter';
 import { useProjectProcessingController } from '../features/projects/useProjectProcessingController';
-import { attachProjectAsset, getProject } from '../features/projects/projectsApi';
-import { projectAssetQueryKeys } from '../features/projects/useProjectAssetsController';
 import {
   ProjectCreativeCheckpointPanel,
   PROJECT_PROVIDER_START_BLOCKED_REASON,
 } from '../features/projects/ProjectCreativeCheckpointPanel';
-import {
-  confirmModeReplacement,
-  hasDraftContent,
-  type StudioMode,
-} from '../features/media-session';
-import { isModelSessionActive } from '../features/media-session/sessionComposerModel';
+import { hasDraftContent } from '../features/media-session';
 import { persistedReferenceAssetId } from '../features/media-session/types';
-import type { StageNotice } from '../features/live-stage';
 import { useStudioSession } from '../orchestration/session';
 import { headerRegionStyles, pageStyles, shellStyles, skipLinkStyles } from './StudioApp.styles';
 import {
@@ -54,14 +28,12 @@ import { StudioExitGuard } from './StudioExitGuard';
 import { StudioHeader } from './StudioHeader';
 import { AssetCreationLauncher } from './AssetCreationLauncher';
 import { isStudioFormError } from './studioStageNotices';
+import { deriveStudioContextualNotices } from './studioContextualNotices';
 import { useProviderAvailability } from './useProviderAvailability';
 import { useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
 import { useTakeReviewFlow } from './useTakeReviewFlow';
 import { useDesktopStudioLayout } from './useDesktopStudioLayout';
 import { useStudioOverlayController, type ActiveOverlay } from './useStudioOverlayController';
-import { useStudioLogoutController } from './useStudioLogoutController';
-import { useStudioSessionCleanup } from './useStudioSessionCleanup';
-import { useStudioSessionExpiryController } from './useStudioSessionExpiryController';
 import { useStudioProjectBridge } from './useStudioProjectBridge';
 import { useStudioSavedVideoController } from './useStudioSavedVideoController';
 import { StudioLibraryOverlays } from './StudioLibraryOverlays';
@@ -70,19 +42,21 @@ import { StudioWorkspace } from './StudioWorkspace';
 import { useStudioOutfitWorkflow } from './useStudioOutfitWorkflow';
 import { useStudioCharacterWorkflow } from './useStudioCharacterWorkflow';
 import { StudioToolOverlays } from './StudioToolOverlays';
-import {
-  captureBlockedReason as resolveCaptureBlockedReason,
-  captureSettingsDisabledReason as resolveCaptureSettingsDisabledReason,
-  characterBuilderBlockedReasons,
-  characterRemovalBlockedReason as resolveCharacterRemovalBlockedReason,
-  currentExperienceLabel as resolveCurrentExperienceLabel,
-} from './studioActivityPolicy';
+import { currentExperienceLabel as resolveCurrentExperienceLabel } from './studioActivityPolicy';
 import { useStudioCreativeRepository } from './useStudioCreativeRepository';
 import { useStudioStageModel } from './useStudioStageModel';
-import {
-  useSaveVideo,
-  type SavedVideoCharacterAttribution,
-} from '../features/saved-videos/useSaveVideo';
+import { useStudioActivityModel } from './useStudioActivityModel';
+import { useStudioCharacterAttribution } from './useStudioCharacterAttribution';
+import { useStudioLibraryHandoff } from './useStudioLibraryHandoff';
+import { useStudioLiveExperience } from './useStudioLiveExperience';
+import { useStudioNavigationActions } from './useStudioNavigationActions';
+import { useStudioRecordingLaunch } from './useStudioRecordingLaunch';
+import { useStudioRouteContext } from './useStudioRouteContext';
+import { useStudioSessionLifecycle } from './useStudioSessionLifecycle';
+import { useDirectSavedVideoRoute } from './useDirectSavedVideoRoute';
+import { useProjectVideoAttachment } from './useProjectVideoAttachment';
+import { useProjectVideoCreationContext } from './useProjectVideoCreationContext';
+import { useSaveVideo } from '../features/saved-videos/useSaveVideo';
 
 const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
@@ -122,76 +96,29 @@ interface StudioExperienceProps {
   initialIntent?: 'upload';
 }
 
-type ProjectVideoCreationContext =
-  | Readonly<{ status: 'none' }>
-  | Readonly<{ status: 'checking'; projectId: string }>
-  | Readonly<{ status: 'ready'; projectId: string }>;
-
-type DirectVideoLoadState =
-  | Readonly<{ status: 'idle' }>
-  | Readonly<{ status: 'loading'; videoId: string }>
-  | Readonly<{ status: 'ready'; videoId: string }>
-  | Readonly<{ status: 'error'; videoId: string; message: string }>;
-
-type DirectVideoLoadResult =
-  | Readonly<{ status: 'ready'; requestKey: string }>
-  | Readonly<{ status: 'error'; requestKey: string; message: string }>;
-
-type ProjectVideoAttachmentState =
-  | Readonly<{ status: 'idle' }>
-  | Readonly<{ status: 'attaching'; projectId: string; videoId: string }>
-  | Readonly<{ status: 'error'; projectId: string; videoId: string; message: string }>;
-
-const safeDirectVideoLoadMessage = (error: unknown): string =>
-  error instanceof ApiClientError && [403, 404, 410].includes(error.status)
-    ? 'This Saved Video is unavailable or has been removed.'
-    : 'The Saved Video could not be loaded safely. Your Assets are unchanged.';
-
 const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceProps) => {
   const theme = useTheme();
   const auth = useAuth();
   const navigate = useNavigate();
-  const goBack = useRouteBack();
   const location = useLocation();
-  const queryClient = useQueryClient();
-  const createQuery = useMemo(
-    () => (location.pathname === APP_PATHS.create ? new URLSearchParams(location.search) : null),
-    [location.pathname, location.search],
-  );
-  const queryCreationIntent =
-    createQuery?.get('intent') === 'record' || createQuery?.get('intent') === 'upload'
-      ? (createQuery.get('intent') as 'record' | 'upload')
-      : null;
-  const creationIntent = queryCreationIntent ?? initialIntent ?? null;
-  const requestedCreationProjectId = createQuery?.get('projectId') ?? null;
-  const parsedCreationProjectId = requestedCreationProjectId
-    ? projectIdSchema.safeParse(requestedCreationProjectId)
-    : null;
-  const validCreationProjectId = parsedCreationProjectId?.success
-    ? parsedCreationProjectId.data
-    : null;
-  const directVideoId = studioVideoIdFromPath(location.pathname);
-  const routeOriginProjectId = useMemo(() => {
-    const state = location.state as { readonly fromProjectId?: unknown } | null;
-    const parsed = projectIdSchema.safeParse(state?.fromProjectId);
-    return parsed.success ? parsed.data : null;
-  }, [location.state]);
-  const projectRouteActive = isProjectsPath(location.pathname);
-  const campaignRouteActive = isCampaignsPath(location.pathname);
-  const dashboardRouteActive = location.pathname === APP_PATHS.dashboard;
-  const assetsRouteActive = isAssetsPath(location.pathname);
-  const liveRouteActive = location.pathname === APP_PATHS.live;
-  const projectWorkspaceActive = isProjectWorkspacePath(location.pathname);
-  const projectOverviewActive = projectRouteActive && !projectWorkspaceActive;
-  const organizationRouteActive =
-    dashboardRouteActive ||
-    assetsRouteActive ||
-    liveRouteActive ||
-    projectWorkspaceActive ||
-    projectOverviewActive ||
-    campaignRouteActive;
-  const activeProjectId = projectIdFromPath(location.pathname);
-  const projectContextActive = projectWorkspaceActive && activeProjectId !== null;
+  const nav = useStudioNavigationActions();
+  const {
+    creationIntent,
+    queryCreationIntent,
+    requestedCreationProjectId,
+    validCreationProjectId,
+    directVideoId,
+    routeOriginProjectId,
+    activeProjectId,
+    projectRouteActive,
+    campaignRouteActive,
+    dashboardRouteActive,
+    assetsRouteActive,
+    liveRouteActive,
+    projectOverviewActive,
+    organizationRouteActive,
+    projectContextActive,
+  } = useStudioRouteContext(initialIntent);
   const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const quickCreateTriggerRef = useRef<HTMLElement>(null);
@@ -206,10 +133,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const browser = useMemo(() => detectBrowserCapabilities(), []);
   const provider = useProviderAvailability();
   const { availability, state: capabilityState, retry: retryProviderAvailability } = provider;
-  const realtimeBetaEnabled = availability.realtimeBetaEnabled === true;
-  const realtimeProviderConfigured = availability.realtimeProviderConfigured ?? availability.decart;
-  const realtimeLiveEnabled =
-    realtimeBetaEnabled && realtimeProviderConfigured && availability.decart;
   const savedVideoSave = useSaveVideo(Boolean(availability.directSavedVideoUploadAvailable));
   const {
     active: activeOverlay,
@@ -218,90 +141,13 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     closeIf: closeOverlayIf,
   } = useStudioOverlayController(creationIntent === 'upload' ? 'video-upload' : null);
 
-  const creationContextRequestKey =
-    location.pathname === APP_PATHS.create && validCreationProjectId !== null
-      ? `${location.key}:${validCreationProjectId}`
-      : null;
-  const [verifiedProjectVideoCreation, setVerifiedProjectVideoCreation] = useState<{
-    readonly requestKey: string;
-    readonly projectId: string;
-  } | null>(null);
-  const projectVideoCreationContext: ProjectVideoCreationContext =
-    creationContextRequestKey === null || validCreationProjectId === null
-      ? { status: 'none' }
-      : verifiedProjectVideoCreation?.requestKey === creationContextRequestKey
-        ? { status: 'ready', projectId: validCreationProjectId }
-        : { status: 'checking', projectId: validCreationProjectId };
-  const directVideoRequestKey = directVideoId === null ? null : `${location.key}:${directVideoId}`;
-  const [directVideoLoadResult, setDirectVideoLoadResult] = useState<DirectVideoLoadResult | null>(
-    null,
-  );
-  const directVideoLoad = useMemo<DirectVideoLoadState>(
-    () =>
-      directVideoId === null || directVideoRequestKey === null
-        ? { status: 'idle' }
-        : directVideoLoadResult?.requestKey !== directVideoRequestKey
-          ? { status: 'loading', videoId: directVideoId }
-          : directVideoLoadResult.status === 'ready'
-            ? { status: 'ready', videoId: directVideoId }
-            : {
-                status: 'error',
-                videoId: directVideoId,
-                message: directVideoLoadResult.message,
-              },
-    [directVideoId, directVideoLoadResult, directVideoRequestKey],
-  );
-  const [projectVideoAttachment, setProjectVideoAttachment] = useState<ProjectVideoAttachmentState>(
-    { status: 'idle' },
-  );
-  const [projectVideoAttachmentRetry, setProjectVideoAttachmentRetry] = useState(0);
-
-  useEffect(() => {
-    if (location.pathname !== APP_PATHS.create || requestedCreationProjectId === null) {
-      return;
-    }
-    if (validCreationProjectId === null) {
-      void navigate(
-        studioCreatePath(queryCreationIntent ? { intent: queryCreationIntent } : undefined),
-        {
-          replace: true,
-          state: null,
-        },
-      );
-      return;
-    }
-    const projectId = validCreationProjectId;
-    const requestKey = creationContextRequestKey;
-    if (requestKey === null) return;
-    const controller = new AbortController();
-    void getProject(projectId, controller.signal)
-      .then((current) => {
-        if (controller.signal.aborted) return;
-        if (current.project.status !== 'archived' && current.project.status !== 'deleted') {
-          setVerifiedProjectVideoCreation({ requestKey, projectId });
-          return;
-        }
-        void navigate(
-          studioCreatePath(queryCreationIntent ? { intent: queryCreationIntent } : undefined),
-          { replace: true, state: null },
-        );
-      })
-      .catch(() => {
-        if (controller.signal.aborted) return;
-        void navigate(
-          studioCreatePath(queryCreationIntent ? { intent: queryCreationIntent } : undefined),
-          { replace: true, state: null },
-        );
-      });
-    return () => controller.abort('creation-context-changed');
-  }, [
-    creationContextRequestKey,
-    location.pathname,
-    navigate,
+  const contextualProjectId = useProjectVideoCreationContext({
+    pathname: location.pathname,
+    locationKey: location.key,
     queryCreationIntent,
     requestedCreationProjectId,
     validCreationProjectId,
-  ]);
+  });
 
   useEffect(() => {
     if (creationIntent !== 'upload' || location.pathname !== APP_PATHS.create) return;
@@ -320,27 +166,22 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   ]);
 
   useEffect(() => {
-    if (!liveRouteActive || capabilityState !== 'ready' || !realtimeLiveEnabled) return;
-    openOverlay('ai-experience');
-    void navigate(APP_PATHS.create, { replace: true, state: null });
-  }, [capabilityState, liveRouteActive, navigate, openOverlay, realtimeLiveEnabled]);
-
-  useEffect(() => {
     if (desktopStudioLayout) closeOverlayIf(['capture-settings']);
   }, [closeOverlayIf, desktopStudioLayout]);
   const [firstSuccessGuideVisible, setFirstSuccessGuideVisible] = useState(false);
-  const [recordingForExistingVideo, setRecordingForExistingVideo] = useState(false);
-  const adoptingExistingVideoRecordingRef = useRef<string | null>(null);
   const promptCommittedHandlerRef = useRef<PromptCommittedHandler>(noopPromptCommitted);
   const characterSelectorRef = useRef<HTMLButtonElement>(null);
   const outfitToggleRef = useRef<HTMLButtonElement>(null);
   const workshopToggleRef = useRef<HTMLButtonElement>(null);
   const editVideoToggleRef = useRef<HTMLButtonElement>(null);
   const uploadToggleRef = useRef<HTMLButtonElement>(null);
+  const focusStudio = useCallback(() => {
+    window.requestAnimationFrame(() => mainRef.current?.focus());
+  }, []);
   const closeTakeReview = useCallback(() => {
     closeOverlay();
-    window.requestAnimationFrame(() => mainRef.current?.focus());
-  }, [closeOverlay]);
+    focusStudio();
+  }, [closeOverlay, focusStudio]);
   const handlePromptCommitted = useCallback<PromptCommittedHandler>(
     (...args) => promptCommittedHandlerRef.current(...args),
     [],
@@ -360,11 +201,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     processing,
     recordingActive,
     reviewLocked,
-    mediaLocked,
     recordingMode,
     recordingSource,
-    finalizingStartedAt,
-    finalizingStream,
     publishUploadedVideo,
     publishValidatedVideo,
   } = takeReview;
@@ -399,47 +237,54 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     activeProjectSession,
     videoEditor,
   );
-  useEffect(() => {
-    const artifact = recording.original;
-    if (
-      !recordingForExistingVideo ||
-      !artifact ||
-      existingVideo.selection ||
-      takeReview.stagePresentation.kind !== 'playback' ||
-      adoptingExistingVideoRecordingRef.current === artifact.id
-    ) {
-      return;
-    }
-
-    adoptingExistingVideoRecordingRef.current = artifact.id;
-    void existingVideo.adoptRecordedArtifact().then(() => {
-      if (adoptingExistingVideoRecordingRef.current !== artifact.id) return;
-      adoptingExistingVideoRecordingRef.current = null;
-      setRecordingForExistingVideo(false);
-      openOverlay('video-upload');
-    });
-  }, [
-    existingVideo,
-    openOverlay,
-    recording.original,
-    recordingForExistingVideo,
-    takeReview.stagePresentation.kind,
-  ]);
-
-  const aiSessionActive = isModelSessionActive(session);
-  const sessionModeLocked = mediaLocked || aiSessionActive || session.lifecycle === 'disconnected';
-  const creativeConfigurationMediaLocked = projectContextActive ? recordingActive : mediaLocked;
-  const creativeConfigurationSessionModeLocked = projectContextActive
-    ? recordingActive || aiSessionActive || session.lifecycle === 'disconnected'
-    : sessionModeLocked;
-  const finalizing = finalizingStartedAt !== null || finalizingStream !== null;
-  const characterBuilderBlocked = characterBuilderBlockedReasons({
+  const {
+    startLocalRecording,
+    startExistingVideoRecording,
+    startProjectRecording,
+    openPlaybackEditor,
+    openExistingVideo,
+    clearExistingVideoIntent,
+    discardPendingAdoption,
+  } = useStudioRecordingLaunch({
+    browser,
+    session,
+    recording,
     recordingActive,
-    finalizing,
-    reviewLocked,
+    stagePresentationKind: takeReview.stagePresentation.kind,
+    existingVideo,
+    creationIntent,
+    projectContextActive,
+    activeProjectId,
+    projectSourceActivity: activeProjectSourceActivity,
+    openOverlay,
+    closeOverlay,
+    focusMain: focusStudio,
   });
-  const characterBuilderActivityBlockedReason = characterBuilderBlocked.activity;
-  const characterBuilderOpenBlockedReason = characterBuilderBlocked.open;
+
+  const {
+    aiSessionActive,
+    sessionModeLocked,
+    finalizing,
+    creativeConfigurationMediaLocked,
+    creativeConfigurationSessionModeLocked,
+    characterBuilderActivityBlockedReason,
+    characterBuilderOpenBlockedReason,
+    characterRemovalBlockedReason,
+    captureBlockedReason,
+    captureSettingsDisabledReason,
+  } = useStudioActivityModel({ session, takeReview, projectContextActive });
+
+  const liveExperience = useStudioLiveExperience({
+    availability,
+    capabilityState,
+    liveRouteActive,
+    projectContextActive,
+    session,
+    openOverlay,
+    closeOverlay,
+    onClearExistingVideoIntent: clearExistingVideoIntent,
+  });
+
   const openWorkshopOverlay = useCallback(() => openOverlay('workshop'), [openOverlay]);
   const handoff = useReferenceRecipeHandoff({
     repository,
@@ -477,14 +322,11 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     saveWorkshopPrompt,
     openWorkshop,
   } = handoff.actions;
-  const openOutfitLibrary = useCallback(() => {
-    void navigate(APP_PATHS.outfits);
-  }, [navigate]);
   const outfit = useStudioOutfitWorkflow({
     blockedReason: characterBuilderOpenBlockedReason,
     openOverlay,
     closeOverlay,
-    onOpenLibrary: openOutfitLibrary,
+    onOpenLibrary: nav.openOutfits,
     applySavedOutfit: applyRecipeSelection,
   });
   const character = useStudioCharacterWorkflow({
@@ -579,19 +421,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const openCharacterSelector = useCallback(() => openOverlay('character-selector'), [openOverlay]);
   const openSavedCharacters = useCallback(() => openOverlay('saved-characters'), [openOverlay]);
   const openOutfitSelector = useCallback(() => openOverlay('outfit-selector'), [openOverlay]);
-  const openLiveAiExperience = useCallback(() => {
-    if (!realtimeLiveEnabled) return;
-    openOverlay('ai-experience');
-  }, [openOverlay, realtimeLiveEnabled]);
 
   const creativePanel = creativePanelForOverlay(activeOverlay);
   const activeCreativeTool = creativeToolForOverlay(activeOverlay, creativePanel, videoEditing);
-  const captureBlockedReason = resolveCaptureBlockedReason({ reviewLocked });
-  const captureSettingsDisabledReason = resolveCaptureSettingsDisabledReason({
-    reviewLocked,
-    recordingActive,
-    aiSessionActive,
-  });
   const activeRecordingSource = recordingActive
     ? recording.activeSource
     : reviewLocked
@@ -607,41 +439,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     activeCharacter?.referenceImageAssetId ??
     persistedReferenceAssetId(session.draft.referenceImage);
   const effectiveRecordingMode = currentExperienceLabel ? session.draft.mode : recordingMode;
-  const startProjectRecording = useCallback(() => {
-    if (
-      activeProjectId === null ||
-      activeProjectSourceActivity?.accepted ||
-      activeProjectSourceActivity?.busy ||
-      !browser.mediaRecorder ||
-      !browser.mediaDevices ||
-      !browser.secureContext
-    ) {
-      return;
-    }
-    setRecordingForExistingVideo(false);
-    closeOverlay();
-    recording.discard();
-    void navigate(projectWorkspacePath(activeProjectId));
-    window.requestAnimationFrame(() => mainRef.current?.focus());
-    void session.startLocal();
-  }, [
-    activeProjectId,
-    activeProjectSourceActivity,
-    browser,
-    closeOverlay,
-    navigate,
-    recording,
-    session,
-  ]);
-  const activeCharacterRecord = activeCharacter
-    ? repositoryStore.savedCharacterPrompts.find((candidate) => candidate.id === activeCharacter.id)
-    : undefined;
-  const characterRemovalBlockedReason = resolveCharacterRemovalBlockedReason({
-    recordingActive,
-    finalizing,
-    reviewLocked,
-    aiSessionActive,
-    sessionDisconnected: session.lifecycle === 'disconnected',
+  const { activeCharacterRecord, recordingCharacterAttribution } = useStudioCharacterAttribution({
+    activeCharacter,
+    activeCharacterName,
+    activeRecipe,
+    store: repositoryStore,
+    sessionMode: session.draft.mode,
   });
   const unselectCharacter = useCallback(() => {
     if (!clearActiveCharacter()) return;
@@ -657,67 +460,16 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       (desktopStudioLayout ? characterSelectorRef.current : mainRef.current)?.focus(),
     );
   }, [clearActiveRecipe, closeOverlayIf, desktopStudioLayout]);
-  const startAdvancedModel = useCallback(() => {
-    if (projectContextActive || !realtimeLiveEnabled) return Promise.resolve();
-    setRecordingForExistingVideo(false);
-    return session.startModel();
-  }, [projectContextActive, realtimeLiveEnabled, session]);
-  const advancedLiveSession = useMemo(
-    () => ({ ...session, startModel: startAdvancedModel }),
-    [session, startAdvancedModel],
-  );
-  const selectExperienceMode = (mode: StudioMode): boolean => {
-    return (
-      confirmModeReplacement(session.draft, mode, (message) => window.confirm(message)) &&
-      session.selectMode(mode)
-    );
-  };
-  const configureVirtualTryOn = () => {
-    if (!realtimeLiveEnabled) return;
-    if (!selectExperienceMode('lucy-vton-latest')) return;
-    openOverlay('ai-settings');
-  };
-  const startPreparedAi = (mode: ModelMode) => {
-    if (projectContextActive || !realtimeLiveEnabled) return;
-    if (!selectExperienceMode(mode)) return;
-    closeOverlay();
-    void startAdvancedModel();
-  };
-  const activeCharacterVariantName =
-    activeRecipe?.origin === 'character-prompt' && activeRecipe.variantId
-      ? (repositoryStore.savedCharacterVariants.find(
-          (variant) =>
-            variant.id === activeRecipe.variantId &&
-            variant.parentCharacterId === activeRecipe.assetId,
-        )?.title ?? null)
-      : null;
-  const recordingCharacterAttribution = useMemo<SavedVideoCharacterAttribution | null>(
-    () =>
-      session.draft.mode === 'lucy-latest' && (activeCharacterRecord?.name ?? activeCharacterName)
-        ? {
-            characterName: activeCharacterRecord?.name ?? activeCharacterName!,
-            characterVariantName: activeCharacterVariantName,
-          }
-        : null,
-    [
-      activeCharacterName,
-      activeCharacterRecord?.name,
-      activeCharacterVariantName,
-      session.draft.mode,
-    ],
-  );
-  const openExistingVideo = useCallback(() => {
-    setRecordingForExistingVideo(false);
-    openOverlay('video-upload');
-  }, [openOverlay]);
-  const navigateToStudio = useCallback(() => {
-    void navigate(APP_PATHS.create, { replace: true });
-  }, [navigate]);
   const openVideoUpload = useCallback(() => openOverlay('video-upload'), [openOverlay]);
   const openTakeReview = useCallback(() => openOverlay('take-review'), [openOverlay]);
-  const focusStudio = useCallback(() => {
-    window.requestAnimationFrame(() => mainRef.current?.focus());
-  }, []);
+  const libraryHandoff = useStudioLibraryHandoff({
+    nav,
+    character,
+    outfit,
+    existingVideo,
+    applyRecipeSelection,
+    openVideoUpload,
+  });
   const focusEditVideo = useCallback(() => {
     window.requestAnimationFrame(() => editVideoToggleRef.current?.focus());
   }, []);
@@ -730,243 +482,77 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     saveController: savedVideoSave,
     savedRecipes: existingVideoSavedRecipes,
     recordingCharacterAttribution,
-    navigateToStudio,
+    navigateToStudio: nav.replaceWithStudio,
     openVideoUpload,
     openTakeReview,
     closeOverlay,
     focusStudio,
     focusEditVideo,
   });
-  const loadSavedVideoRoute = savedVideo.loadSavedVideoRoute;
   const discardSavedVideoWork = savedVideo.discardWork;
-  const directVideoActionsRef = useRef({
-    load: loadSavedVideoRoute,
-    reset: () => {
-      discardSavedVideoWork();
-      existingVideo.reset(true);
-      closeOverlay();
-    },
+  const resetDirectSavedVideoWork = useCallback(() => {
+    discardSavedVideoWork();
+    existingVideo.reset(true);
+    closeOverlay();
+  }, [closeOverlay, discardSavedVideoWork, existingVideo]);
+  const directVideoLoad = useDirectSavedVideoRoute({
+    videoId: directVideoId,
+    locationKey: location.key,
+    load: savedVideo.loadSavedVideoRoute,
+    reset: resetDirectSavedVideoWork,
   });
-  useLayoutEffect(() => {
-    directVideoActionsRef.current = {
-      load: loadSavedVideoRoute,
-      reset: () => {
-        discardSavedVideoWork();
-        existingVideo.reset(true);
-        closeOverlay();
-      },
-    };
-  }, [closeOverlay, discardSavedVideoWork, existingVideo, loadSavedVideoRoute]);
 
-  useEffect(() => {
-    if (directVideoId === null || directVideoRequestKey === null) return;
-    const controller = new AbortController();
-    const requestKey = directVideoRequestKey;
-    directVideoActionsRef.current.reset();
-    void getSavedVideo(directVideoId, controller.signal)
-      .then((detail) => directVideoActionsRef.current.load(detail, controller.signal))
-      .then(() => {
-        if (!controller.signal.aborted) {
-          setDirectVideoLoadResult({ status: 'ready', requestKey });
-        }
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) {
-          setDirectVideoLoadResult({
-            status: 'error',
-            requestKey,
-            message: safeDirectVideoLoadMessage(error),
-          });
-        }
-      });
-    return () => controller.abort('saved-video-route-changed');
-  }, [directVideoId, directVideoRequestKey]);
-
-  const contextualProjectId =
-    projectVideoCreationContext.status === 'ready' ? projectVideoCreationContext.projectId : null;
   const newlySavedVideoId =
     savedVideoSave.state.status === 'saved' ? savedVideoSave.state.video.id : null;
-  const projectVideoAttachmentAttemptRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (contextualProjectId === null || newlySavedVideoId === null) return;
-    const attemptKey = `${contextualProjectId}:${newlySavedVideoId}:${projectVideoAttachmentRetry}`;
-    if (projectVideoAttachmentAttemptRef.current === attemptKey) return;
-    projectVideoAttachmentAttemptRef.current = attemptKey;
-    const controller = new AbortController();
-    setProjectVideoAttachment({
-      status: 'attaching',
+  const { state: projectVideoAttachment, retry: retryProjectVideoAttachment } =
+    useProjectVideoAttachment({
       projectId: contextualProjectId,
-      videoId: newlySavedVideoId,
+      savedVideoId: newlySavedVideoId,
     });
-    void attachProjectAsset(
-      contextualProjectId,
-      { kind: 'video', resourceId: newlySavedVideoId },
-      controller.signal,
-    )
-      .then(async () => {
-        if (controller.signal.aborted) return;
-        await queryClient.invalidateQueries({
-          queryKey: projectAssetQueryKeys.project(contextualProjectId),
-        });
-        if (!controller.signal.aborted) {
-          setProjectVideoAttachment({ status: 'idle' });
-          void navigate(projectPath(contextualProjectId), { replace: true });
-        }
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) {
-          setProjectVideoAttachment({
-            status: 'error',
-            projectId: contextualProjectId,
-            videoId: newlySavedVideoId,
-            message:
-              'The Video was saved to Assets, but its Project association could not be completed.',
-          });
-        }
-      });
-    return () => controller.abort('project-video-context-changed');
-  }, [contextualProjectId, navigate, newlySavedVideoId, projectVideoAttachmentRetry, queryClient]);
   const existingVideoPendingVoiceName = existingVideo.pendingVoiceSelection?.voiceName ?? null;
-  const contextualStageNotices = useMemo<readonly StageNotice[]>(() => {
-    const notices: StageNotice[] = [];
-    if (directVideoLoad.status === 'loading') {
-      notices.push({
-        id: 'saved-video-route-loading',
-        severity: 'info',
-        title: 'Loading Saved Video',
-        message: 'Validating the current Version before opening review.',
-        priority: 250,
-      });
-    } else if (directVideoLoad.status === 'error') {
-      notices.push({
-        id: 'saved-video-route-error',
-        severity: 'error',
-        title: 'Saved Video unavailable',
-        message: directVideoLoad.message,
-        priority: 500,
-        action: {
-          label: routeOriginProjectId ? 'Back to Project' : 'Back to Assets',
-          onAction: () =>
-            goBack(routeOriginProjectId ? projectPath(routeOriginProjectId) : APP_PATHS.videos),
-        },
-      });
-    }
-    if (existingVideoPendingVoiceName !== null) {
-      notices.push({
-        id: 'pending-voice-handoff',
-        severity: 'info',
-        title: 'Voice ready',
-        message: `${existingVideoPendingVoiceName} will be applied once you record or upload a video.`,
-        priority: 200,
-      });
-    }
-    if (projectVideoAttachment.status === 'attaching') {
-      notices.push({
-        id: 'project-video-attachment',
-        severity: 'info',
-        title: 'Video saved',
-        message: 'Attaching it to the Project…',
-        priority: 350,
-      });
-    } else if (projectVideoAttachment.status === 'error') {
-      notices.push({
-        id: 'project-video-attachment',
-        severity: 'error',
-        title: 'Project attachment needs attention',
-        message: projectVideoAttachment.message,
-        priority: 550,
-        action: {
-          label: 'Retry attachment',
-          onAction: () => setProjectVideoAttachmentRetry((current) => current + 1),
-        },
-      });
-    }
-    return notices;
-  }, [
-    directVideoLoad,
-    existingVideoPendingVoiceName,
-    goBack,
-    projectVideoAttachment,
-    routeOriginProjectId,
-  ]);
+  const contextualStageNotices = useMemo(
+    () =>
+      deriveStudioContextualNotices({
+        directVideoLoad,
+        pendingVoiceName: existingVideoPendingVoiceName,
+        projectVideoAttachment,
+        routeOriginProjectId,
+        onLeaveUnavailableVideo: nav.goBackTo,
+        onRetryProjectVideoAttachment: retryProjectVideoAttachment,
+      }),
+    [
+      directVideoLoad,
+      existingVideoPendingVoiceName,
+      nav,
+      projectVideoAttachment,
+      retryProjectVideoAttachment,
+      routeOriginProjectId,
+    ],
+  );
   const effectiveStageNotices = useMemo(
     () => [...stageNotices, ...contextualStageNotices],
     [contextualStageNotices, stageNotices],
   );
-  const updateOutfitDirty = outfit.updateDirty;
-  const discardWardrobeDirty = character.discardWardrobeDirty;
-  const discardLocalTemporaryWork = useCallback(() => {
-    adoptingExistingVideoRecordingRef.current = null;
-    setRecordingForExistingVideo(false);
-    processing.cancel();
-    recording.discard();
-    updateOutfitDirty(false);
-    discardWardrobeDirty();
-    discardSavedVideoWork();
-    closeOverlay();
-  }, [
-    closeOverlay,
-    processing,
-    recording,
-    discardSavedVideoWork,
-    discardWardrobeDirty,
-    updateOutfitDirty,
-  ]);
-  const discardTemporaryWork = useCallback(() => {
-    existingVideo.reset(false);
-    discardLocalTemporaryWork();
-  }, [discardLocalTemporaryWork, existingVideo]);
-  const logoutHasTemporaryWork =
-    Boolean(recording.presented) ||
-    recording.processingState === 'processing' ||
-    outfit.dirty ||
-    character.wardrobeDirty ||
-    videoEditor.dirty ||
-    (activeProjectSourceActivity?.busy ?? false);
-  const logoutHasActiveWork =
-    recordingActive ||
-    finalizingStartedAt !== null ||
-    finalizingStream !== null ||
-    existingVideo.providerActive ||
-    isVideoEditBusy(videoEditor.phase) ||
-    projectWorkingMedia.busy ||
-    (activeProjectWorkingMediaActivity?.busy ?? false);
-  const cleanupTemporaryState = useCallback(async () => {
-    const cleanup = existingVideo.cleanup();
-    discardLocalTemporaryWork();
-    await cleanup;
-  }, [discardLocalTemporaryWork, existingVideo]);
-  const releaseMedia = useCallback(async () => {
-    await session.stopCamera();
-  }, [session]);
-  const handleLoggedOut = useCallback(() => {
-    void navigate(APP_PATHS.entry, { replace: true });
-  }, [navigate]);
-  const runSessionCleanup = useStudioSessionCleanup({ cleanupTemporaryState, releaseMedia });
-  const logout = useStudioLogoutController({
-    projectSourceActivity: activeProjectSourceActivity,
-    projectSession: activeProjectSession,
-    hasTemporaryWork: logoutHasTemporaryWork,
-    hasActiveWork: logoutHasActiveWork,
-    runCleanup: runSessionCleanup,
-    logout: auth.logout,
-    onLoggedOut: handleLoggedOut,
-  });
-  // Holding session teardown is what keeps this shell — and the in-memory work it owns — mounted
-  // long enough to say what is about to be lost. Releasing on unmount is the backstop: if the
-  // shell goes away for any other reason, the session finalizes and the redirect proceeds.
-  const holdSessionEnd = auth.holdSessionEnd;
-  useEffect(() => holdSessionEnd(), [holdSessionEnd]);
-  const sessionEnding = auth.status === 'expiring';
-  const sessionExpiry = useStudioSessionExpiryController({
-    expiring: sessionEnding,
-    projectSourceActivity: activeProjectSourceActivity,
-    projectSession: activeProjectSession,
-    hasTemporaryWork: logoutHasTemporaryWork,
-    hasActiveWork: logoutHasActiveWork,
-    runCleanup: runSessionCleanup,
-    completeSessionEnd: auth.completeSessionEnd,
-  });
+  const { logout, sessionExpiry, sessionEnding, discardTemporaryWork, work } =
+    useStudioSessionLifecycle({
+      auth,
+      session,
+      recording,
+      processing,
+      recordingActive,
+      finalizing,
+      existingVideo,
+      videoEditor,
+      outfit,
+      character,
+      projectWorkingMedia,
+      projectSourceActivity: activeProjectSourceActivity,
+      projectWorkingMediaActivity: activeProjectWorkingMediaActivity,
+      projectSession: activeProjectSession,
+      discardSavedVideoWork,
+      discardPendingAdoption,
+      closeOverlay,
+    });
   const discardExistingVideoSelection = useCallback(() => {
     if (existingVideo.selection) existingVideo.reset(false);
   }, [existingVideo]);
@@ -974,46 +560,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     existingVideo.showResult();
     openOverlay('take-review');
   }, [existingVideo, openOverlay]);
-  const openPlaybackEditor = useCallback(() => {
-    if (!recording.presented || recordingActive) return;
-    if (projectContextActive && !existingVideo.selection) {
-      setRecordingForExistingVideo(true);
-      return;
-    }
-    openExistingVideo();
-  }, [
-    existingVideo.selection,
-    openExistingVideo,
-    projectContextActive,
-    recording.presented,
-    recordingActive,
-  ]);
-  const startExistingVideoRecording = useCallback(() => {
-    if (!browser.mediaRecorder || !browser.mediaDevices || !browser.secureContext) return;
-    setRecordingForExistingVideo(true);
-    closeOverlay();
-    window.requestAnimationFrame(() => mainRef.current?.focus());
-    void session.startLocal();
-  }, [browser, closeOverlay, session]);
-  const startLocalRecording = useCallback(() => {
-    if (!browser.mediaRecorder || !browser.mediaDevices || !browser.secureContext) return;
-    setRecordingForExistingVideo(false);
-    closeOverlay();
-    window.requestAnimationFrame(() => mainRef.current?.focus());
-    void session.startLocal();
-  }, [browser, closeOverlay, session]);
-  const handledRecordIntentRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (location.pathname !== APP_PATHS.create || creationIntent !== 'record') return;
-    // The Studio shell never unmounts, so this ref outlives every "navigation". Keying on
-    // location.key scopes it to one history entry: returning to the same URL later is a new entry
-    // and records again. It also bounds the case where startLocalRecording bails on an unsupported
-    // browser — that entry is spent, but the next one is not.
-    const intentKey = `${location.key}:${location.pathname}${location.search}`;
-    if (handledRecordIntentRef.current === intentKey) return;
-    handledRecordIntentRef.current = intentKey;
-    startLocalRecording();
-  }, [creationIntent, location.key, location.pathname, location.search, startLocalRecording]);
   const closeExistingVideo = useCallback(() => {
     if (existingVideo.providerActive) return;
     if (existingVideo.active) existingVideo.cancelBeforeAcceptance();
@@ -1139,22 +685,18 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                       : 'studio'
             }
             organizationRouteActive={organizationRouteActive}
-            onOpenDashboard={() => void navigate(APP_PATHS.dashboard)}
-            onOpenStudio={() => void navigate(APP_PATHS.create)}
-            onOpenProjects={() => void navigate(APP_PATHS.projects)}
-            onOpenCampaigns={() => void navigate(APP_PATHS.campaigns)}
-            onOpenAssets={() => void navigate(APP_PATHS.assets)}
-            onCreateProject={() =>
-              void navigate(APP_PATHS.projects, { state: { createIntent: 'project' } })
-            }
-            onCreateCampaign={() =>
-              void navigate(APP_PATHS.campaigns, { state: { createIntent: 'campaign' } })
-            }
+            onOpenDashboard={nav.openDashboard}
+            onOpenStudio={nav.openStudio}
+            onOpenProjects={nav.openProjects}
+            onOpenCampaigns={nav.openCampaigns}
+            onOpenAssets={nav.openAssets}
+            onCreateProject={nav.createProject}
+            onCreateCampaign={nav.createCampaign}
             onCreateAsset={(trigger) => {
               quickCreateTriggerRef.current = trigger;
               setAssetCreationLauncherOpen(true);
             }}
-            onOpenLive={() => void navigate(APP_PATHS.live)}
+            onOpenLive={nav.openLive}
             onLogout={() => void logout.request()}
           />
         </div>
@@ -1213,17 +755,15 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           projectCreativeCheckpoint={projectCreativeCheckpoint}
           dashboard={{
             displayName: auth.session!.user.displayName,
-            onCreateVideo: () => void navigate(APP_PATHS.create),
-            onCreateProject: () =>
-              void navigate(APP_PATHS.projects, { state: { createIntent: 'project' } }),
-            onCreateCampaign: () =>
-              void navigate(APP_PATHS.campaigns, { state: { createIntent: 'campaign' } }),
-            onOpenAssets: () => void navigate(APP_PATHS.assets),
-            onOpenProjects: () => void navigate(APP_PATHS.projects),
-            onOpenCampaigns: () => void navigate(APP_PATHS.campaigns),
-            onOpenProject: (projectId) => void navigate(projectPath(projectId)),
-            onOpenCampaign: (campaignId) => void navigate(campaignPath(campaignId)),
-            onOpenVideos: () => void navigate(APP_PATHS.videos),
+            onCreateVideo: nav.openStudio,
+            onCreateProject: nav.createProject,
+            onCreateCampaign: nav.createCampaign,
+            onOpenAssets: nav.openAssets,
+            onOpenProjects: nav.openProjects,
+            onOpenCampaigns: nav.openCampaigns,
+            onOpenProject: nav.openProject,
+            onOpenCampaign: nav.openCampaign,
+            onOpenVideos: nav.openVideos,
           }}
           assets={{
             creativeStore: repositoryStore,
@@ -1231,26 +771,17 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             outfitCount: repositoryStore.savedPrompts.filter(
               (item) => item.modelModeId === 'lucy-vton-latest',
             ).length,
-            onOpen: (destination) => {
-              const paths = {
-                videos: APP_PATHS.videos,
-                characters: APP_PATHS.characters,
-                outfits: APP_PATHS.outfits,
-                voices: APP_PATHS.voices,
-              } as const;
-              void navigate(paths[destination]);
-            },
-            onUploadVideo: () =>
-              void navigate(APP_PATHS.create, { state: { creationIntent: 'upload' } }),
+            onOpen: nav.openAssetLibrary,
+            onUploadVideo: nav.uploadVideo,
             onCreateProjectCharacter: character.openNewForProject,
             onCreateProjectOutfit: outfit.openNewForProject,
           }}
           liveBeta={{
             capabilityState,
-            betaEnabled: realtimeBetaEnabled,
-            providerConfigured: realtimeProviderConfigured,
-            onOpenStudio: () => void navigate(APP_PATHS.create),
-            onOpenDashboard: () => goBack(APP_PATHS.dashboard),
+            betaEnabled: liveExperience.betaEnabled,
+            providerConfigured: liveExperience.providerConfigured,
+            onOpenStudio: nav.openStudio,
+            onOpenDashboard: nav.backToDashboard,
           }}
           saveVideoState={savedVideoSave.state}
           actions={{
@@ -1258,7 +789,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             closeTakeReview,
             discardExistingVideoSelection,
             openVoiceTreatments: () => openOverlay('voice-treatments'),
-            openAiExperience: openLiveAiExperience,
+            openAiExperience: liveExperience.openLiveAiExperience,
             openExistingVideo,
             openCaptureSettings,
             startProjectRecording,
@@ -1272,7 +803,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           onClose={() => setAssetCreationLauncherOpen(false)}
           onCreateVideo={(intent, projectId) => {
             setAssetCreationLauncherOpen(false);
-            void navigate(
+            nav.navigateTo(
               studioCreatePath({
                 ...(intent === 'new' ? {} : { intent }),
                 ...(projectId ? { projectId } : {}),
@@ -1285,7 +816,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               character.openNewForProject(projectId);
               return;
             }
-            void navigate(APP_PATHS.create);
+            nav.openStudio();
             character.openNew();
           }}
           onCreateOutfit={(projectId) => {
@@ -1294,30 +825,19 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               outfit.openNewForProject(projectId);
               return;
             }
-            void navigate(APP_PATHS.create);
+            nav.openStudio();
             outfit.openNew(false, 'library');
           }}
-          onOpenVoiceLibrary={() => void navigate(APP_PATHS.voices)}
+          onOpenVoiceLibrary={nav.openVoices}
         />
 
         <StudioExitGuard
-          recordingOrFinalizing={
-            recordingActive ||
-            finalizingStartedAt !== null ||
-            finalizingStream !== null ||
-            existingVideo.providerActive
-          }
-          videoRenderingActive={
-            isVideoEditBusy(videoEditor.phase) ||
-            projectWorkingMedia.busy ||
-            (activeProjectWorkingMediaActivity?.busy ?? false)
-          }
-          hasTemporaryTake={Boolean(recording.presented)}
-          voiceProcessingActive={recording.processingState === 'processing'}
-          creativeWorkDirty={outfit.dirty || character.wardrobeDirty || videoEditor.dirty}
-          projectContextDirty={
-            projectContextActive && (outfit.dirty || character.wardrobeDirty || videoEditor.dirty)
-          }
+          recordingOrFinalizing={work.recordingOrFinalizing}
+          videoRenderingActive={work.videoRenderingActive}
+          hasTemporaryTake={work.hasTemporaryTake}
+          voiceProcessingActive={work.voiceProcessingActive}
+          creativeWorkDirty={work.creativeWorkDirty}
+          projectContextDirty={projectContextActive && work.creativeWorkDirty}
           projectSourceActivity={activeProjectSourceActivity}
           projectSession={activeProjectSession}
           sessionEnding={sessionEnding}
@@ -1333,7 +853,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           projectContextActive={projectContextActive}
           projectWorkingMedia={projectWorkingMedia}
           saveSuccessSuppressed={contextualProjectId !== null}
-          onOpenSavedVideosLibrary={() => void navigate(APP_PATHS.videos)}
+          onOpenSavedVideosLibrary={nav.openVideos}
           onCreateAnotherVideo={() => {
             discardTemporaryWork();
             focusStudio();
@@ -1345,55 +865,20 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           mainRef={mainRef}
           repository={repository}
           store={repositoryStore}
-          onNavigate={(path) => void navigate(path)}
+          onNavigate={nav.navigateTo}
           onUseVideo={savedVideo.useSavedVideo}
-          onCreateCharacter={() => {
-            void navigate(APP_PATHS.create);
-            character.openNew();
-          }}
-          onCopyCharacter={(savedCharacter) => {
-            void navigate(APP_PATHS.create);
-            character.copy(savedCharacter);
-          }}
-          onOpenWardrobe={(savedCharacter) => {
-            void navigate(APP_PATHS.create);
-            character.openWardrobe(savedCharacter);
-          }}
-          onUseCharacter={(character) => {
-            applyRecipeSelection({
-              origin: 'character-prompt',
-              prompt: character.prompt,
-              modelModeId: 'lucy-latest',
-              assetId: character.id,
-              characterName: character.name,
-              referenceImageAssetId: character.referenceImageAssetId,
-              ...(character.builderDraft ? { builderDraft: character.builderDraft } : {}),
-            });
-            void navigate(APP_PATHS.create);
-          }}
-          onCreateOutfit={() => {
-            void navigate(APP_PATHS.create);
-            outfit.openNew(false, 'library');
-          }}
-          onUseOutfit={(savedOutfit) => {
-            outfit.selectSaved(savedOutfit);
-            void navigate(APP_PATHS.create);
-          }}
+          onCreateCharacter={libraryHandoff.createCharacter}
+          onCopyCharacter={libraryHandoff.copyCharacter}
+          onOpenWardrobe={libraryHandoff.openWardrobe}
+          onUseCharacter={libraryHandoff.useCharacter}
+          onCreateOutfit={libraryHandoff.createOutfit}
+          onUseOutfit={libraryHandoff.useOutfit}
           voiceLibraryUnavailableReason={
             availability.elevenLabs
               ? null
               : 'Saving, removing, and using voices needs a configured ElevenLabs provider. Browsing and previewing stay available.'
           }
-          onUseVoice={(voice) => {
-            // A Voice is meaningless without a video, so land on the surface that supplies one.
-            // With a source already loaded it applies now; otherwise the workflow holds it until
-            // one is ready.
-            if (existingVideo.selection === null)
-              existingVideo.preselectVoice(voice.voiceId, voice.name);
-            else existingVideo.selectVoice(voice.voiceId, voice.name);
-            void navigate(APP_PATHS.create);
-            openVideoUpload();
-          }}
+          onUseVoice={libraryHandoff.useVoice}
         />
 
         <StudioToolOverlays
@@ -1405,7 +890,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           provider={provider}
           browser={browser}
           session={session}
-          advancedLiveSession={advancedLiveSession}
+          advancedLiveSession={liveExperience.advancedLiveSession}
           takeReview={takeReview}
           existingVideo={existingVideo}
           {...(projectContextActive ? { projectProcessing } : {})}
@@ -1437,9 +922,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           onOpenExistingVideo={openExistingVideo}
           onOpenSavedCharacters={openSavedCharacters}
           onOpenSavedOutfits={openOutfitSelector}
-          onOpenSavedVideosLibrary={() => void navigate(APP_PATHS.videos)}
-          onConfigureVirtualTryOn={configureVirtualTryOn}
-          onStartPreparedAi={startPreparedAi}
+          onOpenSavedVideosLibrary={nav.openVideos}
+          onConfigureVirtualTryOn={liveExperience.configureVirtualTryOn}
+          onStartPreparedAi={liveExperience.startPreparedAi}
           onUnselectCharacter={unselectCharacter}
           onUnselectAi={unselectAi}
         />
