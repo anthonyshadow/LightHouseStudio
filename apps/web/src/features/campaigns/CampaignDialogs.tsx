@@ -1,7 +1,7 @@
 import { useTheme } from '@emotion/react';
 import type { CampaignContract, ProjectContract } from '@studio/contracts';
 import { useState, type FormEvent, type RefObject } from 'react';
-import { ApiClientError } from '../../adapters/api-client/apiClient';
+import { apiErrorMessage } from '../../adapters/api-client/apiClient';
 import { Button, OverlayPanel, StatusNotice, TextAreaField, TextField } from '../../ui';
 import { dialogActionsStyles } from '../projects/ProjectRouteSurface.styles';
 import { useProjectsController } from '../projects/useProjectsController';
@@ -10,9 +10,7 @@ import { CampaignApiConflictError } from './campaignsApi';
 import { useCampaignsController } from './useCampaignsController';
 
 export const safeCampaignError = (error: unknown): string =>
-  error instanceof ApiClientError
-    ? error.message
-    : 'Campaigns could not be loaded. Check the local API and try again.';
+  apiErrorMessage(error, 'Campaigns could not be loaded. Check the local API and try again.');
 
 export const CampaignFormDialog = ({
   campaign,

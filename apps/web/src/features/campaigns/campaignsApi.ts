@@ -8,6 +8,7 @@ import {
 } from '@studio/contracts';
 import {
   ApiClientError,
+  invalidApiResponse,
   requestJson,
   type ApiErrorPayloadParser,
 } from '../../adapters/api-client/apiClient';
@@ -35,8 +36,10 @@ const parseCampaignConflict: ApiErrorPayloadParser = (payload, status) => {
     : null;
 };
 
-const invalidCampaignResponse = () =>
-  new ApiClientError('The Campaign response was invalid.', 502, 'invalid-response');
+const invalidCampaignResponse = invalidApiResponse(
+  'The Campaign response was invalid.',
+  'invalid-response',
+);
 const jsonHeaders = { Accept: 'application/json', 'Content-Type': 'application/json' } as const;
 
 export const listCampaigns = (

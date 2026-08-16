@@ -6,9 +6,11 @@ import {
   currentProjectProcessingAttempt,
   projectProcessingAmbiguityIsSuperseded,
   projectProcessingAttemptBlocksArchive,
+  projectProcessingAttemptIsRetryable,
   projectProcessingBlocksArchive,
   projectProcessingNeedsAttention,
   projectProcessingRestartTransition,
+  projectVersionConflictDetail,
   type Campaign,
   type Project,
   type ProjectAggregate,
@@ -112,8 +114,7 @@ import {
 import {
   createSavedVideoProjectMembership,
   deriveProjectAssetMemberships,
-  deterministicProjectAssetMembershipId,
-  membershipsIntroducedByRevision,
+  membershipsForRevisionInput,
 } from './project-asset-memberships.js';
 
 const isMissingFile = (error: unknown): boolean =>
@@ -138,13 +139,6 @@ const mergeAssetMemberships = (
   }
   return [...byResource.values()];
 };
-
-const revisionMemberships = (
-  input: AppendProjectRevisionPersistenceInput,
-): readonly ProjectAssetMembership[] => [
-  ...membershipsIntroducedByRevision(input.revision),
-  ...(input.assetMemberships ?? []),
-];
 
 const currentRead = (aggregate: StoredProjectAggregate): ProjectCurrentRead => {
   const revision = aggregate.revisions.find(
@@ -442,7 +436,8 @@ export class FileProjectRepository
         await this.#afterSavedVideoCommitted?.();
       }
     }
-    await this.#atomicWrite(paths.backup, librarySchema.parse(previous));
+    // `previous` is always a `#read` result, which is already `librarySchema`-validated.
+    await this.#atomicWrite(paths.backup, previous);
     await this.#atomicWrite(paths.primary, next);
     if (journal !== undefined) await this.#afterProjectCommitted?.();
     if (journal !== undefined) await rm(paths.journal, { force: true });
@@ -667,12 +662,11 @@ export class FileProjectRepository
       if (aggregate.project.version !== input.expectedVersion) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'project-version',
-            projectId: attempt.projectId,
-            expectedVersion: input.expectedVersion,
-            actualVersion: aggregate.project.version,
-          },
+          conflict: projectVersionConflictDetail(
+            attempt.projectId,
+            input.expectedVersion,
+            aggregate.project.version,
+          ),
         };
       }
       if (aggregate.project.currentRevisionNumber !== input.expectedRevisionNumber) {
@@ -726,7 +720,7 @@ export class FileProjectRepository
         if (
           previous === null ||
           previous.projectId !== attempt.projectId ||
-          !['ambiguous', 'failed', 'expired', 'cancelled'].includes(previous.status) ||
+          !projectProcessingAttemptIsRetryable(previous.status) ||
           attempt.attemptNumber !== previous.attemptNumber + 1
         ) {
           return { kind: 'conflict', conflict: { kind: 'retry-mismatch' } };
@@ -744,7 +738,7 @@ export class FileProjectRepository
         activeOwnerAttempt !== undefined &&
         !(
           attempt.retryOfOperationId === activeOwnerAttempt.operationId &&
-          ['ambiguous', 'failed', 'expired', 'cancelled'].includes(activeOwnerAttempt.status)
+          projectProcessingAttemptIsRetryable(activeOwnerAttempt.status)
         )
       ) {
         return {
@@ -923,7 +917,7 @@ export class FileProjectRepository
           const nextStatus =
             trace.status === 'cancelled'
               ? 'ready'
-              : ['ambiguous', 'failed', 'expired'].includes(trace.status)
+              : projectProcessingNeedsAttention(trace.status)
                 ? 'needs-attention'
                 : aggregate.project.status;
           if (nextStatus !== aggregate.project.status) {
@@ -1144,7 +1138,7 @@ export class FileProjectRepository
           revision: revisionInput.revision,
           media,
         };
-        introducedMemberships = revisionMemberships(revisionInput);
+        introducedMemberships = membershipsForRevisionInput(revisionInput);
       } else {
         nextAggregate = storedAggregateSchema.parse({
           ...aggregate,
@@ -1466,12 +1460,11 @@ export class FileProjectRepository
       if (aggregate.project.version !== input.expectedVersion) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'project-version',
-            projectId: input.projectId,
-            expectedVersion: input.expectedVersion,
-            actualVersion: aggregate.project.version,
-          },
+          conflict: projectVersionConflictDetail(
+            input.projectId,
+            input.expectedVersion,
+            aggregate.project.version,
+          ),
         };
       }
       if (aggregate.project.currentRevisionNumber !== input.expectedRevisionNumber) {
@@ -1503,7 +1496,7 @@ export class FileProjectRepository
         projects,
         assetMemberships: mergeAssetMemberships(
           library.assetMemberships,
-          revisionMemberships(input),
+          membershipsForRevisionInput(input),
         ),
       });
       return { kind: 'updated' };
@@ -1560,12 +1553,11 @@ export class FileProjectRepository
       if (aggregate.project.version !== input.expectedVersion) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'project-version',
-            projectId: input.projectId,
-            expectedVersion: input.expectedVersion,
-            actualVersion: aggregate.project.version,
-          },
+          conflict: projectVersionConflictDetail(
+            input.projectId,
+            input.expectedVersion,
+            aggregate.project.version,
+          ),
         };
       }
       if (aggregate.project.currentRevisionNumber !== input.expectedRevisionNumber) {
@@ -1605,12 +1597,6 @@ export class FileProjectRepository
           ? []
           : [
               createSavedVideoProjectMembership({
-                id: deterministicProjectAssetMembershipId(
-                  input.ownerUserId,
-                  input.projectId,
-                  'video',
-                  source.savedVideoId,
-                ),
                 ownerUserId: input.ownerUserId,
                 projectId: input.projectId,
                 savedVideoId: source.savedVideoId,
@@ -1622,7 +1608,7 @@ export class FileProjectRepository
         revision: library.revision + 1,
         projects,
         assetMemberships: mergeAssetMemberships(library.assetMemberships, [
-          ...revisionMemberships(input),
+          ...membershipsForRevisionInput(input),
           ...sourceMemberships,
         ]),
       });
@@ -1680,12 +1666,11 @@ export class FileProjectRepository
       if (aggregate.project.version !== input.expectedVersion) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'project-version',
-            projectId: input.projectId,
-            expectedVersion: input.expectedVersion,
-            actualVersion: aggregate.project.version,
-          },
+          conflict: projectVersionConflictDetail(
+            input.projectId,
+            input.expectedVersion,
+            aggregate.project.version,
+          ),
         };
       }
       if (aggregate.project.currentRevisionNumber !== input.expectedRevisionNumber) {
@@ -1726,12 +1711,6 @@ export class FileProjectRepository
           ? []
           : [
               createSavedVideoProjectMembership({
-                id: deterministicProjectAssetMembershipId(
-                  input.ownerUserId,
-                  input.projectId,
-                  'video',
-                  media.savedVideoId,
-                ),
                 ownerUserId: input.ownerUserId,
                 projectId: input.projectId,
                 savedVideoId: media.savedVideoId,
@@ -1743,7 +1722,7 @@ export class FileProjectRepository
         revision: library.revision + 1,
         projects,
         assetMemberships: mergeAssetMemberships(library.assetMemberships, [
-          ...revisionMemberships(input),
+          ...membershipsForRevisionInput(input),
           ...mediaMemberships,
         ]),
       });
@@ -1782,12 +1761,11 @@ export class FileProjectRepository
       if (aggregate.project.version !== expectedVersion) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'project-version',
-            projectId: nextProject.id,
+          conflict: projectVersionConflictDetail(
+            nextProject.id,
             expectedVersion,
-            actualVersion: aggregate.project.version,
-          },
+            aggregate.project.version,
+          ),
         };
       }
       if (
@@ -1837,12 +1815,11 @@ export class FileProjectRepository
       if (aggregate.project.version !== expectedVersion) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'project-version',
-            projectId: nextProject.id,
+          conflict: projectVersionConflictDetail(
+            nextProject.id,
             expectedVersion,
-            actualVersion: aggregate.project.version,
-          },
+            aggregate.project.version,
+          ),
         };
       }
       if (
@@ -2075,12 +2052,11 @@ export class FileProjectRepository
       if (aggregate.project.version !== input.projectRevision.expectedVersion) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'project-version',
-            projectId: aggregate.project.id,
-            expectedVersion: input.projectRevision.expectedVersion,
-            actualVersion: aggregate.project.version,
-          },
+          conflict: projectVersionConflictDetail(
+            aggregate.project.id,
+            input.projectRevision.expectedVersion,
+            aggregate.project.version,
+          ),
         };
       }
       if (
@@ -2194,14 +2170,8 @@ export class FileProjectRepository
         projects,
         outputReceipts: [...library.outputReceipts, receipt],
         assetMemberships: mergeAssetMemberships(library.assetMemberships, [
-          ...revisionMemberships(input.projectRevision),
+          ...membershipsForRevisionInput(input.projectRevision),
           createSavedVideoProjectMembership({
-            id: deterministicProjectAssetMembershipId(
-              input.ownerUserId,
-              input.projectRevision.projectId,
-              'video',
-              savedVideoId,
-            ),
             ownerUserId: input.ownerUserId,
             projectId: input.projectRevision.projectId,
             savedVideoId,

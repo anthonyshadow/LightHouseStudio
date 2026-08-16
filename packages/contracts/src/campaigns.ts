@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { opaquePageTokenSchema } from './common';
 
 export const CAMPAIGN_STATUSES = ['active', 'archived', 'deleted'] as const;
 export const campaignIdSchema = z.uuid();
@@ -41,7 +42,7 @@ export const campaignParamsSchema = z.object({ campaignId: campaignIdSchema }).s
 export const campaignsQuerySchema = z
   .object({
     lifecycle: z.enum(['active', 'archived']).default('active'),
-    cursor: z.string().trim().min(1).max(500).optional(),
+    cursor: opaquePageTokenSchema.optional(),
     pageSize: z.coerce.number().int().min(1).max(40).default(20),
   })
   .strict();

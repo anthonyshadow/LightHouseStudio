@@ -9,10 +9,12 @@ import {
   type ProjectProcessingHistoryResponse,
   type ProjectProcessingMutationResponse,
 } from '@studio/contracts';
-import { ApiClientError, requestJson } from '../../adapters/api-client/apiClient';
+import { invalidApiResponse, requestJson } from '../../adapters/api-client/apiClient';
 
-const invalidResponse = () =>
-  new ApiClientError('The Project processing response was invalid.', 502, 'invalid-response');
+const invalidResponse = invalidApiResponse(
+  'The Project processing response was invalid.',
+  'invalid-response',
+);
 
 const intentHeaders = {
   [VIDEO_PROVIDER_INTENT_HEADER]: VIDEO_PROVIDER_INTENT_VALUE,

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { opaquePageTokenSchema } from './common';
 import { inspectedVideoSchema } from './video-jobs';
 
 export const PROJECT_PROCESSING_CAPABILITIES = [
@@ -161,7 +162,7 @@ export const projectProcessingMutationResponseSchema = z
 
 export const projectProcessingHistoryQuerySchema = z
   .object({
-    cursor: z.string().trim().min(1).max(1_000).optional(),
+    cursor: opaquePageTokenSchema.optional(),
     pageSize: z.coerce.number().int().min(1).max(40).default(20),
   })
   .strict();

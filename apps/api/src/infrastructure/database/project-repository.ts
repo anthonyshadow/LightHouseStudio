@@ -11,8 +11,10 @@ import {
   currentProjectProcessingAttempt,
   projectProcessingAmbiguityIsSuperseded,
   projectProcessingAttemptBlocksArchive,
+  projectProcessingAttemptIsRetryable,
   projectProcessingNeedsAttention,
   projectProcessingRestartTransition,
+  projectVersionConflictDetail,
   type Project,
   type ProjectAggregate,
   type ProjectAssetLink,
@@ -82,8 +84,7 @@ import type {
 import {
   createSavedVideoProjectMembership,
   deriveProjectAssetMemberships,
-  deterministicProjectAssetMembershipId,
-  membershipsIntroducedByRevision,
+  membershipsForRevisionInput,
 } from '../../features/projects/project-asset-memberships.js';
 import {
   projectAssetLinksForRevision,
@@ -504,13 +505,6 @@ const toProjectAssetMembership = (
   resourceId: row.resourceId,
   createdAt: toIsoTimestamp(row.createdAt),
 });
-
-const membershipsForRevisionInput = (
-  input: AppendProjectRevisionPersistenceInput,
-): readonly ProjectAssetMembership[] => [
-  ...membershipsIntroducedByRevision(input.revision),
-  ...(input.assetMemberships ?? []),
-];
 
 export class DrizzleProjectRepository
   implements ProjectRepository, ProjectProcessingRepository, ProjectOutputMetadataUnitOfWork
@@ -1584,12 +1578,11 @@ export class DrizzleProjectRepository
       if (current.version !== input.expectedVersion) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'project-version',
-            projectId: input.projectId,
-            expectedVersion: input.expectedVersion,
-            actualVersion: current.version,
-          },
+          conflict: projectVersionConflictDetail(
+            input.projectId,
+            input.expectedVersion,
+            current.version,
+          ),
         } as const;
       }
       if (current.currentRevisionNumber !== input.expectedRevisionNumber) {
@@ -1745,12 +1738,11 @@ export class DrizzleProjectRepository
       if (current.version !== input.expectedVersion) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'project-version',
-            projectId: input.projectId,
-            expectedVersion: input.expectedVersion,
-            actualVersion: current.version,
-          },
+          conflict: projectVersionConflictDetail(
+            input.projectId,
+            input.expectedVersion,
+            current.version,
+          ),
         } as const;
       }
       if (current.currentRevisionNumber !== input.expectedRevisionNumber) {
@@ -1818,12 +1810,6 @@ export class DrizzleProjectRepository
           ? []
           : [
               createSavedVideoProjectMembership({
-                id: deterministicProjectAssetMembershipId(
-                  input.ownerUserId,
-                  input.projectId,
-                  'video',
-                  input.source.savedVideoId,
-                ),
                 ownerUserId: input.ownerUserId,
                 projectId: input.projectId,
                 savedVideoId: input.source.savedVideoId,
@@ -1927,12 +1913,11 @@ export class DrizzleProjectRepository
       if (current.version !== input.expectedVersion) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'project-version',
-            projectId: input.projectId,
-            expectedVersion: input.expectedVersion,
-            actualVersion: current.version,
-          },
+          conflict: projectVersionConflictDetail(
+            input.projectId,
+            input.expectedVersion,
+            current.version,
+          ),
         } as const;
       }
       if (current.currentRevisionNumber !== input.expectedRevisionNumber) {
@@ -2032,12 +2017,6 @@ export class DrizzleProjectRepository
           ? []
           : [
               createSavedVideoProjectMembership({
-                id: deterministicProjectAssetMembershipId(
-                  input.ownerUserId,
-                  input.projectId,
-                  'video',
-                  input.media.savedVideoId,
-                ),
                 ownerUserId: input.ownerUserId,
                 projectId: input.projectId,
                 savedVideoId: input.media.savedVideoId,
@@ -2108,12 +2087,11 @@ export class DrizzleProjectRepository
       if (current.version !== input.expectedVersion) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'project-version',
-            projectId: current.id,
-            expectedVersion: input.expectedVersion,
-            actualVersion: current.version,
-          },
+          conflict: projectVersionConflictDetail(
+            current.id,
+            input.expectedVersion,
+            current.version,
+          ),
         } as const;
       }
       if (current.currentRevisionNumber !== input.expectedRevisionNumber) {
@@ -2239,7 +2217,7 @@ export class DrizzleProjectRepository
         );
         if (
           previous === null ||
-          !['ambiguous', 'failed', 'expired', 'cancelled'].includes(previous.status) ||
+          !projectProcessingAttemptIsRetryable(previous.status) ||
           input.attempt.attemptNumber !== previous.attemptNumber + 1
         ) {
           return { kind: 'conflict', conflict: { kind: 'retry-mismatch' } } as const;
@@ -2969,12 +2947,7 @@ export class DrizzleProjectRepository
       if (current.version !== expectedVersion) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'project-version',
-            projectId: current.id,
-            expectedVersion,
-            actualVersion: current.version,
-          },
+          conflict: projectVersionConflictDetail(current.id, expectedVersion, current.version),
         } as const;
       }
       if (
@@ -3086,12 +3059,7 @@ export class DrizzleProjectRepository
       if (current.version !== expectedVersion) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'project-version',
-            projectId: current.id,
-            expectedVersion,
-            actualVersion: current.version,
-          },
+          conflict: projectVersionConflictDetail(current.id, expectedVersion, current.version),
         } as const;
       }
       if (
@@ -3206,12 +3174,11 @@ export class DrizzleProjectRepository
       if (current.version !== input.projectRevision.expectedVersion) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'project-version',
-            projectId: current.id,
-            expectedVersion: input.projectRevision.expectedVersion,
-            actualVersion: current.version,
-          },
+          conflict: projectVersionConflictDetail(
+            current.id,
+            input.projectRevision.expectedVersion,
+            current.version,
+          ),
         } as const;
       }
       if (current.currentRevisionNumber !== input.projectRevision.expectedRevisionNumber) {
@@ -3492,12 +3459,6 @@ export class DrizzleProjectRepository
       await this.#persistAssetMemberships(tx, [
         ...membershipsForRevisionInput(input.projectRevision),
         createSavedVideoProjectMembership({
-          id: deterministicProjectAssetMembershipId(
-            input.ownerUserId,
-            input.projectRevision.projectId,
-            'video',
-            savedVideoId,
-          ),
           ownerUserId: input.ownerUserId,
           projectId: input.projectRevision.projectId,
           savedVideoId,

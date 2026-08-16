@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import {
   createProjectAssetMembership,
   type Project,
@@ -7,7 +7,11 @@ import {
   type ProjectOutputLink,
   type ProjectRevision,
 } from '@studio/domain';
-import type { ProjectSourceRecord, ProjectWorkingMediaRecord } from './project-repository.js';
+import type {
+  AppendProjectRevisionPersistenceInput,
+  ProjectSourceRecord,
+  ProjectWorkingMediaRecord,
+} from './project-repository.js';
 
 interface MembershipCandidate {
   readonly kind: ProjectAssetKind;
@@ -93,7 +97,14 @@ export const createSavedVideoProjectMembership = (input: {
   readonly id?: string;
 }): ProjectAssetMembership =>
   createProjectAssetMembership({
-    id: input.id ?? randomUUID(),
+    id:
+      input.id ??
+      deterministicProjectAssetMembershipId(
+        input.ownerUserId,
+        input.projectId,
+        'video',
+        input.savedVideoId,
+      ),
     projectId: input.projectId,
     ownerUserId: input.ownerUserId,
     kind: 'video',
@@ -158,6 +169,14 @@ export const deriveProjectAssetMemberships = (
       }),
     );
 };
+
+/** Memberships a revision append persists: those the revision introduces plus any explicit extras. */
+export const membershipsForRevisionInput = (
+  input: AppendProjectRevisionPersistenceInput,
+): readonly ProjectAssetMembership[] => [
+  ...membershipsIntroducedByRevision(input.revision),
+  ...(input.assetMemberships ?? []),
+];
 
 export const membershipsIntroducedByRevision = (
   revision: ProjectRevision,

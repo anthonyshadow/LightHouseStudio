@@ -6,7 +6,7 @@ import type {
 } from '@studio/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ApiClientError } from '../../adapters/api-client/apiClient';
+import { ApiClientError, apiErrorMessage } from '../../adapters/api-client/apiClient';
 import { projectWorkspacePath } from '../../app/paths';
 import {
   getProjectSource,
@@ -50,9 +50,7 @@ const authority = (
 ): ProjectCurrentResponse => ({ project: response.project, revision: response.revision });
 
 export const projectAssetVideoWorkspaceError = (error: unknown): string =>
-  error instanceof ApiClientError
-    ? error.message
-    : 'The selected Video could not be opened as editable Project media.';
+  apiErrorMessage(error, 'The selected Video could not be opened as editable Project media.');
 
 export const useProjectAssetVideoWorkspaceLauncher = (
   projectId: string,

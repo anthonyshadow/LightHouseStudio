@@ -1,6 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectContract, ProjectCurrentResponse } from '@studio/contracts';
-import type { CreativeAssetStore } from '@studio/domain';
+import { formatDateTime, type CreativeAssetStore } from '@studio/domain';
 import {
   useCallback,
   useEffect,
@@ -84,12 +84,6 @@ const projectStatusLabel = (status: ProjectContract['status']): string =>
   status === 'needs-attention'
     ? 'Needs attention'
     : status.charAt(0).toUpperCase() + status.slice(1);
-
-const formatUpdatedAt = (value: string): string =>
-  new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
 
 const projectWorkflowLabel = (
   phase: ProjectCurrentResponse['revision']['snapshot']['workflowPhase'],
@@ -190,7 +184,7 @@ const ProjectListSection = ({
                   <span data-project-status>{projectStatusLabel(project.status)}</span>
                   <span data-project-updated>
                     Updated{' '}
-                    <time dateTime={project.updatedAt}>{formatUpdatedAt(project.updatedAt)}</time>
+                    <time dateTime={project.updatedAt}>{formatDateTime(project.updatedAt)}</time>
                   </span>
                 </div>
                 <div data-project-actions>
@@ -1035,7 +1029,14 @@ const ProjectDetail = ({
                 <h2>History</h2>
                 <p>Review retained revisions, outputs, and processing activity.</p>
               </header>
-              <ProjectHistorySection current={current} session={session.port} archived={archived} />
+              {/* Mounted on demand: this section opens three history queries the other tasks never need. */}
+              {activeWorkspaceTask === 'history' ? (
+                <ProjectHistorySection
+                  current={current}
+                  session={session.port}
+                  archived={archived}
+                />
+              ) : null}
             </section>
           </div>
         </aside>
@@ -1070,7 +1071,7 @@ const ProjectDetail = ({
               <span data-project-overview-status>{projectStatusLabel(project.status)}</span>
               <span>
                 Updated{' '}
-                <time dateTime={project.updatedAt}>{formatUpdatedAt(project.updatedAt)}</time>
+                <time dateTime={project.updatedAt}>{formatDateTime(project.updatedAt)}</time>
               </span>
               <span>Revision {project.currentRevisionNumber}</span>
               {project.campaignId === null ? (

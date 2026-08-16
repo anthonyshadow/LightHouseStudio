@@ -55,6 +55,11 @@ export const projectProcessingRetryPolicy = (
   return 'not-allowed';
 };
 
+/** A status an explicit retry may follow — the complement of a `not-allowed` retry policy. */
+export const projectProcessingAttemptIsRetryable = (
+  status: ProjectProcessingAttemptFacts['status'],
+): boolean => projectProcessingRetryPolicy(status) !== 'not-allowed';
+
 export const projectProcessingBlocksArchive = (
   status: ProjectProcessingAttemptFacts['status'],
 ): boolean => ACTIVE_PROJECT_PROCESSING_STATUSES.has(status) || status === 'ambiguous';

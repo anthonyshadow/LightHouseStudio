@@ -11,27 +11,16 @@ import {
 import type { ApplicationRuntime, HttpRequest } from '../../application/application-runtime.js';
 import { AppError } from '../../http/app-error.js';
 import { ownerUserIdForRequest } from '../../http/authentication.js';
+import { requestHeader, requireConfiguredService } from '../../http/request-helpers.js';
 import { requireTrustedOrigin, requireVideoProviderIntent } from '../../http/security.js';
-import { contentRangeHeaders, parseByteRange } from '../saved-videos/byte-range.js';
+import { sendRangedAsset } from '../saved-videos/byte-range.js';
 import type { ProjectProcessingService } from './project-processing-service.js';
 
-const header = (request: HttpRequest, name: string): string | undefined => {
-  const value = request.headers[name];
-  return typeof value === 'string' ? value : undefined;
-};
-
-const requireService = (
-  service: ProjectProcessingService | undefined,
-): ProjectProcessingService => {
-  if (service === undefined) {
-    throw new AppError(
-      503,
-      'feature_unavailable',
-      'Project processing authority is unavailable in the configured mode.',
-    );
-  }
-  return service;
-};
+const requireService = (service: ProjectProcessingService | undefined): ProjectProcessingService =>
+  requireConfiguredService(
+    service,
+    'Project processing authority is unavailable in the configured mode.',
+  );
 
 const requireProviderRequest = (request: HttpRequest): Promise<void> => {
   requireTrustedOrigin(request);
@@ -45,7 +34,7 @@ const requireOrigin = (request: HttpRequest): Promise<void> => {
 };
 
 const operationId = (request: HttpRequest): string => {
-  const parsed = projectOperationKeySchema.safeParse(header(request, 'idempotency-key'));
+  const parsed = projectOperationKeySchema.safeParse(requestHeader(request, 'idempotency-key'));
   if (!parsed.success) {
     throw new AppError(400, 'validation_error', 'Provide a UUID Idempotency-Key.');
   }
@@ -170,22 +159,12 @@ export const registerProjectProcessingRoutes = (
         params.data.projectId,
         params.data.operationId,
       );
-      const size = asset.manifest.sizeBytes;
-      const range = parseByteRange(header(request, 'range'), size);
-      const filename = asset.manifest.filename.replaceAll(/["\\\r\n]/gu, '_');
-      reply.header('Accept-Ranges', 'bytes');
-      reply.header('Content-Type', asset.manifest.mimeType);
-      reply.header('X-Content-Type-Options', 'nosniff');
-      reply.header('Content-Disposition', `inline; filename="${filename}"`);
-      if (range === null) {
-        reply.header('Content-Length', size);
-        return reply.send(asset.createReadStream());
-      }
-      const headers = contentRangeHeaders(range, size);
-      reply.status(206);
-      reply.header('Content-Range', headers.contentRange);
-      reply.header('Content-Length', headers.contentLength);
-      return reply.send(asset.createReadStream(range));
+      return sendRangedAsset(request, reply, {
+        asset,
+        mimeType: asset.manifest.mimeType,
+        filename: asset.manifest.filename,
+        allowDownload: false,
+      });
     },
   );
 };
