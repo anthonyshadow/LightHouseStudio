@@ -453,13 +453,13 @@ Responsiveness is taken seriously — there is a dedicated `e2e/accessibility-re
 covering 200 %-text reflow at small-mobile, tablet and desktop, plus a visual matrix. Remaining
 concerns:
 
-| #   | Concern                                                                                                                                                                       | Evidence                                           |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| P1  | The mobile bottom nav only renders on organization routes (`StudioHeader.tsx:381`). On `/studio/create` — the primary mobile use case — there is no bottom navigation at all. | `StudioHeader.tsx:381-397`                         |
-| P2  | The Project workspace tablist is four horizontal tabs; at small widths with large text they compete with the media stage in the same viewport.                                | `ProjectRouteSurface.tsx:870-888`                  |
-| P3  | The account menu becomes a 2.75 rem icon with the label hidden below 48 rem (`AccountMenu.tsx:126-129`), leaving logout behind an unlabelled avatar.                          | `AccountMenu.tsx:126-129`                          |
-| P4  | Asset library overlays are `placement="fullscreen"`, which is correct on mobile but means the hub's context is entirely lost with no breadcrumb (M5, M12).                    | `StudioLibraryOverlays.tsx:70-73`                  |
-| P5  | Capture settings collapse from a desktop sidebar to a right-side overlay based on `useDesktopStudioLayout`; the transition point is not aligned with the nav breakpoints.     | `useDesktopStudioLayout.ts`, `StudioApp.styles.ts` |
+| #   | Concern                                                                                                                                                                                                                       | Evidence                                           |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| P1  | ~~The mobile bottom nav only renders on organization routes. On `/studio/create` there is no bottom navigation at all.~~ — resolved: the shell renders one navigation chrome (rail plus bottom bar) on every protected route. | `StudioHeader.tsx`                                 |
+| P2  | The Project workspace tablist is four horizontal tabs; at small widths with large text they compete with the media stage in the same viewport.                                                                                | `ProjectRouteSurface.tsx:870-888`                  |
+| P3  | The account menu becomes a 2.75 rem icon with the label hidden below 48 rem (`AccountMenu.tsx:126-129`), leaving logout behind an unlabelled avatar.                                                                          | `AccountMenu.tsx:126-129`                          |
+| P4  | Asset library overlays are `placement="fullscreen"`, which is correct on mobile but means the hub's context is entirely lost with no breadcrumb (M5, M12).                                                                    | `StudioLibraryOverlays.tsx:70-73`                  |
+| P5  | Capture settings collapse from a desktop sidebar to a right-side overlay based on `useDesktopStudioLayout`; the transition point is not aligned with the nav breakpoints.                                                     | `useDesktopStudioLayout.ts`, `StudioApp.styles.ts` |
 
 ## 10. Technical risks affecting user flows
 

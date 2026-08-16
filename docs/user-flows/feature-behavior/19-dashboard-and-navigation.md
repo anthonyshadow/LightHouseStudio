@@ -21,7 +21,8 @@ resources, and browse reusable Assets without activating media or a provider.
    overview routes hide the single persistent `MediaStage`; the Project workspace keeps that same
    stage visible inside the organization shell. Navigation never creates a second stage, media
    owner, overlay system, or global store.
-5. Desktop and tablet organization routes, including Project workspaces, use a persistent left rail
+5. Every protected route at `48rem` and above — including Project workspaces and focused Create —
+   uses the same persistent left rail
    for Dashboard, Projects, Campaigns, and Assets. **Quick Create** retains New Video, New Project,
    New Campaign, and gated Live AI, and adds **Create Asset**. The shared chooser offers Video,
    Character, Outfit, and **Add Voice** only. Project context is propagated when creation starts
@@ -29,10 +30,10 @@ resources, and browse reusable Assets without activating media or a provider.
 6. `/assets` launches the current Videos, Characters, Outfits, and Voices libraries. It does not
    invent a new cross-type gallery, and Recipe is absent from routes, cards, menus, counts,
    dialogs, filters, accessibility labels, and Quick Create.
-7. The four-item mobile organization navigation mirrors Dashboard, Projects, Campaigns, and
-   Assets with safe-area padding. Quick Create stays in the header. Project workspaces retain this
-   shared mobile shell with Projects active; focused Create remains standalone without the bottom
-   bar.
+7. The four-item mobile navigation mirrors Dashboard, Projects, Campaigns, and
+   Assets with safe-area padding. Quick Create stays in the header. Project workspaces and focused
+   Create retain this shared mobile shell, and each surface reserves bottom padding so the fixed bar
+   never covers its content.
 8. Dashboard, library listing, Project membership listing, pickers, and preview metadata start no
    paid provider work. Camera, microphone, byte fetching, and provider submissions remain explicit.
 9. Dashboard lists the signed-in owner's queued and active Character Swap and Virtual Try-On jobs.

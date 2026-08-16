@@ -6,75 +6,52 @@ export const pageStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   minHeight: 0,
   overflow: 'hidden',
-  padding: `max(clamp(${theme.space.sm}, 1.5vw, ${theme.space.lg}), env(safe-area-inset-top)) max(clamp(${theme.space.sm}, 1.5vw, ${theme.space.lg}), env(safe-area-inset-right)) max(clamp(${theme.space.sm}, 1.5vw, ${theme.space.lg}), env(safe-area-inset-bottom)) max(clamp(${theme.space.sm}, 1.5vw, ${theme.space.lg}), env(safe-area-inset-left))`,
+  padding: 0,
+  background: theme.colors.canvas,
   '@supports (height: 100svh)': { height: '100svh' },
   '@supports (height: 100dvh)': { height: '100dvh' },
-  '@media (max-width: 39.99rem), (max-height: 48rem)': {
-    padding: `max(${theme.space.xs}, env(safe-area-inset-top)) max(${theme.space.xs}, env(safe-area-inset-right)) max(${theme.space.xs}, env(safe-area-inset-bottom)) max(${theme.space.xs}, env(safe-area-inset-left))`,
-  },
-  '&[data-organization-route="true"]': {
-    padding: 0,
-    background: theme.colors.canvas,
-  },
 });
 
-export const shellStyles = (theme: Theme, organizationRouteActive = false): CSSObject => ({
-  width: 'min(100%, 108rem)',
+/**
+ * One navigation chrome for every protected surface: a left rail from 48rem up, a compact top bar
+ * plus the fixed bottom navigation below it. Studio, Dashboard, Projects, Campaigns and Assets all
+ * render inside this same shell, so the layout never depends on which surface is active.
+ */
+export const shellStyles = (): CSSObject => ({
+  width: '100%',
   height: '100%',
-  marginInline: 'auto',
   display: 'grid',
-  gridTemplateRows: '4rem minmax(0, 1fr)',
-  gap: theme.space.sm,
+  gridTemplateColumns: '11.5rem minmax(0, 1fr)',
+  gridTemplateRows: 'minmax(0, 1fr)',
+  gap: 0,
   minWidth: 0,
   minHeight: 0,
   overflow: 'hidden',
-  ...(organizationRouteActive
-    ? {
-        width: '100%',
-        maxWidth: 'none',
-        marginInline: 0,
-        gridTemplateColumns: '11.5rem minmax(0, 1fr)',
-        gridTemplateRows: 'minmax(0, 1fr)',
-        gap: 0,
-        '@media (min-width: 64rem)': {
-          gridTemplateColumns: '13.5rem minmax(0, 1fr)',
-        },
-        '@media (min-width: 80rem)': {
-          gridTemplateColumns: '15.5rem minmax(0, 1fr)',
-        },
-        '@media (max-width: 47.99rem)': {
-          gridTemplateColumns: 'minmax(0, 1fr)',
-          gridTemplateRows: '3.5rem minmax(0, 1fr)',
-        },
-      }
-    : {
-        '@media (max-width: 80rem), (max-height: 48rem)': {
-          gridTemplateRows: '3.5rem minmax(0, 1fr)',
-          gap: theme.space.xs,
-        },
-        '@media (max-width: 39.99rem)': {
-          gridTemplateRows: '3.25rem minmax(0, 1fr)',
-        },
-      }),
+  '@media (min-width: 64rem)': {
+    gridTemplateColumns: '13.5rem minmax(0, 1fr)',
+  },
+  '@media (min-width: 80rem)': {
+    gridTemplateColumns: '15.5rem minmax(0, 1fr)',
+  },
+  '@media (max-width: 47.99rem)': {
+    gridTemplateColumns: 'minmax(0, 1fr)',
+    gridTemplateRows: '3.5rem minmax(0, 1fr)',
+  },
 });
 
-export const headerRegionStyles = (theme: Theme, organizationRouteActive = false): CSSObject => ({
+export const headerRegionStyles = (theme: Theme): CSSObject => ({
   position: 'relative',
   zIndex: theme.layers.stageNotices + 1,
   minWidth: 0,
   minHeight: 0,
   overflow: 'visible',
-  ...(organizationRouteActive
-    ? {
-        background: theme.colors.canvas,
-        '@media (min-width: 48rem)': {
-          borderInlineEnd: `1px solid ${theme.colors.border}`,
-        },
-        '@media (max-width: 47.99rem)': {
-          borderBlockEnd: `1px solid ${theme.colors.border}`,
-        },
-      }
-    : {}),
+  background: theme.colors.canvas,
+  '@media (min-width: 48rem)': {
+    borderInlineEnd: `1px solid ${theme.colors.border}`,
+  },
+  '@media (max-width: 47.99rem)': {
+    borderBlockEnd: `1px solid ${theme.colors.border}`,
+  },
 });
 
 export const skipLinkStyles = (theme: Theme): CSSObject => ({
@@ -91,36 +68,30 @@ export const skipLinkStyles = (theme: Theme): CSSObject => ({
   '&:focus': { transform: 'translateY(0)' },
 });
 
-export const headerStyles = (theme: Theme, organizationRouteActive = false): CSSObject => ({
+export const headerStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
   height: '100%',
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: theme.space.md,
   minWidth: 0,
-  ...(organizationRouteActive
-    ? {
-        '@media (min-width: 48rem)': {
-          display: 'grid',
-          gridTemplateRows: 'auto auto auto minmax(0, 1fr) auto',
-          alignItems: 'stretch',
-          justifyContent: 'initial',
-          gap: 0,
-          padding: theme.space.lg,
-        },
-        '@media (min-width: 64rem)': { padding: theme.space.xl },
-        '@media (max-width: 47.99rem)': {
-          paddingInline: `max(${theme.space.md}, env(safe-area-inset-left)) max(${theme.space.md}, env(safe-area-inset-right))`,
-          gap: theme.space.xs,
-        },
-        '@media (max-width: 22rem)': { paddingInline: theme.space.md },
-      }
-    : {
-        '@media (max-width: 45rem), (max-height: 48rem)': { gap: theme.space.xs },
-      }),
+  '@media (min-width: 48rem)': {
+    display: 'grid',
+    gridTemplateRows: 'auto auto auto minmax(0, 1fr) auto',
+    alignItems: 'stretch',
+    justifyContent: 'initial',
+    gap: 0,
+    padding: theme.space.lg,
+  },
+  '@media (min-width: 64rem)': { padding: theme.space.xl },
+  '@media (max-width: 47.99rem)': {
+    paddingInline: `max(${theme.space.md}, env(safe-area-inset-left)) max(${theme.space.md}, env(safe-area-inset-right))`,
+    gap: theme.space.xs,
+  },
+  '@media (max-width: 22rem)': { paddingInline: theme.space.md },
 });
 
-export const headerActionsStyles = (theme: Theme, organizationRouteActive = false): CSSObject => ({
+export const headerActionsStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'flex-end',
@@ -131,36 +102,29 @@ export const headerActionsStyles = (theme: Theme, organizationRouteActive = fals
     alignItems: 'center',
     gap: theme.space.sm,
   },
-  ...(organizationRouteActive
-    ? {
-        '@media (min-width: 48rem)': {
-          display: 'contents',
-          '& [data-create-action]': {
-            gridRow: 2,
-            display: 'block',
-            marginBlockEnd: '1.75rem',
-          },
-          '& [data-utility-actions]': {
-            gridRow: 5,
-            display: 'grid',
-            alignItems: 'stretch',
-            gap: theme.space.sm,
-            paddingBlockStart: theme.space.md,
-            borderBlockStart: `1px solid ${theme.colors.border}`,
-          },
-        },
-        '@media (max-width: 47.99rem)': {
-          gap: theme.space.xs,
-          '& [data-create-action], & [data-utility-actions]': { gap: theme.space.xs },
-        },
-      }
-    : { '@media (max-width: 39.99rem)': { gap: theme.space.xs } }),
+  '@media (min-width: 48rem)': {
+    display: 'contents',
+    '& [data-create-action]': {
+      gridRow: 2,
+      display: 'block',
+      marginBlockEnd: '1.75rem',
+    },
+    '& [data-utility-actions]': {
+      gridRow: 5,
+      display: 'grid',
+      alignItems: 'stretch',
+      gap: theme.space.sm,
+      paddingBlockStart: theme.space.md,
+      borderBlockStart: `1px solid ${theme.colors.border}`,
+    },
+  },
+  '@media (max-width: 47.99rem)': {
+    gap: theme.space.xs,
+    '& [data-create-action], & [data-utility-actions]': { gap: theme.space.xs },
+  },
 });
 
-export const primaryNavigationStyles = (
-  theme: Theme,
-  organizationRouteActive = false,
-): CSSObject => ({
+export const primaryNavigationStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
   flex: '0 0 auto',
   alignItems: 'center',
@@ -182,64 +146,55 @@ export const primaryNavigationStyles = (
     background: theme.colors.accent,
   },
   '& [data-nav-icon]': { display: 'none' },
-  ...(organizationRouteActive
-    ? {
-        '@media (min-width: 48rem)': {
-          gridRow: 3,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'stretch',
-          gap: 0,
-          padding: 0,
-          border: 0,
-          borderRadius: 0,
-          background: 'transparent',
-          '& > button': {
-            position: 'relative',
-            width: '100%',
-            minHeight: '2.75rem',
-            justifyContent: 'flex-start',
-            gap: theme.space.sm,
-            padding: `${theme.space.xs} 0`,
-            borderRadius: theme.radii.small,
-            color: theme.colors.textMuted,
-            background: 'transparent',
-            fontSize: theme.fontSizes.body,
-            whiteSpace: 'normal',
-          },
-          '& > button[aria-current="page"]': {
-            color: theme.colors.text,
-            background: 'transparent',
-          },
-          '& > button[aria-current="page"]::before': {
-            position: 'absolute',
-            insetBlock: '0.85rem',
-            insetInlineStart: `-${theme.space.md}`,
-            width: '2px',
-            background: theme.colors.accent,
-            content: '""',
-          },
-          '& > button:hover:not(:disabled)': { background: theme.colors.surfaceSoft },
-          '& [data-nav-icon]': {
-            width: '1.1rem',
-            height: '1.1rem',
-            display: 'block',
-            flex: '0 0 auto',
-            color: theme.colors.textFaint,
-          },
-          '& > button[aria-current="page"] [data-nav-icon]': { color: theme.colors.accent },
-        },
-        '@media (max-width: 47.99rem)': { display: 'none' },
-      }
-    : {
-        '@media (max-width: 52rem)': { display: 'none' },
-        '@media (max-height: 36rem)': {
-          '& > button': { paddingInline: theme.space.sm, fontSize: theme.fontSizes.caption },
-        },
-      }),
+  '@media (min-width: 48rem)': {
+    gridRow: 3,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: 0,
+    padding: 0,
+    border: 0,
+    borderRadius: 0,
+    background: 'transparent',
+    '& > button': {
+      position: 'relative',
+      width: '100%',
+      minHeight: '2.75rem',
+      justifyContent: 'flex-start',
+      gap: theme.space.sm,
+      padding: `${theme.space.xs} 0`,
+      borderRadius: theme.radii.small,
+      color: theme.colors.textMuted,
+      background: 'transparent',
+      fontSize: theme.fontSizes.body,
+      whiteSpace: 'normal',
+    },
+    '& > button[aria-current="page"]': {
+      color: theme.colors.text,
+      background: 'transparent',
+    },
+    '& > button[aria-current="page"]::before': {
+      position: 'absolute',
+      insetBlock: '0.85rem',
+      insetInlineStart: `-${theme.space.md}`,
+      width: '2px',
+      background: theme.colors.accent,
+      content: '""',
+    },
+    '& > button:hover:not(:disabled)': { background: theme.colors.surfaceSoft },
+    '& [data-nav-icon]': {
+      width: '1.1rem',
+      height: '1.1rem',
+      display: 'block',
+      flex: '0 0 auto',
+      color: theme.colors.textFaint,
+    },
+    '& > button[aria-current="page"] [data-nav-icon]': { color: theme.colors.accent },
+  },
+  '@media (max-width: 47.99rem)': { display: 'none' },
 });
 
-export const brandStyles = (theme: Theme, organizationRouteActive = false): CSSObject => ({
+export const brandStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   display: 'inline-grid',
   gridTemplateColumns: '2.4rem minmax(0, 1fr)',
@@ -272,37 +227,27 @@ export const brandStyles = (theme: Theme, organizationRouteActive = false): CSSO
   },
   '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '2px' },
   '&:hover': { background: theme.colors.surfaceSoft },
-  ...(organizationRouteActive
-    ? {
-        '@media (min-width: 48rem)': {
-          gridRow: 1,
-          gridTemplateColumns: '2rem minmax(0, 1fr)',
-          alignSelf: 'start',
-          padding: 0,
-          marginBlockEnd: theme.space.xl,
-          '& img': { width: '2rem', height: '2rem' },
-          '& strong': { fontSize: theme.fontSizes.section },
-          '& span': { fontSize: '0.62rem' },
-        },
-        '@media (min-width: 48rem) and (max-width: 63.99rem)': {
-          gridTemplateColumns: '2rem',
-          '& > div': { display: 'none' },
-        },
-        '@media (max-width: 47.99rem)': {
-          gridTemplateColumns: '2rem minmax(0, 1fr)',
-          padding: 0,
-          '& img': { width: '2rem', height: '2rem' },
-          '& span': { display: 'none' },
-          '& strong': { fontSize: theme.fontSizes.label },
-        },
-      }
-    : {
-        '@media (max-width: 39.99rem), (max-height: 36rem)': {
-          gridTemplateColumns: '2.1rem',
-          '& img': { width: '2.1rem', height: '2.1rem' },
-          '& > div': { display: 'none' },
-        },
-      }),
+  '@media (min-width: 48rem)': {
+    gridRow: 1,
+    gridTemplateColumns: '2rem minmax(0, 1fr)',
+    alignSelf: 'start',
+    padding: 0,
+    marginBlockEnd: theme.space.xl,
+    '& img': { width: '2rem', height: '2rem' },
+    '& strong': { fontSize: theme.fontSizes.section },
+    '& span': { fontSize: '0.62rem' },
+  },
+  '@media (min-width: 48rem) and (max-width: 63.99rem)': {
+    gridTemplateColumns: '2rem',
+    '& > div': { display: 'none' },
+  },
+  '@media (max-width: 47.99rem)': {
+    gridTemplateColumns: '2rem minmax(0, 1fr)',
+    padding: 0,
+    '& img': { width: '2rem', height: '2rem' },
+    '& span': { display: 'none' },
+    '& strong': { fontSize: theme.fontSizes.label },
+  },
 });
 
 export const mobileNavigationStyles = (theme: Theme): CSSObject => ({
@@ -336,7 +281,7 @@ export const mobileNavigationStyles = (theme: Theme): CSSObject => ({
   },
 });
 
-export const createMenuStyles = (theme: Theme, railPresentation = false): CSSObject => ({
+export const createMenuStyles = (theme: Theme): CSSObject => ({
   position: 'relative',
   flex: '0 0 auto',
   '& [data-create-menu]': {
@@ -360,52 +305,37 @@ export const createMenuStyles = (theme: Theme, railPresentation = false): CSSObj
     color: theme.colors.textMuted,
     lineHeight: 1.4,
   },
-  ...(railPresentation
-    ? {
-        width: '100%',
-        '@media (min-width: 48rem)': {
-          '& > button': {
-            width: '100%',
-            minHeight: '2.75rem',
-            justifyContent: 'center',
-            paddingInline: theme.space.xs,
-            borderRadius: theme.radii.small,
-            boxShadow: 'none',
-            whiteSpace: 'nowrap',
-          },
-          '& [data-create-menu]': {
-            insetBlockStart: 0,
-            insetInlineStart: `calc(100% + ${theme.space.sm})`,
-            insetInlineEnd: 'auto',
-          },
-        },
-        '@media (max-width: 47.99rem)': {
-          width: 'auto',
-          '& > button': { minWidth: '2.75rem', paddingInline: theme.space.sm },
-          '& [data-create-label-long]': { display: 'none' },
-          '& [data-create-menu]': {
-            position: 'fixed',
-            insetBlockStart: '4rem',
-            insetInline: theme.space.xs,
-            width: 'auto',
-          },
-        },
-      }
-    : {
-        '@media (max-width: 39.99rem)': {
-          '& > button': { minWidth: '2.75rem', paddingInline: theme.space.sm },
-          '& [data-create-label-long]': { display: 'none' },
-          '& [data-create-menu]': {
-            position: 'fixed',
-            insetBlockStart: '4rem',
-            insetInline: theme.space.xs,
-            width: 'auto',
-          },
-        },
-      }),
+  width: '100%',
+  '@media (min-width: 48rem)': {
+    '& > button': {
+      width: '100%',
+      minHeight: '2.75rem',
+      justifyContent: 'center',
+      paddingInline: theme.space.xs,
+      borderRadius: theme.radii.small,
+      boxShadow: 'none',
+      whiteSpace: 'nowrap',
+    },
+    '& [data-create-menu]': {
+      insetBlockStart: 0,
+      insetInlineStart: `calc(100% + ${theme.space.sm})`,
+      insetInlineEnd: 'auto',
+    },
+  },
+  '@media (max-width: 47.99rem)': {
+    width: 'auto',
+    '& > button': { minWidth: '2.75rem', paddingInline: theme.space.sm },
+    '& [data-create-label-long]': { display: 'none' },
+    '& [data-create-menu]': {
+      position: 'fixed',
+      insetBlockStart: '4rem',
+      insetInline: theme.space.xs,
+      width: 'auto',
+    },
+  },
 });
 
-export const capabilityStyles = (theme: Theme, railPresentation = false): CSSObject => ({
+export const capabilityStyles = (theme: Theme): CSSObject => ({
   position: 'relative',
   flex: '0 0 auto',
   '& > button': {
@@ -438,48 +368,34 @@ export const capabilityStyles = (theme: Theme, railPresentation = false): CSSObj
     color: theme.colors.text,
     background: theme.colors.surface,
   },
-  ...(railPresentation
-    ? {
-        width: '100%',
-        '@media (min-width: 48rem)': {
-          '& > button': {
-            width: '100%',
-            justifyContent: 'flex-start',
-            padding: theme.space.xxs,
-            borderColor: 'transparent',
-            borderRadius: theme.radii.small,
-            background: 'transparent',
-            color: theme.colors.textFaint,
-            fontSize: '0.68rem',
-            letterSpacing: '0.03em',
-          },
-          '& > button:hover': {
-            borderColor: 'transparent',
-            background: theme.colors.surfaceSoft,
-          },
-        },
-        '@media (max-width: 47.99rem)': {
-          width: 'auto',
-          '& > button': {
-            width: '2.75rem',
-            height: '2.75rem',
-            justifyContent: 'center',
-            padding: 0,
-          },
-          '& [data-system-label]': { display: 'none' },
-        },
-      }
-    : {
-        '@media (max-width: 39.99rem)': {
-          '& > button': {
-            width: '2.75rem',
-            height: '2.75rem',
-            justifyContent: 'center',
-            padding: 0,
-          },
-          '& [data-system-label]': { display: 'none' },
-        },
-      }),
+  width: '100%',
+  '@media (min-width: 48rem)': {
+    '& > button': {
+      width: '100%',
+      justifyContent: 'flex-start',
+      padding: theme.space.xxs,
+      borderColor: 'transparent',
+      borderRadius: theme.radii.small,
+      background: 'transparent',
+      color: theme.colors.textFaint,
+      fontSize: '0.68rem',
+      letterSpacing: '0.03em',
+    },
+    '& > button:hover': {
+      borderColor: 'transparent',
+      background: theme.colors.surfaceSoft,
+    },
+  },
+  '@media (max-width: 47.99rem)': {
+    width: 'auto',
+    '& > button': {
+      width: '2.75rem',
+      height: '2.75rem',
+      justifyContent: 'center',
+      padding: 0,
+    },
+    '& [data-system-label]': { display: 'none' },
+  },
 });
 
 export const systemStatusDotStyles = (
@@ -505,7 +421,7 @@ export const systemStatusDotStyles = (
   }`,
 });
 
-export const capabilityDetailStyles = (theme: Theme, railPresentation = false): CSSObject => ({
+export const capabilityDetailStyles = (theme: Theme): CSSObject => ({
   position: 'absolute',
   zIndex: theme.layers.stageNotices,
   insetBlockStart: 'calc(100% + 0.45rem)',
@@ -542,34 +458,22 @@ export const capabilityDetailStyles = (theme: Theme, railPresentation = false): 
     fontSize: theme.fontSizes.caption,
     lineHeight: 1.45,
   },
-  ...(railPresentation
-    ? {
-        '@media (min-width: 48rem)': {
-          insetBlockStart: 'auto',
-          insetBlockEnd: 0,
-          insetInlineStart: `calc(100% + ${theme.space.sm})`,
-          insetInlineEnd: 'auto',
-        },
-        '@media (max-width: 47.99rem)': {
-          position: 'fixed',
-          insetInline: theme.space.xs,
-          insetBlockStart: '4rem',
-          width: 'auto',
-        },
-      }
-    : {
-        '@media (max-width: 39.99rem)': {
-          position: 'fixed',
-          insetInline: theme.space.xs,
-          insetBlockStart: '4rem',
-          width: 'auto',
-        },
-      }),
+  '@media (min-width: 48rem)': {
+    insetBlockStart: 'auto',
+    insetBlockEnd: 0,
+    insetInlineStart: `calc(100% + ${theme.space.sm})`,
+    insetInlineEnd: 'auto',
+  },
+  '@media (max-width: 47.99rem)': {
+    position: 'fixed',
+    insetInline: theme.space.xs,
+    insetBlockStart: '4rem',
+    width: 'auto',
+  },
 });
 
 export const mainGridStyles = (
   projectContextActive = false,
-  organizationRouteActive = false,
   dashboardRouteActive = false,
 ): CSSObject => ({
   display: 'grid',
@@ -582,17 +486,14 @@ export const mainGridStyles = (
   minWidth: 0,
   minHeight: 0,
   overflow: 'hidden',
-  ...(organizationRouteActive && !dashboardRouteActive && !projectContextActive
+  outline: 'none',
+  ...(!dashboardRouteActive && !projectContextActive
     ? { padding: 'clamp(0.75rem, 2vw, 1.5rem)' }
     : {}),
-  ...(organizationRouteActive
-    ? {
-        outline: 'none',
-        '@media (max-width: 47.99rem)': {
-          paddingBlockEnd: `max(4.5rem, calc(env(safe-area-inset-bottom) + 4.5rem))`,
-        },
-      }
-    : {}),
+  /** Clears the fixed bottom navigation the shell renders below 48rem. */
+  '@media (max-width: 47.99rem)': {
+    paddingBlockEnd: `max(4.5rem, calc(env(safe-area-inset-bottom) + 4.5rem))`,
+  },
   ...(projectContextActive
     ? {
         '@media (max-width: 63.99rem)': {

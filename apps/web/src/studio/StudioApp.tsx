@@ -658,15 +658,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     !activeProjectSourceActivity.busy;
 
   return (
-    <div
-      css={pageStyles(theme)}
-      data-organization-route={organizationRouteActive ? 'true' : undefined}
-    >
+    <div css={pageStyles(theme)}>
       <a href="#studio-main" css={skipLinkStyles(theme)}>
         Skip to studio
       </a>
-      <div css={shellStyles(theme, organizationRouteActive)}>
-        <div css={headerRegionStyles(theme, organizationRouteActive)}>
+      <div css={shellStyles()}>
+        <div css={headerRegionStyles(theme)}>
           <StudioHeader
             availability={availability}
             browser={browser}
@@ -684,7 +681,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                       ? 'assets'
                       : 'studio'
             }
-            organizationRouteActive={organizationRouteActive}
             onOpenDashboard={nav.openDashboard}
             onOpenStudio={nav.openStudio}
             onOpenProjects={nav.openProjects}
