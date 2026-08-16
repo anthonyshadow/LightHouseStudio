@@ -574,21 +574,22 @@ export const mainGridStyles = (
 ): CSSObject => ({
   display: 'grid',
   gridTemplateColumns: projectContextActive
-    ? 'minmax(0, 1.45fr) minmax(20rem, 0.7fr)'
+    ? 'minmax(0, 1.45fr) minmax(20rem, 25rem)'
     : 'minmax(0, 1fr)',
-  gap: projectContextActive ? 'clamp(0.5rem, 1.2vw, 1rem)' : 0,
+  gridTemplateRows: projectContextActive ? '3rem minmax(0, 1fr)' : 'minmax(0, 1fr)',
+  gap: 0,
   alignItems: 'stretch',
   minWidth: 0,
   minHeight: 0,
   overflow: 'hidden',
-  ...(organizationRouteActive && !dashboardRouteActive
+  ...(organizationRouteActive && !dashboardRouteActive && !projectContextActive
     ? { padding: 'clamp(0.75rem, 2vw, 1.5rem)' }
     : {}),
   ...(organizationRouteActive
     ? {
         outline: 'none',
         '@media (max-width: 47.99rem)': {
-          paddingBlockEnd: `max(4rem, calc(env(safe-area-inset-bottom) + 4rem))`,
+          paddingBlockEnd: `max(4.5rem, calc(env(safe-area-inset-bottom) + 4.5rem))`,
         },
       }
     : {}),
@@ -596,10 +597,12 @@ export const mainGridStyles = (
     ? {
         '@media (max-width: 63.99rem)': {
           gridTemplateColumns: 'minmax(0, 1fr)',
-          gridTemplateRows: 'minmax(12rem, 45%) minmax(0, 1fr)',
-        },
-        '@media (max-width: 39.99rem)': {
-          gridTemplateRows: 'minmax(min(10rem, 40vh), 40%) minmax(0, 1fr)',
+          gridTemplateRows: '3rem auto auto',
+          alignContent: 'start',
+          containerType: 'inline-size',
+          overflowX: 'hidden',
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
         },
       }
     : {}),
@@ -651,11 +654,31 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
     gridTemplateRows: 'minmax(8rem, 1fr) 3.15rem minmax(11rem, 38vh)',
   },
   '&[data-project-context="true"]': {
+    gridColumn: 1,
+    gridRow: 2,
     gridTemplateColumns: 'minmax(0, 1fr)',
     gridTemplateRows: 'minmax(0, 1fr) 3.4rem',
     gap: theme.space.sm,
+    padding: `clamp(${theme.space.sm}, 1.4vw, ${theme.space.md})`,
     '& > [data-media-stage-layout]': { gridColumn: 1, gridRow: 1 },
-    '& > [data-studio-tool-rail]': { gridColumn: 1, gridRow: 2 },
+    '& > [data-studio-tool-rail]': {
+      gridColumn: 1,
+      gridRow: 2,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.space.xs,
+      padding: '0.3rem',
+      '& > button': {
+        flex: '1 1 0',
+        width: 'auto',
+        height: '100%',
+        minHeight: '2.75rem',
+        justifyContent: 'center',
+        padding: `${theme.space.xxs} ${theme.space.sm}`,
+        whiteSpace: 'nowrap',
+      },
+      '& > span': { display: 'none' },
+    },
     '&[data-video-edit-active="true"]': {
       gridTemplateRows: 'minmax(8rem, 1fr) 3.15rem minmax(11rem, 38vh)',
     },
@@ -666,10 +689,43 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
       gridTemplateRows: 'minmax(8rem, 1fr) 3.15rem minmax(10.5rem, 42vh)',
     },
   },
+  '@media (max-width: 63.99rem)': {
+    '&[data-project-context="true"]': {
+      alignSelf: 'start',
+      boxSizing: 'border-box',
+      height: 'calc((100cqw - 1.5rem) * 0.5625 + 6.5rem)',
+      gridTemplateRows: 'auto 4.25rem',
+      gap: theme.space.sm,
+      padding: theme.space.sm,
+      overflow: 'visible',
+      '& > [data-media-stage-layout]': {
+        width: '100%',
+        height: 'auto',
+      },
+      '& > [data-media-stage-layout] [data-stage-frame]': {
+        width: '100%',
+        height: 'auto',
+        maxHeight: 'none',
+        aspectRatio: '16 / 9',
+      },
+      '&[data-video-edit-active="true"]': {
+        height: 'calc((100cqw - 1.5rem) * 0.5625 + 6.5rem + max(11rem, 38vh))',
+        gridTemplateRows: 'auto 4.25rem minmax(11rem, 38vh)',
+      },
+    },
+  },
   '@media (max-width: 20rem), (max-height: 36rem)': {
     gridTemplateRows: 'minmax(0, 1fr) 3rem 2.75rem',
     '&[data-video-edit-active="true"]': {
       gridTemplateRows: 'minmax(7rem, 1fr) 3rem minmax(9.5rem, 43vh)',
+    },
+    '&[data-project-context="true"]': {
+      height: 'calc((100cqw - 1.5rem) * 0.5625 + 6.25rem)',
+      gridTemplateRows: 'auto 4rem',
+      '&[data-video-edit-active="true"]': {
+        height: 'calc((100cqw - 1.5rem) * 0.5625 + 6.25rem + max(9.5rem, 43vh))',
+        gridTemplateRows: 'auto 4rem minmax(9.5rem, 43vh)',
+      },
     },
   },
   '@media (min-width: 64rem)': {

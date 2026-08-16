@@ -61,6 +61,7 @@ type UseExistingVideoWorkflowOptions = {
   ) => RecordingArtifact;
   readonly onSubmissionAccepted?: (step: ExistingVideoStep) => void;
   readonly videoProcessingCapabilities?: CapabilitiesResponse['videoProcessing'];
+  readonly standaloneVisualSubmissionBlockedReason?: string;
 };
 
 export const useExistingVideoWorkflow = ({
@@ -69,6 +70,7 @@ export const useExistingVideoWorkflow = ({
   publishUploadedVideo,
   onSubmissionAccepted,
   videoProcessingCapabilities = defaultVideoProcessingCapabilities,
+  standaloneVisualSubmissionBlockedReason,
 }: UseExistingVideoWorkflowOptions) => {
   const queryClient = useQueryClient();
   const [workflowState, dispatchWorkflowState] = useReducer(
@@ -347,6 +349,11 @@ export const useExistingVideoWorkflow = ({
       const source = baseArtifact?.media;
       const step = steps[stepIndex];
       if (!selection || !source || !step || submissionOperationRef.current !== null) return;
+      if (standaloneVisualSubmissionBlockedReason) {
+        setPhase('error');
+        setMessage(standaloneVisualSubmissionBlockedReason);
+        return;
+      }
       const operation = operationForModel(step.modelId);
       const capability = capabilityForExistingVideoStep(step, videoProcessingCapabilities);
       if (!capability.available) {
@@ -521,6 +528,7 @@ export const useExistingVideoWorkflow = ({
       setMessage,
       setPhase,
       setRetryJob,
+      standaloneVisualSubmissionBlockedReason,
       steps,
       updateSubmissionOperation,
       videoProcessingCapabilities,

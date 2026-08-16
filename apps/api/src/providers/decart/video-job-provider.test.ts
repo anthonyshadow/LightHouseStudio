@@ -52,7 +52,14 @@ describe('DecartHttpVideoJobProvider', () => {
     expect(form.get('resolution')).toBe('720p');
     expect(form.get('enhance_prompt')).toBe('false');
     expect((form.get('data') as File).name).toBe('input.mov');
-    expect((form.get('reference_image') as File).name).toBe('reference.webp');
+    expect([...form.keys()]).toEqual([
+      'data',
+      'prompt',
+      'resolution',
+      'enhance_prompt',
+      'reference_image.0',
+    ]);
+    expect((form.get('reference_image.0') as File).name).toBe('reference.webp');
   });
 
   it('does not retry an initial billable submission', async () => {

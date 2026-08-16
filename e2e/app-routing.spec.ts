@@ -22,6 +22,14 @@ const loginFromEntry = async (page: Page): Promise<void> => {
   await dialog.getByRole('button', { name: 'Log in' }).click();
 };
 
+const openProjectTask = async (
+  page: Page,
+  task: 'Source' | 'Create' | 'Save' | 'History',
+): Promise<void> => {
+  await page.getByRole('tab', { name: task, exact: true }).click();
+  await expect(page.getByRole('tabpanel', { name: task, exact: true })).toBeVisible();
+};
+
 const SEEDED_PROJECT_CREATIVE_STORE = {
   schemaVersion: 7,
   savedPrompts: [],
@@ -303,6 +311,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
     mimeType: 'video/mp4',
     buffer: fixture,
   });
+  await openProjectTask(page, 'Save');
   await expect(page.getByRole('heading', { name: 'Review and save output' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Save as New Video' }).click();
@@ -325,12 +334,14 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
 
   const pendingOperationId = projects.outputOperationKeys[1];
   await page.reload();
+  await openProjectTask(page, 'Save');
   await expect(page.getByText('Added Version 2 to “Launch master”.')).toBeVisible();
   await expect(page.getByText('Completed', { exact: true })).toBeVisible();
   expect(projects.outputOperationKeys).toHaveLength(3);
   expect(projects.outputOperationKeys[2]).toBe(pendingOperationId);
   expect(projects.outputRequests[2]).toEqual(projects.outputRequests[1]);
 
+  await openProjectTask(page, 'History');
   const versionHistory = page.getByRole('list', { name: 'Saved video Version history' });
   const olderVersion = versionHistory.getByRole('listitem').filter({ hasText: 'Version 1' });
   await expect(
@@ -356,6 +367,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   expect(projects.reuseOperationKeys).toHaveLength(1);
   await page.keyboard.press('Escape');
 
+  await openProjectTask(page, 'Save');
   await page.getByRole('button', { name: 'Add Version' }).click();
   await expect(page.getByRole('dialog', { name: 'Choose Add Version target' })).toBeVisible();
   await page.keyboard.press('Escape');
@@ -376,6 +388,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   await expect(gallery.getByRole('heading', { name: 'Launch master' })).toHaveCount(0);
 
   await page.goto(`/projects/${TEST_PROJECT_ID}/workspace`);
+  await openProjectTask(page, 'History');
   const retainedHistory = page.getByRole('list', { name: 'Saved video Version history' });
   const retainedOlderVersion = retainedHistory
     .getByRole('listitem')
@@ -417,6 +430,7 @@ test('an accepted Project operation reconnects after refresh and presents its re
     .filter({ hasText: 'Project Field Host' })
     .getByRole('button', { name: 'Use in Studio' })
     .click();
+  await openProjectTask(page, 'Create');
   await page.getByRole('button', { name: 'Save creative setup' }).click();
   await expect(page.getByText('Creative setup saved as one Project checkpoint.')).toBeVisible();
   await page
@@ -443,6 +457,7 @@ test('an accepted Project operation reconnects after refresh and presents its re
   await page.getByRole('button', { name: 'Continue editing' }).click();
   await page.reload();
 
+  await openProjectTask(page, 'Create');
   await expect(page.getByText('Character Swap accepted / queued', { exact: true })).toBeVisible();
   await expect(page.getByText('Result ready', { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Revision 5', { exact: true })).toBeVisible();
@@ -483,6 +498,7 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
     .getByRole('button', { name: 'Use in Studio' })
     .click();
   await expect(characters).not.toBeVisible();
+  await openProjectTask(page, 'Create');
   const creativeStore = await readCreativeAssetStore(page);
   const selectedCharacter = creativeStore?.savedCharacterPrompts.find(
     (character) => character.id === 'project-field-host',
@@ -525,7 +541,9 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
   expect(projects.checkpointRequests).toHaveLength(2);
 
   await page.reload();
+  await openProjectTask(page, 'Create');
   await expect(page.getByText('Revision 5', { exact: true })).toBeVisible();
+  await openProjectTask(page, 'Source');
   await expect(page.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
   await expect(page.getByLabel('Studio media stage').locator('video')).toHaveAttribute(
     'src',
@@ -626,6 +644,7 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
     .filter({ hasText: 'Project Field Host' })
     .getByRole('button', { name: 'Use in Studio' })
     .click();
+  await openProjectTask(page, 'Create');
   await page.getByRole('button', { name: 'Save creative setup' }).click();
   await expect(page.getByText('Creative setup saved as one Project checkpoint.')).toBeVisible();
   expect(projects.checkpointRequests).toHaveLength(1);
@@ -646,6 +665,7 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   await expect(existingVideo).toBeHidden();
 
   await page.reload();
+  await openProjectTask(page, 'Create');
   await expect(page.getByText('Character Swap accepted / queued', { exact: true })).toBeVisible();
   await expect(page.getByText('Result ready', { exact: true })).toBeVisible({ timeout: 15_000 });
   expect(projects.processingOperationKeys).toHaveLength(1);
@@ -657,9 +677,11 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   await activeProjects.getByRole('button', { name: 'Open' }).click();
   await expect(page.getByRole('heading', { name: 'Untitled Project' })).toBeVisible();
   await page.getByRole('button', { name: 'Continue editing' }).click();
+  await openProjectTask(page, 'Create');
   await expect(page.getByText('Result ready', { exact: true })).toBeVisible();
   expect(projects.processingOperationKeys).toHaveLength(1);
 
+  await openProjectTask(page, 'Save');
   await page.getByRole('button', { name: 'Save as New Video' }).click();
   const createVideo = page.getByRole('dialog', { name: 'Save as New Video' });
   await createVideo.getByLabel('Video title').fill('Campaign master');

@@ -262,6 +262,7 @@ const harness = vi.hoisted(() => {
     latestWorkspace: null as WorkspaceHarnessProps | null,
     latestProjectSurfaceProps: null as ProjectRouteSurfaceProps | null,
     latestHeaderDestination: null as StudioHeaderDestination | null,
+    latestHeaderOrganizationActive: null as boolean | null,
     fetchReferenceImageMetadata: vi.fn(),
     hydrateReferenceImage: vi.fn(),
     getSavedVideo: vi.fn(),
@@ -533,6 +534,7 @@ vi.mock('./useTakeReviewFlow', () => ({
 vi.mock('./StudioHeader', () => ({
   StudioHeader: ({
     activeDestination,
+    organizationRouteActive,
     onOpenDashboard,
     onOpenStudio,
     onOpenProjects,
@@ -541,6 +543,7 @@ vi.mock('./StudioHeader', () => ({
     onLogout,
   }: {
     activeDestination: StudioHeaderDestination;
+    organizationRouteActive: boolean;
     onOpenDashboard: () => void;
     onOpenStudio: () => void;
     onOpenProjects: () => void;
@@ -549,6 +552,7 @@ vi.mock('./StudioHeader', () => ({
     onLogout: () => void;
   }) => {
     harness.latestHeaderDestination = activeDestination;
+    harness.latestHeaderOrganizationActive = organizationRouteActive;
     return (
       <div>
         Studio header
@@ -781,6 +785,7 @@ describe('StudioApp composition lifecycle', () => {
     harness.latestWorkspace = null;
     harness.latestProjectSurfaceProps = null;
     harness.latestHeaderDestination = null;
+    harness.latestHeaderOrganizationActive = null;
     harness.promptCommitted = null;
     harness.recording.original = null;
     harness.recording.presented = null;
@@ -990,6 +995,8 @@ describe('StudioApp composition lifecycle', () => {
     expect(typeof harness.latestProjectSurfaceProps?.onStartRecording).toBe('function');
     expect(typeof harness.latestProjectSurfaceProps?.onSourceActivityChange).toBe('function');
     expect(typeof harness.latestProjectSurfaceProps?.onSessionChange).toBe('function');
+    expect(harness.latestHeaderDestination).toBe('projects');
+    expect(harness.latestHeaderOrganizationActive).toBe(true);
   });
 
   it('flushes the active Project session before logout cleanup', async () => {

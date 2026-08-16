@@ -602,6 +602,11 @@ describe('DrizzleProcessingJobTraceWriter', () => {
       [],
       [],
       [],
+      [
+        { id: trace.jobId, ownerUserId },
+        { id: crypto.randomUUID(), ownerUserId },
+      ],
+      [],
       [],
       [],
       [],
@@ -634,6 +639,35 @@ describe('DrizzleProcessingJobTraceWriter', () => {
       expect.objectContaining({ status: 'queued' }),
       expect.objectContaining({ status: 'failed' }),
     ]);
+    expect(
+      scripted.calls.filter(
+        (call) =>
+          call.operation === 'set' &&
+          (call.arguments[0] as { status?: string } | undefined)?.status === 'retrieving',
+      ),
+    ).toHaveLength(1);
+    expect(scripted.remaining()).toBe(0);
+  });
+
+  it('keeps startup available when another instance wins ready-result recovery', async () => {
+    const ownerActiveConflict = Object.assign(new Error('owner already active'), {
+      code: '23505',
+      constraint: 'processing_jobs_owner_active_unique',
+    });
+    const scripted = scriptedDatabase(
+      [],
+      [],
+      [{ id: assetId, ownerUserId }],
+      [],
+      ownerActiveConflict,
+      [],
+      [],
+      [],
+    );
+
+    await expect(
+      new DrizzleProcessingJobTraceWriter(scripted.db).listResumable(now),
+    ).resolves.toEqual([]);
     expect(scripted.remaining()).toBe(0);
   });
 

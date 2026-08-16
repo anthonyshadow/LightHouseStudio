@@ -3,6 +3,8 @@ import {
   canPromoteProjectProcessingResult,
   canonicalVideoTransformInputGeometry,
   currentProjectProcessingAttempt,
+  projectProcessingAmbiguityIsSuperseded,
+  projectProcessingAttemptBlocksArchive,
   projectProcessingBlocksArchive,
   projectProcessingNeedsAttention,
   projectProcessingPhase,
@@ -166,6 +168,29 @@ describe('single visual policy', () => {
         operationId: 'op-1',
       }),
     ).toBe(false);
+  });
+
+  it('releases only historical ambiguity after a later durable Project attempt exists', () => {
+    const ambiguous = {
+      operationId: 'op-1',
+      status: 'ambiguous' as const,
+      retryOfOperationId: null,
+      createdAt: '2026-08-13T12:00:00.000Z',
+    };
+    const later = {
+      operationId: 'op-2',
+      status: 'failed' as const,
+      retryOfOperationId: null,
+      createdAt: '2026-08-13T12:01:00.000Z',
+    };
+    const attempts = [ambiguous, later];
+
+    expect(projectProcessingAmbiguityIsSuperseded(ambiguous, attempts)).toBe(true);
+    expect(projectProcessingAttemptBlocksArchive(ambiguous, attempts)).toBe(false);
+    expect(projectProcessingAttemptBlocksArchive(ambiguous, [ambiguous])).toBe(true);
+    expect(
+      projectProcessingAttemptBlocksArchive({ ...later, status: 'processing' }, attempts),
+    ).toBe(true);
   });
 
   it('normalizes interrupted attempts with one persistence-neutral restart policy', () => {

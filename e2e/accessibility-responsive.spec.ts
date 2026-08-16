@@ -403,6 +403,7 @@ test('small-mobile Project output review reflows at 200% text with accessible sa
     mimeType: 'video/mp4',
     buffer: fixture,
   });
+  await page.getByRole('tab', { name: 'Save', exact: true }).click();
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '200%';
   });
@@ -426,6 +427,55 @@ test('small-mobile Project output review reflows at 200% text with accessible sa
   await expectNoAxeViolations(page);
   await page.keyboard.press('Escape');
   await expect(createTrigger).toBeFocused();
+  expectNoExternalProviderTraffic(network);
+});
+
+test('Project workspace keeps a 16:9 stage and the shared navigation at responsive widths', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await installProjectHarness(page, true);
+
+  for (const viewport of [
+    { width: 1440, height: 960, mobile: false, stacked: false },
+    { width: 1280, height: 720, mobile: false, stacked: false },
+    { width: 834, height: 1112, mobile: false, stacked: true },
+    { width: 390, height: 844, mobile: true, stacked: true },
+    { width: 320, height: 568, mobile: true, stacked: true },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto(`/projects/${TEST_PROJECT_ID}/workspace`);
+
+    const stageFrame = page.locator('[data-stage-frame]');
+    const inspectorNavigation = page.getByRole('tablist', { name: 'Project tasks' });
+    await expect(stageFrame).toBeVisible();
+    await expect(inspectorNavigation).toBeVisible();
+    const [stageBox, inspectorBox] = await Promise.all([
+      stageFrame.boundingBox(),
+      inspectorNavigation.boundingBox(),
+    ]);
+    expect(stageBox).not.toBeNull();
+    expect(inspectorBox).not.toBeNull();
+    expect(Math.abs(stageBox!.width / stageBox!.height - 16 / 9)).toBeLessThan(0.03);
+    if (viewport.stacked) {
+      expect(inspectorBox!.y).toBeGreaterThan(stageBox!.y + stageBox!.height);
+    } else {
+      expect(inspectorBox!.x).toBeGreaterThan(stageBox!.x + stageBox!.width);
+    }
+
+    if (viewport.mobile) {
+      await expect(page.getByRole('navigation', { name: 'Mobile primary' })).toBeVisible();
+    } else {
+      await expect(page.getByRole('navigation', { name: 'Primary', exact: true })).toBeVisible();
+      await expect(page.getByRole('navigation', { name: 'Mobile primary' })).toBeHidden();
+    }
+    await expect(page.getByRole('button', { name: 'Projects', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expectNoDocumentOverflow(page);
+  }
+
   expectNoExternalProviderTraffic(network);
 });
 

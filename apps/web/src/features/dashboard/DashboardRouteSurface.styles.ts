@@ -115,6 +115,71 @@ export const onboardingStyles = (theme: Theme): CSSObject => ({
   },
 });
 
+export const processingQueueStyles = (theme: Theme): CSSObject => ({
+  display: 'grid',
+  gap: theme.space.md,
+  paddingBlock: theme.space.xl,
+  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  '& > header': {
+    display: 'flex',
+    alignItems: 'start',
+    justifyContent: 'space-between',
+    gap: theme.space.lg,
+  },
+  '& > header h2': {
+    margin: 0,
+    color: theme.colors.text,
+    fontSize: '1rem',
+  },
+  '& > header p, & > p[role="status"], & [data-empty-queue]': {
+    marginBlockStart: theme.space.xxs,
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSizes.metadata,
+    lineHeight: 1.5,
+  },
+  '& > ul': {
+    display: 'grid',
+    margin: 0,
+    padding: 0,
+    borderBlockStart: `1px solid ${theme.colors.border}`,
+    listStyle: 'none',
+  },
+  '& > ul > li': {
+    minWidth: 0,
+    minHeight: '4.5rem',
+    display: 'grid',
+    gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+    alignItems: 'center',
+    gap: theme.space.md,
+    padding: `${theme.space.md} ${theme.space.xs}`,
+    borderBlockEnd: `1px solid ${theme.colors.border}`,
+  },
+  '& [data-job-status]': {
+    padding: `${theme.space.xxs} ${theme.space.sm}`,
+    border: `1px solid ${theme.colors.borderStrong}`,
+    borderRadius: theme.radii.round,
+    color: theme.colors.accent,
+    fontSize: theme.fontSizes.caption,
+    fontWeight: 750,
+  },
+  '& [data-job-details]': { minWidth: 0, display: 'grid', gap: theme.space.xxs },
+  '& [data-job-details] strong': {
+    overflow: 'hidden',
+    color: theme.colors.text,
+    fontSize: theme.fontSizes.body,
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  '& [data-job-details] span': {
+    color: theme.colors.textFaint,
+    fontSize: theme.fontSizes.caption,
+  },
+  '@media (max-width: 36rem)': {
+    '& > ul > li': { gridTemplateColumns: 'auto minmax(0, 1fr)' },
+    '& > ul > li > button': { gridColumn: '1 / -1', justifySelf: 'start' },
+  },
+});
+
 export const sectionEyebrowStyles = (theme: Theme): CSSObject => ({
   margin: `0 0 ${theme.space.xl}`,
   color: theme.colors.textFaint,

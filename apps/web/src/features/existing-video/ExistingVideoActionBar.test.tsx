@@ -40,7 +40,11 @@ const workflow = (providerBacked: boolean) =>
     submitPlan: vi.fn(() => Promise.resolve()),
   }) as unknown as ExistingVideoWorkflow;
 
-const renderBar = (value: ExistingVideoWorkflow, projectProcessing?: ProjectProcessingController) =>
+const renderBar = (
+  value: ExistingVideoWorkflow,
+  projectProcessing?: ProjectProcessingController,
+  onRequestDiscard = vi.fn(),
+) =>
   render(
     <StudioDesignProvider>
       <ExistingVideoActionBar
@@ -60,7 +64,7 @@ const renderBar = (value: ExistingVideoWorkflow, projectProcessing?: ProjectProc
         onFinish={vi.fn()}
         onEditSelected={vi.fn()}
         onStartOver={vi.fn()}
-        onRequestDiscard={vi.fn()}
+        onRequestDiscard={onRequestDiscard}
       />
     </StudioDesignProvider>,
   );
@@ -208,5 +212,24 @@ describe('ExistingVideoActionBar Project gate', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel provider operation' }));
 
     expect(controller.cancel).toHaveBeenCalledOnce();
+  });
+
+  it('can clear the local editor while an earlier unsupported provider operation continues', async () => {
+    const user = userEvent.setup();
+    const onRequestDiscard = vi.fn();
+    const controller = projectController({
+      attempt: processingAttempt({
+        capability: 'virtual-try-on',
+        phase: 'processing',
+        isCurrent: false,
+        cancellation: 'unsupported',
+      }),
+    });
+    renderBar(workflow(true), controller, onRequestDiscard);
+
+    await user.click(screen.getByRole('button', { name: 'Clear local editor' }));
+
+    expect(onRequestDiscard).toHaveBeenCalledOnce();
+    expect(controller.cancel).not.toHaveBeenCalled();
   });
 });

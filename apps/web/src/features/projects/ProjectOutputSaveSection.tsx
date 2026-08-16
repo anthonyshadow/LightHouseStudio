@@ -17,7 +17,7 @@ import {
   storePendingProjectOutput,
   type PendingProjectOutputOperation,
 } from './projectOutputOperationStorage';
-import { ProjectApiConflictError, saveProjectOutput } from './projectsApi';
+import { getProject, ProjectApiConflictError, saveProjectOutput } from './projectsApi';
 import type { ProjectSessionPort } from './useProjectSession';
 import { projectQueryKeys } from './useProjectsController';
 
@@ -121,12 +121,28 @@ export const ProjectOutputSaveSection = ({
         if (finalClientFailure) {
           clearPendingProjectOutput(pending.ownerUserId, pending.projectId);
           setPendingAvailable(false);
-          setPhase(error instanceof ProjectApiConflictError ? 'conflict' : 'error');
-          setMessage(
-            error instanceof ProjectApiConflictError
-              ? error.message
-              : 'The selected Project output could not be saved. Review the current media and target.',
-          );
+          if (error instanceof ProjectApiConflictError) {
+            let refreshed = false;
+            try {
+              const authoritative = await getProject(pending.projectId);
+              session.acceptCurrent(authoritative);
+              queryClient.setQueryData(projectQueryKeys.detail(pending.projectId), authoritative);
+              refreshed = true;
+            } catch {
+              // The conflict is still final for this operation; a later user action can reload.
+            }
+            setPhase('conflict');
+            setMessage(
+              refreshed
+                ? `${error.message} The latest Project state is loaded; review it and save again.`
+                : `${error.message} Reload the Project before saving again.`,
+            );
+          } else {
+            setPhase('error');
+            setMessage(
+              'The selected Project output could not be saved. Review the current media and target.',
+            );
+          }
         } else {
           setPendingAvailable(true);
           setPhase('error');
@@ -162,9 +178,18 @@ export const ProjectOutputSaveSection = ({
       setMessage('Resolve the preserved Project proposal before saving an output.');
       return;
     }
-    const latest = session.getCurrent();
-    const media = latest === null ? null : readyMediaFor(latest);
-    if (latest === null || media === null || latest.project.status === 'processing') {
+    let latest: ProjectCurrentResponse;
+    try {
+      latest = await getProject(current.project.id);
+      session.acceptCurrent(latest);
+      queryClient.setQueryData(projectQueryKeys.detail(latest.project.id), latest);
+    } catch {
+      setPhase('error');
+      setMessage('The latest Project state could not be verified. No output save was started.');
+      return;
+    }
+    const media = readyMediaFor(latest);
+    if (media === null || latest.project.status === 'processing') {
       setPhase('conflict');
       setMessage('The Project no longer has the exact ready media selected for this save.');
       return;

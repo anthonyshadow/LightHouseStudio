@@ -26,7 +26,7 @@ export const projectProcessingTitle = (attempt: ProjectProcessingAttempt): strin
     case 'needs-attention':
       return attempt.ambiguous ? 'Submission needs attention' : `${capability} failed`;
     case 'cancelled':
-      return `${capability} safely canceled`;
+      return `${capability} removed from local queue`;
   }
 };
 
@@ -49,7 +49,7 @@ export const projectProcessingDetail = (attempt: ProjectProcessingAttempt): stri
     case 'needs-attention':
       return attempt.error?.message ?? 'This operation needs an explicit recovery decision.';
     case 'cancelled':
-      return 'The provider verified cancellation for this operation. No unsupported cancellation claim is made.';
+      return 'Local tracking and its queue slot were cleared. The provider may still finish remote work or charge for work it already accepted.';
   }
 };
 

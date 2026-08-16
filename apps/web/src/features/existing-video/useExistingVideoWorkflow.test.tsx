@@ -205,7 +205,7 @@ beforeEach(() => {
   );
 });
 
-const configuredVisualWorkflow = async () => {
+const configuredVisualWorkflow = async (standaloneVisualSubmissionBlockedReason?: string) => {
   const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
   adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
   const recording = recordingController();
@@ -214,6 +214,9 @@ const configuredVisualWorkflow = async () => {
       recording,
       processing: processingController(),
       publishUploadedVideo: vi.fn(),
+      ...(standaloneVisualSubmissionBlockedReason
+        ? { standaloneVisualSubmissionBlockedReason }
+        : {}),
     }),
   );
 
@@ -231,6 +234,18 @@ const configuredVisualWorkflow = async () => {
 };
 
 describe('useExistingVideoWorkflow', () => {
+  it('cannot reach the standalone video-job submitter from Project-backed editing', async () => {
+    const blockedReason =
+      'Project visual processing must start through the recoverable Project command.';
+    const { result } = await configuredVisualWorkflow(blockedReason);
+
+    await act(async () => result.current.submitPlan());
+
+    expect(adapters.submitVideoJob).not.toHaveBeenCalled();
+    expect(result.current.phase).toBe('error');
+    expect(result.current.message).toBe(blockedReason);
+  });
+
   it('uses a saved character reference without its stored prompt', () => {
     const reference = new File(['portrait'], 'portrait.png', { type: 'image/png' });
 

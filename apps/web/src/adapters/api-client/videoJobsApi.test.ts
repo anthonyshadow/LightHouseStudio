@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, vi } from 'vitest';
-import { downloadVideoJobResult, submitVideoJob } from './videoJobsApi';
+import {
+  abandonVideoJob,
+  downloadVideoJobResult,
+  listActiveVideoJobs,
+  submitVideoJob,
+} from './videoJobsApi';
 import { jsonScenario, responseScenario } from '../../test/msw/handlers';
 import { mockApiServer } from '../../test/msw/server';
 
@@ -63,6 +68,47 @@ describe('videoJobsApi', () => {
     await expect(downloadVideoJobResult(jobId, new AbortController().signal)).rejects.toMatchObject(
       { code: 'result_too_large' },
     );
+  });
+
+  it('lists active jobs and explicitly acknowledges local-only abandonment', async () => {
+    const jobId = crypto.randomUUID();
+    mockApiServer.use(
+      jsonScenario('GET', '/api/video-jobs', {
+        body: {
+          jobs: [
+            {
+              jobId,
+              operation: 'virtual-try-on',
+              provider: 'decart',
+              status: 'processing',
+              createdAt: '2026-07-30T12:00:00.000Z',
+              updatedAt: '2026-07-30T12:01:00.000Z',
+              expiresAt: '2026-07-30T13:00:00.000Z',
+              providerCancellationSupported: false,
+            },
+          ],
+        },
+      }),
+      responseScenario('POST', `/api/video-jobs/${jobId}/abandon`, null, { status: 204 }),
+    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    await expect(listActiveVideoJobs()).resolves.toMatchObject({
+      jobs: [{ jobId, status: 'processing', providerCancellationSupported: false }],
+    });
+    await abandonVideoJob(jobId);
+
+    const abandonPath = `/api/video-jobs/${jobId}/abandon`;
+    const abandonRequest = fetchSpy.mock.calls.find(([input]) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+      return url.endsWith(abandonPath);
+    })?.[1];
+    expect(abandonRequest?.method).toBe('POST');
+    expect(new Headers(abandonRequest?.headers).get('x-lightframe-provider-intent')).toBe('video');
+    if (typeof abandonRequest?.body !== 'string') throw new Error('Expected a JSON request body.');
+    expect(JSON.parse(abandonRequest.body) as unknown).toEqual({
+      acknowledgeProviderMayContinue: true,
+    });
   });
 
   it('cancels a chunked result as soon as its streamed bytes exceed the limit', async () => {

@@ -59,6 +59,41 @@ export const projectProcessingBlocksArchive = (
   status: ProjectProcessingAttemptFacts['status'],
 ): boolean => ACTIVE_PROJECT_PROCESSING_STATUSES.has(status) || status === 'ambiguous';
 
+type ProjectProcessingArchiveAttempt = Pick<
+  ProjectProcessingAttemptFacts,
+  'operationId' | 'status' | 'createdAt'
+> & {
+  readonly retryOfOperationId: string | null;
+};
+
+const projectProcessingAttemptIsLater = (
+  candidate: ProjectProcessingArchiveAttempt,
+  attempt: ProjectProcessingArchiveAttempt,
+): boolean =>
+  candidate.createdAt > attempt.createdAt ||
+  (candidate.createdAt === attempt.createdAt && candidate.operationId > attempt.operationId);
+
+export const projectProcessingAmbiguityIsSuperseded = (
+  attempt: ProjectProcessingArchiveAttempt,
+  projectAttempts: readonly ProjectProcessingArchiveAttempt[],
+): boolean =>
+  attempt.status === 'ambiguous' &&
+  // A later durable attempt proves the Project moved on; the older uncertainty stays in history
+  // but must not become an invisible permanent lifecycle lock.
+  projectAttempts.some(
+    (candidate) =>
+      candidate.operationId !== attempt.operationId &&
+      (candidate.retryOfOperationId === attempt.operationId ||
+        projectProcessingAttemptIsLater(candidate, attempt)),
+  );
+
+export const projectProcessingAttemptBlocksArchive = (
+  attempt: ProjectProcessingArchiveAttempt,
+  projectAttempts: readonly ProjectProcessingArchiveAttempt[],
+): boolean =>
+  projectProcessingBlocksArchive(attempt.status) &&
+  !projectProcessingAmbiguityIsSuperseded(attempt, projectAttempts);
+
 export const projectProcessingNeedsAttention = (
   status: ProjectProcessingAttemptFacts['status'],
 ): boolean => FAILED_PROJECT_PROCESSING_STATUSES.has(status);

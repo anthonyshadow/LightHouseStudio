@@ -25,6 +25,7 @@ export const PROJECT_PROCESSING_SAFE_ERROR_CODES = [
   'input_unavailable',
   'intent_changed',
   'provider_unavailable',
+  'provider_billing',
   'provider_rejected',
   'provider_timeout',
   'result_invalid',

@@ -11,8 +11,9 @@ provider work.
 
 1. **Projects** is a primary destination in the authenticated Studio chrome. `/projects`
    lists bounded active and archived summaries; `/projects/:projectId` is its organization
-   overview; `/projects/:projectId/workspace` opens its focused video workspace. All are
-   protected, deep-linkable, and return to the same URL after Login.
+   overview; `/projects/:projectId/workspace` opens its guided video workspace inside the same
+   responsive organization navigation shell. All are protected, deep-linkable, and return to the
+   same URL after Login.
 2. **New Project** asks for a name and optional Campaign. **Quick project** creates `Untitled
 Project` without requiring a Campaign, brief, source, tag, or provider choice. Either path may
    intentionally remain collection-only. The browser supplies one operation key and reuses it
@@ -23,7 +24,9 @@ Project` without requiring a Campaign, brief, source, tag, or provider choice. E
    details.
 4. Open, rename, archive, restore, and deletion use owner-derived API behavior and Project-version
    CAS. Dialogs expose busy/error state, restore useful focus, and announce results. Archive removes
-   a Project from the active list without deleting its history; restore returns it. Explicitly
+   a Project from the active list without deleting its history; restore returns it. Active or newest
+   unresolved provider work blocks archive, while an older ambiguous attempt is superseded by any
+   later durable attempt for that Project and cannot become an invisible permanent archive lock. Explicitly
    deleting one archived Project tombstones only that Project and removes it from visible Project
    and Campaign lists; retained lineage continues protecting referenced media and no physical purge
    is claimed.
@@ -35,11 +38,14 @@ Project` without requiring a Campaign, brief, source, tag, or provider choice. E
    valid. **Continue editing** opens the workspace, where **No source yet** offers **Record**,
    **Upload**, and **Use Saved Video** without a wizard. Upload previews immediately on the stage;
    Record starts local media only after the explicit action and offers a finalized take for
-   acceptance; Use Saved Video selects the current exact active Version.
+   acceptance; Use Saved Video selects the current exact active Version. The inspector groups the
+   existing lifecycle into keyboard-operable **Source**, **Create**, **Save**, and **History** tasks
+   without inventing a new progression or provider action.
 7. `StudioApp` remains the sole authenticated composition root and owns the one mounted media
    stage. Project list, overview, Dashboard, Assets, and Campaign routes hide it; only the Project
-   workspace presents it beside source controls. No route mounts another Studio, player, media
-   session, object-URL owner, shell, or Project store.
+   workspace presents it beside the task inspector on desktop and above it at narrower widths. The
+   stage remains a visible 16:9 frame on tablet and mobile. No route mounts another Studio, player,
+   media session, object-URL owner, shell, or Project store.
 8. Active Project identity and surface are URL-owned. Refreshing an `/assets/*` route
    restores that global Asset view and cannot resurrect the prior Project workspace from mounted
    React state. Leaving a workspace cannot silently abandon recording, finalization, local render,
@@ -104,15 +110,20 @@ Project` without requiring a Campaign, brief, source, tag, or provider choice. E
     unknown acceptance never auto-retries, and current/stale retained results are labeled
     separately. Configuration and local render/adoption still make no provider call. Provider-
     backed Voice and live starts remain gated because their adapters do not meet the durable
-    reconnect contract. Accepted visual work may continue after a Project switch; local rendering
-    or working-media adoption still blocks switching/exit until it completes or returns to a safe
+    reconnect contract. Accepted visual work may continue after a Project switch. An active
+    Project attempt exposes explicit local queue removal, which stops Lightframe tracking and
+    releases admission without claiming provider cancellation or refund; local rendering or
+    working-media adoption still blocks switching/exit until it completes or returns to a safe
     cancellable checkpoint.
 23. A ready Project review exposes **Save as New Video** and, only after separate Saved Video target
     selection and confirmation, **Add Version**. The command flushes the session, checks exact
-    Project/revision/media and append CAS, reuses the already-durable current bytes, creates one
+    freshly reads Project authority, checks exact Project/revision/media and append CAS, reuses the
+    already-durable current bytes, creates one
     immutable Video Version, attributes it to the producing pre-save revision, and appends a
     distinct completed post-save revision with the exact retained output pointer. Reusing a Saved
-    Video Version as source never preselects an Add Version target.
+    Video Version as source never preselects an Add Version target. A final CAS conflict clears the
+    operation and refreshes current Project authority before asking the operator to review and save
+    again.
 24. One pending owner/environment/Project-scoped operation survives browser response loss. Reload
     resubmits only the exact stored request and reconciles the original result; a changed replay
     conflicts without another Version or partial aggregate advancement. Removing the Saved Video
@@ -128,10 +139,13 @@ Project` without requiring a Campaign, brief, source, tag, or provider choice. E
     never promoted automatically. A removed global Saved Video remains reachable only through an
     exact same-owner retaining Project relation with truthful retention copy.
 27. Project overview also exposes a separate non-owning Asset collection for Videos, Characters,
-    Outfits, and Voices. Memberships are newest-first cursor pages, idempotent by
-    Project/kind/resource, and do not become sources, working media, outputs, or retention claims.
-    Archived Projects show the collection read-only. Missing underlying records remain visible as
-    unavailable until explicitly detached.
+    Outfits, and Voices. Memberships are newest-first cursor pages and idempotent by
+    Project/kind/resource. Membership alone does not create a source, working media, output, or
+    retention claim. Archived Projects show the collection read-only. Missing underlying records
+    remain visible as unavailable until explicitly detached. **Open in Workspace** adopts the
+    attached Video's exact current Version before navigating to `/projects/:projectId/workspace`: it
+    becomes the immutable source for an empty Project or current working media for a source-bearing
+    Project without changing that immutable source.
 28. **Add Asset** can attach existing records or launch Project-aware creation. Record/Upload uses
     `/studio/create?intent=...&projectId=...`; only an explicit Save to Assets attempts attachment,
     then returns to Project detail. A successful save plus failed attachment preserves the Video

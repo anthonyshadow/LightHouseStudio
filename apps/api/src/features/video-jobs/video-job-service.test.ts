@@ -9,11 +9,12 @@ import type {
   ProcessingJobAdmissionResult,
   VideoProcessingJobTrace,
 } from '../processing-jobs/file-processing-job-repository.js';
-import type {
-  ExistingVideoJobProvider,
-  ExistingVideoProviderRegistry,
-  VideoJobProviderFailureReason,
-  VideoJobProviderStatus,
+import {
+  type ExistingVideoJobProvider,
+  type ExistingVideoProviderRegistry,
+  type VideoJobProviderFailureReason,
+  type VideoJobProviderStatus,
+  VideoJobProviderError,
 } from '../../providers/video-jobs/video-job-provider.js';
 
 const VIDEO_FIXTURE_BASE64 =
@@ -293,6 +294,63 @@ describe('VideoJobService', () => {
 
     submittingTrace.resolve(undefined);
     await vi.waitFor(() => expect(provider.submissions).toHaveLength(1));
+  });
+
+  it('normalizes fractional inspected durations before writing Project processing traces', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-project-trace-'));
+    const provider = new FakeVideoProvider();
+    const traces: VideoProcessingJobTrace[] = [];
+    const traceWriter = {
+      upsert: vi.fn((trace: VideoProcessingJobTrace) => {
+        traces.push(trace);
+        return Number.isInteger(trace.sourceDurationMs)
+          ? Promise.resolve()
+          : Promise.reject(new Error('Project processing durations must use whole milliseconds.'));
+      }),
+    };
+    const service = createService(provider, root, { traceWriter });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = crypto.randomUUID();
+    const paths = await service.prepareJobDirectory(jobId);
+    await writeFile(paths.inputPath, Buffer.from(VIDEO_FIXTURE_BASE64, 'base64'), {
+      flag: 'wx',
+      mode: 0o600,
+    });
+
+    const started = await service.startPrelinked({
+      jobId,
+      ownerId,
+      requestFingerprint: 'a'.repeat(64),
+      recipe: {
+        operation: 'virtual-try-on',
+        inputKind: 'prompt',
+        prompt: 'Add a tailored navy jacket',
+        enhancePrompt: false,
+        hasReferenceImage: false,
+      },
+      inspectedInput: {
+        mimeType: 'video/mp4',
+        container: 'mp4',
+        videoCodec: 'avc',
+        audioCodec: null,
+        durationMs: 1_000.4,
+        width: 1_280,
+        height: 720,
+        sizeBytes: Buffer.from(VIDEO_FIXTURE_BASE64, 'base64').byteLength,
+        hasAudio: false,
+      },
+      directory: paths.directory,
+      inputPath: paths.inputPath,
+      referencePath: null,
+      referenceMimeType: null,
+    });
+
+    expect(started.status).toBe('submitting');
+    await vi.waitFor(() => expect(provider.submissions).toHaveLength(1));
+    await vi.waitFor(() => expect(traces.map(({ status }) => status)).toContain('queued'));
+    expect(traces.every(({ sourceDurationMs }) => sourceDurationMs === 1_000)).toBe(true);
+    await expect(service.existing(jobId, ownerId)).resolves.toMatchObject({ status: 'queued' });
   });
 
   it.each([
@@ -785,6 +843,31 @@ describe('VideoJobService', () => {
     expect(provider.submissions).toHaveLength(1);
   });
 
+  it('reconciles an abandoned active job before another workflow checks owner admission', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-active-reconcile-'));
+    const provider = new FakeVideoProvider();
+    const service = createService(provider, root);
+    services.push(service);
+    const ownerId = 'owner-active-reconcile';
+    const firstJobId = crypto.randomUUID();
+
+    await startJob(service, firstJobId, ownerId);
+    await waitFor(service, firstJobId, ownerId, 'queued');
+    await expect(service.reconcileActiveJob(ownerId)).resolves.toBe(true);
+
+    provider.nextStatus = 'failed';
+    provider.nextFailureReason = 'rejected';
+    await expect(service.reconcileActiveJob(ownerId)).resolves.toBe(false);
+    await expect(service.existing(firstJobId, ownerId)).resolves.toMatchObject({
+      status: 'failed',
+    });
+
+    provider.nextStatus = 'pending';
+    provider.nextFailureReason = undefined;
+    await startJob(service, crypto.randomUUID(), ownerId);
+    await vi.waitFor(() => expect(provider.submissions).toHaveLength(2));
+  });
+
   it('allows more than four sequential explicit submissions for one owner', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-repeat-'));
     const provider = new FakeVideoProvider();
@@ -957,6 +1040,71 @@ describe('VideoJobService', () => {
     expect(provider.submit).toHaveBeenCalledOnce();
   });
 
+  it('surfaces and logs a normalized billing reason without its upstream status', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-billing-submit-'));
+    const provider = new FakeVideoProvider();
+    provider.submit = vi.fn().mockRejectedValue(new VideoJobProviderError('billing', 402));
+    const service = createService(provider, root);
+    services.push(service);
+    const report = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-billing-submit';
+
+    await startJob(service, jobId, ownerId);
+    const failed = await waitFor(service, jobId, ownerId, 'failed');
+
+    expect(failed.error).toEqual({
+      code: 'provider_billing',
+      message:
+        'Visual processing is blocked by the configured provider account. Resolve its billing or credit balance before retrying.',
+    });
+    expect(report).toHaveBeenCalledWith('[video-jobs] Provider submission failed.', {
+      jobId,
+      provider: 'decart',
+      operation: 'character-swap',
+      reason: 'billing',
+    });
+    expect(JSON.stringify(report.mock.calls)).not.toContain('402');
+    report.mockRestore();
+  });
+
+  it('waits for a terminal Project trace before returning status to reconciliation', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-terminal-trace-'));
+    const provider = new FakeVideoProvider();
+    provider.submit = vi.fn().mockRejectedValue(new VideoJobProviderError('billing', 402));
+    const terminalTraceStarted = deferred<void>();
+    const releaseTerminalTrace = deferred<void>();
+    const service = createService(provider, root, {
+      traceWriter: {
+        upsert: vi.fn(async (trace: VideoProcessingJobTrace) => {
+          if (trace.status !== 'failed') return;
+          terminalTraceStarted.resolve();
+          await releaseTerminalTrace.promise;
+        }),
+      },
+    });
+    services.push(service);
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-terminal-trace';
+
+    await startJob(service, jobId, ownerId);
+    await terminalTraceStarted.promise;
+    let statusSettled = false;
+    const status = service.status(jobId, ownerId).finally(() => {
+      statusSettled = true;
+    });
+    await Promise.resolve();
+
+    expect(statusSettled).toBe(false);
+    releaseTerminalTrace.resolve();
+    await expect(status).resolves.toMatchObject({
+      status: 'failed',
+      error: { code: 'provider_billing' },
+    });
+    warning.mockRestore();
+  });
+
   it('distinguishes a terminal provider generation failure from an HTTP request failure', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-terminal-failure-'));
     const provider = new FakeVideoProvider();
@@ -1115,6 +1263,102 @@ describe('VideoJobService', () => {
 
     expect(await pathExists(paths.directory)).toBe(false);
     expect(await service.existing(jobId, ownerId)).toBeNull();
+  });
+
+  it('lists active owner jobs and abandons one locally without claiming provider cancellation', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-abandon-'));
+    const provider = new FakeVideoProvider();
+    const traceWriter = { upsert: vi.fn().mockResolvedValue(undefined) };
+    const service = createService(provider, root, { traceWriter });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-abandon';
+    const { paths } = await startJob(service, jobId, ownerId);
+    await waitFor(service, jobId, ownerId, 'queued');
+
+    await expect(service.listActiveJobs('different-owner')).resolves.toEqual({ jobs: [] });
+    await expect(service.listActiveJobs(ownerId)).resolves.toMatchObject({
+      jobs: [
+        {
+          jobId,
+          operation: 'character-swap',
+          provider: 'decart',
+          status: 'queued',
+          providerCancellationSupported: false,
+        },
+      ],
+    });
+    await expect(service.abandon(jobId, 'different-owner')).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'not_found',
+    });
+
+    await service.abandon(jobId, ownerId);
+
+    expect(await pathExists(paths.directory)).toBe(false);
+    await expect(service.listActiveJobs(ownerId)).resolves.toEqual({ jobs: [] });
+    expect(traceWriter.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId, ownerUserId: ownerId, status: 'cancelled' }),
+    );
+
+    const nextJobId = crypto.randomUUID();
+    await expect(startJob(service, nextJobId, ownerId)).resolves.toBeDefined();
+  });
+
+  it('makes a raced ready result cancelled before local queue cleanup', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-abandon-ready-'));
+    const provider = new FakeVideoProvider();
+    const traceWriter = { upsert: vi.fn().mockResolvedValue(undefined) };
+    const service = createService(provider, root, { traceWriter });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-abandon-ready';
+    const { paths } = await startJob(service, jobId, ownerId);
+    await makeReady(service, provider, jobId, ownerId);
+
+    await service.abandon(jobId, ownerId);
+
+    expect(await pathExists(paths.directory)).toBe(false);
+    await expect(service.existing(jobId, ownerId)).resolves.toBeNull();
+    expect(traceWriter.upsert).toHaveBeenLastCalledWith(
+      expect.objectContaining({ jobId, ownerUserId: ownerId, status: 'cancelled' }),
+    );
+  });
+
+  it('keeps a locally abandoned job visible and blocking until its cancelled trace is durable', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-abandon-trace-'));
+    const provider = new FakeVideoProvider();
+    let rejectCancellation = true;
+    const traceWriter = {
+      upsert: vi.fn((trace: VideoProcessingJobTrace) =>
+        trace.status === 'cancelled' && rejectCancellation
+          ? Promise.reject(new Error('private persistence detail'))
+          : Promise.resolve(),
+      ),
+    };
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const service = createService(provider, root, { traceWriter });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-abandon-trace';
+    await startJob(service, jobId, ownerId);
+    await waitFor(service, jobId, ownerId, 'queued');
+
+    await expect(service.abandon(jobId, ownerId)).rejects.toThrow('private persistence detail');
+    await expect(service.listActiveJobs(ownerId)).resolves.toMatchObject({
+      jobs: [{ jobId, status: 'queued' }],
+    });
+
+    rejectCancellation = false;
+    await service.abandon(jobId, ownerId);
+
+    await expect(service.listActiveJobs(ownerId)).resolves.toEqual({ jobs: [] });
+    expect(warning).toHaveBeenCalledWith(
+      '[video-jobs] Durable processing trace could not be updated.',
+      { jobId },
+    );
+    expect(JSON.stringify(warning.mock.calls)).not.toContain('private persistence detail');
+    warning.mockRestore();
   });
 
   it('does not let a late provider download resurrect an expired job', async () => {

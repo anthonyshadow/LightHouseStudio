@@ -238,6 +238,10 @@ exhausted.
 
 Expiry and earlier cleanup apply only to Lightframe's in-memory state and private temporary files.
 They do not cancel a provider job and do not establish provider-side deletion.
+The Dashboard's confirmed queue removal/stop-tracking action and the Project workspace's explicit
+queue-removal action apply the same boundary: they mark the app-owned job cancelled, abandon later
+result recovery, clean local temporary files, and release local admission, but the provider may
+continue processing and charging for accepted work.
 
 ## Provider retention
 

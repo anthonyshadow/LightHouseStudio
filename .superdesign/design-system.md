@@ -35,8 +35,10 @@ download.
 
 - Desktop: Lightframe brand/Home, Dashboard, Projects, Campaigns, Assets, one prominent Create
   action, availability, and Account.
-- Mobile organization screens: compact top bar and four-item bottom navigation for Dashboard,
-  Projects, Campaigns, and Assets. Studio replaces that bottom navigation with a context/exit bar.
+- Dashboard, Projects, Campaigns, Assets, and Project workspaces share the organization shell.
+  Desktop and tablet use the existing left navigation rail. Mobile uses the existing compact top
+  bar and four-item bottom navigation for Dashboard, Projects, Campaigns, and Assets. Standalone
+  Create remains the separate context/exit workspace.
 - Every page has one visible page-level `h1`; the brand is a Dashboard link rather than the heading.
 - Use one primary action per screen, consistent overflow menus for secondary actions, actionable
   empty states, section-scoped loading/retry, and explicit save destinations.
@@ -137,6 +139,24 @@ card/button language.
   horizontal overflow; the primary action remains easy to reach and touch targets stay about 44px.
 - Preserve every existing dialog, route, API contract, focus behavior, live announcement, and
   empty/loading/error state. The redesign changes presentation and information hierarchy only.
+
+## Project workspace UX direction
+
+- `/projects/:projectId/workspace` uses the same organization shell as Dashboard, Projects, and
+  Campaigns: the exact existing left navigation rail at widths of 48rem and above, and the exact
+  existing compact mobile header plus four-item bottom navigation below 48rem. Projects remains the
+  active destination. Do not create a second or workspace-specific navigation system.
+- Keep the one persistent media stage mounted and visibly framed at every supported viewport. The
+  video must never collapse to zero height, disappear behind the Project panel, or be obscured by
+  the mobile bottom navigation.
+- At 1440x960 and 1280x720, the video stage remains dominant beside a compact Project workflow
+  inspector. At 834x1112, keep the left rail and stack a 16:9 video stage above the workflow. At
+  390x844 and 320x568, keep the compact top bar and bottom navigation, render a full-width 16:9
+  stage above the workflow, and reserve bottom safe-area space so both video and controls remain
+  reachable without horizontal overflow.
+- Preserve the current source, creative checkpoint, working-media, processing recovery, output
+  save, and bounded history contracts. Responsive presentation may reorder or progressively
+  disclose their views, but it must not duplicate stateful controls or invent actions.
 
 ## Responsive contract
 

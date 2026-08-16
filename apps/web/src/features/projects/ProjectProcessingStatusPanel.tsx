@@ -42,6 +42,22 @@ export const ProjectProcessingStatusPanel = ({
           </p>
         ) : null}
         {message ? <p>{message}</p> : null}
+        {attempt.cancellation === 'available' ? (
+          <div>
+            <p>
+              Removing this operation stops local tracking and clears the queue slot. The provider
+              may still finish remote work or charge for work it already accepted.
+            </p>
+            <Button
+              size="small"
+              variant="danger"
+              busy={phase === 'cancelling'}
+              onClick={() => void controller.cancel()}
+            >
+              Remove from processing queue
+            </Button>
+          </div>
+        ) : null}
         {phase === 'error' ? (
           <Button size="small" onClick={() => void controller.reconcile()}>
             Check same operation

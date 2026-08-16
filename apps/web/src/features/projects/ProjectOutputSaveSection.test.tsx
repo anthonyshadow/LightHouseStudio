@@ -221,6 +221,7 @@ beforeEach(() => {
       },
     } satisfies Storage,
   });
+  mockApiServer.use(http.get(`*/api/projects/${projectId}`, () => HttpResponse.json(current())));
 });
 
 afterEach(() => {
@@ -453,6 +454,7 @@ describe('Project output save UI', () => {
     const port = { ...session(), getCurrent: () => staleCurrent };
     let outputRequests = 0;
     mockApiServer.use(
+      http.get(`*/api/projects/${projectId}`, () => HttpResponse.json(staleCurrent)),
       http.post(`*/api/projects/${projectId}/outputs`, () => {
         outputRequests += 1;
         return HttpResponse.error();
@@ -551,8 +553,9 @@ describe('Project output save UI', () => {
         ),
       ),
     );
+    const acceptCurrent = vi.fn();
     const user = userEvent.setup();
-    renderSection();
+    renderSection(session(acceptCurrent));
 
     await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
     await user.click(
@@ -564,6 +567,10 @@ describe('Project output save UI', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'The Project changed before output save.',
     );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The latest Project state is loaded; review it and save again.',
+    );
+    expect(acceptCurrent).toHaveBeenCalledWith(current());
     expect(
       window.localStorage.getItem(projectOutputOperationStorageKey(ownerUserId, projectId)),
     ).toBeNull();

@@ -2,11 +2,13 @@ import {
   VIDEO_PROVIDER_INTENT_HEADER,
   VIDEO_PROVIDER_INTENT_VALUE,
   VIDEO_RESULT_MAX_BYTES,
+  videoJobQueueResponseSchema,
   videoJobStatusResponseSchema,
+  type VideoJobQueueResponse,
   type VideoJobStatusResponse,
   type VideoTransformRecipe,
 } from '@studio/contracts';
-import { ApiClientError, apiFetch } from './apiClient';
+import { ApiClientError, apiFetch, requestJson } from './apiClient';
 import { readBoundedBlob } from './readBoundedBlob';
 
 const jobUrl = (jobId: string): string => `/api/video-jobs/${encodeURIComponent(jobId)}`;
@@ -90,6 +92,32 @@ export const releaseVideoJob = async (jobId: string, signal?: AbortSignal): Prom
   await apiFetch(jobUrl(jobId), {
     method: 'DELETE',
     headers: intentHeaders,
+    ...(signal ? { signal } : {}),
+  });
+};
+
+export const listActiveVideoJobs = (signal?: AbortSignal): Promise<VideoJobQueueResponse> =>
+  requestJson(
+    '/api/video-jobs',
+    {
+      headers: intentHeaders,
+      cache: 'no-store',
+      ...(signal ? { signal } : {}),
+    },
+    videoJobQueueResponseSchema,
+    () =>
+      new ApiClientError(
+        'The video processing queue response was invalid.',
+        502,
+        'invalid-response',
+      ),
+  );
+
+export const abandonVideoJob = async (jobId: string, signal?: AbortSignal): Promise<void> => {
+  await apiFetch(`${jobUrl(jobId)}/abandon`, {
+    method: 'POST',
+    headers: { ...intentHeaders, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ acknowledgeProviderMayContinue: true }),
     ...(signal ? { signal } : {}),
   });
 };

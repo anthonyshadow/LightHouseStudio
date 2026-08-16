@@ -5,6 +5,7 @@ import type {
   ProjectAssetsResponse,
   ProjectCurrentResponse,
   ProjectSourceResponse,
+  ProjectWorkingMediaResponse,
   SavedVideoSummary,
 } from '@studio/contracts';
 import { createEmptyCreativeAssetStore, type CreativeAssetStore } from '@studio/domain';
@@ -28,6 +29,7 @@ const campaignId = '20ce94fa-15d1-42c6-abd3-77ff61516b48';
 const sourceAssetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
 const savedVideoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
 const videoVersionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
+const workingRevisionId = 'f621e540-6ef7-49fc-a124-c4926015e93a';
 const now = '2026-08-11T16:00:00.000Z';
 
 const savedVideoSummary = (): SavedVideoSummary => ({
@@ -280,6 +282,34 @@ describe('Project route surface', () => {
     expect(screen.queryByRole('video')).not.toBeInTheDocument();
   });
 
+  it('presents the workspace lifecycle as four keyboard-operable guided tasks', async () => {
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(currentProject(activeId))),
+    );
+    const user = userEvent.setup();
+    renderProjects(`/projects/${activeId}/workspace`);
+
+    const tabs = await screen.findByRole('tablist', { name: 'Project tasks' });
+    const sourceTab = within(tabs).getByRole('tab', { name: 'Source' });
+    const createTab = within(tabs).getByRole('tab', { name: 'Create' });
+
+    expect(within(tabs).getAllByRole('tab')).toHaveLength(4);
+    expect(sourceTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel', { name: 'Source' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Project Source' })).toBeVisible();
+
+    await user.click(createTab);
+    expect(createTab).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('tabpanel', { name: 'Create' })).toBeVisible();
+    expect(screen.queryByRole('tabpanel', { name: 'Source' })).not.toBeInTheDocument();
+
+    await user.keyboard('{ArrowRight}');
+    expect(within(tabs).getByRole('tab', { name: 'Save' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+  });
+
   it('shows the assigned Campaign name and returns safely to its detail route', async () => {
     const assigned = currentProject(activeId, { campaignId });
     mockApiServer.use(
@@ -373,7 +403,7 @@ describe('Project route surface', () => {
       'src',
       `/api/videos/${savedVideoId}/thumbnail`,
     );
-    expect(screen.getByRole('button', { name: 'Open in Studio' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Open in Workspace' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Preview' }));
     const dialog = await screen.findByRole('dialog', { name: 'Library source' });
     const previewBody = dialog.querySelector<HTMLElement>('[data-overlay-body-mode="contained"]');
@@ -381,6 +411,7 @@ describe('Project route surface', () => {
     expect(previewBody).toHaveStyle({ overflow: 'hidden' });
     expect(within(dialog).getByRole('group', { name: 'Video controls' })).toBeVisible();
     expect(within(dialog).getByRole('button', { name: 'Play video' })).toBeVisible();
+    expect(within(dialog).getByRole('button', { name: 'Open in Workspace' })).toBeVisible();
     expect(within(dialog).getByRole('slider', { name: 'Video position' })).toBeVisible();
     expect(within(dialog).getByLabelText('Preview of Library source')).toHaveStyle({
       width: '100%',
@@ -405,8 +436,34 @@ describe('Project route surface', () => {
     expect(screen.getByText(/Detaching never deletes an Asset or Project history/u)).toBeVisible();
   });
 
-  it('opens an attached Saved Video directly in Studio with Project return context', async () => {
+  it("opens an attached Video's exact current Version as an empty Project source", async () => {
     const summary = savedVideoSummary();
+    const reference = {
+      kind: 'saved-video-version' as const,
+      savedVideoId,
+      videoVersionId,
+    };
+    const baseSource = acceptedSourceResponse();
+    const reusedSource: ProjectSourceResponse = {
+      ...baseSource,
+      revision: {
+        ...baseSource.revision,
+        snapshot: {
+          ...baseSource.revision.snapshot,
+          workingMedia: reference,
+          presentedMedia: reference,
+        },
+      },
+      source: {
+        ...baseSource.source,
+        kind: 'saved-video-version',
+        savedVideoId,
+        videoVersionId,
+        filename: summary.currentVersion.filename,
+      },
+    };
+    let authority = currentProject(activeId);
+    const present = vi.fn<ProjectSourceRuntime['present']>();
     projectAssetsResponse = {
       assets: [
         {
@@ -421,14 +478,139 @@ describe('Project route surface', () => {
       nextCursor: null,
     };
     mockApiServer.use(
-      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(currentProject(activeId))),
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(authority)),
+      http.post(`*/api/projects/${activeId}/source/reuse`, async ({ request }) => {
+        expect(await request.json()).toEqual({
+          expectedVersion: 1,
+          expectedRevisionNumber: 1,
+          savedVideoId,
+          videoVersionId,
+        });
+        authority = { project: reusedSource.project, revision: reusedSource.revision };
+        return HttpResponse.json(reusedSource, { status: 201 });
+      }),
+      http.get(`*/api/projects/${activeId}/source`, () => HttpResponse.json(reusedSource)),
+      http.get(`*/api/projects/${activeId}/source/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+        }),
+      ),
     );
-    const { router } = renderProjects(`/projects/${activeId}`);
+    const { router } = renderProjects(`/projects/${activeId}`, {
+      sourceRuntime: { present, clear: vi.fn() },
+    });
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Open in Studio' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Open in Workspace' }));
 
-    await waitFor(() => expect(router.state.location.pathname).toBe(`/studio/${savedVideoId}`));
-    expect(router.state.location.state).toEqual({ fromProjectId: activeId });
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`),
+    );
+    await waitFor(() => expect(present).toHaveBeenCalledOnce());
+    expect(screen.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+  });
+
+  it("opens an attached Video's exact current Version as working media without replacing the source", async () => {
+    const summary = savedVideoSummary();
+    const initial = acceptedProject();
+    const reference = {
+      kind: 'saved-video-version' as const,
+      savedVideoId,
+      videoVersionId,
+    };
+    const adopted: ProjectWorkingMediaResponse = {
+      project: {
+        ...initial.project,
+        version: 3,
+        currentRevisionId: workingRevisionId,
+        currentRevisionNumber: 3,
+      },
+      revision: {
+        ...initial.revision,
+        id: workingRevisionId,
+        revisionNumber: 3,
+        parentRevisionId: initial.revision.id,
+        parentRevisionNumber: initial.revision.revisionNumber,
+        snapshot: {
+          ...initial.revision.snapshot,
+          workingMedia: reference,
+          presentedMedia: reference,
+        },
+      },
+      isCurrent: true,
+      media: {
+        kind: 'saved-video-version',
+        reference,
+        assetId: sourceAssetId,
+        savedVideoId,
+        videoVersionId,
+        mimeType: summary.currentVersion.mimeType,
+        filename: summary.currentVersion.filename,
+        sizeBytes: summary.currentVersion.sizeBytes,
+        checksumSha256: 'a'.repeat(64),
+        container: 'mp4',
+        videoCodec: 'avc',
+        audioCodec: null,
+        durationMs: summary.currentVersion.durationMs,
+        width: summary.currentVersion.width,
+        height: summary.currentVersion.height,
+        hasAudio: false,
+        adoptedRevisionId: workingRevisionId,
+        adoptedRevisionNumber: 3,
+        adoptedAt: now,
+        contentUrl: `/api/projects/${activeId}/working-media/${workingRevisionId}/content`,
+      },
+    };
+    const sourceResponse: ProjectSourceResponse = {
+      ...acceptedSourceResponse(),
+      project: adopted.project,
+      revision: adopted.revision,
+    };
+    let authority: ProjectCurrentResponse = initial;
+    const present = vi.fn<ProjectSourceRuntime['present']>();
+    projectAssetsResponse = {
+      assets: [
+        {
+          id: '5de818cc-8d7a-48ae-9981-80101f3ced33',
+          projectId: activeId,
+          kind: 'video',
+          resourceId: savedVideoId,
+          createdAt: now,
+        },
+      ],
+      videoSummaries: [summary],
+      nextCursor: null,
+    };
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(authority)),
+      http.post(`*/api/projects/${activeId}/working-media/reuse`, async ({ request }) => {
+        expect(await request.json()).toEqual({
+          expectedVersion: 2,
+          expectedRevisionNumber: 2,
+          media: reference,
+          localEdit: null,
+        });
+        authority = { project: adopted.project, revision: adopted.revision };
+        return HttpResponse.json(adopted, { status: 201 });
+      }),
+      http.get(`*/api/projects/${activeId}/source`, () => HttpResponse.json(sourceResponse)),
+      http.get(`*/api/projects/${activeId}/working-media`, () => HttpResponse.json(adopted)),
+      http.get(`*/api/projects/${activeId}/working-media/${workingRevisionId}/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+        }),
+      ),
+    );
+    const { router } = renderProjects(`/projects/${activeId}`, {
+      sourceRuntime: { present, clear: vi.fn() },
+    });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Open in Workspace' }));
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`),
+    );
+    await waitFor(() => expect(present).toHaveBeenCalledOnce());
+    expect(screen.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
   });
 
   it('shows retained images and type-specific visuals for attached creative Assets', async () => {

@@ -71,6 +71,7 @@ export const projectAssetFiltersStyles = (theme: Theme): CSSObject => ({
   alignItems: 'end',
   gap: theme.space.xl,
   marginBlockEnd: `clamp(${theme.space.xl}, 4cqi, 2.5rem)`,
+  overflowX: 'auto',
   overscrollBehaviorInline: 'contain',
   borderBlockEnd: `1px solid ${theme.colors.border}`,
   scrollbarWidth: 'thin',

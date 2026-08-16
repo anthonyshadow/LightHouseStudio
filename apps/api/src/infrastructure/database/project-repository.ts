@@ -9,6 +9,8 @@ import {
 } from '@studio/contracts';
 import {
   currentProjectProcessingAttempt,
+  projectProcessingAmbiguityIsSuperseded,
+  projectProcessingAttemptBlocksArchive,
   projectProcessingNeedsAttention,
   projectProcessingRestartTransition,
   type Project,
@@ -20,7 +22,7 @@ import {
   type ProjectRevision,
   type ProjectVersionReferenceLink,
 } from '@studio/domain';
-import { and, desc, eq, inArray, isNull, lt, or, sql, type SQLWrapper } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lt, ne, or, sql, type SQLWrapper } from 'drizzle-orm';
 import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestamps.js';
 import type {
   AdoptProjectWorkingMediaPersistenceInput,
@@ -2360,12 +2362,25 @@ export class DrizzleProjectRepository
     });
   }
 
-  async hasProjectAttemptRetry(
+  async isProjectAttemptSuperseded(
     ownerUserId: string,
     projectId: string,
     operationId: string,
   ): Promise<boolean> {
-    const [row] = await this.db
+    const [attempt] = await this.db
+      .select({ status: processingJobs.status, createdAt: processingJobs.createdAt })
+      .from(projectJobs)
+      .innerJoin(processingJobs, processingJobMatchesProjectLink)
+      .where(
+        and(
+          eq(projectJobs.projectId, projectId),
+          eq(projectJobs.ownerUserId, ownerUserId),
+          eq(processingJobs.id, operationId),
+        ),
+      )
+      .limit(1);
+    if (attempt?.status !== 'ambiguous') return false;
+    const [superseding] = await this.db
       .select({ id: processingJobs.id })
       .from(projectJobs)
       .innerJoin(processingJobs, processingJobMatchesProjectLink)
@@ -2373,11 +2388,19 @@ export class DrizzleProjectRepository
         and(
           eq(projectJobs.projectId, projectId),
           eq(projectJobs.ownerUserId, ownerUserId),
-          eq(processingJobs.retryOfJobId, operationId),
+          ne(processingJobs.id, operationId),
+          or(
+            eq(processingJobs.retryOfJobId, operationId),
+            gt(processingJobs.createdAt, attempt.createdAt),
+            and(
+              eq(processingJobs.createdAt, attempt.createdAt),
+              gt(processingJobs.id, operationId),
+            ),
+          ),
         ),
       )
       .limit(1);
-    return row !== undefined;
+    return superseding !== undefined;
   }
 
   async listProjectAttempts(
@@ -2438,14 +2461,36 @@ export class DrizzleProjectRepository
                 inArray(processingJobs.retryOfJobId, ambiguousOperationIds),
               ),
             );
+    const [latestRow] =
+      ambiguousOperationIds.length === 0
+        ? []
+        : await this.db
+            .select({
+              operationId: processingJobs.id,
+              status: processingJobs.status,
+              retryOfOperationId: processingJobs.retryOfJobId,
+              createdAt: processingJobs.createdAt,
+            })
+            .from(projectJobs)
+            .innerJoin(processingJobs, processingJobMatchesProjectLink)
+            .where(
+              and(eq(projectJobs.projectId, projectId), eq(projectJobs.ownerUserId, ownerUserId)),
+            )
+            .orderBy(desc(processingJobs.createdAt), desc(processingJobs.id))
+            .limit(1);
+    const retriedOperationIds = new Set(
+      retryRows.flatMap(({ operationId }) => (operationId === null ? [] : [operationId])),
+    );
     return {
       attempts: page,
       currentOperationId: currentAttempt?.operationId ?? null,
-      retriedOperationIds: [
-        ...new Set(
-          retryRows.flatMap(({ operationId }) => (operationId === null ? [] : [operationId])),
-        ),
-      ],
+      supersededOperationIds: page.flatMap((attempt) =>
+        retriedOperationIds.has(attempt.operationId) ||
+        (latestRow !== undefined &&
+          projectProcessingAmbiguityIsSuperseded(attempt, [attempt, latestRow]))
+          ? [attempt.operationId]
+          : [],
+      ),
       nextCursor:
         rows.length > input.pageSize && last !== undefined
           ? { createdAt: last.createdAt, operationId: last.operationId }
@@ -2950,6 +2995,7 @@ export class DrizzleProjectRepository
             id: processingJobs.id,
             status: processingJobs.status,
             retryOfJobId: processingJobs.retryOfJobId,
+            createdAt: processingJobs.createdAt,
           })
           .from(projectJobs)
           .innerJoin(
@@ -2966,21 +3012,14 @@ export class DrizzleProjectRepository
             ),
           )
           .for('share');
-        const retryPredecessors = new Set(
-          processing.flatMap(({ retryOfJobId }) => (retryOfJobId === null ? [] : [retryOfJobId])),
-        );
-        const activeJob = processing.find(
-          ({ id, status }) =>
-            [
-              'pending',
-              'validating',
-              'submitting',
-              'accepted',
-              'queued',
-              'processing',
-              'retrieving',
-            ].includes(status) ||
-            (status === 'ambiguous' && !retryPredecessors.has(id)),
+        const attempts = processing.map(({ id, status, retryOfJobId, createdAt }) => ({
+          operationId: id,
+          status,
+          retryOfOperationId: retryOfJobId,
+          createdAt: toIsoTimestamp(createdAt),
+        }));
+        const activeJob = attempts.find((attempt) =>
+          projectProcessingAttemptBlocksArchive(attempt, attempts),
         );
         if (activeJob !== undefined) {
           return {
