@@ -9,37 +9,45 @@ original on failure.
 1. Open **Voice** in the existing-video editor or **Voice treatments** in Latest Take for a source
    with a usable sidecar, browser audio replacement, and a duration no greater than five minutes.
    A confirmed local video edit supplies a newly extracted sidecar from its validated H.264/AAC
-   candidate before this action becomes available.
+   candidate before this action becomes available. **Assets ▸ Voices** is an equal entry point to
+   the same library, reachable without any video loaded.
 2. Select **Saved AI Voice** in the shared Voice workspace. The library replaces the treatment
    detail pane instead of opening a nested dialog. Loading remains lazy: opening Voice treatments
    alone does not contact ElevenLabs.
-3. Use **Saved Voices** to search, filter, page, refresh, preview, and select voices related to the
+3. From **Assets ▸ Voices**, the same library browses, previews, saves and removes voices for the
+   account, and its per-voice action reads **Use in Studio**. Choosing one opens Studio's video
+   upload surface. With a source already loaded the voice applies at once; with an empty Studio it
+   is held and applied as soon as a source is ready, a stage notice names it while it waits, a voice
+   the operator picks inside the workflow always wins, and discarding temporary work drops it. When
+   ElevenLabs is unconfigured the library explains that saving, removing and using a voice are
+   unavailable while browsing and previewing continue.
+4. Use **Saved Voices** to search, filter, page, refresh, preview, and select voices related to the
    authenticated Lightframe user. The first explicit list may claim eligible configured-workspace
    voices into that relationship repository. Use **Browse Voices** to discover catalog voices by text,
    language, gender, age, accent, use case, tone/style, or Trending/Newest/Most used/Most saved.
    Each page contains at most 20 voices and each tab preserves its current criteria and page.
-4. Text search begins after three trimmed characters and waits 300 ms. One or two characters keep
+5. Text search begins after three trimmed characters and waits 300 ms. One or two characters keep
    the last settled page visible with a short hint; clearing applies immediately. Superseded
    requests are cancelled and late results cannot replace current results.
-5. Preview uses one dedicated player and only the provider sample. **Add to Saved** performs an
+6. Preview uses one dedicated player and only the provider sample. **Add to Saved** performs an
    exact fresh eligibility check and becomes **Already saved** after success; duplicate concurrent
    adds coalesce. Browse never shows a custom-rate, separately licensed, or malformed-eligibility
    candidate.
-6. Saved voices expose **Remove from Lightframe** for the authenticated user's relationship.
+7. Saved voices expose **Remove from Lightframe** for the authenticated user's relationship.
    Removal requires confirmation and never calls the provider voice-delete API. A provider
    workspace bookmark may therefore remain available for later re-adding.
-7. Select a saved voice separately from previewing it. The confirmation area states the exact clip
+8. Select a saved voice separately from previewing it. The confirmation area states the exact clip
    duration, configured model, possible credit use, and zero-retention requirement. From Latest
    Take, **Apply treatment** revalidates saved membership and model support before sending only the
    immutable original audio sidecar through the same-origin broker. In the existing-video editor,
    **Use this voice for the edit** only updates the captured plan; conversion waits for the outer
    **Start edit** action.
-8. On success, Studio remuxes the converted audio with local video. Return to treatments or Take
+9. On success, Studio remuxes the converted audio with local video. Return to treatments or Take
    Review to save, release, or discard. Download is available later from Saved Videos.
-9. A character Wardrobe may attach one saved voice as that character's default. Opening this
-   configuration is an explicit lazy library read. Choosing the character in Existing Video
-   preselects the default in the edit plan without uploading or processing media; the creator may
-   replace it or choose original audio before **Start edit**.
+10. A character Wardrobe may attach one saved voice as that character's default. Opening this
+    configuration is an explicit lazy library read. Choosing the character in Existing Video
+    preselects the default in the edit plan without uploading or processing media; the creator may
+    replace it or choose original audio before **Start edit**.
 
 ## Eligibility and provider contract
 

@@ -20,6 +20,10 @@ export type VoiceLibraryProps = {
   disabled: boolean;
   onSelect: (voice: VoiceSummary) => void;
   selectedVoiceId?: string | null;
+  /** Names the per-voice action for the surface hosting the library. Defaults to "Select". */
+  selectLabel?: string;
+  /** Explains a `disabled` library instead of leaving every control inert without a reason. */
+  unavailableReason?: string | null;
 };
 
 const libraryStyles = (): CSSObject => ({
@@ -163,7 +167,13 @@ const SORT_OPTIONS: readonly SelectOption[] = [
   { value: 'cloned_by_count', label: 'Most saved' },
 ];
 
-export const VoiceLibrary = ({ disabled, onSelect, selectedVoiceId }: VoiceLibraryProps) => {
+export const VoiceLibrary = ({
+  disabled,
+  onSelect,
+  selectedVoiceId,
+  selectLabel,
+  unavailableReason,
+}: VoiceLibraryProps) => {
   const theme = useTheme();
   const library = useVoiceLibrary();
   const [removeCandidate, setRemoveCandidate] = useState<WorkspaceVoiceItem | null>(null);
@@ -286,6 +296,11 @@ export const VoiceLibrary = ({ disabled, onSelect, selectedVoiceId }: VoiceLibra
       </VisuallyHidden>
 
       <div css={resultsStyles(theme)}>
+        {disabled && unavailableReason ? (
+          <StatusNotice role="status" tone="warning" title="Voice actions unavailable">
+            {unavailableReason}
+          </StatusNotice>
+        ) : null}
         {library.mutationMessage ? (
           <StatusNotice role="status" aria-live="polite" tone="success">
             {library.mutationMessage}
@@ -335,6 +350,7 @@ export const VoiceLibrary = ({ disabled, onSelect, selectedVoiceId }: VoiceLibra
           selected={selected}
           loading={library.loading}
           disabled={disabled}
+          {...(selectLabel ? { selectLabel } : {})}
           previewVoiceId={preview.item?.voice.voiceId ?? null}
           previewLoadingVoiceId={preview.loadingVoiceId}
           previewPlaying={preview.playing}

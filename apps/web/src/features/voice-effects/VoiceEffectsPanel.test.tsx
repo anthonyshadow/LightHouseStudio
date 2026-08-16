@@ -246,6 +246,60 @@ describe('VoiceLibrary accessibility', () => {
     expect(screen.queryByText(/public library|import|add & apply/i)).not.toBeInTheDocument();
   });
 
+  it('names the action for the hosting surface and explains a disabled library', async () => {
+    voiceApi.listWorkspaceVoices.mockResolvedValue({
+      ...emptyPage,
+      voices: [
+        {
+          kind: 'workspace',
+          voice: {
+            voiceId: 'saved-voice',
+            name: 'Saved Star',
+            category: 'featured',
+            description: 'Bright delivery',
+            labels: {},
+            traits: {
+              language: 'en',
+              gender: 'female',
+              age: 'young',
+              accent: 'Canadian',
+              useCase: 'narration',
+              descriptive: 'bright',
+            },
+            previewAvailable: true,
+            removable: true,
+          },
+        },
+      ],
+      total: 1,
+    });
+
+    const { unmount } = renderWithTheme(
+      <VoiceLibrary disabled={false} selectLabel="Use in Studio" onSelect={vi.fn()} />,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Use in Studio Saved Star' })).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Remove Saved Star from Saved Voices' }),
+    ).toBeEnabled();
+    unmount();
+
+    renderWithTheme(
+      <VoiceLibrary
+        disabled
+        selectLabel="Use in Studio"
+        unavailableReason="Voice actions need a configured provider."
+        onSelect={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('button', { name: 'Use in Studio Saved Star' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Remove Saved Star from Saved Voices' }),
+    ).toBeDisabled();
+    expect(screen.getByText('Voice actions need a configured provider.')).toBeVisible();
+  });
+
   it('browses eligible voices and prevents duplicate adds after a successful save', async () => {
     const user = userEvent.setup();
     voiceApi.listSharedVoices.mockResolvedValue({

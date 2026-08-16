@@ -37,7 +37,7 @@ Consequences that matter for every flow:
 | `/assets/videos`                  | Yes       | `AssetsRouteSurface` + Videos overlay     |                                                                                                                                                         |
 | `/assets/characters`              | Yes       | `AssetsRouteSurface` + Characters overlay |                                                                                                                                                         |
 | `/assets/outfits`                 | Yes       | `AssetsRouteSurface` + Outfits overlay    |                                                                                                                                                         |
-| `/assets/voices`                  | Yes       | `AssetsRouteSurface` + Voices overlay     | Overlay is read-only (`disabled`, no-op `onSelect`)                                                                                                     |
+| `/assets/voices`                  | Yes       | `AssetsRouteSurface` + Voices overlay     | Browse, preview, save, remove, and **Use in Studio**; disabled only when ElevenLabs is unconfigured                                                     |
 
 ## Legacy redirects
 
@@ -96,7 +96,7 @@ AssetsRouteSurface
 Videos overlay (VideoGallery)
   ├─ Open in Studio ────────────────────► /studio/create (replace: true)  useStudioSavedVideoController.ts:157
   ├─ Edit video ────────────────────────► /studio/create then video editor
-  ├─ Add to Project ────────────────────► AddVideoToProjectDialog (stays)
+  ├─ Use as Project source ─────────────► /projects/{id}/workspace (source accepted)
   ├─ Download ──────────────────────────► /api/videos/{id}/content?download=true
   ├─ Rename / Remove ───────────────────► in-place
   └─ close ─────────────────────────────► /assets  (push)
@@ -108,8 +108,11 @@ ProjectsWorkspace
 
 ProjectDetail (overview)
   ├─ breadcrumb ────────────────────────► back, fallback /projects or /campaign/{id}
-  ├─ Continue editing ──────────────────► /projects/{id}/workspace
+  ├─ Add source / Continue editing ─────► /projects/{id}/workspace
+  ├─ Project source ▸ Record ───────────► /projects/{id}/workspace, capture starts (empty Project only)
+  ├─ Project source ▸ Upload / reuse ───► /projects/{id}/workspace once accepted
   ├─ Move Project ──────────────────────► ProjectCampaignDialog
+  ├─ Assets ▸ attached Video ▸ adopt ───► /projects/{id}/workspace as source or working media
   └─ Assets section ▸ add video ────────► /studio/create?projectId={id}[&intent=…]
 
 ProjectDetail (workspace)
@@ -135,8 +138,8 @@ Studio (create)
   ├─ Upload Video ──────────────────────► video-upload overlay
   ├─ Change experience ─────────────────► AI experience chooser
   ├─ Voice ─────────────────────────────► voice-treatments overlay
-  ├─ Save ──────────────────────────────► SaveVideoDialog → Saved Video
-  └─ (no in-Studio link to the saved result)
+  ├─ Save ──────────────────────────────► SaveVideoDialog → Saved Video → SaveVideoSuccessPanel
+  └─ Saved result ▸ Download | View in Assets (/assets/videos) | Create another (stays)
 ```
 
 ## Back-navigation behaviour
@@ -155,13 +158,15 @@ recording, finalization, render, or dirty creative state exists.
 
 ## Route-driven side effects
 
-| Trigger                                                                  | Effect                                                                           | Code                                                          |
-| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `/studio/create?intent=record`                                           | Starts local capture once per `pathname+search`                                  | `StudioApp.tsx:972-979`                                       |
-| `/studio/create?intent=upload` or router state `creationIntent:'upload'` | Opens the video-upload overlay and strips the state                              | `StudioApp.tsx:304-318`                                       |
-| `/studio/create?projectId=…`                                             | Verifies the project is not archived/deleted, else strips the param              | `StudioApp.tsx:257-302`                                       |
-| Saving a video while `projectId` context is verified                     | Attaches the new video to the project and replaces the URL with `/projects/{id}` | `StudioApp.tsx:788-826`                                       |
-| `/studio/{uuid}`                                                         | Resets local work, fetches the Saved Video, loads it into review                 | `StudioApp.tsx:759-781`                                       |
-| `/studio/create/live` with beta enabled                                  | Opens AI-experience overlay, replaces URL with `/studio/create`                  | `StudioApp.tsx:320-324`                                       |
-| Router state `{ createIntent: 'project' \| 'campaign' }`                 | Auto-opens the corresponding create dialog                                       | `ProjectRouteSurface.tsx:258`, `CampaignRouteSurface.tsx:161` |
-| Router state `{ campaignCreated: id }`                                   | Shows the "Create the first Project" next-step notice                            | `CampaignRouteSurface.tsx:395-397`                            |
+| Trigger                                                                  | Effect                                                                                                                 | Code                                                          |
+| ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `/studio/create?intent=record`                                           | Starts local capture once per `pathname+search`                                                                        | `StudioApp.tsx:972-979`                                       |
+| `/studio/create?intent=upload` or router state `creationIntent:'upload'` | Opens the video-upload overlay and strips the state                                                                    | `StudioApp.tsx:304-318`                                       |
+| `/studio/create?projectId=…`                                             | Verifies the project is not archived/deleted, else strips the param                                                    | `StudioApp.tsx:257-302`                                       |
+| Saving a video while `projectId` context is verified                     | Attaches the new video to the project and replaces the URL with `/projects/{id}`; the save-success panel is suppressed | `StudioApp.tsx:788-826`                                       |
+| An explicitly requested save outside a project context                   | Opens `SaveVideoSuccessPanel` with Download / View in Assets / Create another                                          | `StudioLifecycleDialogs.tsx`                                  |
+| **Use in Studio** on a saved voice                                       | Navigates to `/studio/create`, opens the upload overlay, and holds the voice until a source is ready                   | `existingVideoWorkflowState.ts` (`source-ready`)              |
+| `/studio/{uuid}`                                                         | Resets local work, fetches the Saved Video, loads it into review                                                       | `StudioApp.tsx:759-781`                                       |
+| `/studio/create/live` with beta enabled                                  | Opens AI-experience overlay, replaces URL with `/studio/create`                                                        | `StudioApp.tsx:320-324`                                       |
+| Router state `{ createIntent: 'project' \| 'campaign' }`                 | Auto-opens the corresponding create dialog                                                                             | `ProjectRouteSurface.tsx:258`, `CampaignRouteSurface.tsx:161` |
+| Router state `{ campaignCreated: id }`                                   | Shows the "Create the first Project" next-step notice                                                                  | `CampaignRouteSurface.tsx:395-397`                            |

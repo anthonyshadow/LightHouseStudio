@@ -1,4 +1,8 @@
-import { VIDEO_RESULT_MAX_BYTES, type SavedVideoSummary } from '@studio/contracts';
+import {
+  VIDEO_RESULT_MAX_BYTES,
+  type SavedVideoDetail,
+  type SavedVideoSummary,
+} from '@studio/contracts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiClientError, apiFetch } from '../adapters/api-client/apiClient';
 import { readBoundedBlob } from '../adapters/api-client/readBoundedBlob';
@@ -73,6 +77,9 @@ export const useStudioSavedVideoController = ({
   focusEditVideo,
 }: UseStudioSavedVideoControllerOptions) => {
   const [pendingSave, setPendingSave] = useState<PendingVideoSave | null>(null);
+  // Only an explicitly requested save records an outcome. The pre-edit save inside `commitVideoEdit`
+  // also reaches `saved`, but it is a side effect of replacing the source, not a completed journey.
+  const [saveOutcome, setSaveOutcome] = useState<SavedVideoDetail | null>(null);
   const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
   const [loadedSource, setLoadedSource] = useState<LoadedSavedVideoSource | null>(null);
   const galleryEditRequestedRef = useRef(false);
@@ -288,6 +295,7 @@ export const useStudioSavedVideoController = ({
             }
           : current,
       );
+      setSaveOutcome(video);
     }
   }, [activeLoadedSource, presentedCharacter, recording.presented, saveController]);
 
@@ -410,7 +418,11 @@ export const useStudioSavedVideoController = ({
         void commitVideoEdit(true, name);
         return;
       }
-      void saveController.save(pending.artifact, name, pending.source, pending.character);
+      void saveController
+        .save(pending.artifact, name, pending.source, pending.character)
+        .then((saved) => {
+          if (saved) setSaveOutcome(saved);
+        });
     },
     [commitVideoEdit, pendingSave, saveController],
   );
@@ -420,6 +432,7 @@ export const useStudioSavedVideoController = ({
     gallerySourceLoadControllerRef.current = null;
     galleryEditRequestedRef.current = false;
     setPendingSave(null);
+    setSaveOutcome(null);
     videoEditor.close();
     saveController.reset();
   }, [saveController, videoEditor]);
@@ -430,6 +443,7 @@ export const useStudioSavedVideoController = ({
     comparedExistingVideoArtifact,
     presentedCharacter,
     pendingSave,
+    saveOutcome,
     discardPromptOpen,
     useSavedVideo,
     loadSavedVideoRoute,
@@ -437,6 +451,7 @@ export const useStudioSavedVideoController = ({
     replaceLoadedSavedVideo,
     requestSavePresentedVideo,
     dismissPendingSave: () => setPendingSave(null),
+    dismissSaveOutcome: () => setSaveOutcome(null),
     confirmPendingSave,
     requestVideoEditDiscard,
     dismissVideoEditDiscard: () => setDiscardPromptOpen(false),

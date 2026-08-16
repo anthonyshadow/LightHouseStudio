@@ -49,6 +49,7 @@ import {
   projectOverviewHeaderStyles,
   projectOverviewInnerStyles,
   projectOverviewRouteStyles,
+  projectOverviewSourceStyles,
   taskBodyStyles,
   taskInspectorStyles,
   taskNavigationStyles,
@@ -72,6 +73,7 @@ import type { ProjectProcessingController } from './useProjectProcessingControll
 import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
 import { ProjectHistorySection } from './ProjectHistorySection';
 import { ProjectAssetsSection } from './ProjectAssetsSection';
+import { ProjectWorkflowProgress } from './ProjectWorkflowProgress';
 
 const projectStatusLabel = (status: ProjectContract['status']): string =>
   status === 'needs-attention'
@@ -634,6 +636,7 @@ const ProjectSourceSection = ({
       <ProjectSavedVideoPicker
         open={pickerOpen}
         busy={controller.busy}
+        title="Choose the Project source"
         returnFocusRef={savedVideoTriggerRef}
         onClose={() => setPickerOpen(false)}
         onSelect={(video) => {
@@ -760,6 +763,19 @@ const ProjectDetail = ({
     [onSourceActivityChange],
   );
   const detailContentStyles = workspaceMode ? workspaceInnerStyles : projectOverviewInnerStyles;
+  const acceptSession = session.acceptCurrent;
+  // Accepting a source from the overview lands the operator in the workspace, where the media stage
+  // holding the accepted original is visible. The identity must stay stable: the source controller
+  // re-runs its hydration effect whenever this callback changes.
+  const acceptOverviewSource = useCallback(
+    (next: ProjectCurrentResponse) => {
+      acceptSession(next);
+      if (next.revision.snapshot.sourceAssetId !== null) {
+        void navigate(projectWorkspacePath(next.project.id));
+      }
+    },
+    [acceptSession, navigate],
+  );
 
   useEffect(() => {
     onSessionChange?.(session.port);
@@ -800,6 +816,7 @@ const ProjectDetail = ({
   const current = session.current;
   const project = current.project;
   const archived = project.archivedAt !== null;
+  const overviewHasSource = current.revision.snapshot.sourceAssetId !== null;
   const campaignName = campaign.data?.name ?? null;
   const closeDialog = () => {
     setRenameTarget(null);
@@ -1033,11 +1050,12 @@ const ProjectDetail = ({
             <div data-project-workspace-status>
               <AppIcon name="info" />
               <span>
-                {current.revision.snapshot.sourceAssetId === null
-                  ? 'No source yet • This Project is ready whenever you want to begin.'
-                  : `Source ready • ${projectWorkflowLabel(current.revision.snapshot.workflowPhase)} workflow active.`}
+                {overviewHasSource
+                  ? `Source ready • ${projectWorkflowLabel(current.revision.snapshot.workflowPhase)} workflow active.`
+                  : 'No source yet • Choose the original video below to begin.'}
               </span>
             </div>
+            <ProjectWorkflowProgress snapshot={current.revision.snapshot} />
           </div>
           <div data-detail-actions>
             <Button
@@ -1045,7 +1063,7 @@ const ProjectDetail = ({
               data-detail-action="continue"
               onClick={() => void navigate(projectWorkspacePath(project.id))}
             >
-              {archived ? 'View workspace' : 'Continue editing'}
+              {archived ? 'View workspace' : overviewHasSource ? 'Continue editing' : 'Add source'}
             </Button>
             <Button
               data-detail-action="move"
@@ -1097,9 +1115,36 @@ const ProjectDetail = ({
         {announcement}
       </div>
 
+      {!archived && !overviewHasSource ? (
+        <section
+          css={projectOverviewSourceStyles(theme)}
+          aria-labelledby="project-overview-source-heading"
+          data-project-overview-source=""
+        >
+          <header>
+            <h2 id="project-overview-source-heading">Project source</h2>
+            <p>
+              Every Project is built from one original video that never changes. Choose it here, or
+              open the workspace to do it later.
+            </p>
+          </header>
+          <ProjectSourceSection
+            key={project.id}
+            current={current}
+            runtime={sourceRuntime}
+            recordingCandidate={recordingCandidate}
+            recordingActive={recordingActive}
+            {...(onStartRecording ? { onStartRecording } : {})}
+            {...(onSourceActivityChange ? { onActivityChange: onSourceActivityChange } : {})}
+            onCurrentChange={acceptOverviewSource}
+          />
+        </section>
+      ) : null}
+
       <ProjectAssetsSection
         projectId={project.id}
         archived={archived}
+        projectHasSource={overviewHasSource}
         session={session.port}
         {...(creativeStore ? { creativeStore } : {})}
         {...(onCreateProjectCharacter ? { onCreateCharacter: onCreateProjectCharacter } : {})}

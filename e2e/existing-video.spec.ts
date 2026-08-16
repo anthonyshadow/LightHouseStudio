@@ -194,7 +194,10 @@ test('provider-free upload previews and enters the existing take/save surface', 
   await review.getByRole('button', { name: 'Save to Assets' }).click();
   await confirmSaveVideo(page);
   await expect(review.getByRole('button', { name: 'Saved' })).toBeVisible();
-  await expect(review.getByRole('link', { name: /Download/u })).toHaveCount(0);
+  const download = review.getByRole('link', { name: /Download/u });
+  await expect(download).toHaveCount(1);
+  await expect(download).toHaveAttribute('href', /\/content\?download=true$/u);
+  await expect(review.getByRole('button', { name: 'View in Assets' })).toBeVisible();
   expect(await cameraCalls(page)).toBe(0);
   expect(new Set(network.apiRequests.map(({ path }) => path))).toEqual(
     new Set(['/api/capabilities', '/api/creative-library']),
@@ -277,7 +280,7 @@ test('provider-free Adjust video renders locally and atomically replaces the per
   await page.getByRole('button', { name: 'Save edited video' }).click();
   await expect(replacement).toBeVisible({ timeout: 60_000 });
   await replacement.getByRole('button', { name: 'Replace and Save' }).click();
-  await confirmSaveVideo(page, 'Local edit source');
+  await confirmSaveVideo(page, 'Local edit source', { expectSuccessPanel: false });
 
   await expect(upload).toBeVisible();
   await expect(upload.getByRole('button', { name: 'Character Swap', exact: true })).toBeDisabled();

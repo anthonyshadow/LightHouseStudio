@@ -22,13 +22,27 @@ export const expectNoDocumentOverflow = async (page: Page): Promise<void> => {
   expect(dimensions.bodyHeight).toBeLessThanOrEqual(dimensions.height + 1);
 };
 
-export const confirmSaveVideo = async (page: Page, name?: string): Promise<void> => {
+export const saveSuccessPanel = (page: Page) =>
+  page.getByRole('dialog', { name: /(Saved to Assets|Version added to Assets)/u });
+
+export const confirmSaveVideo = async (
+  page: Page,
+  name?: string,
+  options: { readonly expectSuccessPanel?: boolean } = {},
+): Promise<void> => {
   const dialog = page.getByRole('dialog', { name: 'Save to Assets' });
   await expect(dialog).toBeVisible();
   const nameField = dialog.getByRole('textbox', { name: 'Video name (optional)' });
   if (name !== undefined) await nameField.fill(name);
   await dialog.getByRole('button', { name: 'Save to Assets' }).click();
   await expect(dialog).toBeHidden();
+  // An explicit save ends with a completion surface. A save that only stages a video-edit
+  // replacement does not, so callers on that path opt out.
+  if (options.expectSuccessPanel === false) return;
+  const success = saveSuccessPanel(page);
+  await expect(success).toBeVisible();
+  await success.getByRole('button', { name: 'Stay in Studio' }).click();
+  await expect(success).toBeHidden();
 };
 
 export const settleVisualPage = async (page: Page): Promise<void> => {

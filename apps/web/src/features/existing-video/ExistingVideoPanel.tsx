@@ -56,6 +56,7 @@ type ExistingVideoPanelProps = {
   readonly onFinish: () => void;
   readonly onSaveVideo?: () => void;
   readonly saveVideoState?: SaveVideoState;
+  readonly onOpenSavedVideosLibrary?: () => void;
   readonly savedRecipes?: readonly ExistingVideoSavedRecipe[];
   readonly onCreateCharacter?: (stepId: string) => void;
   readonly onCreateWardrobeVariant?: (stepId: string, characterId: string) => void;
@@ -79,6 +80,7 @@ export const ExistingVideoPanel = ({
   onFinish,
   onSaveVideo,
   saveVideoState,
+  onOpenSavedVideosLibrary,
   savedRecipes = [],
   onCreateCharacter,
   onCreateWardrobeVariant,
@@ -477,6 +479,7 @@ export const ExistingVideoPanel = ({
         onFinish={onFinish}
         {...(onSaveVideo ? { onSaveVideo } : {})}
         {...(saveVideoState ? { saveVideoState } : {})}
+        {...(onOpenSavedVideosLibrary ? { onOpenSavedVideosLibrary } : {})}
         onEditSelected={() => {
           setActiveTool(null);
           workflow.editSelected();

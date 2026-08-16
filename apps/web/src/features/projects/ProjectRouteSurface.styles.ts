@@ -903,6 +903,62 @@ export const emptyProjectStyles = (theme: Theme): CSSObject => ({
   },
 });
 
+export const projectOverviewSourceStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  alignContent: 'start',
+  gap: theme.space.md,
+  paddingBlock: `clamp(${theme.space.xl}, 4cqi, 2.5rem) 0`,
+  '& > header': { minWidth: 0, display: 'grid', gap: theme.space.xs },
+  '& > header h2': {
+    margin: 0,
+    fontFamily: theme.type.display,
+    fontSize: '1.25rem',
+  },
+  '& > header p': {
+    margin: 0,
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSizes.metadata,
+    lineHeight: 1.55,
+  },
+});
+
+export const projectWorkflowProgressStyles = (theme: Theme): CSSObject => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: theme.space.xs,
+  margin: 0,
+  padding: 0,
+  listStyle: 'none',
+  '& li': {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: theme.space.xxs,
+    padding: `0.28rem ${theme.space.sm}`,
+    border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.radii.round,
+    color: theme.colors.textFaint,
+    background: theme.colors.canvasRaised,
+    fontSize: theme.fontSizes.caption,
+    fontWeight: 720,
+  },
+  '& li[data-state="done"]': {
+    borderColor: theme.colors.borderStrong,
+    color: theme.colors.textMuted,
+    background: theme.colors.surfaceStrong,
+  },
+  '& li[aria-current="step"]': {
+    borderColor: theme.colors.accent,
+    color: theme.colors.text,
+    background: theme.colors.accentSoft,
+  },
+  '& li span[data-step-ordinal]': {
+    color: theme.colors.textFaint,
+    fontWeight: 640,
+  },
+});
+
 export const dialogActionsStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
   flexWrap: 'wrap',

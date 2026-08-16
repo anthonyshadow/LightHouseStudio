@@ -3,6 +3,7 @@ import { useState, type RefObject } from 'react';
 import type { VideoProcessingOperationCapability } from '@studio/contracts';
 import { Button } from '../../ui';
 import type { ProjectProcessingController } from '../projects/useProjectProcessingController';
+import { SavedVideoSuccessActions } from '../saved-videos/SavedVideoSuccessActions';
 import type { SaveVideoState } from '../saved-videos/useSaveVideo';
 import {
   actionBarStyles,
@@ -29,6 +30,7 @@ export interface ExistingVideoActionBarProps {
   readonly discardButtonRef?: RefObject<HTMLButtonElement | null>;
   readonly onSaveVideo?: () => void;
   readonly saveVideoState?: SaveVideoState;
+  readonly onOpenSavedVideosLibrary?: () => void;
   readonly providerStartBlockedReason?: string;
   readonly projectProcessing?: ProjectProcessingController;
 }
@@ -57,6 +59,7 @@ export const ExistingVideoActionBar = ({
   discardButtonRef,
   onSaveVideo,
   saveVideoState = { status: 'idle' },
+  onOpenSavedVideosLibrary,
   providerStartBlockedReason,
   projectProcessing,
 }: ExistingVideoActionBarProps) => {
@@ -105,13 +108,14 @@ export const ExistingVideoActionBar = ({
   }
 
   if (workflow.phase === 'complete') {
+    const savedVideo = saved && saveVideoState.status === 'saved' ? saveVideoState.video : null;
     return (
       <div css={actionBarStyles(theme)} aria-label="Result actions">
         <div css={actionSummaryStyles(theme)} role="status" aria-live="polite">
-          <strong>{saved ? 'Saved to gallery' : 'Result ready'}</strong>
+          <strong>{saved ? 'Saved to Assets' : 'Result ready'}</strong>
           <span>
             {saved
-              ? 'Open Saved Videos when you are ready to download.'
+              ? 'Download it now, open it in Assets, or keep editing this take.'
               : 'Compare Original and Result, then save or continue editing.'}
           </span>
         </div>
@@ -136,6 +140,9 @@ export const ExistingVideoActionBar = ({
             Discard video and result
           </Button>
         </div>
+        {savedVideo && onOpenSavedVideosLibrary ? (
+          <SavedVideoSuccessActions video={savedVideo} onOpenInAssets={onOpenSavedVideosLibrary} />
+        ) : null}
       </div>
     );
   }
