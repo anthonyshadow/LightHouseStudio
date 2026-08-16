@@ -2,7 +2,6 @@ import type { CSSObject, Theme } from '@emotion/react';
 
 export const dashboardStyles = (theme: Theme): CSSObject => ({
   width: '100%',
-  maxWidth: '75rem',
   height: '100%',
   minWidth: 0,
   minHeight: 0,

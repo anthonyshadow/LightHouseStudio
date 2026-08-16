@@ -37,7 +37,6 @@ export const projectOverviewRouteStyles = (theme: Theme): CSSObject => ({
 });
 
 export const projectsWorkspaceInnerStyles = (theme: Theme): CSSObject => ({
-  width: 'min(100%, 88rem)',
   minHeight: '100%',
   marginInline: 'auto',
   paddingInline: `clamp(${theme.space.md}, 4vw, ${theme.space.xxl})`,
@@ -344,7 +343,6 @@ export const projectsLedgerEmptyStyles = (theme: Theme): CSSObject => ({
 });
 
 export const workspaceInnerStyles = (theme: Theme): CSSObject => ({
-  width: 'min(100%, 88rem)',
   minHeight: '100%',
   marginInline: 'auto',
   padding: `clamp(${theme.space.md}, 3vw, ${theme.space.xxl})`,
@@ -358,11 +356,8 @@ export const workspaceInnerStyles = (theme: Theme): CSSObject => ({
 });
 
 export const projectOverviewInnerStyles = (theme: Theme): CSSObject => ({
-  width: 'min(100%, 88rem)',
   minHeight: '100%',
   marginInline: 'auto',
-  paddingBlock: 'clamp(2rem, 5cqi, 4rem)',
-  paddingInline: 'clamp(2rem, 5cqi, 6rem)',
   display: 'grid',
   gridTemplateColumns: 'minmax(0, 1fr)',
   alignContent: 'start',
@@ -401,14 +396,6 @@ export const workspaceHeaderStyles = (theme: Theme): CSSObject => ({
   },
 });
 
-export const listLayoutStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.65fr) minmax(18rem, 0.75fr)',
-  alignItems: 'start',
-  gap: theme.space.lg,
-  '@media (max-width: 62rem)': { gridTemplateColumns: 'minmax(0, 1fr)' },
-});
-
 export const listSectionStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   display: 'grid',
@@ -426,50 +413,6 @@ export const listSectionStyles = (theme: Theme): CSSObject => ({
   },
   '& h3': { margin: 0, fontSize: theme.fontSizes.section },
   '& header span': { color: theme.colors.textFaint, fontSize: theme.fontSizes.caption },
-});
-
-export const projectListStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gap: theme.space.sm,
-  margin: 0,
-  padding: 0,
-  listStyle: 'none',
-});
-
-export const projectCardStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) auto',
-  alignItems: 'center',
-  gap: theme.space.md,
-  padding: theme.space.md,
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: theme.radii.medium,
-  background: theme.colors.surface,
-  '& h4': {
-    margin: 0,
-    overflowWrap: 'anywhere',
-    fontSize: theme.fontSizes.label,
-  },
-  '& [data-project-meta]': {
-    display: 'flex',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: theme.space.xs,
-    marginBlockStart: theme.space.xs,
-    color: theme.colors.textMuted,
-    fontSize: theme.fontSizes.metadata,
-  },
-  '& [data-project-actions]': {
-    display: 'flex',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    gap: theme.space.xs,
-  },
-  '@media (max-width: 39.99rem)': {
-    gridTemplateColumns: 'minmax(0, 1fr)',
-    '& [data-project-actions]': { justifyContent: 'stretch' },
-    '& [data-project-actions] > button': { flex: '1 1 auto' },
-  },
 });
 
 export const statusPillStyles = (theme: Theme, archived: boolean): CSSObject => ({
