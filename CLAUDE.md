@@ -22,7 +22,7 @@ Imports point inward. `apps/web` must never import `apps/api` implementation.
 | Task touches                                                          | Look in                                                                                                 |
 | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | A route, redirect, or "where does this link go"                       | `apps/web/src/app/paths.ts`, `AppRouter.tsx`, `docs/user-flows/navigation-map.md`                       |
-| Any authenticated screen                                              | `apps/web/src/studio/StudioApp.tsx` → `StudioWorkspace.tsx` (one shell renders every protected surface) |
+| Any authenticated screen                                              | `apps/web/src/app/shell/AuthenticatedShell.tsx` (persistent) → `studio/StudioApp.tsx` (live media only) |
 | Dashboard / Assets / Projects / Campaigns surfaces                    | `apps/web/src/features/{dashboard,assets,projects,campaigns}`                                           |
 | Recording, take review, stage                                         | `apps/web/src/orchestration/{recording,session}`, `features/live-stage`, `studio/useTakeReviewFlow.ts`  |
 | Upload / Character Swap / Virtual Try-On / voice on an existing video | `apps/web/src/features/existing-video`                                                                  |
@@ -118,16 +118,28 @@ check as passing.
 
 ## Repo-specific gotchas
 
-- **One shell, no page unmounts.** `StudioApp` stays mounted across every protected route. State
-  held in it (refs, overlays, capture session) persists across "navigation". Guard route-triggered
-  effects with `location.key`, not just `pathname + search`.
+- **The shell persists; the Studio runtime does not.** `apps/web/src/app/shell/AuthenticatedShell.tsx`
+  stays mounted across every protected route and owns what has to outlive a surface: the
+  remote-state `QueryClient`, awaitable confirmations, and the session lifecycle (teardown hold,
+  logout, expiry). The Studio capture runtime belongs only to the routes that own live media —
+  `isStudioRuntimePath` in `app/paths.ts`. **Do not put cross-route state in the runtime**, and do
+  not reach into it from a surface that outlives it: it reports work up through
+  `StudioRuntimeRegistry` and receives creative selections through the shell's handoff channel
+  (`app/shell/useStudioHandoff.ts`).
+  _Migration in progress_: the runtime is still rendered by the shell on every protected route.
+  Until the gate flips, guard route-triggered effects with `location.key`, not just
+  `pathname + search` — that keying stays correct either way, since it scopes to a visit rather
+  than to a mount.
 - **Asset libraries are overlays**, not pages — they key off `location.pathname` in
   `StudioLibraryOverlays.tsx`.
 - **Route registration is conditional.** Project source/working-media/output and creative-library
   routes only exist in certain `DATABASE_MODE` configurations. `503 feature_unavailable` is a
   legitimate response; handle it.
-- **`apps/api/src/route-inventory.test.ts` is an oracle.** Adding or removing a route fails it until
-  you update the expected list. That is intentional.
+- **Two route oracles, both intentional.** `apps/web/src/app/route-inventory.test.ts` covers
+  `PROTECTED_ROUTES`, and `paths.test.ts` additionally forces every registered destination to state
+  whether it mounts the Studio runtime. `apps/api/src/route-inventory.test.ts` covers HTTP
+  endpoints. Adding or removing either kind of route fails its oracle until the expected list is
+  updated.
 - **Idempotency keys and CAS versions are load-bearing** on Project and Campaign mutations. Do not
   drop `expectedVersion`, `expectedRevisionNumber` or `Idempotency-Key` to "simplify" a call.
 - **`scripts/check-retired-program-references.mjs` fails on certain retired words** in any tracked
