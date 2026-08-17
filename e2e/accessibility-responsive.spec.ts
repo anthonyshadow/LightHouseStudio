@@ -332,7 +332,7 @@ for (const viewport of dashboardViewports) {
     await expect(page.getByRole('button', { name: 'Create video' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Continue Work' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent Work' })).toBeVisible();
-    await expect(page.getByLabel('Studio media stage')).toBeHidden();
+    await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
 
     const desktopNavigation = page.getByRole('navigation', { name: 'Primary', exact: true });
     const mobileNavigation = page.getByRole('navigation', {

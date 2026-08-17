@@ -44,7 +44,7 @@ const AuthenticatedShellSurfaces = ({ initialIntent }: AuthenticatedShellProps) 
   const nav = useStudioNavigationActions();
   const confirmation = useConfirmationRequest();
   const user = auth.session!.user;
-  const { registry, logout, sessionExpiry, sessionEnding, creativeLocks } =
+  const { registry, logout, sessionExpiry, sessionEnding, creativeLocks, work } =
     useAuthenticatedSessionLifecycle(auth);
   const runtimeRouteActive = isStudioRuntimePath(location.pathname);
   const handoff = useStudioHandoff({ runtimeRouteActive, openStudio: nav.openStudio });
@@ -54,6 +54,7 @@ const AuthenticatedShellSurfaces = ({ initialIntent }: AuthenticatedShellProps) 
     confirmation,
     handoff,
     creativeLocks,
+    projectSession: work.projectSession,
   });
 
   return (

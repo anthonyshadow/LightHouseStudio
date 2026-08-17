@@ -59,7 +59,18 @@ export const ShellMain = ({
   studioRuntime,
 }: ShellMainProps) => {
   const location = useLocation();
-  const { route, nav, creative, character, outfit, provider, ownerUserId, mainRef } = services;
+  const {
+    route,
+    nav,
+    creative,
+    character,
+    outfit,
+    provider,
+    ownerUserId,
+    mainRef,
+    projectProcessing,
+    reportOverviewProjectSession,
+  } = services;
   const { projectContextActive, dashboardRouteActive } = route;
 
   // Not a mount-time effect: the shell stays mounted, so arriving somewhere new is a change of
@@ -129,6 +140,8 @@ export const ShellMain = ({
           <ProjectRouteSurface
             workspaceMode={false}
             ownerUserId={ownerUserId}
+            processing={projectProcessing}
+            onSessionChange={reportOverviewProjectSession}
             creativeStore={creative.store}
             onCreateProjectCharacter={character.openNewForProject}
             onCreateProjectOutfit={outfit.openNewForProject}

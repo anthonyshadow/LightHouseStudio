@@ -211,13 +211,15 @@ describe('AppRouter', () => {
     expect(router.state.location.search).toBe('?sort=latest');
   });
 
-  it('keeps one Studio runtime while navigating between canonical surfaces', async () => {
+  it('keeps one authenticated shell while navigating between canonical surfaces', async () => {
     const { router } = renderApplication('/dashboard');
     await screen.findByText('Studio route');
 
     await router.navigate('/projects');
     await waitFor(() => expect(document.title).toBe('Projects · Lightframe Studio'));
 
+    // The shell is what persists: its query cache, session hold and navigation chrome must survive
+    // a route change even though the Studio inside it does not.
     expect(appHarness.mountCount).toBe(1);
     await waitFor(() => expect(document.activeElement).toHaveAttribute('id', 'studio-main'));
   });

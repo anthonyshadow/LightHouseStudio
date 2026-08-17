@@ -27,6 +27,7 @@ const runtimePorts = (overrides: Partial<StudioRuntimePorts> = {}): StudioRuntim
     applyCharacterToStep: () => Promise.resolve(),
   },
   useSavedVideo: vi.fn(),
+  checkpointProjectCreative: () => Promise.resolve(true),
   saveStudioCharacter: () => Promise.resolve(),
   ...overrides,
 });
