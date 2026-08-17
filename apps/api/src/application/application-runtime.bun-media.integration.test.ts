@@ -1,4 +1,7 @@
 import { execFile } from 'node:child_process';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -13,10 +16,26 @@ const MEBIBYTE = 1_024 * 1_024;
 
 describe('Bun large-media boundary', () => {
   it('spools raw and multipart 300 MB boundaries with bounded memory and cleanup', async () => {
-    const { stdout } = await executeFile('bun', ['--no-env-file', probePath], {
-      cwd: repositoryRoot,
-      timeout: 50_000,
-    });
+    // The probe proves cleanup by diffing `lightframe-voice-upload-*` directories in `tmpdir()`.
+    // That prefix is not unique to this process, so a sibling test spooling an upload in the same
+    // run would be counted as this probe's leak. A private temporary root makes the accounting
+    // observe only the directories the probe itself created.
+    const probeTemporaryRoot = await mkdtemp(path.join(tmpdir(), 'lightframe-media-probe-root-'));
+    let stdout: string;
+    try {
+      ({ stdout } = await executeFile('bun', ['--no-env-file', probePath], {
+        cwd: repositoryRoot,
+        timeout: 50_000,
+        env: {
+          ...process.env,
+          TMPDIR: probeTemporaryRoot,
+          TMP: probeTemporaryRoot,
+          TEMP: probeTemporaryRoot,
+        },
+      }));
+    } finally {
+      await rm(probeTemporaryRoot, { recursive: true, force: true });
+    }
     const result = JSON.parse(stdout.trim()) as BunMediaBoundaryProbeResult;
 
     expect(result.exact).toMatchObject({
