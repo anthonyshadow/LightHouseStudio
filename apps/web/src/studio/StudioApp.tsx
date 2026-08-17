@@ -371,9 +371,13 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     };
   }, [recordCommittedPrompt]);
 
+  // A non-form session error is reported as a stage notice, so the capture panel steps aside to
+  // keep that notice reachable. AI Settings deliberately stays open: it owns Start/Apply/Reset, so
+  // it is the surface the disconnect recovery copy points at, and mode switching is locked while
+  // local media is live — closing it would strand a disconnected session with no way back.
   useEffect(() => {
     if (!session.error || isStudioFormError(session.error)) return;
-    closeOverlayIf(['ai-settings', 'capture-settings']);
+    closeOverlayIf(['capture-settings']);
   }, [closeOverlayIf, session.error]);
 
   const clearSessionError = session.clearError;

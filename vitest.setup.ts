@@ -22,6 +22,50 @@ class BlockedWebSocket {
   }
 }
 
+// Node 26 exposes inert `localStorage`/`sessionStorage` globals unless `--localstorage-file` is
+// given, and Vitest's DOM environments skip any window key that already exists on the Node global.
+// Web Storage therefore never reaches `window` there, and DOM tests silently exercise the
+// storage-unavailable fallbacks instead of real persistence. Restore a per-file in-memory Storage
+// whenever the environment left one that cannot be used.
+const createMemoryStorage = (): Storage => {
+  const values = new Map<string, string>();
+  return {
+    get length() {
+      return values.size;
+    },
+    key: (index: number) => [...values.keys()][index] ?? null,
+    getItem: (key: string) => values.get(String(key)) ?? null,
+    setItem: (key: string, value: string) => {
+      values.set(String(key), String(value));
+    },
+    removeItem: (key: string) => {
+      values.delete(String(key));
+    },
+    clear: () => {
+      values.clear();
+    },
+  } satisfies Storage;
+};
+
+const restoreWebStorage = (name: 'localStorage' | 'sessionStorage'): void => {
+  if (typeof globalThis.document === 'undefined') return;
+  let existing: unknown;
+  try {
+    existing = globalThis[name];
+  } catch {
+    existing = undefined;
+  }
+  if (typeof (existing as Storage | undefined)?.getItem === 'function') return;
+  Object.defineProperty(globalThis, name, {
+    configurable: true,
+    writable: true,
+    value: createMemoryStorage(),
+  });
+};
+
+restoreWebStorage('localStorage');
+restoreWebStorage('sessionStorage');
+
 let usesMockApiServer = false;
 let mockApiServer: SetupServerApi | undefined;
 
