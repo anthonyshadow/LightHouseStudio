@@ -74,7 +74,12 @@ export type CreativeWorkspaceState = {
   panel: AuxiliaryPanel;
   activeTool: 'edit-video' | 'character' | 'outfit' | 'workshop' | null;
   showDesktopAiTools: boolean;
-  projectMode?: boolean;
+  /**
+   * Whether a loaded playback video still leaves the live tools usable. Surfaces that own their
+   * own media lifecycle set this; standalone capture, where the playback video *is* the work in
+   * progress, leaves it false so the live tools stay blocked.
+   */
+  liveToolsAvailableDuringPlayback?: boolean;
   activeCharacterLabel?: string | undefined;
   activeOutfitLabel?: string | undefined;
   activeSessionMode: StudioMode;
@@ -195,7 +200,7 @@ export const CreativeWorkspace = ({ state, actions, refs }: CreativeWorkspacePro
     panel,
     activeTool,
     showDesktopAiTools,
-    projectMode = false,
+    liveToolsAvailableDuringPlayback = false,
     activeCharacterLabel,
     activeOutfitLabel,
     activeSessionMode,
@@ -220,7 +225,7 @@ export const CreativeWorkspace = ({ state, actions, refs }: CreativeWorkspacePro
   } = actions;
   const { workshopToggleRef, editVideoToggleRef, characterToggleRef, outfitToggleRef } = refs;
   const theme = useTheme();
-  const playbackBlocksLiveTools = hasPlaybackVideo && !projectMode;
+  const playbackBlocksLiveTools = hasPlaybackVideo && !liveToolsAvailableDuringPlayback;
   const characterWorkshopBlocked =
     playbackBlocksLiveTools ||
     recordingActive ||

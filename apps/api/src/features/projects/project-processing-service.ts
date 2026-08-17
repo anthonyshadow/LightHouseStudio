@@ -627,9 +627,16 @@ export class ProjectProcessingService {
           attempt.status === 'processing' ||
           attempt.status === 'retrieving')
       ) {
-        volatileReady = (await this.videoJobs.status(operationId, ownerUserId)).status === 'ready';
-        attempt =
-          (await this.processing.getProjectAttempt(ownerUserId, projectId, operationId)) ?? attempt;
+        const volatile = await this.videoJobs.status(operationId, ownerUserId);
+        volatileReady = volatile.status === 'ready';
+        // The poll only writes a trace when the provider actually moved. Re-reading the attempt
+        // when the volatile status still matches what is stored is a wasted three-table join on
+        // every tick of a poll that runs for the whole life of the job.
+        if (volatileReady || volatile.status !== attempt.status) {
+          attempt =
+            (await this.processing.getProjectAttempt(ownerUserId, projectId, operationId)) ??
+            attempt;
+        }
       }
       if ((attempt.status === 'ready' || volatileReady) && attempt.outputAssetId === null) {
         attempt = await this.#retainResult(attempt);

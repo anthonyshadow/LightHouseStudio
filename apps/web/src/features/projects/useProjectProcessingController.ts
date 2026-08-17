@@ -15,6 +15,7 @@ import {
 } from './projectProcessingApi';
 import { getProject } from './projectsApi';
 import type { ProjectSessionPort } from './useProjectSession';
+import { useStableOperationKey } from './useStableOperationKey';
 
 type ProjectProcessingCommandPhase =
   | 'idle'
@@ -33,8 +34,6 @@ type ProjectProcessingControllerState = Readonly<{
   message: string | null;
   unverifiedOperationId: string | null;
 }>;
-
-type OperationIdentity = Readonly<{ signature: string; operationId: string }>;
 
 const initialState = (projectId: string | null): ProjectProcessingControllerState => ({
   projectId,
@@ -83,8 +82,8 @@ export const useProjectProcessingController = ({
   const pollControllerRef = useRef<AbortController | null>(null);
   const commandActiveRef = useRef<symbol | null>(null);
   const pollActiveRef = useRef<symbol | null>(null);
-  const startOperationRef = useRef<OperationIdentity | null>(null);
-  const retryOperationRef = useRef<OperationIdentity | null>(null);
+  const startOperation = useStableOperationKey();
+  const retryOperation = useStableOperationKey();
 
   useLayoutEffect(() => {
     stateRef.current = state;
@@ -298,11 +297,7 @@ export const useProjectProcessingController = ({
           revisionNumber: current.revision.revisionNumber,
           capability,
         });
-        const operation =
-          startOperationRef.current?.signature === signature
-            ? startOperationRef.current
-            : { signature, operationId: crypto.randomUUID() };
-        startOperationRef.current = operation;
+        const operationId = startOperation.keyFor(signature);
         const controller = new AbortController();
         commandControllerRef.current?.abort('project-processing-command-replaced');
         commandControllerRef.current = controller;
@@ -310,18 +305,14 @@ export const useProjectProcessingController = ({
         const run = () =>
           submitProjectProcessing({
             projectId: activeProjectId,
-            operationId: operation.operationId,
+            operationId,
             expectedVersion: current.project.version,
             expectedRevisionNumber: current.revision.revisionNumber,
             capability,
             signal: controller.signal,
           });
         try {
-          const response = await recoverExactOperation(
-            operation.operationId,
-            run,
-            controller.signal,
-          );
+          const response = await recoverExactOperation(operationId, run, controller.signal);
           if (projectIdRef.current !== activeProjectId) return false;
           await applyMutation(response, controller.signal, activeProjectId);
           if (!attemptNeedsProjectRefresh(response.attempt)) {
@@ -336,7 +327,7 @@ export const useProjectProcessingController = ({
             patchState({
               phase: 'error',
               message: commandErrorMessage(error),
-              unverifiedOperationId: operation.operationId,
+              unverifiedOperationId: operationId,
             });
           }
           return false;
@@ -347,7 +338,7 @@ export const useProjectProcessingController = ({
         if (commandActiveRef.current === commandToken) commandActiveRef.current = null;
       }
     },
-    [applyMutation, patchState, recoverExactOperation, synchronizeProject],
+    [applyMutation, patchState, recoverExactOperation, startOperation, synchronizeProject],
   );
 
   const retry = useCallback(async (): Promise<boolean> => {
@@ -382,11 +373,7 @@ export const useProjectProcessingController = ({
         previousOperationId: previous.operationId,
         revisionId: current.revision.id,
       });
-      const operation =
-        retryOperationRef.current?.signature === signature
-          ? retryOperationRef.current
-          : { signature, operationId: crypto.randomUUID() };
-      retryOperationRef.current = operation;
+      const operationId = retryOperation.keyFor(signature);
       const controller = new AbortController();
       commandControllerRef.current?.abort('project-processing-retry-replaced');
       commandControllerRef.current = controller;
@@ -394,7 +381,7 @@ export const useProjectProcessingController = ({
       const run = () =>
         retryProjectProcessing({
           projectId: activeProjectId,
-          operationId: operation.operationId,
+          operationId,
           previousOperationId: previous.operationId,
           expectedVersion: current.project.version,
           expectedRevisionNumber: current.revision.revisionNumber,
@@ -403,7 +390,7 @@ export const useProjectProcessingController = ({
           signal: controller.signal,
         });
       try {
-        const response = await recoverExactOperation(operation.operationId, run, controller.signal);
+        const response = await recoverExactOperation(operationId, run, controller.signal);
         if (projectIdRef.current !== activeProjectId) return false;
         await applyMutation(response, controller.signal, activeProjectId);
         if (!attemptNeedsProjectRefresh(response.attempt)) {
@@ -418,7 +405,7 @@ export const useProjectProcessingController = ({
           patchState({
             phase: 'error',
             message: commandErrorMessage(error),
-            unverifiedOperationId: operation.operationId,
+            unverifiedOperationId: operationId,
           });
         }
         return false;
@@ -428,7 +415,7 @@ export const useProjectProcessingController = ({
     } finally {
       if (commandActiveRef.current === commandToken) commandActiveRef.current = null;
     }
-  }, [applyMutation, patchState, recoverExactOperation, synchronizeProject]);
+  }, [applyMutation, patchState, recoverExactOperation, retryOperation, synchronizeProject]);
 
   const cancel = useCallback(async (): Promise<boolean> => {
     const activeProjectId = projectIdRef.current;
@@ -525,8 +512,8 @@ export const useProjectProcessingController = ({
     loadControllerRef.current?.abort('project-processing-context-replaced');
     pollControllerRef.current?.abort('project-processing-context-replaced');
     pollActiveRef.current = null;
-    startOperationRef.current = null;
-    retryOperationRef.current = null;
+    startOperation.reset();
+    retryOperation.reset();
     replaceState({
       phase: projectId === null || sessionProjectId === null ? 'idle' : 'loading',
       attempt: null,
@@ -547,7 +534,15 @@ export const useProjectProcessingController = ({
       if (loadControllerRef.current === controller) loadControllerRef.current = null;
     });
     return () => controller.abort('project-processing-hydration-replaced');
-  }, [loadAuthority, projectId, replaceState, revisionId, sessionProjectId]);
+  }, [
+    loadAuthority,
+    projectId,
+    replaceState,
+    retryOperation,
+    revisionId,
+    sessionProjectId,
+    startOperation,
+  ]);
 
   // State belonging to another Project is not a partial view of this one — discard all of it.
   const { attempt, phase, message, unverifiedOperationId } =

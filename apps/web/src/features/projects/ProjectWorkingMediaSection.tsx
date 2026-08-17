@@ -9,8 +9,24 @@ import {
   reuseProjectWorkingMedia,
 } from './projectsApi';
 import type { ProjectSessionPort } from './useProjectSession';
+import { useStableOperationKey } from './useStableOperationKey';
 
 type AdoptionPhase = 'idle' | 'saving' | 'saved' | 'conflict' | 'error';
+
+const adoptionPhaseNotice = {
+  idle: { role: 'status', tone: 'success', title: 'Working media ready' },
+  saving: { role: 'status', tone: 'neutral', title: 'Saving working media' },
+  saved: { role: 'status', tone: 'success', title: 'Working media ready' },
+  conflict: { role: 'alert', tone: 'warning', title: 'Conflict' },
+  error: { role: 'alert', tone: 'danger', title: 'Working media not changed' },
+} as const satisfies Record<
+  AdoptionPhase,
+  {
+    readonly role: 'alert' | 'status';
+    readonly tone: 'neutral' | 'success' | 'warning' | 'danger';
+    readonly title: string;
+  }
+>;
 
 export interface ProjectWorkingMediaActivity {
   readonly projectId: string;
@@ -30,7 +46,7 @@ export const ProjectWorkingMediaSection = ({
 }) => {
   const theme = useTheme();
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const operationRef = useRef<{ readonly signature: string; readonly key: string } | null>(null);
+  const operation = useStableOperationKey();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [phase, setPhase] = useState<AdoptionPhase>('idle');
   const [message, setMessage] = useState<string | null>(null);
@@ -59,11 +75,7 @@ export const ProjectWorkingMediaSection = ({
         savedVideoId: video.id,
         videoVersionId: video.currentVersion.id,
       });
-      const operationKey =
-        operationRef.current?.signature === signature
-          ? operationRef.current.key
-          : crypto.randomUUID();
-      operationRef.current = { signature, key: operationKey };
+      const operationKey = operation.keyFor(signature);
       setPhase('saving');
       setMessage('Validating the exact retained Version and adopting its existing bytes.');
       try {
@@ -101,7 +113,7 @@ export const ProjectWorkingMediaSection = ({
           return;
         }
         session.acceptCurrent({ project: response.project, revision: response.revision });
-        operationRef.current = null;
+        operation.reset();
         setPhase('saved');
         setMessage(
           'Working media ready from the exact retained Version. Bytes were not copied, the original was not replaced, and no output Version was created.',
@@ -115,7 +127,7 @@ export const ProjectWorkingMediaSection = ({
         );
       }
     },
-    [session],
+    [operation, session],
   );
 
   if (snapshot.sourceAssetId === null) return null;
@@ -141,25 +153,9 @@ export const ProjectWorkingMediaSection = ({
         </div>
         {message ? (
           <StatusNotice
-            role={phase === 'error' || phase === 'conflict' ? 'alert' : 'status'}
-            tone={
-              phase === 'error'
-                ? 'danger'
-                : phase === 'conflict'
-                  ? 'warning'
-                  : phase === 'saving'
-                    ? 'neutral'
-                    : 'success'
-            }
-            title={
-              phase === 'saving'
-                ? 'Saving working media'
-                : phase === 'conflict'
-                  ? 'Conflict'
-                  : phase === 'error'
-                    ? 'Working media not changed'
-                    : 'Working media ready'
-            }
+            role={adoptionPhaseNotice[phase].role}
+            tone={adoptionPhaseNotice[phase].tone}
+            title={adoptionPhaseNotice[phase].title}
           >
             {message}
           </StatusNotice>

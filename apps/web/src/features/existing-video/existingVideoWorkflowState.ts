@@ -112,7 +112,6 @@ const stateSetter =
 export const createWorkflowStateSetters = (
   dispatch: Dispatch<ExistingVideoWorkflowStateAction>,
 ) => ({
-  setSelection: stateSetter(dispatch, 'selection'),
   setStep: stateSetter(dispatch, 'step'),
   setPhase: stateSetter(dispatch, 'phase'),
   setMessage: stateSetter(dispatch, 'message'),

@@ -4,6 +4,7 @@ import {
   captureBlockedReason as resolveCaptureBlockedReason,
   captureSettingsDisabledReason as resolveCaptureSettingsDisabledReason,
   characterBuilderBlockedReasons,
+  creativeConfigurationLocks,
   characterRemovalBlockedReason as resolveCharacterRemovalBlockedReason,
 } from './studioActivityPolicy';
 import type { useTakeReviewFlow } from './useTakeReviewFlow';
@@ -11,21 +12,21 @@ import type { useTakeReviewFlow } from './useTakeReviewFlow';
 interface UseStudioActivityModelOptions {
   readonly session: ReturnType<typeof useStudioSession>;
   readonly takeReview: ReturnType<typeof useTakeReviewFlow>;
-  readonly projectContextActive: boolean;
+  /** Whether the creative configuration is a saved, recoverable proposal rather than a draft. */
+  readonly creativeConfigurationIsDurable: boolean;
 }
 
 /**
  * Applies `studioActivityPolicy` to the live session and take-review state: what the Studio is
  * currently doing, and therefore what it must refuse.
  *
- * A Project context locks less than standalone capture does. Its creative configuration is a saved,
- * recoverable proposal rather than an in-memory draft, so only an active recording can invalidate
- * it — a model session or a paused review cannot.
+ * A surface whose creative configuration is durable locks less than standalone capture does: the
+ * configuration survives as a saved, recoverable proposal, so a paused review cannot invalidate it.
  */
 export const useStudioActivityModel = ({
   session,
   takeReview,
-  projectContextActive,
+  creativeConfigurationIsDurable,
 }: UseStudioActivityModelOptions) => {
   const { recordingActive, reviewLocked, mediaLocked, finalizingStartedAt, finalizingStream } =
     takeReview;
@@ -39,14 +40,21 @@ export const useStudioActivityModel = ({
     reviewLocked,
   });
 
+  const creativeConfigurationLockState = creativeConfigurationLocks({
+    configurationIsDurable: creativeConfigurationIsDurable,
+    recordingActive,
+    mediaLocked,
+    sessionModeLocked,
+    aiSessionActive,
+    sessionDisconnected,
+  });
+
   return {
     aiSessionActive,
     sessionModeLocked,
     finalizing,
-    creativeConfigurationMediaLocked: projectContextActive ? recordingActive : mediaLocked,
-    creativeConfigurationSessionModeLocked: projectContextActive
-      ? recordingActive || aiSessionActive || sessionDisconnected
-      : sessionModeLocked,
+    creativeConfigurationMediaLocked: creativeConfigurationLockState.mediaLocked,
+    creativeConfigurationSessionModeLocked: creativeConfigurationLockState.sessionModeLocked,
     characterBuilderActivityBlockedReason: characterBuilderBlocked.activity,
     characterBuilderOpenBlockedReason: characterBuilderBlocked.open,
     characterRemovalBlockedReason: resolveCharacterRemovalBlockedReason({

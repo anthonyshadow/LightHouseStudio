@@ -1,5 +1,5 @@
 import { useTheme } from '@emotion/react';
-import { useState, type RefObject } from 'react';
+import type { RefObject } from 'react';
 import type { VideoProcessingOperationCapability } from '@studio/contracts';
 import { Button } from '../../ui';
 import type { ProjectProcessingController } from '../projects/useProjectProcessingController';
@@ -64,7 +64,6 @@ export const ExistingVideoActionBar = ({
   projectProcessing,
 }: ExistingVideoActionBarProps) => {
   const theme = useTheme();
-  const [retryConfirmationOpen, setRetryConfirmationOpen] = useState(false);
   const step = workflow.steps[0];
   const plan = planSummary(workflow);
   const stepIncomplete = Boolean(
@@ -93,14 +92,11 @@ export const ExistingVideoActionBar = ({
   ) {
     return (
       <ExistingVideoProjectProcessingActions
-        theme={theme}
         workflow={workflow}
         projectProcessing={projectProcessing}
         projectCapability={projectCapability}
         stepIncomplete={stepIncomplete}
         visualUnavailable={visualUnavailable}
-        retryConfirmationOpen={retryConfirmationOpen}
-        onRetryConfirmationOpenChange={setRetryConfirmationOpen}
         onRequestDiscard={onRequestDiscard}
         {...(discardButtonRef ? { discardButtonRef } : {})}
       />

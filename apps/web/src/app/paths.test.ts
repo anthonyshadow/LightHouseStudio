@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   APP_PATHS,
-  assetLibraryPath,
+  ASSET_DESTINATION_PATHS,
   campaignIdFromPath,
   campaignPath,
   canonicalizeLegacyAppPath,
@@ -48,10 +48,10 @@ describe('authenticated application paths', () => {
     expect(studioCreatePath({ intent: 'upload' })).toBe('/studio/create?intent=upload');
     expect(studioCreatePath()).toBe(APP_PATHS.create);
     expect(isStudioWorkspacePath(studioVideoPath(videoId))).toBe(true);
-    expect(assetLibraryPath('video')).toBe(APP_PATHS.videos);
-    expect(assetLibraryPath('character')).toBe(APP_PATHS.characters);
-    expect(assetLibraryPath('outfit')).toBe(APP_PATHS.outfits);
-    expect(assetLibraryPath('voice')).toBe(APP_PATHS.voices);
+    expect(ASSET_DESTINATION_PATHS.videos).toBe(APP_PATHS.videos);
+    expect(ASSET_DESTINATION_PATHS.characters).toBe(APP_PATHS.characters);
+    expect(ASSET_DESTINATION_PATHS.outfits).toBe(APP_PATHS.outfits);
+    expect(ASSET_DESTINATION_PATHS.voices).toBe(APP_PATHS.voices);
     expect(savedVideoLibraryPath(videoId)).toBe(`${APP_PATHS.videos}?video=${videoId}`);
     expect(requestedSavedVideoIdFromSearch(`?video=${videoId}`)).toBe(videoId);
     expect(requestedSavedVideoIdFromSearch('?sort=latest')).toBeNull();

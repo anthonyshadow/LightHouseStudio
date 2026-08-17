@@ -19,6 +19,7 @@ import {
   reuseProjectWorkingMedia,
 } from './projectsApi';
 import type { ProjectSessionPort } from './useProjectSession';
+import { useStableOperationKey } from './useStableOperationKey';
 
 const revisionSourceLabel: Record<ProjectCurrentResponse['revision']['source'], string> = {
   create: 'Project created',
@@ -75,7 +76,7 @@ export const ProjectHistorySection = ({
   const [busyItemKey, setBusyItemKey] = useState<string | null>(null);
   const [preview, setPreview] = useState<ProjectOutputHistoryItem | null>(null);
   const previewTriggerRef = useRef<HTMLElement | null>(null);
-  const operationRef = useRef<{ readonly signature: string; readonly key: string } | null>(null);
+  const operation = useStableOperationKey();
 
   const revisions = useInfiniteQuery({
     queryKey: ['projects', 'history', projectId, 'revisions'],
@@ -123,11 +124,7 @@ export const ProjectHistorySection = ({
         expectedRevisionNumber: latest.revision.revisionNumber,
         media,
       });
-      const operationKey =
-        operationRef.current?.signature === signature
-          ? operationRef.current.key
-          : crypto.randomUUID();
-      operationRef.current = { signature, key: operationKey };
+      const operationKey = operation.keyFor(signature);
       setBusyItemKey(itemKey);
       try {
         const response = await reuseProjectWorkingMedia({
@@ -146,7 +143,7 @@ export const ProjectHistorySection = ({
             actualRevisionNumber: response.project.currentRevisionNumber,
           });
         }
-        operationRef.current = null;
+        operation.reset();
         session.acceptCurrent({ project: response.project, revision: response.revision });
         setMessage(
           `${label} is now working media. The immutable original and Saved Video current pointer were not changed.`,
@@ -162,7 +159,7 @@ export const ProjectHistorySection = ({
         setBusyItemKey(null);
       }
     },
-    [projectId, queryClient, session],
+    [operation, projectId, queryClient, session],
   );
 
   const revisionItems = revisions.data?.pages.flatMap((page) => page.revisions) ?? [];

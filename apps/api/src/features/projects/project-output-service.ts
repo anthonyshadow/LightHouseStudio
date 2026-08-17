@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
   projectOutputSaveResultSchema,
   saveProjectOutputResponseSchema,
@@ -15,6 +14,7 @@ import {
   type ProjectMediaReference,
   type ProjectOutputLink,
 } from '@studio/domain';
+import { deterministicUuid } from './deterministic-uuid';
 import { AppError } from '../../http/app-error.js';
 import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
 import { inspectSavedVideoFile } from '../saved-videos/saved-video-inspection.js';
@@ -54,20 +54,12 @@ interface ReadyProjectMedia {
   readonly source: ProjectSourceRecord | null;
 }
 
-const deterministicUuid = (
+const projectOutputId = (
   ownerUserId: string,
   operationId: string,
   purpose: 'saved-video' | 'video-version' | 'project-revision',
-): string => {
-  const bytes = createHash('sha256')
-    .update(`lightframe:project-output:v1:${ownerUserId}:${operationId}:${purpose}`)
-    .digest()
-    .subarray(0, 16);
-  bytes[6] = (bytes[6]! & 0x0f) | 0x50;
-  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
-  const hex = bytes.toString('hex');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-};
+): string =>
+  deterministicUuid(`lightframe:project-output:v1:${ownerUserId}:${operationId}:${purpose}`);
 
 const publicOutput = (output: ProjectOutputLink) => ({
   projectId: output.projectId,
@@ -296,9 +288,9 @@ export class ProjectOutputService {
     const now = this.#now().toISOString();
     const savedVideoId =
       request.target.kind === 'new'
-        ? deterministicUuid(ownerUserId, operationId, 'saved-video')
+        ? projectOutputId(ownerUserId, operationId, 'saved-video')
         : request.target.savedVideoId;
-    const versionId = deterministicUuid(ownerUserId, operationId, 'video-version');
+    const versionId = projectOutputId(ownerUserId, operationId, 'video-version');
     const targetAggregate =
       request.target.kind === 'version'
         ? await this.savedVideos.get(ownerUserId, request.target.savedVideoId)
@@ -367,7 +359,7 @@ export class ProjectOutputService {
         },
         {
           now,
-          createId: () => deterministicUuid(ownerUserId, operationId, 'project-revision'),
+          createId: () => projectOutputId(ownerUserId, operationId, 'project-revision'),
         },
       );
     } catch (error) {

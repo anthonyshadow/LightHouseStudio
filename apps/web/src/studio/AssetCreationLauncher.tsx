@@ -2,8 +2,7 @@ import { useTheme } from '@emotion/react';
 import type { VoiceSummary } from '@studio/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useState, type RefObject } from 'react';
-import { attachProjectAsset } from '../features/projects/projectsApi';
-import { projectAssetQueryKeys } from '../features/projects/useProjectAssetsController';
+import { attachProjectAssetAndSync } from '../features/projects/useProjectAssetsController';
 import { Button, OverlayPanel, StatusNotice } from '../ui';
 
 const VoiceLibrary = lazy(() =>
@@ -52,8 +51,10 @@ const OpenAssetCreationLauncher = ({
     setVoiceBusy(true);
     setVoiceError(null);
     try {
-      await attachProjectAsset(projectId, { kind: 'voice', resourceId: voice.voiceId });
-      await queryClient.invalidateQueries({ queryKey: projectAssetQueryKeys.project(projectId) });
+      await attachProjectAssetAndSync(queryClient, projectId, {
+        kind: 'voice',
+        resourceId: voice.voiceId,
+      });
       onClose();
     } catch {
       setVoiceError(

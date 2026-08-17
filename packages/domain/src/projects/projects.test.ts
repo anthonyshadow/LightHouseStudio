@@ -12,6 +12,7 @@ import {
   deriveProjectStatus,
   isProjectResumable,
   moveProjectToCampaign,
+  projectStatusAfterProcessingTrace,
   promoteProjectJobResult,
   ProjectRuleError,
   renameProject,
@@ -608,5 +609,23 @@ describe('Project aggregate rules', () => {
         { now: later, createId: () => secondRevisionId },
       ),
     ).toEqual({ kind: 'stale' });
+  });
+  it('settles Project status from a processing trace without no-op version churn', () => {
+    // Terminal failure moves a live Project to needs-attention.
+    expect(projectStatusAfterProcessingTrace('processing', 'failed')).toBe('needs-attention');
+    // Cancellation returns it to ready.
+    expect(projectStatusAfterProcessingTrace('processing', 'cancelled')).toBe('ready');
+
+    // Already settled: null, so the caller does not bump the CAS version for an unchanged status.
+    expect(projectStatusAfterProcessingTrace('needs-attention', 'failed')).toBeNull();
+    expect(projectStatusAfterProcessingTrace('ready', 'cancelled')).toBeNull();
+
+    // Non-terminal traces settle nothing.
+    expect(projectStatusAfterProcessingTrace('processing', 'queued')).toBeNull();
+    expect(projectStatusAfterProcessingTrace('processing', 'ready')).toBeNull();
+
+    // A late trace can never resurrect a deleted Project.
+    expect(projectStatusAfterProcessingTrace('deleted', 'failed')).toBeNull();
+    expect(projectStatusAfterProcessingTrace('deleted', 'cancelled')).toBeNull();
   });
 });

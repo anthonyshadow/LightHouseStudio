@@ -3,6 +3,7 @@ import type { AuthenticatedUser } from '@studio/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccountMenu } from '../features/account/AccountMenu';
 import type { BrowserCapabilities, ProviderAvailability } from '../features/media-session';
+import { liveExperienceAvailability } from './studioLiveAvailability';
 import { AppIcon, Button, type AppIconName } from '../ui';
 import { useDismissiblePopover } from '../ui/primitives/useDismissiblePopover';
 import {
@@ -260,9 +261,11 @@ export const StudioHeader = ({
   const [openMenu, setOpenMenu] = useState<HeaderMenu | null>(null);
   const localCaptureAvailable = browser.mediaDevices && browser.secureContext;
   const localCaptureState = localCaptureAvailable ? 'available' : 'unavailable';
-  const liveBetaEnabled = availability.realtimeBetaEnabled === true;
-  const liveProviderConfigured = availability.realtimeProviderConfigured ?? availability.decart;
-  const liveEnabled = liveBetaEnabled && liveProviderConfigured && availability.decart;
+  const {
+    betaEnabled: liveBetaEnabled,
+    providerConfigured: liveProviderConfigured,
+    enabled: liveEnabled,
+  } = liveExperienceAvailability(availability);
   const liveAiState =
     capabilityState === 'loading'
       ? 'checking'

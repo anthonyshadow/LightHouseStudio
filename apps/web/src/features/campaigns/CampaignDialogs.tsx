@@ -2,7 +2,7 @@ import { useTheme } from '@emotion/react';
 import type { CampaignContract, ProjectContract } from '@studio/contracts';
 import { useState, type FormEvent, type RefObject } from 'react';
 import { apiErrorMessage } from '../../adapters/api-client/apiClient';
-import { Button, OverlayPanel, StatusNotice, TextAreaField, TextField } from '../../ui';
+import { Button, ConfirmationDialog, OverlayPanel, TextAreaField, TextField } from '../../ui';
 import { dialogActionsStyles } from '../projects/ProjectRouteSurface.styles';
 import { useProjectsController } from '../projects/useProjectsController';
 import { ProjectCampaignPicker, projectCampaignId } from './ProjectCampaignPicker';
@@ -197,7 +197,6 @@ export const CampaignLifecycleDialog = ({
   readonly onClose: () => void;
   readonly onChanged: (campaign: CampaignContract, action: CampaignLifecycleAction) => void;
 }) => {
-  const theme = useTheme();
   const controller = useCampaignsController();
   const [error, setError] = useState<string | null>(null);
   const archiving = action === 'archive';
@@ -218,46 +217,30 @@ export const CampaignLifecycleDialog = ({
   };
 
   return (
-    <OverlayPanel
+    <ConfirmationDialog
       open
-      onClose={onClose}
       title={`${archiving ? 'Archive' : 'Restore'} Campaign`}
       description={
         archiving
           ? 'Archiving only changes Campaign visibility. It does not archive or move Projects.'
           : 'Restoring allows new and moved Project membership again.'
       }
-      placement="bottom"
-      size="standard"
-      closeDisabled={busy}
-      closeOnBackdrop={false}
-      returnFocusRef={returnFocusRef}
-      footer={
-        <div css={dialogActionsStyles(theme)}>
-          <Button variant="quiet" disabled={busy} onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant={archiving ? 'danger' : 'primary'}
-            busy={busy}
-            onClick={() => void apply()}
-          >
-            {archiving ? 'Archive Campaign' : 'Restore Campaign'}
-          </Button>
-        </div>
+      body={
+        <p>
+          {archiving
+            ? `Archive “${campaign.name}”? Its Projects remain intact.`
+            : `Restore “${campaign.name}”?`}
+        </p>
       }
-    >
-      <p>
-        {archiving
-          ? `Archive “${campaign.name}”? Its Projects remain intact.`
-          : `Restore “${campaign.name}”?`}
-      </p>
-      {error ? (
-        <StatusNotice role="alert" tone="danger" title="Change not applied">
-          {error}
-        </StatusNotice>
-      ) : null}
-    </OverlayPanel>
+      confirmLabel={archiving ? 'Archive Campaign' : 'Restore Campaign'}
+      cancelLabel="Cancel"
+      danger={archiving}
+      busy={busy}
+      {...(error === null ? {} : { alert: error, alertTitle: 'Change not applied' })}
+      returnFocusRef={returnFocusRef}
+      onCancel={onClose}
+      onConfirm={() => void apply()}
+    />
   );
 };
 
@@ -272,7 +255,6 @@ export const DeleteCampaignDialog = ({
   readonly onClose: () => void;
   readonly onDeleted: (name: string) => void;
 }) => {
-  const theme = useTheme();
   const controller = useCampaignsController();
   const [error, setError] = useState<string | null>(null);
   const busy = controller.tombstoneMutation.isPending;
@@ -295,33 +277,23 @@ export const DeleteCampaignDialog = ({
   };
 
   return (
-    <OverlayPanel
+    <ConfirmationDialog
       open
-      onClose={onClose}
       title="Delete Campaign"
       description="Only an archived empty Campaign can be deleted. No Project or content bytes are erased."
-      placement="bottom"
-      size="standard"
-      closeDisabled={busy}
-      closeOnBackdrop={false}
-      returnFocusRef={returnFocusRef}
-      footer={
-        <div css={dialogActionsStyles(theme)}>
-          <Button variant="quiet" disabled={busy} onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="danger" busy={busy} onClick={() => void remove()}>
-            Confirm Delete Campaign
-          </Button>
-        </div>
+      body={
+        <p>
+          Delete “{campaign.name}” as an organizer? This does not erase Project or content bytes.
+        </p>
       }
-    >
-      <p>Delete “{campaign.name}” as an organizer? This does not erase Project or content bytes.</p>
-      {error ? (
-        <StatusNotice role="alert" tone="warning" title="Campaign not deleted">
-          {error}
-        </StatusNotice>
-      ) : null}
-    </OverlayPanel>
+      confirmLabel="Confirm Delete Campaign"
+      cancelLabel="Cancel"
+      danger
+      busy={busy}
+      {...(error === null ? {} : { alert: error, alertTitle: 'Campaign not deleted' })}
+      returnFocusRef={returnFocusRef}
+      onCancel={onClose}
+      onConfirm={() => void remove()}
+    />
   );
 };

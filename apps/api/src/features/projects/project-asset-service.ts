@@ -9,6 +9,7 @@ import {
 } from '@studio/contracts';
 import { createProjectAssetMembership, type ProjectAssetMembership } from '@studio/domain';
 import { AppError } from '../../http/app-error.js';
+import { decodePageCursor, encodePageCursor } from '../../http/page-cursor.js';
 import type { CreativeLibraryRepository } from '../creative-libraries/creative-library-repository.js';
 import type { SavedVideoRepository } from '../saved-videos/saved-video-repository.js';
 import { publicSavedVideoSummary } from '../saved-videos/saved-video-service.js';
@@ -18,50 +19,24 @@ import type { ProjectAssetMembershipCursor, ProjectRepository } from './project-
 const cursorCriteria = (projectId: string, query: ProjectAssetsQuery): string =>
   JSON.stringify({ projectId, kind: query.kind ?? null, pageSize: query.pageSize });
 
+const ASSET_MEMBERSHIP_CURSOR = {
+  timestampKey: 'createdAt',
+  idKey: 'membershipId',
+  invalidMessage: 'Use a valid Project asset page cursor.',
+} as const;
+
 const encodeCursor = (
   cursor: ProjectAssetMembershipCursor,
   projectId: string,
   query: ProjectAssetsQuery,
-): string =>
-  Buffer.from(
-    JSON.stringify({ version: 1, ...cursor, criteria: cursorCriteria(projectId, query) }),
-    'utf8',
-  ).toString('base64url');
+): string => encodePageCursor(cursor, cursorCriteria(projectId, query));
 
 const decodeCursor = (
   cursor: string | undefined,
   projectId: string,
   query: ProjectAssetsQuery,
-): ProjectAssetMembershipCursor | undefined => {
-  if (cursor === undefined) return undefined;
-  try {
-    const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as unknown;
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      'version' in value &&
-      value.version === 1 &&
-      'createdAt' in value &&
-      typeof value.createdAt === 'string' &&
-      Number.isFinite(new Date(value.createdAt).valueOf()) &&
-      'membershipId' in value &&
-      typeof value.membershipId === 'string' &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
-        value.membershipId,
-      ) &&
-      'criteria' in value &&
-      value.criteria === cursorCriteria(projectId, query)
-    ) {
-      return {
-        createdAt: new Date(value.createdAt).toISOString(),
-        membershipId: value.membershipId,
-      };
-    }
-  } catch {
-    // Opaque application cursors fail as one finite validation error.
-  }
-  throw new AppError(400, 'validation_error', 'Use a valid Project asset page cursor.');
-};
+): ProjectAssetMembershipCursor | undefined =>
+  decodePageCursor(cursor, cursorCriteria(projectId, query), ASSET_MEMBERSHIP_CURSOR);
 
 const publicMembership = (membership: ProjectAssetMembership) =>
   projectAssetMembershipSchema.parse({

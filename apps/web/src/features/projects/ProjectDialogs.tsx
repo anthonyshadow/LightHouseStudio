@@ -2,7 +2,7 @@ import { useTheme } from '@emotion/react';
 import type { ProjectContract, ProjectCurrentResponse } from '@studio/contracts';
 import { useRef, useState, type FormEvent, type RefObject } from 'react';
 import { apiErrorMessage } from '../../adapters/api-client/apiClient';
-import { Button, OverlayPanel, StatusNotice, TextField } from '../../ui';
+import { Button, ConfirmationDialog, OverlayPanel, StatusNotice, TextField } from '../../ui';
 import { ProjectCampaignPicker, projectCampaignId } from '../campaigns/ProjectCampaignPicker';
 import { dialogActionsStyles } from './ProjectRouteSurface.styles';
 import { ProjectApiConflictError } from './projectsApi';
@@ -224,9 +224,7 @@ export const ProjectLifecycleDialog = ({
   readonly onClose: () => void;
   readonly onChanged: (current: ProjectCurrentResponse, action: ProjectLifecycleAction) => void;
 }) => {
-  const theme = useTheme();
   const controller = useProjectsController();
-  const cancelRef = useRef<HTMLButtonElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryWithLatest, setRetryWithLatest] = useState(false);
   const mutation = action === 'archive' ? controller.archiveMutation : controller.restoreMutation;
@@ -252,9 +250,8 @@ export const ProjectLifecycleDialog = ({
   };
 
   return (
-    <OverlayPanel
+    <ConfirmationDialog
       open
-      onClose={onClose}
       title={`${actionLabel} Project`}
       description={
         action === 'archive'
@@ -262,41 +259,25 @@ export const ProjectLifecycleDialog = ({
             'Archived Projects leave the active workspace and retain their durable history.')
           : 'Restoring returns this empty Project to the active workspace.'
       }
-      placement="bottom"
-      size="standard"
-      closeDisabled={mutation.isPending}
-      closeOnBackdrop={false}
-      initialFocusRef={cancelRef}
-      returnFocusRef={returnFocusRef}
-      footer={
-        <div css={dialogActionsStyles(theme)}>
-          <Button ref={cancelRef} variant="quiet" disabled={mutation.isPending} onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant={action === 'archive' ? 'danger' : 'primary'}
-            busy={mutation.isPending}
-            disabled={action === 'archive' && archiveBlockedReason !== undefined}
-            onClick={() => void change()}
-          >
-            {retryWithLatest ? `Reload and retry ${action}` : `${actionLabel} Project`}
-          </Button>
-        </div>
+      body={
+        <p>
+          {action === 'archive' && archiveBlockedReason
+            ? 'Stay in this Project or switch away normally. Browser status checks stop on switch, while accepted remote work may continue and reconnect when reopened.'
+            : action === 'archive'
+              ? `Archive “${project.title}”? You can restore it later.`
+              : `Restore “${project.title}” to active Projects?`}
+        </p>
       }
-    >
-      <p>
-        {action === 'archive' && archiveBlockedReason
-          ? 'Stay in this Project or switch away normally. Browser status checks stop on switch, while accepted remote work may continue and reconnect when reopened.'
-          : action === 'archive'
-            ? `Archive “${project.title}”? You can restore it later.`
-            : `Restore “${project.title}” to active Projects?`}
-      </p>
-      {error ? (
-        <StatusNotice role="alert" tone="warning" title={`${actionLabel} not applied`}>
-          {error}
-        </StatusNotice>
-      ) : null}
-    </OverlayPanel>
+      confirmLabel={retryWithLatest ? `Reload and retry ${action}` : `${actionLabel} Project`}
+      cancelLabel="Cancel"
+      danger={action === 'archive'}
+      busy={mutation.isPending}
+      confirmDisabled={action === 'archive' && archiveBlockedReason !== undefined}
+      {...(error === null ? {} : { alert: error, alertTitle: `${actionLabel} not applied` })}
+      returnFocusRef={returnFocusRef}
+      onCancel={onClose}
+      onConfirm={() => void change()}
+    />
   );
 };
 
@@ -311,9 +292,7 @@ export const DeleteProjectDialog = ({
   readonly onClose: () => void;
   readonly onDeleted: (title: string) => void;
 }) => {
-  const theme = useTheme();
   const controller = useProjectsController();
-  const cancelRef = useRef<HTMLButtonElement>(null);
   const [error, setError] = useState<string | null>(null);
   const busy = controller.tombstoneMutation.isPending;
 
@@ -331,38 +310,25 @@ export const DeleteProjectDialog = ({
   };
 
   return (
-    <OverlayPanel
+    <ConfirmationDialog
       open
-      onClose={onClose}
       title="Delete Project"
       description="The Project disappears from the workspace, while retained lineage continues protecting referenced media."
-      placement="bottom"
-      size="standard"
-      closeDisabled={busy}
-      closeOnBackdrop={false}
-      initialFocusRef={cancelRef}
-      returnFocusRef={returnFocusRef}
-      footer={
-        <div css={dialogActionsStyles(theme)}>
-          <Button ref={cancelRef} variant="quiet" disabled={busy} onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant="danger" busy={busy} onClick={() => void remove()}>
-            Confirm Delete Project
-          </Button>
-        </div>
+      body={
+        <p>
+          Delete “{project.title}”? This removes only this archived Project from visible Project and
+          Campaign lists. It does not claim physical erasure of retained history or media.
+        </p>
       }
-    >
-      <p>
-        Delete “{project.title}”? This removes only this archived Project from visible Project and
-        Campaign lists. It does not claim physical erasure of retained history or media.
-      </p>
-      {error ? (
-        <StatusNotice role="alert" tone="warning" title="Project not deleted">
-          {error}
-        </StatusNotice>
-      ) : null}
-    </OverlayPanel>
+      confirmLabel="Confirm Delete Project"
+      cancelLabel="Cancel"
+      danger
+      busy={busy}
+      {...(error === null ? {} : { alert: error, alertTitle: 'Project not deleted' })}
+      returnFocusRef={returnFocusRef}
+      onCancel={onClose}
+      onConfirm={() => void remove()}
+    />
   );
 };
 

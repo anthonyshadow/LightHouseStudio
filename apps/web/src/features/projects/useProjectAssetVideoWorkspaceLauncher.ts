@@ -16,6 +16,7 @@ import {
   reuseSavedVideoAsProjectSource,
 } from './projectsApi';
 import type { ProjectSessionPort } from './useProjectSession';
+import { useStableOperationKey } from './useStableOperationKey';
 
 const selectedReference = (video: SavedVideoSummary) => ({
   kind: 'saved-video-version' as const,
@@ -58,7 +59,7 @@ export const useProjectAssetVideoWorkspaceLauncher = (
   session: ProjectSessionPort,
 ) => {
   const navigate = useNavigate();
-  const operationRef = useRef<{ readonly signature: string; readonly key: string } | null>(null);
+  const operation = useStableOperationKey();
   const controllerRef = useRef<AbortController | null>(null);
   const [busyVideoId, setBusyVideoId] = useState<string | null>(null);
 
@@ -108,11 +109,7 @@ export const useProjectAssetVideoWorkspaceLauncher = (
         savedVideoId: video.id,
         videoVersionId: video.currentVersion.id,
       });
-      const operationKey =
-        operationRef.current?.signature === signature
-          ? operationRef.current.key
-          : crypto.randomUUID();
-      operationRef.current = { signature, key: operationKey };
+      const operationKey = operation.keyFor(signature);
       const controller = new AbortController();
       controllerRef.current?.abort('project-video-workspace-launch-replaced');
       controllerRef.current = controller;
@@ -176,7 +173,7 @@ export const useProjectAssetVideoWorkspaceLauncher = (
         }
 
         controller.signal.throwIfAborted();
-        operationRef.current = null;
+        operation.reset();
         session.acceptCurrent(next);
         setBusyVideoId(null);
         void navigate(projectWorkspacePath(projectId));
@@ -185,7 +182,7 @@ export const useProjectAssetVideoWorkspaceLauncher = (
         setBusyVideoId(null);
       }
     },
-    [archived, busyVideoId, navigate, projectId, session],
+    [archived, busyVideoId, navigate, operation, projectId, session],
   );
 
   return { open, busyVideoId } as const;

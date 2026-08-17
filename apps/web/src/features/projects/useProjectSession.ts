@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { checkpointProject, getProject } from './projectsApi';
 import { ProjectSessionController, type ProjectSessionPhase } from './projectSessionController';
-import { projectQueryKeys } from './useProjectsController';
+import { reconcileProject } from './useProjectsController';
 
 export interface ProjectSessionPort {
   readonly projectId: string;
@@ -40,10 +40,7 @@ export const useProjectSession = (projectId: string) => {
             },
             signal,
           ),
-        publish: (current) => {
-          queryClient.setQueryData(projectQueryKeys.detail(current.project.id), current);
-          void queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
-        },
+        publish: (current) => void reconcileProject(queryClient, current),
       }),
     [projectId, queryClient],
   );

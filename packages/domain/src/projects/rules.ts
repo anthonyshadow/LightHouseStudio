@@ -15,6 +15,10 @@ import type {
   ProjectStatus,
   ProjectStatusFacts,
 } from './types';
+import { requireIsoTimestamp, requireOpaqueId, stripControlCharacters } from '../common/identity';
+import { normalizeWhitespace } from '../common/text';
+import type { ProjectProcessingJobStatus } from '../video-processing/types';
+import { projectProcessingNeedsAttention } from '../video-processing/rules';
 import { PROJECT_SNAPSHOT_SCHEMA_VERSION } from './types';
 
 export type ProjectRuleErrorReason =
@@ -40,25 +44,15 @@ const PROJECT_TITLE_MAX_LENGTH = 120;
 const PROJECT_INTENT_MAX_LENGTH = 4_000;
 const PROJECT_APPLIED_LABEL_MAX_LENGTH = 120;
 
-const requireTimestamp = (value: string): string => {
-  const parsed = new Date(value);
-  if (!Number.isFinite(parsed.valueOf())) {
+const requireTimestamp = (value: string): string =>
+  requireIsoTimestamp(value, () => {
     throw new ProjectRuleError('invalid-timestamp', 'A valid project timestamp is required.');
-  }
-  return parsed.toISOString();
-};
+  });
 
-const requireId = (value: string, label: string): string => {
-  const normalized = value.trim();
-  if (
-    normalized.length === 0 ||
-    normalized.length > 200 ||
-    /^(?:blob|data|https?):/iu.test(normalized)
-  ) {
-    throw new ProjectRuleError('invalid-id', `${label} must be an opaque durable identifier.`);
-  }
-  return normalized;
-};
+const requireId = (value: string, label: string): string =>
+  requireOpaqueId(value, label, (message) => {
+    throw new ProjectRuleError('invalid-id', message);
+  });
 
 const requireAppliedLabel = (value: string, label: string): void => {
   const normalized = value.replaceAll(/\s+/gu, ' ').trim();
@@ -68,15 +62,10 @@ const requireAppliedLabel = (value: string, label: string): void => {
 };
 
 export const normalizeProjectTitle = (value: string): string => {
-  const normalized = [...value]
-    .filter((character) => {
-      const codePoint = character.codePointAt(0) ?? 0;
-      return codePoint > 31 && codePoint !== 127;
-    })
-    .join('')
-    .replaceAll(/\s+/gu, ' ')
-    .trim()
-    .slice(0, PROJECT_TITLE_MAX_LENGTH);
+  const normalized = normalizeWhitespace(
+    stripControlCharacters(value, { stripDelete: true }),
+    PROJECT_TITLE_MAX_LENGTH,
+  );
   if (normalized.length === 0) {
     throw new ProjectRuleError('invalid-title', 'A project needs a title.');
   }
@@ -321,6 +310,29 @@ const assertStatusTransition = (from: ProjectStatus, to: ProjectStatus): void =>
   }
 };
 
+/**
+ * The status a Project takes when the trace for its *current* processing attempt settles.
+ *
+ * Returns `null` when nothing should change. That is load-bearing rather than a convenience: the
+ * Project version is a CAS token, so persisting a status the Project already has would invalidate
+ * every client's `expectedVersion` for no observable reason. A forbidden transition — most
+ * importantly anything out of `deleted` — also returns `null`, so a late provider trace can never
+ * resurrect a Project the owner removed.
+ */
+export const projectStatusAfterProcessingTrace = (
+  currentStatus: ProjectStatus,
+  traceStatus: ProjectProcessingJobStatus,
+): ProjectStatus | null => {
+  const next: ProjectStatus | null =
+    traceStatus === 'cancelled'
+      ? 'ready'
+      : projectProcessingNeedsAttention(traceStatus)
+        ? 'needs-attention'
+        : null;
+  if (next === null || next === currentStatus) return null;
+  return canTransitionProjectStatus(currentStatus, next) ? next : null;
+};
+
 export const isProjectResumable = (
   project: Project,
   snapshot: ProjectSnapshot,
@@ -434,6 +446,68 @@ export const projectVersionConflictDetail = (
   expectedVersion,
   actualVersion,
 });
+
+/**
+ * The Project conflict taxonomy, constructed in exactly one place.
+ *
+ * Every persistence adapter has to answer "which conflict is this?" for the same set of
+ * situations. Storage mechanics legitimately differ between adapters; the conflict a caller
+ * observes must not, or `local`/`shadow` and `neon` can report different outcomes for an identical
+ * request and the route layer has no way to tell which one is authoritative.
+ */
+export const projectConflicts = {
+  operationKey: (
+    operation: Extract<ProjectConflict, { readonly kind: 'operation-key' }>['operation'],
+  ): Extract<ProjectConflict, { readonly kind: 'operation-key' }> => ({
+    kind: 'operation-key',
+    operation,
+  }),
+  version: projectVersionConflictDetail,
+  revision: (
+    projectId: string,
+    expectedRevisionNumber: number,
+    actualRevisionNumber: number,
+  ): Extract<ProjectConflict, { readonly kind: 'revision' }> => ({
+    kind: 'revision',
+    projectId,
+    expectedRevisionNumber,
+    actualRevisionNumber,
+  }),
+  relationMismatch: (
+    projectId: string,
+    relation: 'job' | 'output',
+  ): Extract<ProjectConflict, { readonly kind: 'relation-mismatch' }> => ({
+    kind: 'relation-mismatch',
+    projectId,
+    relation,
+  }),
+  activeJobs: (projectId: string): Extract<ProjectConflict, { readonly kind: 'active-jobs' }> => ({
+    kind: 'active-jobs',
+    projectId,
+  }),
+  campaignMembership: (
+    projectId: string,
+  ): Extract<ProjectConflict, { readonly kind: 'campaign-membership' }> => ({
+    kind: 'campaign-membership',
+    projectId,
+  }),
+  immutableSource: (
+    projectId: string,
+  ): Extract<ProjectConflict, { readonly kind: 'immutable-source' }> => ({
+    kind: 'immutable-source',
+    projectId,
+  }),
+  savedVideoVersion: (
+    savedVideoId: string,
+    expectedVersionId: string,
+    actualVersionId: string,
+  ): Extract<ProjectConflict, { readonly kind: 'saved-video-version' }> => ({
+    kind: 'saved-video-version',
+    savedVideoId,
+    expectedVersionId,
+    actualVersionId,
+  }),
+} as const;
 
 const projectVersionConflict = (
   project: Project,

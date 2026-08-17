@@ -1,18 +1,17 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectContract, SavedVideoSummary } from '@studio/contracts';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRef, useState, type RefObject } from 'react';
+import { useState, type RefObject } from 'react';
 import { useNavigate } from 'react-router';
-import { ApiClientError } from '../../adapters/api-client/apiClient';
 import { projectWorkspacePath } from '../../app/paths';
 import { Button, OverlayPanel, StatusNotice } from '../../ui';
+import { safeProjectError } from './ProjectDialogs';
 import { getProject, reuseSavedVideoAsProjectSource } from './projectsApi';
-import { projectQueryKeys, useProjectList } from './useProjectsController';
+import { reconcileProject, useProjectList } from './useProjectsController';
+import { useStableOperationKey } from './useStableOperationKey';
 
-const messageForError = (error: unknown): string =>
-  error instanceof ApiClientError || error instanceof Error
-    ? error.message
-    : 'The video could not be added to that Project.';
+/** Raised locally so its operator-facing copy is distinguishable from transport-vetted errors. */
+class ProjectSourceOccupiedError extends Error {}
 
 export const AddVideoToProjectDialog = ({
   video,
@@ -28,7 +27,7 @@ export const AddVideoToProjectDialog = ({
   const queryClient = useQueryClient();
   const projectsQuery = useProjectList('active');
   const projects = projectsQuery.data?.pages.flatMap((page) => page.projects) ?? [];
-  const operationRef = useRef<{ readonly projectId: string; readonly key: string } | null>(null);
+  const operation = useStableOperationKey();
   const [busyProjectId, setBusyProjectId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,15 +51,25 @@ export const AddVideoToProjectDialog = ({
           finish(project.id);
           return;
         }
-        throw new Error(
+        throw new ProjectSourceOccupiedError(
           `“${project.title}” already has an immutable source. Choose an empty Project instead.`,
         );
       }
-      const operationKey =
-        operationRef.current?.projectId === project.id
-          ? operationRef.current.key
-          : crypto.randomUUID();
-      operationRef.current = { projectId: project.id, key: operationKey };
+      // Mirrors the server's request fingerprint for `source-accept`. Keying on `projectId` alone
+      // let one key outlive the request it was minted for: after a first attempt landed but lost
+      // its response, the retry re-read a bumped `expectedVersion`, and the same key with a
+      // different fingerprint is rejected as an `operation-key` conflict — so a retry of a
+      // *succeeded* operation surfaced as a 409 instead of reconciling. Rotating the key with the
+      // request lets the preflight above recognise the Project's own source and finish cleanly.
+      const operationKey = operation.keyFor(
+        JSON.stringify({
+          projectId: project.id,
+          expectedVersion: current.project.version,
+          expectedRevisionNumber: current.project.currentRevisionNumber,
+          savedVideoId: video.id,
+          videoVersionId: video.currentVersion.id,
+        }),
+      );
       const response = await reuseSavedVideoAsProjectSource({
         projectId: project.id,
         operationKey,
@@ -69,15 +78,16 @@ export const AddVideoToProjectDialog = ({
         savedVideoId: video.id,
         videoVersionId: video.currentVersion.id,
       });
-      queryClient.setQueryData(projectQueryKeys.detail(project.id), {
+      await reconcileProject(queryClient, {
         project: response.project,
         revision: response.revision,
       });
-      await queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
-      operationRef.current = null;
+      operation.reset();
       finish(project.id);
     } catch (caught) {
-      setError(messageForError(caught));
+      setError(
+        caught instanceof ProjectSourceOccupiedError ? caught.message : safeProjectError(caught),
+      );
     } finally {
       setBusyProjectId(null);
     }

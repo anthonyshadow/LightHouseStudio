@@ -7,6 +7,7 @@ import { StudioDesignProvider } from '../../ui';
 import type { VideoEditSession } from './useVideoEditSession';
 import { formatVideoEditTime } from './types';
 import { VideoEditWorkspace } from './VideoEditWorkspace';
+import { projectVideoEditOutcome } from '../../studio/projectVideoEditOutcome';
 
 afterEach(cleanup);
 
@@ -95,8 +96,7 @@ const renderProjectWorkspace = (
       <VideoEditWorkspace
         session={session}
         onRequestDiscard={vi.fn()}
-        projectMode
-        appliedProjectEdit={appliedProjectEdit}
+        outcome={projectVideoEditOutcome(appliedProjectEdit)}
       />
     </StudioDesignProvider>,
   );
