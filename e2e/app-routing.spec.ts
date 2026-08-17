@@ -113,7 +113,7 @@ test('entry stays provider-free and Login opens Dashboard without starting media
   await expect(page).toHaveTitle('Dashboard · Lightframe');
   await expect(page.locator('#studio-main')).toBeFocused();
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-  await expect(page.getByLabel('Studio media stage')).toBeHidden();
+  await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
 });
 
 test('the pre-rename singular Campaign URLs redirect to their canonical plural paths', async ({
@@ -165,16 +165,12 @@ test('direct and refreshed Studio entries preserve one stage', async ({ page }) 
     .toMatchObject({ cameraCalls: 0, requirementModels: [], connections: [] });
 });
 
-test('Video, Character, and Outfit Asset routes preserve the shared Studio stage', async ({
+test('Asset libraries open with no Studio stage and hand a selection back to it', async ({
   page,
 }) => {
   await installSuccessfulStudioHarness(page);
   await page.goto(STUDIO_PATH);
-  const stageVideo = page.getByLabel('Studio media stage').locator('video');
-  await stageVideo.evaluate((video) => {
-    (window as typeof window & { __sharedLibraryStage?: HTMLVideoElement }).__sharedLibraryStage =
-      video as HTMLVideoElement;
-  });
+  await expect(page.getByLabel('Studio media stage')).toHaveCount(1);
 
   await page.getByRole('button', { name: 'Assets', exact: true }).click();
   for (const library of [
@@ -189,16 +185,24 @@ test('Video, Character, and Outfit Asset routes preserve the shared Studio stage
     if (library.path === '/assets/characters') {
       await expect(dialog.getByRole('button', { name: 'Create new character' })).toBeVisible();
     }
-    expect(
-      await stageVideo.evaluate(
-        (video) =>
-          (window as typeof window & { __sharedLibraryStage?: HTMLVideoElement })
-            .__sharedLibraryStage === video,
-      ),
-    ).toBe(true);
+    // A library needs no camera, so it gets none: the stage is absent, not hidden behind CSS.
+    await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
     await dialog.getByRole('button', { name: 'Close panel' }).click();
     await expect(page).toHaveURL(/\/assets$/u);
   }
+
+  // Creating from a library still lands in Studio with the runtime mounted, which is the path the
+  // shell's handoff channel exists to serve.
+  await page.getByRole('button', { name: 'Open Characters' }).click();
+  await page
+    .getByRole('dialog', { name: 'Characters' })
+    .getByRole('button', { name: 'Create new character' })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
+  await expect(page.getByLabel('Studio media stage')).toHaveCount(1);
+  await expect
+    .poll(async () => readBrowserState(page))
+    .toMatchObject({ cameraCalls: 0, connections: [] });
 });
 
 test('closing an Asset library consumes its history entry instead of stacking the hub', async ({
@@ -233,8 +237,8 @@ test('Projects quick creation, lifecycle, refresh, and explicit Assets exit stay
 
   await expect(page).toHaveTitle('Projects · Lightframe Studio');
   await expect(page.getByText('No active Projects yet', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Studio media stage')).toHaveCount(1);
-  await expect(page.getByLabel('Studio media stage')).toBeHidden();
+  // The Projects list owns no live media, so no stage is mounted for it at all.
+  await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
   await page.getByRole('button', { name: 'Quick project' }).click();
 
   await expect(page).toHaveURL(new RegExp(`/projects/${TEST_PROJECT_ID}$`, 'u'));
@@ -610,7 +614,7 @@ test('Campaign creation reaches a Campaign Project without activating media or p
 
   await expect(page).toHaveTitle('Campaigns · Lightframe Studio');
   await expect(page.getByText('No Campaigns yet', { exact: true })).toBeVisible();
-  await expect(page.getByLabel('Studio media stage')).toBeHidden();
+  await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
   await page.getByRole('button', { name: 'Create Campaign' }).click();
   const create = page.getByRole('dialog', { name: 'Create Campaign' });
   await create.getByRole('textbox', { name: /Campaign name/u }).fill('Summer launch');

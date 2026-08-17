@@ -61,6 +61,8 @@ export interface StudioRuntimePorts {
   readonly existingVideoCharacter: ExistingVideoCharacterPort;
   /** Loads a Saved Video into review or the local editor. Navigates to Studio itself. */
   readonly useSavedVideo: (video: SavedVideoSummary, intent: 'play' | 'edit') => Promise<void>;
+  /** Flushes unsaved creative configuration into a Project checkpoint before a submission. */
+  readonly checkpointProjectCreative: () => Promise<boolean>;
   /** Saves a Character into the live session's creative configuration. */
   readonly saveStudioCharacter: (
     snapshot: CharacterSaveSnapshot,
