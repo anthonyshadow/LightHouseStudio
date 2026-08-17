@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAwaitableQuestion } from './useAwaitableQuestion';
 import type { SavedCharacterPrompt } from '../features/creative-assets/types';
 import {
   createCharacterEditDraftValue,
@@ -39,28 +40,15 @@ export const useCharacterBuilderLaunchController = ({
   const [launch, setLaunch] = useState<CharacterBuilderLaunch>({
     target: { kind: 'create' },
   });
-  const [discardPrompt, setDiscardPrompt] = useState<string | null>(null);
   const [launchError, setLaunchError] = useState<string | null>(null);
-  const discardResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
   const launchPendingRef = useRef(false);
   const operationGenerationRef = useRef(0);
   const mountedRef = useRef(true);
 
-  const settleDiscard = useCallback((confirmed: boolean) => {
-    const resolve = discardResolverRef.current;
-    discardResolverRef.current = null;
-    setDiscardPrompt(null);
-    resolve?.(confirmed);
-  }, []);
-
-  const requestDiscard = useCallback((message: string): Promise<boolean> => {
-    if (!mountedRef.current) return Promise.resolve(false);
-    return new Promise((resolve) => {
-      discardResolverRef.current?.(false);
-      discardResolverRef.current = resolve;
-      setDiscardPrompt(message);
-    });
-  }, []);
+  // The prompt carries only its message: this flow renders its own dialog, so it needs the
+  // awaitable plumbing rather than the shell's confirmation copy.
+  const discard = useAwaitableQuestion<string>();
+  const { pending: discardPrompt, ask: requestDiscard } = discard;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -68,8 +56,6 @@ export const useCharacterBuilderLaunchController = ({
       mountedRef.current = false;
       operationGenerationRef.current += 1;
       launchPendingRef.current = false;
-      discardResolverRef.current?.(false);
-      discardResolverRef.current = null;
     };
   }, []);
 
@@ -148,7 +134,7 @@ export const useCharacterBuilderLaunchController = ({
     openNewCharacter,
     editCharacter,
     copyCharacter,
-    resolveDiscard: settleDiscard,
+    resolveDiscard: (confirmed: boolean) => (confirmed ? discard.confirm() : discard.cancel()),
     dismissLaunchError,
   } as const;
 };

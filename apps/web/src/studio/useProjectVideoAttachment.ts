@@ -2,8 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { projectPath } from '../app/paths';
-import { attachProjectAsset } from '../features/projects/projectsApi';
-import { projectAssetQueryKeys } from '../features/projects/useProjectAssetsController';
+import { attachProjectAssetAndSync } from '../features/projects/useProjectAssetsController';
 
 export type ProjectVideoAttachmentState =
   | Readonly<{ status: 'idle' }>
@@ -43,16 +42,13 @@ export const useProjectVideoAttachment = ({
     attemptRef.current = attemptKey;
     const controller = new AbortController();
     setState({ status: 'attaching', projectId, videoId: savedVideoId });
-    void attachProjectAsset(
+    void attachProjectAssetAndSync(
+      queryClient,
       projectId,
       { kind: 'video', resourceId: savedVideoId },
       controller.signal,
     )
-      .then(async () => {
-        if (controller.signal.aborted) return;
-        await queryClient.invalidateQueries({
-          queryKey: projectAssetQueryKeys.project(projectId),
-        });
+      .then(() => {
         if (!controller.signal.aborted) {
           setState({ status: 'idle' });
           void navigate(projectPath(projectId), { replace: true });

@@ -18,8 +18,8 @@ import {
 } from '../features/existing-video/useExistingVideoWorkflow';
 import { useCharacterBuilderLaunchController } from './useCharacterBuilderLaunchController';
 import type { ActiveOverlay } from './useStudioOverlayController';
-import { attachProjectAsset } from '../features/projects/projectsApi';
-import { projectAssetQueryKeys } from '../features/projects/useProjectAssetsController';
+import { attachProjectAssetAndSync } from '../features/projects/useProjectAssetsController';
+import type { ConfirmationRequest } from './useConfirmationRequest';
 
 export type CharacterBuilderDestination =
   | Readonly<{ kind: 'studio' }>
@@ -44,6 +44,7 @@ interface UseStudioCharacterWorkflowOptions {
   readonly saveStudioCharacter: SaveCharacter;
   readonly openOverlay: (overlay: Exclude<ActiveOverlay, null>) => void;
   readonly closeOverlay: () => void;
+  readonly confirmation: ConfirmationRequest;
 }
 
 export const useStudioCharacterWorkflow = ({
@@ -57,6 +58,7 @@ export const useStudioCharacterWorkflow = ({
   saveStudioCharacter,
   openOverlay,
   closeOverlay,
+  confirmation,
 }: UseStudioCharacterWorkflowOptions) => {
   const queryClient = useQueryClient();
   const [destination, setDestination] = useState<CharacterBuilderDestination>({ kind: 'studio' });
@@ -174,12 +176,9 @@ export const useStudioCharacterWorkflow = ({
         await persistCharacterSaveSnapshot(repository, snapshot, characterId);
         await progress.markCharacterPersisted();
       }
-      await attachProjectAsset(destination.projectId, {
+      await attachProjectAssetAndSync(queryClient, destination.projectId, {
         kind: 'character',
         resourceId: characterId,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: projectAssetQueryKeys.project(destination.projectId),
       });
       await progress.markStudioPreloaded();
     },
@@ -218,8 +217,19 @@ export const useStudioCharacterWorkflow = ({
     [existingVideo.providerActive, existingVideo.steps, openOverlay, repository],
   );
 
-  const closeWardrobe = useCallback(() => {
-    if (wardrobeDirty && !window.confirm('Discard the unfinished wardrobe variant?')) return;
+  const closeWardrobe = useCallback(async () => {
+    if (
+      wardrobeDirty &&
+      !(await confirmation.ask({
+        title: 'Discard the unfinished wardrobe variant?',
+        description: 'The variant has not been saved and cannot be recovered.',
+        confirmLabel: 'Discard variant',
+        cancelLabel: 'Keep editing',
+        danger: true,
+      }))
+    ) {
+      return;
+    }
     setWardrobeDirty(false);
     if (wardrobeExistingVideoStepId && existingVideo.selection) {
       setWardrobeExistingVideoStepId(null);
@@ -229,6 +239,7 @@ export const useStudioCharacterWorkflow = ({
     closeOverlay();
   }, [
     closeOverlay,
+    confirmation,
     existingVideo.selection,
     openOverlay,
     wardrobeDirty,

@@ -3,8 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { savedPromptToRecipeSelection } from '../features/creative-assets/recipeSelection';
 import type { RecentPrompt, SavedPrompt } from '../features/creative-assets/types';
 import type { ActiveOverlay } from './useStudioOverlayController';
-import { attachProjectAsset } from '../features/projects/projectsApi';
-import { projectAssetQueryKeys } from '../features/projects/useProjectAssetsController';
+import { attachProjectAssetAndSync } from '../features/projects/useProjectAssetsController';
+import type { ConfirmationRequest } from './useConfirmationRequest';
 
 export type OutfitBuilderLaunch = Readonly<{
   outfit?: SavedPrompt;
@@ -22,6 +22,7 @@ interface UseStudioOutfitWorkflowOptions {
   readonly closeOverlay: () => void;
   readonly onOpenLibrary: () => void;
   readonly applySavedOutfit: (selection: ReturnType<typeof savedPromptToRecipeSelection>) => void;
+  readonly confirmation: ConfirmationRequest;
 }
 
 export const useStudioOutfitWorkflow = ({
@@ -30,6 +31,7 @@ export const useStudioOutfitWorkflow = ({
   closeOverlay,
   onOpenLibrary,
   applySavedOutfit,
+  confirmation,
 }: UseStudioOutfitWorkflowOptions) => {
   const queryClient = useQueryClient();
   const [launch, setLaunch] = useState<OutfitBuilderLaunch>({
@@ -109,10 +111,16 @@ export const useStudioOutfitWorkflow = ({
     [openEditor],
   );
 
-  const close = useCallback(() => {
+  const close = useCallback(async () => {
     if (
       dirtyRef.current &&
-      !window.confirm('Discard the unfinished outfit changes? The draft cannot be recovered.')
+      !(await confirmation.ask({
+        title: 'Discard the unfinished outfit changes?',
+        description: 'The draft cannot be recovered.',
+        confirmLabel: 'Discard changes',
+        cancelLabel: 'Keep editing',
+        danger: true,
+      }))
     ) {
       return;
     }
@@ -127,7 +135,7 @@ export const useStudioOutfitWorkflow = ({
       return;
     }
     openOverlay('outfit-selector');
-  }, [closeOverlay, launch.destination, onOpenLibrary, openOverlay, updateDirty]);
+  }, [closeOverlay, confirmation, launch.destination, onOpenLibrary, openOverlay, updateDirty]);
 
   const selectSaved = useCallback(
     (outfit: SavedPrompt) => {
@@ -140,12 +148,9 @@ export const useStudioOutfitWorkflow = ({
   const completeSave = useCallback(
     async (savedOutfit: SavedPrompt) => {
       if (launch.destination === 'project') {
-        await attachProjectAsset(launch.projectId, {
+        await attachProjectAssetAndSync(queryClient, launch.projectId, {
           kind: 'outfit',
           resourceId: savedOutfit.id,
-        });
-        await queryClient.invalidateQueries({
-          queryKey: projectAssetQueryKeys.project(launch.projectId),
         });
         updateDirty(false);
         closeOverlay();

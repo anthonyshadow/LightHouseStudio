@@ -20,14 +20,12 @@ import { Button } from '../ui/primitives/Button';
 import { EntryPage } from './EntryPage';
 import {
   APP_PATHS,
-  campaignIdFromPath,
   isAssetsPath,
   isCampaignsPath,
   isProtectedAppPath,
-  isProjectWorkspacePath,
   isProjectsPath,
   canonicalizeLegacyAppPath,
-  projectIdFromPath,
+  protectedRouteForPath,
 } from './paths';
 import { ProtectedRoute } from './ProtectedRoute';
 
@@ -51,34 +49,10 @@ const routeSurfaceStyles = {
 };
 
 const titleForPath = (pathname: string): string => {
-  if (isProjectWorkspacePath(pathname)) return 'Project Studio · Lightframe';
-  if (projectIdFromPath(pathname) !== null) return 'Project · Lightframe Studio';
-  if (campaignIdFromPath(pathname) !== null) return 'Campaign · Lightframe Studio';
-
-  switch (pathname) {
-    case APP_PATHS.dashboard:
-      return 'Dashboard · Lightframe';
-    case APP_PATHS.create:
-      return 'Studio · Lightframe';
-    case APP_PATHS.live:
-      return 'Live AI Beta · Lightframe';
-    case APP_PATHS.projects:
-      return 'Projects · Lightframe Studio';
-    case APP_PATHS.campaigns:
-      return 'Campaigns · Lightframe Studio';
-    case APP_PATHS.assets:
-      return 'Assets · Lightframe';
-    case APP_PATHS.videos:
-      return 'Videos · Assets · Lightframe';
-    case APP_PATHS.characters:
-      return 'Characters · Assets · Lightframe';
-    case APP_PATHS.outfits:
-      return 'Outfits · Assets · Lightframe';
-    case APP_PATHS.voices:
-      return 'Voices · Assets · Lightframe';
-    default:
-      return isProtectedAppPath(pathname) ? 'Lightframe Studio' : 'Enter Lightframe Studio';
-  }
+  const route = protectedRouteForPath(pathname);
+  if (route !== null) return route.title;
+  // Legacy paths are protected but redirect before they render, so they never keep a title.
+  return isProtectedAppPath(pathname) ? 'Lightframe Studio' : 'Enter Lightframe Studio';
 };
 
 const RouteMetadata = () => {

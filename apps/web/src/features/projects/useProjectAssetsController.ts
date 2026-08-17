@@ -1,14 +1,34 @@
 import type { AttachProjectAssetRequest } from '@studio/contracts';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import { attachProjectAsset, detachProjectAsset, listProjectAssets } from './projectsApi';
 
 const PAGE_SIZE = 24;
 
 export const projectAssetQueryKeys = {
-  all: ['projects', 'assets'] as const,
   project: (projectId: string) => ['projects', 'assets', projectId] as const,
   list: (projectId: string, kind: AttachProjectAssetRequest['kind'] | 'all') =>
     ['projects', 'assets', projectId, kind] as const,
+};
+
+/**
+ * Attaching an asset from outside the Project surfaces — Studio character/outfit/voice creation,
+ * the video attachment flow — still has to invalidate the cache the Project Assets grid reads. One
+ * owner for the pair, so a new attach path cannot leave the grid stale.
+ */
+export const attachProjectAssetAndSync = async (
+  queryClient: QueryClient,
+  projectId: string,
+  input: AttachProjectAssetRequest,
+  signal?: AbortSignal,
+) => {
+  const result = await attachProjectAsset(projectId, input, signal);
+  await queryClient.invalidateQueries({ queryKey: projectAssetQueryKeys.project(projectId) });
+  return result;
 };
 
 export const useProjectAssetsController = (

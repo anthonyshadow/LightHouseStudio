@@ -4,6 +4,7 @@ import type {
   CampaignMutationContext,
   CampaignMutationResult,
 } from './types';
+import { requireIsoTimestamp, requireOpaqueId, stripControlCharacters } from '../common/identity';
 
 export const CAMPAIGN_NAME_MAX_LENGTH = 120;
 export const CAMPAIGN_BRIEF_MAX_LENGTH = 1_000;
@@ -27,33 +28,15 @@ export class CampaignRuleError extends Error {
   }
 }
 
-const requireId = (value: string, label: string): string => {
-  const normalized = value.trim();
-  if (
-    normalized.length === 0 ||
-    normalized.length > 200 ||
-    /^(?:blob|data|https?):/iu.test(normalized)
-  ) {
-    throw new CampaignRuleError('invalid-id', `${label} must be an opaque durable identifier.`);
-  }
-  return normalized;
-};
+const requireId = (value: string, label: string): string =>
+  requireOpaqueId(value, label, (message) => {
+    throw new CampaignRuleError('invalid-id', message);
+  });
 
-const requireTimestamp = (value: string): string => {
-  const timestamp = new Date(value);
-  if (!Number.isFinite(timestamp.valueOf())) {
+const requireTimestamp = (value: string): string =>
+  requireIsoTimestamp(value, () => {
     throw new CampaignRuleError('invalid-timestamp', 'A valid Campaign timestamp is required.');
-  }
-  return timestamp.toISOString();
-};
-
-const stripControlCharacters = (value: string, preserveNewlines = false): string =>
-  [...value]
-    .filter((character) => {
-      const codePoint = character.codePointAt(0) ?? 0;
-      return codePoint > 31 || (preserveNewlines && (character === '\n' || character === '\t'));
-    })
-    .join('');
+  });
 
 export const normalizeCampaignName = (value: string): string => {
   const normalized = stripControlCharacters(value).replaceAll(/\s+/gu, ' ').trim();
@@ -68,7 +51,9 @@ export const normalizeCampaignName = (value: string): string => {
 
 export const normalizeCampaignBrief = (value: string | null | undefined): string | null => {
   if (value === null || value === undefined) return null;
-  const normalized = stripControlCharacters(value.replace(/\r\n?/gu, '\n'), true)
+  const normalized = stripControlCharacters(value.replace(/\r\n?/gu, '\n'), {
+    preserveNewlines: true,
+  })
     .replaceAll(/[ \t]+/gu, ' ')
     .replaceAll(/\n{3,}/gu, '\n\n')
     .trim();

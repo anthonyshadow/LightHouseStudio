@@ -4,6 +4,7 @@ import { defaultSavedVideoName } from '../features/saved-videos/useSaveVideo';
 import type { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
 import type { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import { Button, OverlayPanel } from '../ui';
+import type { ConfirmationRequest } from './useConfirmationRequest';
 import type { useStudioLogoutController } from './useStudioLogoutController';
 import type { useStudioSavedVideoController } from './useStudioSavedVideoController';
 import type { useStudioSessionExpiryController } from './useStudioSessionExpiryController';
@@ -29,9 +30,17 @@ interface StudioLifecycleDialogsProps {
   readonly logout: ReturnType<typeof useStudioLogoutController>;
   readonly sessionExpiry: ReturnType<typeof useStudioSessionExpiryController>;
   readonly savedVideo: ReturnType<typeof useStudioSavedVideoController>;
+  /**
+   * The shell's awaitable confirmations. Rendered here because this component already owns every
+   * Studio-level confirmation, so there is one place that decides how a destructive question looks.
+   */
+  readonly confirmation: ConfirmationRequest;
   readonly videoEditor: ReturnType<typeof useVideoEditSession>;
-  readonly projectContextActive: boolean;
-  readonly projectWorkingMedia: ReturnType<typeof useProjectWorkingMediaController>;
+  /**
+   * Present only when a durable working-media owner is in play. Its presence *is* the signal that
+   * a render is adopted rather than committed, so there is no second boolean to keep in agreement.
+   */
+  readonly projectWorkingMedia: ReturnType<typeof useProjectWorkingMediaController> | null;
   /**
    * Suppressed while a Project video context owns the save: that path attaches the new Video and
    * redirects to the Project, so a second completion surface would compete with it.
@@ -47,13 +56,29 @@ export const StudioLifecycleDialogs = ({
   sessionExpiry,
   savedVideo,
   videoEditor,
-  projectContextActive,
+  confirmation,
   projectWorkingMedia,
   saveSuccessSuppressed,
   onOpenSavedVideosLibrary,
   onCreateAnotherVideo,
 }: StudioLifecycleDialogsProps) => (
   <>
+    <Suspense fallback={null}>
+      <ConfirmationDialog
+        open={confirmation.pending !== null}
+        title={confirmation.pending?.title ?? ''}
+        description={confirmation.pending?.description ?? ''}
+        confirmLabel={confirmation.pending?.confirmLabel ?? 'Confirm'}
+        {...(confirmation.pending?.cancelLabel === undefined
+          ? {}
+          : { cancelLabel: confirmation.pending.cancelLabel })}
+        danger={confirmation.pending?.danger ?? false}
+        returnFocusRef={mainRef}
+        onCancel={confirmation.cancel}
+        onConfirm={confirmation.confirm}
+      />
+    </Suspense>
+
     {savedVideo.pendingSave ? (
       <SaveVideoDialog
         fallbackName={defaultSavedVideoName(savedVideo.pendingSave.artifact)}
@@ -151,7 +176,7 @@ export const StudioLifecycleDialogs = ({
         onCancel={savedVideo.dismissVideoEditDiscard}
         onConfirm={savedVideo.returnFromVideoEditor}
       />
-      {projectContextActive ? (
+      {projectWorkingMedia !== null ? (
         <ConfirmationDialog
           open={videoEditor.phase === 'awaiting-replacement'}
           title="Adopt Render preview as Project working media?"

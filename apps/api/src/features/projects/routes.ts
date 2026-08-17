@@ -99,14 +99,18 @@ const conflictMessage = (conflict: ProjectConflict): string => {
   }
 };
 
-const sendMutation = (reply: HttpReply, result: ProjectServiceMutationResult) => {
-  if (result.ok) return result.current;
-  return reply.status(409).send(
+/** One owner for the 409 wire shape, so every mutation reports a conflict identically. */
+const sendProjectConflict = (reply: HttpReply, conflict: ProjectConflict) =>
+  reply.status(409).send(
     projectConflictResponseSchema.parse({
-      error: { code: 'conflict', message: conflictMessage(result.conflict) },
-      conflict: result.conflict,
+      error: { code: 'conflict', message: conflictMessage(conflict) },
+      conflict,
     }),
   );
+
+const sendMutation = (reply: HttpReply, result: ProjectServiceMutationResult) => {
+  if (result.ok) return result.current;
+  return sendProjectConflict(reply, result.conflict);
 };
 
 const sendReplayableMutation = (
@@ -117,12 +121,7 @@ const sendReplayableMutation = (
     if (!result.replayed) reply.status(201);
     return result.response;
   }
-  return reply.status(409).send(
-    projectConflictResponseSchema.parse({
-      error: { code: 'conflict', message: conflictMessage(result.conflict) },
-      conflict: result.conflict,
-    }),
-  );
+  return sendProjectConflict(reply, result.conflict);
 };
 
 const sendProjectOutputMutation = (reply: HttpReply, result: ProjectOutputSaveMutationResult) => {
@@ -130,12 +129,7 @@ const sendProjectOutputMutation = (reply: HttpReply, result: ProjectOutputSaveMu
     if (!result.response.replayed) reply.status(201);
     return saveProjectOutputResponseSchema.parse(result.response);
   }
-  return reply.status(409).send(
-    projectConflictResponseSchema.parse({
-      error: { code: 'conflict', message: conflictMessage(result.conflict) },
-      conflict: result.conflict,
-    }),
-  );
+  return sendProjectConflict(reply, result.conflict);
 };
 
 const parseUploadMetadata = <Output>(

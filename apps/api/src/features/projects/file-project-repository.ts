@@ -19,6 +19,8 @@ import {
   type ProjectJobLink,
   type ProjectOutputLink,
   type ProjectRevision,
+  projectStatusAfterProcessingTrace,
+  projectConflicts,
 } from '@studio/domain';
 import type {
   ResumableVideoProcessingJob,
@@ -497,7 +499,7 @@ export class FileProjectRepository
         if (prior.requestFingerprint !== receipt.requestFingerprint) {
           return {
             kind: 'conflict',
-            conflict: { kind: 'operation-key', operation: 'create' },
+            conflict: projectConflicts.operationKey('create'),
           };
         }
         const existing = library.projects.find(({ project }) => project.id === prior.projectId);
@@ -524,7 +526,7 @@ export class FileProjectRepository
       ) {
         return {
           kind: 'conflict',
-          conflict: { kind: 'campaign-membership', projectId: aggregate.project.id },
+          conflict: projectConflicts.campaignMembership(aggregate.project.id),
         };
       }
       const next = librarySchema.parse({
@@ -576,6 +578,19 @@ export class FileProjectRepository
     return (
       aggregate?.revisions.find((revision) => revision.revisionNumber === revisionNumber) ?? null
     );
+  }
+
+  async getRevisions(
+    ownerUserId: string,
+    projectId: string,
+    revisionNumbers: readonly number[],
+  ): Promise<readonly ProjectRevision[]> {
+    const wanted = new Set(revisionNumbers);
+    if (wanted.size === 0) return [];
+    const aggregate = (await this.#read(ownerUserId)).projects.find(
+      ({ project }) => project.id === projectId && project.deletedAt === null,
+    );
+    return aggregate?.revisions.filter(({ revisionNumber }) => wanted.has(revisionNumber)) ?? [];
   }
 
   async getCurrentWithSource(
@@ -913,24 +928,20 @@ export class FileProjectRepository
           aggregate,
           attemptsForProject(processingJobs, aggregate.project.id),
         );
-        if (latest?.operationId === current.operationId) {
-          const nextStatus =
-            trace.status === 'cancelled'
-              ? 'ready'
-              : projectProcessingNeedsAttention(trace.status)
-                ? 'needs-attention'
-                : aggregate.project.status;
-          if (nextStatus !== aggregate.project.status) {
-            projects[projectIndex] = storedAggregateSchema.parse({
-              ...aggregate,
-              project: {
-                ...aggregate.project,
-                status: nextStatus,
-                version: aggregate.project.version + 1,
-                updatedAt: trace.updatedAt,
-              },
-            });
-          }
+        const nextStatus =
+          latest?.operationId === current.operationId
+            ? projectStatusAfterProcessingTrace(aggregate.project.status, trace.status)
+            : null;
+        if (nextStatus !== null) {
+          projects[projectIndex] = storedAggregateSchema.parse({
+            ...aggregate,
+            project: {
+              ...aggregate.project,
+              status: nextStatus,
+              version: aggregate.project.version + 1,
+              updatedAt: trace.updatedAt,
+            },
+          });
         }
       }
       await this.#write(library, {
@@ -1519,7 +1530,7 @@ export class FileProjectRepository
         ) {
           return {
             kind: 'conflict',
-            conflict: { kind: 'operation-key', operation: 'source-accept' },
+            conflict: projectConflicts.operationKey('source-accept'),
           };
         }
         const revision = prior.revisions.find(
@@ -1547,7 +1558,7 @@ export class FileProjectRepository
       ) {
         return {
           kind: 'conflict',
-          conflict: { kind: 'immutable-source', projectId: input.projectId },
+          conflict: projectConflicts.immutableSource(input.projectId),
         };
       }
       if (aggregate.project.version !== input.expectedVersion) {
@@ -1648,7 +1659,7 @@ export class FileProjectRepository
         ) {
           return {
             kind: 'conflict',
-            conflict: { kind: 'operation-key', operation: 'working-media-adopt' },
+            conflict: projectConflicts.operationKey('working-media-adopt'),
           };
         }
         const revision = currentRead(prior.aggregate).revision;
@@ -1790,7 +1801,7 @@ export class FileProjectRepository
       ) {
         return {
           kind: 'conflict',
-          conflict: { kind: 'active-jobs', projectId: nextProject.id },
+          conflict: projectConflicts.activeJobs(nextProject.id),
         };
       }
       const projects = [...library.projects];
@@ -1845,7 +1856,7 @@ export class FileProjectRepository
       ) {
         return {
           kind: 'conflict',
-          conflict: { kind: 'campaign-membership', projectId: nextProject.id },
+          conflict: projectConflicts.campaignMembership(nextProject.id),
         };
       }
       const projects = [...library.projects];
@@ -2038,7 +2049,7 @@ export class FileProjectRepository
           ? { kind: 'replayed', receipt: prior }
           : {
               kind: 'conflict',
-              conflict: { kind: 'operation-key', operation: 'output-save' },
+              conflict: projectConflicts.operationKey('output-save'),
             };
       }
 
@@ -2277,7 +2288,7 @@ export class FileProjectRepository
             ? { kind: 'linked', replayed: true }
             : {
                 kind: 'conflict',
-                conflict: { kind: 'relation-mismatch', projectId, relation },
+                conflict: projectConflicts.relationMismatch(projectId, relation),
               };
         }
       }

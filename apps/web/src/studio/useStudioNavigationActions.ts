@@ -1,16 +1,14 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
-import { APP_PATHS, campaignPath, projectPath, savedVideoLibraryPath } from '../app/paths';
+import {
+  APP_PATHS,
+  ASSET_DESTINATION_PATHS,
+  type AssetDestination,
+  campaignPath,
+  projectPath,
+  savedVideoLibraryPath,
+} from '../app/paths';
 import { useRouteBack } from '../app/useRouteBack';
-
-type AssetDestination = 'videos' | 'characters' | 'outfits' | 'voices';
-
-const ASSET_DESTINATION_PATHS: Readonly<Record<AssetDestination, string>> = {
-  videos: APP_PATHS.videos,
-  characters: APP_PATHS.characters,
-  outfits: APP_PATHS.outfits,
-  voices: APP_PATHS.voices,
-};
 
 /**
  * The Studio shell's outbound destinations in one place, so header, dashboard, asset cards and

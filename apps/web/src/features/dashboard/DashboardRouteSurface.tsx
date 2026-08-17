@@ -126,6 +126,7 @@ export const DashboardRouteSurface = ({
       listSavedVideos({
         ...(pageParam ? { cursor: pageParam } : {}),
         sort: 'latest',
+        pageSize: RECENT_LIMIT,
         signal,
       }),
     initialPageParam: null as string | null,

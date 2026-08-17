@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { APP_PATHS } from '../app/paths';
 import type { ModelMode } from '../application/types';
-import { confirmModeReplacement, type StudioMode } from '../features/media-session';
+import { modeReplacementNeedsConfirmation, type StudioMode } from '../features/media-session';
 import type { ProviderAvailability } from '../features/media-session';
 import type { useStudioSession } from '../orchestration/session';
 import type { CapabilityState } from './StudioHeader';
+import { liveExperienceAvailability } from './studioLiveAvailability';
 import type { useStudioOverlayController } from './useStudioOverlayController';
+import type { ConfirmationRequest } from './useConfirmationRequest';
 
 interface UseStudioLiveExperienceOptions {
   readonly availability: ProviderAvailability;
@@ -18,6 +20,7 @@ interface UseStudioLiveExperienceOptions {
   readonly closeOverlay: ReturnType<typeof useStudioOverlayController>['close'];
   /** Clears a pending capture handoff so a realtime session never inherits one. */
   readonly onClearExistingVideoIntent: () => void;
+  readonly confirmation: ConfirmationRequest;
 }
 
 /**
@@ -36,11 +39,14 @@ export const useStudioLiveExperience = ({
   openOverlay,
   closeOverlay,
   onClearExistingVideoIntent,
+  confirmation,
 }: UseStudioLiveExperienceOptions) => {
   const navigate = useNavigate();
-  const betaEnabled = availability.realtimeBetaEnabled === true;
-  const providerConfigured = availability.realtimeProviderConfigured ?? availability.decart;
-  const liveEnabled = betaEnabled && providerConfigured && availability.decart;
+  const {
+    betaEnabled,
+    providerConfigured,
+    enabled: liveEnabled,
+  } = liveExperienceAvailability(availability);
 
   useEffect(() => {
     if (!liveRouteActive || capabilityState !== 'ready' || !liveEnabled) return;
@@ -64,19 +70,30 @@ export const useStudioLiveExperience = ({
     [session, startAdvancedModel],
   );
 
-  const selectExperienceMode = (mode: StudioMode): boolean =>
-    confirmModeReplacement(session.draft, mode, (message) => window.confirm(message)) &&
-    session.selectMode(mode);
+  const selectExperienceMode = async (mode: StudioMode): Promise<boolean> => {
+    if (
+      modeReplacementNeedsConfirmation(session.draft, mode) &&
+      !(await confirmation.ask({
+        title: 'Switch modes and remove the current reference image?',
+        description: 'Your text draft will be kept.',
+        confirmLabel: 'Switch mode',
+        cancelLabel: 'Keep this mode',
+      }))
+    ) {
+      return false;
+    }
+    return session.selectMode(mode);
+  };
 
-  const configureVirtualTryOn = () => {
+  const configureVirtualTryOn = async () => {
     if (!liveEnabled) return;
-    if (!selectExperienceMode('lucy-vton-latest')) return;
+    if (!(await selectExperienceMode('lucy-vton-latest'))) return;
     openOverlay('ai-settings');
   };
 
-  const startPreparedAi = (mode: ModelMode) => {
+  const startPreparedAi = async (mode: ModelMode) => {
     if (projectContextActive || !liveEnabled) return;
-    if (!selectExperienceMode(mode)) return;
+    if (!(await selectExperienceMode(mode))) return;
     closeOverlay();
     void startAdvancedModel();
   };

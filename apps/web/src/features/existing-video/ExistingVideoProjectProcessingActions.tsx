@@ -1,5 +1,5 @@
-import type { Theme } from '@emotion/react';
-import type { RefObject } from 'react';
+import { useTheme } from '@emotion/react';
+import { useState, type RefObject } from 'react';
 import { Button, ConfirmationDialog } from '../../ui';
 import {
   projectProcessingCapabilityLabel,
@@ -67,28 +67,24 @@ const projectProcessingBlockedDetail = ({
 };
 
 export const ExistingVideoProjectProcessingActions = ({
-  theme,
   workflow,
   projectProcessing,
   projectCapability,
   stepIncomplete,
   visualUnavailable,
-  retryConfirmationOpen,
-  onRetryConfirmationOpenChange,
   onRequestDiscard,
   discardButtonRef,
 }: {
-  readonly theme: Theme;
   readonly workflow: ExistingVideoWorkflow;
   readonly projectProcessing: ProjectProcessingController;
   readonly projectCapability: ProjectVisualProcessingCapability | null;
   readonly stepIncomplete: boolean;
   readonly visualUnavailable: boolean;
-  readonly retryConfirmationOpen: boolean;
-  readonly onRetryConfirmationOpenChange: (open: boolean) => void;
   readonly onRequestDiscard: () => void;
   readonly discardButtonRef?: RefObject<HTMLButtonElement | null>;
 }) => {
+  const theme = useTheme();
+  const [retryConfirmationOpen, setRetryConfirmationOpen] = useState(false);
   const projectAttempt = projectProcessing.attempt;
   const commandTitle = projectProcessingCommandTitle(projectProcessing.phase);
   const canRetry = Boolean(
@@ -166,7 +162,7 @@ export const ExistingVideoProjectProcessingActions = ({
     }
     if (canRetry) {
       return (
-        <Button variant="primary" onClick={() => onRetryConfirmationOpenChange(true)}>
+        <Button variant="primary" onClick={() => setRetryConfirmationOpen(true)}>
           Retry as new provider attempt
         </Button>
       );
@@ -241,9 +237,9 @@ export const ExistingVideoProjectProcessingActions = ({
             : 'Start new attempt'
         }
         cancelLabel="Keep current attempt"
-        onCancel={() => onRetryConfirmationOpenChange(false)}
+        onCancel={() => setRetryConfirmationOpen(false)}
         onConfirm={() => {
-          onRetryConfirmationOpenChange(false);
+          setRetryConfirmationOpen(false);
           void projectProcessing.retry();
         }}
       />

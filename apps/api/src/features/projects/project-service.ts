@@ -21,6 +21,7 @@ import {
   type ProjectConflict,
 } from '@studio/domain';
 import { AppError } from '../../http/app-error.js';
+import { decodePageCursor, encodePageCursor } from '../../http/page-cursor.js';
 import {
   projectAggregateForCurrent,
   type ProjectCurrentRead,
@@ -91,42 +92,20 @@ const cursorCriteria = (query: ProjectsQuery): string =>
     pageSize: query.pageSize,
   });
 
+const PROJECT_CURSOR = {
+  timestampKey: 'updatedAt',
+  idKey: 'projectId',
+  invalidMessage: 'Use a valid Project page cursor.',
+} as const;
+
 const encodeCursor = (cursor: ProjectSummaryCursor, query: ProjectsQuery): string =>
-  Buffer.from(
-    JSON.stringify({ version: 1, ...cursor, criteria: cursorCriteria(query) }),
-    'utf8',
-  ).toString('base64url');
+  encodePageCursor(cursor, cursorCriteria(query));
 
 const decodeCursor = (
   cursor: string | undefined,
   query: ProjectsQuery,
-): ProjectSummaryCursor | undefined => {
-  if (cursor === undefined) return undefined;
-  try {
-    const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as unknown;
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      'version' in value &&
-      value.version === 1 &&
-      'updatedAt' in value &&
-      typeof value.updatedAt === 'string' &&
-      Number.isFinite(new Date(value.updatedAt).valueOf()) &&
-      'projectId' in value &&
-      typeof value.projectId === 'string' &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
-        value.projectId,
-      ) &&
-      'criteria' in value &&
-      value.criteria === cursorCriteria(query)
-    ) {
-      return { updatedAt: new Date(value.updatedAt).toISOString(), projectId: value.projectId };
-    }
-  } catch {
-    // Opaque application cursors fail as one finite validation error.
-  }
-  throw new AppError(400, 'validation_error', 'Use a valid Project page cursor.');
-};
+): ProjectSummaryCursor | undefined =>
+  decodePageCursor(cursor, cursorCriteria(query), PROJECT_CURSOR);
 
 export type ProjectServiceMutationResult =
   | { readonly ok: true; readonly current: ProjectCurrentResponse }

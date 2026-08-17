@@ -573,6 +573,33 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
       : { video: toVideo(row.video), version: toVersion(row.version) };
   }
 
+  async getRetainedVersions(
+    ownerUserId: string,
+    references: readonly { readonly videoId: string; readonly versionId: string }[],
+  ): Promise<readonly StoredVideoVersionRead[]> {
+    const versionIds = [...new Set(references.map(({ versionId }) => versionId))];
+    if (versionIds.length === 0) return [];
+    const rows = await this.db
+      .select({ video: savedVideos, version: videoVersions })
+      .from(savedVideos)
+      .innerJoin(
+        videoVersions,
+        and(
+          eq(videoVersions.videoId, savedVideos.id),
+          eq(videoVersions.ownerUserId, savedVideos.ownerUserId),
+        ),
+      )
+      .where(and(eq(savedVideos.ownerUserId, ownerUserId), inArray(videoVersions.id, versionIds)));
+    // A version id is unique, but the caller named a video too — honour the pair it asked for
+    // rather than whatever video the row happens to belong to.
+    const requested = new Set(
+      references.map(({ videoId, versionId }) => `${videoId}:${versionId}`),
+    );
+    return rows
+      .filter((row) => requested.has(`${row.video.id}:${row.version.id}`))
+      .map((row) => ({ video: toVideo(row.video), version: toVersion(row.version) }));
+  }
+
   async rename(
     ownerUserId: string,
     videoId: string,

@@ -130,7 +130,7 @@ export const StudioCharacterOverlays = ({
 
       <OverlayPanel
         open={activeOverlay === 'character-wardrobe' && Boolean(character.wardrobeCharacter)}
-        onClose={character.closeWardrobe}
+        onClose={() => void character.closeWardrobe()}
         title={
           character.wardrobeCharacter
             ? `${character.wardrobeCharacter.name} wardrobe`
@@ -157,7 +157,7 @@ export const StudioCharacterOverlays = ({
               )}
               useDisabled={recipeInsertionBlocked || referenceUsePending}
               onDirtyChange={character.setWardrobeDirty}
-              onClose={character.closeWardrobe}
+              onClose={() => void character.closeWardrobe()}
               {...(character.wardrobeExistingVideoStepId
                 ? { onSaved: character.finishWardrobeVariantForExistingVideo }
                 : {})}

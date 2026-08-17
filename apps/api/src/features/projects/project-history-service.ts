@@ -6,7 +6,10 @@ import {
 } from '@studio/contracts';
 import type { ProjectOutputLink, ProjectRevision } from '@studio/domain';
 import { AppError } from '../../http/app-error.js';
-import type { SavedVideoRepository } from '../saved-videos/saved-video-repository.js';
+import type {
+  SavedVideoRepository,
+  StoredVideoVersionRead,
+} from '../saved-videos/saved-video-repository.js';
 import { publicSavedVideoVersion } from '../saved-videos/saved-video-service.js';
 import type { ProjectRepository } from './project-repository.js';
 
@@ -142,13 +145,38 @@ export class ProjectHistoryService {
     if (current === null || page === null) {
       throw new AppError(404, 'not_found', 'That Project is unavailable.');
     }
-    const outputs = await Promise.all(
-      page.links.map((link) => {
-        if (!('producingRevisionId' in link)) {
-          throw new Error('Project output history returned a non-output relation.');
-        }
-        return this.#outputItem(ownerUserId, projectId, link, current.revision);
-      }),
+    const links = page.links.map((link) => {
+      if (!('producingRevisionId' in link)) {
+        throw new Error('Project output history returned a non-output relation.');
+      }
+      return link;
+    });
+    // Two batched reads for the whole page, rather than two per row.
+    const [retainedVersions, referenceRevisions] = await Promise.all([
+      this.savedVideos.getRetainedVersions(
+        ownerUserId,
+        links.map((link) => ({ videoId: link.savedVideoId, versionId: link.videoVersionId })),
+      ),
+      this.projects.getRevisions(
+        ownerUserId,
+        projectId,
+        links.map((link) => link.producingRevisionNumber + 1),
+      ),
+    ]);
+    const retainedByVersionId = new Map(
+      retainedVersions.map((retained) => [retained.version.id, retained]),
+    );
+    const revisionByNumber = new Map(
+      referenceRevisions.map((revision) => [revision.revisionNumber, revision]),
+    );
+    const outputs = links.map((link) =>
+      this.#outputItemFrom(
+        projectId,
+        link,
+        current.revision,
+        retainedByVersionId.get(link.videoVersionId) ?? null,
+        revisionByNumber.get(link.producingRevisionNumber + 1) ?? null,
+      ),
     );
     return {
       outputs,
@@ -182,6 +210,17 @@ export class ProjectHistoryService {
       this.savedVideos.getRetainedVersion(ownerUserId, output.savedVideoId, output.videoVersionId),
       this.projects.getRevision(ownerUserId, projectId, output.producingRevisionNumber + 1),
     ]);
+    return this.#outputItemFrom(projectId, output, currentRevision, retained, referenceRevision);
+  }
+
+  /** Pure projection, so a page can resolve its reads in bulk and then build every row locally. */
+  #outputItemFrom(
+    projectId: string,
+    output: ProjectOutputLink,
+    currentRevision: ProjectRevision,
+    retained: StoredVideoVersionRead | null,
+    referenceRevision: ProjectRevision | null,
+  ): ProjectOutputHistoryItem {
     if (retained === null) {
       throw new AppError(404, 'not_found', 'That Project output is unavailable.');
     }

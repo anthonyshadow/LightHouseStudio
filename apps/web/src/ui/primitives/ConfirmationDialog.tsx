@@ -1,16 +1,29 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { Button, type ButtonVariant } from './Button';
 import { OverlayPanel } from './OverlayPanel';
+import { StatusNotice } from './StatusNotice';
 
 export interface ConfirmationDialogProps {
   open: boolean;
   title: string;
   description: string;
+  /**
+   * Body copy, when the question the operator answers differs from the panel's description.
+   * Defaults to repeating `description`.
+   */
+  body?: ReactNode;
   alert?: string | undefined;
+  /**
+   * Renders the alert as a titled `StatusNotice` instead of a bare paragraph. Confirmations that
+   * report a failed mutation want the heavier treatment; a plain caution does not.
+   */
+  alertTitle?: string | undefined;
   confirmLabel: string;
   cancelLabel?: string;
   danger?: boolean;
   busy?: boolean;
+  /** Blocks the confirm action while leaving the dialog readable — an explained refusal. */
+  confirmDisabled?: boolean;
   secondaryAction?: Readonly<{
     label: string;
     onAction: () => void;
@@ -25,11 +38,14 @@ export const ConfirmationDialog = ({
   open,
   title,
   description,
+  body,
   alert,
+  alertTitle,
   confirmLabel,
   cancelLabel = 'Stay',
   danger = false,
   busy = false,
+  confirmDisabled = false,
   secondaryAction,
   returnFocusRef,
   onCancel,
@@ -69,7 +85,7 @@ export const ConfirmationDialog = ({
           ) : null}
           <Button
             busy={busy}
-            disabled={busy}
+            disabled={busy || confirmDisabled}
             variant={danger ? 'danger' : 'primary'}
             onClick={onConfirm}
           >
@@ -78,8 +94,13 @@ export const ConfirmationDialog = ({
         </div>
       }
     >
-      <p>{description}</p>
-      {alert ? <p role="alert">{alert}</p> : null}
+      {body === undefined ? <p>{description}</p> : body}
+      {alert !== undefined && alertTitle !== undefined ? (
+        <StatusNotice role="alert" tone="warning" title={alertTitle}>
+          {alert}
+        </StatusNotice>
+      ) : null}
+      {alert !== undefined && alertTitle === undefined ? <p role="alert">{alert}</p> : null}
     </OverlayPanel>
   );
 };

@@ -118,6 +118,15 @@ export class ProjectSourceService {
     return this.options.inspect ?? inspectSavedVideoFile;
   }
 
+  /**
+   * Refuses an unreachable Project before any expensive work starts.
+   *
+   * `#accept` reads the Project again through `getCurrentWithSource`, so this looks like a
+   * redundant query and has been flagged as one. It is not: between here and there sit a full
+   * media inspection and a byte-store write. Paying one indexed read to avoid inspecting and
+   * storing bytes for a Project that does not exist — and then having to delete them again — is
+   * the cheaper order, and it keeps a 404 from arriving only after the upload was durably written.
+   */
   async #assertProjectAccessible(ownerUserId: string, projectId: string): Promise<void> {
     if ((await this.projects.getCurrent(ownerUserId, projectId)) === null) {
       throw new AppError(404, 'not_found', 'That Project is unavailable.');

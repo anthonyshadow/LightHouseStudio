@@ -10,6 +10,7 @@ import { ApiClientError, apiFetch } from '../../adapters/api-client/apiClient';
 import { readBoundedBlob } from '../../adapters/api-client/readBoundedBlob';
 import type { RestorePersistedOriginalInput } from '../recording/types';
 import { projectQueryKeys } from './useProjectsController';
+import { useStableOperationKey } from './useStableOperationKey';
 import {
   getProjectSource,
   getProjectWorkingMedia,
@@ -138,9 +139,7 @@ export const useProjectSourceController = (
   const [source, setSource] = useState<ProjectSourceResponse['source'] | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
-  const pendingOperationRef = useRef<{ readonly signature: string; readonly key: string } | null>(
-    null,
-  );
+  const operation = useStableOperationKey();
   const generationRef = useRef(0);
   const hydratedMediaRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
@@ -154,11 +153,11 @@ export const useProjectSourceController = (
     generationRef.current += 1;
     controllerRef.current?.abort('project-source-aborted');
     controllerRef.current = null;
-    pendingOperationRef.current = null;
+    operation.reset();
     if (current.revision.snapshot.sourceAssetId === null) runtime.clear(projectId);
     setPhase(current.revision.snapshot.sourceAssetId === null ? 'idle' : 'saved');
     setMessage('Source preparation was cancelled safely.');
-  }, [current.revision.snapshot.sourceAssetId, projectId, runtime]);
+  }, [current.revision.snapshot.sourceAssetId, operation, projectId, runtime]);
 
   useEffect(() => {
     onActivityChange?.({
@@ -294,21 +293,13 @@ export const useProjectSourceController = (
       else runtime.present(projectId, artifactInput(previewFile, response.source));
       if (controller.signal.aborted || generation !== generationRef.current || !mountedRef.current)
         return;
-      pendingOperationRef.current = null;
+      operation.reset();
       setSource(response.source);
       setMessage(null);
       setPhase('saved');
     },
-    [onCurrentChange, presentAccepted, projectId, queryClient, runtime],
+    [onCurrentChange, operation, presentAccepted, projectId, queryClient, runtime],
   );
-
-  const operationKeyFor = useCallback((signature: string): string => {
-    const pending = pendingOperationRef.current;
-    if (pending?.signature === signature) return pending.key;
-    const key = crypto.randomUUID();
-    pendingOperationRef.current = { signature, key };
-    return key;
-  }, []);
 
   const runAcceptance = useCallback(
     async ({
@@ -317,7 +308,7 @@ export const useProjectSourceController = (
       previewBeforeAcceptance,
       request,
     }: SourceAcceptanceOperation) => {
-      const operationKey = operationKeyFor(signature);
+      const operationKey = operation.keyFor(signature);
       const generation = ++generationRef.current;
       const controller = new AbortController();
       controllerRef.current?.abort('project-source-replaced');
@@ -347,7 +338,7 @@ export const useProjectSourceController = (
         if (controllerRef.current === controller) controllerRef.current = null;
       }
     },
-    [finishAcceptance, operationKeyFor, projectId, runtime],
+    [finishAcceptance, operation, projectId, runtime],
   );
 
   const runUpload = useCallback(

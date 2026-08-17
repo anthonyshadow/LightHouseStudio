@@ -82,7 +82,7 @@ export const StudioOutfitOverlays = ({
 
       <OverlayPanel
         open={activeOverlay === 'outfit-builder'}
-        onClose={outfit.close}
+        onClose={() => void outfit.close()}
         title={outfit.launch.outfit ? 'Edit outfit' : 'Create a new outfit'}
         description="Choose Prompt or Reference image, then name and save the reusable outfit."
         placement="right"
@@ -104,7 +104,7 @@ export const StudioOutfitOverlays = ({
               saveAndSelect={outfit.launch.saveAndSelect}
               disabledReason={characterOpenBlockedReason}
               onDirtyChange={outfit.updateDirty}
-              onCancel={outfit.close}
+              onCancel={() => void outfit.close()}
               onSaved={outfit.completeSave}
             />
           </Suspense>
