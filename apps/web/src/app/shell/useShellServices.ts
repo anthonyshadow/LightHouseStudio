@@ -1,4 +1,7 @@
-import { useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
+import { useProjectProcessingController } from '../../features/projects/useProjectProcessingController';
+import type { ProjectSessionPort } from '../../features/projects/useProjectSession';
 import { detectBrowserCapabilities } from '../../adapters/browser-media/browserMedia';
 import type { StudioCreativeLocks } from './studioRuntimeWork';
 import { useStudioCharacterWorkflow } from '../../studio/useStudioCharacterWorkflow';
@@ -10,6 +13,8 @@ import { useStudioOverlayController } from '../../studio/useStudioOverlayControl
 import { useStudioRouteContext } from '../../studio/useStudioRouteContext';
 import { useDesktopStudioLayout } from '../../studio/useDesktopStudioLayout';
 import { useProviderAvailability } from '../../studio/useProviderAvailability';
+import { liveExperienceAvailability } from '../../studio/studioLiveAvailability';
+import { APP_PATHS } from '../paths';
 import type { ConfirmationRequest } from '../../ui';
 import type { useStudioHandoff } from './useStudioHandoff';
 
@@ -19,6 +24,8 @@ interface UseShellServicesOptions {
   readonly confirmation: ConfirmationRequest;
   readonly handoff: ReturnType<typeof useStudioHandoff>;
   readonly creativeLocks: StudioCreativeLocks;
+  /** The runtime's Project session, or null when no Studio is mounted. */
+  readonly projectSession: ProjectSessionPort | null;
 }
 
 /**
@@ -40,6 +47,7 @@ export const useShellServices = ({
   confirmation,
   handoff,
   creativeLocks,
+  projectSession,
 }: UseShellServicesOptions) => {
   const route = useStudioRouteContext(initialIntent);
   const nav = useStudioNavigationActions();
@@ -84,6 +92,37 @@ export const useShellServices = ({
     confirmation,
   });
 
+  // Server state about the Project, not about a camera: whether an accepted provider operation
+  // blocks archiving has to be known on the Project overview, which mounts no Studio. The
+  // controller scopes itself to a live Project session, and each surface owns one — the workspace's
+  // arrives through the runtime, the overview reports its own here — so it follows whichever
+  // surface is showing rather than resetting when the Studio unmounts.
+  const [overviewProjectSession, setOverviewProjectSession] = useState<ProjectSessionPort | null>(
+    null,
+  );
+  const readPorts = handoff.readPorts;
+  const checkpointProjectCreative = useCallback(
+    () => readPorts()?.checkpointProjectCreative() ?? Promise.resolve(false),
+    [readPorts],
+  );
+  const projectProcessing = useProjectProcessingController({
+    projectId: route.activeProjectId,
+    session: projectSession ?? overviewProjectSession,
+    checkpointCreative: checkpointProjectCreative,
+  });
+
+  // `/studio/create/live` is an entry point, not a workspace: it has never shown a stage. When the
+  // beta is actually available it hands straight over to Studio with the chooser open, and the
+  // overlay survives the navigation because the overlay controller is the shell's. When it is not,
+  // `ShellMain` renders the capability card and no capture graph is fetched at all.
+  const navigate = useNavigate();
+  const { enabled: liveEnabled } = liveExperienceAvailability(provider.availability);
+  useEffect(() => {
+    if (!route.liveRouteActive || provider.state !== 'ready' || !liveEnabled) return;
+    openOverlay('ai-experience');
+    void navigate(APP_PATHS.create, { replace: true, state: null });
+  }, [liveEnabled, navigate, openOverlay, provider.state, route.liveRouteActive]);
+
   const openVideoUpload = useMemo(() => () => openOverlay('video-upload'), [openOverlay]);
   const libraryHandoff = useStudioLibraryHandoff({
     nav,
@@ -109,6 +148,8 @@ export const useShellServices = ({
         outfit,
         character,
         libraryHandoff,
+        projectProcessing,
+        reportOverviewProjectSession: setOverviewProjectSession,
         openVideoUpload,
         confirmation,
         handoff,
@@ -135,6 +176,7 @@ export const useShellServices = ({
       nav,
       openVideoUpload,
       outfit,
+      projectProcessing,
       overlay,
       ownerUserId,
       provider,

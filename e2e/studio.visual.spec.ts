@@ -333,7 +333,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await expect(page.getByRole('heading', { name: 'Continue Work' })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Recent Work' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'New Campaign' })).toBeVisible();
-      await expect(page.getByLabel('Studio media stage')).toBeHidden();
+      await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
     },
   },
   'assets-overview': {
@@ -344,7 +344,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await expect(page.getByRole('button', { name: 'Open Videos' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Open Voices' })).toBeVisible();
       await expect(page.getByText(/Recipe/u)).toHaveCount(0);
-      await expect(page.getByLabel('Studio media stage')).toBeHidden();
+      await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
     },
   },
   'studio-initial-closed': {

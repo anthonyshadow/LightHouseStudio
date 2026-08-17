@@ -1037,8 +1037,7 @@ describe('StudioApp composition lifecycle', () => {
 
     await waitFor(() => expect(harness.session.startLocal).toHaveBeenCalledOnce());
 
-    // The Studio shell stays mounted across protected routes, so the guard must not treat a later
-    // visit to the identical URL as already handled.
+    // Leaving Studio and coming back is a fresh visit and must record again.
     await act(async () => {
       await router.navigate('/dashboard');
     });
@@ -1046,6 +1045,25 @@ describe('StudioApp composition lifecycle', () => {
       await router.navigate('/studio/create?intent=record');
     });
 
+    await waitFor(() => expect(harness.session.startLocal).toHaveBeenCalledTimes(2));
+  });
+
+  it('treats a return within Studio as a fresh record intent, without a remount to do it', async () => {
+    const { router } = renderStudio(undefined, '/studio/create?intent=record');
+    await waitFor(() => expect(harness.session.startLocal).toHaveBeenCalledOnce());
+    const stage = await screen.findByTestId('media-stage');
+
+    // Both destinations mount the runtime, so it never unmounts here. Only the `location.key` guard
+    // in useStudioRecordingLaunch can make the second visit record — which is what keeps that guard
+    // covered now that leaving Studio would otherwise explain it.
+    await act(async () => {
+      await router.navigate(`/studio/${directVideoId}`);
+    });
+    await act(async () => {
+      await router.navigate('/studio/create?intent=record');
+    });
+
+    expect(screen.getByTestId('media-stage')).toBe(stage);
     await waitFor(() => expect(harness.session.startLocal).toHaveBeenCalledTimes(2));
   });
 

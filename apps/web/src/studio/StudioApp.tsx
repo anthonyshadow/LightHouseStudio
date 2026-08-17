@@ -14,7 +14,6 @@ import {
 import { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
 import { useProjectCreativeSessionAdapter } from '../features/projects/useProjectCreativeSessionAdapter';
-import { useProjectProcessingController } from '../features/projects/useProjectProcessingController';
 import {
   ProjectCreativeCheckpointPanel,
   PROJECT_PROVIDER_START_BLOCKED_REASON,
@@ -110,6 +109,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     openVideoUpload,
     confirmation,
     handoff: studioHandoff,
+    projectProcessing,
     mainRef,
     characterSelectorRef,
     outfitToggleRef,
@@ -126,7 +126,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     directVideoId,
     routeOriginProjectId,
     activeProjectId,
-    liveRouteActive,
     projectContextActive,
   } = route;
   const {
@@ -274,8 +273,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
 
   const liveExperience = useStudioLiveExperience({
     availability,
-    capabilityState,
-    liveRouteActive,
     projectContextActive,
     session,
     openOverlay,
@@ -330,11 +327,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     repository,
     store: repositoryStore,
     existingVideo,
-  });
-  const projectProcessing = useProjectProcessingController({
-    projectId: activeProjectId,
-    session: activeProjectSession,
-    checkpointCreative: projectCreative.checkpoint,
   });
 
   useLayoutEffect(() => {
@@ -504,12 +496,14 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
       selectVoice: selectVoiceForSource,
       existingVideoCharacter,
       useSavedVideo: (video, intent) => savedVideo.useSavedVideo(video, intent),
+      checkpointProjectCreative: () => projectCreative.checkpoint(),
       saveStudioCharacter: saveBuiltCharacter,
     });
     return () => registerPorts(null);
   }, [
     applyRecipeSelection,
     existingVideoCharacter,
+    projectCreative,
     registerPorts,
     saveBuiltCharacter,
     savedVideo,

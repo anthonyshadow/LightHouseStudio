@@ -1,6 +1,4 @@
-import { useCallback, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router';
-import { APP_PATHS } from '../app/paths';
+import { useCallback, useMemo } from 'react';
 import type { ModelMode } from '../application/types';
 import {
   MODE_REPLACEMENT_CONFIRMATION,
@@ -9,15 +7,12 @@ import {
 } from '../features/media-session';
 import type { ProviderAvailability } from '../features/media-session';
 import type { useStudioSession } from '../orchestration/session';
-import type { CapabilityState } from './StudioHeader';
 import { liveExperienceAvailability } from './studioLiveAvailability';
 import type { useStudioOverlayController } from './useStudioOverlayController';
 import type { ConfirmationRequest } from '../ui';
 
 interface UseStudioLiveExperienceOptions {
   readonly availability: ProviderAvailability;
-  readonly capabilityState: CapabilityState;
-  readonly liveRouteActive: boolean;
   readonly projectContextActive: boolean;
   readonly session: ReturnType<typeof useStudioSession>;
   readonly openOverlay: ReturnType<typeof useStudioOverlayController>['open'];
@@ -36,8 +31,6 @@ interface UseStudioLiveExperienceOptions {
  */
 export const useStudioLiveExperience = ({
   availability,
-  capabilityState,
-  liveRouteActive,
   projectContextActive,
   session,
   openOverlay,
@@ -45,18 +38,11 @@ export const useStudioLiveExperience = ({
   onClearExistingVideoIntent,
   confirmation,
 }: UseStudioLiveExperienceOptions) => {
-  const navigate = useNavigate();
   const {
     betaEnabled,
     providerConfigured,
     enabled: liveEnabled,
   } = liveExperienceAvailability(availability);
-
-  useEffect(() => {
-    if (!liveRouteActive || capabilityState !== 'ready' || !liveEnabled) return;
-    openOverlay('ai-experience');
-    void navigate(APP_PATHS.create, { replace: true, state: null });
-  }, [capabilityState, liveEnabled, liveRouteActive, navigate, openOverlay]);
 
   const openLiveAiExperience = useCallback(() => {
     if (!liveEnabled) return;
