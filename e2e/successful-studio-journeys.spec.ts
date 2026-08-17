@@ -718,6 +718,8 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
     page.locator('[data-stage-status-long]', { hasText: /^AI stopped · local preview$/u }),
   ).toBeVisible();
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
+  // The fallback keeps the recovery surface reachable; it owns the only Start control.
+  await expect(page.getByRole('dialog', { name: 'AI Settings' })).toBeVisible();
 
   await openAiSettings(page);
   await page.getByRole('button', { name: 'Start Character AI' }).click({ force: true });
@@ -726,7 +728,8 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
 
   await page.getByRole('button', { name: 'Reset AI' }).click({ force: true });
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
-  await expect(page.getByRole('dialog', { name: 'AI Settings' })).toBeHidden();
+  await expect(page.getByLabel('Character direction')).toHaveValue('');
+  await expect(page.getByRole('button', { name: 'Start Character AI' })).toBeVisible();
 
   browser = await readBrowserState(page);
   expect(browser.cameraCalls).toBe(1);

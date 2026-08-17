@@ -406,7 +406,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
 
   await olderVersion.getByRole('button', { name: 'Preview Version 1' }).click();
   const versionPreview = page.getByRole('dialog', { name: 'Launch master · Version 1' });
-  await expect(versionPreview.getByLabel('Preview Launch master, Version 1')).toBeVisible();
+  await expect(versionPreview.getByLabel('Preview of Launch master, Version 1')).toBeVisible();
   await versionPreview.getByRole('button', { name: 'Use in Project' }).click();
   await expect(
     page.getByText(/immutable original and Saved Video current pointer were not changed/u),
