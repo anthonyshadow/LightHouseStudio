@@ -95,19 +95,6 @@ export const useShellServices = ({
     openVideoUpload,
   });
 
-  const refs = useMemo(
-    () => ({
-      main: mainRef,
-      characterSelector: characterSelectorRef,
-      outfitToggle: outfitToggleRef,
-      workshopToggle: workshopToggleRef,
-      editVideoToggle: editVideoToggleRef,
-      uploadToggle: uploadToggleRef,
-      fullscreenWorkspace: fullscreenWorkspaceRef,
-    }),
-    [],
-  );
-
   return useMemo(
     () =>
       ({
@@ -126,7 +113,15 @@ export const useShellServices = ({
         confirmation,
         handoff,
         creativeLocks,
-        refs,
+        // Refs stay top-level rather than grouped: they are already stable, and nesting them in a
+        // memo reads to the compiler as holding ref values across a render.
+        mainRef,
+        characterSelectorRef,
+        outfitToggleRef,
+        workshopToggleRef,
+        editVideoToggleRef,
+        uploadToggleRef,
+        fullscreenWorkspaceRef,
       }) as const,
     [
       browser,
@@ -143,7 +138,6 @@ export const useShellServices = ({
       overlay,
       ownerUserId,
       provider,
-      refs,
       route,
     ],
   );

@@ -39,7 +39,10 @@ export const ShellCreativeBuilders = ({ services }: { readonly services: ShellSe
     provider,
     desktopStudioLayout,
     creativeLocks,
-    refs,
+    mainRef,
+    characterSelectorRef,
+    editVideoToggleRef,
+    outfitToggleRef,
   } = services;
   const { availability } = provider;
 
@@ -56,10 +59,10 @@ export const ShellCreativeBuilders = ({ services }: { readonly services: ShellSe
               : {})}
             returnFocusRef={
               character.destination.kind === 'existing-video'
-                ? refs.editVideoToggle
+                ? editVideoToggleRef
                 : desktopStudioLayout
-                  ? refs.characterSelector
-                  : refs.main
+                  ? characterSelectorRef
+                  : mainRef
             }
             generationAvailable={Boolean(availability.referenceImages)}
             optimizationAvailable={Boolean(availability.referenceImageOptimizerAvailable)}
@@ -92,8 +95,8 @@ export const ShellCreativeBuilders = ({ services }: { readonly services: ShellSe
         closeOnBackdrop={false}
         returnFocusRef={
           outfit.launch.destination === 'selector' && desktopStudioLayout
-            ? refs.outfitToggle
-            : refs.main
+            ? outfitToggleRef
+            : mainRef
         }
       >
         {overlay.active === 'outfit-builder' ? (

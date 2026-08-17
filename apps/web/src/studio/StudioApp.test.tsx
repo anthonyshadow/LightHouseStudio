@@ -856,7 +856,7 @@ describe('StudioApp composition lifecycle', () => {
 
   it('keeps the mounted stage node stable while overlays and deferred tools change', async () => {
     renderStudio();
-    const stage = screen.getByTestId('media-stage');
+    const stage = await screen.findByTestId('media-stage');
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Upload Video' }));
@@ -869,32 +869,35 @@ describe('StudioApp composition lifecycle', () => {
     expect(screen.getByTestId('media-stage')).toBe(stage);
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Assets' }));
-    await screen.findByRole('heading', { name: 'Assets' });
-    expect(screen.getByTestId('media-stage')).toBe(stage);
-    expect(stage.closest('[hidden]')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Videos' }));
-    await screen.findByText('Deferred saved videos');
-    expect(screen.getByTestId('media-stage')).toBe(stage);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Assets' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Open Characters' }));
-    await screen.findByText('Deferred saved characters');
-    expect(screen.getByTestId('media-stage')).toBe(stage);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Assets' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Open Outfits' }));
-    await screen.findByText('Deferred saved outfits');
-    expect(screen.getByTestId('media-stage')).toBe(stage);
-    fireEvent.click(screen.getByRole('button', { name: 'Close Outfits' }));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Studio' }));
-    await waitFor(() => expect(stage.closest('[hidden]')).not.toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: 'Open outfit options' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Create deferred outfit' }));
     await screen.findByText('Deferred outfit builder');
     expect(screen.getByTestId('media-stage')).toBe(stage);
+    expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
+    expect(harness.session.startLocal).not.toHaveBeenCalled();
+  });
+
+  it('releases the stage entirely when the operator leaves Studio for an Asset library', async () => {
+    renderStudio();
+    expect(await screen.findByTestId('media-stage')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Assets' }));
+    await screen.findByRole('heading', { name: 'Assets' });
+    // Not hidden — absent. A stage kept behind `display: none` still holds a camera, a <video>
+    // element and the whole capture graph on a route that has no use for any of it.
+    expect(screen.queryByTestId('media-stage')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Videos' }));
+    await screen.findByText('Deferred saved videos');
+    expect(screen.queryByTestId('media-stage')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Assets' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Characters' }));
+    await screen.findByText('Deferred saved characters');
+    expect(screen.queryByTestId('media-stage')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Studio' }));
+    await waitFor(() => expect(screen.getByTestId('media-stage')).toBeInTheDocument());
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
     expect(harness.session.startLocal).not.toHaveBeenCalled();
   });
@@ -947,7 +950,7 @@ describe('StudioApp composition lifecycle', () => {
 
   it('hydrates a direct Saved Video route into review while preserving the route and stage owner', async () => {
     const { router } = renderStudio(undefined, `/studio/${directVideoId}`);
-    const stage = screen.getByTestId('media-stage');
+    const stage = await screen.findByTestId('media-stage');
 
     expect(await screen.findByRole('region', { name: 'Latest Take' })).toBeVisible();
     expect(harness.getSavedVideo).toHaveBeenCalledWith(directVideoId, expect.any(AbortSignal));
@@ -1055,26 +1058,24 @@ describe('StudioApp composition lifecycle', () => {
     await waitFor(() => expect(harness.session.startLocal).toHaveBeenCalledOnce());
   });
 
-  it('keeps one hidden media-stage owner while the full Projects workspace is active', async () => {
+  it('mounts no media-stage owner while the Projects overview is active', async () => {
     renderStudio(undefined, '/projects');
-    const stage = screen.getByTestId('media-stage');
 
     expect(await screen.findByText('Deferred Projects workspace')).toBeInTheDocument();
-    expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
-    expect(stage.closest('[hidden]')).toBeInTheDocument();
+    expect(screen.queryAllByTestId('media-stage')).toHaveLength(0);
     expect(harness.session.startLocal).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Studio' }));
     await waitFor(() =>
       expect(screen.queryByText('Deferred Projects workspace')).not.toBeInTheDocument(),
     );
-    expect(screen.getByTestId('media-stage')).toBe(stage);
+    const stage = await screen.findByTestId('media-stage');
     expect(stage.closest('[hidden]')).not.toBeInTheDocument();
   });
 
   it('keeps the same media-stage owner visible in an open Project and supplies source lifecycle seams', async () => {
     renderStudio(undefined, '/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
-    const stage = screen.getByTestId('media-stage');
+    const stage = await screen.findByTestId('media-stage');
 
     expect(await screen.findByText('Deferred Projects workspace')).toBeInTheDocument();
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
@@ -1114,7 +1115,7 @@ describe('StudioApp composition lifecycle', () => {
 
   it('closes Use existing video and hands local recording to the persistent stage', async () => {
     renderStudio('upload');
-    const stage = screen.getByTestId('media-stage');
+    const stage = await screen.findByTestId('media-stage');
 
     expect(screen.getByRole('region', { name: 'Use existing video' })).toBeInTheDocument();
 
@@ -1244,7 +1245,7 @@ describe('StudioApp composition lifecycle', () => {
       .spyOn(HTMLCanvasElement.prototype, 'getContext')
       .mockImplementation(() => null);
     renderStudio();
-    const stage = screen.getByTestId('media-stage');
+    const stage = await screen.findByTestId('media-stage');
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit Video rail' }));
     fireEvent.click(screen.getByRole('button', { name: 'Adjust video' }));

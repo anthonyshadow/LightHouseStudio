@@ -30,7 +30,7 @@ export const ShellChrome = ({ services, user, logout }: ShellChromeProps) => {
   // Written only from the trigger's own click handler, so focus returns to the control the operator
   // actually used rather than to whichever one rendered last.
   const quickCreateTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const { route, nav, browser, provider, creative, character, outfit, libraryHandoff, refs } =
+  const { route, nav, browser, provider, creative, character, outfit, libraryHandoff, mainRef } =
     services;
   const { availability, state: capabilityState } = provider;
   const { repository, store } = creative;
@@ -108,7 +108,7 @@ export const ShellChrome = ({ services, user, logout }: ShellChromeProps) => {
 
       <StudioLibraryOverlays
         pathname={route.pathname}
-        mainRef={refs.main}
+        mainRef={mainRef}
         repository={repository}
         store={store}
         onClose={nav.closeAssetLibrary}

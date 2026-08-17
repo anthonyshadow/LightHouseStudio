@@ -86,7 +86,6 @@ const focusDesktopCaptureSettings = () => {
 export interface StudioAppProps {
   /** Everything the shell owns and the runtime borrows: route, nav, library, overlays, refs. */
   readonly services: ShellServices;
-  readonly focusMainOnMount?: boolean;
   /** The shell's teardown coordinator and status channel. */
   readonly runtimeRegistry: StudioRuntimeRegistry;
   readonly sessionEnding: boolean;
@@ -97,12 +96,7 @@ export interface StudioAppProps {
  * all share. It belongs to the routes that own live media and is torn down on the way out of them,
  * so nothing here may hold state another surface needs — that lives in the shell.
  */
-export const StudioApp = ({
-  services,
-  focusMainOnMount = false,
-  runtimeRegistry,
-  sessionEnding,
-}: StudioAppProps) => {
+export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAppProps) => {
   const {
     route,
     nav,
@@ -116,7 +110,13 @@ export const StudioApp = ({
     openVideoUpload,
     confirmation,
     handoff: studioHandoff,
-    refs,
+    mainRef,
+    characterSelectorRef,
+    outfitToggleRef,
+    workshopToggleRef,
+    editVideoToggleRef,
+    uploadToggleRef,
+    fullscreenWorkspaceRef,
   } = services;
   const {
     creationIntent,
@@ -126,13 +126,7 @@ export const StudioApp = ({
     directVideoId,
     routeOriginProjectId,
     activeProjectId,
-    projectRouteActive,
-    campaignRouteActive,
-    dashboardRouteActive,
-    assetsRouteActive,
     liveRouteActive,
-    projectOverviewActive,
-    organizationRouteActive,
     projectContextActive,
   } = route;
   const {
@@ -147,15 +141,7 @@ export const StudioApp = ({
     close: closeOverlay,
     closeIf: closeOverlayIf,
   } = overlay;
-  const {
-    main: mainRef,
-    characterSelector: characterSelectorRef,
-    outfitToggle: outfitToggleRef,
-    workshopToggle: workshopToggleRef,
-    editVideoToggle: editVideoToggleRef,
-    uploadToggle: uploadToggleRef,
-    fullscreenWorkspace: fullscreenWorkspaceRef,
-  } = refs;
+
   const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -350,11 +336,6 @@ export const StudioApp = ({
     session: activeProjectSession,
     checkpointCreative: projectCreative.checkpoint,
   });
-
-  useLayoutEffect(() => {
-    if (!focusMainOnMount) return;
-    mainRef.current?.focus();
-  }, [focusMainOnMount, location.key, mainRef]);
 
   useLayoutEffect(() => {
     promptCommittedHandlerRef.current = recordCommittedPrompt;
@@ -744,34 +725,16 @@ export const StudioApp = ({
   return (
     <>
       <StudioWorkspace
-        refs={{
-          main: mainRef,
-          fullscreen: fullscreenWorkspaceRef,
-          uploadToggle: uploadToggleRef,
-        }}
-        route={{
-          organizationActive: organizationRouteActive,
-          dashboardActive: dashboardRouteActive,
-          assetsActive: assetsRouteActive,
-          liveUnavailableActive: liveRouteActive,
-          projectContextActive,
-          projectActive: projectRouteActive,
-          projectOverviewActive,
-          campaignActive: campaignRouteActive,
-          projectRecordingAvailable,
-        }}
-        controllers={{
-          session,
-          takeReview,
-          videoEditor,
-          savedVideo,
-          project,
-          projectProcessing,
-        }}
+        refs={{ fullscreen: fullscreenWorkspaceRef, uploadToggle: uploadToggleRef }}
+        route={{ projectContextActive, projectRecordingAvailable }}
+        controllers={{ session, takeReview, videoEditor, savedVideo, project, projectProcessing }}
         environment={{
           browser,
           desktopLayout: desktopStudioLayout,
           ownerUserId: auth.session!.user.id,
+          creativeStore: repositoryStore,
+          onCreateProjectCharacter: character.openNewForProject,
+          onCreateProjectOutfit: outfit.openNewForProject,
         }}
         stage={{
           presentation: stagePresentation,
@@ -784,44 +747,9 @@ export const StudioApp = ({
           recordingCharacterAttribution,
           recordingSource: activeRecordingSource,
         }}
-        activity={{
-          captureBlockedReason,
-          captureSettingsDisabledReason,
-          aiSessionActive,
-        }}
+        activity={{ captureBlockedReason, captureSettingsDisabledReason, aiSessionActive }}
         creativeWorkspace={creativeWorkspace}
         projectCreativeCheckpoint={projectCreativeCheckpoint}
-        dashboard={{
-          displayName: auth.session!.user.displayName,
-          onCreateVideo: nav.openStudio,
-          onCreateProject: nav.createProject,
-          onCreateCampaign: nav.createCampaign,
-          onOpenAssets: nav.openAssets,
-          onOpenProjects: nav.openProjects,
-          onOpenCampaigns: nav.openCampaigns,
-          onOpenProject: nav.openProject,
-          onOpenCampaign: nav.openCampaign,
-          onOpenVideos: nav.openVideos,
-          onOpenVideo: nav.openSavedVideo,
-        }}
-        assets={{
-          creativeStore: repositoryStore,
-          characterCount: repositoryStore.savedCharacterPrompts.length,
-          outfitCount: repositoryStore.savedPrompts.filter(
-            (item) => item.modelModeId === 'lucy-vton-latest',
-          ).length,
-          onOpen: nav.openAssetLibrary,
-          onUploadVideo: nav.uploadVideo,
-          onCreateProjectCharacter: character.openNewForProject,
-          onCreateProjectOutfit: outfit.openNewForProject,
-        }}
-        liveBeta={{
-          capabilityState,
-          betaEnabled: liveExperience.betaEnabled,
-          providerConfigured: liveExperience.providerConfigured,
-          onOpenStudio: nav.openStudio,
-          onOpenDashboard: nav.backToDashboard,
-        }}
         saveVideoState={savedVideoSave.state}
         actions={{
           startLocalRecording,
