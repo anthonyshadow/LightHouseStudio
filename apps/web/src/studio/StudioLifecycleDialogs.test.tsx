@@ -13,26 +13,6 @@ const savedVersionId = 'c5b9b3ab-6c2f-4c1c-92c4-6f2b0e19f0d2';
 
 const dialogProps = (overrides: Partial<DialogProps> = {}): DialogProps => ({
   mainRef: createRef<HTMLElement>(),
-  confirmation: { pending: null, ask: vi.fn(), confirm: vi.fn(), cancel: vi.fn() },
-  logout: {
-    promptOpen: false,
-    blockedOpen: false,
-    busy: false,
-    preparing: false,
-    failure: null,
-    hasProjectProposal: false,
-    request: vi.fn(),
-    dismissPrompt: vi.fn(),
-    dismissBlocked: vi.fn(),
-    confirmDiscard: vi.fn(),
-  },
-  sessionExpiry: {
-    noticeOpen: false,
-    hasActiveWork: false,
-    hasProjectProposal: false,
-    busy: false,
-    acknowledge: vi.fn(),
-  },
   savedVideo: {
     pendingSave: null,
     saveOutcome: null,
@@ -67,61 +47,6 @@ const renderDialogs = (props: DialogProps) =>
 
 describe('StudioLifecycleDialogs', () => {
   afterEach(cleanup);
-
-  it('presents sanitized logout failure recovery actions', async () => {
-    const dismissPrompt = vi.fn();
-    const confirmDiscard = vi.fn();
-    const props = dialogProps({
-      logout: {
-        promptOpen: true,
-        blockedOpen: false,
-        busy: false,
-        preparing: false,
-        failure: 'Local cleanup did not finish.',
-        hasProjectProposal: false,
-        request: vi.fn(),
-        dismissPrompt,
-        dismissBlocked: vi.fn(),
-        confirmDiscard,
-      } as unknown as DialogProps['logout'],
-    });
-    renderDialogs(props);
-
-    expect(await screen.findByRole('heading', { name: 'Could not log out' })).toBeVisible();
-    expect(screen.getByRole('alert')).toHaveTextContent('Local cleanup did not finish.');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Retry logout' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Stay in Studio' }));
-
-    expect(confirmDiscard).toHaveBeenCalledOnce();
-    expect(dismissPrompt).toHaveBeenCalledOnce();
-  });
-
-  it('returns from the active-work logout blocker without abandoning media', async () => {
-    const dismissBlocked = vi.fn();
-    const props = dialogProps({
-      logout: {
-        promptOpen: false,
-        blockedOpen: true,
-        busy: false,
-        preparing: false,
-        failure: null,
-        hasProjectProposal: false,
-        request: vi.fn(),
-        dismissPrompt: vi.fn(),
-        dismissBlocked,
-        confirmDiscard: vi.fn(),
-      } as unknown as DialogProps['logout'],
-    });
-    renderDialogs(props);
-
-    expect(
-      await screen.findByRole('heading', { name: 'Finish active work before logging out' }),
-    ).toBeVisible();
-    fireEvent.click(screen.getByRole('button', { name: 'Return to Studio' }));
-
-    expect(dismissBlocked).toHaveBeenCalledOnce();
-  });
 
   it('adopts validated render preview only through the Project confirmation', async () => {
     const cancel = vi.fn();
@@ -237,48 +162,5 @@ describe('StudioLifecycleDialogs', () => {
     renderDialogs(dialogProps({ savedVideo, saveSuccessSuppressed: true }));
 
     expect(screen.queryByRole('heading', { name: 'Saved to Assets' })).not.toBeInTheDocument();
-  });
-
-  it('names what an expiring session discards and offers exactly one way out', () => {
-    const acknowledge = vi.fn();
-    renderDialogs(
-      dialogProps({
-        sessionExpiry: {
-          noticeOpen: true,
-          hasActiveWork: false,
-          hasProjectProposal: true,
-          busy: false,
-          acknowledge,
-        },
-      }),
-    );
-
-    const notice = screen.getByRole('dialog', { name: 'Your session ended' });
-    expect(notice).toHaveTextContent('The current temporary take');
-    expect(notice).toHaveTextContent('Unsaved Project changes cannot be saved without a session');
-    // There is no session left to stay in, so a cancel affordance would be a false promise.
-    expect(screen.queryByRole('button', { name: /Stay/u })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Log in again' }));
-
-    expect(acknowledge).toHaveBeenCalledOnce();
-  });
-
-  it('tells an active-work expiry that the running operation stops', () => {
-    renderDialogs(
-      dialogProps({
-        sessionExpiry: {
-          noticeOpen: true,
-          hasActiveWork: true,
-          hasProjectProposal: false,
-          busy: false,
-          acknowledge: vi.fn(),
-        },
-      }),
-    );
-
-    const notice = screen.getByRole('dialog', { name: 'Your session ended' });
-    expect(notice).toHaveTextContent('will stop');
-    expect(notice).not.toHaveTextContent('Unsaved Project changes');
   });
 });

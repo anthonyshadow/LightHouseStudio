@@ -1,9 +1,18 @@
 import { useTheme } from '@emotion/react';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
 import { useAuth } from '../application/auth/AuthProvider';
-import { RemoteStateProvider } from '../application/remote-state/RemoteStateProvider';
+import type { StudioRuntimeRegistry } from '../app/shell/studioRuntimeWork';
+import type { useStudioLogoutController } from './useStudioLogoutController';
 import { APP_PATHS, studioCreatePath } from '../app/paths';
 import type { PromptCommittedHandler } from '../application/types';
 import { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
@@ -57,7 +66,7 @@ import { useDirectSavedVideoRoute } from './useDirectSavedVideoRoute';
 import { useProjectVideoAttachment } from './useProjectVideoAttachment';
 import { useProjectVideoCreationContext } from './useProjectVideoCreationContext';
 import { useSaveVideo } from '../features/saved-videos/useSaveVideo';
-import { useConfirmationRequest } from '../ui';
+import type { ConfirmationRequest } from '../ui';
 
 const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
@@ -92,12 +101,28 @@ const focusDesktopCaptureSettings = () => {
   });
 };
 
-interface StudioExperienceProps {
-  focusMainOnMount: boolean;
-  initialIntent?: 'upload';
+export interface StudioAppProps {
+  readonly focusMainOnMount?: boolean;
+  readonly initialIntent?: 'upload';
+  /** The shell's teardown coordinator and work channel. */
+  readonly runtimeRegistry: StudioRuntimeRegistry;
+  /** Owned by the shell so a confirmation outlives the surface that asked it. */
+  readonly confirmation: ConfirmationRequest;
+  readonly logout: ReturnType<typeof useStudioLogoutController>;
+  readonly sessionEnding: boolean;
+  /** The shell's `<main>`, so overlays return focus to the element the shell will keep. */
+  readonly shellMainRef: RefObject<HTMLElement | null>;
 }
 
-const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceProps) => {
+export const StudioApp = ({
+  focusMainOnMount = false,
+  initialIntent,
+  runtimeRegistry,
+  confirmation,
+  logout,
+  sessionEnding,
+  shellMainRef,
+}: StudioAppProps) => {
   const theme = useTheme();
   const auth = useAuth();
   const navigate = useNavigate();
@@ -122,7 +147,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     projectContextActive,
   } = useStudioRouteContext(initialIntent);
   const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
-  const mainRef = useRef<HTMLElement>(null);
+  const mainRef = shellMainRef;
   const quickCreateTriggerRef = useRef<HTMLElement>(null);
   const [assetCreationLauncherOpen, setAssetCreationLauncherOpen] = useState(false);
   const desktopStudioLayout = useDesktopStudioLayout();
@@ -178,7 +203,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const uploadToggleRef = useRef<HTMLButtonElement>(null);
   const focusStudio = useCallback(() => {
     window.requestAnimationFrame(() => mainRef.current?.focus());
-  }, []);
+  }, [mainRef]);
   const closeTakeReview = useCallback(() => {
     closeOverlay();
     focusStudio();
@@ -279,8 +304,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     creativeConfigurationIsDurable: projectContextActive,
   });
 
-  const confirmation = useConfirmationRequest();
-
   const liveExperience = useStudioLiveExperience({
     availability,
     capabilityState,
@@ -370,7 +393,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   useLayoutEffect(() => {
     if (!focusMainOnMount) return;
     mainRef.current?.focus();
-  }, [focusMainOnMount, location.key]);
+  }, [focusMainOnMount, location.key, mainRef]);
 
   useLayoutEffect(() => {
     promptCommittedHandlerRef.current = recordCommittedPrompt;
@@ -467,14 +490,14 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     window.requestAnimationFrame(() =>
       (desktopStudioLayout ? characterSelectorRef.current : mainRef.current)?.focus(),
     );
-  }, [clearActiveCharacter, closeOverlayIf, desktopStudioLayout]);
+  }, [clearActiveCharacter, closeOverlayIf, desktopStudioLayout, mainRef]);
   const unselectAi = useCallback(() => {
     if (!clearActiveRecipe()) return;
     closeOverlayIf(['character-selector', 'outfit-selector']);
     window.requestAnimationFrame(() =>
       (desktopStudioLayout ? characterSelectorRef.current : mainRef.current)?.focus(),
     );
-  }, [clearActiveRecipe, closeOverlayIf, desktopStudioLayout]);
+  }, [clearActiveRecipe, closeOverlayIf, desktopStudioLayout, mainRef]);
   const openVideoUpload = useCallback(() => openOverlay('video-upload'), [openOverlay]);
   const openTakeReview = useCallback(() => openOverlay('take-review'), [openOverlay]);
   const libraryHandoff = useStudioLibraryHandoff({
@@ -549,26 +572,25 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     () => [...stageNotices, ...contextualStageNotices],
     [contextualStageNotices, stageNotices],
   );
-  const { logout, sessionExpiry, sessionEnding, discardTemporaryWork, work } =
-    useStudioSessionLifecycle({
-      auth,
-      session,
-      recording,
-      processing,
-      recordingActive,
-      finalizing,
-      existingVideo,
-      videoEditor,
-      outfit,
-      character,
-      projectWorkingMedia,
-      projectSourceActivity: activeProjectSourceActivity,
-      projectWorkingMediaActivity: activeProjectWorkingMediaActivity,
-      projectSession: activeProjectSession,
-      discardSavedVideoWork,
-      discardPendingAdoption,
-      closeOverlay,
-    });
+  const { discardTemporaryWork, work } = useStudioSessionLifecycle({
+    registry: runtimeRegistry,
+    session,
+    recording,
+    processing,
+    recordingActive,
+    finalizing,
+    existingVideo,
+    videoEditor,
+    outfit,
+    character,
+    projectWorkingMedia,
+    projectSourceActivity: activeProjectSourceActivity,
+    projectWorkingMediaActivity: activeProjectWorkingMediaActivity,
+    projectSession: activeProjectSession,
+    discardSavedVideoWork,
+    discardPendingAdoption,
+    closeOverlay,
+  });
   const discardExistingVideoSelection = useCallback(() => {
     if (existingVideo.selection) existingVideo.reset(false);
   }, [existingVideo]);
@@ -855,11 +877,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
 
         <StudioLifecycleDialogs
           mainRef={mainRef}
-          logout={logout}
-          sessionExpiry={sessionExpiry}
           savedVideo={savedVideo}
           videoEditor={videoEditor}
-          confirmation={confirmation}
           projectWorkingMedia={projectContextActive ? projectWorkingMedia : null}
           saveSuccessSuppressed={contextualProjectId !== null}
           onOpenSavedVideosLibrary={nav.openVideos}
@@ -943,17 +962,3 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     </div>
   );
 };
-
-export interface StudioAppProps {
-  readonly focusMainOnMount?: boolean;
-  readonly initialIntent?: 'upload';
-}
-
-export const StudioApp = ({ focusMainOnMount = false, initialIntent }: StudioAppProps) => (
-  <RemoteStateProvider>
-    <StudioExperience
-      focusMainOnMount={focusMainOnMount}
-      {...(initialIntent ? { initialIntent } : {})}
-    />
-  </RemoteStateProvider>
-);

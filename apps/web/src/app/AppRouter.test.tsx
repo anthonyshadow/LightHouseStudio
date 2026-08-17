@@ -7,12 +7,12 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { createMemoryRouter, RouterProvider, type InitialEntry } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from '../application/auth/AuthProvider';
-import type { StudioAppProps } from '../studio/StudioApp';
+import type { AuthenticatedShellProps } from './shell/AuthenticatedShell';
 import { StudioDesignProvider } from '../ui';
 
 const appHarness = vi.hoisted(() => ({
   mountCount: 0,
-  latestProps: null as StudioAppProps | null,
+  latestProps: null as AuthenticatedShellProps | null,
 }));
 
 const authApi = vi.hoisted(() => ({
@@ -55,8 +55,11 @@ vi.mock('../features/auth/LoginDialog', () => {
   };
 });
 
-vi.mock('../studio/StudioApp', () => ({
-  StudioApp: (props: StudioAppProps) => {
+// The router's contract is with the authenticated shell, not with the Studio runtime inside it.
+// Standing in for the shell also keeps the session-expiry cases honest: the real shell registers a
+// teardown hold, which is exactly the condition "nothing holding it" is meant to exclude.
+vi.mock('./shell/AuthenticatedShell', () => ({
+  AuthenticatedShell: (props: AuthenticatedShellProps) => {
     appHarness.latestProps = props;
     const mainRef = useRef<HTMLElement>(null);
     useEffect(() => {
@@ -178,7 +181,7 @@ describe('AppRouter', () => {
   });
 
   it('returns to entry immediately when a session expires with nothing holding it', async () => {
-    // StudioApp is mocked here, so no holder registers — the same situation as an expiry during
+    // The shell is mocked here, so no holder registers — the same situation as an expiry during
     // lazy-load or an error boundary. Teardown must stay immediate rather than parking with no
     // route to login.
     const { router } = renderApplication('/dashboard');
