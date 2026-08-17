@@ -1,22 +1,16 @@
-import { useTheme } from '@emotion/react';
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type RefObject,
-} from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
+import { hydrateReferenceImage } from '../adapters/api-client/apiClient';
 import { useAuth } from '../application/auth/AuthProvider';
+import type { ExistingVideoCharacterPort } from '../app/shell/studioHandoff';
 import type { StudioRuntimeRegistry } from '../app/shell/studioRuntimeWork';
-import type { useStudioHandoff } from '../app/shell/useStudioHandoff';
-import type { useStudioLogoutController } from './useStudioLogoutController';
-import { APP_PATHS, studioCreatePath } from '../app/paths';
+import type { ShellServices } from '../app/shell/useShellServices';
+import { APP_PATHS } from '../app/paths';
 import type { PromptCommittedHandler } from '../application/types';
-import { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
+import {
+  savedCharacterStepInput,
+  useExistingVideoWorkflow,
+} from '../features/existing-video/useExistingVideoWorkflow';
 import { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
 import { useProjectCreativeSessionAdapter } from '../features/projects/useProjectCreativeSessionAdapter';
@@ -28,46 +22,33 @@ import {
 import { hasDraftContent } from '../features/media-session';
 import { persistedReferenceAssetId } from '../features/media-session/types';
 import { useStudioSession } from '../orchestration/session';
-import { headerRegionStyles, pageStyles, shellStyles, skipLinkStyles } from './StudioApp.styles';
 import {
   CreativeWorkspace,
   type AuxiliaryPanel,
   type CreativeWorkspaceState,
 } from './CreativeWorkspace';
 import { StudioExitGuard } from './StudioExitGuard';
-import { StudioHeader } from './StudioHeader';
-import { AssetCreationLauncher } from './AssetCreationLauncher';
 import { isStudioFormError } from './studioStageNotices';
 import { deriveStudioContextualNotices } from './studioContextualNotices';
-import { useProviderAvailability } from './useProviderAvailability';
 import { useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
 import { useTakeReviewFlow } from './useTakeReviewFlow';
-import { useDesktopStudioLayout } from './useDesktopStudioLayout';
-import { useStudioOverlayController, type ActiveOverlay } from './useStudioOverlayController';
+import type { ActiveOverlay } from './useStudioOverlayController';
 import { useStudioProjectBridge } from './useStudioProjectBridge';
 import { useStudioSavedVideoController } from './useStudioSavedVideoController';
-import { StudioLibraryOverlays } from './StudioLibraryOverlays';
 import { StudioLifecycleDialogs } from './StudioLifecycleDialogs';
 import { StudioWorkspace } from './StudioWorkspace';
-import { useStudioOutfitWorkflow } from './useStudioOutfitWorkflow';
-import { useStudioCharacterWorkflow } from './useStudioCharacterWorkflow';
 import { StudioToolOverlays } from './StudioToolOverlays';
 import { currentExperienceLabel as resolveCurrentExperienceLabel } from './studioActivityPolicy';
-import { useStudioCreativeRepository } from './useStudioCreativeRepository';
 import { useStudioStageModel } from './useStudioStageModel';
 import { useStudioActivityModel } from './useStudioActivityModel';
 import { useStudioCharacterAttribution } from './useStudioCharacterAttribution';
-import { useStudioLibraryHandoff } from './useStudioLibraryHandoff';
 import { useStudioLiveExperience } from './useStudioLiveExperience';
-import { useStudioNavigationActions } from './useStudioNavigationActions';
 import { useStudioRecordingLaunch } from './useStudioRecordingLaunch';
-import { useStudioRouteContext } from './useStudioRouteContext';
 import { useStudioSessionLifecycle } from './useStudioSessionLifecycle';
 import { useDirectSavedVideoRoute } from './useDirectSavedVideoRoute';
 import { useProjectVideoAttachment } from './useProjectVideoAttachment';
 import { useProjectVideoCreationContext } from './useProjectVideoCreationContext';
 import { useSaveVideo } from '../features/saved-videos/useSaveVideo';
-import type { ConfirmationRequest } from '../ui';
 
 const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
@@ -103,42 +84,46 @@ const focusDesktopCaptureSettings = () => {
 };
 
 export interface StudioAppProps {
+  /** Everything the shell owns and the runtime borrows: route, nav, library, overlays, refs. */
+  readonly services: ShellServices;
   readonly focusMainOnMount?: boolean;
-  readonly initialIntent?: 'upload';
-  /** The shell's teardown coordinator and work channel. */
+  /** The shell's teardown coordinator and status channel. */
   readonly runtimeRegistry: StudioRuntimeRegistry;
-  /** The shell's route into this runtime for selections made where it was not mounted. */
-  readonly studioHandoff: ReturnType<typeof useStudioHandoff>;
-  /** Owned by the shell so a confirmation outlives the surface that asked it. */
-  readonly confirmation: ConfirmationRequest;
-  readonly logout: ReturnType<typeof useStudioLogoutController>;
   readonly sessionEnding: boolean;
-  /** The shell's `<main>`, so overlays return focus to the element the shell will keep. */
-  readonly shellMainRef: RefObject<HTMLElement | null>;
 }
 
+/**
+ * The Studio's live-media runtime: capture, take review, uploads, local editing, and the stage they
+ * all share. It belongs to the routes that own live media and is torn down on the way out of them,
+ * so nothing here may hold state another surface needs — that lives in the shell.
+ */
 export const StudioApp = ({
+  services,
   focusMainOnMount = false,
-  initialIntent,
   runtimeRegistry,
-  studioHandoff,
-  confirmation,
-  logout,
   sessionEnding,
-  shellMainRef,
 }: StudioAppProps) => {
-  const theme = useTheme();
-  const auth = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const nav = useStudioNavigationActions();
+  const {
+    route,
+    nav,
+    desktopStudioLayout,
+    browser,
+    provider,
+    creative,
+    overlay,
+    outfit,
+    character,
+    openVideoUpload,
+    confirmation,
+    handoff: studioHandoff,
+    refs,
+  } = services;
   const {
     creationIntent,
     queryCreationIntent,
     requestedCreationProjectId,
     validCreationProjectId,
     directVideoId,
-    focusedSavedVideoId,
     routeOriginProjectId,
     activeProjectId,
     projectRouteActive,
@@ -149,28 +134,33 @@ export const StudioApp = ({
     projectOverviewActive,
     organizationRouteActive,
     projectContextActive,
-  } = useStudioRouteContext(initialIntent);
-  const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
-  const mainRef = shellMainRef;
-  const quickCreateTriggerRef = useRef<HTMLElement>(null);
-  const [assetCreationLauncherOpen, setAssetCreationLauncherOpen] = useState(false);
-  const desktopStudioLayout = useDesktopStudioLayout();
+  } = route;
   const {
     repository,
     store: repositoryStore,
     existingVideoSavedRecipes,
     recordAcceptedBatchStep,
-  } = useStudioCreativeRepository(auth.session!.user.id);
-  const browser = useMemo(() => detectBrowserCapabilities(), []);
-  const provider = useProviderAvailability();
-  const { availability, state: capabilityState, retry: retryProviderAvailability } = provider;
-  const savedVideoSave = useSaveVideo(Boolean(availability.directSavedVideoUploadAvailable));
+  } = creative;
   const {
     active: activeOverlay,
     open: openOverlay,
     close: closeOverlay,
     closeIf: closeOverlayIf,
-  } = useStudioOverlayController(creationIntent === 'upload' ? 'video-upload' : null);
+  } = overlay;
+  const {
+    main: mainRef,
+    characterSelector: characterSelectorRef,
+    outfitToggle: outfitToggleRef,
+    workshopToggle: workshopToggleRef,
+    editVideoToggle: editVideoToggleRef,
+    uploadToggle: uploadToggleRef,
+    fullscreenWorkspace: fullscreenWorkspaceRef,
+  } = refs;
+  const auth = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { availability, state: capabilityState, retry: retryProviderAvailability } = provider;
+  const savedVideoSave = useSaveVideo(Boolean(availability.directSavedVideoUploadAvailable));
 
   const contextualProjectId = useProjectVideoCreationContext({
     pathname: location.pathname,
@@ -183,28 +173,16 @@ export const StudioApp = ({
   useEffect(() => {
     if (creationIntent !== 'upload' || location.pathname !== APP_PATHS.create) return;
     openOverlay('video-upload');
-    if (initialIntent === 'upload' && location.state !== null) {
+    // Router state carried the intent in; drop it so Back cannot re-open the upload panel.
+    if (location.state !== null) {
       void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
     }
-  }, [
-    creationIntent,
-    initialIntent,
-    location.pathname,
-    location.search,
-    location.state,
-    navigate,
-    openOverlay,
-  ]);
+  }, [creationIntent, location.pathname, location.search, location.state, navigate, openOverlay]);
 
   useEffect(() => {
     if (desktopStudioLayout) closeOverlayIf(['capture-settings']);
   }, [closeOverlayIf, desktopStudioLayout]);
   const promptCommittedHandlerRef = useRef<PromptCommittedHandler>(noopPromptCommitted);
-  const characterSelectorRef = useRef<HTMLButtonElement>(null);
-  const outfitToggleRef = useRef<HTMLButtonElement>(null);
-  const workshopToggleRef = useRef<HTMLButtonElement>(null);
-  const editVideoToggleRef = useRef<HTMLButtonElement>(null);
-  const uploadToggleRef = useRef<HTMLButtonElement>(null);
   const focusStudio = useCallback(() => {
     window.requestAnimationFrame(() => mainRef.current?.focus());
   }, [mainRef]);
@@ -358,29 +336,6 @@ export const StudioApp = ({
     saveWorkshopPrompt,
     openWorkshop,
   } = handoff.actions;
-  const outfit = useStudioOutfitWorkflow({
-    blockedReason: characterBuilderOpenBlockedReason,
-    openOverlay,
-    closeOverlay,
-    onOpenLibrary: nav.openOutfits,
-    // The shell's channel, so an outfit chosen from the library reaches a Studio that may not be
-    // mounted yet by the same path as one chosen inside it.
-    applySavedOutfit: studioHandoff.applyRecipe,
-    confirmation,
-  });
-  const character = useStudioCharacterWorkflow({
-    ownerUserId: auth.session!.user.id,
-    repository,
-    store: repositoryStore,
-    existingVideo,
-    activityBlockedReason: characterBuilderActivityBlockedReason,
-    openBlockedReason: characterBuilderOpenBlockedReason,
-    studioSaveBlockedReason: characterBuilderSaveBlockedReason,
-    saveStudioCharacter: saveBuiltCharacter,
-    openOverlay,
-    closeOverlay,
-    confirmation,
-  });
   const projectCreative = useProjectCreativeSessionAdapter({
     projectId: activeProjectId,
     projectSession: activeProjectSession,
@@ -496,66 +451,18 @@ export const StudioApp = ({
     window.requestAnimationFrame(() =>
       (desktopStudioLayout ? characterSelectorRef.current : mainRef.current)?.focus(),
     );
-  }, [clearActiveCharacter, closeOverlayIf, desktopStudioLayout, mainRef]);
+  }, [characterSelectorRef, clearActiveCharacter, closeOverlayIf, desktopStudioLayout, mainRef]);
   const unselectAi = useCallback(() => {
     if (!clearActiveRecipe()) return;
     closeOverlayIf(['character-selector', 'outfit-selector']);
     window.requestAnimationFrame(() =>
       (desktopStudioLayout ? characterSelectorRef.current : mainRef.current)?.focus(),
     );
-  }, [clearActiveRecipe, closeOverlayIf, desktopStudioLayout, mainRef]);
-  const openVideoUpload = useCallback(() => openOverlay('video-upload'), [openOverlay]);
+  }, [characterSelectorRef, clearActiveRecipe, closeOverlayIf, desktopStudioLayout, mainRef]);
   const openTakeReview = useCallback(() => openOverlay('take-review'), [openOverlay]);
-  // Published for the surfaces that outlive this runtime. Registered in a layout effect so a
-  // selection made on the route that mounted us is applied before first paint, and withdrawn on
-  // unmount so the shell holds a selection instead of calling into a torn-down session.
-  const {
-    registerPorts,
-    pending: pendingHandoff,
-    clearPending: clearPendingHandoff,
-  } = studioHandoff;
-  const selectVoiceForSource = useCallback(
-    (voiceId: string, voiceName: string) => {
-      if (existingVideo.selection === null) existingVideo.preselectVoice(voiceId, voiceName);
-      else existingVideo.selectVoice(voiceId, voiceName);
-    },
-    [existingVideo],
-  );
-  useLayoutEffect(() => {
-    registerPorts({ applyRecipe: applyRecipeSelection, selectVoice: selectVoiceForSource });
-    return () => registerPorts(null);
-  }, [applyRecipeSelection, registerPorts, selectVoiceForSource]);
-
-  useEffect(() => {
-    if (!pendingHandoff) return;
-    // Cleared first: applying a recipe can raise a confirmation, and a re-render while that is open
-    // must not find the same handoff still pending and apply it twice.
-    clearPendingHandoff();
-    if (pendingHandoff.kind === 'use-recipe') {
-      applyRecipeSelection(pendingHandoff.selection);
-      return;
-    }
-    selectVoiceForSource(pendingHandoff.voiceId, pendingHandoff.voiceName);
-    openVideoUpload();
-  }, [
-    applyRecipeSelection,
-    clearPendingHandoff,
-    openVideoUpload,
-    pendingHandoff,
-    selectVoiceForSource,
-  ]);
-
-  const libraryHandoff = useStudioLibraryHandoff({
-    nav,
-    character,
-    outfit,
-    applyRecipe: studioHandoff.applyRecipe,
-    selectVoice: studioHandoff.selectVoice,
-    openVideoUpload,
-  });
   const focusEditVideo = useCallback(() => {
     window.requestAnimationFrame(() => editVideoToggleRef.current?.focus());
-  }, []);
+  }, [editVideoToggleRef]);
   const savedVideo = useStudioSavedVideoController({
     existingVideo,
     recording,
@@ -573,6 +480,85 @@ export const StudioApp = ({
     focusStudio,
     focusEditVideo,
   });
+  // Published for the surfaces that outlive this runtime. Registered in a layout effect so a
+  // selection made on the route that mounted us is applied before first paint, and withdrawn on
+  // unmount so the shell holds a selection instead of calling into a torn-down session.
+  const {
+    registerPorts,
+    pending: pendingHandoff,
+    clearPending: clearPendingHandoff,
+  } = studioHandoff;
+  const selectVoiceForSource = useCallback(
+    (voiceId: string, voiceName: string) => {
+      if (existingVideo.selection === null) existingVideo.preselectVoice(voiceId, voiceName);
+      else existingVideo.selectVoice(voiceId, voiceName);
+    },
+    [existingVideo],
+  );
+  const existingVideoCharacter = useMemo<ExistingVideoCharacterPort>(
+    () => ({
+      providerActive: existingVideo.providerActive,
+      hasSelection: existingVideo.selection !== null,
+      isCharacterSwapStep: (stepId) =>
+        existingVideo.steps.some(
+          (candidate) => candidate.id === stepId && candidate.modelId === 'lucy-latest',
+        ),
+      applyCharacterToStep: async (stepId, snapshot, characterId) => {
+        const reference = snapshot.referenceImage
+          ? await hydrateReferenceImage(snapshot.referenceImage.assetId, snapshot.referenceImage)
+          : null;
+        existingVideo.updateStep(stepId, {
+          savedRecipeId: characterId,
+          characterName: snapshot.name,
+          characterVariantName: null,
+          ...savedCharacterStepInput(snapshot.prompt, reference?.file ?? null),
+        });
+      },
+    }),
+    [existingVideo],
+  );
+  useLayoutEffect(() => {
+    registerPorts({
+      applyRecipe: applyRecipeSelection,
+      selectVoice: selectVoiceForSource,
+      existingVideoCharacter,
+      useSavedVideo: (video, intent) => savedVideo.useSavedVideo(video, intent),
+      saveStudioCharacter: saveBuiltCharacter,
+    });
+    return () => registerPorts(null);
+  }, [
+    applyRecipeSelection,
+    existingVideoCharacter,
+    registerPorts,
+    saveBuiltCharacter,
+    savedVideo,
+    selectVoiceForSource,
+  ]);
+
+  useEffect(() => {
+    if (!pendingHandoff) return;
+    // Cleared first: applying a recipe can raise a confirmation, and a re-render while that is open
+    // must not find the same handoff still pending and apply it twice.
+    clearPendingHandoff();
+    if (pendingHandoff.kind === 'use-recipe') {
+      applyRecipeSelection(pendingHandoff.selection);
+      return;
+    }
+    if (pendingHandoff.kind === 'use-saved-video') {
+      void savedVideo.useSavedVideo(pendingHandoff.video, pendingHandoff.intent);
+      return;
+    }
+    selectVoiceForSource(pendingHandoff.voiceId, pendingHandoff.voiceName);
+    openVideoUpload();
+  }, [
+    applyRecipeSelection,
+    clearPendingHandoff,
+    openVideoUpload,
+    pendingHandoff,
+    savedVideo,
+    selectVoiceForSource,
+  ]);
+
   const discardSavedVideoWork = savedVideo.discardWork;
   const resetDirectSavedVideoWork = useCallback(() => {
     discardSavedVideoWork();
@@ -617,8 +603,23 @@ export const StudioApp = ({
     () => [...stageNotices, ...contextualStageNotices],
     [contextualStageNotices, stageNotices],
   );
+  const creativeLocks = useMemo(
+    () => ({
+      characterActivity: characterBuilderActivityBlockedReason,
+      characterOpen: characterBuilderOpenBlockedReason,
+      characterRemoval: characterRemovalBlockedReason,
+      characterSave: characterBuilderSaveBlockedReason,
+    }),
+    [
+      characterBuilderActivityBlockedReason,
+      characterBuilderOpenBlockedReason,
+      characterBuilderSaveBlockedReason,
+      characterRemovalBlockedReason,
+    ],
+  );
   const { discardTemporaryWork, work } = useStudioSessionLifecycle({
     registry: runtimeRegistry,
+    creativeLocks,
     session,
     recording,
     processing,
@@ -741,269 +742,171 @@ export const StudioApp = ({
     !activeProjectSourceActivity.busy;
 
   return (
-    <div css={pageStyles(theme)}>
-      <a href="#studio-main" css={skipLinkStyles(theme)}>
-        Skip to studio
-      </a>
-      <div css={shellStyles()}>
-        <div css={headerRegionStyles(theme)}>
-          <StudioHeader
-            availability={availability}
-            browser={browser}
-            capabilityState={capabilityState}
-            user={auth.session!.user}
-            accountBusy={logout.busy || logout.preparing}
-            activeDestination={
-              dashboardRouteActive
-                ? 'dashboard'
-                : campaignRouteActive
-                  ? 'campaigns'
-                  : projectRouteActive
-                    ? 'projects'
-                    : assetsRouteActive
-                      ? 'assets'
-                      : 'studio'
-            }
-            onOpenDashboard={nav.openDashboard}
-            onOpenStudio={nav.openStudio}
-            onOpenProjects={nav.openProjects}
-            onOpenCampaigns={nav.openCampaigns}
-            onOpenAssets={nav.openAssets}
-            onCreateProject={nav.createProject}
-            onCreateCampaign={nav.createCampaign}
-            onCreateAsset={(trigger) => {
-              quickCreateTriggerRef.current = trigger;
-              setAssetCreationLauncherOpen(true);
-            }}
-            onOpenLive={nav.openLive}
-            onLogout={() => void logout.request()}
-          />
-        </div>
+    <>
+      <StudioWorkspace
+        refs={{
+          main: mainRef,
+          fullscreen: fullscreenWorkspaceRef,
+          uploadToggle: uploadToggleRef,
+        }}
+        route={{
+          organizationActive: organizationRouteActive,
+          dashboardActive: dashboardRouteActive,
+          assetsActive: assetsRouteActive,
+          liveUnavailableActive: liveRouteActive,
+          projectContextActive,
+          projectActive: projectRouteActive,
+          projectOverviewActive,
+          campaignActive: campaignRouteActive,
+          projectRecordingAvailable,
+        }}
+        controllers={{
+          session,
+          takeReview,
+          videoEditor,
+          savedVideo,
+          project,
+          projectProcessing,
+        }}
+        environment={{
+          browser,
+          desktopLayout: desktopStudioLayout,
+          ownerUserId: auth.session!.user.id,
+        }}
+        stage={{
+          presentation: stagePresentation,
+          aspectRatio: stageAspectRatio,
+          notices: effectiveStageNotices,
+          editPreview: videoEditPreview,
+          experienceLabel: currentExperienceLabel,
+          experienceImageAssetId: currentExperienceImageAssetId,
+          recordingMode: effectiveRecordingMode,
+          recordingCharacterAttribution,
+          recordingSource: activeRecordingSource,
+        }}
+        activity={{
+          captureBlockedReason,
+          captureSettingsDisabledReason,
+          aiSessionActive,
+        }}
+        creativeWorkspace={creativeWorkspace}
+        projectCreativeCheckpoint={projectCreativeCheckpoint}
+        dashboard={{
+          displayName: auth.session!.user.displayName,
+          onCreateVideo: nav.openStudio,
+          onCreateProject: nav.createProject,
+          onCreateCampaign: nav.createCampaign,
+          onOpenAssets: nav.openAssets,
+          onOpenProjects: nav.openProjects,
+          onOpenCampaigns: nav.openCampaigns,
+          onOpenProject: nav.openProject,
+          onOpenCampaign: nav.openCampaign,
+          onOpenVideos: nav.openVideos,
+          onOpenVideo: nav.openSavedVideo,
+        }}
+        assets={{
+          creativeStore: repositoryStore,
+          characterCount: repositoryStore.savedCharacterPrompts.length,
+          outfitCount: repositoryStore.savedPrompts.filter(
+            (item) => item.modelModeId === 'lucy-vton-latest',
+          ).length,
+          onOpen: nav.openAssetLibrary,
+          onUploadVideo: nav.uploadVideo,
+          onCreateProjectCharacter: character.openNewForProject,
+          onCreateProjectOutfit: outfit.openNewForProject,
+        }}
+        liveBeta={{
+          capabilityState,
+          betaEnabled: liveExperience.betaEnabled,
+          providerConfigured: liveExperience.providerConfigured,
+          onOpenStudio: nav.openStudio,
+          onOpenDashboard: nav.backToDashboard,
+        }}
+        saveVideoState={savedVideoSave.state}
+        actions={{
+          startLocalRecording,
+          closeTakeReview,
+          discardExistingVideoSelection,
+          openVoiceTreatments: () => openOverlay('voice-treatments'),
+          openAiExperience: liveExperience.openLiveAiExperience,
+          openExistingVideo,
+          openCaptureSettings,
+          startProjectRecording,
+        }}
+      />
 
-        <StudioWorkspace
-          refs={{
-            main: mainRef,
-            fullscreen: fullscreenWorkspaceRef,
-            uploadToggle: uploadToggleRef,
-          }}
-          route={{
-            organizationActive: organizationRouteActive,
-            dashboardActive: dashboardRouteActive,
-            assetsActive: assetsRouteActive,
-            liveUnavailableActive: liveRouteActive,
-            projectContextActive,
-            projectActive: projectRouteActive,
-            projectOverviewActive,
-            campaignActive: campaignRouteActive,
-            projectRecordingAvailable,
-          }}
-          controllers={{
-            session,
-            takeReview,
-            videoEditor,
-            savedVideo,
-            project,
-            projectProcessing,
-          }}
-          environment={{
-            browser,
-            desktopLayout: desktopStudioLayout,
-            ownerUserId: auth.session!.user.id,
-          }}
-          stage={{
-            presentation: stagePresentation,
-            aspectRatio: stageAspectRatio,
-            notices: effectiveStageNotices,
-            editPreview: videoEditPreview,
-            experienceLabel: currentExperienceLabel,
-            experienceImageAssetId: currentExperienceImageAssetId,
-            recordingMode: effectiveRecordingMode,
-            recordingCharacterAttribution,
-            recordingSource: activeRecordingSource,
-          }}
-          activity={{
-            captureBlockedReason,
-            captureSettingsDisabledReason,
-            aiSessionActive,
-          }}
-          creativeWorkspace={creativeWorkspace}
-          projectCreativeCheckpoint={projectCreativeCheckpoint}
-          dashboard={{
-            displayName: auth.session!.user.displayName,
-            onCreateVideo: nav.openStudio,
-            onCreateProject: nav.createProject,
-            onCreateCampaign: nav.createCampaign,
-            onOpenAssets: nav.openAssets,
-            onOpenProjects: nav.openProjects,
-            onOpenCampaigns: nav.openCampaigns,
-            onOpenProject: nav.openProject,
-            onOpenCampaign: nav.openCampaign,
-            onOpenVideos: nav.openVideos,
-            onOpenVideo: nav.openSavedVideo,
-          }}
-          assets={{
-            creativeStore: repositoryStore,
-            characterCount: repositoryStore.savedCharacterPrompts.length,
-            outfitCount: repositoryStore.savedPrompts.filter(
-              (item) => item.modelModeId === 'lucy-vton-latest',
-            ).length,
-            onOpen: nav.openAssetLibrary,
-            onUploadVideo: nav.uploadVideo,
-            onCreateProjectCharacter: character.openNewForProject,
-            onCreateProjectOutfit: outfit.openNewForProject,
-          }}
-          liveBeta={{
-            capabilityState,
-            betaEnabled: liveExperience.betaEnabled,
-            providerConfigured: liveExperience.providerConfigured,
-            onOpenStudio: nav.openStudio,
-            onOpenDashboard: nav.backToDashboard,
-          }}
-          saveVideoState={savedVideoSave.state}
-          actions={{
-            startLocalRecording,
-            closeTakeReview,
-            discardExistingVideoSelection,
-            openVoiceTreatments: () => openOverlay('voice-treatments'),
-            openAiExperience: liveExperience.openLiveAiExperience,
-            openExistingVideo,
-            openCaptureSettings,
-            startProjectRecording,
-          }}
-        />
+      <StudioExitGuard
+        recordingOrFinalizing={work.recordingOrFinalizing}
+        videoRenderingActive={work.videoRenderingActive}
+        hasTemporaryTake={work.hasTemporaryTake}
+        voiceProcessingActive={work.voiceProcessingActive}
+        creativeWorkDirty={work.creativeWorkDirty}
+        projectContextDirty={projectContextActive && work.creativeWorkDirty}
+        projectSourceActivity={activeProjectSourceActivity}
+        projectSession={activeProjectSession}
+        sessionEnding={sessionEnding}
+        onDiscardTemporaryWork={discardTemporaryWork}
+      />
 
-        <AssetCreationLauncher
-          open={assetCreationLauncherOpen}
-          projectId={projectRouteActive ? activeProjectId : null}
-          returnFocusRef={quickCreateTriggerRef}
-          onClose={() => setAssetCreationLauncherOpen(false)}
-          onCreateVideo={(intent, projectId) => {
-            setAssetCreationLauncherOpen(false);
-            nav.navigateTo(
-              studioCreatePath({
-                ...(intent === 'new' ? {} : { intent }),
-                ...(projectId ? { projectId } : {}),
-              }),
-            );
-          }}
-          onCreateCharacter={(projectId) => {
-            setAssetCreationLauncherOpen(false);
-            if (projectId) {
-              character.openNewForProject(projectId);
-              return;
-            }
-            nav.openStudio();
-            character.openNew();
-          }}
-          onCreateOutfit={(projectId) => {
-            setAssetCreationLauncherOpen(false);
-            if (projectId) {
-              outfit.openNewForProject(projectId);
-              return;
-            }
-            nav.openStudio();
-            outfit.openNew(false, 'library');
-          }}
-          onOpenVoiceLibrary={nav.openVoices}
-        />
+      <StudioLifecycleDialogs
+        mainRef={mainRef}
+        savedVideo={savedVideo}
+        videoEditor={videoEditor}
+        projectWorkingMedia={projectContextActive ? projectWorkingMedia : null}
+        saveSuccessSuppressed={contextualProjectId !== null}
+        onOpenSavedVideosLibrary={nav.openVideos}
+        onCreateAnotherVideo={() => {
+          discardTemporaryWork();
+          focusStudio();
+        }}
+      />
 
-        <StudioExitGuard
-          recordingOrFinalizing={work.recordingOrFinalizing}
-          videoRenderingActive={work.videoRenderingActive}
-          hasTemporaryTake={work.hasTemporaryTake}
-          voiceProcessingActive={work.voiceProcessingActive}
-          creativeWorkDirty={work.creativeWorkDirty}
-          projectContextDirty={projectContextActive && work.creativeWorkDirty}
-          projectSourceActivity={activeProjectSourceActivity}
-          projectSession={activeProjectSession}
-          sessionEnding={sessionEnding}
-          onDiscardTemporaryWork={discardTemporaryWork}
-        />
-
-        <StudioLifecycleDialogs
-          mainRef={mainRef}
-          savedVideo={savedVideo}
-          videoEditor={videoEditor}
-          projectWorkingMedia={projectContextActive ? projectWorkingMedia : null}
-          saveSuccessSuppressed={contextualProjectId !== null}
-          onOpenSavedVideosLibrary={nav.openVideos}
-          onCreateAnotherVideo={() => {
-            discardTemporaryWork();
-            focusStudio();
-          }}
-        />
-
-        <StudioLibraryOverlays
-          pathname={location.pathname}
-          mainRef={mainRef}
-          repository={repository}
-          store={repositoryStore}
-          onClose={nav.closeAssetLibrary}
-          focusedSavedVideoId={focusedSavedVideoId}
-          onFocusedSavedVideoConsumed={nav.clearFocusedSavedVideo}
-          onUseVideo={savedVideo.useSavedVideo}
-          onCreateCharacter={libraryHandoff.createCharacter}
-          onCopyCharacter={libraryHandoff.copyCharacter}
-          onOpenWardrobe={libraryHandoff.openWardrobe}
-          onUseCharacter={libraryHandoff.useCharacter}
-          onCreateOutfit={libraryHandoff.createOutfit}
-          onUseOutfit={libraryHandoff.useOutfit}
-          voiceLibraryUnavailableReason={
-            availability.elevenLabs
-              ? null
-              : 'Saving, removing, and using voices needs a configured ElevenLabs provider. Browsing and previewing stay available.'
-          }
-          onUseVoice={libraryHandoff.useVoice}
-        />
-
-        <StudioToolOverlays
-          ownerUserId={auth.session!.user.id}
-          activeOverlay={activeOverlay}
-          desktopStudioLayout={desktopStudioLayout}
-          repository={repository}
-          store={repositoryStore}
-          provider={provider}
-          browser={browser}
-          session={session}
-          advancedLiveSession={liveExperience.advancedLiveSession}
-          takeReview={takeReview}
-          existingVideo={existingVideo}
-          {...(projectContextActive ? { projectProcessing } : {})}
-          savedVideo={savedVideo}
-          saveVideoState={savedVideoSave.state}
-          savedRecipes={existingVideoSavedRecipes}
-          handoff={handoff}
-          character={character}
-          outfit={outfit}
-          activeCharacterRecord={activeCharacterRecord}
-          characterOpenBlockedReason={characterBuilderOpenBlockedReason}
-          characterRemovalBlockedReason={characterRemovalBlockedReason}
-          aiSessionActive={aiSessionActive}
-          captureSettingsDisabledReason={captureSettingsDisabledReason}
-          {...(projectContextActive
-            ? { providerStartBlockedReason: PROJECT_PROVIDER_START_BLOCKED_REASON }
-            : {})}
-          mainRef={mainRef}
-          characterSelectorRef={characterSelectorRef}
-          outfitToggleRef={outfitToggleRef}
-          editVideoToggleRef={editVideoToggleRef}
-          uploadToggleRef={uploadToggleRef}
-          onOpenOverlay={openOverlay}
-          onCloseOverlay={closeOverlay}
-          onCloseExistingVideo={closeExistingVideo}
-          onFinishExistingVideo={finishExistingVideoSetup}
-          onStartExistingVideoRecording={startExistingVideoRecording}
-          onDiscardExistingVideoSelection={discardExistingVideoSelection}
-          onOpenExistingVideo={openExistingVideo}
-          onOpenSavedCharacters={openSavedCharacters}
-          onOpenSavedOutfits={openOutfitSelector}
-          onOpenSavedVideosLibrary={nav.openVideos}
-          onConfigureVirtualTryOn={() => void liveExperience.configureVirtualTryOn()}
-          onStartPreparedAi={(mode) => void liveExperience.startPreparedAi(mode)}
-          onUnselectCharacter={unselectCharacter}
-          onUnselectAi={unselectAi}
-        />
-      </div>
-    </div>
+      <StudioToolOverlays
+        activeOverlay={activeOverlay}
+        desktopStudioLayout={desktopStudioLayout}
+        repository={repository}
+        store={repositoryStore}
+        provider={provider}
+        browser={browser}
+        session={session}
+        advancedLiveSession={liveExperience.advancedLiveSession}
+        takeReview={takeReview}
+        existingVideo={existingVideo}
+        {...(projectContextActive ? { projectProcessing } : {})}
+        savedVideo={savedVideo}
+        saveVideoState={savedVideoSave.state}
+        savedRecipes={existingVideoSavedRecipes}
+        handoff={handoff}
+        character={character}
+        outfit={outfit}
+        activeCharacterRecord={activeCharacterRecord}
+        characterOpenBlockedReason={characterBuilderOpenBlockedReason}
+        characterRemovalBlockedReason={characterRemovalBlockedReason}
+        aiSessionActive={aiSessionActive}
+        captureSettingsDisabledReason={captureSettingsDisabledReason}
+        {...(projectContextActive
+          ? { providerStartBlockedReason: PROJECT_PROVIDER_START_BLOCKED_REASON }
+          : {})}
+        mainRef={mainRef}
+        characterSelectorRef={characterSelectorRef}
+        outfitToggleRef={outfitToggleRef}
+        editVideoToggleRef={editVideoToggleRef}
+        uploadToggleRef={uploadToggleRef}
+        onOpenOverlay={openOverlay}
+        onCloseOverlay={closeOverlay}
+        onCloseExistingVideo={closeExistingVideo}
+        onFinishExistingVideo={finishExistingVideoSetup}
+        onStartExistingVideoRecording={startExistingVideoRecording}
+        onDiscardExistingVideoSelection={discardExistingVideoSelection}
+        onOpenExistingVideo={openExistingVideo}
+        onOpenSavedCharacters={openSavedCharacters}
+        onOpenSavedOutfits={openOutfitSelector}
+        onOpenSavedVideosLibrary={nav.openVideos}
+        onConfigureVirtualTryOn={() => void liveExperience.configureVirtualTryOn()}
+        onStartPreparedAi={(mode) => void liveExperience.startPreparedAi(mode)}
+        onUnselectCharacter={unselectCharacter}
+        onUnselectAi={unselectAi}
+      />
+    </>
   );
 };
