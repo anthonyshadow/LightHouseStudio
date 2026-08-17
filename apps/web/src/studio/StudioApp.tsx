@@ -108,6 +108,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     requestedCreationProjectId,
     validCreationProjectId,
     directVideoId,
+    focusedSavedVideoId,
     routeOriginProjectId,
     activeProjectId,
     projectRouteActive,
@@ -482,7 +483,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     saveController: savedVideoSave,
     savedRecipes: existingVideoSavedRecipes,
     recordingCharacterAttribution,
-    navigateToStudio: nav.replaceWithStudio,
+    navigateToStudio: nav.openStudio,
     openVideoUpload,
     openTakeReview,
     closeOverlay,
@@ -760,6 +761,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             onOpenProject: nav.openProject,
             onOpenCampaign: nav.openCampaign,
             onOpenVideos: nav.openVideos,
+            onOpenVideo: nav.openSavedVideo,
           }}
           assets={{
             creativeStore: repositoryStore,
@@ -861,7 +863,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           mainRef={mainRef}
           repository={repository}
           store={repositoryStore}
-          onNavigate={nav.navigateTo}
+          onClose={nav.closeAssetLibrary}
+          focusedSavedVideoId={focusedSavedVideoId}
+          onFocusedSavedVideoConsumed={nav.clearFocusedSavedVideo}
           onUseVideo={savedVideo.useSavedVideo}
           onCreateCharacter={libraryHandoff.createCharacter}
           onCopyCharacter={libraryHandoff.copyCharacter}

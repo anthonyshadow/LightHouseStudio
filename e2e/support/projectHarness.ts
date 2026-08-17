@@ -710,10 +710,17 @@ export const installProjectHarness = async (
     if (url.pathname === '/api/projects' && method === 'GET') {
       const lifecycle = url.searchParams.get('lifecycle');
       const campaignId = url.searchParams.get('campaignId');
+      // `none` is a contract-defined sentinel for "no Campaign", not a Campaign id to compare.
+      const matchesCampaign =
+        campaignId === null
+          ? true
+          : campaignId === 'none'
+            ? current?.project.campaignId === null
+            : current?.project.campaignId === campaignId;
       const projects =
         current &&
         (current.project.archivedAt === null ? 'active' : 'archived') === lifecycle &&
-        (campaignId === null || current.project.campaignId === campaignId)
+        matchesCampaign
           ? [current.project]
           : [];
       await route.fulfill({

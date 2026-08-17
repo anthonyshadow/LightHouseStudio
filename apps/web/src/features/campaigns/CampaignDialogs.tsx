@@ -177,6 +177,90 @@ export const MoveProjectDialog = ({
   );
 };
 
+export type CampaignLifecycleAction = 'archive' | 'restore';
+
+/**
+ * One owner for archive and restore, shared by the Campaign list and the Campaign detail page.
+ * Deliberately has no reload-and-retry path: unlike Projects, `useCampaignsController` exposes no
+ * "latest version" refetch, and a stale CAS here should say so rather than silently re-apply.
+ */
+export const CampaignLifecycleDialog = ({
+  action,
+  campaign,
+  returnFocusRef,
+  onClose,
+  onChanged,
+}: {
+  readonly action: CampaignLifecycleAction;
+  readonly campaign: CampaignContract;
+  readonly returnFocusRef: RefObject<HTMLElement | null>;
+  readonly onClose: () => void;
+  readonly onChanged: (campaign: CampaignContract, action: CampaignLifecycleAction) => void;
+}) => {
+  const theme = useTheme();
+  const controller = useCampaignsController();
+  const [error, setError] = useState<string | null>(null);
+  const archiving = action === 'archive';
+  const mutation = archiving ? controller.archiveMutation : controller.restoreMutation;
+  const busy = mutation.isPending;
+
+  const apply = async () => {
+    setError(null);
+    try {
+      const updated = await mutation.mutateAsync({
+        campaignId: campaign.id,
+        expectedVersion: campaign.version,
+      });
+      onChanged(updated, action);
+    } catch (caught) {
+      setError(safeCampaignError(caught));
+    }
+  };
+
+  return (
+    <OverlayPanel
+      open
+      onClose={onClose}
+      title={`${archiving ? 'Archive' : 'Restore'} Campaign`}
+      description={
+        archiving
+          ? 'Archiving only changes Campaign visibility. It does not archive or move Projects.'
+          : 'Restoring allows new and moved Project membership again.'
+      }
+      placement="bottom"
+      size="standard"
+      closeDisabled={busy}
+      closeOnBackdrop={false}
+      returnFocusRef={returnFocusRef}
+      footer={
+        <div css={dialogActionsStyles(theme)}>
+          <Button variant="quiet" disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant={archiving ? 'danger' : 'primary'}
+            busy={busy}
+            onClick={() => void apply()}
+          >
+            {archiving ? 'Archive Campaign' : 'Restore Campaign'}
+          </Button>
+        </div>
+      }
+    >
+      <p>
+        {archiving
+          ? `Archive “${campaign.name}”? Its Projects remain intact.`
+          : `Restore “${campaign.name}”?`}
+      </p>
+      {error ? (
+        <StatusNotice role="alert" tone="danger" title="Change not applied">
+          {error}
+        </StatusNotice>
+      ) : null}
+    </OverlayPanel>
+  );
+};
+
 export const DeleteCampaignDialog = ({
   campaign,
   returnFocusRef,

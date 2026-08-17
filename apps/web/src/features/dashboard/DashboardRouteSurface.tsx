@@ -61,7 +61,9 @@ type DashboardRouteSurfaceProps = Readonly<{
   onOpenCampaigns: () => void;
   onOpenProject: (projectId: string) => void;
   onOpenCampaign: (campaignId: string) => void;
+  /** The whole Videos library — "All Videos", not a specific record. */
   onOpenVideos: () => void;
+  onOpenVideo: (videoId: string) => void;
 }>;
 
 type RecentKind = 'all' | 'projects' | 'videos' | 'campaigns';
@@ -105,6 +107,7 @@ export const DashboardRouteSurface = ({
   onOpenProject,
   onOpenCampaign,
   onOpenVideos,
+  onOpenVideo,
 }: DashboardRouteSurfaceProps) => {
   const theme = useTheme();
   const queryClient = useQueryClient();
@@ -174,7 +177,7 @@ export const DashboardRouteSurface = ({
           title: video.title,
           meta: `${video.versionCount} Version${video.versionCount === 1 ? '' : 's'}`,
           updatedAt: video.updatedAt,
-          open: onOpenVideos,
+          open: () => onOpenVideo(video.id),
         })),
         ...campaigns.map((campaign: CampaignContract) => ({
           id: campaign.id,
@@ -185,7 +188,7 @@ export const DashboardRouteSurface = ({
           open: () => onOpenCampaign(campaign.id),
         })),
       ].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
-    [campaigns, onOpenCampaign, onOpenProject, onOpenVideos, projects, videos],
+    [campaigns, onOpenCampaign, onOpenProject, onOpenVideo, projects, videos],
   );
   const visibleItems = recentItems
     .filter((item) => recentKind === 'all' || item.kind === recentKind)

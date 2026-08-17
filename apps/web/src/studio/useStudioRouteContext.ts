@@ -1,4 +1,4 @@
-import { projectIdSchema } from '@studio/contracts';
+import { projectIdSchema, savedVideoIdSchema } from '@studio/contracts';
 import { useMemo } from 'react';
 import { useLocation } from 'react-router';
 import {
@@ -8,6 +8,7 @@ import {
   isProjectWorkspacePath,
   isProjectsPath,
   projectIdFromPath,
+  requestedSavedVideoIdFromSearch,
   studioVideoIdFromPath,
   type StudioCreationIntent,
 } from '../app/paths';
@@ -23,6 +24,8 @@ export type StudioRouteContext = Readonly<{
   requestedCreationProjectId: string | null;
   validCreationProjectId: string | null;
   directVideoId: string | null;
+  /** `/assets/videos?video=<uuid>` — the Saved Video whose preview the Videos library should open. */
+  focusedSavedVideoId: string | null;
   routeOriginProjectId: string | null;
   activeProjectId: string | null;
   projectRouteActive: boolean;
@@ -59,6 +62,11 @@ export const useStudioRouteContext = (initialIntent?: StudioCreationIntent): Stu
     ? parsedCreationProjectId.data
     : null;
   const directVideoId = studioVideoIdFromPath(location.pathname);
+  const focusedSavedVideoId = useMemo(() => {
+    if (location.pathname !== APP_PATHS.videos) return null;
+    const parsed = savedVideoIdSchema.safeParse(requestedSavedVideoIdFromSearch(location.search));
+    return parsed.success ? parsed.data : null;
+  }, [location.pathname, location.search]);
   const routeOriginProjectId = useMemo(() => {
     const state = location.state as { readonly fromProjectId?: unknown } | null;
     const parsed = projectIdSchema.safeParse(state?.fromProjectId);
@@ -87,6 +95,7 @@ export const useStudioRouteContext = (initialIntent?: StudioCreationIntent): Stu
     requestedCreationProjectId,
     validCreationProjectId,
     directVideoId,
+    focusedSavedVideoId,
     routeOriginProjectId,
     activeProjectId,
     projectRouteActive,

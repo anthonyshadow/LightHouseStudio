@@ -5,7 +5,7 @@ export const APP_PATHS = Object.freeze({
   create: '/studio/create',
   live: '/studio/create/live',
   projects: '/projects',
-  campaigns: '/campaign',
+  campaigns: '/campaigns',
   assets: '/assets',
   videos: '/assets/videos',
   characters: '/assets/characters',
@@ -15,6 +15,8 @@ export const APP_PATHS = Object.freeze({
   recipes: '/studio/assets/recipes',
   legacyProjects: '/studio/projects',
   legacyCampaigns: '/studio/campaigns',
+  /** Compatibility-only route. Campaigns were singular before every other collection was plural. */
+  legacyCampaignsSingular: '/campaign',
   legacyAssets: '/studio/assets',
   legacyVideos: '/studio/videos',
   legacyCharacters: '/studio/characters',
@@ -25,6 +27,8 @@ export const APP_PATHS = Object.freeze({
 
 export type AssetLibraryKind = 'video' | 'character' | 'outfit' | 'voice';
 export type StudioCreationIntent = 'record' | 'upload';
+
+const FOCUSED_SAVED_VIDEO_PARAM = 'video';
 
 const PROTECTED_LEAF_PATHS = new Set<string>([
   APP_PATHS.dashboard,
@@ -41,13 +45,15 @@ const PROTECTED_LEAF_PATHS = new Set<string>([
 
 const PROJECT_DETAIL_PATH = /^\/projects\/([^/]+)$/u;
 const PROJECT_WORKSPACE_PATH = /^\/projects\/([^/]+)\/workspace$/u;
-const CAMPAIGN_DETAIL_PATH = /^\/campaign\/([^/]+)$/u;
+const CAMPAIGN_DETAIL_PATH = /^\/campaigns\/([^/]+)$/u;
 const STUDIO_VIDEO_PATH =
   /^\/studio\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/iu;
 
 const LEGACY_PROJECT_DETAIL_PATH = /^\/studio\/projects\/([^/]+)$/u;
 const LEGACY_PROJECT_WORKSPACE_PATH = /^\/studio\/projects\/([^/]+)\/workspace$/u;
 const LEGACY_CAMPAIGN_DETAIL_PATH = /^\/studio\/campaigns\/([^/]+)$/u;
+/** The literal `/` after `campaign` is what keeps this from ever matching a canonical plural path. */
+const LEGACY_CAMPAIGN_SINGULAR_DETAIL_PATH = /^\/campaign\/([^/]+)$/u;
 
 export const projectPath = (projectId: string): string =>
   `${APP_PATHS.projects}/${encodeURIComponent(projectId)}`;
@@ -104,6 +110,17 @@ export const assetLibraryPath = (kind: AssetLibraryKind): string => {
   }
 };
 
+/**
+ * The Videos library focused on one Saved Video. A query parameter rather than a path segment: the
+ * library is an overlay whose `open` prop compares `pathname` alone, so `/assets/videos/<id>` would
+ * close the very overlay it is trying to focus.
+ */
+export const savedVideoLibraryPath = (videoId: string): string =>
+  `${APP_PATHS.videos}?${FOCUSED_SAVED_VIDEO_PARAM}=${encodeURIComponent(videoId)}`;
+
+export const requestedSavedVideoIdFromSearch = (search: string): string | null =>
+  new URLSearchParams(search).get(FOCUSED_SAVED_VIDEO_PARAM);
+
 export const isAssetsPath = (pathname: string): boolean =>
   pathname === APP_PATHS.assets ||
   pathname === APP_PATHS.videos ||
@@ -144,7 +161,9 @@ const legacyProjectRedirect = (pathname: string): string | null => {
 };
 
 const legacyCampaignRedirect = (pathname: string): string | null => {
-  const campaignId = decodedPathId(LEGACY_CAMPAIGN_DETAIL_PATH.exec(pathname));
+  const campaignId =
+    decodedPathId(LEGACY_CAMPAIGN_DETAIL_PATH.exec(pathname)) ??
+    decodedPathId(LEGACY_CAMPAIGN_SINGULAR_DETAIL_PATH.exec(pathname));
   return campaignId === null ? null : campaignPath(campaignId);
 };
 
@@ -160,6 +179,7 @@ export const canonicalizeLegacyAppPath = (pathname: string): string | null => {
     case APP_PATHS.legacyProjects:
       return APP_PATHS.projects;
     case APP_PATHS.legacyCampaigns:
+    case APP_PATHS.legacyCampaignsSingular:
       return APP_PATHS.campaigns;
     case APP_PATHS.legacyAssets:
       return APP_PATHS.assets;
