@@ -9,6 +9,15 @@ export const campaignBriefStyles = (theme: Theme): CSSObject => ({
   overflowWrap: 'anywhere',
 });
 
+/** Keeps "Updated …" and the status pill on one wrapping line, outside the card's action row. */
+export const campaignCardMetaStyles = (theme: Theme): CSSObject => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  gap: theme.space.sm,
+  marginTop: theme.space.sm,
+});
+
 export const campaignGridStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 19rem), 1fr))',

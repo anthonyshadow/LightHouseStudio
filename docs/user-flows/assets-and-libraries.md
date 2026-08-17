@@ -12,12 +12,15 @@ whose `open` prop is a pathname comparison (`StudioLibraryOverlays.tsx:66,84,124
 grid is behind the overlay; the persistent Studio media stage is hidden on these routes
 (`StudioWorkspace.tsx:223`).
 
-Each overlay's close control calls `onNavigate(APP_PATHS.assets)` — a **push**, not a replace —
-so closing an overlay adds a history entry.
+Each overlay's close control calls `nav.closeAssetLibrary`, a history-aware back
+(`useRouteBack`): it consumes the entry the library was opened with, falling back to a `replace`
+onto `/assets` when the library was entered directly. Closing therefore adds **no** history entry.
+A library reached from somewhere other than the hub — the Dashboard's "All Videos", the save-success
+panel's "View in Assets" — closes back to that origin rather than to `/assets`.
 
 ## Flow: Assets hub (`/assets`)
 
-**Entry** — nav "Assets", dashboard "Browse Assets", any library overlay close.
+**Entry** — nav "Assets", dashboard "Browse Assets", a library overlay closed from the hub.
 
 **Journey**
 
@@ -40,6 +43,11 @@ Rendered by `apps/web/src/features/video-gallery/VideoGallery.tsx` — the riche
 
 1. `GET /api/videos` (infinite query) with `sort`, optional `characterName` and `format` filters
    driven by server-provided facets.
+   Arriving with `?video=<uuid>` — how the Dashboard's Recent Work opens one specific video — the
+   gallery resolves that id through `getSavedVideo` under the same query key the preview itself
+   uses, opens its preview, and reports an unknown or removed id as a notice rather than an empty
+   overlay. The shell then replaces the entry without the parameter, so closing the preview or
+   pressing Back never re-opens it.
 2. Grid of cards: thumbnail (with a graceful placeholder when the thumbnail is absent or fails to
    load), duration badge, title, dimensions, created date, and chips for version count, origin,
    format, character name, character variant, non-ready status, and `Unassigned Content`.
@@ -52,9 +60,9 @@ Rendered by `apps/web/src/features/video-gallery/VideoGallery.tsx` — the riche
 4. **Open in Studio** / **Edit video** run `useStudioSavedVideoController.loadSavedVideo`
    (`useStudioSavedVideoController.ts:114-180`): abort any prior load → `GET /api/videos/{id}/content`
    with a 300 MB bound and a strict content-type check → build a `File` →
-   **`navigate('/studio/create', { replace: true })`** → open the video-upload overlay → hand the
-   file to the existing-video workflow. `intent: 'edit'` additionally opens the local video editor
-   once the workflow reaches `ready` (`:207-217`).
+   **`navigate('/studio/create')`** — a push, so Back from Studio returns to the library — → open
+   the video-upload overlay → hand the file to the existing-video workflow. `intent: 'edit'`
+   additionally opens the local video editor once the workflow reaches `ready`.
 5. **Use as Project source** opens `AddVideoToProjectDialog`, which calls
    `reuseSavedVideoAsProjectSource` — `POST /api/projects/{projectId}/source/reuse`. It sets the
    Project's **immutable source** and navigates to that Project's workspace. It is _not_ an asset
@@ -145,8 +153,8 @@ import, upload, edit, composition and outfit try-on all have dedicated routes
 
 ## Exit points
 
-- Any library overlay → `/assets` (push)
-- Videos → `/studio/create` (replace) with the video loaded
+- Any library overlay → back one entry, fallback `/assets`
+- Videos → `/studio/create` (push) with the video loaded
 - Characters / Outfits → `/studio/create` with a builder overlay open
 - Videos ⋯ ▸ Use as Project source → `/projects/{id}/workspace` with the source accepted
 

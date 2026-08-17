@@ -87,7 +87,7 @@ Dashboard; `/studio/create` is standard video creation; `/studio/create/live` is
 `/studio/:videoId` directly loads the current version of an owner-checked Saved Video into review;
 `/assets` and its `/videos`, `/characters`, `/outfits`, and `/voices` children are reusable-resource
 surfaces; and Projects/Campaigns use `/projects`, `/projects/:projectId`,
-`/projects/:projectId/workspace`, `/campaign`, and `/campaign/:campaignId`. The reserved create
+`/projects/:projectId/workspace`, `/campaigns`, and `/campaigns/:campaignId`. The reserved create
 routes are matched before the UUID-only Saved Video route. Legacy organization, library, Recipe,
 and `/studio/live` URLs replace-navigate to their canonical replacements.
 The data-router form is required for route blocking. Route metadata, protected

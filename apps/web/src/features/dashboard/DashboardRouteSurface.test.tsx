@@ -73,6 +73,7 @@ const callbacks = () => ({
   onOpenProject: vi.fn(),
   onOpenCampaign: vi.fn(),
   onOpenVideos: vi.fn(),
+  onOpenVideo: vi.fn(),
 });
 
 const renderDashboard = (ownerUserId: string, actions = callbacks()) => {
@@ -131,6 +132,28 @@ describe('DashboardRouteSurface', () => {
     expect(screen.queryByText('Summer launch')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'All Campaigns' }));
     expect(actions.onOpenCampaigns).toHaveBeenCalledOnce();
+  });
+
+  it('opens the exact Saved Video a Recent Work row names, not the whole library', async () => {
+    mockApiServer.use(
+      http.get('*/api/projects', () => HttpResponse.json({ projects: [], nextCursor: null })),
+      http.get('*/api/campaigns', () => HttpResponse.json({ campaigns: [], nextCursor: null })),
+      http.get('*/api/videos', () =>
+        HttpResponse.json({
+          videos: [video],
+          nextCursor: null,
+          total: 1,
+          facets: { characterNames: [], formats: ['landscape'] },
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    const { actions } = renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
+
+    await user.click(await screen.findByRole('button', { name: /Launch master/u }));
+
+    expect(actions.onOpenVideo).toHaveBeenCalledWith(video.id);
+    expect(actions.onOpenVideos).not.toHaveBeenCalled();
   });
 
   it('persists lightweight onboarding separately for each account', async () => {

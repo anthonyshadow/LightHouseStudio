@@ -9,7 +9,13 @@ import {
   readCreativeAssetStore,
   startLocalPreview,
 } from './support/studioHarness';
-import { DASHBOARD_PATH, ENTRY_PATH, STUDIO_PATH } from './support/studioRoutes';
+import {
+  CAMPAIGNS_PATH,
+  DASHBOARD_PATH,
+  ENTRY_PATH,
+  LEGACY_CAMPAIGNS_PATH,
+  STUDIO_PATH,
+} from './support/studioRoutes';
 import { installProjectHarness, TEST_PROJECT_ID } from './support/projectHarness';
 import { installCampaignHarness, TEST_CAMPAIGN_ID } from './support/campaignHarness';
 import { loadDecodableH264VideoFixture } from './support/existingVideoHarness';
@@ -110,6 +116,21 @@ test('entry stays provider-free and Login opens Dashboard without starting media
   await expect(page.getByLabel('Studio media stage')).toBeHidden();
 });
 
+test('the pre-rename singular Campaign URLs redirect to their canonical plural paths', async ({
+  page,
+}) => {
+  await installSuccessfulStudioHarness(page);
+  await installCampaignHarness(page, true);
+
+  await page.goto(LEGACY_CAMPAIGNS_PATH);
+  await expect(page).toHaveURL(new RegExp(`${CAMPAIGNS_PATH}$`, 'u'));
+  await expect(page).toHaveTitle('Campaigns · Lightframe Studio');
+
+  await page.goto(`${LEGACY_CAMPAIGNS_PATH}/${TEST_CAMPAIGN_ID}`);
+  await expect(page).toHaveURL(new RegExp(`${CAMPAIGNS_PATH}/${TEST_CAMPAIGN_ID}$`, 'u'));
+  await expect(page.getByRole('heading', { name: 'Summer launch' })).toBeVisible();
+});
+
 test('Back and Forward restore focus across canonical organization routes', async ({ page }) => {
   await installSuccessfulStudioHarness(page, { initiallyAuthenticated: false });
   await page.goto(ENTRY_PATH);
@@ -178,6 +199,29 @@ test('Video, Character, and Outfit Asset routes preserve the shared Studio stage
     await dialog.getByRole('button', { name: 'Close panel' }).click();
     await expect(page).toHaveURL(/\/assets$/u);
   }
+});
+
+test('closing an Asset library consumes its history entry instead of stacking the hub', async ({
+  page,
+}) => {
+  await installSuccessfulStudioHarness(page);
+  await page.goto(DASHBOARD_PATH);
+  await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  await expect(page).toHaveURL(/\/assets$/u);
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await page.getByRole('button', { name: 'Open Videos' }).click();
+    await expect(page).toHaveURL(/\/assets\/videos$/u);
+    await page
+      .getByRole('dialog', { name: 'Videos' })
+      .getByRole('button', { name: 'Close panel' })
+      .click();
+    await expect(page).toHaveURL(/\/assets$/u);
+  }
+
+  // Three open/close pairs used to bury the Dashboard under six entries.
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`${DASHBOARD_PATH}$`, 'u'));
 });
 
 test('Projects quick creation, lifecycle, refresh, and explicit Assets exit stay in one shell', async ({
@@ -562,7 +606,7 @@ test('Campaign creation reaches a Campaign Project without activating media or p
 }) => {
   const network = await installSuccessfulStudioHarness(page);
   const campaigns = await installCampaignHarness(page);
-  await page.goto('/campaign');
+  await page.goto(CAMPAIGNS_PATH);
 
   await expect(page).toHaveTitle('Campaigns · Lightframe Studio');
   await expect(page.getByText('No Campaigns yet', { exact: true })).toBeVisible();
@@ -573,7 +617,7 @@ test('Campaign creation reaches a Campaign Project without activating media or p
   await create.getByRole('textbox', { name: /Brief/u }).fill('Keep the launch focused.');
   await create.getByRole('button', { name: 'Create Campaign' }).click();
 
-  await expect(page).toHaveURL(new RegExp(`/campaign/${TEST_CAMPAIGN_ID}$`, 'u'));
+  await expect(page).toHaveURL(new RegExp(`${CAMPAIGNS_PATH}/${TEST_CAMPAIGN_ID}$`, 'u'));
   await expect(page.getByRole('heading', { name: 'Summer launch' })).toBeVisible();
   await page.getByRole('button', { name: 'New Project' }).click();
   const createProject = page.getByRole('dialog', { name: 'New Project' });
@@ -602,7 +646,7 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
     ({ storageKey, store }) => window.localStorage.setItem(storageKey, JSON.stringify(store)),
     { storageKey: CREATIVE_ASSET_STORAGE_KEY, store: SEEDED_PROJECT_CREATIVE_STORE },
   );
-  await page.goto('/campaign');
+  await page.goto(CAMPAIGNS_PATH);
 
   await page.getByRole('button', { name: 'Create Campaign' }).click();
   const createCampaign = page.getByRole('dialog', { name: 'Create Campaign' });

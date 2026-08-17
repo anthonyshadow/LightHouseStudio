@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
-import { APP_PATHS, campaignPath, projectPath } from '../app/paths';
+import { APP_PATHS, campaignPath, projectPath, savedVideoLibraryPath } from '../app/paths';
 import { useRouteBack } from '../app/useRouteBack';
 
 type AssetDestination = 'videos' | 'characters' | 'outfits' | 'voices';
@@ -29,12 +29,14 @@ export const useStudioNavigationActions = () => {
         navigateTo: (path: string) => void navigate(path),
         openDashboard: () => void navigate(APP_PATHS.dashboard),
         openStudio: () => void navigate(APP_PATHS.create),
-        /** Replaces the current entry — used when the Studio is a destination, not a step. */
-        replaceWithStudio: () => void navigate(APP_PATHS.create, { replace: true }),
         openProjects: () => void navigate(APP_PATHS.projects),
         openCampaigns: () => void navigate(APP_PATHS.campaigns),
         openAssets: () => void navigate(APP_PATHS.assets),
         openVideos: () => void navigate(APP_PATHS.videos),
+        /** The Videos library with one Saved Video's preview open, rather than the whole shelf. */
+        openSavedVideo: (videoId: string) => void navigate(savedVideoLibraryPath(videoId)),
+        /** Drops `?video=` once the library has acted on it, so Back cannot re-open the preview. */
+        clearFocusedSavedVideo: () => void navigate(APP_PATHS.videos, { replace: true }),
         openVoices: () => void navigate(APP_PATHS.voices),
         openOutfits: () => void navigate(APP_PATHS.outfits),
         openLive: () => void navigate(APP_PATHS.live),
@@ -50,6 +52,11 @@ export const useStudioNavigationActions = () => {
         /** Returns to the real previous entry, falling back to `path` on direct entry. */
         goBackTo: (path: string) => goBack(path),
         backToDashboard: () => goBack(APP_PATHS.dashboard),
+        /**
+         * Library overlays are entered by pushing their path, so they must be left by consuming that
+         * entry. Pushing `/assets` instead made every open/close pair cost two Back presses.
+         */
+        closeAssetLibrary: () => goBack(APP_PATHS.assets),
       }) as const,
     [goBack, navigate],
   );

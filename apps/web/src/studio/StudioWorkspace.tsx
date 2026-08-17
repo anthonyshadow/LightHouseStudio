@@ -116,6 +116,7 @@ interface StudioWorkspaceProps {
     readonly onOpenProject: (projectId: string) => void;
     readonly onOpenCampaign: (campaignId: string) => void;
     readonly onOpenVideos: () => void;
+    readonly onOpenVideo: (videoId: string) => void;
   };
   readonly assets: {
     readonly creativeStore: CreativeAssetStore;
@@ -401,6 +402,7 @@ export const StudioWorkspace = ({
             onOpenProject={dashboard.onOpenProject}
             onOpenCampaign={dashboard.onOpenCampaign}
             onOpenVideos={dashboard.onOpenVideos}
+            onOpenVideo={dashboard.onOpenVideo}
           />
         </Suspense>
       ) : null}

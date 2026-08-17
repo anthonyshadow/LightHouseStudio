@@ -8,9 +8,11 @@ making Campaign setup a prerequisite for creative work.
 ## Journey
 
 1. Open **Campaigns** from the primary Studio navigation. Active and archived Campaigns load as
-   separate bounded lists; no Project revision or media bytes are loaded for these summaries.
+   separate bounded lists; no Project revision or media bytes are loaded for these summaries. Each
+   row carries its own compare-and-swap version, so it can be edited, archived, restored or deleted
+   without first opening it.
 2. Choose **Create Campaign**, enter a required Name and optional Brief, and submit. Creation is
-   idempotent and opens `/campaign/:campaignId` immediately. A success callout offers **Create
+   idempotent and opens `/campaigns/:campaignId` immediately. A success callout offers **Create
    Project in Campaign** or **Not now**.
 3. Choose the persistent **New Project** action, enter a name with the active Campaign fixed as the
    relationship source, or use **Quick
@@ -20,8 +22,9 @@ making Campaign setup a prerequisite for creative work.
    overwrite concurrent Project work silently.
 5. In Projects, choose **No Campaign** to view standalone Projects. This is a query group, not a
    stored default Campaign.
-6. Edit the Campaign Name/Brief, or archive it. Archive changes only the organizer: every attached
-   Project remains intact and openable, but no new or moved Project can attach until restore.
+6. Edit the Campaign Name/Brief, or archive it — from the Campaign list or from its detail page,
+   which share one dialog per action. Archive changes only the organizer: every attached Project
+   remains intact and openable, but no new or moved Project can attach until restore.
 7. Restore an archived Campaign to accept membership again. To delete the organizer, first move or
    detach every active and archived Project, then explicitly confirm **Delete Campaign**. A
    nonempty Campaign is blocked and no cascade action is offered.

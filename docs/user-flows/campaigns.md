@@ -38,7 +38,7 @@ Lifecycle rules (`packages/domain/src/campaigns/rules.ts`):
 Membership is a Project mutation, not a Campaign mutation. `moveProjectToCampaign`
 (`projects/rules.ts:737-759`) bumps the _project's_ version.
 
-## Flow: Campaign list (`/campaign`)
+## Flow: Campaign list (`/campaigns`)
 
 **Entry** — nav "Campaigns", dashboard "All Campaigns" / Recent Work, Quick Create ▸ New Campaign
 (router state `{ createIntent: 'campaign' }`).
@@ -50,17 +50,19 @@ Membership is a Project mutation, not a Campaign mutation. `moveProjectToCampaig
 2. Header: `h1` "Campaigns", an explanation that Campaigns are optional, and a single primary
    **Create Campaign** button.
 3. Two sections — Active and Archived — each a card grid. Each card shows the name, the brief (or
-   "No brief yet."), "Updated <date>", an **Open** button, a status pill, and, **only when
-   archived**, a **Delete** button.
-4. Loading / error+retry / per-lifecycle empty states are present (`:60-78`).
+   "No brief yet."), "Updated <date>" and a status pill, plus the same actions the Projects list
+   offers: **Open** · **Edit** (active only) · **Archive**/**Restore** · **Delete** (archived only).
+   Every mutating action takes its `expectedVersion` from the row itself, because the list response
+   returns full Campaign records — no detail fetch is needed to manage one.
+4. Loading / error+retry / per-lifecycle empty states are present.
 
 **Create** — `CampaignFormDialog` (name required, brief optional with a live character count) posts
-`/api/campaigns` with a retained idempotency key, then navigates to `/campaign/{id}` carrying
+`/api/campaigns` with a retained idempotency key, then navigates to `/campaigns/{id}` carrying
 router state `{ campaignCreated: id }`.
 
-**Exit** — `/campaign/{id}`.
+**Exit** — `/campaigns/{id}`.
 
-## Flow: Campaign detail (`/campaign/{id}`)
+## Flow: Campaign detail (`/campaigns/{id}`)
 
 **Journey**
 
@@ -85,34 +87,42 @@ router state `{ campaignCreated: id }`.
 **Move or detach** — `MoveProjectDialog` (`CampaignDialogs.tsx:105+`) uses `ProjectCampaignPicker`
 and posts `/api/projects/{id}/campaign`.
 
-**Archive / Restore** — a confirm `OverlayPanel` whose copy states archiving only changes campaign
-visibility. On success an `aria-live` announcement fires and focus returns to the heading.
+**Archive / Restore** — `CampaignLifecycleDialog`, whose copy states archiving only changes campaign
+visibility. On success an `aria-live` announcement fires and focus returns to the heading. It has
+deliberately **no** reload-and-retry path: unlike Projects, the campaign controller exposes no
+"latest version" refetch, so a stale CAS reports _"Change not applied"_ rather than silently
+re-applying against a version the operator never saw.
 
-**Delete** — a confirm `OverlayPanel`. The `campaign-not-empty` conflict is translated into a
-specific instruction: _"Move or detach every active and archived Project before deleting this
-Campaign."_ (`:365-372`). On success, navigate to `/campaign` with `replace: true`.
+**Delete** — `DeleteCampaignDialog`. The `campaign-not-empty` conflict is translated into a specific
+instruction: _"Move or detach every active and archived Project before deleting this Campaign."_
+
+Both dialogs, and the dual-mode `CampaignFormDialog`, live in `CampaignDialogs.tsx` and are shared
+by the list and the detail page — one owner each. The two surfaces differ only in what success
+means: the detail page navigates to `/campaigns` after a delete, while the list refreshes in place
+and never moves the operator off the list. Each dialog owns its own error, so a dismissed failure
+does not linger on the page behind it.
 
 ## System behaviour summary
 
-| UI action       | Request                                         | Follow-up                                                |
-| --------------- | ----------------------------------------------- | -------------------------------------------------------- |
-| Open list       | `GET /api/campaigns?lifecycle=…&pageSize=20`    | infinite query                                           |
-| Create          | `POST /api/campaigns` + Idempotency-Key         | cache detail, invalidate lists, navigate                 |
-| Edit            | `PATCH /api/campaigns/{id}`                     | cache detail, invalidate lists                           |
-| Archive/Restore | `POST …/archive` / `…/restore`                  | same                                                     |
-| Delete          | `POST …/tombstone`                              | invalidate all campaign queries, navigate to `/campaign` |
-| Move project    | `POST /api/projects/{id}/campaign`              | project caches invalidated                               |
-| Project groups  | `GET /api/projects?lifecycle=…&campaignId={id}` | infinite query                                           |
+| UI action       | Request                                         | Follow-up                                                    |
+| --------------- | ----------------------------------------------- | ------------------------------------------------------------ |
+| Open list       | `GET /api/campaigns?lifecycle=…&pageSize=20`    | infinite query; rows carry `version`, so the list can mutate |
+| Create          | `POST /api/campaigns` + Idempotency-Key         | cache detail, invalidate lists, navigate                     |
+| Edit            | `PATCH /api/campaigns/{id}`                     | cache detail, invalidate lists                               |
+| Archive/Restore | `POST …/archive` / `…/restore`                  | same                                                         |
+| Delete          | `POST …/tombstone`                              | invalidate all campaign queries, navigate to `/campaigns`    |
+| Move project    | `POST /api/projects/{id}/campaign`              | project caches invalidated                                   |
+| Project groups  | `GET /api/projects?lifecycle=…&campaignId={id}` | infinite query                                               |
 
 ## Exit points
 
 - `/projects/{id}` from a project row or after creating a project in the campaign
-- `/campaign/{newId}` from "Create another Campaign"
-- `/campaign` after deletion or via the breadcrumb
+- `/campaigns/{newId}` from "Create another Campaign"
+- `/campaigns` after deletion or via the breadcrumb
 
 ## Answers to specific questions
 
-- **After creating a campaign, where does the user land?** `/campaign/{id}`, with an explicit
+- **After creating a campaign, where does the user land?** `/campaigns/{id}`, with an explicit
   "create the first Project" next-step notice. This is the only place in the product that offers a
   guided next step after a create.
 - **Can a Project be created from inside a Campaign?** Yes — `CampaignRouteSurface.tsx:596-604`.
@@ -123,6 +133,8 @@ Campaign."_ (`:365-372`). On success, navigate to `/campaign` with `replace: tru
   media bytes.
 - **Does the detail view show anything besides projects?** Name, brief, status, updated date, and
   the lifecycle notices. No aggregate stats, no thumbnails, no activity.
+- **Must a Campaign be opened to manage it?** No. Edit, Archive, Restore and Delete are all
+  available inline on the list, at parity with the Projects list.
 
 ## Unverified
 

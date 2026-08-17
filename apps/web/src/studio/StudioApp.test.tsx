@@ -274,6 +274,10 @@ const harness = vi.hoisted(() => {
     saveVideo: vi.fn(() => Promise.resolve(null)),
     replaceSavedVideo: vi.fn(() => Promise.resolve(null)),
     resetSavedVideo: vi.fn(),
+    latestVideoGalleryProps: null as {
+      focusVideoId?: string | null;
+      onFocusVideoConsumed?: (() => void) | undefined;
+    } | null,
     hydratedReference: null as PersistedSessionReference | null,
     promptCommitted: null as
       | ((
@@ -469,7 +473,21 @@ vi.mock('../features/account-library/SavedCreativeLibrary', () => ({
 }));
 
 vi.mock('../features/video-gallery/VideoGallery', () => ({
-  VideoGallery: () => <div>Deferred saved videos</div>,
+  VideoGallery: (props: {
+    focusVideoId?: string | null;
+    onFocusVideoConsumed?: (() => void) | undefined;
+  }) => {
+    harness.latestVideoGalleryProps = props;
+    return (
+      <div>
+        <span>Deferred saved videos</span>
+        <span>Requested video: {props.focusVideoId ?? 'none'}</span>
+        <button type="button" onClick={() => props.onFocusVideoConsumed?.()}>
+          Consume requested video
+        </button>
+      </div>
+    );
+  },
 }));
 
 vi.mock('../features/projects/ProjectRouteSurface', () => ({
@@ -869,6 +887,42 @@ describe('StudioApp composition lifecycle', () => {
     expect(screen.getByTestId('media-stage')).toBe(stage);
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
     expect(harness.session.startLocal).not.toHaveBeenCalled();
+  });
+
+  it('hands a requested Saved Video to the library and drops the parameter once it is used', async () => {
+    const requestedId = '3d1b3b5a-6d2c-4d1f-9c0e-7a1f2b3c4d5e';
+    const { router } = renderStudio(undefined, `/assets/videos?video=${requestedId}`);
+
+    expect(await screen.findByText(`Requested video: ${requestedId}`)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Consume requested video' }));
+
+    await waitFor(() => expect(router.state.location.search).toBe(''));
+    expect(router.state.location.pathname).toBe('/assets/videos');
+    // Replaced, not pushed: Back must not walk into the preview the operator just closed.
+    expect(router.state.historyAction).toBe('REPLACE');
+    expect(screen.getByText('Requested video: none')).toBeInTheDocument();
+  });
+
+  it('ignores a malformed Saved Video parameter instead of requesting it', async () => {
+    renderStudio(undefined, '/assets/videos?video=not-a-uuid');
+
+    expect(await screen.findByText('Requested video: none')).toBeInTheDocument();
+  });
+
+  it('leaves an Asset library without stacking another history entry on the hub', async () => {
+    const { router } = renderStudio(undefined, '/assets');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Open Outfits' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/assets/outfits'));
+    expect(router.state.historyAction).toBe('PUSH');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Outfits' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/assets'));
+    // A memory router has no `window.history.state.idx`, so `useRouteBack` takes its replace
+    // fallback here; a real browser pops instead. Either way the close never pushes, which is the
+    // property N3 is about. The pop itself is covered in `e2e/app-routing.spec.ts`.
+    expect(router.state.historyAction).not.toBe('PUSH');
   });
 
   it.each([

@@ -17,7 +17,7 @@ documentation. Where behaviour could not be established from code, it is marked 
 | [`authentication-and-entry.md`](authentication-and-entry.md)   | `/`, login, session restore, protected routing, logout                                                            |
 | [`dashboard-and-navigation.md`](dashboard-and-navigation.md)   | `/dashboard`, global navigation shell, Quick Create, processing queue                                             |
 | [`projects.md`](projects.md)                                   | `/projects`, project overview, project workspace, source/working media/outputs/history, project-scoped processing |
-| [`campaigns.md`](campaigns.md)                                 | `/campaign`, campaign detail, project membership                                                                  |
+| [`campaigns.md`](campaigns.md)                                 | `/campaigns`, campaign detail, project membership                                                                 |
 | [`assets-and-libraries.md`](assets-and-libraries.md)           | `/assets` and the Videos / Characters / Outfits / Voices libraries                                                |
 | [`studio-creation-workflows.md`](studio-creation-workflows.md) | `/studio/create`, recording, upload/import, Character Swap, Virtual Try-On, voice, local video edit, save         |
 | [`navigation-map.md`](navigation-map.md)                       | Complete route table, redirects, and the reachability graph                                                       |
@@ -77,9 +77,9 @@ surface renders inside the shell — specifically, whether the persistent media 
 ├── Create video ─────────────► /studio/create
 ├── Continue Project ─────────► /projects/{id}
 ├── New Project (dialog) ─────► /projects  (createIntent) ──► /projects/{id}
-├── New Campaign (dialog) ────► /campaign  (createIntent) ──► /campaign/{id}
+├── New Campaign (dialog) ────► /campaigns  (createIntent) ──► /campaigns/{id}
 ├── Browse Assets ────────────► /assets
-└── Recent Work ──────────────► /projects/{id} · /campaign/{id} · /assets/videos
+└── Recent Work ──────────────► /projects/{id} · /campaigns/{id} · /assets/videos?video={id}
 
 /projects ──► /projects/{id} ──► /projects/{id}/workspace
                   │                    ├── Source  (record · upload · reuse Saved Video)
@@ -88,12 +88,12 @@ surface renders inside the shell — specifically, whether the persistent media 
                   │                    └── History (revisions · outputs · download)
                   └── Assets section (attach Videos / Characters / Outfits / Voices)
 
-/campaign ──► /campaign/{id} ──► project groups ──► /projects/{id}
+/campaigns ──► /campaigns/{id} ──► project groups ──► /projects/{id}
 
 /assets ──► /assets/videos      (overlay: preview · Open in Studio · Edit · Use as Project source · Download · Rename · Remove)
         ├─► /assets/characters  (overlay: create · copy · wardrobe · use)
         ├─► /assets/outfits     (overlay: create · use · remove)
-        └─► /assets/voices      (overlay: browse/preview only — read-only here)
+        └─► /assets/voices      (overlay: browse · preview · save · remove · Use in Studio)
 
 /studio/create ──► record | upload ──► review ──► Character Swap / Virtual Try-On / Voice / Adjust
                                                     └──► Save to Assets ──► Saved Video
@@ -119,7 +119,7 @@ surface renders inside the shell — specifically, whether the persistent media 
 | Character builder, wardrobe variants, outfits                          | **Complete**            |                                                                                                                                                                                       |
 | Projects: create, source, checkpoint, working media, output, history   | **Complete**            |                                                                                                                                                                                       |
 | Project-scoped Character Swap / Virtual Try-On with reconnect          | **Complete**            |                                                                                                                                                                                       |
-| Campaigns: create, edit, archive, restore, delete, membership          | **Complete**            |                                                                                                                                                                                       |
+| Campaigns: create, edit, archive, restore, delete, membership          | **Complete**            | Every lifecycle action is reachable from the list as well as the detail page                                                                                                          |
 | Attaching assets to a Project                                          | **Complete**            |                                                                                                                                                                                       |
 | **Live AI (realtime) sessions**                                        | **Partial / gated**     | Code paths exist end-to-end but are disabled unless `REALTIME_VIDEO_BETA_ENABLED` **and** a Decart key are configured; `/studio/create/live` otherwise renders an unavailable surface |
 | Voices library page                                                    | **Complete**            | `/assets/voices` browses, previews, saves and removes voices, and hands one to Studio; disabled with an explanation only when ElevenLabs is unconfigured                              |

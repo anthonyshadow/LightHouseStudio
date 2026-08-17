@@ -272,8 +272,14 @@ const VideoGalleryGrid = ({
 
 export const VideoGallery = ({
   onUse,
+  focusVideoId = null,
+  onFocusVideoConsumed,
 }: {
   onUse: (video: SavedVideoSummary, intent: 'play' | 'edit') => Promise<void>;
+  /** A Saved Video to open directly in preview, addressed by id rather than by loaded row. */
+  focusVideoId?: string | null;
+  /** Fires once the id has been acted on, so the caller can drop it from the URL. */
+  onFocusVideoConsumed?: () => void;
 }) => {
   const theme = useTheme();
   const queryClient = useQueryClient();
@@ -298,6 +304,7 @@ export const VideoGallery = ({
   const [actionError, setActionError] = useState<string | null>(null);
   const [brokenThumbnails, setBrokenThumbnails] = useState<ReadonlySet<string>>(() => new Set());
   const previewTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const consumedFocusVideoIdRef = useRef<string | null>(null);
   const previewPlayerRef = useRef<HTMLVideoElement | null>(null);
   const actionTriggerRef = useRef<HTMLElement | null>(null);
   const renameInputRef = useRef<HTMLInputElement | null>(null);
@@ -377,6 +384,46 @@ export const VideoGallery = ({
       player?.removeAttribute('src');
     };
   }, [previewVideo]);
+
+  // Acted on once per requested id. The fetch uses the key `previewDetailQuery` already reads, so a
+  // video on screen resolves from cache and one from a later page costs only the request the
+  // preview itself would have made.
+  useEffect(() => {
+    if (focusVideoId === null) {
+      consumedFocusVideoIdRef.current = null;
+      return;
+    }
+    if (consumedFocusVideoIdRef.current === focusVideoId) return;
+    consumedFocusVideoIdRef.current = focusVideoId;
+    let abandoned = false;
+    void queryClient
+      .fetchQuery({
+        queryKey: ['saved-videos', 'detail', focusVideoId],
+        queryFn: ({ signal }) => getSavedVideo(focusVideoId, signal),
+      })
+      .then((focused) => {
+        if (abandoned) return;
+        // No trigger element to return to: OverlayPanel falls back to the Videos overlay itself.
+        previewTriggerRef.current = null;
+        setPreviewError(false);
+        setSelectedVersionId(focused.currentVersion.id);
+        setPreviewVideo(focused);
+      })
+      .catch(() => {
+        if (abandoned) return;
+        setNotice({
+          role: 'alert',
+          tone: 'danger',
+          message: 'That video is no longer in Assets.',
+        });
+      })
+      .finally(() => {
+        if (!abandoned) onFocusVideoConsumed?.();
+      });
+    return () => {
+      abandoned = true;
+    };
+  }, [focusVideoId, onFocusVideoConsumed, queryClient]);
 
   const closeAction = () => {
     if (renameMutation.isPending || deleteMutation.isPending) return;

@@ -5,10 +5,9 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { APP_PATHS, campaignIdFromPath, campaignPath, projectPath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
-import { Button, OverlayPanel, StatusNotice } from '../../ui';
+import { Button, StatusNotice } from '../../ui';
 import {
   detailHeaderStyles,
-  dialogActionsStyles,
   emptyListStyles,
   listSectionStyles,
   statusPillStyles,
@@ -20,31 +19,42 @@ import { NewProjectDialog } from '../projects/ProjectDialogs';
 import { useProjectList } from '../projects/useProjectsController';
 import {
   campaignBriefStyles,
+  campaignCardMetaStyles,
   campaignCardStyles,
   campaignGridStyles,
   projectGroupStyles,
 } from './CampaignRouteSurface.styles';
 import {
   CampaignFormDialog,
+  CampaignLifecycleDialog,
   DeleteCampaignDialog,
   MoveProjectDialog,
   safeCampaignError as safeError,
+  type CampaignLifecycleAction,
 } from './CampaignDialogs';
-import { CampaignApiConflictError } from './campaignsApi';
-import {
-  useCampaignDetail,
-  useCampaignList,
-  useCampaignsController,
-} from './useCampaignsController';
+import { useCampaignDetail, useCampaignList } from './useCampaignsController';
 
-const CampaignListSection = ({ lifecycle }: { readonly lifecycle: 'active' | 'archived' }) => {
+interface CampaignListSectionProps {
+  readonly lifecycle: 'active' | 'archived';
+  readonly onOpen: (campaign: CampaignContract) => void;
+  readonly onEdit: (campaign: CampaignContract, trigger: HTMLButtonElement) => void;
+  readonly onLifecycle: (
+    action: CampaignLifecycleAction,
+    campaign: CampaignContract,
+    trigger: HTMLButtonElement,
+  ) => void;
+  readonly onDelete: (campaign: CampaignContract, trigger: HTMLButtonElement) => void;
+}
+
+const CampaignListSection = ({
+  lifecycle,
+  onOpen,
+  onEdit,
+  onLifecycle,
+  onDelete,
+}: CampaignListSectionProps) => {
   const theme = useTheme();
-  const navigate = useNavigate();
   const query = useCampaignList(lifecycle);
-  const headingRef = useRef<HTMLHeadingElement>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
-  const [deleteCampaign, setDeleteCampaign] = useState<CampaignContract | null>(null);
-  const [announcement, setAnnouncement] = useState<string | null>(null);
   const campaigns = useMemo(
     () => query.data?.pages.flatMap((page) => page.campaigns) ?? [],
     [query.data],
@@ -53,9 +63,7 @@ const CampaignListSection = ({ lifecycle }: { readonly lifecycle: 'active' | 'ar
   return (
     <section css={listSectionStyles(theme)} aria-labelledby={`${lifecycle}-campaigns-heading`}>
       <header>
-        <h3 ref={headingRef} tabIndex={-1} id={`${lifecycle}-campaigns-heading`}>
-          {archived ? 'Archived' : 'Active Campaigns'}
-        </h3>
+        <h3 id={`${lifecycle}-campaigns-heading`}>{archived ? 'Archived' : 'Active Campaigns'}</h3>
         <span>{campaigns.length} loaded</span>
       </header>
       {query.isPending ? <p role="status">Loading {lifecycle} Campaigns…</p> : null}
@@ -88,30 +96,53 @@ const CampaignListSection = ({ lifecycle }: { readonly lifecycle: 'active' | 'ar
                 <div>
                   <h4>{campaign.name}</h4>
                   <p>{campaign.brief ?? 'No brief yet.'}</p>
-                  <small>
-                    Updated{' '}
-                    <time dateTime={campaign.updatedAt}>{formatDate(campaign.updatedAt)}</time>
-                  </small>
+                  {/* Status is metadata, not an action — and the action row now holds up to four
+                      buttons, which must stay reflowable at 200% text on a small screen. A span,
+                      not a p: the card's `& p` rule would otherwise line-clamp and mute the pill. */}
+                  <div css={campaignCardMetaStyles(theme)}>
+                    <small>
+                      Updated{' '}
+                      <time dateTime={campaign.updatedAt}>{formatDate(campaign.updatedAt)}</time>
+                    </small>
+                    <span css={statusPillStyles(theme, archived)}>
+                      {archived ? 'Archived' : 'Active'}
+                    </span>
+                  </div>
                 </div>
                 <div data-campaign-actions>
                   <Button
                     size="small"
                     variant="primary"
-                    onClick={() => void navigate(campaignPath(campaign.id))}
+                    data-campaign-action="open"
+                    onClick={() => onOpen(campaign)}
                   >
                     Open
                   </Button>
-                  <span css={statusPillStyles(theme, archived)}>
-                    {archived ? 'Archived' : 'Active'}
-                  </span>
+                  {!archived ? (
+                    <Button
+                      size="small"
+                      data-campaign-action="edit"
+                      onClick={(event) => onEdit(campaign, event.currentTarget)}
+                    >
+                      Edit
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="small"
+                    variant={archived ? 'secondary' : 'quiet'}
+                    data-campaign-action={archived ? 'restore' : 'archive'}
+                    onClick={(event) =>
+                      onLifecycle(archived ? 'restore' : 'archive', campaign, event.currentTarget)
+                    }
+                  >
+                    {archived ? 'Restore' : 'Archive'}
+                  </Button>
                   {archived ? (
                     <Button
                       size="small"
                       variant="danger"
-                      onClick={(event) => {
-                        returnFocusRef.current = event.currentTarget;
-                        setDeleteCampaign(campaign);
-                      }}
+                      data-campaign-action="delete"
+                      onClick={(event) => onDelete(campaign, event.currentTarget)}
                     >
                       Delete
                     </Button>
@@ -131,21 +162,6 @@ const CampaignListSection = ({ lifecycle }: { readonly lifecycle: 'active' | 'ar
           Load more {lifecycle} Campaigns
         </Button>
       ) : null}
-      <div role="status" aria-live="polite" aria-atomic="true">
-        {announcement}
-      </div>
-      {deleteCampaign ? (
-        <DeleteCampaignDialog
-          campaign={deleteCampaign}
-          returnFocusRef={returnFocusRef}
-          onClose={() => setDeleteCampaign(null)}
-          onDeleted={(name) => {
-            setAnnouncement(`${name} deleted.`);
-            setDeleteCampaign(null);
-            window.requestAnimationFrame(() => headingRef.current?.focus());
-          }}
-        />
-      ) : null}
     </section>
   );
 };
@@ -157,6 +173,13 @@ const CampaignsWorkspace = () => {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const [creating, setCreating] = useState(false);
+  const [editCampaign, setEditCampaign] = useState<CampaignContract | null>(null);
+  const [lifecycleDialog, setLifecycleDialog] = useState<{
+    readonly action: CampaignLifecycleAction;
+    readonly campaign: CampaignContract;
+  } | null>(null);
+  const [deleteCampaign, setDeleteCampaign] = useState<CampaignContract | null>(null);
+  const [announcement, setAnnouncement] = useState<string | null>(null);
   const routeCreateRequested =
     (location.state as { readonly createIntent?: string } | null)?.createIntent === 'campaign';
   const setHeadingRef = useCallback(
@@ -166,11 +189,31 @@ const CampaignsWorkspace = () => {
     },
     [routeCreateRequested],
   );
+  /**
+   * Drops `createIntent` from this history entry. Every path that closes the dialog must call it —
+   * a successful create used to skip it, so Back from the new Campaign re-opened the dialog over a
+   * list that already contained it.
+   */
+  const clearRouteCreateIntent = () => {
+    if (routeCreateRequested) void navigate(location.pathname, { replace: true, state: null });
+  };
   const closeCreateDialog = () => {
     setCreating(false);
-    if (routeCreateRequested) {
-      void navigate(location.pathname, { replace: true, state: null });
-    }
+    clearRouteCreateIntent();
+  };
+  const closeDialog = () => {
+    setEditCampaign(null);
+    setLifecycleDialog(null);
+    setDeleteCampaign(null);
+  };
+  const finishDialog = (message: string) => {
+    closeDialog();
+    setAnnouncement(message);
+    window.requestAnimationFrame(() => headingRef.current?.focus());
+  };
+  const openWithReturnFocus = (trigger: HTMLButtonElement, open: () => void) => {
+    returnFocusRef.current = trigger;
+    open();
   };
 
   return (
@@ -195,17 +238,64 @@ const CampaignsWorkspace = () => {
           Create Campaign
         </Button>
       </header>
-      <CampaignListSection lifecycle="active" />
-      <CampaignListSection lifecycle="archived" />
+      <div role="status" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
+      {(['active', 'archived'] as const).map((lifecycle) => (
+        <CampaignListSection
+          key={lifecycle}
+          lifecycle={lifecycle}
+          onOpen={(campaign) => void navigate(campaignPath(campaign.id))}
+          onEdit={(campaign, trigger) =>
+            openWithReturnFocus(trigger, () => setEditCampaign(campaign))
+          }
+          onLifecycle={(action, campaign, trigger) =>
+            openWithReturnFocus(trigger, () => setLifecycleDialog({ action, campaign }))
+          }
+          onDelete={(campaign, trigger) =>
+            openWithReturnFocus(trigger, () => setDeleteCampaign(campaign))
+          }
+        />
+      ))}
       {creating || routeCreateRequested ? (
         <CampaignFormDialog
           returnFocusRef={returnFocusRef}
           onClose={closeCreateDialog}
-          onSaved={(campaign) =>
+          onSaved={(campaign) => {
+            clearRouteCreateIntent();
             void navigate(campaignPath(campaign.id), {
               state: { campaignCreated: campaign.id },
-            })
+            });
+          }}
+        />
+      ) : null}
+      {editCampaign ? (
+        <CampaignFormDialog
+          campaign={editCampaign}
+          returnFocusRef={returnFocusRef}
+          onClose={closeDialog}
+          onSaved={(saved) => finishDialog(`${saved.name} updated.`)}
+        />
+      ) : null}
+      {lifecycleDialog ? (
+        <CampaignLifecycleDialog
+          action={lifecycleDialog.action}
+          campaign={lifecycleDialog.campaign}
+          returnFocusRef={returnFocusRef}
+          onClose={closeDialog}
+          onChanged={(updated, action) =>
+            finishDialog(
+              `${updated.name} ${action === 'archive' ? 'archived' : 'restored'}. Projects remain intact.`,
+            )
           }
+        />
+      ) : null}
+      {deleteCampaign ? (
+        <DeleteCampaignDialog
+          campaign={deleteCampaign}
+          returnFocusRef={returnFocusRef}
+          onClose={closeDialog}
+          onDeleted={(name) => finishDialog(`${name} deleted.`)}
         />
       ) : null}
     </div>
@@ -296,13 +386,11 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
   const goBack = useRouteBack();
   const location = useLocation();
   const query = useCampaignDetail(campaignId);
-  const campaigns = useCampaignsController();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const [dialog, setDialog] = useState<CampaignDialog | null>(null);
   const [moveProject, setMoveProject] = useState<ProjectContract | null>(null);
   const [announcement, setAnnouncement] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
   const [creatingProject, setCreatingProject] = useState(false);
   const [creatingCampaign, setCreatingCampaign] = useState(false);
   const createdCampaignId = (location.state as { readonly campaignCreated?: unknown } | null)
@@ -333,42 +421,12 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
   const archived = campaign.status === 'archived';
   const openDialog = (next: CampaignDialog, trigger: HTMLButtonElement) => {
     returnFocusRef.current = trigger;
-    setActionError(null);
     setDialog(next);
   };
-  const changeLifecycle = async () => {
-    if (dialog !== 'archive' && dialog !== 'restore') return;
-    setActionError(null);
-    try {
-      const updated = await (dialog === 'archive'
-        ? campaigns.archiveMutation.mutateAsync({ campaignId, expectedVersion: campaign.version })
-        : campaigns.restoreMutation.mutateAsync({ campaignId, expectedVersion: campaign.version }));
-      setAnnouncement(
-        `${updated.name} ${dialog === 'archive' ? 'archived' : 'restored'}. Projects remain intact.`,
-      );
-      setDialog(null);
-      window.requestAnimationFrame(() => headingRef.current?.focus());
-    } catch (caught) {
-      setActionError(safeError(caught));
-    }
-  };
-  const tombstone = async () => {
-    setActionError(null);
-    try {
-      await campaigns.tombstoneMutation.mutateAsync({
-        campaignId,
-        expectedVersion: campaign.version,
-      });
-      void navigate(APP_PATHS.campaigns, { replace: true });
-    } catch (caught) {
-      const blocked =
-        caught instanceof CampaignApiConflictError && caught.conflict.kind === 'campaign-not-empty';
-      setActionError(
-        blocked
-          ? 'Move or detach every active and archived Project before deleting this Campaign.'
-          : safeError(caught),
-      );
-    }
+  const finishDialog = (message: string) => {
+    setDialog(null);
+    setAnnouncement(message);
+    window.requestAnimationFrame(() => headingRef.current?.focus());
   };
   return (
     <div css={workspaceInnerStyles(theme)}>
@@ -452,11 +510,6 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
           </div>
         </StatusNotice>
       ) : null}
-      {actionError && dialog === null ? (
-        <StatusNotice role="alert" tone="danger" title="Action not completed">
-          {actionError}
-        </StatusNotice>
-      ) : null}
       {archived ? (
         <StatusNotice tone="warning" title="Campaign archived">
           Its Projects remain intact and openable. Restore this Campaign before adding or moving
@@ -484,89 +537,30 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
           campaign={campaign}
           returnFocusRef={returnFocusRef}
           onClose={() => setDialog(null)}
-          onSaved={(updated) => {
-            setAnnouncement(`${updated.name} updated.`);
-            setDialog(null);
-          }}
+          onSaved={(updated) => finishDialog(`${updated.name} updated.`)}
         />
       ) : null}
       {dialog === 'archive' || dialog === 'restore' ? (
-        <OverlayPanel
-          open
-          onClose={() => setDialog(null)}
-          title={`${dialog === 'archive' ? 'Archive' : 'Restore'} Campaign`}
-          description={
-            dialog === 'archive'
-              ? 'Archiving only changes Campaign visibility. It does not archive or move Projects.'
-              : 'Restoring allows new and moved Project membership again.'
-          }
-          placement="bottom"
-          size="standard"
-          closeDisabled={campaigns.archiveMutation.isPending || campaigns.restoreMutation.isPending}
-          closeOnBackdrop={false}
+        <CampaignLifecycleDialog
+          action={dialog}
+          campaign={campaign}
           returnFocusRef={returnFocusRef}
-          footer={
-            <div css={dialogActionsStyles(theme)}>
-              <Button variant="quiet" onClick={() => setDialog(null)}>
-                Cancel
-              </Button>
-              <Button
-                variant={dialog === 'archive' ? 'danger' : 'primary'}
-                busy={campaigns.archiveMutation.isPending || campaigns.restoreMutation.isPending}
-                onClick={() => void changeLifecycle()}
-              >
-                {dialog === 'archive' ? 'Archive Campaign' : 'Restore Campaign'}
-              </Button>
-            </div>
+          onClose={() => setDialog(null)}
+          onChanged={(updated, action) =>
+            finishDialog(
+              `${updated.name} ${action === 'archive' ? 'archived' : 'restored'}. Projects remain intact.`,
+            )
           }
-        >
-          <p>
-            {dialog === 'archive'
-              ? `Archive “${campaign.name}”? Its Projects remain intact.`
-              : `Restore “${campaign.name}”?`}
-          </p>
-          {actionError ? (
-            <StatusNotice role="alert" tone="danger" title="Change not applied">
-              {actionError}
-            </StatusNotice>
-          ) : null}
-        </OverlayPanel>
+        />
       ) : null}
       {dialog === 'tombstone' ? (
-        <OverlayPanel
-          open
-          onClose={() => setDialog(null)}
-          title="Delete Campaign"
-          description="Only an archived empty Campaign can be deleted. No Project or content bytes are erased."
-          placement="bottom"
-          size="standard"
-          closeDisabled={campaigns.tombstoneMutation.isPending}
-          closeOnBackdrop={false}
+        <DeleteCampaignDialog
+          campaign={campaign}
           returnFocusRef={returnFocusRef}
-          footer={
-            <div css={dialogActionsStyles(theme)}>
-              <Button variant="quiet" onClick={() => setDialog(null)}>
-                Cancel
-              </Button>
-              <Button
-                variant="danger"
-                busy={campaigns.tombstoneMutation.isPending}
-                onClick={() => void tombstone()}
-              >
-                Confirm Delete Campaign
-              </Button>
-            </div>
-          }
-        >
-          <p>
-            Delete “{campaign.name}” as an organizer? This does not erase Project or content bytes.
-          </p>
-          {actionError ? (
-            <StatusNotice role="alert" tone="warning" title="Campaign not deleted">
-              {actionError}
-            </StatusNotice>
-          ) : null}
-        </OverlayPanel>
+          onClose={() => setDialog(null)}
+          // The list variant refreshes in place; the detail page has to leave the record it shows.
+          onDeleted={() => void navigate(APP_PATHS.campaigns, { replace: true })}
+        />
       ) : null}
       {moveProject ? (
         <MoveProjectDialog
