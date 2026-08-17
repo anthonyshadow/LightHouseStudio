@@ -1,5 +1,5 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { Button } from '../../ui';
+import { Button, ConfirmationRequestDialog, useConfirmationRequest } from '../../ui';
 import type { RecordingController } from '../recording/types';
 import type { SaveVideoState } from '../saved-videos/useSaveVideo';
 
@@ -71,6 +71,7 @@ export const TakeReviewActions = ({
   hasUnsavedChanges,
 }: TakeReviewActionsProps) => {
   const theme = useTheme();
+  const confirmation = useConfirmationRequest();
   const artifact = recording.presented;
   const locked = recording.processingState === 'processing';
   const compact = presentation === 'control-bar';
@@ -86,11 +87,14 @@ export const TakeReviewActions = ({
     onCloseTake?.();
   };
 
-  const discard = () => {
+  const discard = async () => {
     if (
-      !window.confirm(
-        'Discard this in-memory take? It cannot be recovered after the tab releases it.',
-      )
+      !(await confirmation.ask({
+        title: 'Discard this in-memory take?',
+        description: 'It cannot be recovered after the tab releases it.',
+        confirmLabel: 'Discard take',
+        danger: true,
+      }))
     ) {
       return;
     }
@@ -126,7 +130,7 @@ export const TakeReviewActions = ({
         </Button>
       ) : null}
       {unsaved ? (
-        <Button variant="danger" disabled={locked || saving} onClick={discard}>
+        <Button variant="danger" disabled={locked || saving} onClick={() => void discard()}>
           Discard
         </Button>
       ) : null}
@@ -152,6 +156,7 @@ export const TakeReviewActions = ({
       {saveVideoState.status === 'error' && saveVideoState.artifactId === artifact.id ? (
         <span role="alert">{saveVideoState.message}</span>
       ) : null}
+      <ConfirmationRequestDialog request={confirmation} />
     </div>
   );
 };

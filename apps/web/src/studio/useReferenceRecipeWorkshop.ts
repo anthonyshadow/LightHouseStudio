@@ -19,7 +19,7 @@ type UseReferenceRecipeWorkshopOptions = {
   readonly session: StudioSessionController;
   readonly recordingActive: boolean;
   readonly activeRecipe: ActiveStudioRecipe;
-  readonly selectLucyMode: () => boolean;
+  readonly selectLucyMode: () => Promise<boolean>;
   readonly openWorkshopOverlay: () => void;
 };
 
@@ -36,9 +36,9 @@ export const useReferenceRecipeWorkshop = ({
   const sourceRecipeRef = useRef<ActiveStudioRecipe>(null);
 
   const openSavedWorkshop = useCallback(
-    (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => {
+    async (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => {
       if (recordingActive || draft.intent === 'character-transform') return;
-      if (session.draft.mode !== 'lucy-latest' && !selectLucyMode()) return;
+      if (session.draft.mode !== 'lucy-latest' && !(await selectLucyMode())) return;
       sourceRecipeRef.current = { origin: 'character-prompt', assetId: asset.id };
       drafts.rememberDraft(draft);
       openWorkshopOverlay();
@@ -117,9 +117,9 @@ export const useReferenceRecipeWorkshop = ({
     [repository, session.draft.referenceImage],
   );
 
-  const openWorkshop = useCallback(() => {
+  const openWorkshop = useCallback(async () => {
     if (recordingActive) return;
-    if (session.draft.mode !== 'lucy-latest' && !selectLucyMode()) return;
+    if (session.draft.mode !== 'lucy-latest' && !(await selectLucyMode())) return;
     sourceRecipeRef.current = activeRecipe;
     openWorkshopOverlay();
   }, [activeRecipe, openWorkshopOverlay, recordingActive, selectLucyMode, session.draft.mode]);

@@ -52,12 +52,12 @@ import { useStudioLiveExperience } from './useStudioLiveExperience';
 import { useStudioNavigationActions } from './useStudioNavigationActions';
 import { useStudioRecordingLaunch } from './useStudioRecordingLaunch';
 import { useStudioRouteContext } from './useStudioRouteContext';
-import { useConfirmationRequest } from './useConfirmationRequest';
 import { useStudioSessionLifecycle } from './useStudioSessionLifecycle';
 import { useDirectSavedVideoRoute } from './useDirectSavedVideoRoute';
 import { useProjectVideoAttachment } from './useProjectVideoAttachment';
 import { useProjectVideoCreationContext } from './useProjectVideoCreationContext';
 import { useSaveVideo } from '../features/saved-videos/useSaveVideo';
+import { useConfirmationRequest } from '../ui';
 
 const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
@@ -304,6 +304,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     characterBuilderOpenBlockedReason,
     openWorkshopOverlay,
     closeOverlay,
+    confirmation,
   });
   const {
     activeRecipe,
@@ -651,7 +652,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         onOpenEditVideo: openPlaybackEditor,
         onOpenCharacter: openCharacterSelector,
         onOpenOutfit: openOutfitSelector,
-        onOpenWorkshop: openWorkshop,
+        onOpenWorkshop: () => void openWorkshop(),
         onClose: closeCreativePanel,
         onWorkshopDraftChange: rememberWorkshopDraft,
         onUseWorkshop: applyWorkshopPrompt,

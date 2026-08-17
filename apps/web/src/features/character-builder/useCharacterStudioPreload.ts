@@ -3,7 +3,10 @@ import { canonicalPrompt } from '@studio/domain';
 import { useCallback } from 'react';
 import { hydrateReferenceImage } from '../../adapters/api-client/apiClient';
 import type { CreativeAssetRepository } from '../creative-assets/types';
-import { confirmModeReplacement } from '../media-session/draftPolicy';
+import {
+  MODE_REPLACEMENT_CONFIRMATION,
+  modeReplacementNeedsConfirmation,
+} from '../media-session/draftPolicy';
 import type { StudioSessionController } from '../media-session/types';
 import type {
   CharacterSaveProgress,
@@ -11,6 +14,7 @@ import type {
 } from './characterBuilderControllerSupport';
 import type { CharacterSaveStage } from './characterBuilderPersistence';
 import { persistCharacterSaveSnapshot } from './persistCharacterSaveSnapshot';
+import type { ConfirmationRequest } from '../../ui';
 
 const referenceIdentity = (
   reference: StudioSessionController['draft']['referenceImage'],
@@ -32,6 +36,7 @@ type UseCharacterStudioPreloadOptions = {
   readonly repository: CreativeAssetRepository;
   readonly session: StudioSessionController;
   readonly saveBlockedReason: string | undefined;
+  readonly confirmation: ConfirmationRequest;
   readonly onStudioPreloaded: (preloaded: PreloadedCharacter) => void;
 };
 
@@ -40,6 +45,7 @@ export const useCharacterStudioPreload = ({
   repository,
   session,
   saveBlockedReason,
+  confirmation,
   onStudioPreloaded,
 }: UseCharacterStudioPreloadOptions) =>
   useCallback(
@@ -52,7 +58,8 @@ export const useCharacterStudioPreload = ({
       if (saveBlockedReason) throw new Error(saveBlockedReason);
       if (
         session.draft.mode !== 'lucy-latest' &&
-        !confirmModeReplacement(session.draft, 'lucy-latest', (message) => window.confirm(message))
+        modeReplacementNeedsConfirmation(session.draft, 'lucy-latest') &&
+        !(await confirmation.ask(MODE_REPLACEMENT_CONFIRMATION))
       ) {
         throw new Error('Character save was cancelled. The resumable draft is unchanged.');
       }
@@ -74,9 +81,12 @@ export const useCharacterStudioPreload = ({
         hasCurrentLucyRecipe &&
         (canonicalPrompt(session.draft.prompt) !== canonicalPrompt(studioPrompt) ||
           currentReferenceId !== incomingReferenceId) &&
-        !window.confirm(
-          'Replace the current Character settings with this saved Character? Your current AI settings will be replaced.',
-        )
+        !(await confirmation.ask({
+          title: 'Replace the current Character settings?',
+          description: 'This saved Character replaces your current AI settings.',
+          confirmLabel: 'Replace settings',
+          danger: true,
+        }))
       ) {
         throw new Error('Character save was cancelled. The resumable draft is unchanged.');
       }
@@ -99,5 +109,5 @@ export const useCharacterStudioPreload = ({
       onStudioPreloaded({ characterId, snapshot, studioPrompt, referenceImage });
       await progress.markStudioPreloaded();
     },
-    [onStudioPreloaded, repository, saveBlockedReason, session],
+    [confirmation, onStudioPreloaded, repository, saveBlockedReason, session],
   );

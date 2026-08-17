@@ -4,7 +4,7 @@ import { savedPromptToRecipeSelection } from '../features/creative-assets/recipe
 import type { RecentPrompt, SavedPrompt } from '../features/creative-assets/types';
 import type { ActiveOverlay } from './useStudioOverlayController';
 import { attachProjectAssetAndSync } from '../features/projects/useProjectAssetsController';
-import type { ConfirmationRequest } from './useConfirmationRequest';
+import type { ConfirmationRequest } from '../ui';
 
 export type OutfitBuilderLaunch = Readonly<{
   outfit?: SavedPrompt;

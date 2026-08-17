@@ -1,7 +1,5 @@
+import type { ConfirmationRequestOptions } from '../../ui';
 import type { SessionDraft, StudioMode } from './types';
-
-export const MODE_REPLACEMENT_MESSAGE =
-  'Switch modes and remove the current reference image? Your text draft will be kept.';
 
 export const hasDraftContent = (draft: SessionDraft): boolean =>
   Boolean(draft.prompt.trim() || draft.referenceImage || draft.enhance);
@@ -17,8 +15,15 @@ export const modeReplacementNeedsConfirmation = (
   target: StudioMode,
 ): boolean => target !== draft.mode && Boolean(draft.referenceImage);
 
-export const confirmModeReplacement = (
-  draft: SessionDraft,
-  target: StudioMode,
-  confirm: (message: string) => boolean,
-): boolean => !modeReplacementNeedsConfirmation(draft, target) || confirm(MODE_REPLACEMENT_MESSAGE);
+/**
+ * The one mode-replacement question, asked by every surface that can switch modes.
+ *
+ * Kept beside {@link modeReplacementNeedsConfirmation} so the rule and the words it puts to the
+ * operator cannot drift: four surfaces ask this, and they must all describe the same consequence.
+ */
+export const MODE_REPLACEMENT_CONFIRMATION: ConfirmationRequestOptions = {
+  title: 'Switch modes and remove the current reference image?',
+  description: 'Your text draft will be kept.',
+  confirmLabel: 'Switch mode',
+  cancelLabel: 'Keep this mode',
+};

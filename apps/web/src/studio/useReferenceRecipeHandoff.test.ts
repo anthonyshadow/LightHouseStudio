@@ -263,6 +263,12 @@ describe('reference recipe handoff', () => {
         characterBuilderOpenBlockedReason,
         openWorkshopOverlay,
         closeOverlay,
+        confirmation: {
+          pending: null,
+          ask: vi.fn(() => Promise.resolve(true)),
+          confirm: vi.fn(),
+          cancel: vi.fn(),
+        },
       }),
     );
     return {
@@ -770,8 +776,8 @@ describe('reference recipe handoff', () => {
     };
     const harness = renderHandoff({ store, referenceAsset: uploadedAsset });
 
-    act(() => {
-      harness.result.current.actions.openSavedWorkshop(workshopDraft, character);
+    await act(async () => {
+      await harness.result.current.actions.openSavedWorkshop(workshopDraft, character);
     });
     expect(harness.openWorkshopOverlay).toHaveBeenCalledOnce();
     expect(harness.result.current.state.workshopDraft).toEqual(workshopDraft);

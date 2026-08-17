@@ -3,8 +3,7 @@ import { SaveVideoDialog } from '../features/saved-videos/SaveVideoDialog';
 import { defaultSavedVideoName } from '../features/saved-videos/useSaveVideo';
 import type { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
 import type { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
-import { Button, OverlayPanel } from '../ui';
-import type { ConfirmationRequest } from './useConfirmationRequest';
+import { Button, ConfirmationRequestDialog, OverlayPanel, type ConfirmationRequest } from '../ui';
 import type { useStudioLogoutController } from './useStudioLogoutController';
 import type { useStudioSavedVideoController } from './useStudioSavedVideoController';
 import type { useStudioSessionExpiryController } from './useStudioSessionExpiryController';
@@ -63,21 +62,7 @@ export const StudioLifecycleDialogs = ({
   onCreateAnotherVideo,
 }: StudioLifecycleDialogsProps) => (
   <>
-    <Suspense fallback={null}>
-      <ConfirmationDialog
-        open={confirmation.pending !== null}
-        title={confirmation.pending?.title ?? ''}
-        description={confirmation.pending?.description ?? ''}
-        confirmLabel={confirmation.pending?.confirmLabel ?? 'Confirm'}
-        {...(confirmation.pending?.cancelLabel === undefined
-          ? {}
-          : { cancelLabel: confirmation.pending.cancelLabel })}
-        danger={confirmation.pending?.danger ?? false}
-        returnFocusRef={mainRef}
-        onCancel={confirmation.cancel}
-        onConfirm={confirmation.confirm}
-      />
-    </Suspense>
+    <ConfirmationRequestDialog request={confirmation} returnFocusRef={mainRef} />
 
     {savedVideo.pendingSave ? (
       <SaveVideoDialog
