@@ -12,19 +12,9 @@ import type { useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
 import type { useStudioCharacterWorkflow } from './useStudioCharacterWorkflow';
 import type { ActiveOverlay } from './useStudioOverlayController';
 
-const CharacterBuilderCoordinator = lazy(() =>
-  import('../features/character-builder/CharacterBuilderCoordinator').then((module) => ({
-    default: module.CharacterBuilderCoordinator,
-  })),
-);
 const CharacterWardrobePanel = lazy(() =>
   import('../features/character-wardrobe/CharacterWardrobePanel').then((module) => ({
     default: module.CharacterWardrobePanel,
-  })),
-);
-const ConfirmationDialog = lazy(() =>
-  import('../ui/primitives/ConfirmationDialog').then((module) => ({
-    default: module.ConfirmationDialog,
   })),
 );
 const SavedCharacterLibrary = lazy(() =>
@@ -34,7 +24,6 @@ const SavedCharacterLibrary = lazy(() =>
 );
 
 export const StudioCharacterOverlays = ({
-  ownerUserId,
   activeOverlay,
   desktopStudioLayout,
   repository,
@@ -48,12 +37,10 @@ export const StudioCharacterOverlays = ({
   recordingActive,
   mainRef,
   characterSelectorRef,
-  editVideoToggleRef,
   onClose,
   onOpenSavedCharacters,
   onUnselectCharacter,
 }: {
-  readonly ownerUserId: string;
   readonly activeOverlay: ActiveOverlay;
   readonly desktopStudioLayout: boolean;
   readonly repository: CreativeAssetRepository;
@@ -67,7 +54,6 @@ export const StudioCharacterOverlays = ({
   readonly recordingActive: boolean;
   readonly mainRef: RefObject<HTMLElement | null>;
   readonly characterSelectorRef: RefObject<HTMLButtonElement | null>;
-  readonly editVideoToggleRef: RefObject<HTMLButtonElement | null>;
   readonly onClose: () => void;
   readonly onOpenSavedCharacters: () => void;
   readonly onUnselectCharacter: () => void;
@@ -181,59 +167,6 @@ export const StudioCharacterOverlays = ({
           </Suspense>
         ) : null}
       </OverlayPanel>
-
-      {activeOverlay === 'character-builder' ? (
-        <Suspense fallback={<p role="status">Loading studio tool…</p>}>
-          <CharacterBuilderCoordinator
-            open
-            ownerUserId={ownerUserId}
-            target={character.launch.target}
-            {...(character.launch.initialValue
-              ? { initialValue: character.launch.initialValue }
-              : {})}
-            returnFocusRef={
-              character.destination.kind === 'existing-video'
-                ? editVideoToggleRef
-                : desktopStudioLayout
-                  ? characterSelectorRef
-                  : mainRef
-            }
-            generationAvailable={Boolean(availability.referenceImages)}
-            optimizationAvailable={Boolean(availability.referenceImageOptimizerAvailable)}
-            editAvailable={Boolean(availability.referenceImageEditAvailable)}
-            {...(availability.referenceImageProvider !== undefined
-              ? { referenceImageProvider: availability.referenceImageProvider }
-              : {})}
-            {...(availability.referenceImageModel !== undefined
-              ? { referenceImageModel: availability.referenceImageModel }
-              : {})}
-            {...(availability.referenceImageOptimizerModel !== undefined
-              ? { referenceImageOptimizerModel: availability.referenceImageOptimizerModel }
-              : {})}
-            {...(character.saveBlockedReason
-              ? { saveBlockedReason: character.saveBlockedReason }
-              : {})}
-            onSaveCharacter={character.saveCharacter}
-            onDismiss={character.dismissBuilder}
-          />
-        </Suspense>
-      ) : null}
-
-      <Suspense fallback={null}>
-        <ConfirmationDialog
-          open={character.discardPrompt !== null}
-          title="Unfinished character draft"
-          description={
-            character.discardPrompt ??
-            'An unfinished character draft exists. Continue and discard it?'
-          }
-          confirmLabel="Continue"
-          cancelLabel="Cancel"
-          danger
-          onCancel={() => character.resolveDiscard(false)}
-          onConfirm={() => character.resolveDiscard(true)}
-        />
-      </Suspense>
     </>
   );
 };

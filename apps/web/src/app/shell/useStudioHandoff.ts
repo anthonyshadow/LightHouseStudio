@@ -1,3 +1,4 @@
+import type { SavedVideoSummary } from '@studio/contracts';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { RecipeSelection } from '../../features/creative-assets/RecipeShelf.types';
 import type { StudioHandoff, StudioRuntimePorts } from './studioHandoff';
@@ -29,6 +30,8 @@ export const useStudioHandoff = ({ runtimeRouteActive, openStudio }: UseStudioHa
   const registerPorts = useCallback((ports: StudioRuntimePorts | null) => {
     portsRef.current = ports;
   }, []);
+  /** Reads the live ports. Always call this at the moment of use — never capture the result. */
+  const readPorts = useCallback((): StudioRuntimePorts | null => portsRef.current, []);
 
   // A selection the runtime never drained is stale once the operator has left Studio again: they
   // went somewhere else, and applying it on a later visit would be an action they did not ask for.
@@ -61,6 +64,20 @@ export const useStudioHandoff = ({ runtimeRouteActive, openStudio }: UseStudioHa
     [openStudio],
   );
 
+  const useSavedVideo = useCallback(
+    async (video: SavedVideoSummary, intent: 'play' | 'edit') => {
+      const ports = portsRef.current;
+      // The runtime's loader navigates on its own, so this path only has to reach it.
+      if (ports) {
+        await ports.useSavedVideo(video, intent);
+        return;
+      }
+      setPending({ kind: 'use-saved-video', video, intent });
+      openStudio();
+    },
+    [openStudio],
+  );
+
   const selectVoice = useCallback((voiceId: string, voiceName: string) => {
     const ports = portsRef.current;
     if (ports) {
@@ -71,7 +88,16 @@ export const useStudioHandoff = ({ runtimeRouteActive, openStudio }: UseStudioHa
   }, []);
 
   return useMemo(
-    () => ({ registerPorts, applyRecipe, selectVoice, pending, clearPending }) as const,
-    [applyRecipe, clearPending, pending, registerPorts, selectVoice],
+    () =>
+      ({
+        registerPorts,
+        readPorts,
+        applyRecipe,
+        selectVoice,
+        useSavedVideo,
+        pending,
+        clearPending,
+      }) as const,
+    [applyRecipe, clearPending, pending, readPorts, registerPorts, selectVoice, useSavedVideo],
   );
 };

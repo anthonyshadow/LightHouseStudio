@@ -1,4 +1,4 @@
-import type { VoiceSummary } from '@studio/contracts';
+import type { SavedVideoSummary, VoiceSummary } from '@studio/contracts';
 import { useMemo } from 'react';
 import type { useStudioHandoff } from '../app/shell/useStudioHandoff';
 import type { SavedCharacterPrompt, SavedPrompt } from '../features/creative-assets/types';
@@ -13,6 +13,7 @@ interface UseStudioLibraryHandoffOptions {
   /** The shell's channel: applies to a live session, or holds the choice for the one about to mount. */
   readonly applyRecipe: ReturnType<typeof useStudioHandoff>['applyRecipe'];
   readonly selectVoice: ReturnType<typeof useStudioHandoff>['selectVoice'];
+  readonly useSavedVideo: ReturnType<typeof useStudioHandoff>['useSavedVideo'];
   readonly openVideoUpload: () => void;
 }
 
@@ -31,11 +32,14 @@ export const useStudioLibraryHandoff = ({
   outfit,
   applyRecipe,
   selectVoice,
+  useSavedVideo,
   openVideoUpload,
 }: UseStudioLibraryHandoffOptions) =>
   useMemo(
     () =>
       ({
+        useVideo: (video: SavedVideoSummary, intent: 'play' | 'edit') =>
+          useSavedVideo(video, intent),
         createCharacter: () => {
           nav.openStudio();
           character.openNew();
@@ -74,5 +78,5 @@ export const useStudioLibraryHandoff = ({
           openVideoUpload();
         },
       }) as const,
-    [applyRecipe, character, nav, openVideoUpload, outfit, selectVoice],
+    [applyRecipe, character, nav, openVideoUpload, outfit, selectVoice, useSavedVideo],
   );
