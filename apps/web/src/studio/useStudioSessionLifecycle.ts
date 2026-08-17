@@ -1,7 +1,9 @@
-import { useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router';
-import { APP_PATHS } from '../app/paths';
-import type { useAuth } from '../application/auth/AuthProvider';
+import { useCallback, useEffect, useMemo } from 'react';
+import {
+  NO_STUDIO_RUNTIME_WORK,
+  type StudioRuntimeRegistry,
+  type StudioRuntimeWork,
+} from '../app/shell/studioRuntimeWork';
 import type { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 import type { ProjectSourceActivity } from '../features/projects/useProjectSourceController';
@@ -13,13 +15,12 @@ import type { useStudioSession } from '../orchestration/session';
 import type { useStudioCharacterWorkflow } from './useStudioCharacterWorkflow';
 import type { useStudioOutfitWorkflow } from './useStudioOutfitWorkflow';
 import type { useStudioOverlayController } from './useStudioOverlayController';
-import { useStudioLogoutController } from './useStudioLogoutController';
 import { useStudioSessionCleanup } from './useStudioSessionCleanup';
-import { useStudioSessionExpiryController } from './useStudioSessionExpiryController';
 import type { useTakeReviewFlow } from './useTakeReviewFlow';
 
 interface UseStudioSessionLifecycleOptions {
-  readonly auth: ReturnType<typeof useAuth>;
+  /** The shell's teardown coordinator and work channel. */
+  readonly registry: StudioRuntimeRegistry;
   readonly session: ReturnType<typeof useStudioSession>;
   readonly recording: ReturnType<typeof useTakeReviewFlow>['recording'];
   readonly processing: ReturnType<typeof useTakeReviewFlow>['processing'];
@@ -40,15 +41,18 @@ interface UseStudioSessionLifecycleOptions {
 }
 
 /**
- * Everything that has to happen to in-flight local work when the Studio session ends, voluntarily
- * or not, plus the accounting that decides what the operator is warned about.
+ * What the Studio runtime is holding, and how to let go of it.
  *
- * The individual work signals are returned rather than only the two roll-ups because the exit guard
+ * The decisions — whether to warn, block, or finalize — belong to the shell, which outlives this
+ * runtime; the runtime's job is to say truthfully what would be lost and to register the ordered
+ * teardown that releases it. Unregistering on unmount is deliberate: a runtime that has gone away
+ * is holding nothing, and the shell must not offer to discard work that no longer exists.
+ *
+ * The individual work signals are reported rather than only the two roll-ups because the exit guard
  * has to name what is at risk, while logout and expiry only need to know whether anything is.
- * Deriving both from one place keeps the warning and the block in agreement.
  */
 export const useStudioSessionLifecycle = ({
-  auth,
+  registry,
   session,
   recording,
   processing,
@@ -66,7 +70,6 @@ export const useStudioSessionLifecycle = ({
   discardPendingAdoption,
   closeOverlay,
 }: UseStudioSessionLifecycleOptions) => {
-  const navigate = useNavigate();
   const updateOutfitDirty = outfit.updateDirty;
   const discardWardrobeDirty = character.discardWardrobeDirty;
 
@@ -102,13 +105,6 @@ export const useStudioSessionLifecycle = ({
     projectWorkingMedia.busy ||
     (projectWorkingMediaActivity?.busy ?? false);
 
-  const hasTemporaryWork =
-    hasTemporaryTake ||
-    voiceProcessingActive ||
-    creativeWorkDirty ||
-    (projectSourceActivity?.busy ?? false);
-  const hasActiveWork = recordingOrFinalizing || videoRenderingActive;
-
   const cleanupTemporaryState = useCallback(async () => {
     const cleanup = existingVideo.cleanup();
     discardLocalTemporaryWork();
@@ -117,46 +113,36 @@ export const useStudioSessionLifecycle = ({
   const releaseMedia = useCallback(async () => {
     await session.stopCamera();
   }, [session]);
-  const handleLoggedOut = useCallback(() => {
-    void navigate(APP_PATHS.entry, { replace: true });
-  }, [navigate]);
-  const runSessionCleanup = useStudioSessionCleanup({ cleanupTemporaryState, releaseMedia });
-  const logout = useStudioLogoutController({
-    projectSourceActivity,
-    projectSession,
-    hasTemporaryWork,
-    hasActiveWork,
-    runCleanup: runSessionCleanup,
-    logout: auth.logout,
-    onLoggedOut: handleLoggedOut,
-  });
-  // Holding session teardown is what keeps this shell — and the in-memory work it owns — mounted
-  // long enough to say what is about to be lost. Releasing on unmount is the backstop: if the
-  // shell goes away for any other reason, the session finalizes and the redirect proceeds.
-  const holdSessionEnd = auth.holdSessionEnd;
-  useEffect(() => holdSessionEnd(), [holdSessionEnd]);
-  const sessionEnding = auth.status === 'expiring';
-  const sessionExpiry = useStudioSessionExpiryController({
-    expiring: sessionEnding,
-    projectSourceActivity,
-    projectSession,
-    hasTemporaryWork,
-    hasActiveWork,
-    runCleanup: runSessionCleanup,
-    completeSessionEnd: auth.completeSessionEnd,
-  });
+  useStudioSessionCleanup({ cleanup: registry.cleanup, cleanupTemporaryState, releaseMedia });
 
-  return {
-    logout,
-    sessionExpiry,
-    sessionEnding,
-    discardTemporaryWork,
-    work: {
+  const work = useMemo<StudioRuntimeWork>(
+    () => ({
       hasTemporaryTake,
       voiceProcessingActive,
       creativeWorkDirty,
       recordingOrFinalizing,
       videoRenderingActive,
-    },
-  } as const;
+      projectSourceActivity,
+      projectSession,
+    }),
+    [
+      creativeWorkDirty,
+      hasTemporaryTake,
+      projectSession,
+      projectSourceActivity,
+      recordingOrFinalizing,
+      videoRenderingActive,
+      voiceProcessingActive,
+    ],
+  );
+
+  const reportWork = registry.reportWork;
+  useEffect(() => {
+    reportWork(work);
+  }, [reportWork, work]);
+  // A runtime that has gone away is holding nothing. Without this the shell would keep offering to
+  // discard a take whose artifacts were already revoked by this runtime's own unmount.
+  useEffect(() => () => reportWork(NO_STUDIO_RUNTIME_WORK), [reportWork]);
+
+  return { discardTemporaryWork, work } as const;
 };

@@ -129,10 +129,31 @@ export const studioCreatePath = (
 export const studioVideoIdFromPath = (pathname: string): string | null =>
   decodedPathId(STUDIO_VIDEO_PATH.exec(pathname));
 
-export const isStudioWorkspacePath = (pathname: string): boolean =>
+/**
+ * The destinations that own live media, and therefore the ones that mount the Studio runtime.
+ *
+ * Derived rather than chosen. `useStudioRouteContext` groups `/studio/create/live` with the
+ * organization routes, and organization routes hide the stage column — so the Live AI Beta route
+ * has never shown a stage and never needs the capture graph behind one. Evaluating that same
+ * condition across `PROTECTED_ROUTES` yields exactly these three destinations; `paths.test.ts`
+ * asserts the classification route by route so a new destination has to state which side it is on.
+ */
+export const isStudioRuntimePath = (pathname: string): boolean =>
   pathname === APP_PATHS.create ||
-  pathname === APP_PATHS.live ||
-  studioVideoIdFromPath(pathname) !== null;
+  studioVideoIdFromPath(pathname) !== null ||
+  isProjectWorkspacePath(pathname);
+
+/**
+ * Destinations whose content does not claim focus itself, so the shell moves focus to `<main>` on
+ * arrival. It lives here rather than in the router so the route table and the focus rule cannot
+ * drift apart, and so the route inventory can assert it.
+ */
+export const focusesMainOnNavigation = (pathname: string): boolean =>
+  pathname === APP_PATHS.dashboard ||
+  pathname === APP_PATHS.create ||
+  isAssetsPath(pathname) ||
+  isProjectsPath(pathname) ||
+  isCampaignsPath(pathname);
 
 const legacyProjectRedirect = (pathname: string): string | null => {
   const workspaceId = decodedPathId(LEGACY_PROJECT_WORKSPACE_PATH.exec(pathname));

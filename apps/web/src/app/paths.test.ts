@@ -6,13 +6,15 @@ import {
   campaignPath,
   canonicalizeLegacyAppPath,
   canonicalizeProtectedDestination,
+  focusesMainOnNavigation,
   isAssetsPath,
   isCampaignsPath,
   isProjectWorkspacePath,
   isProjectsPath,
   isProtectedAppPath,
   isStudioPath,
-  isStudioWorkspacePath,
+  isStudioRuntimePath,
+  PROTECTED_ROUTES,
   projectIdFromPath,
   projectPath,
   projectWorkspacePath,
@@ -47,7 +49,7 @@ describe('authenticated application paths', () => {
     );
     expect(studioCreatePath({ intent: 'upload' })).toBe('/studio/create?intent=upload');
     expect(studioCreatePath()).toBe(APP_PATHS.create);
-    expect(isStudioWorkspacePath(studioVideoPath(videoId))).toBe(true);
+    expect(isStudioRuntimePath(studioVideoPath(videoId))).toBe(true);
     expect(ASSET_DESTINATION_PATHS.videos).toBe(APP_PATHS.videos);
     expect(ASSET_DESTINATION_PATHS.characters).toBe(APP_PATHS.characters);
     expect(ASSET_DESTINATION_PATHS.outfits).toBe(APP_PATHS.outfits);
@@ -78,6 +80,59 @@ describe('authenticated application paths', () => {
     }
     expect(isAssetsPath(APP_PATHS.assets)).toBe(true);
     expect(isAssetsPath(APP_PATHS.voices)).toBe(true);
+  });
+
+  /**
+   * An oracle over the runtime split, in the spirit of `route-inventory.test.ts`.
+   *
+   * "Does this destination mount the capture graph" is the question the Studio runtime boundary
+   * exists to answer, so it must not be answerable by accident. Registering a destination fails
+   * this table until someone states which side of the boundary it is on.
+   */
+  it('classifies every registered destination against the Studio runtime boundary', () => {
+    const parameterizedSamplePaths: Readonly<Record<string, string>> = {
+      'project-workspace': projectWorkspacePath(projectId),
+      'project-detail': projectPath(projectId),
+      'campaign-detail': campaignPath(campaignId),
+      'saved-video': studioVideoPath(videoId),
+    };
+    const expected: Readonly<
+      Record<string, { readonly studioRuntime: boolean; readonly focusesMain: boolean }>
+    > = {
+      'project-workspace': { studioRuntime: true, focusesMain: true },
+      'project-detail': { studioRuntime: false, focusesMain: true },
+      'campaign-detail': { studioRuntime: false, focusesMain: true },
+      'saved-video': { studioRuntime: true, focusesMain: false },
+      dashboard: { studioRuntime: false, focusesMain: true },
+      create: { studioRuntime: true, focusesMain: true },
+      // The Live AI Beta route has never shown a stage: `useStudioRouteContext` groups it with the
+      // organization routes, which hide the stage column. It renders a capability card, or hands
+      // off to `/studio/create`, so it never needs the capture graph.
+      live: { studioRuntime: false, focusesMain: false },
+      projects: { studioRuntime: false, focusesMain: true },
+      campaigns: { studioRuntime: false, focusesMain: true },
+      assets: { studioRuntime: false, focusesMain: true },
+      videos: { studioRuntime: false, focusesMain: true },
+      characters: { studioRuntime: false, focusesMain: true },
+      outfits: { studioRuntime: false, focusesMain: true },
+      voices: { studioRuntime: false, focusesMain: true },
+    };
+
+    expect(Object.keys(expected).toSorted()).toEqual(
+      PROTECTED_ROUTES.map(({ id }) => id).toSorted(),
+    );
+
+    for (const { id, path } of PROTECTED_ROUTES) {
+      const pathname = path ?? parameterizedSamplePaths[id];
+      if (pathname === undefined) {
+        throw new Error(`Register a sample pathname for the parameterised route "${id}".`);
+      }
+      expect({ id, ...expected[id] }).toEqual({
+        id,
+        studioRuntime: isStudioRuntimePath(pathname),
+        focusesMain: focusesMainOnNavigation(pathname),
+      });
+    }
   });
 
   it('normalizes every supported legacy organization route', () => {
