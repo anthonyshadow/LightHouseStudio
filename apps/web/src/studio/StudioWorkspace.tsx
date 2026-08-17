@@ -1,7 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { CreativeAssetStore } from '@studio/domain';
 import { lazy, Suspense, type ReactNode, type RefObject } from 'react';
-import type { AssetDestination } from '../app/paths';
 import type { BrowserCapabilities } from '../application/types';
 import { CaptureSettingsPanel, RecordingAction, RecordingControls } from '../features/recording';
 import type { RecordingSource } from '../features/recording';
@@ -15,7 +14,7 @@ import type { useVideoEditSession } from '../features/video-editor/useVideoEditS
 import type { ProjectProcessingController } from '../features/projects/useProjectProcessingController';
 import type { useStudioSession } from '../orchestration/session';
 import { projectVideoEditOutcome } from './projectVideoEditOutcome';
-import { mainGridStyles, stageColumnStyles } from './StudioApp.styles';
+import { stageColumnStyles } from './StudioApp.styles';
 import { StudioSessionControlBar } from './StudioSessionControlBar';
 import type { useStudioProjectBridge } from './useStudioProjectBridge';
 import type { useStudioSavedVideoController } from './useStudioSavedVideoController';
@@ -31,44 +30,16 @@ const ProjectRouteSurface = lazy(() =>
     default: module.ProjectRouteSurface,
   })),
 );
-const CampaignRouteSurface = lazy(() =>
-  import('../features/campaigns/CampaignRouteSurface').then((module) => ({
-    default: module.CampaignRouteSurface,
-  })),
-);
-const DashboardRouteSurface = lazy(() =>
-  import('../features/dashboard/DashboardRouteSurface').then((module) => ({
-    default: module.DashboardRouteSurface,
-  })),
-);
-const AssetsRouteSurface = lazy(() =>
-  import('../features/assets/AssetsRouteSurface').then((module) => ({
-    default: module.AssetsRouteSurface,
-  })),
-);
-const LiveBetaRouteSurface = lazy(() =>
-  import('../features/beta/LiveBetaRouteSurface').then((module) => ({
-    default: module.LiveBetaRouteSurface,
-  })),
-);
 
 const deferredWorkspaceFallback = <p role="status">Loading studio tool…</p>;
 
 interface StudioWorkspaceProps {
   readonly refs: {
-    readonly main: RefObject<HTMLElement | null>;
     readonly fullscreen: RefObject<HTMLDivElement | null>;
     readonly uploadToggle: RefObject<HTMLButtonElement | null>;
   };
   readonly route: {
-    readonly organizationActive: boolean;
-    readonly dashboardActive: boolean;
-    readonly assetsActive: boolean;
-    readonly liveUnavailableActive: boolean;
     readonly projectContextActive: boolean;
-    readonly projectActive: boolean;
-    readonly projectOverviewActive: boolean;
-    readonly campaignActive: boolean;
     readonly projectRecordingAvailable: boolean;
   };
   readonly controllers: {
@@ -83,6 +54,9 @@ interface StudioWorkspaceProps {
     readonly browser: BrowserCapabilities;
     readonly desktopLayout: boolean;
     readonly ownerUserId: string;
+    readonly creativeStore: CreativeAssetStore;
+    readonly onCreateProjectCharacter: (projectId: string) => void;
+    readonly onCreateProjectOutfit: (projectId: string) => void;
   };
   readonly stage: {
     readonly presentation: StagePresentation;
@@ -102,35 +76,6 @@ interface StudioWorkspaceProps {
   };
   readonly creativeWorkspace: ReactNode;
   readonly projectCreativeCheckpoint: ReactNode;
-  readonly dashboard: {
-    readonly displayName: string;
-    readonly onCreateVideo: () => void;
-    readonly onCreateProject: () => void;
-    readonly onCreateCampaign: () => void;
-    readonly onOpenAssets: () => void;
-    readonly onOpenProjects: () => void;
-    readonly onOpenCampaigns: () => void;
-    readonly onOpenProject: (projectId: string) => void;
-    readonly onOpenCampaign: (campaignId: string) => void;
-    readonly onOpenVideos: () => void;
-    readonly onOpenVideo: (videoId: string) => void;
-  };
-  readonly assets: {
-    readonly creativeStore: CreativeAssetStore;
-    readonly characterCount: number;
-    readonly outfitCount: number;
-    readonly onOpen: (destination: AssetDestination) => void;
-    readonly onUploadVideo: () => void;
-    readonly onCreateProjectCharacter: (projectId: string) => void;
-    readonly onCreateProjectOutfit: (projectId: string) => void;
-  };
-  readonly liveBeta: {
-    readonly capabilityState: 'loading' | 'ready' | 'error';
-    readonly betaEnabled: boolean;
-    readonly providerConfigured: boolean;
-    readonly onOpenStudio: () => void;
-    readonly onOpenDashboard: () => void;
-  };
   readonly saveVideoState: SaveVideoState;
   readonly actions: {
     readonly startLocalRecording: () => void;
@@ -153,25 +98,12 @@ export const StudioWorkspace = ({
   activity,
   creativeWorkspace,
   projectCreativeCheckpoint,
-  dashboard,
-  assets,
-  liveBeta,
   saveVideoState,
   actions,
 }: StudioWorkspaceProps) => {
   const theme = useTheme();
-  const { main: mainRef, fullscreen: fullscreenWorkspaceRef, uploadToggle: uploadToggleRef } = refs;
-  const {
-    organizationActive: organizationRouteActive,
-    dashboardActive,
-    assetsActive,
-    liveUnavailableActive,
-    projectContextActive,
-    projectActive: projectRouteActive,
-    projectOverviewActive,
-    campaignActive: campaignRouteActive,
-    projectRecordingAvailable,
-  } = route;
+  const { fullscreen: fullscreenWorkspaceRef, uploadToggle: uploadToggleRef } = refs;
+  const { projectContextActive, projectRecordingAvailable } = route;
   const { session, takeReview, videoEditor, savedVideo, project, projectProcessing } = controllers;
   const { browser, desktopLayout: desktopStudioLayout, ownerUserId } = environment;
   const {
@@ -208,15 +140,9 @@ export const StudioWorkspace = ({
   const videoEditing = videoEditor.phase !== 'closed';
 
   return (
-    <main
-      ref={mainRef}
-      id="studio-main"
-      tabIndex={-1}
-      css={mainGridStyles(projectContextActive, dashboardActive)}
-    >
+    <>
       <div
         ref={fullscreenWorkspaceRef}
-        hidden={organizationRouteActive && !projectContextActive}
         css={stageColumnStyles(theme)}
         data-video-edit-active={videoEditing ? 'true' : 'false'}
         data-project-context={projectContextActive ? 'true' : undefined}
@@ -352,53 +278,14 @@ export const StudioWorkspace = ({
           </>
         )}
       </div>
-      {dashboardActive ? (
-        <Suspense fallback={<p role="status">Loading Dashboard…</p>}>
-          <DashboardRouteSurface
-            ownerUserId={ownerUserId}
-            displayName={dashboard.displayName}
-            onCreateVideo={dashboard.onCreateVideo}
-            onCreateProject={dashboard.onCreateProject}
-            onCreateCampaign={dashboard.onCreateCampaign}
-            onOpenAssets={dashboard.onOpenAssets}
-            onOpenProjects={dashboard.onOpenProjects}
-            onOpenCampaigns={dashboard.onOpenCampaigns}
-            onOpenProject={dashboard.onOpenProject}
-            onOpenCampaign={dashboard.onOpenCampaign}
-            onOpenVideos={dashboard.onOpenVideos}
-            onOpenVideo={dashboard.onOpenVideo}
-          />
-        </Suspense>
-      ) : null}
-      {assetsActive ? (
-        <Suspense fallback={<p role="status">Loading Assets…</p>}>
-          <AssetsRouteSurface
-            characterCount={assets.characterCount}
-            outfitCount={assets.outfitCount}
-            onOpen={assets.onOpen}
-            onUploadVideo={assets.onUploadVideo}
-          />
-        </Suspense>
-      ) : null}
-      {liveUnavailableActive ? (
-        <Suspense fallback={<p role="status">Checking Live AI Beta…</p>}>
-          <LiveBetaRouteSurface
-            capabilityState={liveBeta.capabilityState}
-            betaEnabled={liveBeta.betaEnabled}
-            providerConfigured={liveBeta.providerConfigured}
-            onOpenStudio={liveBeta.onOpenStudio}
-            onOpenDashboard={liveBeta.onOpenDashboard}
-          />
-        </Suspense>
-      ) : null}
-      {projectRouteActive ? (
+      {projectContextActive ? (
         <Suspense fallback={<p role="status">Loading Projects workspace…</p>}>
           <ProjectRouteSurface
-            workspaceMode={!projectOverviewActive}
+            workspaceMode
             ownerUserId={ownerUserId}
-            creativeStore={assets.creativeStore}
-            onCreateProjectCharacter={assets.onCreateProjectCharacter}
-            onCreateProjectOutfit={assets.onCreateProjectOutfit}
+            creativeStore={environment.creativeStore}
+            onCreateProjectCharacter={environment.onCreateProjectCharacter}
+            onCreateProjectOutfit={environment.onCreateProjectOutfit}
             creativeCheckpoint={projectCreativeCheckpoint}
             processing={projectProcessing}
             sourceRuntime={project.sourceRuntime}
@@ -413,11 +300,6 @@ export const StudioWorkspace = ({
           />
         </Suspense>
       ) : null}
-      {campaignRouteActive ? (
-        <Suspense fallback={<p role="status">Loading Campaigns workspace…</p>}>
-          <CampaignRouteSurface />
-        </Suspense>
-      ) : null}
-    </main>
+    </>
   );
 };

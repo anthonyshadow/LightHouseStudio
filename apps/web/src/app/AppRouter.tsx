@@ -20,10 +20,7 @@ import { Button } from '../ui/primitives/Button';
 import { EntryPage } from './EntryPage';
 import {
   APP_PATHS,
-  isAssetsPath,
-  isCampaignsPath,
   isProtectedAppPath,
-  isProjectsPath,
   canonicalizeLegacyAppPath,
   protectedRouteForPath,
 } from './paths';
@@ -125,20 +122,13 @@ const EntryRoute = ({ focusEnterOnMount }: EntryRouteProps) => (
   <EntryPage focusEnterOnMount={focusEnterOnMount} />
 );
 
-interface AuthenticatedShellRouteProps {
-  readonly focusMainOnMount: boolean;
-}
-
-const AuthenticatedShellRoute = ({ focusMainOnMount }: AuthenticatedShellRouteProps) => {
+const AuthenticatedShellRoute = () => {
   const location = useLocation();
   const routeState = location.state as { creationIntent?: unknown } | null;
   const initialIntent = routeState?.creationIntent === 'upload' ? 'upload' : undefined;
   return (
     <Suspense fallback={<StudioLoading />}>
-      <LazyAuthenticatedShell
-        focusMainOnMount={focusMainOnMount}
-        {...(initialIntent ? { initialIntent } : {})}
-      />
+      <LazyAuthenticatedShell {...(initialIntent ? { initialIntent } : {})} />
     </Suspense>
   );
 };
@@ -151,13 +141,6 @@ export const RoutedApplication = () => {
   if (!hasVisitedProtectedApp && isProtectedAppPath(location.pathname)) {
     setHasVisitedProtectedApp(true);
   }
-  const focusMainOnMount =
-    (location.pathname === APP_PATHS.dashboard ||
-      location.pathname === APP_PATHS.create ||
-      isAssetsPath(location.pathname) ||
-      isProjectsPath(location.pathname) ||
-      isCampaignsPath(location.pathname)) &&
-    location.key !== 'default';
   const legacyRedirect = canonicalizeLegacyAppPath(location.pathname);
 
   return (
@@ -177,7 +160,7 @@ export const RoutedApplication = () => {
                   {legacyRedirect ? (
                     <Navigate replace to={legacyRedirect} />
                   ) : (
-                    <AuthenticatedShellRoute focusMainOnMount={focusMainOnMount} />
+                    <AuthenticatedShellRoute />
                   )}
                 </ProtectedRoute>
               ) : (

@@ -4,10 +4,11 @@ import type { AuthenticatedSessionResponse } from '@studio/contracts';
 import { createPhaseOneEntitlements } from '@studio/domain';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { createMemoryRouter, RouterProvider, type InitialEntry } from 'react-router';
+import { createMemoryRouter, RouterProvider, useLocation, type InitialEntry } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from '../application/auth/AuthProvider';
 import type { AuthenticatedShellProps } from './shell/AuthenticatedShell';
+import { focusesMainOnNavigation } from './paths';
 import { StudioDesignProvider } from '../ui';
 
 const appHarness = vi.hoisted(() => ({
@@ -61,13 +62,17 @@ vi.mock('../features/auth/LoginDialog', () => {
 vi.mock('./shell/AuthenticatedShell', () => ({
   AuthenticatedShell: (props: AuthenticatedShellProps) => {
     appHarness.latestProps = props;
+    const location = useLocation();
     const mainRef = useRef<HTMLElement>(null);
     useEffect(() => {
       appHarness.mountCount += 1;
     }, []);
+    // Mirrors the real shell: focus follows the history entry, not a mount.
     useLayoutEffect(() => {
-      if (props.focusMainOnMount) mainRef.current?.focus();
-    }, [props.focusMainOnMount]);
+      if (focusesMainOnNavigation(location.pathname) && location.key !== 'default') {
+        mainRef.current?.focus();
+      }
+    }, [location.key, location.pathname]);
     return (
       <main ref={mainRef} id="studio-main" tabIndex={-1}>
         Studio route
@@ -214,7 +219,6 @@ describe('AppRouter', () => {
     await waitFor(() => expect(document.title).toBe('Projects · Lightframe Studio'));
 
     expect(appHarness.mountCount).toBe(1);
-    expect(appHarness.latestProps?.focusMainOnMount).toBe(true);
     await waitFor(() => expect(document.activeElement).toHaveAttribute('id', 'studio-main'));
   });
 
@@ -249,12 +253,11 @@ describe('AppRouter', () => {
     ['/campaigns', 'Campaigns · Lightframe Studio'],
     ['/studio/create', 'Studio · Lightframe'],
     ['/assets', 'Assets · Lightframe'],
-  ])('protects canonical route %s with the shared Studio runtime', async (path, title) => {
+  ])('protects canonical route %s with the authenticated shell', async (path, title) => {
     renderApplication(path);
 
     expect(await screen.findByText('Studio route')).toBeInTheDocument();
     expect(appHarness.mountCount).toBe(1);
-    expect(appHarness.latestProps?.focusMainOnMount).toBe(false);
     expect(document.title).toBe(title);
   });
 
