@@ -1,10 +1,14 @@
 import { useRef } from 'react';
+import { useLocation } from 'react-router';
 import { useAuth } from '../../application/auth/AuthProvider';
 import { RemoteStateProvider } from '../../application/remote-state/RemoteStateProvider';
 import { StudioApp } from '../../studio/StudioApp';
+import { useStudioNavigationActions } from '../../studio/useStudioNavigationActions';
 import { useConfirmationRequest } from '../../ui';
+import { isStudioRuntimePath } from '../paths';
 import { ShellLifecycleDialogs } from './ShellLifecycleDialogs';
 import { useAuthenticatedSessionLifecycle } from './useAuthenticatedSessionLifecycle';
+import { useStudioHandoff } from './useStudioHandoff';
 
 export interface AuthenticatedShellProps {
   readonly focusMainOnMount?: boolean;
@@ -24,9 +28,15 @@ const AuthenticatedShellSurfaces = ({
   initialIntent,
 }: AuthenticatedShellProps) => {
   const auth = useAuth();
+  const location = useLocation();
+  const nav = useStudioNavigationActions();
   const shellMainRef = useRef<HTMLElement>(null);
   const confirmation = useConfirmationRequest();
   const { registry, logout, sessionExpiry, sessionEnding } = useAuthenticatedSessionLifecycle(auth);
+  const handoff = useStudioHandoff({
+    runtimeRouteActive: isStudioRuntimePath(location.pathname),
+    openStudio: nav.openStudio,
+  });
 
   return (
     <>
@@ -39,6 +49,7 @@ const AuthenticatedShellSurfaces = ({
         focusMainOnMount={focusMainOnMount ?? false}
         {...(initialIntent ? { initialIntent } : {})}
         runtimeRegistry={registry}
+        studioHandoff={handoff}
         confirmation={confirmation}
         logout={logout}
         sessionEnding={sessionEnding}
