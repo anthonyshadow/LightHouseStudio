@@ -14,6 +14,7 @@ import {
 } from '../app/paths';
 
 export type StudioRouteContext = Readonly<{
+  pathname: string;
   /**
    * Intent carried by `?intent=`, kept separate from the resolved intent so redirects can rebuild
    * the query string without inventing one the URL never had.
@@ -40,7 +41,7 @@ export type StudioRouteContext = Readonly<{
 }>;
 
 /**
- * Reads the one shell's current location into the destinations and identifiers the Studio acts on.
+ * Reads the current location into the destinations and identifiers the authenticated app acts on.
  * Derivation only — nothing here navigates, fetches or holds state.
  */
 export const useStudioRouteContext = (initialIntent?: StudioCreationIntent): StudioRouteContext => {
@@ -90,6 +91,7 @@ export const useStudioRouteContext = (initialIntent?: StudioCreationIntent): Stu
   const projectContextActive = projectWorkspaceActive && activeProjectId !== null;
 
   return {
+    pathname: location.pathname,
     queryCreationIntent,
     creationIntent,
     requestedCreationProjectId,

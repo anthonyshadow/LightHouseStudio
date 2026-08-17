@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { hydrateReferenceImage } from '../adapters/api-client/apiClient';
+import type { useStudioHandoff } from '../app/shell/useStudioHandoff';
 import type {
   CharacterSaveProgress,
   CharacterSaveSnapshot,
@@ -12,10 +12,6 @@ import type {
   CreativeAssetStore,
   SavedCharacterPrompt,
 } from '../features/creative-assets/types';
-import {
-  savedCharacterStepInput,
-  type useExistingVideoWorkflow,
-} from '../features/existing-video/useExistingVideoWorkflow';
 import { useCharacterBuilderLaunchController } from './useCharacterBuilderLaunchController';
 import type { ActiveOverlay } from './useStudioOverlayController';
 import { attachProjectAssetAndSync } from '../features/projects/useProjectAssetsController';
@@ -37,11 +33,15 @@ interface UseStudioCharacterWorkflowOptions {
   readonly ownerUserId: string;
   readonly repository: CreativeAssetRepository;
   readonly store: CreativeAssetStore;
-  readonly existingVideo: ReturnType<typeof useExistingVideoWorkflow>;
+  /**
+   * Reads the Studio runtime's ports, or null when none is mounted. Called at the moment of use,
+   * never captured: a Character created from the Characters library picks its destination while no
+   * runtime exists and is saved later inside one.
+   */
+  readonly readPorts: ReturnType<typeof useStudioHandoff>['readPorts'];
   readonly activityBlockedReason: string | undefined;
   readonly openBlockedReason: string | undefined;
   readonly studioSaveBlockedReason: string | undefined;
-  readonly saveStudioCharacter: SaveCharacter;
   readonly openOverlay: (overlay: Exclude<ActiveOverlay, null>) => void;
   readonly closeOverlay: () => void;
   readonly confirmation: ConfirmationRequest;
@@ -51,11 +51,10 @@ export const useStudioCharacterWorkflow = ({
   ownerUserId,
   repository,
   store,
-  existingVideo,
+  readPorts,
   activityBlockedReason,
   openBlockedReason,
   studioSaveBlockedReason,
-  saveStudioCharacter,
   openOverlay,
   closeOverlay,
   confirmation,
@@ -111,13 +110,13 @@ export const useStudioCharacterWorkflow = ({
 
   const createForExistingVideo = useCallback(
     (stepId: string) => {
-      if (activityBlockedReason || existingVideo.providerActive) return;
-      const step = existingVideo.steps.find((candidate) => candidate.id === stepId);
-      if (step?.modelId !== 'lucy-latest') return;
+      const upload = readPorts()?.existingVideoCharacter;
+      if (activityBlockedReason || upload === undefined || upload.providerActive) return;
+      if (!upload.isCharacterSwapStep(stepId)) return;
       setDestination({ kind: 'existing-video', stepId });
       openNewCharacter();
     },
-    [activityBlockedReason, existingVideo.providerActive, existingVideo.steps, openNewCharacter],
+    [activityBlockedReason, openNewCharacter, readPorts],
   );
 
   const openNewForProject = useCallback(
@@ -140,31 +139,37 @@ export const useStudioCharacterWorkflow = ({
   const saveExistingVideoCharacter = useCallback<SaveCharacter>(
     async (snapshot, characterId, stage, progress) => {
       if (existingVideoSaveBlockedReason) throw new Error(existingVideoSaveBlockedReason);
-      if (destination.kind !== 'existing-video') {
+      const upload = readPorts()?.existingVideoCharacter;
+      if (destination.kind !== 'existing-video' || upload === undefined) {
         throw new Error('The upload character destination is no longer available.');
       }
-      const step = existingVideo.steps.find(
-        (candidate) => candidate.id === destination.stepId && candidate.modelId === 'lucy-latest',
-      );
-      if (!step) throw new Error('The Character Swap step is no longer available.');
+      if (!upload.isCharacterSwapStep(destination.stepId)) {
+        throw new Error('The Character Swap step is no longer available.');
+      }
 
       if (stage === 'intent') {
         await persistCharacterSaveSnapshot(repository, snapshot, characterId);
         await progress.markCharacterPersisted();
       }
 
-      const reference = snapshot.referenceImage
-        ? await hydrateReferenceImage(snapshot.referenceImage.assetId, snapshot.referenceImage)
-        : null;
-      existingVideo.updateStep(step.id, {
-        savedRecipeId: characterId,
-        characterName: snapshot.name,
-        characterVariantName: null,
-        ...savedCharacterStepInput(snapshot.prompt, reference?.file ?? null),
-      });
+      await upload.applyCharacterToStep(destination.stepId, snapshot, characterId);
       await progress.markStudioPreloaded();
     },
-    [destination, existingVideo, existingVideoSaveBlockedReason, repository],
+    [destination, existingVideoSaveBlockedReason, readPorts, repository],
+  );
+
+  /**
+   * The Studio destination is chosen where no runtime may exist — `character.openNew()` runs on
+   * `/assets/characters` and navigates — and reached where one does. Resolving the port at save
+   * time rather than at render is what makes that sequence work.
+   */
+  const saveStudioCharacter = useCallback<SaveCharacter>(
+    async (snapshot, characterId, stage, progress) => {
+      const save = readPorts()?.saveStudioCharacter;
+      if (save === undefined) throw new Error('The Studio character destination is not available.');
+      await save(snapshot, characterId, stage, progress);
+    },
+    [readPorts],
   );
 
   const saveProjectCharacter = useCallback<SaveCharacter>(
@@ -201,20 +206,18 @@ export const useStudioCharacterWorkflow = ({
 
   const openWardrobeForExistingVideo = useCallback(
     (stepId: string, characterId: string) => {
-      if (existingVideo.providerActive) return;
-      const step = existingVideo.steps.find(
-        (candidate) => candidate.id === stepId && candidate.modelId === 'lucy-latest',
-      );
+      const upload = readPorts()?.existingVideoCharacter;
+      if (upload === undefined || upload.providerActive) return;
       const character = repository
         .getSnapshot()
         .store.savedCharacterPrompts.find((candidate) => candidate.id === characterId);
-      if (!step || !character) return;
+      if (!upload.isCharacterSwapStep(stepId) || !character) return;
       setWardrobeCharacterId(character.id);
       setWardrobeExistingVideoStepId(stepId);
       setWardrobeDirty(false);
       openOverlay('character-wardrobe');
     },
-    [existingVideo.providerActive, existingVideo.steps, openOverlay, repository],
+    [openOverlay, readPorts, repository],
   );
 
   const closeWardrobe = useCallback(async () => {
@@ -231,7 +234,7 @@ export const useStudioCharacterWorkflow = ({
       return;
     }
     setWardrobeDirty(false);
-    if (wardrobeExistingVideoStepId && existingVideo.selection) {
+    if (wardrobeExistingVideoStepId && readPorts()?.existingVideoCharacter.hasSelection) {
       setWardrobeExistingVideoStepId(null);
       openOverlay('video-upload');
       return;
@@ -240,26 +243,26 @@ export const useStudioCharacterWorkflow = ({
   }, [
     closeOverlay,
     confirmation,
-    existingVideo.selection,
     openOverlay,
+    readPorts,
     wardrobeDirty,
     wardrobeExistingVideoStepId,
   ]);
 
   const finishWardrobeVariantForExistingVideo = useCallback(() => {
-    if (!wardrobeExistingVideoStepId || !existingVideo.selection) return;
+    if (!wardrobeExistingVideoStepId || !readPorts()?.existingVideoCharacter.hasSelection) return;
     setWardrobeDirty(false);
     setWardrobeExistingVideoStepId(null);
     openOverlay('video-upload');
-  }, [existingVideo.selection, openOverlay, wardrobeExistingVideoStepId]);
+  }, [openOverlay, readPorts, wardrobeExistingVideoStepId]);
 
   const dismissBuilder = useCallback(() => {
-    if (destination.kind === 'existing-video' && existingVideo.selection) {
+    if (destination.kind === 'existing-video' && readPorts()?.existingVideoCharacter.hasSelection) {
       openOverlay('video-upload');
       return;
     }
     closeOverlay();
-  }, [closeOverlay, destination, existingVideo.selection, openOverlay]);
+  }, [closeOverlay, destination, openOverlay, readPorts]);
 
   return {
     destination,

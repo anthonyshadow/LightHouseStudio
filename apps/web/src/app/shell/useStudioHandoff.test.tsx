@@ -17,6 +17,20 @@ const selection: RecipeSelection = {
   referenceImageAssetId: null,
 };
 
+const runtimePorts = (overrides: Partial<StudioRuntimePorts> = {}): StudioRuntimePorts => ({
+  applyRecipe: vi.fn(),
+  selectVoice: vi.fn(),
+  existingVideoCharacter: {
+    providerActive: false,
+    hasSelection: false,
+    isCharacterSwapStep: () => false,
+    applyCharacterToStep: () => Promise.resolve(),
+  },
+  useSavedVideo: vi.fn(),
+  saveStudioCharacter: () => Promise.resolve(),
+  ...overrides,
+});
+
 const renderHandoff = (runtimeRouteActive = false, openStudio = vi.fn()) => {
   const view = renderHook(
     ({ active }: { active: boolean }) =>
@@ -29,7 +43,7 @@ const renderHandoff = (runtimeRouteActive = false, openStudio = vi.fn()) => {
 describe('useStudioHandoff', () => {
   it('applies straight to a mounted runtime without holding anything', () => {
     const applyRecipe = vi.fn();
-    const ports: StudioRuntimePorts = { applyRecipe, selectVoice: vi.fn() };
+    const ports = runtimePorts({ applyRecipe });
     const { result, openStudio } = renderHandoff(true);
 
     act(() => result.current.registerPorts(ports));
@@ -55,7 +69,7 @@ describe('useStudioHandoff', () => {
 
     // Registration happens after the caller already has its handle on the channel — the case a
     // captured closure would get wrong.
-    act(() => result.current.registerPorts({ applyRecipe, selectVoice: vi.fn() }));
+    act(() => result.current.registerPorts(runtimePorts({ applyRecipe })));
     act(() => result.current.applyRecipe(selection));
 
     expect(applyRecipe).toHaveBeenCalledWith(selection);
@@ -66,7 +80,7 @@ describe('useStudioHandoff', () => {
     const applyRecipe = vi.fn();
     const { result } = renderHandoff(true);
 
-    act(() => result.current.registerPorts({ applyRecipe, selectVoice: vi.fn() }));
+    act(() => result.current.registerPorts(runtimePorts({ applyRecipe })));
     act(() => result.current.registerPorts(null));
     act(() => result.current.applyRecipe(selection));
 

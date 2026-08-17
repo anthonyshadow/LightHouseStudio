@@ -36,6 +36,39 @@ export const NO_STUDIO_RUNTIME_WORK: StudioRuntimeWork = Object.freeze({
   projectSession: null,
 });
 
+/**
+ * Why the Studio is currently refusing a creative edit, in the operator's words.
+ *
+ * The Character and Outfit builders are reachable from Project routes, which own no capture graph,
+ * so they live in the shell — but what they are allowed to do still depends on whether media is
+ * live. Every one of these is `undefined` with no runtime mounted, which is correct rather than
+ * merely permissive: nothing can be recording without the graph that records.
+ */
+export interface StudioCreativeLocks {
+  readonly characterActivity: string | undefined;
+  readonly characterOpen: string | undefined;
+  readonly characterRemoval: string | undefined;
+  readonly characterSave: string | undefined;
+}
+
+export const NO_STUDIO_CREATIVE_LOCKS: StudioCreativeLocks = Object.freeze({
+  characterActivity: undefined,
+  characterOpen: undefined,
+  characterRemoval: undefined,
+  characterSave: undefined,
+});
+
+/** Everything the runtime tells the shell about itself, reported as one value. */
+export interface StudioRuntimeStatus {
+  readonly work: StudioRuntimeWork;
+  readonly creativeLocks: StudioCreativeLocks;
+}
+
+export const NO_STUDIO_RUNTIME_STATUS: StudioRuntimeStatus = Object.freeze({
+  work: NO_STUDIO_RUNTIME_WORK,
+  creativeLocks: NO_STUDIO_CREATIVE_LOCKS,
+});
+
 /** Work the operator can be asked to discard. */
 export const hasDiscardableStudioWork = (work: StudioRuntimeWork): boolean =>
   work.hasTemporaryTake ||
@@ -56,5 +89,5 @@ export const hasUninterruptibleStudioWork = (work: StudioRuntimeWork): boolean =
  */
 export interface StudioRuntimeRegistry {
   readonly cleanup: SessionCleanupCoordinator;
-  readonly reportWork: (work: StudioRuntimeWork) => void;
+  readonly report: (status: StudioRuntimeStatus) => void;
 }

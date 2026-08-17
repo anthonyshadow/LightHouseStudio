@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import {
-  NO_STUDIO_RUNTIME_WORK,
+  NO_STUDIO_RUNTIME_STATUS,
+  type StudioCreativeLocks,
   type StudioRuntimeRegistry,
   type StudioRuntimeWork,
 } from '../app/shell/studioRuntimeWork';
@@ -19,8 +20,10 @@ import { useStudioSessionCleanup } from './useStudioSessionCleanup';
 import type { useTakeReviewFlow } from './useTakeReviewFlow';
 
 interface UseStudioSessionLifecycleOptions {
-  /** The shell's teardown coordinator and work channel. */
+  /** The shell's teardown coordinator and status channel. */
   readonly registry: StudioRuntimeRegistry;
+  /** What the live session currently forbids, for the builders the shell hosts. */
+  readonly creativeLocks: StudioCreativeLocks;
   readonly session: ReturnType<typeof useStudioSession>;
   readonly recording: ReturnType<typeof useTakeReviewFlow>['recording'];
   readonly processing: ReturnType<typeof useTakeReviewFlow>['processing'];
@@ -53,6 +56,7 @@ interface UseStudioSessionLifecycleOptions {
  */
 export const useStudioSessionLifecycle = ({
   registry,
+  creativeLocks,
   session,
   recording,
   processing,
@@ -136,13 +140,14 @@ export const useStudioSessionLifecycle = ({
     ],
   );
 
-  const reportWork = registry.reportWork;
+  const report = registry.report;
   useEffect(() => {
-    reportWork(work);
-  }, [reportWork, work]);
-  // A runtime that has gone away is holding nothing. Without this the shell would keep offering to
-  // discard a take whose artifacts were already revoked by this runtime's own unmount.
-  useEffect(() => () => reportWork(NO_STUDIO_RUNTIME_WORK), [reportWork]);
+    report({ work, creativeLocks });
+  }, [creativeLocks, report, work]);
+  // A runtime that has gone away is holding nothing and forbidding nothing. Without this the shell
+  // would keep offering to discard a take whose artifacts this runtime already revoked on its way
+  // out, and would keep a builder locked against a session that no longer exists.
+  useEffect(() => () => report(NO_STUDIO_RUNTIME_STATUS), [report]);
 
   return { discardTemporaryWork, work } as const;
 };

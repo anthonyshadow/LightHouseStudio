@@ -8,9 +8,9 @@ import { APP_PATHS } from '../paths';
 import {
   hasDiscardableStudioWork,
   hasUninterruptibleStudioWork,
-  NO_STUDIO_RUNTIME_WORK,
+  NO_STUDIO_RUNTIME_STATUS,
   type StudioRuntimeRegistry,
-  type StudioRuntimeWork,
+  type StudioRuntimeStatus,
 } from './studioRuntimeWork';
 
 /**
@@ -28,11 +28,12 @@ import {
  */
 export const useAuthenticatedSessionLifecycle = (auth: ReturnType<typeof useAuth>) => {
   const navigate = useNavigate();
-  const [work, setWork] = useState<StudioRuntimeWork>(NO_STUDIO_RUNTIME_WORK);
+  const [status, setStatus] = useState<StudioRuntimeStatus>(NO_STUDIO_RUNTIME_STATUS);
+  const { work, creativeLocks } = status;
   const cleanup = useMemo(() => new SessionCleanupCoordinator(), []);
 
   const registry = useMemo<StudioRuntimeRegistry>(
-    () => ({ cleanup, reportWork: setWork }),
+    () => ({ cleanup, report: setStatus }),
     [cleanup],
   );
   const runCleanup = useCallback(async () => {
@@ -75,5 +76,5 @@ export const useAuthenticatedSessionLifecycle = (auth: ReturnType<typeof useAuth
     completeSessionEnd: auth.completeSessionEnd,
   });
 
-  return { registry, logout, sessionExpiry, sessionEnding, work } as const;
+  return { registry, logout, sessionExpiry, sessionEnding, work, creativeLocks } as const;
 };

@@ -28,7 +28,6 @@ import type { ProjectProcessingController } from '../features/projects/useProjec
 import { REVIEW_LOCK_REASON } from './studioPolicies';
 
 interface StudioToolOverlaysProps {
-  readonly ownerUserId: string;
   readonly activeOverlay: ActiveOverlay;
   readonly desktopStudioLayout: boolean;
   readonly repository: CreativeAssetRepository;
@@ -74,7 +73,6 @@ interface StudioToolOverlaysProps {
 }
 
 export const StudioToolOverlays = ({
-  ownerUserId,
   activeOverlay,
   desktopStudioLayout,
   repository,
@@ -159,7 +157,6 @@ export const StudioToolOverlays = ({
       />
 
       <StudioCharacterOverlays
-        ownerUserId={ownerUserId}
         activeOverlay={activeOverlay}
         desktopStudioLayout={desktopStudioLayout}
         repository={repository}
@@ -173,7 +170,6 @@ export const StudioToolOverlays = ({
         recordingActive={recordingActive}
         mainRef={mainRef}
         characterSelectorRef={characterSelectorRef}
-        editVideoToggleRef={editVideoToggleRef}
         onClose={onCloseOverlay}
         onOpenSavedCharacters={onOpenSavedCharacters}
         onUnselectCharacter={onUnselectCharacter}
