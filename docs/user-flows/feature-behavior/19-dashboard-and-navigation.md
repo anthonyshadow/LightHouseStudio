@@ -9,10 +9,13 @@ resources, and browse reusable Assets without activating media or a provider.
 
 1. Successful Login and a restored authenticated visit to `/` replace-navigate to `/dashboard`
    unless a validated protected deep link is waiting. Dashboard exposes Create Video, Browse
-   Assets, New Project, and New Campaign plus independent bounded recent queries.
-2. Canonical organization routes are `/dashboard`, `/campaign`, `/projects`, and `/assets`.
+   Assets, New Project, and New Campaign plus independent bounded recent queries. Every recent row
+   opens the exact record it names — a video row opens that Saved Video's preview in the Videos
+   library, not the unfiltered library.
+2. Canonical organization routes are `/dashboard`, `/campaigns`, `/projects`, and `/assets`.
    Project and Campaign detail/workspace children remain deep-linkable. Former `/studio/...`
    organization and library URLs replace-redirect to the corresponding canonical path; the former
+   singular `/campaign` and `/campaign/:campaignId` redirect to their plural equivalents; the former
    Recipe URL redirects to `/assets`.
 3. `/studio/create` remains standalone creation, `/studio/create/live` remains configuration-gated
    Live AI, and UUID-only `/studio/:videoId` opens the current Saved Video Version in review.
@@ -49,6 +52,8 @@ resources, and browse reusable Assets without activating media or a provider.
   destination naming, keyboard/focus restoration, mobile layout, and 200% text remain covered.
 - Route-level **Back** controls traverse the actual prior browser entry. A direct deep link with no
   prior app entry uses the named safe in-app destination instead of leaving the operator stranded.
+  Closing an Asset library overlay and returning from a create dialog both follow this rule, so
+  repeated open/close cycles never accumulate history entries the operator must press Back through.
 - `/studio/:videoId` direct entry is refresh-safe, cancellation-safe, and reports normalized
   unavailable/removed/load failures with navigation back to Videos or its originating Project.
 - Dashboard and organization routes acquire no media, issue no provider token, and do not remount

@@ -222,7 +222,12 @@ describe('AppRouter', () => {
       '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace',
       '/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace',
     ],
-    ['/studio/campaigns', '/campaign'],
+    ['/studio/campaigns', '/campaigns'],
+    ['/campaign', '/campaigns'],
+    [
+      '/campaign/20ce94fa-15d1-42c6-abd3-77ff61516b48',
+      '/campaigns/20ce94fa-15d1-42c6-abd3-77ff61516b48',
+    ],
     ['/studio/assets', '/assets'],
     ['/studio/videos', '/assets/videos'],
     ['/studio/assets/recipes', '/assets'],
@@ -238,7 +243,7 @@ describe('AppRouter', () => {
     ['/projects', 'Projects · Lightframe Studio'],
     ['/projects/18b120ac-1578-46e3-8c3d-42307772f391', 'Project · Lightframe Studio'],
     ['/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace', 'Project Studio · Lightframe'],
-    ['/campaign', 'Campaigns · Lightframe Studio'],
+    ['/campaigns', 'Campaigns · Lightframe Studio'],
     ['/studio/create', 'Studio · Lightframe'],
     ['/assets', 'Assets · Lightframe'],
   ])('protects canonical route %s with the shared Studio runtime', async (path, title) => {

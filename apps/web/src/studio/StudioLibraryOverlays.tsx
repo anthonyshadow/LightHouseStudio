@@ -36,7 +36,10 @@ interface StudioLibraryOverlaysProps {
   readonly mainRef: RefObject<HTMLElement | null>;
   readonly repository: CreativeAssetRepository;
   readonly store: CreativeAssetStore;
-  readonly onNavigate: (path: string) => void;
+  /** Leaves the library by consuming its history entry rather than pushing the hub on top of it. */
+  readonly onClose: () => void;
+  readonly focusedSavedVideoId: string | null;
+  readonly onFocusedSavedVideoConsumed: () => void;
   readonly onUseVideo: (video: SavedVideoSummary, intent: 'play' | 'edit') => Promise<void>;
   readonly onCreateCharacter: () => void;
   readonly onCopyCharacter: (character: SavedCharacterPrompt) => void;
@@ -53,7 +56,9 @@ export const StudioLibraryOverlays = ({
   mainRef,
   repository,
   store,
-  onNavigate,
+  onClose,
+  focusedSavedVideoId,
+  onFocusedSavedVideoConsumed,
   onUseVideo,
   onCreateCharacter,
   onCopyCharacter,
@@ -68,7 +73,7 @@ export const StudioLibraryOverlays = ({
     <>
       <OverlayPanel
         open={pathname === APP_PATHS.videos}
-        onClose={() => onNavigate(APP_PATHS.assets)}
+        onClose={onClose}
         title="Videos"
         description="Preview, edit in Studio, download, rename, remove, or inspect exact retained Versions."
         placement="fullscreen"
@@ -78,14 +83,18 @@ export const StudioLibraryOverlays = ({
       >
         {pathname === APP_PATHS.videos ? (
           <Suspense fallback={deferredLibraryFallback}>
-            <VideoGallery onUse={onUseVideo} />
+            <VideoGallery
+              onUse={onUseVideo}
+              focusVideoId={focusedSavedVideoId}
+              onFocusVideoConsumed={onFocusedSavedVideoConsumed}
+            />
           </Suspense>
         ) : null}
       </OverlayPanel>
 
       <OverlayPanel
         open={pathname === APP_PATHS.characters}
-        onClose={() => onNavigate(APP_PATHS.assets)}
+        onClose={onClose}
         title="Characters"
         description="Manage your Lucy 2.5 cast and their wardrobe."
         headerActions={
@@ -126,7 +135,7 @@ export const StudioLibraryOverlays = ({
 
       <OverlayPanel
         open={pathname === APP_PATHS.outfits}
-        onClose={() => onNavigate(APP_PATHS.assets)}
+        onClose={onClose}
         title="Outfits"
         description="Choose a saved Virtual Try-On outfit for Studio or remove it from your library."
         placement="fullscreen"
@@ -148,7 +157,7 @@ export const StudioLibraryOverlays = ({
 
       <OverlayPanel
         open={pathname === APP_PATHS.voices}
-        onClose={() => onNavigate(APP_PATHS.assets)}
+        onClose={onClose}
         title="Voices"
         description="Preview the provider catalog, keep the voices you want for this account, and send a saved voice to Studio."
         placement="fullscreen"

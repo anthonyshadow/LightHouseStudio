@@ -28,10 +28,9 @@ Header regions:
 | Status menu  | "Core Studio ready" / "Studio limited" / "Checking integrations" with a breakdown of Local capture, Existing-video AI, Live AI Beta, Voice cloud |
 | Account menu | Display name, login, **Log out** only                                                                                                            |
 
-Note that `activeDestination` never resolves to `campaigns` for the _list_ route in one respect
-worth knowing: `isCampaignsPath` matches both `/campaign` and `/campaign/{id}`, so both highlight
-"Campaigns" correctly. The Studio routes fall through to `'studio'`, which is **not** one of the
-four rendered nav items, so no nav item is highlighted while in Studio.
+`isCampaignsPath` matches both `/campaigns` and `/campaigns/{id}`, so both highlight "Campaigns"
+correctly. The Studio routes fall through to `'studio'`, which is **not** one of the four rendered
+nav items, so no nav item is highlighted while in Studio.
 
 ## Dashboard anatomy
 
@@ -53,7 +52,9 @@ Sections in DOM order:
 5. **Start New** — **New Project** and **New Campaign** buttons.
 6. **Recent Work** — merged list of the newest 4 projects, 4 videos and 4 campaigns, sorted by
    `updatedAt` descending, filtered by an All / Videos / Projects / Campaigns toggle, then sliced to
-   4 items (`DashboardRouteSurface.tsx:153-199`).
+   4 items. Every row opens the specific record it names: projects go to `/projects/{id}`, campaigns
+   to `/campaigns/{id}`, and videos to `/assets/videos?video={id}`, which opens that video's preview
+   in the Videos library.
 7. **Footer links** — All Projects · All Videos · All Campaigns.
 
 ## System behaviour
@@ -104,8 +105,8 @@ and open the respective builder overlay.
 
 - `/studio/create` — Create video, Quick Create ▸ New video, Recent Work has no direct route here
 - `/projects`, `/projects/{id}` — Continue Project, Recent Work, All Projects
-- `/campaign`, `/campaign/{id}` — Recent Work, All Campaigns
-- `/assets`, `/assets/videos` — Browse Assets, All Videos, Recent Work (videos)
+- `/campaigns`, `/campaigns/{id}` — Recent Work, All Campaigns
+- `/assets`, `/assets/videos` — Browse Assets, All Videos; Recent Work (videos) adds `?video={id}`
 - `/studio/create/live` — Quick Create ▸ Live AI · Beta
 
 ## Unverified

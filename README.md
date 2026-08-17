@@ -103,7 +103,7 @@ Neither document changes the current loopback, account, provider, privacy, or de
 `/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/dashboard` is the
 Dashboard; `/studio/create` is standard creation; `/studio/create/live` is gated Live AI Beta;
 `/studio/:videoId` opens the current Saved Video version in review; `/assets` groups Videos,
-Characters, Outfits, and Voices; and `/campaign` plus `/projects` share one persistent `StudioApp`
+Characters, Outfits, and Voices; and `/campaigns` plus `/projects` share one persistent `StudioApp`
 and one stage. Dashboard, Assets, Campaigns, Project lists, and Project overviews hide the stage;
 `/projects/:projectId/workspace` reuses that same stage beside its Project controls without
 creating another shell, player,

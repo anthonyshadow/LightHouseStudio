@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import type { CapabilitiesResponse } from '@studio/contracts';
 import { TEST_AUTH_SESSION } from './support/authFixture';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
+import { CAMPAIGNS_PATH } from './support/studioRoutes';
 import {
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
@@ -536,7 +537,7 @@ test('mobile Campaign organization remains keyboard-accessible at 200% text', as
   const network = await installProviderFreeStudio(page);
   await installCampaignHarness(page, true);
   await page.setViewportSize(STUDIO_VIEWPORT_SIZES.mobilePortrait);
-  await page.goto('/campaign');
+  await page.goto(CAMPAIGNS_PATH);
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '200%';
   });

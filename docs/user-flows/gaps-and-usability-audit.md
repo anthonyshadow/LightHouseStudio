@@ -4,8 +4,9 @@ Consolidated findings from the code-first audit. Every item cites the code that 
 Severities are **Critical / High / Medium / Low / Observation**.
 
 **Status:** the four **High** product gaps — G1, G2, G3 and G4 — are closed, and so are all of
-**Tier 1** and **Tier 2**: B1, B3, G7/M6 and the §7 terminology pass. Each entry below records what
-shipped. Everything else remains an open finding.
+**Tier 1**, **Tier 2** and **Tier 3**: B1, B3, G7/M6, the §7 terminology pass, and N4, N2, N3, B2,
+N10, N1 and G6. **R3** closed as a consequence of G6. Each entry below records what shipped.
+Everything else remains an open finding.
 
 Two framing notes before the list:
 
@@ -105,12 +106,40 @@ overview.
 preferences, no storage usage, no provider configuration view, no way to see the plan or
 entitlements that the API already returns in the session payload.
 
-### G6 — Campaigns cannot be managed from the list (Medium)
+### G6 — Campaigns cannot be managed from the list (Medium) — **Resolved**
 
-The Projects list offers Rename, Archive, Restore and Delete inline
-(`ProjectRouteSurface.tsx:184-222`). The Campaigns list offers only **Open** and — when archived —
-**Delete** (`CampaignRouteSurface.tsx:98-121`). Editing or archiving a campaign requires opening it
-first. Two comparable entities behave differently for no discoverable reason.
+The Projects list offered Rename, Archive, Restore and Delete inline. The Campaigns list offered
+only **Open** and — when archived — **Delete**. Editing or archiving a campaign required opening it
+first. Two comparable entities behaved differently for no discoverable reason.
+
+_Shipped:_ campaign rows now carry **Open · Edit · Archive/Restore · Delete**, tagged
+`data-campaign-action` to match `data-project-action`. Nothing new was needed underneath: the list
+response returns full `campaignSchema` records including `version`, so every mutation takes its
+`expectedVersion` straight from the row — no detail fetch, no new endpoint.
+
+`CampaignListSection` became presentational with the same callback-prop shape as
+`ProjectListSection`, and `CampaignsWorkspace` took over the dialogs and the (previously duplicated
+per-section) live region. A new `CampaignLifecycleDialog` joined `CampaignFormDialog` and
+`DeleteCampaignDialog` in `CampaignDialogs.tsx`, and **`CampaignDetail` was switched onto all
+three**, deleting its two inline `OverlayPanel`s — the archive/restore panel and a near-verbatim
+re-implementation of `DeleteCampaignDialog`. Sharing rather than copying is the whole point: a
+second archive dialog written for the list would have been the duplication this repo forbids. The
+two surfaces differ only in what success means, which the callbacks carry: the detail page navigates
+to `/campaigns` after a delete, the list refreshes in place.
+
+Deliberately **not** copied from `ProjectLifecycleDialog`: its reload-and-retry path.
+`useCampaignsController` has no `changeLatestLifecycle` equivalent, and inventing one would re-apply
+a lifecycle change against a version the operator never saw. A stale CAS says "Change not applied"
+and re-sends the same `expectedVersion` if retried. Parity here means the same _actions_, not new
+recovery machinery.
+
+The status pill moved out of the card's action row into its metadata, because it is not an action
+and the row now holds up to four buttons — the mobile 200 %-text reflow case in
+`accessibility-responsive.spec.ts` is the constraint that made this non-optional.
+
+This also closes **R3**: with both handlers inside dialogs that own their own error, `actionError`
+and its three competing render sites on the detail page have no writer left and are gone. A
+dismissed failure no longer lingers as a page-level banner behind the dialog that produced it.
 
 ### G7 — Nothing guides a user from a Project to its output (Medium) — **Resolved**
 
@@ -152,29 +181,93 @@ therefore unreachable in the current build**.
 
 ## 3. UX and navigation problems
 
-### N1 — `/campaign` is singular; everything else is plural (Medium)
+### N1 — `/campaign` is singular; everything else is plural (Medium) — **Resolved**
 
-`APP_PATHS.campaigns = '/campaign'` (`paths.ts:9`) while the nav label, the page heading and the
-detail path segment all read "Campaigns". Projects use `/projects`. This is visible in the URL bar
-and in every shared link.
+`APP_PATHS.campaigns` was `/campaign` while the nav label, the page heading and the detail path
+segment all read "Campaigns". Projects use `/projects`. This was visible in the URL bar and in every
+shared link.
 
-### N2 — Opening a video from the gallery destroys the gallery history entry (Medium)
+_Shipped:_ `/campaigns` and `/campaigns/{id}` are canonical. Only **two** non-test source
+occurrences of the old literal existed — the constant and the hardcoded `CAMPAIGN_DETAIL_PATH`
+regex — because everything else already routed through `APP_PATHS.campaigns` / `campaignPath()`.
 
-`navigateToStudio` uses `navigate(APP_PATHS.create, { replace: true })`
-(`StudioApp.tsx:711-713`, called from `useStudioSavedVideoController.ts:157`). Pressing Back from
-Studio after "Open in Studio" does **not** return to `/assets/videos`.
+The old paths redirect, modelled exactly on how `/studio/assets/recipes` is handled: a
+`legacyCampaignsSingular` constant, a `LEGACY_CAMPAIGN_SINGULAR_DETAIL_PATH` regex folded into
+`legacyCampaignRedirect`, and a `switch` arm in `canonicalizeLegacyAppPath` — but **no** entry in
+`PROTECTED_LEAF_PATHS`. That last part is load-bearing: it is what keeps the one-hop guard in
+`canonicalizeProtectedDestination` honest, so a saved login return to `/campaign?x=1` resolves to
+`/campaigns?x=1` instead of being rejected as still-legacy. The two regexes cannot collide, because
+`^\/campaign\/` requires a literal `/` immediately after `campaign`.
 
-### N3 — Closing a library overlay pushes history (Low)
+Note the limit: `AppRouter`'s `<Navigate replace to={legacyRedirect} />` carries pathname only, so a
+typed `/campaign?x=1` lands on `/campaigns` without the query. Nothing in the product ever linked
+`/campaign` with a query string, and the login-return path — which does preserve it — goes through
+`canonicalizeProtectedDestination` instead.
 
-Each overlay's close handler calls `onNavigate(APP_PATHS.assets)`
-(`StudioLibraryOverlays.tsx:67, 85, 125, 147`) — a push. Open and close a library three times and
-Back must be pressed six times to leave Assets.
+### N2 — Opening a video from the gallery destroys the gallery history entry (Medium) — **Resolved**
 
-### N4 — Recent Work "video" rows open the whole gallery (Medium)
+`navigateToStudio` used `navigate(APP_PATHS.create, { replace: true })`, so pressing Back from Studio
+after "Open in Studio" did **not** return to `/assets/videos`.
 
-`DashboardRouteSurface.tsx:184` sets `open: onOpenVideos` for every video item, ignoring the item's
-id. Clicking a specific recent video navigates to `/assets/videos` with no filter, selection or
-scroll target — while project and campaign rows open the specific record.
+_Shipped:_ the wiring now passes `nav.openStudio` (a push), and `replaceWithStudio` — whose only
+consumer this was — is deleted along with its now-false doc comment. The other caller,
+`loadSavedVideoRoute`, passes `preserveRoute: true` and never navigated in the first place, so
+`/studio/{videoId}` is untouched.
+
+Back from Studio now lands on `/assets/videos`. If a take is loaded, `StudioExitGuard` raises its
+usual discard prompt — the same prompt every other Studio exit already raises, just with a different
+destination behind it.
+
+**Not covered by an automated test, deliberately.** Reaching the assertion needs a real
+`GET /api/videos/{id}/content` response, and no e2e harness serves video bytes; building one for a
+one-line wiring change would be a larger and more fragile addition than the fix. Verified by reading
+the single call path and by driving the running app.
+
+### N3 — Closing a library overlay pushes history (Low) — **Resolved**
+
+Each overlay's close handler called `onNavigate(APP_PATHS.assets)` — a push. Open and close a
+library three times and Back had to be pressed six times to leave Assets.
+
+_Shipped:_ `StudioLibraryOverlays` now takes `onClose` instead of `onNavigate` (which had no other
+use in the file), wired to a new `nav.closeAssetLibrary` that goes through the existing
+`useRouteBack`. Closing consumes the entry the library was opened with, and falls back to a
+`replace` onto `/assets` on direct entry, so a deep-linked library still lands somewhere sensible.
+
+The consequence is intended and worth stating: a library reached from somewhere other than the hub —
+the Dashboard's "All Videos", the save-success panel's "View in Assets" — now closes back to _that_
+origin rather than to `/assets`. Back means back.
+
+The unit test asserts the property that holds in both branches (the close never pushes), because a
+memory router has no `window.history.state.idx` and therefore always takes the replace fallback; the
+real pop is covered in `e2e/app-routing.spec.ts`.
+
+### N4 — Recent Work "video" rows open the whole gallery (Medium) — **Resolved**
+
+Every video item set `open: onOpenVideos`, ignoring the item's id, so clicking a specific recent
+video navigated to `/assets/videos` with no filter, selection or scroll target — while project and
+campaign rows opened the specific record.
+
+_Shipped:_ video rows call a new `onOpenVideo(video.id)` and land on `/assets/videos?video={id}`,
+which opens that Saved Video's preview — the version selector, Download, Open in Studio and Edit
+that the library already provides for one record. `onOpenVideos` is kept: "All Videos" and the
+save-success panel still want the whole shelf.
+
+**Why not `/studio/{videoId}`.** That orphaned deep link (**R6**) is the other candidate "specific"
+destination and would have closed R6 too, but it downloads the video's bytes, unconditionally resets
+in-memory work on entry, and sits outside `StudioExitGuard` (**B4**). Making it one click from the
+Dashboard would have raised B4's severity to pay for a route-hygiene win. R6 stays open.
+
+A query parameter rather than a path segment, because the library is an overlay whose `open` prop
+compares `pathname` alone — `/assets/videos/{id}` would close the very overlay it was trying to
+focus. `VideoGallery` stays router-free: it takes `focusVideoId` and reports back through
+`onFocusVideoConsumed`, and the shell replaces the entry without the parameter, so closing the
+preview or pressing Back never re-opens it. That is the same consume-and-strip shape the
+`creationIntent: 'upload'` handling already uses.
+
+The id resolves through `getSavedVideo` under the same query key the preview itself reads, so a
+video already on screen costs no extra request and one from a later page costs only the request the
+preview would have made anyway. An unknown or removed id surfaces the gallery's existing danger
+notice instead of an empty overlay.
 
 ### N5 — Two competing create actions on the Projects list (Medium)
 
@@ -214,12 +307,22 @@ the visible text is implementation vocabulary.
 (`DashboardRouteSurface.tsx:250-252`). Sighted users see "Momentum Workspace"; assistive technology
 announces "Dashboard".
 
-### N10 — Archived projects ignore the campaign filter (Medium)
+### N10 — Archived projects ignore the campaign filter (Medium) — **Resolved**
 
-In `ProjectsWorkspace`, selecting **No Campaign** applies `campaignId: 'none'` to the active
-section only; the archived section is always rendered unfiltered
-(`ProjectRouteSurface.tsx:372-388`). Selecting a filter therefore produces a screen where half the
-content contradicts it.
+In `ProjectsWorkspace`, selecting **No Campaign** applied `campaignId: 'none'` to the active section
+only; the archived section was always rendered unfiltered, so selecting a filter produced a screen
+where half the content contradicted it.
+
+_Shipped:_ the archived section takes the same `campaignId`, retitled **Archived · No Campaign**
+while filtered, with empty-state copy that says "no archived Projects _without a Campaign_" rather
+than implying there are none at all. Nothing below the component needed changing —
+`useProjectList` already keys on `campaignId ?? 'all'`, `projectsQuerySchema` already permits
+`lifecycle=archived&campaignId=none`, and both repositories already apply the two filters
+conjunctively. `CampaignDetail` had the correct shape all along; this brings the Projects list to it.
+
+The finding survived this long because the surface's own test handler short-circuited the archived
+lifecycle **before** reading `campaignId`, so the request it should have asserted was never
+observed. The capture moved above the branch and the archived request is now asserted.
 
 ### N11 — Project counts are "N loaded", never totals (Low)
 
@@ -249,14 +352,14 @@ Both list surfaces show `{items.length} loaded` (`ProjectRouteSurface.tsx:145`,
 
 Deliberately conservative — each item was verified before listing.
 
-| #   | Item                                                                                                                                                                                                                                                   | Evidence                                                            |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| R1  | **"Create another Campaign" on the Campaign detail page.** A secondary action competing with "New Project" on the surface whose job is to fill _this_ campaign. The same action exists in Quick Create and on the Campaigns list.                      | `CampaignRouteSurface.tsx:471-478`                                  |
-| R2  | **Four paths to create a video** — Dashboard "Create video", Quick Create ▸ New video, Quick Create ▸ Create Asset ▸ Video ▸ New Video, Assets "Upload video". Three land on `/studio/create` with different intents; the difference is not explained. | `StudioApp.tsx:1106, 1179, 1236-1244`, `AssetsRouteSurface.tsx:145` |
-| R3  | **Duplicate campaign error surface.** `actionError` renders both inline on the page and inside the open dialog.                                                                                                                                        | `CampaignRouteSurface.tsx:427-431` vs `:519-523, 561-565`           |
-| R4  | **"Start New" section on the dashboard** duplicates Quick Create ▸ New Project / New Campaign and the empty-state buttons directly above it.                                                                                                           | `DashboardRouteSurface.tsx:391-405`                                 |
-| R5  | **`/studio/assets/recipes`** — a compatibility route for a UI that no longer exists; it silently redirects to `/assets`.                                                                                                                               | `paths.ts:18-19, 169-170`                                           |
-| R6  | **`studioVideoPath()`** is exported and unit-tested but never called by application code, so `/studio/{videoId}` is an orphaned deep link.                                                                                                             | `grep studioVideoPath` matches only `paths.ts` and `paths.test.ts`  |
+| #      | Item                                                                                                                                                                                                                                                                                                                                                            | Evidence                                                            |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| R1     | **"Create another Campaign" on the Campaign detail page.** A secondary action competing with "New Project" on the surface whose job is to fill _this_ campaign. The same action exists in Quick Create and on the Campaigns list.                                                                                                                               | `CampaignRouteSurface.tsx:471-478`                                  |
+| R2     | **Four paths to create a video** — Dashboard "Create video", Quick Create ▸ New video, Quick Create ▸ Create Asset ▸ Video ▸ New Video, Assets "Upload video". Three land on `/studio/create` with different intents; the difference is not explained.                                                                                                          | `StudioApp.tsx:1106, 1179, 1236-1244`, `AssetsRouteSurface.tsx:145` |
+| ~~R3~~ | ~~**Duplicate campaign error surface.** `actionError` renders both inline on the page and inside the open dialog.~~ — **resolved with G6**: each shared dialog owns its error, so the page-level `actionError` has no writer left                                                                                                                               | `CampaignDialogs.tsx`                                               |
+| R4     | **"Start New" section on the dashboard** duplicates Quick Create ▸ New Project / New Campaign and the empty-state buttons directly above it.                                                                                                                                                                                                                    | `DashboardRouteSurface.tsx:391-405`                                 |
+| R5     | **`/studio/assets/recipes`** — a compatibility route for a UI that no longer exists; it silently redirects to `/assets`.                                                                                                                                                                                                                                        | `paths.ts:18-19, 169-170`                                           |
+| R6     | **`studioVideoPath()`** is exported and unit-tested but never called by application code, so `/studio/{videoId}` is an orphaned deep link. **Still open, deliberately** — N4 considered and rejected linking to it, because the route resets in-memory work and is outside `StudioExitGuard` (**B4**). Closing R6 means fixing B4 first, or deleting the route. | `grep studioVideoPath` matches only `paths.ts` and `paths.test.ts`  |
 
 ## 6. Potential bugs
 
@@ -279,14 +382,26 @@ the URL and fires capture twice. That predates this fix — the search string ch
 key changed as well — and it is bounded, because `startLocal` aborts its predecessor. It belongs
 with **B5**, which owns the re-verification behaviour.
 
-### B2 — Browser Back re-opens the create dialog (Medium)
+### B2 — Browser Back re-opens the create dialog (Medium) — **Resolved**
 
-`createIntent` is carried in router state on the `/projects` and `/campaign` history entries
-(`StudioApp.tsx:1110-1115`). After creating, the app pushes the new detail route without clearing
-that state. Pressing Back returns to the list entry with the state intact, so
-`routeCreateRequested` is true again and `NewProjectDialog` / `CampaignFormDialog` re-opens over a
-list that already contains the just-created record
-(`ProjectRouteSurface.tsx:258, 402-408`; `CampaignRouteSurface.tsx:161, 191-201`).
+`createIntent` is carried in router state on the `/projects` and `/campaigns` history entries. After
+creating, the app pushed the new detail route without clearing that state. Pressing Back returned to
+the list entry with the state intact, so `routeCreateRequested` was true again and
+`NewProjectDialog` / `CampaignFormDialog` re-opened over a list that already contained the
+just-created record.
+
+_Shipped:_ both surfaces gained a `clearRouteCreateIntent` — the repo's existing
+`navigate(pathname, { replace: true, state: null })` idiom, already used on the cancel path — and
+**every** close path now calls it, including the successful create that used to skip it. The success
+handler replaces the list entry and then pushes the detail route; with no loaders on these routes
+the replace settles before the push, so Back lands on a list entry whose state is `null`.
+
+Consuming the intent on arrival was the other candidate and was rejected: it requires latching the
+dialog's open state into `useState` from inside an effect, which `react-hooks/set-state-in-effect`
+forbids repo-wide, and the workarounds are worse — a mount-time initializer breaks Quick Create
+fired while already on the list (the shell never unmounts, so the component does not remount), and a
+scheduled setter adds async for no reason. Clearing at the close boundary keeps
+`routeCreateRequested` as the single render-time owner and touches nothing else.
 
 ### B3 — Session expiry silently discarded in-memory work (Medium) — **Resolved**
 
@@ -503,16 +618,23 @@ independent.
    above into user language.~~ **Done** for the six and their reachable twins. The wider vocabulary
    consolidation is now tracked as an open finding in §7 — it needs a product decision first.
 
-**Tier 3 — navigation consistency**
+**Tier 3 — navigation consistency** — **complete**
 
-9. **N4** — make Recent Work video rows open the specific video.
-10. **N2/N3** — stop replacing history on "Open in Studio"; close overlays with a history-aware back
-    rather than a push.
-11. **B2** — clear `createIntent` router state after a successful create.
-12. **N10** — apply the campaign filter to the archived project section, or hide it while filtered.
-13. **N1** — rename `/campaign` to `/campaigns` with a legacy redirect (the redirect infrastructure
-    already exists in `paths.ts`).
-14. **G6** — bring campaign list actions to parity with the projects list.
+9. ~~**N4** — make Recent Work video rows open the specific video.~~ **Done** — the Videos library
+   opened on that video's preview, via `?video=`. Not the `/studio/{videoId}` deep link, so **R6**
+   stays open on purpose.
+10. ~~**N2/N3** — stop replacing history on "Open in Studio"; close overlays with a history-aware
+    back rather than a push.~~ **Done** — both. Closing a library now returns to wherever it was
+    opened from, which is the point.
+11. ~~**B2** — clear `createIntent` router state after a successful create.~~ **Done** — every close
+    path clears it, not just cancel.
+12. ~~**N10** — apply the campaign filter to the archived project section, or hide it while
+    filtered.~~ **Done** — applied, with an honest heading and empty state.
+13. ~~**N1** — rename `/campaign` to `/campaigns` with a legacy redirect.~~ **Done** — two source
+    literals, and the legacy paths follow the `recipes` compatibility shape exactly.
+14. ~~**G6** — bring campaign list actions to parity with the projects list.~~ **Done**, by
+    extracting the dialogs and sharing them with the detail page rather than copying them — which
+    also closed **R3**.
 
 **Tier 4 — consistency and hygiene**
 
@@ -522,7 +644,8 @@ independent.
 18. **N8/N9** — make the dashboard greeting visible and align the heading with its accessible name.
 19. **B6** — give cloud-library sync a retry and an explicit "keep local / keep cloud" choice.
 20. **B8/T6** — add minimal error reporting behind the existing route error boundary.
-21. **R1/R3/R4/R5** — remove the redundant surfaces once the flows above settle.
+21. **R1/R4/R5** — remove the redundant surfaces once the flows above settle. (**R3** already went
+    with G6.)
 
 ## 12. Unverified items
 
@@ -541,3 +664,10 @@ working copy staged for analysis excluded `node_modules`, so tooling could not r
 were from static reading of source, tests and SQL. The G1–G4 fixes were validated with targeted
 component and E2E runs. The Tier 1 and Tier 2 fixes (B1, B3, G7/M6, §7) were validated with the full
 `apps/web` unit suite, the full Chromium E2E suite, and `bun run quality`.
+
+The Tier 3 fixes (N4, N2/N3, B2, N10, N1, G6) were validated with the full `apps/web` unit suite,
+the `app-routing` and `accessibility-responsive` Chromium E2E specs, and `bun run quality`. Two
+caveats recorded honestly: **N2 has no automated coverage** (see its entry — no e2e harness serves
+video content bytes), and `e2e/app-routing.spec.ts` "a Project saves exact Versions, reconciles
+response loss, and retains truthful history" fails **on the unmodified baseline too**, so it is a
+pre-existing failure rather than a Tier 3 regression.

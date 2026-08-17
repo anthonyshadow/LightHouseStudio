@@ -16,6 +16,8 @@ import {
   projectIdFromPath,
   projectPath,
   projectWorkspacePath,
+  requestedSavedVideoIdFromSearch,
+  savedVideoLibraryPath,
   studioCreatePath,
   studioVideoIdFromPath,
   studioVideoPath,
@@ -34,7 +36,7 @@ describe('authenticated application paths', () => {
     expect(isProjectWorkspacePath(projectWorkspacePath(projectId))).toBe(true);
     expect(isProjectsPath(APP_PATHS.projects)).toBe(true);
     expect(isProjectsPath(projectPath(projectId))).toBe(true);
-    expect(campaignPath(campaignId)).toBe(`/campaign/${campaignId}`);
+    expect(campaignPath(campaignId)).toBe(`/campaigns/${campaignId}`);
     expect(campaignIdFromPath(campaignPath(campaignId))).toBe(campaignId);
     expect(isCampaignsPath(APP_PATHS.campaigns)).toBe(true);
     expect(isCampaignsPath(campaignPath(campaignId))).toBe(true);
@@ -50,6 +52,9 @@ describe('authenticated application paths', () => {
     expect(assetLibraryPath('character')).toBe(APP_PATHS.characters);
     expect(assetLibraryPath('outfit')).toBe(APP_PATHS.outfits);
     expect(assetLibraryPath('voice')).toBe(APP_PATHS.voices);
+    expect(savedVideoLibraryPath(videoId)).toBe(`${APP_PATHS.videos}?video=${videoId}`);
+    expect(requestedSavedVideoIdFromSearch(`?video=${videoId}`)).toBe(videoId);
+    expect(requestedSavedVideoIdFromSearch('?sort=latest')).toBeNull();
 
     for (const path of [
       APP_PATHS.dashboard,
@@ -66,6 +71,8 @@ describe('authenticated application paths', () => {
       APP_PATHS.outfits,
       APP_PATHS.voices,
       studioVideoPath(videoId),
+      APP_PATHS.legacyCampaignsSingular,
+      `/campaign/${campaignId}`,
     ]) {
       expect(isProtectedAppPath(path)).toBe(true);
     }
@@ -84,6 +91,10 @@ describe('authenticated application paths', () => {
     expect(canonicalizeLegacyAppPath(`/studio/campaigns/${campaignId}`)).toBe(
       campaignPath(campaignId),
     );
+    expect(canonicalizeLegacyAppPath('/campaign')).toBe(APP_PATHS.campaigns);
+    expect(canonicalizeLegacyAppPath(`/campaign/${campaignId}`)).toBe(campaignPath(campaignId));
+    expect(canonicalizeLegacyAppPath(APP_PATHS.campaigns)).toBeNull();
+    expect(canonicalizeLegacyAppPath(campaignPath(campaignId))).toBeNull();
     expect(canonicalizeLegacyAppPath('/studio/assets')).toBe(APP_PATHS.assets);
     expect(canonicalizeLegacyAppPath('/studio/assets/videos')).toBe(APP_PATHS.videos);
     expect(canonicalizeLegacyAppPath('/studio/videos')).toBe(APP_PATHS.videos);
@@ -103,6 +114,12 @@ describe('authenticated application paths', () => {
     expect(canonicalizeProtectedDestination(`/projects/${projectId}#assets`)).toBe(
       `/projects/${projectId}#assets`,
     );
+    expect(canonicalizeProtectedDestination('/campaign?lifecycle=archived')).toBe(
+      `${APP_PATHS.campaigns}?lifecycle=archived`,
+    );
+    expect(canonicalizeProtectedDestination(`/campaign/${campaignId}`)).toBe(
+      campaignPath(campaignId),
+    );
     expect(canonicalizeProtectedDestination('//example.com/projects')).toBeNull();
     expect(canonicalizeProtectedDestination('https://example.com/projects')).toBeNull();
     expect(canonicalizeProtectedDestination('/not-a-route')).toBeNull();
@@ -115,6 +132,7 @@ describe('authenticated application paths', () => {
       '/projects/%E0%A4%A',
       '/advanced',
       '/assets/recipes',
+      `/campaigns/${campaignId}/projects`,
     ]) {
       expect(isProtectedAppPath(path)).toBe(false);
     }

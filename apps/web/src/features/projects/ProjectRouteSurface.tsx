@@ -164,7 +164,9 @@ const ProjectListSection = ({
           <strong>{archived ? 'No archived Projects' : 'No active Projects yet'}</strong>
           <p>
             {archived
-              ? 'Archived work appears here and can be restored.'
+              ? campaignId === 'none'
+                ? 'Archived Projects with no Campaign appear here and can be restored.'
+                : 'Archived work appears here and can be restored.'
               : 'Quick project creates an unassigned Project immediately. Name one instead when the work already has a clear purpose.'}
           </p>
         </div>
@@ -270,6 +272,14 @@ const ProjectsWorkspace = () => {
     },
     [routeCreateRequested],
   );
+  /**
+   * Drops `createIntent` from this history entry. Every path that closes the dialog must call it —
+   * a successful create used to skip it, so Back from the new Project re-opened the dialog over a
+   * list that already contained it.
+   */
+  const clearRouteCreateIntent = () => {
+    if (routeCreateRequested) void navigate(location.pathname, { replace: true, state: null });
+  };
 
   const quickStart = async () => {
     setCreateError(null);
@@ -289,9 +299,7 @@ const ProjectsWorkspace = () => {
   };
   const closeCreateDialog = () => {
     setCreating(false);
-    if (routeCreateRequested) {
-      void navigate(location.pathname, { replace: true, state: null });
-    }
+    clearRouteCreateIntent();
   };
   const openProject = (project: ProjectContract) => {
     void navigate(projectPath(project.id));
@@ -385,8 +393,12 @@ const ProjectsWorkspace = () => {
           onLifecycle={openLifecycleDialog}
           onDelete={openDeleteDialog}
         />
+        {/* The filter applies to both sections, or half the screen contradicts the other half. */}
         <ProjectListSection
           lifecycle="archived"
+          {...(activeGroup === 'none'
+            ? { campaignId: 'none' as const, heading: 'Archived · No Campaign' }
+            : {})}
           onOpen={openProject}
           onRename={openRenameDialog}
           onLifecycle={openLifecycleDialog}
@@ -409,7 +421,10 @@ const ProjectsWorkspace = () => {
         <NewProjectDialog
           returnFocusRef={dialogReturnRef}
           onClose={closeCreateDialog}
-          onCreated={(current) => void navigate(projectPath(current.project.id))}
+          onCreated={(current) => {
+            clearRouteCreateIntent();
+            void navigate(projectPath(current.project.id));
+          }}
         />
       ) : null}
       {lifecycleDialog ? (

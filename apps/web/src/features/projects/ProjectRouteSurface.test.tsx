@@ -186,6 +186,7 @@ const renderProjects = (
   path = '/projects',
   props: ProjectRouteSurfaceProps = {},
   previousPath?: string,
+  routeState?: unknown,
 ) => {
   mockApiServer.use(
     http.get('*/api/projects/:projectId/history', () =>
@@ -202,11 +203,16 @@ const renderProjects = (
   const router = createMemoryRouter(
     [
       { path: '/projects/*', element: <ProjectRouteSurface {...props} /> },
-      { path: '/campaign/:campaignId', element: <div>Campaign return</div> },
+      { path: '/campaigns/:campaignId', element: <div>Campaign return</div> },
       { path: '/dashboard', element: <div>Dashboard previous</div> },
       { path: '/studio/:videoId', element: <div>Studio direct</div> },
     ],
-    { initialEntries: previousPath ? [previousPath, path] : [path] },
+    {
+      initialEntries: [
+        ...(previousPath ? [previousPath] : []),
+        routeState === undefined ? path : { pathname: path, state: routeState },
+      ],
+    },
   );
   const view = render(
     <StudioDesignProvider>
@@ -425,7 +431,7 @@ describe('Project route surface', () => {
     const campaignReturn = screen.getByRole('button', { name: '← Summer launch' });
     await user.click(campaignReturn);
 
-    await waitFor(() => expect(router.state.location.pathname).toBe(`/campaign/${campaignId}`));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/campaigns/${campaignId}`));
     expect(screen.getByText('Campaign return')).toBeVisible();
   });
 
@@ -445,7 +451,7 @@ describe('Project route surface', () => {
 
     expect(await screen.findByText('Campaign unavailable')).toBeVisible();
     await user.click(screen.getByRole('button', { name: '← Campaign' }));
-    await waitFor(() => expect(router.state.location.pathname).toBe(`/campaign/${campaignId}`));
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/campaigns/${campaignId}`));
   });
 
   it('uses the actual prior route for Back instead of the Project hierarchy', async () => {
@@ -850,6 +856,29 @@ describe('Project route surface', () => {
     expect(await screen.findByRole('heading', { name: 'Untitled Project' })).toBeVisible();
   });
 
+  it('does not re-open the create dialog when Back returns to the list that requested it', async () => {
+    installProjectLists([], []);
+    const created = currentProject(activeId, { title: 'Launch cut' });
+    mockApiServer.use(
+      http.post('*/api/projects', () => HttpResponse.json(created, { status: 201 })),
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(created)),
+    );
+    const { router } = renderProjects('/projects', {}, undefined, { createIntent: 'project' });
+    const user = userEvent.setup();
+
+    const dialog = await screen.findByRole('dialog', { name: 'New Project' });
+    await user.type(within(dialog).getByRole('textbox', { name: /Project name/u }), 'Launch cut');
+    await user.click(within(dialog).getByRole('button', { name: 'Create Project' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/projects/${activeId}`));
+
+    await router.navigate(-1);
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/projects'));
+    expect(router.state.location.state).toBeNull();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'New Project' })).toBeNull());
+  });
+
   it('loads the next bounded page only after an explicit pagination action', async () => {
     mockApiServer.use(
       http.get('*/api/projects', ({ request }) => {
@@ -1047,13 +1076,16 @@ describe('Project route surface', () => {
     const renamed = currentProject(activeId, { title: 'Launch master' });
     let listedProject = currentProject(activeId).project;
     const activeCampaignFilters: Array<string | null> = [];
+    const archivedCampaignFilters: Array<string | null> = [];
     mockApiServer.use(
       http.get('*/api/projects', ({ request }) => {
         const url = new URL(request.url);
+        const filter = url.searchParams.get('campaignId');
+        // Captured before the lifecycle branch: reading it after was why N10 went unnoticed.
         if (url.searchParams.get('lifecycle') === 'archived') {
+          archivedCampaignFilters.push(filter);
           return HttpResponse.json({ projects: [], nextCursor: null });
         }
-        const filter = url.searchParams.get('campaignId');
         activeCampaignFilters.push(filter);
         return HttpResponse.json({
           projects: filter === 'none' ? [] : [listedProject],
@@ -1075,7 +1107,17 @@ describe('Project route surface', () => {
     expect(await screen.findByText('No active Projects yet')).toBeVisible();
     expect(activeCampaignFilters).toContain('none');
 
+    // The filter owns the whole screen: the archived section must not keep listing every Campaign.
+    expect(await screen.findByRole('heading', { name: 'Archived · No Campaign' })).toBeVisible();
+    await waitFor(() => expect(archivedCampaignFilters).toContain('none'));
+    expect(
+      await screen.findByText(
+        'Archived Projects with no Campaign appear here and can be restored.',
+      ),
+    ).toBeVisible();
+
     await user.click(screen.getByRole('button', { name: 'All Active' }));
+    expect(await screen.findByRole('heading', { name: 'Archived' })).toBeVisible();
     const activeList = await screen.findByRole('list', { name: 'Active Projects' });
     await user.click(within(activeList).getByRole('button', { name: 'Rename' }));
     const dialog = screen.getByRole('dialog', { name: 'Rename Project' });

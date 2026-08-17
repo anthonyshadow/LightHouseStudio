@@ -97,8 +97,10 @@ configured `DATABASE_MODE`; otherwise the routes are absent and the client sees 
 2. Header: `h1` "Projects", subtitle, and two create actions — **Quick project** (secondary) and
    **New Project** (primary).
 3. A group filter with two options: **All Active** and **No Campaign** (`:352-369`).
-4. Two `ProjectListSection`s render: `lifecycle="active"` (respecting the group filter) and
-   `lifecycle="archived"` (**never** filtered by campaign).
+4. Two `ProjectListSection`s render — `lifecycle="active"` and `lifecycle="archived"` — and the
+   group filter applies to **both**. Selecting "No Campaign" retitles them "No Campaign" and
+   "Archived · No Campaign" and issues `campaignId=none` for each; the archived section used to
+   ignore the filter, so half the screen contradicted the other half.
 5. Each row shows title, status label, "Updated <date>", and actions:
    - active: **Open** · **Rename** · **Archive**
    - archived: **Open** · **Restore** · **Delete**
@@ -150,7 +152,7 @@ deep link.
 task and the workflow shape; the rest is behind the primary action.
 
 **Exit** — `/projects/{id}/workspace` (via **Add source** / **Continue editing**, or automatically
-once a source is accepted from the overview), `/campaign/{id}`, `/projects`,
+once a source is accepted from the overview), `/campaigns/{id}`, `/projects`,
 `/studio/create?projectId=…`.
 
 ## Flow: Project workspace (`/projects/{id}/workspace`)
@@ -302,7 +304,7 @@ because `acceptProjectSource` is one-shot.
 ## Exit points
 
 - Overview ↔ workspace
-- `/campaign/{id}` via the breadcrumb when the project belongs to a campaign
+- `/campaigns/{id}` via the breadcrumb when the project belongs to a campaign
 - `/projects` after deleting from the overview (replace)
 - `/studio/create?projectId=…` and back again after a save
 - Saved Videos library (outputs appear there)

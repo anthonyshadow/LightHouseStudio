@@ -71,13 +71,16 @@ const mockGalleryPages = (pages: Readonly<Record<string, unknown>>): Request[] =
   return requests;
 };
 
-const renderGallery = (onUse = vi.fn().mockResolvedValue(undefined)) => {
+const renderGallery = (
+  onUse = vi.fn().mockResolvedValue(undefined),
+  focus?: Readonly<{ focusVideoId: string | null; onFocusVideoConsumed: () => void }>,
+) => {
   const queryClient = createRemoteStateQueryClient();
   queryClients.push(queryClient);
   render(
     <QueryClientProvider client={queryClient}>
       <StudioDesignProvider>
-        <VideoGallery onUse={onUse} />
+        <VideoGallery onUse={onUse} {...(focus ?? {})} />
       </StudioDesignProvider>
     </QueryClientProvider>,
   );
@@ -451,5 +454,46 @@ describe('VideoGallery', () => {
     await screen.findByRole('heading', { name: 'Morning take' });
     expect(screen.getByRole('combobox', { name: 'Character used' })).toBeEnabled();
     expect(screen.getByText('No saved videos have character attribution yet.')).toBeInTheDocument();
+  });
+
+  it('opens a requested Version preview for a video no loaded page contains', async () => {
+    const listed = video();
+    const requested = video({
+      id: '9f2b8b0e-3f0c-4a7d-9a1e-0b6b2c5d4e31',
+      title: 'Evening take',
+      currentVersion: {
+        ...video().currentVersion,
+        id: 'd41f9a3b-9c1e-4f2a-8d55-2b7e6c9a0f14',
+        videoId: '9f2b8b0e-3f0c-4a7d-9a1e-0b6b2c5d4e31',
+        filename: 'evening-take.mp4',
+      },
+    });
+    mockGalleryPages({ '': page([listed]) });
+    mockApiServer.use(
+      jsonScenario('GET', `/api/videos/${requested.id}`, { body: detail(requested) }),
+    );
+    const onFocusVideoConsumed = vi.fn();
+    renderGallery(undefined, { focusVideoId: requested.id, onFocusVideoConsumed });
+
+    const dialog = await screen.findByRole('dialog', { name: 'Evening take' });
+    expect(within(dialog).getByLabelText('Preview of Evening take, Version 1')).toBeInTheDocument();
+    expect(onFocusVideoConsumed).toHaveBeenCalledOnce();
+  });
+
+  it('explains a requested video that is no longer in Assets instead of opening an empty preview', async () => {
+    mockGalleryPages({ '': page([video()]) });
+    const missingId = '9f2b8b0e-3f0c-4a7d-9a1e-0b6b2c5d4e31';
+    mockApiServer.use(
+      jsonScenario('GET', `/api/videos/${missingId}`, {
+        body: { error: { code: 'not_found', message: 'Saved video not found.' } },
+        status: 404,
+      }),
+    );
+    const onFocusVideoConsumed = vi.fn();
+    renderGallery(undefined, { focusVideoId: missingId, onFocusVideoConsumed });
+
+    expect(await screen.findByText('That video is no longer in Assets.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(onFocusVideoConsumed).toHaveBeenCalledOnce();
   });
 });
