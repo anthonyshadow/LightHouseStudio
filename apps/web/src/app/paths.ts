@@ -25,23 +25,10 @@ export const APP_PATHS = Object.freeze({
   legacyLive: '/studio/live',
 } as const);
 
-export type AssetLibraryKind = 'video' | 'character' | 'outfit' | 'voice';
+export type AssetDestination = 'videos' | 'characters' | 'outfits' | 'voices';
 export type StudioCreationIntent = 'record' | 'upload';
 
 const FOCUSED_SAVED_VIDEO_PARAM = 'video';
-
-const PROTECTED_LEAF_PATHS = new Set<string>([
-  APP_PATHS.dashboard,
-  APP_PATHS.create,
-  APP_PATHS.live,
-  APP_PATHS.projects,
-  APP_PATHS.campaigns,
-  APP_PATHS.assets,
-  APP_PATHS.videos,
-  APP_PATHS.characters,
-  APP_PATHS.outfits,
-  APP_PATHS.voices,
-]);
 
 const PROJECT_DETAIL_PATH = /^\/projects\/([^/]+)$/u;
 const PROJECT_WORKSPACE_PATH = /^\/projects\/([^/]+)\/workspace$/u;
@@ -97,17 +84,11 @@ export const campaignIdFromPath = (pathname: string): string | null =>
 export const isCampaignsPath = (pathname: string): boolean =>
   pathname === APP_PATHS.campaigns || campaignIdFromPath(pathname) !== null;
 
-export const assetLibraryPath = (kind: AssetLibraryKind): string => {
-  switch (kind) {
-    case 'video':
-      return APP_PATHS.videos;
-    case 'character':
-      return APP_PATHS.characters;
-    case 'outfit':
-      return APP_PATHS.outfits;
-    case 'voice':
-      return APP_PATHS.voices;
-  }
+export const ASSET_DESTINATION_PATHS: Readonly<Record<AssetDestination, string>> = {
+  videos: APP_PATHS.videos,
+  characters: APP_PATHS.characters,
+  outfits: APP_PATHS.outfits,
+  voices: APP_PATHS.voices,
 };
 
 /**
@@ -167,41 +148,99 @@ const legacyCampaignRedirect = (pathname: string): string | null => {
   return campaignId === null ? null : campaignPath(campaignId);
 };
 
+/**
+ * Retired pathnames and the canonical destination each one now resolves to.
+ *
+ * A table rather than a `switch` so the set of supported legacy entry points can be read, tested
+ * and extended in one place — every one of these is a URL somebody may still have bookmarked.
+ */
+const LEGACY_PATH_REDIRECTS: Readonly<Record<string, string>> = {
+  [APP_PATHS.studio]: APP_PATHS.dashboard,
+  [APP_PATHS.legacyProjects]: APP_PATHS.projects,
+  [APP_PATHS.legacyCampaigns]: APP_PATHS.campaigns,
+  [APP_PATHS.legacyCampaignsSingular]: APP_PATHS.campaigns,
+  [APP_PATHS.legacyAssets]: APP_PATHS.assets,
+  '/studio/assets/videos': APP_PATHS.videos,
+  [APP_PATHS.legacyVideos]: APP_PATHS.videos,
+  '/studio/assets/characters': APP_PATHS.characters,
+  [APP_PATHS.legacyCharacters]: APP_PATHS.characters,
+  '/studio/assets/outfits': APP_PATHS.outfits,
+  [APP_PATHS.legacyOutfits]: APP_PATHS.outfits,
+  [APP_PATHS.legacyVoices]: APP_PATHS.voices,
+  [APP_PATHS.recipes]: APP_PATHS.assets,
+  [APP_PATHS.legacyLive]: APP_PATHS.live,
+};
+
 export const canonicalizeLegacyAppPath = (pathname: string): string | null => {
   const projectRedirect = legacyProjectRedirect(pathname);
   if (projectRedirect !== null) return projectRedirect;
   const campaignRedirect = legacyCampaignRedirect(pathname);
   if (campaignRedirect !== null) return campaignRedirect;
 
-  switch (pathname) {
-    case APP_PATHS.studio:
-      return APP_PATHS.dashboard;
-    case APP_PATHS.legacyProjects:
-      return APP_PATHS.projects;
-    case APP_PATHS.legacyCampaigns:
-    case APP_PATHS.legacyCampaignsSingular:
-      return APP_PATHS.campaigns;
-    case APP_PATHS.legacyAssets:
-      return APP_PATHS.assets;
-    case '/studio/assets/videos':
-    case APP_PATHS.legacyVideos:
-      return APP_PATHS.videos;
-    case '/studio/assets/characters':
-    case APP_PATHS.legacyCharacters:
-      return APP_PATHS.characters;
-    case '/studio/assets/outfits':
-    case APP_PATHS.legacyOutfits:
-      return APP_PATHS.outfits;
-    case APP_PATHS.legacyVoices:
-      return APP_PATHS.voices;
-    case APP_PATHS.recipes:
-      return APP_PATHS.assets;
-    case APP_PATHS.legacyLive:
-      return APP_PATHS.live;
-    default:
-      return null;
-  }
+  return LEGACY_PATH_REDIRECTS[pathname] ?? null;
 };
+
+/**
+ * The registration point for an authenticated destination.
+ *
+ * Everything that has to agree about "is this a route, and what is it called" derives from this
+ * one list: the protected-path guard, the document title, and the route inventory that fails when
+ * the two drift. Adding a destination is one entry here rather than several edits scattered across
+ * `paths.ts` and `AppRouter.tsx`, none of which used to fail loudly when one was missed.
+ *
+ * Parameterised routes carry a `match` because their patterns are constrained beyond what a plain
+ * segment expresses — a Saved Video id must be a UUID, so `/studio/anything` is not a route.
+ */
+export interface ProtectedRouteDefinition {
+  readonly id: string;
+  readonly title: string;
+  /** A literal pathname, for routes with no parameters. */
+  readonly path?: string;
+  /** Recognises a parameterised pathname. Evaluated in table order, before the literal paths. */
+  readonly match?: (pathname: string) => boolean;
+}
+
+export const PROTECTED_ROUTES: readonly ProtectedRouteDefinition[] = [
+  { id: 'project-workspace', title: 'Project Studio · Lightframe', match: isProjectWorkspacePath },
+  {
+    id: 'project-detail',
+    title: 'Project · Lightframe Studio',
+    match: (pathname) => projectIdFromPath(pathname) !== null,
+  },
+  {
+    id: 'campaign-detail',
+    title: 'Campaign · Lightframe Studio',
+    match: (pathname) => campaignIdFromPath(pathname) !== null,
+  },
+  {
+    id: 'saved-video',
+    title: 'Lightframe Studio',
+    match: (pathname) => studioVideoIdFromPath(pathname) !== null,
+  },
+  { id: 'dashboard', title: 'Dashboard · Lightframe', path: APP_PATHS.dashboard },
+  { id: 'create', title: 'Studio · Lightframe', path: APP_PATHS.create },
+  { id: 'live', title: 'Live AI Beta · Lightframe', path: APP_PATHS.live },
+  { id: 'projects', title: 'Projects · Lightframe Studio', path: APP_PATHS.projects },
+  { id: 'campaigns', title: 'Campaigns · Lightframe Studio', path: APP_PATHS.campaigns },
+  { id: 'assets', title: 'Assets · Lightframe', path: APP_PATHS.assets },
+  { id: 'videos', title: 'Videos · Assets · Lightframe', path: APP_PATHS.videos },
+  { id: 'characters', title: 'Characters · Assets · Lightframe', path: APP_PATHS.characters },
+  { id: 'outfits', title: 'Outfits · Assets · Lightframe', path: APP_PATHS.outfits },
+  { id: 'voices', title: 'Voices · Assets · Lightframe', path: APP_PATHS.voices },
+];
+
+const PROTECTED_LEAF_PATHS = new Set<string>(
+  PROTECTED_ROUTES.flatMap(({ path }) => (path === undefined ? [] : [path])),
+);
+
+/**
+ * The protected route a pathname resolves to, or `null` for anything outside the authenticated
+ * app. Parameterised matchers are consulted first because a literal path can never be ambiguous.
+ */
+export const protectedRouteForPath = (pathname: string): ProtectedRouteDefinition | null =>
+  PROTECTED_ROUTES.find(({ match }) => match?.(pathname) === true) ??
+  PROTECTED_ROUTES.find(({ path }) => path === pathname) ??
+  null;
 
 /** Recognizes canonical protected routes and supported legacy destinations. */
 export const isProtectedAppPath = (pathname: string): boolean =>

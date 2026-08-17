@@ -628,27 +628,23 @@ test('unfinished Outfit Builder work requires confirmed discard before returning
     'true',
   );
 
-  await page.evaluate(() => {
-    const testWindow = window as typeof window & { __outfitConfirmMessages?: string[] };
-    testWindow.__outfitConfirmMessages = [];
-    window.confirm = (message) => {
-      testWindow.__outfitConfirmMessages?.push(String(message ?? ''));
-      return false;
-    };
-  });
+  // Declining the discard keeps the unfinished draft on screen.
   await builder.getByRole('button', { name: 'Close panel' }).click();
+  const discardPrompt = page.getByRole('dialog', {
+    name: 'Discard the unfinished outfit changes?',
+  });
+  await expect(discardPrompt).toBeVisible();
+  await expect(discardPrompt).toContainText('The draft cannot be recovered.');
+  await discardPrompt.getByRole('button', { name: 'Keep editing' }).click();
+  await expect(discardPrompt).toBeHidden();
   await expect(builder).toBeVisible();
-  expect(
-    await page.evaluate(
-      () =>
-        (window as typeof window & { __outfitConfirmMessages?: string[] }).__outfitConfirmMessages,
-    ),
-  ).toEqual(['Discard the unfinished outfit changes? The draft cannot be recovered.']);
 
-  await page.evaluate(() => {
-    window.confirm = () => true;
-  });
+  // Only an explicit discard returns to Outfit selection.
   await builder.getByRole('button', { name: 'Close panel' }).click();
+  await page
+    .getByRole('dialog', { name: 'Discard the unfinished outfit changes?' })
+    .getByRole('button', { name: 'Discard changes' })
+    .click();
   await expect(selector).toBeVisible();
   expect((await readBrowserState(page)).cameraCalls).toBe(0);
   expectNoExternalProviderTraffic(network);

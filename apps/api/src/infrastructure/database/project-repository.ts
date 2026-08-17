@@ -23,6 +23,8 @@ import {
   type ProjectOutputLink,
   type ProjectRevision,
   type ProjectVersionReferenceLink,
+  projectStatusAfterProcessingTrace,
+  projectConflicts,
 } from '@studio/domain';
 import { and, desc, eq, gt, inArray, isNull, lt, ne, or, sql, type SQLWrapper } from 'drizzle-orm';
 import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestamps.js';
@@ -211,6 +213,18 @@ const toProjectCurrentRead = (row: CurrentProjectRow): ProjectCurrentRead => {
   }
   return { project: toProject(row.project), revision: toRevision(row.revision) };
 };
+
+/**
+ * A Project row joined to the revision it currently points at. Identity is asserted on all four
+ * columns — owner, project, revision id and revision number — so a stale or cross-owner revision
+ * can never satisfy the join.
+ */
+const currentRevisionMatch = and(
+  eq(projectRevisions.projectId, projects.id),
+  eq(projectRevisions.ownerUserId, projects.ownerUserId),
+  eq(projectRevisions.id, projects.currentRevisionId),
+  eq(projectRevisions.revisionNumber, projects.currentRevisionNumber),
+);
 
 // UUID columns are compared as text so malformed historical JSON is rejected by snapshot parsing,
 // rather than failing early through a PostgreSQL UUID cast.
@@ -469,7 +483,7 @@ const replayOrRelationConflict = <Row>(
     ? { kind: 'linked', replayed: true }
     : {
         kind: 'conflict',
-        conflict: { kind: 'relation-mismatch', projectId, relation },
+        conflict: projectConflicts.relationMismatch(projectId, relation),
       };
 
 const toProjectOutputReceipt = (row: ProjectOutputReceiptRow): ProjectOutputOperationReceipt => ({
@@ -509,6 +523,14 @@ const toProjectAssetMembership = (
 export class DrizzleProjectRepository
   implements ProjectRepository, ProjectProcessingRepository, ProjectOutputMetadataUnitOfWork
 {
+  /**
+   * Owners whose asset-membership backfill this process has already observed as complete. The
+   * `ownerMigrations` row remains the durable authority; this only stops a warm process from
+   * opening a transaction to re-ask a question it has already answered, on every single
+   * Project-assets request for the rest of the owner's session.
+   */
+  readonly #assetMembershipBackfilled = new Set<string>();
+
   constructor(private readonly db: LightframeDatabase) {}
 
   async #persistAssetMemberships(
@@ -745,15 +767,7 @@ export class DrizzleProjectRepository
             isNull(projects.deletedAt),
           ),
         )
-        .leftJoin(
-          projectRevisions,
-          and(
-            eq(projectRevisions.projectId, projects.id),
-            eq(projectRevisions.ownerUserId, projects.ownerUserId),
-            eq(projectRevisions.id, projects.currentRevisionId),
-            eq(projectRevisions.revisionNumber, projects.currentRevisionNumber),
-          ),
-        )
+        .leftJoin(projectRevisions, currentRevisionMatch)
         .where(
           and(
             eq(projectOperationReceipts.ownerUserId, input.aggregate.project.ownerUserId),
@@ -769,7 +783,7 @@ export class DrizzleProjectRepository
       ) {
         return {
           kind: 'conflict',
-          conflict: { kind: 'operation-key', operation: 'create' },
+          conflict: projectConflicts.operationKey('create'),
         };
       }
       if (row.project === null || row.revision === null) {
@@ -789,15 +803,7 @@ export class DrizzleProjectRepository
     const [row] = await this.db
       .select({ project: projects, revision: projectRevisions })
       .from(projects)
-      .leftJoin(
-        projectRevisions,
-        and(
-          eq(projectRevisions.projectId, projects.id),
-          eq(projectRevisions.ownerUserId, projects.ownerUserId),
-          eq(projectRevisions.id, projects.currentRevisionId),
-          eq(projectRevisions.revisionNumber, projects.currentRevisionNumber),
-        ),
-      )
+      .leftJoin(projectRevisions, currentRevisionMatch)
       .where(
         and(
           eq(projects.id, projectId),
@@ -837,6 +843,34 @@ export class DrizzleProjectRepository
     return row === undefined ? null : toRevision(row.revision);
   }
 
+  async getRevisions(
+    ownerUserId: string,
+    projectId: string,
+    revisionNumbers: readonly number[],
+  ): Promise<readonly ProjectRevision[]> {
+    const numbers = [...new Set(revisionNumbers)];
+    if (numbers.length === 0) return [];
+    const rows = await this.db
+      .select({ revision: projectRevisions })
+      .from(projectRevisions)
+      .innerJoin(
+        projects,
+        and(
+          eq(projects.id, projectRevisions.projectId),
+          eq(projects.ownerUserId, projectRevisions.ownerUserId),
+          isNull(projects.deletedAt),
+        ),
+      )
+      .where(
+        and(
+          eq(projectRevisions.ownerUserId, ownerUserId),
+          eq(projectRevisions.projectId, projectId),
+          inArray(projectRevisions.revisionNumber, numbers),
+        ),
+      );
+    return rows.map(({ revision }) => toRevision(revision));
+  }
+
   async getCurrentWithSource(
     ownerUserId: string,
     projectId: string,
@@ -844,15 +878,7 @@ export class DrizzleProjectRepository
     const [row] = await this.db
       .select({ project: projects, revision: projectRevisions, source: projectSources })
       .from(projects)
-      .leftJoin(
-        projectRevisions,
-        and(
-          eq(projectRevisions.projectId, projects.id),
-          eq(projectRevisions.ownerUserId, projects.ownerUserId),
-          eq(projectRevisions.id, projects.currentRevisionId),
-          eq(projectRevisions.revisionNumber, projects.currentRevisionNumber),
-        ),
-      )
+      .leftJoin(projectRevisions, currentRevisionMatch)
       .leftJoin(
         projectSources,
         and(
@@ -911,15 +937,7 @@ export class DrizzleProjectRepository
         media: projectWorkingMediaAdoptions,
       })
       .from(projects)
-      .leftJoin(
-        projectRevisions,
-        and(
-          eq(projectRevisions.projectId, projects.id),
-          eq(projectRevisions.ownerUserId, projects.ownerUserId),
-          eq(projectRevisions.id, projects.currentRevisionId),
-          eq(projectRevisions.revisionNumber, projects.currentRevisionNumber),
-        ),
-      )
+      .leftJoin(projectRevisions, currentRevisionMatch)
       .leftJoin(
         projectWorkingMediaAdoptions,
         and(
@@ -962,15 +980,7 @@ export class DrizzleProjectRepository
           isNull(projects.deletedAt),
         ),
       )
-      .leftJoin(
-        projectRevisions,
-        and(
-          eq(projectRevisions.projectId, projects.id),
-          eq(projectRevisions.ownerUserId, projects.ownerUserId),
-          eq(projectRevisions.id, projects.currentRevisionId),
-          eq(projectRevisions.revisionNumber, projects.currentRevisionNumber),
-        ),
-      )
+      .leftJoin(projectRevisions, currentRevisionMatch)
       .where(
         and(
           eq(projectWorkingMediaAdoptions.ownerUserId, ownerUserId),
@@ -1030,6 +1040,7 @@ export class DrizzleProjectRepository
   }
 
   async ensureAssetMembershipBackfill(ownerUserId: string): Promise<void> {
+    if (this.#assetMembershipBackfilled.has(ownerUserId)) return;
     const migrationId = 'project-asset-memberships-v1';
     await this.db.transaction(async (tx) => {
       const [completed] = await tx
@@ -1122,6 +1133,7 @@ export class DrizzleProjectRepository
           target: [ownerMigrations.ownerUserId, ownerMigrations.migrationId],
         });
     });
+    this.#assetMembershipBackfilled.add(ownerUserId);
   }
 
   async listAssetMemberships(
@@ -1666,21 +1678,13 @@ export class DrizzleProjectRepository
         ) {
           return {
             kind: 'conflict',
-            conflict: { kind: 'operation-key', operation: 'source-accept' },
+            conflict: projectConflicts.operationKey('source-accept'),
           } as const;
         }
         const [replayed] = await tx
           .select({ project: projects, revision: projectRevisions })
           .from(projects)
-          .innerJoin(
-            projectRevisions,
-            and(
-              eq(projectRevisions.projectId, projects.id),
-              eq(projectRevisions.ownerUserId, projects.ownerUserId),
-              eq(projectRevisions.id, projects.currentRevisionId),
-              eq(projectRevisions.revisionNumber, projects.currentRevisionNumber),
-            ),
-          )
+          .innerJoin(projectRevisions, currentRevisionMatch)
           .where(
             and(
               eq(projects.id, input.projectId),
@@ -1732,7 +1736,7 @@ export class DrizzleProjectRepository
       if (acceptedSource !== undefined) {
         return {
           kind: 'conflict',
-          conflict: { kind: 'immutable-source', projectId: input.projectId },
+          conflict: projectConflicts.immutableSource(input.projectId),
         } as const;
       }
       if (current.version !== input.expectedVersion) {
@@ -1858,21 +1862,13 @@ export class DrizzleProjectRepository
         ) {
           return {
             kind: 'conflict',
-            conflict: { kind: 'operation-key', operation: 'working-media-adopt' },
+            conflict: projectConflicts.operationKey('working-media-adopt'),
           } as const;
         }
         const [replayed] = await tx
           .select({ project: projects, revision: projectRevisions })
           .from(projects)
-          .innerJoin(
-            projectRevisions,
-            and(
-              eq(projectRevisions.projectId, projects.id),
-              eq(projectRevisions.ownerUserId, projects.ownerUserId),
-              eq(projectRevisions.id, projects.currentRevisionId),
-              eq(projectRevisions.revisionNumber, projects.currentRevisionNumber),
-            ),
-          )
+          .innerJoin(projectRevisions, currentRevisionMatch)
           .where(
             and(
               eq(projects.id, input.projectId),
@@ -2538,11 +2534,15 @@ export class DrizzleProjectRepository
             id: project.currentRevisionId,
             revisionNumber: project.currentRevisionNumber,
           });
-          if (latest?.operationId === trace.jobId) {
+          const nextStatus =
+            latest?.operationId === trace.jobId
+              ? projectStatusAfterProcessingTrace(project.status, trace.status)
+              : null;
+          if (nextStatus !== null) {
             await tx
               .update(projects)
               .set({
-                status: trace.status === 'cancelled' ? 'ready' : 'needs-attention',
+                status: nextStatus,
                 version: project.version + 1,
                 updatedAt: toIsoTimestamp(trace.updatedAt),
               })
@@ -2997,7 +2997,7 @@ export class DrizzleProjectRepository
         if (activeJob !== undefined) {
           return {
             kind: 'conflict',
-            conflict: { kind: 'active-jobs', projectId: current.id },
+            conflict: projectConflicts.activeJobs(current.id),
           } as const;
         }
       }
@@ -3039,7 +3039,7 @@ export class DrizzleProjectRepository
         if (campaign === undefined) {
           return {
             kind: 'conflict',
-            conflict: { kind: 'campaign-membership', projectId: nextProject.id },
+            conflict: projectConflicts.campaignMembership(nextProject.id),
           } as const;
         }
       }
@@ -3132,7 +3132,7 @@ export class DrizzleProjectRepository
           ? { kind: 'replayed', receipt: prior }
           : {
               kind: 'conflict',
-              conflict: { kind: 'operation-key', operation: 'output-save' },
+              conflict: projectConflicts.operationKey('output-save'),
             };
       }
 
@@ -3168,7 +3168,7 @@ export class DrizzleProjectRepository
           ? { kind: 'replayed', receipt: prior }
           : {
               kind: 'conflict',
-              conflict: { kind: 'operation-key', operation: 'output-save' },
+              conflict: projectConflicts.operationKey('output-save'),
             };
       }
       if (current.version !== input.projectRevision.expectedVersion) {
@@ -3407,7 +3407,7 @@ export class DrizzleProjectRepository
           ? { kind: 'replayed', receipt: raced }
           : {
               kind: 'conflict',
-              conflict: { kind: 'operation-key', operation: 'output-save' },
+              conflict: projectConflicts.operationKey('output-save'),
             };
       }
 

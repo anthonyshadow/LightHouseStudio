@@ -4,6 +4,7 @@ export * from './campaigns';
 export * from './saved-videos';
 export * from './projects';
 export * from './common/datetime';
+export * from './common/identity';
 export * from './common/text';
 export * from './errors/safe-error';
 export * from './prompts';

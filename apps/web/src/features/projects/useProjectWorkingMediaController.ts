@@ -7,6 +7,7 @@ import {
   uploadProjectWorkingMedia,
 } from './projectsApi';
 import type { ProjectSessionPort } from './useProjectSession';
+import { useStableOperationKey } from './useStableOperationKey';
 
 export type ProjectWorkingMediaPhase = 'idle' | 'saving' | 'saved' | 'conflict' | 'error';
 
@@ -33,7 +34,7 @@ export const useProjectWorkingMediaController = (
     phase: 'idle',
     message: null,
   }));
-  const operationRef = useRef<{ readonly signature: string; readonly key: string } | null>(null);
+  const operation = useStableOperationKey();
   const controllerRef = useRef<AbortController | null>(null);
   const phase = state.projectId === projectId ? state.phase : 'idle';
   const message = state.projectId === projectId ? state.message : null;
@@ -59,12 +60,12 @@ export const useProjectWorkingMediaController = (
   );
 
   useEffect(() => {
-    operationRef.current = null;
+    operation.reset();
     return () => {
       controllerRef.current?.abort('project-working-media-context-replaced');
       controllerRef.current = null;
     };
-  }, [projectId]);
+  }, [operation, projectId]);
 
   const adoptRenderPreview = useCallback(async (): Promise<boolean> => {
     const candidate = videoEditor.candidate;
@@ -96,11 +97,7 @@ export const useProjectWorkingMediaController = (
       lastModified: candidate.validated.file.lastModified,
       localEdit: candidate.spec,
     });
-    const operationKey =
-      operationRef.current?.signature === signature
-        ? operationRef.current.key
-        : crypto.randomUUID();
-    operationRef.current = { signature, key: operationKey };
+    const operationKey = operation.keyFor(signature);
     controllerRef.current?.abort('working-media-replaced');
     const controller = new AbortController();
     controllerRef.current = controller;
@@ -140,7 +137,7 @@ export const useProjectWorkingMediaController = (
         });
       }
       session.acceptCurrent({ project: response.project, revision: response.revision });
-      operationRef.current = null;
+      operation.reset();
       setPhase('saved');
       setMessage(
         'Working media ready. No Saved Video or Video Version was created, and the immutable original is unchanged.',
@@ -156,7 +153,7 @@ export const useProjectWorkingMediaController = (
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;
     }
-  }, [phase, projectId, session, setMessage, setPhase, videoEditor]);
+  }, [operation, phase, projectId, session, setMessage, setPhase, videoEditor]);
 
   const cancel = useCallback(() => {
     if (phase === 'saving') return;

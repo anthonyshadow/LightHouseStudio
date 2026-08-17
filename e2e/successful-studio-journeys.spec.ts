@@ -947,8 +947,11 @@ test('Space records and finishes only outside editable controls', async ({ page 
   await expect(nameInput).toHaveValue('Keyboard guard ');
   expect((await readBrowserState(page)).recorderStarts).toBe(0);
 
-  page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Close panel' }).click();
+  await page
+    .getByRole('dialog', { name: 'Discard the unfinished outfit changes?' })
+    .getByRole('button', { name: 'Discard changes' })
+    .click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Outfit' })).toBeHidden();
   await expect(outfitLauncher).toBeFocused();

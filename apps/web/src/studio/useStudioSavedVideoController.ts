@@ -17,6 +17,7 @@ import type {
 import { isVideoEditBusy } from '../features/video-editor/types';
 import type { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import type { useTakeReviewFlow } from './useTakeReviewFlow';
+import type { ConfirmationRequest } from './useConfirmationRequest';
 
 type ExistingVideoController = ReturnType<typeof useExistingVideoWorkflow>;
 type RecordingController = ReturnType<typeof useTakeReviewFlow>['recording'];
@@ -58,6 +59,7 @@ interface UseStudioSavedVideoControllerOptions {
   readonly closeOverlay: () => void;
   readonly focusStudio: () => void;
   readonly focusEditVideo: () => void;
+  readonly confirmation: ConfirmationRequest;
 }
 
 export const useStudioSavedVideoController = ({
@@ -75,6 +77,7 @@ export const useStudioSavedVideoController = ({
   closeOverlay,
   focusStudio,
   focusEditVideo,
+  confirmation,
 }: UseStudioSavedVideoControllerOptions) => {
   const [pendingSave, setPendingSave] = useState<PendingVideoSave | null>(null);
   // Only an explicitly requested save records an outcome. The pre-edit save inside `commitVideoEdit`
@@ -272,9 +275,11 @@ export const useStudioSavedVideoController = ({
     const artifact = recording.presented;
     if (!artifact || !activeLoadedSource || artifact.id === activeLoadedSource.artifactId) return;
     if (
-      !window.confirm(
-        'Replace the current gallery version with this result? The previous version remains recoverable.',
-      )
+      !(await confirmation.ask({
+        title: 'Replace the current gallery version with this result?',
+        description: 'The previous version remains recoverable.',
+        confirmLabel: 'Replace version',
+      }))
     ) {
       return;
     }
@@ -297,7 +302,7 @@ export const useStudioSavedVideoController = ({
       );
       setSaveOutcome(video);
     }
-  }, [activeLoadedSource, presentedCharacter, recording.presented, saveController]);
+  }, [activeLoadedSource, confirmation, presentedCharacter, recording.presented, saveController]);
 
   const requestSavePresentedVideo = useCallback(() => {
     const artifact = recording.presented;
@@ -440,8 +445,6 @@ export const useStudioSavedVideoController = ({
   return {
     activeLoadedSource,
     presentedHasUnsavedChanges,
-    comparedExistingVideoArtifact,
-    presentedCharacter,
     pendingSave,
     saveOutcome,
     discardPromptOpen,

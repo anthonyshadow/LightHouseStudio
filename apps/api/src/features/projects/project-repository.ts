@@ -324,6 +324,15 @@ export interface ProjectRepository {
     projectId: string,
     revisionNumber: number,
   ): Promise<ProjectRevision | null>;
+  /**
+   * Batched sibling of {@link getRevision} for page reads. History pages resolve one reference
+   * revision per row; asking per row turns a page into a per-item round trip.
+   */
+  getRevisions(
+    ownerUserId: string,
+    projectId: string,
+    revisionNumbers: readonly number[],
+  ): Promise<readonly ProjectRevision[]>;
   getCurrentWithSource(
     ownerUserId: string,
     projectId: string,

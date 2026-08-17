@@ -1,6 +1,7 @@
 import { useTheme } from '@emotion/react';
 import type { CreativeAssetStore } from '@studio/domain';
 import { lazy, Suspense, type ReactNode, type RefObject } from 'react';
+import type { AssetDestination } from '../app/paths';
 import type { BrowserCapabilities } from '../application/types';
 import { CaptureSettingsPanel, RecordingAction, RecordingControls } from '../features/recording';
 import type { RecordingSource } from '../features/recording';
@@ -13,8 +14,8 @@ import type { StudioMode } from '../features/media-session';
 import type { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import type { ProjectProcessingController } from '../features/projects/useProjectProcessingController';
 import type { useStudioSession } from '../orchestration/session';
-import { Button } from '../ui';
-import { firstSuccessGuideStyles, mainGridStyles, stageColumnStyles } from './StudioApp.styles';
+import { projectVideoEditOutcome } from './projectVideoEditOutcome';
+import { mainGridStyles, stageColumnStyles } from './StudioApp.styles';
 import { StudioSessionControlBar } from './StudioSessionControlBar';
 import type { useStudioProjectBridge } from './useStudioProjectBridge';
 import type { useStudioSavedVideoController } from './useStudioSavedVideoController';
@@ -70,10 +71,6 @@ interface StudioWorkspaceProps {
     readonly campaignActive: boolean;
     readonly projectRecordingAvailable: boolean;
   };
-  readonly guide: {
-    readonly visible: boolean;
-    readonly dismiss: () => void;
-  };
   readonly controllers: {
     readonly session: ReturnType<typeof useStudioSession>;
     readonly takeReview: ReturnType<typeof useTakeReviewFlow>;
@@ -122,7 +119,7 @@ interface StudioWorkspaceProps {
     readonly creativeStore: CreativeAssetStore;
     readonly characterCount: number;
     readonly outfitCount: number;
-    readonly onOpen: (destination: 'videos' | 'characters' | 'outfits' | 'voices') => void;
+    readonly onOpen: (destination: AssetDestination) => void;
     readonly onUploadVideo: () => void;
     readonly onCreateProjectCharacter: (projectId: string) => void;
     readonly onCreateProjectOutfit: (projectId: string) => void;
@@ -150,7 +147,6 @@ interface StudioWorkspaceProps {
 export const StudioWorkspace = ({
   refs,
   route,
-  guide,
   controllers,
   environment,
   stage,
@@ -176,7 +172,6 @@ export const StudioWorkspace = ({
     campaignActive: campaignRouteActive,
     projectRecordingAvailable,
   } = route;
-  const { visible: showFirstSuccessGuide, dismiss: onDismissFirstSuccessGuide } = guide;
   const { session, takeReview, videoEditor, savedVideo, project, projectProcessing } = controllers;
   const { browser, desktopLayout: desktopStudioLayout, ownerUserId } = environment;
   const {
@@ -234,42 +229,6 @@ export const StudioWorkspace = ({
           recordingSeconds={recording.elapsedSeconds}
           aspectRatio={stageAspectRatio}
           realtimeSessionTiming={session.realtimeSessionTiming}
-          idleAction={
-            !projectContextActive && stagePresentation.kind === 'idle' && showFirstSuccessGuide ? (
-              <aside
-                aria-label="First take guide"
-                data-first-success-guide=""
-                css={firstSuccessGuideStyles(theme)}
-              >
-                <strong data-guide-title>Create a video</strong>
-                <span data-guide-copy>
-                  <span data-guide-primary-long>
-                    <span data-guide-step-number aria-hidden="true">
-                      1
-                    </span>
-                    <span>Record New Video or Upload Video → review</span>
-                  </span>
-                  <span data-guide-upload>
-                    <span data-guide-step-number aria-hidden="true">
-                      2
-                    </span>
-                    <span>Virtual Try On · Character Swap · Voice → Save</span>
-                  </span>
-                </span>
-                <Button
-                  size="small"
-                  variant="quiet"
-                  aria-label="Dismiss first take guide"
-                  onClick={onDismissFirstSuccessGuide}
-                >
-                  <span data-guide-dismiss-long>Dismiss</span>
-                  <span data-guide-dismiss-short aria-hidden="true">
-                    ×
-                  </span>
-                </Button>
-              </aside>
-            ) : null
-          }
           {...(currentExperienceLabel ? { experienceLabel: currentExperienceLabel } : {})}
           {...(projectContextActive
             ? {
@@ -341,8 +300,13 @@ export const StudioWorkspace = ({
             <VideoEditWorkspace
               session={videoEditor}
               onRequestDiscard={savedVideo.requestVideoEditDiscard}
-              projectMode={projectContextActive}
-              appliedProjectEdit={project.session?.current?.revision.snapshot.localEdit ?? null}
+              {...(projectContextActive
+                ? {
+                    outcome: projectVideoEditOutcome(
+                      project.session?.current?.revision.snapshot.localEdit ?? null,
+                    ),
+                  }
+                : {})}
             />
           </Suspense>
         ) : projectContextActive ? (

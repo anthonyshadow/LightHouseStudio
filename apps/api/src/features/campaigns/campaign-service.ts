@@ -18,6 +18,7 @@ import {
   type CampaignConflict,
 } from '@studio/domain';
 import { AppError } from '../../http/app-error.js';
+import { decodePageCursor, encodePageCursor } from '../../http/page-cursor.js';
 import type { CampaignRepository, CampaignSummaryCursor } from './campaign-repository.js';
 
 const publicCampaign = (campaign: Campaign): CampaignContract =>
@@ -36,42 +37,20 @@ const publicCampaign = (campaign: Campaign): CampaignContract =>
 const cursorCriteria = (query: CampaignsQuery): string =>
   JSON.stringify({ lifecycle: query.lifecycle, pageSize: query.pageSize });
 
+const CAMPAIGN_CURSOR = {
+  timestampKey: 'updatedAt',
+  idKey: 'campaignId',
+  invalidMessage: 'Use a valid Campaign page cursor.',
+} as const;
+
 const encodeCursor = (cursor: CampaignSummaryCursor, query: CampaignsQuery): string =>
-  Buffer.from(
-    JSON.stringify({ version: 1, ...cursor, criteria: cursorCriteria(query) }),
-    'utf8',
-  ).toString('base64url');
+  encodePageCursor(cursor, cursorCriteria(query));
 
 const decodeCursor = (
   cursor: string | undefined,
   query: CampaignsQuery,
-): CampaignSummaryCursor | undefined => {
-  if (cursor === undefined) return undefined;
-  try {
-    const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as unknown;
-    if (
-      typeof value === 'object' &&
-      value !== null &&
-      'version' in value &&
-      value.version === 1 &&
-      'updatedAt' in value &&
-      typeof value.updatedAt === 'string' &&
-      Number.isFinite(new Date(value.updatedAt).valueOf()) &&
-      'campaignId' in value &&
-      typeof value.campaignId === 'string' &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
-        value.campaignId,
-      ) &&
-      'criteria' in value &&
-      value.criteria === cursorCriteria(query)
-    ) {
-      return { updatedAt: new Date(value.updatedAt).toISOString(), campaignId: value.campaignId };
-    }
-  } catch {
-    // Opaque application cursors fail as one finite validation error.
-  }
-  throw new AppError(400, 'validation_error', 'Use a valid Campaign page cursor.');
-};
+): CampaignSummaryCursor | undefined =>
+  decodePageCursor(cursor, cursorCriteria(query), CAMPAIGN_CURSOR);
 
 export type CampaignServiceMutationResult =
   | { readonly ok: true; readonly campaign: CampaignContract }

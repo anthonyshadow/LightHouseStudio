@@ -142,7 +142,7 @@ describe('CreativeWorkspace responsive tools', () => {
   it('keeps reusable creative setup available beside Project working-media playback', () => {
     render(
       <StudioDesignProvider>
-        <CreativeWorkspace {...createProps(true, { projectMode: true })} />
+        <CreativeWorkspace {...createProps(true, { liveToolsAvailableDuringPlayback: true })} />
       </StudioDesignProvider>,
     );
 

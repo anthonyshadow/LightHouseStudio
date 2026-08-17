@@ -1,5 +1,10 @@
 import type { ProjectContract, ProjectCurrentResponse } from '@studio/contracts';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+  type QueryClient,
+} from '@tanstack/react-query';
 import { useCallback, useRef } from 'react';
 import {
   archiveProject,
@@ -15,10 +20,23 @@ import {
 const PROJECT_PAGE_SIZE = 20;
 
 export const projectQueryKeys = {
-  all: ['projects'] as const,
   lists: ['projects', 'list'] as const,
   list: (lifecycle: 'active' | 'archived') => ['projects', 'list', lifecycle] as const,
   detail: (projectId: string) => ['projects', 'detail', projectId] as const,
+};
+
+/**
+ * The single owner of how a freshly authoritative Project lands in the cache: the detail entry is
+ * replaced outright (the response *is* the new truth, so refetching it would only race), and the
+ * lists are invalidated because a mutation can move a Project between lifecycle or Campaign pages.
+ */
+export const reconcileProject = async (
+  queryClient: QueryClient,
+  current: ProjectCurrentResponse,
+): Promise<ProjectCurrentResponse> => {
+  queryClient.setQueryData(projectQueryKeys.detail(current.project.id), current);
+  await queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
+  return current;
 };
 
 const lifecycleForProject = (project: ProjectContract): 'active' | 'archived' =>
@@ -45,11 +63,7 @@ export const useProjectsController = () => {
   const pendingNamedCreateKey = useRef<string | null>(null);
 
   const reconcile = useCallback(
-    async (current: ProjectCurrentResponse) => {
-      queryClient.setQueryData(projectQueryKeys.detail(current.project.id), current);
-      await queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
-      return current;
-    },
+    (current: ProjectCurrentResponse) => reconcileProject(queryClient, current),
     [queryClient],
   );
 

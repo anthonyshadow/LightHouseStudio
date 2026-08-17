@@ -1,7 +1,6 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
+import { type AssetDestination } from '../../app/paths';
 import { Button } from '../../ui';
-
-type AssetDestination = 'videos' | 'characters' | 'outfits' | 'voices';
 
 type AssetsRouteSurfaceProps = Readonly<{
   characterCount: number;

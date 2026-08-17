@@ -285,16 +285,22 @@ export const saveSavedVideoThumbnail = (
     invalidResponse,
   );
 
+const DEFAULT_SAVED_VIDEO_PAGE_SIZE = 20;
+
 export type ListSavedVideosInput = Readonly<{
   cursor?: string;
   characterName?: string;
   format?: SavedVideoFormat;
   sort?: SavedVideoSort;
+  /** Surfaces that render a short strip should ask for what they show, not a full gallery page. */
+  pageSize?: number;
   signal?: AbortSignal;
 }>;
 
 export const listSavedVideos = (input: ListSavedVideosInput = {}): Promise<SavedVideosResponse> => {
-  const query = new URLSearchParams({ pageSize: '20' });
+  const query = new URLSearchParams({
+    pageSize: String(input.pageSize ?? DEFAULT_SAVED_VIDEO_PAGE_SIZE),
+  });
   if (input.cursor) query.set('cursor', input.cursor);
   if (input.characterName) query.set('characterName', input.characterName);
   if (input.format) query.set('format', input.format);

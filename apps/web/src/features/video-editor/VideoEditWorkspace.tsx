@@ -9,6 +9,7 @@ import {
   type VideoEditFilter,
   type VideoEditSpec,
 } from '@studio/domain';
+import type { ReactNode } from 'react';
 import { Button, StatusNotice } from '../../ui';
 import type { VideoEditSession } from './useVideoEditSession';
 import { formatVideoEditTime, isVideoEditBusy, type VideoEditTool } from './types';
@@ -291,18 +292,36 @@ const ToolSettings = ({ session }: { session: VideoEditSession }) => {
   );
 };
 
+/**
+ * What committing a render produces, described by whoever owns the surrounding workflow.
+ *
+ * The editor renders bytes locally and knows nothing about where they go: a standalone edit
+ * replaces the video being viewed, while a caller with durable media of its own may treat the same
+ * render as a disposable preview. Keeping that as caller-supplied copy is what stops the editor
+ * from having to enumerate the workflows that embed it.
+ */
+export type VideoEditOutcome = Readonly<{
+  commitLabel: string;
+  errorTitle: string;
+  /** Guidance shown above the tool settings, e.g. what the render does and does not persist. */
+  notices?: ReactNode;
+}>;
+
+const SAVE_EDITED_VIDEO: VideoEditOutcome = {
+  commitLabel: 'Save edited video',
+  errorTitle: 'Edit not saved',
+};
+
 export type VideoEditWorkspaceProps = Readonly<{
   session: VideoEditSession;
   onRequestDiscard: () => void;
-  projectMode?: boolean;
-  appliedProjectEdit?: VideoEditSpec | null;
+  outcome?: VideoEditOutcome;
 }>;
 
 export const VideoEditWorkspace = ({
   session,
   onRequestDiscard,
-  projectMode = false,
-  appliedProjectEdit = null,
+  outcome = SAVE_EDITED_VIDEO,
 }: VideoEditWorkspaceProps) => {
   const theme = useTheme();
   const busy = isVideoEditBusy(session.phase);
@@ -384,21 +403,7 @@ export const VideoEditWorkspace = ({
               path. Your current video is unchanged and can still be saved.
             </StatusNotice>
           ) : null}
-          {projectMode ? (
-            <StatusNotice tone="neutral" title="Temporary Render preview" role="status">
-              Rendering does not save Project media. After validation, explicitly adopt the preview
-              to make it durable working media; the immutable original stays unchanged.
-            </StatusNotice>
-          ) : null}
-          {projectMode && appliedProjectEdit ? (
-            <StatusNotice tone="neutral" title="Applied Project edit" role="status">
-              The current working-media bytes already include the retained edit from{' '}
-              {Math.round(appliedProjectEdit.trim.startMs)}–
-              {Math.round(appliedProjectEdit.trim.endMs)} ms, {appliedProjectEdit.crop.preset} crop,
-              and {appliedProjectEdit.filter} filter. New controls start from that rendered baseline
-              so the historical edit is not applied twice.
-            </StatusNotice>
-          ) : null}
+          {outcome.notices}
           <ToolSettings session={session} />
           {session.phase === 'rendering' || session.phase === 'validating' ? (
             <div css={renderProgressStyles(theme)} role="status" aria-live="polite">
@@ -415,11 +420,7 @@ export const VideoEditWorkspace = ({
             </div>
           ) : null}
           {session.error ? (
-            <StatusNotice
-              tone="danger"
-              title={projectMode ? 'Render preview not ready' : 'Edit not saved'}
-              role="alert"
-            >
+            <StatusNotice tone="danger" title={outcome.errorTitle} role="alert">
               {session.error}
             </StatusNotice>
           ) : null}
@@ -440,7 +441,7 @@ export const VideoEditWorkspace = ({
               disabled={!session.dirty || !session.supported || busy}
               onClick={() => void session.startRender()}
             >
-              {projectMode ? 'Render preview' : 'Save edited video'}
+              {outcome.commitLabel}
             </Button>
             <Button variant="danger" disabled={busy} onClick={onRequestDiscard}>
               Discard

@@ -52,6 +52,7 @@ import { useStudioLiveExperience } from './useStudioLiveExperience';
 import { useStudioNavigationActions } from './useStudioNavigationActions';
 import { useStudioRecordingLaunch } from './useStudioRecordingLaunch';
 import { useStudioRouteContext } from './useStudioRouteContext';
+import { useConfirmationRequest } from './useConfirmationRequest';
 import { useStudioSessionLifecycle } from './useStudioSessionLifecycle';
 import { useDirectSavedVideoRoute } from './useDirectSavedVideoRoute';
 import { useProjectVideoAttachment } from './useProjectVideoAttachment';
@@ -169,7 +170,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   useEffect(() => {
     if (desktopStudioLayout) closeOverlayIf(['capture-settings']);
   }, [closeOverlayIf, desktopStudioLayout]);
-  const [firstSuccessGuideVisible, setFirstSuccessGuideVisible] = useState(false);
   const promptCommittedHandlerRef = useRef<PromptCommittedHandler>(noopPromptCommitted);
   const characterSelectorRef = useRef<HTMLButtonElement>(null);
   const outfitToggleRef = useRef<HTMLButtonElement>(null);
@@ -273,7 +273,13 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     characterRemovalBlockedReason,
     captureBlockedReason,
     captureSettingsDisabledReason,
-  } = useStudioActivityModel({ session, takeReview, projectContextActive });
+  } = useStudioActivityModel({
+    session,
+    takeReview,
+    creativeConfigurationIsDurable: projectContextActive,
+  });
+
+  const confirmation = useConfirmationRequest();
 
   const liveExperience = useStudioLiveExperience({
     availability,
@@ -283,6 +289,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     session,
     openOverlay,
     closeOverlay,
+    confirmation,
     onClearExistingVideoIntent: clearExistingVideoIntent,
   });
 
@@ -329,6 +336,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     closeOverlay,
     onOpenLibrary: nav.openOutfits,
     applySavedOutfit: applyRecipeSelection,
+    confirmation,
   });
   const character = useStudioCharacterWorkflow({
     ownerUserId: auth.session!.user.id,
@@ -341,6 +349,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     saveStudioCharacter: saveBuiltCharacter,
     openOverlay,
     closeOverlay,
+    confirmation,
   });
   const projectCreative = useProjectCreativeSessionAdapter({
     projectId: activeProjectId,
@@ -488,6 +497,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     savedRecipes: existingVideoSavedRecipes,
     recordingCharacterAttribution,
     navigateToStudio: nav.openStudio,
+    confirmation,
     openVideoUpload,
     openTakeReview,
     closeOverlay,
@@ -607,7 +617,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         panel: creativePanel,
         activeTool: activeCreativeTool,
         showDesktopAiTools: desktopStudioLayout,
-        projectMode: projectContextActive,
+        liveToolsAvailableDuringPlayback: projectContextActive,
         activeCharacterLabel: activeCharacterName,
         activeOutfitLabel:
           session.draft.mode === 'lucy-vton-latest' && hasDraftContent(session.draft)
@@ -718,10 +728,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             projectOverviewActive,
             campaignActive: campaignRouteActive,
             projectRecordingAvailable,
-          }}
-          guide={{
-            visible: firstSuccessGuideVisible,
-            dismiss: () => setFirstSuccessGuideVisible(false),
           }}
           controllers={{
             session,
@@ -852,8 +858,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           sessionExpiry={sessionExpiry}
           savedVideo={savedVideo}
           videoEditor={videoEditor}
-          projectContextActive={projectContextActive}
-          projectWorkingMedia={projectWorkingMedia}
+          confirmation={confirmation}
+          projectWorkingMedia={projectContextActive ? projectWorkingMedia : null}
           saveSuccessSuppressed={contextualProjectId !== null}
           onOpenSavedVideosLibrary={nav.openVideos}
           onCreateAnotherVideo={() => {
@@ -927,8 +933,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           onOpenSavedCharacters={openSavedCharacters}
           onOpenSavedOutfits={openOutfitSelector}
           onOpenSavedVideosLibrary={nav.openVideos}
-          onConfigureVirtualTryOn={liveExperience.configureVirtualTryOn}
-          onStartPreparedAi={liveExperience.startPreparedAi}
+          onConfigureVirtualTryOn={() => void liveExperience.configureVirtualTryOn()}
+          onStartPreparedAi={(mode) => void liveExperience.startPreparedAi(mode)}
           onUnselectCharacter={unselectCharacter}
           onUnselectAi={unselectAi}
         />

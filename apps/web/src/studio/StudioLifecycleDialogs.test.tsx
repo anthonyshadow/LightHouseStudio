@@ -13,6 +13,7 @@ const savedVersionId = 'c5b9b3ab-6c2f-4c1c-92c4-6f2b0e19f0d2';
 
 const dialogProps = (overrides: Partial<DialogProps> = {}): DialogProps => ({
   mainRef: createRef<HTMLElement>(),
+  confirmation: { pending: null, ask: vi.fn(), confirm: vi.fn(), cancel: vi.fn() },
   logout: {
     promptOpen: false,
     blockedOpen: false,
@@ -48,13 +49,7 @@ const dialogProps = (overrides: Partial<DialogProps> = {}): DialogProps => ({
     phase: 'idle',
     resumeEditing: vi.fn(),
   } as unknown as DialogProps['videoEditor'],
-  projectContextActive: false,
-  projectWorkingMedia: {
-    busy: false,
-    message: null,
-    cancel: vi.fn(),
-    adoptRenderPreview: vi.fn(() => Promise.resolve()),
-  } as unknown as DialogProps['projectWorkingMedia'],
+  projectWorkingMedia: null,
   saveSuccessSuppressed: false,
   onOpenSavedVideosLibrary: vi.fn(),
   onCreateAnotherVideo: vi.fn(),
@@ -136,7 +131,6 @@ describe('StudioLifecycleDialogs', () => {
         phase: 'awaiting-replacement',
         resumeEditing: vi.fn(),
       } as unknown as DialogProps['videoEditor'],
-      projectContextActive: true,
       projectWorkingMedia: {
         busy: false,
         message: 'Store this render as the Project working-media checkpoint.',

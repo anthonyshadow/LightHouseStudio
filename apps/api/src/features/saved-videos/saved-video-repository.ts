@@ -188,6 +188,14 @@ export interface SavedVideoRepository {
     videoId: string,
     versionId: string,
   ): Promise<StoredVideoVersionRead | null>;
+  /**
+   * Batched sibling of {@link getRetainedVersion} for page reads. Returns only the requested
+   * (videoId, versionId) pairs; a pair the owner cannot reach is simply absent from the result.
+   */
+  getRetainedVersions(
+    ownerUserId: string,
+    references: readonly { readonly videoId: string; readonly versionId: string }[],
+  ): Promise<readonly StoredVideoVersionRead[]>;
   rename(
     ownerUserId: string,
     videoId: string,
@@ -503,6 +511,22 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
     return aggregate === undefined || version === undefined
       ? null
       : { video: aggregate.video, version };
+  }
+
+  async getRetainedVersions(
+    ownerUserId: string,
+    references: readonly { readonly videoId: string; readonly versionId: string }[],
+  ): Promise<readonly StoredVideoVersionRead[]> {
+    if (references.length === 0) return [];
+    const library = await this.#read(ownerUserId);
+    const byVideoId = new Map(library.videos.map((item) => [item.video.id, item]));
+    return references.flatMap(({ videoId, versionId }) => {
+      const aggregate = byVideoId.get(videoId);
+      const version = aggregate?.versions.find(({ id }) => id === versionId);
+      return aggregate === undefined || version === undefined
+        ? []
+        : [{ video: aggregate.video, version }];
+    });
   }
 
   /** Called only while the shared owner lock is held by the local composite output unit of work. */
