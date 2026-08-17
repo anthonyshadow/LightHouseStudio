@@ -79,7 +79,7 @@ const RECIPE_COMMIT_BLOCKED_MESSAGE =
   'Release the active camera or AI session, then retry this complete creative setup.';
 
 type UseReferenceRecipeHydrationOptions = {
-  readonly canStart: (pending: PendingReferenceRecipeUse) => boolean;
+  readonly canStart: (pending: PendingReferenceRecipeUse) => boolean | Promise<boolean>;
   readonly currentReferenceImage: () => SessionReferenceImage | null;
   readonly onCommit: (result: ReferenceRecipeHydrationResult) => boolean | Promise<boolean>;
 };
@@ -116,7 +116,14 @@ export const useReferenceRecipeHydration = ({
 
   const start = useCallback(
     async (pending: PendingReferenceRecipeUse, continueWithoutReference = false): Promise<void> => {
-      if (activeOperationRef.current || !canStart(pending)) return;
+      if (activeOperationRef.current) return;
+      const decision = canStart(pending);
+      if (decision === false) return;
+      if (decision !== true) {
+        // Only a decision that has to ask the operator something suspends here. Re-check the slot
+        // afterwards: another selection could have claimed it while this one awaited an answer.
+        if (!(await decision) || activeOperationRef.current) return;
+      }
 
       pendingUseRef.current = pending;
       const controller = new AbortController();

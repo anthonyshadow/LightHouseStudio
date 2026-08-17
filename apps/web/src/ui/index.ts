@@ -9,6 +9,13 @@ export { SegmentedControl } from './primitives/SegmentedControl';
 export { VisuallyHidden } from './primitives/VisuallyHidden';
 export { IconButton } from './primitives/IconButton';
 export { ConfirmationDialog } from './primitives/ConfirmationDialog';
+export {
+  ConfirmationRequestDialog,
+  useConfirmationRequest,
+  type ConfirmationRequest,
+  type ConfirmationRequestOptions,
+} from './primitives/confirmationRequest';
+export { useAwaitableQuestion } from './primitives/useAwaitableQuestion';
 export { OverlayPanel } from './primitives/OverlayPanel';
 export { ReferenceImagePreview } from './primitives/ReferenceImagePreview';
 export { ImagePickerDropField } from './primitives/ImagePickerDropField';

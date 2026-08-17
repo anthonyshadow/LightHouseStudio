@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { Button } from '../../ui';
+import { Button, ConfirmationRequestDialog, useConfirmationRequest } from '../../ui';
 import type { StudioMode } from '../media-session';
 import type { RecordingController, RecordingSource, VideoCharacterAttribution } from './types';
 
@@ -115,18 +115,25 @@ export const RecordingAction = ({
     }
   }, [recording.lifecycle]);
 
+  const confirmation = useConfirmationRequest();
+
   const start = useCallback(async () => {
     if (!source) return;
     if (recording.original) {
-      const proceed = window.confirm(
-        'Starting another take replaces the current in-memory clip. Save it first if you want to keep it. Continue?',
-      );
+      const proceed = await confirmation.ask({
+        title: 'Start another take?',
+        description:
+          'Starting another take replaces the current in-memory clip. Save it first if you want to keep it.',
+        confirmLabel: 'Start new take',
+        cancelLabel: 'Keep current take',
+        danger: true,
+      });
       if (!proceed) return;
     }
     if (recording.original) recording.discard();
     if (characterAttribution) await recording.start(source, mode, characterAttribution);
     else await recording.start(source, mode);
-  }, [characterAttribution, mode, recording, source]);
+  }, [characterAttribution, confirmation, mode, recording, source]);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -211,6 +218,7 @@ export const RecordingAction = ({
           {unavailableReason}
         </p>
       ) : null}
+      <ConfirmationRequestDialog request={confirmation} />
     </>
   );
 };

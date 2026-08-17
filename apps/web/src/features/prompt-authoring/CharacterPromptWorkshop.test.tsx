@@ -105,18 +105,18 @@ describe('CharacterPromptWorkshop', () => {
 
   it('confirms before resetting only the current intent', async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi
-      .spyOn(window, 'confirm')
-      .mockReturnValueOnce(false)
-      .mockReturnValueOnce(true);
     renderWorkshop();
 
     await user.type(screen.getByLabelText(/^Object to add/), 'paper lantern');
+
+    // Declining leaves the intent's choices untouched.
     await user.click(screen.getByRole('button', { name: 'Reset this intent' }));
+    await user.click(screen.getByRole('button', { name: 'Stay' }));
     expect(screen.getByLabelText(/^Object to add/)).toHaveValue('paper lantern');
-    await user.click(screen.getByRole('button', { name: 'Reset this intent' }));
+
+    await user.click(await screen.findByRole('button', { name: 'Reset this intent' }));
+    await user.click(screen.getByRole('button', { name: 'Reset intent' }));
     expect(screen.getByLabelText(/^Object to add/)).toHaveValue('');
-    expect(confirmSpy).toHaveBeenCalledTimes(2);
   });
 
   it('restores saved non-character drafts supplied by the session owner', async () => {

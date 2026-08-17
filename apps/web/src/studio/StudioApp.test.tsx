@@ -502,11 +502,11 @@ vi.mock('../features/existing-video/useExistingVideoWorkflow', () => ({
 }));
 
 vi.mock('../features/media-session', async () => {
-  const { confirmModeReplacement, hasDraftContent } =
+  const { hasDraftContent, modeReplacementNeedsConfirmation } =
     await import('../features/media-session/draftPolicy');
   return {
-    confirmModeReplacement,
     hasDraftContent,
+    modeReplacementNeedsConfirmation,
     SessionComposer: () => <div>AI configuration content</div>,
   };
 });
@@ -599,6 +599,11 @@ vi.mock('../ui', async () => {
   const { useEffect, useRef } = await import('react');
   const { StudioDesignProvider } = await import('../ui/StudioDesignProvider');
   const { Button } = await import('../ui/primitives/Button');
+  // The confirmation mechanism is plain state with no styling, so the real one is used here: a
+  // stub would let a shell change that stops asking pass unnoticed.
+  const { useConfirmationRequest, ConfirmationRequestDialog } =
+    await import('../ui/primitives/confirmationRequest');
+  const { useAwaitableQuestion } = await import('../ui/primitives/useAwaitableQuestion');
   const OverlayPanel = ({
     open,
     title,
@@ -629,6 +634,9 @@ vi.mock('../ui', async () => {
   return {
     StudioDesignProvider,
     Button,
+    useConfirmationRequest,
+    ConfirmationRequestDialog,
+    useAwaitableQuestion,
     TextField: ({
       label,
       hint,

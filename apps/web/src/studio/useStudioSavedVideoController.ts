@@ -17,7 +17,7 @@ import type {
 import { isVideoEditBusy } from '../features/video-editor/types';
 import type { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import type { useTakeReviewFlow } from './useTakeReviewFlow';
-import type { ConfirmationRequest } from './useConfirmationRequest';
+import type { ConfirmationRequest } from '../ui';
 
 type ExistingVideoController = ReturnType<typeof useExistingVideoWorkflow>;
 type RecordingController = ReturnType<typeof useTakeReviewFlow>['recording'];

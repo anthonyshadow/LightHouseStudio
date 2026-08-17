@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useAwaitableQuestion } from './useAwaitableQuestion';
+import { useAwaitableQuestion } from '../ui';
 import type { SavedCharacterPrompt } from '../features/creative-assets/types';
 import {
   createCharacterEditDraftValue,

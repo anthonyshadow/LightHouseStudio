@@ -224,7 +224,7 @@ export const StudioToolOverlays = ({
                 lockReason: REVIEW_LOCK_REASON,
               }
             : {})}
-          onOpenWorkshop={handoff.actions.openWorkshop}
+          onOpenWorkshop={() => void handoff.actions.openWorkshop()}
         />
       </OverlayPanel>
 

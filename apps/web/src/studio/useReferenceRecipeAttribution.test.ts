@@ -101,6 +101,12 @@ describe('reference recipe attribution', () => {
         activeCharacterName: undefined,
         dispatchActiveRecipe,
         characterBuilderOpenBlockedReason: undefined,
+        confirmation: {
+          pending: null,
+          ask: vi.fn(() => Promise.resolve(true)),
+          confirm: vi.fn(),
+          cancel: vi.fn(),
+        },
         referenceUsePending: false,
       }),
     );
@@ -218,6 +224,12 @@ describe('reference recipe attribution', () => {
         activeCharacterName: undefined,
         dispatchActiveRecipe,
         characterBuilderOpenBlockedReason: undefined,
+        confirmation: {
+          pending: null,
+          ask: vi.fn(() => Promise.resolve(true)),
+          confirm: vi.fn(),
+          cancel: vi.fn(),
+        },
         referenceUsePending: false,
       }),
     );

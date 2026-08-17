@@ -486,10 +486,6 @@ describe('StudioSessionControlBar', () => {
     });
     const onCloseTakeReview = vi.fn();
     const onDiscardTake = vi.fn();
-    const confirm = vi
-      .spyOn(window, 'confirm')
-      .mockReturnValueOnce(false)
-      .mockReturnValueOnce(true);
     renderBar(
       createSession(),
       vi.fn(),
@@ -502,14 +498,15 @@ describe('StudioSessionControlBar', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Discard' }));
+    await user.click(screen.getByRole('button', { name: 'Stay' }));
     expect(recording.discard).not.toHaveBeenCalled();
     expect(onDiscardTake).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole('button', { name: 'Discard' }));
+    await user.click(await screen.findByRole('button', { name: 'Discard' }));
+    await user.click(screen.getByRole('button', { name: 'Discard take' }));
     expect(recording.discard).toHaveBeenCalledOnce();
     expect(onDiscardTake).toHaveBeenCalledOnce();
     expect(onCloseTakeReview).toHaveBeenCalledOnce();
-    confirm.mockRestore();
   });
 
   it('renders the stage-owned visibility state with matching inert semantics', () => {

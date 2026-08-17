@@ -207,12 +207,11 @@ describe('SessionComposer', () => {
     const session = createSession('lucy-vton-latest', {
       draft: { ...createEmptyDraft('lucy-vton-latest'), prompt: 'navy wool jacket' },
     });
-    vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderComposer(session);
 
     await user.click(screen.getByRole('button', { name: 'Clear draft' }));
+    await user.click(screen.getByRole('button', { name: 'Stay' }));
 
-    expect(window.confirm).toHaveBeenCalledOnce();
     expect(session.resetModel).not.toHaveBeenCalled();
   });
 

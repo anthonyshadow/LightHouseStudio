@@ -1,6 +1,6 @@
 import { useTheme } from '@emotion/react';
 import { useId, useMemo, useState } from 'react';
-import { Surface } from '../../ui';
+import { ConfirmationRequestDialog, Surface, useConfirmationRequest } from '../../ui';
 import {
   createPromptBuilderDraft,
   generateStructuredPrompt,
@@ -145,6 +145,8 @@ export const CharacterPromptWorkshop = ({
     onDraftChange?.(nextDraft);
   };
 
+  const confirmation = useConfirmationRequest();
+
   const changeIntent = (nextIntent: WorkshopIntent) => {
     setIntent(nextIntent);
     setShowSave(false);
@@ -152,10 +154,15 @@ export const CharacterPromptWorkshop = ({
     onDraftChange?.(drafts[nextIntent]);
   };
 
-  const resetCurrent = () => {
+  const resetCurrent = async () => {
     if (
       hasChanges &&
-      !window.confirm('Reset this intent and discard its current workshop choices?')
+      !(await confirmation.ask({
+        title: 'Reset this intent?',
+        description: 'Its current workshop choices are discarded and cannot be recovered.',
+        confirmLabel: 'Reset intent',
+        danger: true,
+      }))
     ) {
       return;
     }
@@ -201,7 +208,7 @@ export const CharacterPromptWorkshop = ({
             disabled={disabled}
             hasChanges={hasChanges}
             onIntentChange={changeIntent}
-            onReset={resetCurrent}
+            onReset={() => void resetCurrent()}
           />
         </div>
 
@@ -245,6 +252,7 @@ export const CharacterPromptWorkshop = ({
           />
         </footer>
       </div>
+      <ConfirmationRequestDialog request={confirmation} />
     </Surface>
   );
 };

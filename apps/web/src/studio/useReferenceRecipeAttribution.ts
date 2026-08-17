@@ -22,6 +22,7 @@ import type {
   PendingReferenceRecipeUse,
   ReferenceRecipeHydrationResult,
 } from './useReferenceRecipeHydration';
+import type { ConfirmationRequest } from '../ui';
 
 export const createPendingReferenceRecipeUse = (
   selection: RecipeSelection,
@@ -117,6 +118,7 @@ type UseReferenceRecipeAttributionOptions = {
   readonly dispatchActiveRecipe: Dispatch<ActiveRecipeAction>;
   readonly characterBuilderOpenBlockedReason: string | undefined;
   readonly referenceUsePending: boolean;
+  readonly confirmation: ConfirmationRequest;
 };
 
 /**
@@ -132,6 +134,7 @@ export const useReferenceRecipeAttribution = ({
   dispatchActiveRecipe,
   characterBuilderOpenBlockedReason,
   referenceUsePending,
+  confirmation,
 }: UseReferenceRecipeAttributionOptions) => {
   const selectedSavedPromptRef = useRef<string | undefined>(undefined);
   const selectedCharacterPromptRef = useRef<string | undefined>(undefined);
@@ -345,6 +348,7 @@ export const useReferenceRecipeAttribution = ({
     repository,
     session,
     saveBlockedReason,
+    confirmation,
     onStudioPreloaded: rememberPreloadedCharacter,
   });
 
