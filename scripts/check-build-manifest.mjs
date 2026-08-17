@@ -4,14 +4,16 @@ import { pathToFileURL } from 'node:url';
 
 export const BUILD_CLOSURE_BUDGETS = {
   'index.html': 345_000,
-  // The authenticated Studio owns the intentionally shared TanStack Query remote-state runtime.
-  // The guardrail's job is to keep optional surfaces lazy, not to freeze the shell: dialogs and
-  // panels reachable only after a specific outcome belong in their own chunks (SaveVideoSuccessPanel,
-  // SessionExpiryNotice, ConfirmationDialog), while session-lifecycle code that must run before any
-  // of them — auth state, teardown holds, exit guards — is necessarily static.
-  // Raised from 1_000_000 when session-expiry handling landed; the previous value had drifted to
-  // 0.1% headroom, so it fired on any shell change at all rather than on a real regression.
-  'src/studio/StudioApp.tsx': 1_050_000,
+  // What every authenticated route pays. The shell owns the intentionally shared TanStack Query
+  // remote-state runtime and the session lifecycle — auth state, teardown holds — which must run
+  // before anything they protect and is therefore necessarily static. The guardrail's job is to
+  // keep optional surfaces lazy: dialogs and panels reachable only after a specific outcome belong
+  // in their own chunks (SaveVideoSuccessPanel, SessionExpiryNotice, ConfirmationDialog).
+  //
+  // This budget still carries the whole Studio capture graph, because the runtime is currently
+  // mounted on every protected route. Gating it is in progress; this number is expected to fall by
+  // roughly 230-280 KB, and the budget must be lowered to match rather than left as slack.
+  'src/app/shell/AuthenticatedShell.tsx': 1_050_000,
 };
 
 const forbiddenEntryDependencies = [

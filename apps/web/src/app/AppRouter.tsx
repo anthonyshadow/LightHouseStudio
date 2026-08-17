@@ -29,8 +29,8 @@ import {
 } from './paths';
 import { ProtectedRoute } from './ProtectedRoute';
 
-const LazyStudioApp = lazy(() =>
-  import('../studio/StudioApp').then((module) => ({ default: module.StudioApp })),
+const LazyAuthenticatedShell = lazy(() =>
+  import('./shell/AuthenticatedShell').then((module) => ({ default: module.AuthenticatedShell })),
 );
 
 const ENTRY_DESCRIPTION = 'Record or upload a video, then review and edit it in Lightframe Studio.';
@@ -125,17 +125,17 @@ const EntryRoute = ({ focusEnterOnMount }: EntryRouteProps) => (
   <EntryPage focusEnterOnMount={focusEnterOnMount} />
 );
 
-interface StudioRouteProps {
+interface AuthenticatedShellRouteProps {
   readonly focusMainOnMount: boolean;
 }
 
-const StudioRoute = ({ focusMainOnMount }: StudioRouteProps) => {
+const AuthenticatedShellRoute = ({ focusMainOnMount }: AuthenticatedShellRouteProps) => {
   const location = useLocation();
   const routeState = location.state as { creationIntent?: unknown } | null;
   const initialIntent = routeState?.creationIntent === 'upload' ? 'upload' : undefined;
   return (
     <Suspense fallback={<StudioLoading />}>
-      <LazyStudioApp
+      <LazyAuthenticatedShell
         focusMainOnMount={focusMainOnMount}
         {...(initialIntent ? { initialIntent } : {})}
       />
@@ -177,7 +177,7 @@ export const RoutedApplication = () => {
                   {legacyRedirect ? (
                     <Navigate replace to={legacyRedirect} />
                   ) : (
-                    <StudioRoute focusMainOnMount={focusMainOnMount} />
+                    <AuthenticatedShellRoute focusMainOnMount={focusMainOnMount} />
                   )}
                 </ProtectedRoute>
               ) : (

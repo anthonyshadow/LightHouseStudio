@@ -718,7 +718,7 @@ vi.mock('./CreativeWorkspace', () => ({
   },
 }));
 
-import { StudioApp } from './StudioApp';
+import { AuthenticatedShell } from '../app/shell/AuthenticatedShell';
 import { AuthProvider } from '../application/auth/AuthProvider';
 import { StudioDesignProvider } from '../ui';
 
@@ -778,7 +778,9 @@ const renderStudio = (initialIntent?: 'upload', initialPath = '/studio/create') 
       [
         {
           path: '*',
-          element: <StudioApp {...(initialIntent ? { initialIntent } : {})} />,
+          // The real composition: the shell supplies the query cache, confirmations and session
+          // lifecycle the Studio runtime reads, so rendering it bare would test a wiring nobody has.
+          element: <AuthenticatedShell {...(initialIntent ? { initialIntent } : {})} />,
         },
       ],
       { initialEntries: [initialPath] },
