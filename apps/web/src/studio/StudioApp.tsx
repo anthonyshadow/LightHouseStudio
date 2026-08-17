@@ -12,6 +12,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
 import { useAuth } from '../application/auth/AuthProvider';
 import type { StudioRuntimeRegistry } from '../app/shell/studioRuntimeWork';
+import type { useStudioHandoff } from '../app/shell/useStudioHandoff';
 import type { useStudioLogoutController } from './useStudioLogoutController';
 import { APP_PATHS, studioCreatePath } from '../app/paths';
 import type { PromptCommittedHandler } from '../application/types';
@@ -106,6 +107,8 @@ export interface StudioAppProps {
   readonly initialIntent?: 'upload';
   /** The shell's teardown coordinator and work channel. */
   readonly runtimeRegistry: StudioRuntimeRegistry;
+  /** The shell's route into this runtime for selections made where it was not mounted. */
+  readonly studioHandoff: ReturnType<typeof useStudioHandoff>;
   /** Owned by the shell so a confirmation outlives the surface that asked it. */
   readonly confirmation: ConfirmationRequest;
   readonly logout: ReturnType<typeof useStudioLogoutController>;
@@ -118,6 +121,7 @@ export const StudioApp = ({
   focusMainOnMount = false,
   initialIntent,
   runtimeRegistry,
+  studioHandoff,
   confirmation,
   logout,
   sessionEnding,
@@ -359,7 +363,9 @@ export const StudioApp = ({
     openOverlay,
     closeOverlay,
     onOpenLibrary: nav.openOutfits,
-    applySavedOutfit: applyRecipeSelection,
+    // The shell's channel, so an outfit chosen from the library reaches a Studio that may not be
+    // mounted yet by the same path as one chosen inside it.
+    applySavedOutfit: studioHandoff.applyRecipe,
     confirmation,
   });
   const character = useStudioCharacterWorkflow({
@@ -500,12 +506,51 @@ export const StudioApp = ({
   }, [clearActiveRecipe, closeOverlayIf, desktopStudioLayout, mainRef]);
   const openVideoUpload = useCallback(() => openOverlay('video-upload'), [openOverlay]);
   const openTakeReview = useCallback(() => openOverlay('take-review'), [openOverlay]);
+  // Published for the surfaces that outlive this runtime. Registered in a layout effect so a
+  // selection made on the route that mounted us is applied before first paint, and withdrawn on
+  // unmount so the shell holds a selection instead of calling into a torn-down session.
+  const {
+    registerPorts,
+    pending: pendingHandoff,
+    clearPending: clearPendingHandoff,
+  } = studioHandoff;
+  const selectVoiceForSource = useCallback(
+    (voiceId: string, voiceName: string) => {
+      if (existingVideo.selection === null) existingVideo.preselectVoice(voiceId, voiceName);
+      else existingVideo.selectVoice(voiceId, voiceName);
+    },
+    [existingVideo],
+  );
+  useLayoutEffect(() => {
+    registerPorts({ applyRecipe: applyRecipeSelection, selectVoice: selectVoiceForSource });
+    return () => registerPorts(null);
+  }, [applyRecipeSelection, registerPorts, selectVoiceForSource]);
+
+  useEffect(() => {
+    if (!pendingHandoff) return;
+    // Cleared first: applying a recipe can raise a confirmation, and a re-render while that is open
+    // must not find the same handoff still pending and apply it twice.
+    clearPendingHandoff();
+    if (pendingHandoff.kind === 'use-recipe') {
+      applyRecipeSelection(pendingHandoff.selection);
+      return;
+    }
+    selectVoiceForSource(pendingHandoff.voiceId, pendingHandoff.voiceName);
+    openVideoUpload();
+  }, [
+    applyRecipeSelection,
+    clearPendingHandoff,
+    openVideoUpload,
+    pendingHandoff,
+    selectVoiceForSource,
+  ]);
+
   const libraryHandoff = useStudioLibraryHandoff({
     nav,
     character,
     outfit,
-    existingVideo,
-    applyRecipeSelection,
+    applyRecipe: studioHandoff.applyRecipe,
+    selectVoice: studioHandoff.selectVoice,
     openVideoUpload,
   });
   const focusEditVideo = useCallback(() => {
