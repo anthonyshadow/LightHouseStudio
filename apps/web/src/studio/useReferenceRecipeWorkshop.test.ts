@@ -58,13 +58,13 @@ describe('useReferenceRecipeWorkshop', () => {
         session,
         recordingActive: false,
         activeRecipe: null,
-        selectLucyMode: vi.fn(() => true),
+        selectLucyMode: vi.fn(() => Promise.resolve(true)),
         openWorkshopOverlay,
       }),
     );
 
-    act(() => {
-      result.current.openSavedWorkshop(draft, character);
+    await act(async () => {
+      await result.current.openSavedWorkshop(draft, character);
     });
     expect(openWorkshopOverlay).toHaveBeenCalledOnce();
     expect(result.current.draft).toEqual(draft);

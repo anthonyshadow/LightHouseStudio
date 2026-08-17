@@ -34,6 +34,12 @@ describe('useCharacterStudioPreload', () => {
         repository,
         session,
         saveBlockedReason: undefined,
+        confirmation: {
+          pending: null,
+          ask: vi.fn(() => Promise.resolve(true)),
+          confirm: vi.fn(),
+          cancel: vi.fn(),
+        },
         onStudioPreloaded,
       }),
     );

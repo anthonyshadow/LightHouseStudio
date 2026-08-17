@@ -4,6 +4,7 @@ import {
   closeAiSettings,
   confirmSaveVideo,
   createLocalTake,
+  discardTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   FIXED_WEBM_BASE64,
@@ -206,10 +207,7 @@ for (const viewport of exactViewports) {
     await expectStableStageRect(page, stableStageRect);
     await page.getByRole('button', { name: 'Back to take review' }).click();
 
-    await page
-      .getByRole('dialog', { name: 'Latest Take' })
-      .getByRole('button', { name: 'Discard' })
-      .click();
+    await discardTake(page, page.getByRole('dialog', { name: 'Latest Take' }));
     await openAiSettings(page);
     await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
     await page.getByLabel('Character direction').fill('An adult cinematic field presenter');
@@ -274,10 +272,7 @@ test('@cross-browser focused media smoke reaches record, Voice, and review recov
     page.getByText('Every treatment starts from the immutable original audio sidecar.'),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Back to take review' }).click();
-  await page
-    .getByRole('dialog', { name: 'Latest Take' })
-    .getByRole('button', { name: 'Discard' })
-    .click();
+  await discardTake(page, page.getByRole('dialog', { name: 'Latest Take' }));
   await expect(page.getByLabel('Recorded take playback')).toHaveCount(0);
 
   const browser = await readBrowserState(page);
@@ -472,7 +467,7 @@ test('no-key Local Camera records and finalizes without provider HTTP, WebSocket
   const takeControls = page.getByRole('group', { name: 'Recorded take controls' });
   await expect(takeControls.getByRole('button', { name: 'Save' })).toBeVisible();
   await expectNoAxeViolations(page);
-  await takeControls.getByRole('button', { name: 'Discard' }).click();
+  await discardTake(page, takeControls);
   await expect(page.getByLabel('Recorded take playback')).toHaveCount(0);
 
   const browser = await readBrowserState(page);
@@ -727,6 +722,10 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
   await expect(page.locator('[data-stage-status-long]', { hasText: /^AI active/u })).toBeVisible();
 
   await page.getByRole('button', { name: 'Reset AI' }).click({ force: true });
+  await page
+    .getByRole('dialog', { name: 'Reset these AI settings?' })
+    .getByRole('button', { name: 'Reset settings' })
+    .click();
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
   await expect(page.getByLabel('Character direction')).toHaveValue('');
   await expect(page.getByRole('button', { name: 'Start Character AI' })).toBeVisible();

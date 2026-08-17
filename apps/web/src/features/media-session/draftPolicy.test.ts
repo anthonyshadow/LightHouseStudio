@@ -1,21 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
-import { confirmModeReplacement, hasDraftContent } from './draftPolicy';
+import { describe, expect, it } from 'vitest';
+import { hasDraftContent, modeReplacementNeedsConfirmation } from './draftPolicy';
 import { createEmptyDraft } from './types';
 
 describe('mode replacement policy', () => {
   it('switches empty drafts without interruption', () => {
-    const confirm = vi.fn();
-    expect(confirmModeReplacement(createEmptyDraft('local'), 'lucy-latest', confirm)).toBe(true);
-    expect(confirm).not.toHaveBeenCalled();
+    expect(modeReplacementNeedsConfirmation(createEmptyDraft('local'), 'lucy-latest')).toBe(false);
   });
 
   it('preserves text drafts without an unnecessary confirmation', () => {
     const draft = { ...createEmptyDraft('lucy-vton-latest'), prompt: 'A linen jacket' };
-    const confirm = vi.fn().mockReturnValue(false);
 
     expect(hasDraftContent(draft)).toBe(true);
-    expect(confirmModeReplacement(draft, 'lucy-latest', confirm)).toBe(true);
-    expect(confirm).not.toHaveBeenCalled();
+    expect(modeReplacementNeedsConfirmation(draft, 'lucy-latest')).toBe(false);
   });
 
   it('requires confirmation before switching discards a reference image', () => {
@@ -28,16 +24,12 @@ describe('mode replacement policy', () => {
         previewUrl: 'blob:garment',
       },
     };
-    const confirm = vi.fn().mockReturnValue(false);
 
-    expect(confirmModeReplacement(draft, 'lucy-latest', confirm)).toBe(false);
-    expect(confirm).toHaveBeenCalledOnce();
+    expect(modeReplacementNeedsConfirmation(draft, 'lucy-latest')).toBe(true);
   });
 
   it('does not interrupt actions that stay in the current mode', () => {
     const draft = { ...createEmptyDraft('lucy-latest'), enhance: true };
-    const confirm = vi.fn();
-    expect(confirmModeReplacement(draft, 'lucy-latest', confirm)).toBe(true);
-    expect(confirm).not.toHaveBeenCalled();
+    expect(modeReplacementNeedsConfirmation(draft, 'lucy-latest')).toBe(false);
   });
 });

@@ -2,13 +2,17 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { APP_PATHS } from '../app/paths';
 import type { ModelMode } from '../application/types';
-import { modeReplacementNeedsConfirmation, type StudioMode } from '../features/media-session';
+import {
+  MODE_REPLACEMENT_CONFIRMATION,
+  modeReplacementNeedsConfirmation,
+  type StudioMode,
+} from '../features/media-session';
 import type { ProviderAvailability } from '../features/media-session';
 import type { useStudioSession } from '../orchestration/session';
 import type { CapabilityState } from './StudioHeader';
 import { liveExperienceAvailability } from './studioLiveAvailability';
 import type { useStudioOverlayController } from './useStudioOverlayController';
-import type { ConfirmationRequest } from './useConfirmationRequest';
+import type { ConfirmationRequest } from '../ui';
 
 interface UseStudioLiveExperienceOptions {
   readonly availability: ProviderAvailability;
@@ -73,12 +77,7 @@ export const useStudioLiveExperience = ({
   const selectExperienceMode = async (mode: StudioMode): Promise<boolean> => {
     if (
       modeReplacementNeedsConfirmation(session.draft, mode) &&
-      !(await confirmation.ask({
-        title: 'Switch modes and remove the current reference image?',
-        description: 'Your text draft will be kept.',
-        confirmLabel: 'Switch mode',
-        cancelLabel: 'Keep this mode',
-      }))
+      !(await confirmation.ask(MODE_REPLACEMENT_CONFIRMATION))
     ) {
       return false;
     }

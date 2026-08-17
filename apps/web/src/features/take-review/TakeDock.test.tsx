@@ -110,7 +110,6 @@ describe('TakeDock metadata', () => {
     const user = userEvent.setup();
     const controller = recording();
     const onCloseTake = vi.fn();
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
 
     render(
       <StudioDesignProvider>
@@ -126,10 +125,12 @@ describe('TakeDock metadata', () => {
 
     const discard = screen.getByRole('button', { name: 'Discard' });
     await user.click(discard);
+    await user.click(screen.getByRole('button', { name: 'Stay' }));
     expect(controller.discard).not.toHaveBeenCalled();
     expect(onCloseTake).not.toHaveBeenCalled();
 
-    await user.click(discard);
+    await user.click(await screen.findByRole('button', { name: 'Discard' }));
+    await user.click(screen.getByRole('button', { name: 'Discard take' }));
     expect(controller.discard).toHaveBeenCalledOnce();
     expect(onCloseTake).toHaveBeenCalledOnce();
   });

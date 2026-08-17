@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import type { NetworkJourneyState } from './studioHarness.types.js';
 
 export const expectNoExternalProviderTraffic = (network: NetworkJourneyState): void => {
@@ -113,4 +113,18 @@ export const createLocalTake = async (page: Page): Promise<void> => {
   await takeControls.getByRole('button', { name: 'Voice' }).click();
   await page.getByRole('button', { name: 'Back to take review' }).click();
   await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeVisible();
+};
+
+/**
+ * Discards the recorded take through its confirmation.
+ *
+ * Discarding is a real dialog rather than `window.confirm`, so the answer is part of the
+ * interaction: clicking Discard alone leaves the take in place.
+ */
+export const discardTake = async (page: Page, scope?: Locator): Promise<void> => {
+  await (scope ?? page).getByRole('button', { name: 'Discard' }).click();
+  await page
+    .getByRole('dialog', { name: 'Discard this in-memory take?' })
+    .getByRole('button', { name: 'Discard take' })
+    .click();
 };

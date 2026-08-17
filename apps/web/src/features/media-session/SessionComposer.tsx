@@ -1,8 +1,19 @@
 import { useState } from 'react';
 import { useTheme } from '@emotion/react';
-import { Button, SegmentedControl, StatusNotice, Surface } from '../../ui';
+import {
+  Button,
+  ConfirmationRequestDialog,
+  SegmentedControl,
+  StatusNotice,
+  Surface,
+  useConfirmationRequest,
+} from '../../ui';
 import type { StudioSessionController } from './types';
-import { confirmModeReplacement, hasDraftContent } from './draftPolicy';
+import {
+  MODE_REPLACEMENT_CONFIRMATION,
+  hasDraftContent,
+  modeReplacementNeedsConfirmation,
+} from './draftPolicy';
 import { ModelRecipeFields } from './ModelRecipeFields';
 import { SessionActions } from './SessionActions';
 import {
@@ -46,8 +57,13 @@ export const SessionComposer = ({
       ? session.error
       : null;
 
-  const changeMode = (mode: StudioMode) => {
-    if (!confirmModeReplacement(session.draft, mode, (message) => window.confirm(message))) {
+  const confirmation = useConfirmationRequest();
+
+  const changeMode = async (mode: StudioMode) => {
+    if (
+      modeReplacementNeedsConfirmation(session.draft, mode) &&
+      !(await confirmation.ask(MODE_REPLACEMENT_CONFIRMATION))
+    ) {
       return;
     }
     if (recording || !session.selectMode(mode)) {
@@ -58,12 +74,16 @@ export const SessionComposer = ({
     setModeSwitchNotice(false);
   };
 
-  const resetDraft = () => {
+  const resetDraft = async () => {
     if (
       hasDraftContent(session.draft) &&
-      !window.confirm(
-        'Reset these AI settings? The working prompt and ephemeral image will be cleared; completed takes stay available.',
-      )
+      !(await confirmation.ask({
+        title: 'Reset these AI settings?',
+        description:
+          'The working prompt and ephemeral image will be cleared; completed takes stay available.',
+        confirmLabel: 'Reset settings',
+        danger: true,
+      }))
     ) {
       return;
     }
@@ -96,7 +116,7 @@ export const SessionComposer = ({
             value={session.draft.mode}
             options={studioModeOptions}
             disabled={modeLocked}
-            onChange={changeMode}
+            onChange={(mode) => void changeMode(mode)}
           />
         </header>
 
@@ -156,10 +176,11 @@ export const SessionComposer = ({
             recording={recording}
             lockReason={lockReason}
             {...(modelStartBlockedReason ? { modelStartBlockedReason } : {})}
-            onReset={resetDraft}
+            onReset={() => void resetDraft()}
           />
         </footer>
       </div>
+      <ConfirmationRequestDialog request={confirmation} />
     </Surface>
   );
 };

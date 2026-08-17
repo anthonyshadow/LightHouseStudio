@@ -4,7 +4,10 @@ import type {
   CreativeAssetRepository,
   CreativeAssetStore,
 } from '../features/creative-assets/types';
-import { confirmModeReplacement } from '../features/media-session/draftPolicy';
+import {
+  MODE_REPLACEMENT_CONFIRMATION,
+  modeReplacementNeedsConfirmation,
+} from '../features/media-session/draftPolicy';
 import type { StudioMode, StudioSessionController } from '../features/media-session/types';
 import type { PromptWorkshopAction } from '../features/prompt-authoring/CharacterPromptWorkshop';
 import {
@@ -19,6 +22,7 @@ import {
 } from './useReferenceRecipeAttribution';
 import { useReferenceRecipeHydration } from './useReferenceRecipeHydration';
 import { useReferenceRecipeWorkshop } from './useReferenceRecipeWorkshop';
+import type { ConfirmationRequest } from '../ui';
 
 export { isExactActiveRecipe } from './referenceRecipeIdentity';
 type UseReferenceRecipeHandoffOptions = {
@@ -31,6 +35,7 @@ type UseReferenceRecipeHandoffOptions = {
   readonly characterBuilderOpenBlockedReason: string | undefined;
   readonly openWorkshopOverlay: () => void;
   readonly closeOverlay: () => void;
+  readonly confirmation: ConfirmationRequest;
 };
 
 /**
@@ -47,6 +52,7 @@ export const useReferenceRecipeHandoff = ({
   characterBuilderOpenBlockedReason,
   openWorkshopOverlay,
   closeOverlay,
+  confirmation,
 }: UseReferenceRecipeHandoffOptions) => {
   const [activeRecipeState, dispatchActiveRecipe] = useReducer(
     activeRecipeReducer,
@@ -57,11 +63,17 @@ export const useReferenceRecipeHandoff = ({
     [activeRecipeState, session.draft, store],
   );
   const selectModeWithDraftProtection = useCallback(
-    (mode: StudioMode): boolean =>
-      !mediaLocked &&
-      confirmModeReplacement(session.draft, mode, (message) => window.confirm(message)) &&
-      session.selectMode(mode),
-    [mediaLocked, session],
+    async (mode: StudioMode): Promise<boolean> => {
+      if (mediaLocked) return false;
+      if (
+        modeReplacementNeedsConfirmation(session.draft, mode) &&
+        !(await confirmation.ask(MODE_REPLACEMENT_CONFIRMATION))
+      ) {
+        return false;
+      }
+      return session.selectMode(mode);
+    },
+    [confirmation, mediaLocked, session],
   );
   const selectLucyMode = useCallback(
     () => selectModeWithDraftProtection('lucy-latest'),
@@ -78,10 +90,14 @@ export const useReferenceRecipeHandoff = ({
   });
 
   const hydration = useReferenceRecipeHydration({
-    canStart: (pending) =>
-      !mediaLocked &&
-      (pending.mode === session.draft.mode ||
-        confirmModeReplacement(session.draft, pending.mode, (message) => window.confirm(message))),
+    // Deliberately not `async`: an `async` arrow would return a promise even when the answer is
+    // already known, turning every hydration start into a deferred one. Only the branch that
+    // actually has to ask the operator yields a promise.
+    canStart: (pending) => {
+      if (mediaLocked) return false;
+      if (!modeReplacementNeedsConfirmation(session.draft, pending.mode)) return true;
+      return confirmation.ask(MODE_REPLACEMENT_CONFIRMATION);
+    },
     currentReferenceImage: () => session.draft.referenceImage,
     onCommit: async (result) => {
       const committed = session.replaceRecipeDraft({
@@ -100,6 +116,7 @@ export const useReferenceRecipeHandoff = ({
   });
 
   const attribution = useReferenceRecipeAttribution({
+    confirmation,
     repository,
     session,
     activeRecipe: activeRecipe.recipe,

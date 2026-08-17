@@ -256,6 +256,12 @@ test('saved character opens in Builder and updates its original record after reg
     'Immutable astronomy host',
   );
   await editNameDialog.getByRole('button', { name: 'Save Character', exact: true }).click();
+  // Preloading the regenerated Character into the session replaces the current AI settings, so the
+  // save asks before it overwrites them.
+  await page
+    .getByRole('dialog', { name: 'Replace the current Character settings?' })
+    .getByRole('button', { name: 'Replace settings' })
+    .click();
   await expect(builder).toBeHidden();
 
   const editedStore = await readCreativeAssetStore(page);
