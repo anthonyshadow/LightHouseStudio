@@ -397,4 +397,36 @@ describe('OverlayPanel', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
+  it('does not drag focus back to the initial target when the operator has already moved on', async () => {
+    // The deferred focus repair runs a frame after the panel registers, to recover from isolation
+    // blurring its target. Holding the frame lets this assert the exact race that made the
+    // focus-wrapping test flaky under load: a Shift+Tab landing before the frame ran, and the
+    // repair then yanking focus back to the close button.
+    const frames: FrameRequestCallback[] = [];
+    const requestAnimationFrame = vi
+      .spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((callback: FrameRequestCallback) => {
+        frames.push(callback);
+        return frames.length;
+      });
+
+    try {
+      const user = userEvent.setup();
+      render(<FocusHarness />);
+
+      await user.click(screen.getByRole('button', { name: 'Open focus panel' }));
+      const closeButton = screen.getByRole('button', { name: 'Close panel' });
+      expect(closeButton).toHaveFocus();
+
+      const lastAction = screen.getByRole('button', { name: 'Visible last action' });
+      await user.keyboard('{Shift>}{Tab}{/Shift}');
+      expect(lastAction).toHaveFocus();
+
+      // Release the held frame only now, with focus already moved inside the panel.
+      for (const frame of frames.splice(0)) frame(performance.now());
+      expect(lastAction).toHaveFocus();
+    } finally {
+      requestAnimationFrame.mockRestore();
+    }
+  });
 });

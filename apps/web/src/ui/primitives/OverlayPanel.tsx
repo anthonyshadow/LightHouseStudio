@@ -183,8 +183,14 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
     // aria-hidden on an ancestor that still contains the active element.
     resolveInitialTarget()?.focus();
     const unregister = registerOverlay({ id: overlayId, root });
+    // Registering isolation can blur the target, so recover the focus a frame later. This is a
+    // repair, not a policy: if focus already sits inside the panel by the time the frame runs, the
+    // operator has moved on and re-asserting the initial target would drag them backwards.
     const initialFocusFrame = window.requestAnimationFrame(() => {
-      if (isTopmostOverlay(overlayId)) resolveInitialTarget()?.focus();
+      if (!isTopmostOverlay(overlayId)) return;
+      const panel = panelRef.current;
+      if (panel?.contains(document.activeElement)) return;
+      resolveInitialTarget()?.focus();
     });
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
