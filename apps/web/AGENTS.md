@@ -5,10 +5,17 @@ Use `docs/ARCHITECTURE.md` and the affected user story for detailed behavior.
 
 ## Composition and ownership
 
-- `src/app/AppRouter.tsx` is the route boundary. `src/studio/StudioApp.tsx` is
-  the sole runtime composition boundary.
-- Preserve one persistent `MediaStage`. Do not create a second product shell,
-  media session, saved-character store, provider client, or modal system.
+- `src/app/AppRouter.tsx` is the route boundary.
+  `src/app/shell/AuthenticatedShell.tsx` is the persistent authenticated
+  composition boundary; `src/studio/StudioApp.tsx` is the live-media runtime
+  inside it, and belongs only to routes that own live media
+  (`isStudioRuntimePath`).
+- One `MediaStage`, owned by the runtime and mounted for as long as the runtime
+  is. Do not create a second product shell, media session, saved-character
+  store, provider client, or modal system, and do not add a second copy of a
+  runtime concern to a surface that outlives the runtime — report work up
+  through `StudioRuntimeRegistry` and receive selections through the shell's
+  handoff channel instead.
 - Use the shared `OverlayPanel`; it owns focus trap, inert background, Escape,
   scroll lock, topmost dismissal, and return focus. It never owns media.
 - Components present state. Controllers and `src/orchestration` own async

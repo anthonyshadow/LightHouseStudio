@@ -44,8 +44,9 @@ Keep only lessons that should constrain future work.
 
 - Characterize DOM/media identity, handoffs, late results, and cleanup order before extracting a
   coordinator.
-- Keep one persistent stage and one shared overlay system; split controllers at ownership and
-  lifecycle boundaries.
+- Keep one stage and one shared overlay system; split controllers at ownership and lifecycle
+  boundaries. "Persistent" is a property of the authenticated shell, not of the media runtime —
+  a stage that never unmounts makes every route pay for capture and lets state leak across pages.
 - Lazy loading helps only when static imports do not pull the same feature back into the entry
   graph.
 
