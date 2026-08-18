@@ -42,11 +42,13 @@ const projectProcessingBlockedDetail = ({
   projectCapability,
   visualUnavailable,
   stepIncomplete,
+  authorityReady,
 }: {
   readonly workflow: ExistingVideoWorkflow;
   readonly projectCapability: ProjectVisualProcessingCapability | null;
   readonly visualUnavailable: boolean;
   readonly stepIncomplete: boolean;
+  readonly authorityReady: boolean;
 }): string => {
   if (workflow.voiceSelection?.kind === 'elevenlabs') {
     return 'Project provider Voice remains unavailable because its synchronous response cannot reconnect through the durable Project operation authority. Remove Voice to start the visual operation.';
@@ -62,6 +64,9 @@ const projectProcessingBlockedDetail = ({
   }
   if (stepIncomplete) {
     return `Finish configuring ${projectProcessingCapabilityLabel(projectCapability)} before Start.`;
+  }
+  if (!authorityReady) {
+    return 'Checking whether this Project already has an accepted operation. Start stays unavailable until that is known, so a second potentially billable submission cannot be created.';
   }
   return 'Start creates one explicit potentially billable operation after the exact Project setup is saved.';
 };
@@ -106,6 +111,7 @@ export const ExistingVideoProjectProcessingActions = ({
     projectCapability,
     visualUnavailable,
     stepIncomplete,
+    authorityReady: projectProcessing.authorityReady,
   });
   const summaryTitle =
     commandTitle ??

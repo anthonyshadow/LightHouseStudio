@@ -117,9 +117,20 @@ export const ExistingVideoPanel = ({
   const [pendingVisualSwitch, setPendingVisualSwitch] = useState<PendingVisualSwitch | null>(null);
   const [visualSwitchConfirmationOpen, setVisualSwitchConfirmationOpen] = useState(false);
   const [pendingDroppedFile, setPendingDroppedFile] = useState<File | null>(null);
-  const structureLocked = workflow.acceptedSubmission || workflow.active;
+  // A durable Project operation is submitted against one exact plan. While it is accepted — or
+  // being submitted right now — the editor must not let a second edit be configured on top of it:
+  // the local workflow never runs in Project context, so `workflow.active` says nothing about it.
+  const projectOperationHoldsPlan =
+    projectProcessing !== undefined &&
+    (projectProcessing.active ||
+      projectProcessing.phase === 'preparing' ||
+      projectProcessing.phase === 'submitting' ||
+      projectProcessing.phase === 'retrying');
+  const structureLocked =
+    workflow.acceptedSubmission || workflow.active || projectOperationHoldsPlan;
   const recipeLocked =
     workflow.active ||
+    projectOperationHoldsPlan ||
     (workflow.acceptedSubmission && !(workflow.phase === 'error' && workflow.retryJob));
   const selected = workflow.selection;
   const {
