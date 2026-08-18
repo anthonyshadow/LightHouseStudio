@@ -1,0 +1,26 @@
+name: Workspace
+description: Install Bun and Node, restore the Bun download cache, and install workspace dependencies.
+
+runs:
+  using: composite
+  steps:
+    - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      with:
+        bun-version-file: .bun-version
+
+    - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version-file: .nvmrc
+
+    # setup-bun caches the Bun executable, not downloaded packages. Restoring the download cache
+    # keeps `bun ci` from re-fetching every dependency in every job.
+    - name: Restore Bun download cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+        restore-keys: |
+          bun-${{ runner.os }}-
+
+    - shell: bash
+      run: bun ci
