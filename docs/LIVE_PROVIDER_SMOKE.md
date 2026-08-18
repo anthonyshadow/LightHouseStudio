@@ -112,7 +112,7 @@ For each exact batch model:
 4. Observe validating, submitting, queued, processing, retrieving, and ready as applicable. The UI
    may show elapsed time but never a fabricated percentage or provider ID/URL/body.
 5. Download the completed result. Verify 1280×720 or 720×1280 orientation, duration within 500 ms,
-   bounded size, restored source audio, and playback on the persistent stage.
+   bounded size, restored source audio, and playback on the Studio stage.
 6. Exercise a retryable status/content interruption. It must reuse the accepted job. Recipe fields
    remain editable with a warning that edits do not mutate the accepted job. A terminal failure
    removes the stale resume action; an explicit submission retry must use a new job ID and be

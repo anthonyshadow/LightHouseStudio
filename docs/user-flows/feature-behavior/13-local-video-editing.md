@@ -1,6 +1,6 @@
 # Local non-destructive video editing
 
-**Outcome:** adjust the artifact currently shown on the persistent Studio stage without contacting
+**Outcome:** adjust the artifact currently shown on the Studio stage without contacting
 a provider, and replace the immutable source only after a validated export and explicit consent.
 
 ## Journey

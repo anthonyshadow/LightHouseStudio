@@ -13,7 +13,7 @@ deliberately release or discard it.
    transcoding to finish. Studio forces H.264 video and AAC audio when present into MP4; the raw
    recorder container is never downloadable.
 4. After the converted MP4 becomes authoritative and live/provider resources release, confirm
-   **Recorded take playback** on the persistent stage. Local and live AI recordings retain compact
+   **Recorded take playback** on the Studio stage. Local and live AI recordings retain compact
    Save, Discard, Voice, and Release actions directly beneath the video. They never overlay the take or
    its native playback controls, and the narrowest supported viewport wraps them into a second row.
 5. Confirm **Edit Video** is enabled in the creative tool rail for any finalized playback. An

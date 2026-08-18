@@ -14,7 +14,7 @@ source, then edit either base, save, start over, or discard.
 2. The idle Studio control bar exposes **Record New Video** and **Upload Video** actions.
    Upload needs no camera permission, provider credentials, Decart SDK, or external traffic.
 3. Studio accepts a file picker or drop, validates browser metadata and decode, and publishes a
-   playable temporary source on the persistent stage and the upload panel's accessible inline
+   playable temporary source on the Studio stage and the upload panel's accessible inline
    player. Both expose play/pause, seek, volume, and fullscreen where supported. **Use existing
    video** presents a compact **Source → Edit → Review** progress indicator, a stable source
    preview, and the next action without requiring the creator to scan the whole form. The inline player
@@ -30,14 +30,14 @@ source, then edit either base, save, start over, or discard.
    Once a video is selected, backdrop clicks cannot dismiss the panel; the creator must use an
    explicit close action or complete the workflow.
 4. Instead of selecting a file, the creator may choose control-bar **Record New Video** or panel
-   **Record a local video**. Camera and microphone start only after that action. The one persistent
+   **Record a local video**. Camera and microphone start only after that action. The one
    stage owns live preview, Record, Stop, the independent 270/300-second warning/limit, and
    finalization. After a healthy finalization, Studio validates and adopts the normalized
    recording as the source, then opens the editor. The inline player is not mounted during live
    preview, recording, or finalization.
 5. The creator may choose provider-free **Adjust video** for the artifact currently displayed.
    Studio closes the panel and replaces its ordinary tool/capture regions with the local editing
-   workspace around the same persistent stage and video node. Trim, crop, 90° rotation, flips,
+   workspace around the same stage and video node. Trim, crop, 90° rotation, flips,
    lighting, filters, Before, reset, and grouped undo/redo remain draft-only until a dedicated
    worker renders and validates an H.264/AAC MP4. The final dialog can cancel, **Replace Without
    Saving**, or **Replace and Save** the pinned pre-edit artifact to Saved Videos before replacing

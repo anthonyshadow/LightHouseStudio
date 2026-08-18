@@ -45,7 +45,7 @@ Project` without requiring a Campaign, brief, source, tag, or provider choice. E
    acceptance; Use Saved Video selects the current exact active Version. The inspector groups the
    existing lifecycle into keyboard-operable **Source**, **Create**, **Save**, and **History** tasks
    without inventing a new progression or provider action.
-7. `StudioApp` remains the sole authenticated composition root and owns the one mounted media
+7. `AuthenticatedShell` remains the sole authenticated composition root; the Studio runtime owns the one mounted media
    stage. Project list, overview, Dashboard, Assets, and Campaign routes hide it; only the Project
    workspace presents it beside the task inspector on desktop and above it at narrower widths. The
    stage remains a visible 16:9 frame on tablet and mobile. No route mounts another Studio, player,

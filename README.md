@@ -79,7 +79,7 @@ Neither document changes the current loopback, account, provider, privacy, or de
    creator explicitly starts them from the control bar or **Record a local video** in the upload
    panel. No AI model, provider session, or remote processing starts on entry or refresh.
 3. Choose a landscape 16:9 or portrait 9:16 local format in Capture Settings, then record on the
-   persistent stage, or select a compatible device-local file at any aspect ratio. For the best
+   Studio stage, or select a compatible device-local file at any aspect ratio. For the best
    visual-processing experience, use 16:9 or 9:16 or crop to one of those ratios with **Adjust
    video** after upload. A healthy local recording is normalized on device and becomes the editor
    source after finalization.
@@ -103,11 +103,12 @@ Neither document changes the current loopback, account, provider, privacy, or de
 `/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/dashboard` is the
 Dashboard; `/studio/create` is standard creation; `/studio/create/live` is gated Live AI Beta;
 `/studio/:videoId` opens the current Saved Video version in review; `/assets` groups Videos,
-Characters, Outfits, and Voices; and `/campaigns` plus `/projects` share one persistent `StudioApp`
-and one stage. Dashboard, Assets, Campaigns, Project lists, and Project overviews hide the stage;
-`/projects/:projectId/workspace` reuses that same stage beside its Project controls without
-creating another shell, player,
-media session, provider action, or browser authority store. **Quick project** creates a standalone
+Characters, Outfits, and Voices; and `/campaigns` plus `/projects` share one persistent
+`AuthenticatedShell`. Dashboard, Assets, Campaigns, Project lists, and Project overviews mount no
+capture runtime at all — no stage, no media session, no camera; `/studio/*` and
+`/projects/:projectId/workspace` mount one, and the workspace renders its Project controls beside
+that stage without creating another shell, player, media session, provider action, or browser
+authority store. **Quick project** creates a standalone
 `Untitled Project`; **New Project** asks for a name and optional Campaign, with the current Campaign
 preselected when launched from its detail. **No Campaign** is a virtual Project group, never a
 default database row. Project detail also contains a non-owning collection of Videos, Characters,

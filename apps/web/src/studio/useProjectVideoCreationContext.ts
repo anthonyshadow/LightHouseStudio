@@ -11,8 +11,8 @@ type ProjectVideoCreationContext =
 interface UseProjectVideoCreationContextOptions {
   readonly pathname: string;
   /**
-   * History entry identity. The shell never unmounts, so verification is scoped per visit rather
-   * than per mount: returning to the same URL later is a new entry and re-checks the Project.
+   * History entry identity. Verification is scoped per visit rather than per mount, so returning to
+   * the same URL later re-checks the Project whether or not the runtime unmounted in between.
    */
   readonly locationKey: string;
   readonly queryCreationIntent: StudioCreationIntent | null;

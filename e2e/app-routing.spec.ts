@@ -228,7 +228,7 @@ test('closing an Asset library consumes its history entry instead of stacking th
   await expect(page).toHaveURL(new RegExp(`${DASHBOARD_PATH}$`, 'u'));
 });
 
-test('Projects quick creation, lifecycle, refresh, and explicit Assets exit stay in one shell', async ({
+test('Projects quick creation, lifecycle, refresh, and explicit Assets exit keep one shell', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);

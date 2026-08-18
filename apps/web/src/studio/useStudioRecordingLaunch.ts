@@ -147,10 +147,10 @@ export const useStudioRecordingLaunch = ({
   const handledRecordIntentRef = useRef<string | null>(null);
   useEffect(() => {
     if (location.pathname !== APP_PATHS.create || creationIntent !== 'record') return;
-    // The Studio shell never unmounts, so this ref outlives every "navigation". Keying on
-    // location.key scopes it to one history entry: returning to the same URL later is a new entry
-    // and records again. It also bounds the case where startLocalRecording bails on an unsupported
-    // browser — that entry is spent, but the next one is not.
+    // Keyed on location.key so the guard scopes to one history entry rather than to this mount:
+    // returning to the same URL later is a new entry and records again, including when the return
+    // stays inside Studio and nothing remounts. It also bounds the case where startLocalRecording
+    // bails on an unsupported browser — that entry is spent, but the next one is not.
     const intentKey = `${location.key}:${location.pathname}${location.search}`;
     if (handledRecordIntentRef.current === intentKey) return;
     handledRecordIntentRef.current = intentKey;

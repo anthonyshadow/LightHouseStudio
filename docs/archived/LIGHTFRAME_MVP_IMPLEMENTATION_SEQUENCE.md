@@ -1,5 +1,11 @@
 # Lightframe Studio MVP implementation sequence
 
+> **Superseded.** This document describes an architecture in which one `StudioApp` stayed mounted
+> across every authenticated route and organization pages hid its media stage. The Studio's capture
+> runtime now mounts only on routes that own live media (`isStudioRuntimePath` in
+> `apps/web/src/app/paths.ts`); the persistent piece is `AuthenticatedShell`. Read the
+> always-mounted claims below as a record of what was true at the time.
+
 **Status:** completed Prompt 02–13 implementation and local-MVP acceptance record
 
 **Acceptance evidence:** [MVP acceptance runbook](../MVP_ACCEPTANCE.md)

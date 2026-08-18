@@ -1,7 +1,7 @@
 # Extractable components
 
 There are no conventional cross-route navigation or footer components relevant to this overlay.
-The persistent Studio shell must remain in React and is not a safe draft component extraction.
+The authenticated shell and the Studio runtime must remain in React and are not safe draft component extractions.
 
 ## OverlayPanel
 
