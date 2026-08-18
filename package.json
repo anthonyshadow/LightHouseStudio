@@ -27,7 +27,9 @@
   },
   "scripts": {
     "build:packages": "bun run --filter @studio/domain build && bun run --filter @studio/contracts build",
-    "dev": "bun run db:development:up && bun run db:migrate:development && bun run build:packages && concurrently -k -n api,web -c blue,magenta \"bun run --filter @studio/api dev\" \"bun run --filter @studio/web dev\"",
+    "dev:servers": "concurrently -k -n api,web -c blue,magenta \"bun run --filter @studio/api dev\" \"bun run --filter @studio/web dev\"",
+    "dev": "bun run db:development:up && bun run db:migrate:development && bun run build:packages && bun run dev:servers",
+    "dev:ci": "bun run db:migrate:development && bun run build:packages && bun run dev:servers",
     "build": "bun run build:packages && bun run --filter @studio/web build && bun run --filter @studio/api build",
     "start": "bun run --filter @studio/api start",
     "start:production": "bun run --filter @studio/api start:production",

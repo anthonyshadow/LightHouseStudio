@@ -28,6 +28,18 @@ runs:
         path: ~/.cache/ms-playwright
         key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ steps.playwright.outputs.slug }}
 
+    # The runner image prefers an in-datacenter Ubuntu mirror that is periodically unreachable.
+    # apt's 120s default timeout turns that into a multi-minute stall before it falls back, so
+    # shorten the timeout and let apt retry: the fallback mirror then takes over in seconds.
+    - name: Shorten apt mirror failover
+      shell: bash
+      run: |
+        sudo tee /etc/apt/apt.conf.d/99-ci-failover >/dev/null <<'CONF'
+        Acquire::Retries "3";
+        Acquire::http::Timeout "20";
+        Acquire::https::Timeout "20";
+        CONF
+
     # $BROWSERS is deliberately unquoted below: Playwright takes one argument per browser.
     - name: Download browsers and install system dependencies
       if: ${{ steps.cache.outputs.cache-hit != 'true' }}

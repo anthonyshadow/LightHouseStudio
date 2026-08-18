@@ -1,16 +1,29 @@
 name: Workspace
 description: Install Bun and Node, restore the Bun download cache, and install workspace dependencies.
 
+inputs:
+  bun-source:
+    description: >-
+      How to install Bun. "action" uses setup-bun. "npm" is for container jobs whose image has no
+      unzip, which setup-bun needs to extract its download.
+    default: action
+
 runs:
   using: composite
   steps:
-    - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+    - if: ${{ inputs.bun-source == 'action' }}
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       with:
         bun-version-file: .bun-version
 
     - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         node-version-file: .nvmrc
+
+    - name: Install Bun from npm
+      if: ${{ inputs.bun-source == 'npm' }}
+      shell: bash
+      run: npm install --global "bun@$(cat .bun-version)"
 
     # setup-bun caches the Bun executable, not downloaded packages. Restoring the download cache
     # keeps `bun ci` from re-fetching every dependency in every job.
