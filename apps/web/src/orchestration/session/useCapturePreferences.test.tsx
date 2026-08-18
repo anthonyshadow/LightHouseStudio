@@ -58,7 +58,11 @@ describe('useCapturePreferences', () => {
       });
 
       const { result, rerender } = renderHook(() =>
-        useCapturePreferences({ stream: null, onApply: vi.fn().mockResolvedValue(undefined) }),
+        useCapturePreferences({
+          stream: null,
+          ownerUserId: null,
+          onApply: vi.fn().mockResolvedValue(undefined),
+        }),
       );
 
       expect(result.current.draft.aspectRatio).toBe(expected);
@@ -74,7 +78,8 @@ describe('useCapturePreferences', () => {
   it('restores a checkpointed aspect ratio without starting media and refuses an active stream', () => {
     const onApply = vi.fn().mockResolvedValue(undefined);
     const { result, rerender } = renderHook(
-      ({ stream }: { stream: MediaStream | null }) => useCapturePreferences({ stream, onApply }),
+      ({ stream }: { stream: MediaStream | null }) =>
+        useCapturePreferences({ stream, ownerUserId: null, onApply }),
       { initialProps: { stream: null as MediaStream | null } },
     );
 
@@ -114,7 +119,9 @@ describe('useCapturePreferences', () => {
       },
     });
     const onApply = vi.fn().mockResolvedValue(undefined);
-    const { result, unmount } = renderHook(() => useCapturePreferences({ stream: null, onApply }));
+    const { result, unmount } = renderHook(() =>
+      useCapturePreferences({ stream: null, ownerUserId: null, onApply }),
+    );
 
     await act(async () => {
       await result.current.refreshDevices();
@@ -163,7 +170,11 @@ describe('useCapturePreferences', () => {
       },
     });
     const { result } = renderHook(() =>
-      useCapturePreferences({ stream: null, onApply: vi.fn().mockResolvedValue(undefined) }),
+      useCapturePreferences({
+        stream: null,
+        ownerUserId: null,
+        onApply: vi.fn().mockResolvedValue(undefined),
+      }),
     );
 
     await act(async () => {
@@ -190,9 +201,12 @@ describe('useCapturePreferences', () => {
   it('shares one apply operation across same-tick callers', async () => {
     const pending = deferred<void>();
     const onApply = vi.fn(() => pending.promise);
-    const { result } = renderHook(() => useCapturePreferences({ stream: null, onApply }), {
-      wrapper: StrictMode,
-    });
+    const { result } = renderHook(
+      () => useCapturePreferences({ stream: null, ownerUserId: null, onApply }),
+      {
+        wrapper: StrictMode,
+      },
+    );
 
     act(() => result.current.updateVideoDeviceId('camera-2'));
     act(() => result.current.updateAspectRatio('9:16'));
@@ -246,7 +260,7 @@ describe('useCapturePreferences', () => {
     });
     const onApply = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() =>
-      useCapturePreferences({ stream: streamWithLiveVideo, onApply }),
+      useCapturePreferences({ stream: streamWithLiveVideo, ownerUserId: null, onApply }),
     );
 
     await waitFor(() =>
@@ -262,7 +276,9 @@ describe('useCapturePreferences', () => {
   it('does not publish a late apply result after unmount', async () => {
     const pending = deferred<void>();
     const onApply = vi.fn(() => pending.promise);
-    const { result, unmount } = renderHook(() => useCapturePreferences({ stream: null, onApply }));
+    const { result, unmount } = renderHook(() =>
+      useCapturePreferences({ stream: null, ownerUserId: null, onApply }),
+    );
 
     act(() => result.current.updateAudioDeviceId('microphone-2'));
     const request = result.current.apply();
@@ -278,7 +294,9 @@ describe('useCapturePreferences', () => {
       .fn<() => Promise<void>>()
       .mockRejectedValueOnce(new Error('device failed'))
       .mockResolvedValueOnce(undefined);
-    const { result } = renderHook(() => useCapturePreferences({ stream: null, onApply }));
+    const { result } = renderHook(() =>
+      useCapturePreferences({ stream: null, ownerUserId: null, onApply }),
+    );
 
     act(() => result.current.updateVideoDeviceId('camera-3'));
     await act(async () => {

@@ -171,6 +171,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Capture choices persist now, so a case that applies one must not seed the next.
+  window.localStorage.clear();
   vi.useRealTimers();
 });
 
@@ -178,6 +180,7 @@ describe('useStudioSession explicit-start boundaries', () => {
   it('keeps preferences session-only until Apply and uses them on explicit local start', async () => {
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -213,6 +216,7 @@ describe('useStudioSession explicit-start boundaries', () => {
       .mockResolvedValueOnce(fallbackStream);
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -253,6 +257,7 @@ describe('useStudioSession explicit-start boundaries', () => {
       .mockImplementationOnce(() => pendingReplacement.promise);
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -318,6 +323,7 @@ describe('useStudioSession explicit-start boundaries', () => {
     ]);
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -363,6 +369,7 @@ describe('useStudioSession explicit-start boundaries', () => {
       .mockRejectedValueOnce(new DOMException('Camera is busy.', 'NotReadableError'));
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -393,6 +400,7 @@ describe('useStudioSession explicit-start boundaries', () => {
   it('does no camera, token, model-resolution, or connection work while preparing a draft', async () => {
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: true, elevenLabsModel: 'eleven-v3' },
       }),
     );
@@ -416,6 +424,7 @@ describe('useStudioSession explicit-start boundaries', () => {
   it('keeps independent text drafts while switching between inactive model modes', () => {
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -453,6 +462,7 @@ describe('useStudioSession explicit-start boundaries', () => {
   it('keeps local mode off the Decart/token path after explicit local start', async () => {
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -477,6 +487,7 @@ describe('useStudioSession explicit-start boundaries', () => {
   it('rejects an empty model draft before media access or provider work', async () => {
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -500,6 +511,7 @@ describe('useStudioSession explicit-start boundaries', () => {
   it('switches a prepared AI mode without releasing a ready local preview', async () => {
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -531,6 +543,7 @@ describe('useStudioSession explicit-start boundaries', () => {
     });
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -571,6 +584,7 @@ describe('useStudioSession explicit-start boundaries', () => {
     });
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -617,6 +631,7 @@ describe('useStudioSession explicit-start boundaries', () => {
     );
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -648,6 +663,7 @@ describe('useStudioSession explicit-start boundaries', () => {
     adapters.acquireLocalMedia.mockResolvedValueOnce(owned);
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -673,6 +689,7 @@ describe('useStudioSession explicit-start boundaries', () => {
   it('exposes the same safe-replacement preflight used by character Save', async () => {
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -696,6 +713,7 @@ describe('useStudioSession explicit-start boundaries', () => {
     adapters.acquireLocalMedia.mockResolvedValueOnce(first).mockResolvedValueOnce(replacement);
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -722,6 +740,7 @@ describe('useStudioSession explicit-start boundaries', () => {
     adapters.acquireLocalMedia.mockResolvedValue(local);
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -755,6 +774,7 @@ describe('useStudioSession model lifecycle contract', () => {
     });
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -820,6 +840,7 @@ describe('useStudioSession model lifecycle contract', () => {
     });
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -876,6 +897,7 @@ describe('useStudioSession model lifecycle contract', () => {
     });
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
         onPromptCommitted,
       }),
@@ -936,6 +958,7 @@ describe('useStudioSession model lifecycle contract', () => {
     });
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -995,6 +1018,7 @@ describe('useStudioSession model lifecycle contract', () => {
     });
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -1034,6 +1058,7 @@ describe('useStudioSession model lifecycle contract', () => {
     });
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -1064,6 +1089,7 @@ describe('useStudioSession model lifecycle contract', () => {
     });
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -1105,6 +1131,7 @@ describe('useStudioSession model lifecycle contract', () => {
     adapters.connectDecartRealtime.mockResolvedValue(session);
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
         onPromptCommitted,
       }),
@@ -1179,6 +1206,7 @@ describe('useStudioSession model lifecycle contract', () => {
     adapters.connectDecartRealtime.mockRejectedValueOnce(new Error('connection failed'));
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
         onPromptCommitted,
       }),
@@ -1220,6 +1248,7 @@ describe('useStudioSession model lifecycle contract', () => {
     };
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
         onPromptCommitted,
       }),
@@ -1261,6 +1290,7 @@ describe('useStudioSession model lifecycle contract', () => {
     });
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );
@@ -1315,6 +1345,7 @@ describe('useStudioSession model lifecycle contract', () => {
     });
     const { result, unmount } = renderHook(() =>
       useStudioSession({
+        ownerUserId: 'test-owner',
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
       }),
     );

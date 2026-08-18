@@ -26,6 +26,7 @@ import type { ConfirmationRequest } from '../ui';
 
 export { isExactActiveRecipe } from './referenceRecipeIdentity';
 type UseReferenceRecipeHandoffOptions = {
+  readonly ownerUserId: string;
   readonly repository: CreativeAssetRepository;
   readonly store: CreativeAssetStore;
   readonly session: StudioSessionController;
@@ -43,6 +44,7 @@ type UseReferenceRecipeHandoffOptions = {
  * Builder preload, and successful-use attribution.
  */
 export const useReferenceRecipeHandoff = ({
+  ownerUserId,
   repository,
   store,
   session,
@@ -81,6 +83,7 @@ export const useReferenceRecipeHandoff = ({
   );
 
   const workshop = useReferenceRecipeWorkshop({
+    ownerUserId,
     repository,
     session,
     recordingActive,

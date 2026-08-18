@@ -29,6 +29,8 @@ import { useSessionDraftState } from './useSessionDraftState';
 
 export type StudioSessionOptions = {
   availability: ProviderAvailability;
+  /** Scopes persisted capture choices to the signed-in operator. */
+  ownerUserId: string;
   onPromptCommitted?: PromptCommittedHandler;
 };
 
@@ -59,6 +61,7 @@ const withPreferredFacingMode = (
 
 export const useStudioSession = ({
   availability,
+  ownerUserId,
   onPromptCommitted,
 }: StudioSessionOptions): StudioSessionWithCapturePreferences => {
   const [lifecycle, setLifecycle] = useState<SessionLifecycle>('idle');
@@ -179,6 +182,7 @@ export const useStudioSession = ({
 
   const capturePreferences = useCapturePreferences({
     stream: localStream,
+    ownerUserId,
     onApply: applyCapturePreferences,
   });
   const {

@@ -62,7 +62,7 @@ describe('CaptureSettingsPanel', () => {
     const onApply = vi.fn().mockResolvedValue(undefined);
 
     const Harness = () => {
-      const controller = useCapturePreferences({ stream: null, onApply });
+      const controller = useCapturePreferences({ stream: null, ownerUserId: null, onApply });
       return (
         <StudioDesignProvider>
           <CaptureSettingsPanel controller={controller} mode="local" />
@@ -119,6 +119,7 @@ describe('CaptureSettingsPanel', () => {
     const Harness = () => {
       const controller = useCapturePreferences({
         stream: null,
+        ownerUserId: null,
         onApply: vi.fn().mockResolvedValue(undefined),
       });
       return (
@@ -148,7 +149,7 @@ describe('CaptureSettingsPanel', () => {
     const onApply = vi.fn().mockRejectedValue(new Error('replacement failed'));
 
     const Harness = () => {
-      const controller = useCapturePreferences({ stream: null, onApply });
+      const controller = useCapturePreferences({ stream: null, ownerUserId: null, onApply });
       return (
         <StudioDesignProvider>
           <CaptureSettingsPanel controller={controller} mode="local" />
@@ -180,6 +181,7 @@ describe('CaptureSettingsPanel', () => {
     const Harness = () => {
       const controller = useCapturePreferences({
         stream: null,
+        ownerUserId: null,
         onApply: vi.fn().mockResolvedValue(undefined),
       });
       return (
@@ -219,6 +221,7 @@ describe('CaptureSettingsPanel', () => {
     const Harness = () => {
       const controller = useCapturePreferences({
         stream,
+        ownerUserId: null,
         onApply: vi.fn().mockResolvedValue(undefined),
       });
       return (
@@ -244,6 +247,7 @@ describe('CaptureSettingsPanel', () => {
     const Harness = () => {
       const controller = useCapturePreferences({
         stream: null,
+        ownerUserId: null,
         onApply: vi.fn().mockResolvedValue(undefined),
       });
       return (
