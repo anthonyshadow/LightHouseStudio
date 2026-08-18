@@ -12,6 +12,7 @@ import { MediaStage, type MediaStageProps, type StagePresentation } from '../fea
 import type { StudioMode } from '../features/media-session';
 import type { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import type { ProjectProcessingController } from '../features/projects/useProjectProcessingController';
+import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 import type { useStudioSession } from '../orchestration/session';
 import { projectVideoEditOutcome } from './projectVideoEditOutcome';
 import { stageColumnStyles } from './StudioApp.styles';
@@ -74,6 +75,8 @@ interface StudioWorkspaceProps {
     readonly captureSettingsDisabledReason: string | undefined;
     readonly aiSessionActive: boolean;
   };
+  /** Reports the workspace's Project session to the shell, which owns the one active slot. */
+  readonly onProjectSessionChange: (session: ProjectSessionPort | null) => void;
   readonly creativeWorkspace: ReactNode;
   readonly projectCreativeCheckpoint: ReactNode;
   readonly saveVideoState: SaveVideoState;
@@ -96,6 +99,7 @@ export const StudioWorkspace = ({
   environment,
   stage,
   activity,
+  onProjectSessionChange,
   creativeWorkspace,
   projectCreativeCheckpoint,
   saveVideoState,
@@ -296,7 +300,7 @@ export const StudioWorkspace = ({
             onStartRecording={onStartProjectRecording}
             onSourceActivityChange={project.handleSourceActivity}
             onWorkingMediaActivityChange={project.handleWorkingMediaActivity}
-            onSessionChange={project.handleSession}
+            onSessionChange={onProjectSessionChange}
           />
         </Suspense>
       ) : null}

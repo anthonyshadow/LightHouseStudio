@@ -38,11 +38,7 @@ export const useStudioLiveExperience = ({
   onClearExistingVideoIntent,
   confirmation,
 }: UseStudioLiveExperienceOptions) => {
-  const {
-    betaEnabled,
-    providerConfigured,
-    enabled: liveEnabled,
-  } = liveExperienceAvailability(availability);
+  const { enabled: liveEnabled } = liveExperienceAvailability(availability);
 
   const openLiveAiExperience = useCallback(() => {
     if (!liveEnabled) return;
@@ -84,8 +80,6 @@ export const useStudioLiveExperience = ({
   };
 
   return {
-    betaEnabled,
-    providerConfigured,
     liveEnabled,
     advancedLiveSession,
     openLiveAiExperience,

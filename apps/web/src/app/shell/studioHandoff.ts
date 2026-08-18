@@ -22,11 +22,6 @@ import type { RecipeSelection } from '../../features/creative-assets/RecipeShelf
  * This module must stay a leaf: the shell reaches the runtime through a dynamic import, which
  * `check-module-graph.mjs` counts as an edge, so anything imported back from here would be a cycle.
  */
-export type StudioHandoff =
-  | Readonly<{ kind: 'use-recipe'; selection: RecipeSelection }>
-  | Readonly<{ kind: 'preselect-voice'; voiceId: string; voiceName: string }>
-  | Readonly<{ kind: 'use-saved-video'; video: SavedVideoSummary; intent: 'play' | 'edit' }>;
-
 /**
  * The Character Swap side of an upload, as the Character Builder needs it.
  *

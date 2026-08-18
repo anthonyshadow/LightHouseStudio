@@ -53,5 +53,8 @@ export const useStudioCreativeRepository = (ownerUserId: string) => {
     [existingVideoSavedRecipes, repository],
   );
 
-  return { repository, store, existingVideoSavedRecipes, recordAcceptedBatchStep } as const;
+  return useMemo(
+    () => ({ repository, store, existingVideoSavedRecipes, recordAcceptedBatchStep }) as const,
+    [existingVideoSavedRecipes, recordAcceptedBatchStep, repository, store],
+  );
 };

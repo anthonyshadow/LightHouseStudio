@@ -15,11 +15,9 @@ import {
  * discard it. The most recent draft is not restored as *active* — the operator did not reopen the
  * Workshop, so re-selecting one is theirs to do.
  */
-export const useWorkshopDrafts = (ownerUserId: string | null) => {
+export const useWorkshopDrafts = (ownerUserId: string) => {
   const [draft, setDraft] = useState<WorkshopDraft | undefined>();
-  const [drafts, setDrafts] = useState<StoredWorkshopDrafts>(() =>
-    ownerUserId === null ? {} : loadWorkshopDrafts(ownerUserId),
-  );
+  const [drafts, setDrafts] = useState<StoredWorkshopDrafts>(() => loadWorkshopDrafts(ownerUserId));
 
   const rememberDraft = useCallback(
     (next: PromptBuilderDraft) => {
@@ -30,7 +28,7 @@ export const useWorkshopDrafts = (ownerUserId: string | null) => {
           ...current,
           [next.intent]: next,
         };
-        if (ownerUserId !== null) persistWorkshopDrafts(ownerUserId, updated);
+        persistWorkshopDrafts(ownerUserId, updated);
         return updated;
       });
     },

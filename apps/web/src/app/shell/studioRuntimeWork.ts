@@ -1,4 +1,3 @@
-import type { ProjectSessionPort } from '../../features/projects/useProjectSession';
 import type { ProjectSourceActivity } from '../../features/projects/useProjectSourceController';
 import type { SessionCleanupCoordinator } from '../../orchestration/lifecycle/SessionCleanupCoordinator';
 
@@ -22,18 +21,16 @@ export interface StudioRuntimeWork {
   readonly recordingOrFinalizing: boolean;
   readonly videoRenderingActive: boolean;
   readonly projectSourceActivity: ProjectSourceActivity | null;
-  readonly projectSession: ProjectSessionPort | null;
 }
 
 /** What the shell reports while no Studio runtime is mounted: nothing transient is being held. */
-export const NO_STUDIO_RUNTIME_WORK: StudioRuntimeWork = Object.freeze({
+const NO_STUDIO_RUNTIME_WORK: StudioRuntimeWork = Object.freeze({
   hasTemporaryTake: false,
   voiceProcessingActive: false,
   creativeWorkDirty: false,
   recordingOrFinalizing: false,
   videoRenderingActive: false,
   projectSourceActivity: null,
-  projectSession: null,
 });
 
 /**
@@ -51,7 +48,7 @@ export interface StudioCreativeLocks {
   readonly characterSave: string | undefined;
 }
 
-export const NO_STUDIO_CREATIVE_LOCKS: StudioCreativeLocks = Object.freeze({
+const NO_STUDIO_CREATIVE_LOCKS: StudioCreativeLocks = Object.freeze({
   characterActivity: undefined,
   characterOpen: undefined,
   characterRemoval: undefined,

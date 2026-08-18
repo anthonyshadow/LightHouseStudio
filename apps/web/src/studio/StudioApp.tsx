@@ -13,6 +13,7 @@ import {
 } from '../features/existing-video/useExistingVideoWorkflow';
 import { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
+import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 import { useProjectCreativeSessionAdapter } from '../features/projects/useProjectCreativeSessionAdapter';
 import {
   ProjectCreativeCheckpointPanel,
@@ -110,14 +111,16 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     confirmation,
     handoff: studioHandoff,
     projectProcessing,
+    reportProjectSession,
     mainRef,
     characterSelectorRef,
     outfitToggleRef,
-    workshopToggleRef,
     editVideoToggleRef,
-    uploadToggleRef,
-    fullscreenWorkspaceRef,
   } = services;
+  // Runtime-local: nothing outside the capture graph reads these.
+  const workshopToggleRef = useRef<HTMLButtonElement>(null);
+  const uploadToggleRef = useRef<HTMLButtonElement>(null);
+  const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
   const {
     creationIntent,
     queryCreationIntent,
@@ -210,6 +213,16 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     presentSource: publishUploadedVideo,
     clearSource: recording.discard,
   });
+  // Both consumers: the bridge scopes it to this Project for the runtime's own use, and the shell
+  // keeps the one active slot that logout, expiry and Project processing read.
+  const reportBridgeSession = project.handleSession;
+  const handleProjectSession = useCallback(
+    (session: ProjectSessionPort | null) => {
+      reportBridgeSession(session);
+      reportProjectSession(session);
+    },
+    [reportBridgeSession, reportProjectSession],
+  );
   const activeProjectSourceActivity = project.sourceActivity;
   const activeProjectWorkingMediaActivity = project.workingMediaActivity;
   const activeProjectSession = project.session;
@@ -461,11 +474,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   // Published for the surfaces that outlive this runtime. Registered in a layout effect so a
   // selection made on the route that mounted us is applied before first paint, and withdrawn on
   // unmount so the shell holds a selection instead of calling into a torn-down session.
-  const {
-    registerPorts,
-    pending: pendingHandoff,
-    clearPending: clearPendingHandoff,
-  } = studioHandoff;
+  const { registerPorts } = studioHandoff;
   const selectVoiceForSource = useCallback(
     (voiceId: string, voiceName: string) => {
       if (existingVideo.selection === null) existingVideo.preselectVoice(voiceId, voiceName);
@@ -511,30 +520,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     projectCreative,
     registerPorts,
     saveBuiltCharacter,
-    savedVideo,
-    selectVoiceForSource,
-  ]);
-
-  useEffect(() => {
-    if (!pendingHandoff) return;
-    // Cleared first: applying a recipe can raise a confirmation, and a re-render while that is open
-    // must not find the same handoff still pending and apply it twice.
-    clearPendingHandoff();
-    if (pendingHandoff.kind === 'use-recipe') {
-      applyRecipeSelection(pendingHandoff.selection);
-      return;
-    }
-    if (pendingHandoff.kind === 'use-saved-video') {
-      void savedVideo.useSavedVideo(pendingHandoff.video, pendingHandoff.intent);
-      return;
-    }
-    selectVoiceForSource(pendingHandoff.voiceId, pendingHandoff.voiceName);
-    openVideoUpload();
-  }, [
-    applyRecipeSelection,
-    clearPendingHandoff,
-    openVideoUpload,
-    pendingHandoff,
     savedVideo,
     selectVoiceForSource,
   ]);
@@ -612,7 +597,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     projectWorkingMedia,
     projectSourceActivity: activeProjectSourceActivity,
     projectWorkingMediaActivity: activeProjectWorkingMediaActivity,
-    projectSession: activeProjectSession,
     discardSavedVideoWork,
     discardPendingAdoption,
     closeOverlay,
@@ -747,6 +731,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
           recordingSource: activeRecordingSource,
         }}
         activity={{ captureBlockedReason, captureSettingsDisabledReason, aiSessionActive }}
+        onProjectSessionChange={handleProjectSession}
         creativeWorkspace={creativeWorkspace}
         projectCreativeCheckpoint={projectCreativeCheckpoint}
         saveVideoState={savedVideoSave.state}

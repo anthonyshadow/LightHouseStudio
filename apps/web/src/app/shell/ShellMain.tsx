@@ -1,7 +1,7 @@
-import { lazy, Suspense, useLayoutEffect, type ReactNode } from 'react';
-import { useLocation } from 'react-router';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import { mainGridStyles } from '../../studio/StudioApp.styles';
-import { focusesMainOnNavigation } from '../paths';
+import { APP_PATHS, focusesMainOnNavigation } from '../paths';
 import type { ShellServices } from './useShellServices';
 
 const ProjectRouteSurface = lazy(() =>
@@ -30,11 +30,28 @@ const LiveBetaRouteSurface = lazy(() =>
   })),
 );
 
+/**
+ * The Live AI Beta entry point. It is a destination, not a workspace: when the beta is actually
+ * available it hands straight over to Studio with the chooser open, and when it is not the sibling
+ * surface explains why. Being a component rather than an effect in shell-wide code is the point —
+ * it cannot run on a route it was not rendered for.
+ */
+const LiveBetaEntry = ({
+  ready,
+  onEnter,
+}: {
+  readonly ready: boolean;
+  readonly onEnter: () => void;
+}) => {
+  useEffect(() => {
+    if (ready) onEnter();
+  }, [onEnter, ready]);
+  return null;
+};
+
 interface ShellMainProps {
   readonly services: ShellServices;
   readonly displayName: string;
-  readonly liveBetaEnabled: boolean;
-  readonly liveProviderConfigured: boolean;
   /**
    * The Studio's stage column, or nothing on a route that owns no live media. It renders inside
    * this `<main>` as a sibling of the route surfaces, which is what lets the Project workspace show
@@ -51,13 +68,7 @@ interface ShellMainProps {
  * *workspace* is deliberately absent here: it renders beside the stage and is the runtime's, while
  * the Project list and overview are ordinary reading surfaces and are ours.
  */
-export const ShellMain = ({
-  services,
-  displayName,
-  liveBetaEnabled,
-  liveProviderConfigured,
-  studioRuntime,
-}: ShellMainProps) => {
+export const ShellMain = ({ services, displayName, studioRuntime }: ShellMainProps) => {
   const location = useLocation();
   const {
     route,
@@ -69,9 +80,17 @@ export const ShellMain = ({
     ownerUserId,
     mainRef,
     projectProcessing,
-    reportOverviewProjectSession,
+    reportProjectSession,
+    liveAvailability,
+    overlay,
   } = services;
   const { projectContextActive, dashboardRouteActive } = route;
+  const navigate = useNavigate();
+  const openOverlay = overlay.open;
+  const openLiveExperience = useCallback(() => {
+    openOverlay('ai-experience');
+    void navigate(APP_PATHS.create, { replace: true, state: null });
+  }, [navigate, openOverlay]);
 
   // Not a mount-time effect: the shell stays mounted, so arriving somewhere new is a change of
   // `location.key` rather than a remount. 'default' is a cold direct entry, where stealing focus
@@ -124,15 +143,22 @@ export const ShellMain = ({
       ) : null}
 
       {route.liveRouteActive ? (
-        <Suspense fallback={<p role="status">Checking Live AI Beta…</p>}>
-          <LiveBetaRouteSurface
-            capabilityState={provider.state}
-            betaEnabled={liveBetaEnabled}
-            providerConfigured={liveProviderConfigured}
-            onOpenStudio={nav.openStudio}
-            onOpenDashboard={nav.backToDashboard}
+        <>
+          {/* Mounting is the guard: this only exists on the Live route, so no path predicate. */}
+          <LiveBetaEntry
+            ready={provider.state === 'ready' && liveAvailability.enabled}
+            onEnter={openLiveExperience}
           />
-        </Suspense>
+          <Suspense fallback={<p role="status">Checking Live AI Beta…</p>}>
+            <LiveBetaRouteSurface
+              capabilityState={provider.state}
+              betaEnabled={liveAvailability.betaEnabled}
+              providerConfigured={liveAvailability.providerConfigured}
+              onOpenStudio={nav.openStudio}
+              onOpenDashboard={nav.backToDashboard}
+            />
+          </Suspense>
+        </>
       ) : null}
 
       {route.projectOverviewActive ? (
@@ -141,7 +167,7 @@ export const ShellMain = ({
             workspaceMode={false}
             ownerUserId={ownerUserId}
             processing={projectProcessing}
-            onSessionChange={reportOverviewProjectSession}
+            onSessionChange={reportProjectSession}
             creativeStore={creative.store}
             onCreateProjectCharacter={character.openNewForProject}
             onCreateProjectOutfit={outfit.openNewForProject}

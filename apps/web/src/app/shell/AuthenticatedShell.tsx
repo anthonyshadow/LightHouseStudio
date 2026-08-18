@@ -1,7 +1,8 @@
 import { useTheme } from '@emotion/react';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useLocation } from 'react-router';
 import { useAuth } from '../../application/auth/AuthProvider';
+import type { ProjectSessionPort } from '../../features/projects/useProjectSession';
 import { RemoteStateProvider } from '../../application/remote-state/RemoteStateProvider';
 import { pageStyles, shellStyles, skipLinkStyles } from '../../studio/StudioApp.styles';
 import { useStudioNavigationActions } from '../../studio/useStudioNavigationActions';
@@ -44,8 +45,11 @@ const AuthenticatedShellSurfaces = ({ initialIntent }: AuthenticatedShellProps) 
   const nav = useStudioNavigationActions();
   const confirmation = useConfirmationRequest();
   const user = auth.session!.user;
-  const { registry, logout, sessionExpiry, sessionEnding, creativeLocks, work } =
-    useAuthenticatedSessionLifecycle(auth);
+  // One slot for the active Project's session: `ProjectRouteSurface` reports it from the overview
+  // and from the workspace, the two never coexist, and logout, expiry and processing all read it.
+  const [projectSession, setProjectSession] = useState<ProjectSessionPort | null>(null);
+  const { registry, logout, sessionExpiry, sessionEnding, creativeLocks } =
+    useAuthenticatedSessionLifecycle(auth, projectSession);
   const runtimeRouteActive = isStudioRuntimePath(location.pathname);
   const handoff = useStudioHandoff({ runtimeRouteActive, openStudio: nav.openStudio });
   const services = useShellServices({
@@ -54,7 +58,8 @@ const AuthenticatedShellSurfaces = ({ initialIntent }: AuthenticatedShellProps) 
     confirmation,
     handoff,
     creativeLocks,
-    projectSession: work.projectSession,
+    projectSession,
+    reportProjectSession: setProjectSession,
   });
 
   return (
@@ -68,10 +73,6 @@ const AuthenticatedShellSurfaces = ({ initialIntent }: AuthenticatedShellProps) 
         <ShellMain
           services={services}
           displayName={user.displayName}
-          liveBetaEnabled={Boolean(services.provider.availability.realtimeBetaEnabled)}
-          liveProviderConfigured={Boolean(
-            services.provider.availability.realtimeProviderConfigured,
-          )}
           studioRuntime={
             // The change this whole boundary exists for: no capture graph is fetched, parsed or
             // mounted on a route that owns no live media.
