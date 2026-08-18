@@ -1,5 +1,12 @@
 import type { EphemeralImageDescriptor } from '../session/image';
 
+/**
+ * Only `character-transform` has a producer. The other three are **compatibility-only**: the
+ * structured Prompt Workshop that authored them is retired, but `sanitizeCreativeAssetStore` parses
+ * `promptIntent` and `builderDraft` against this list, so narrowing it would silently null out
+ * saved Characters already on operators' disks. Do not wire new UI to them, and do not delete them
+ * without a stored-data migration.
+ */
 export const PROMPT_INTENTS = [
   'character-transform',
   'add-object',

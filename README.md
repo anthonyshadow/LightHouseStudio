@@ -15,7 +15,7 @@ Download an exact Version**
 The standalone Studio remains available for a fast record/upload workflow that does not
 automatically create or assign a Project.
 
-Live character transformation and Workshop remain advanced tools. The app binds to loopback. Phase
+Live character transformation remains an advanced tool. The app binds to loopback. Phase
 1 provides one seeded local demo account, authenticated ownership, and durable local saved-media
 records; it does not provide signup, billing, collaboration, or public multi-user deployment. A
 durable, video-oriented Project authority and lightweight optional Campaigns now support bounded
@@ -94,9 +94,10 @@ Neither document changes the current loopback, account, provider, privacy, or de
    idempotent. An edit saves as a new, source-linked video by default; explicit replacement
    confirms before appending an immutable version. Download is available for one exact ready
    Version from Videos in Assets or its retaining Project history.
-7. Prepare advanced live work without starting media: **Select Character**, **Select Outfit**, and
-   **Workshop** use the shared creative-library and builder flows. A prepared selection can then be
-   started explicitly from **Start AI** and recorded through the existing live flow.
+7. Prepare advanced live work without starting media: **Select Character** and **Select Outfit**
+   use the shared creative-library and builder flows, and the AI Settings direction field takes a
+   prompt. A prepared selection can then be started explicitly from **Start AI** and recorded
+   through the existing live flow.
 
 ### Campaign and Project workspace
 

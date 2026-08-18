@@ -335,20 +335,6 @@ export const projectsHeaderActionsStyles = (theme: Theme): CSSObject => ({
     boxShadow: 'none',
     whiteSpace: 'nowrap',
   },
-  '& > button[data-project-create="quick"]': {
-    borderColor: 'transparent',
-    color: theme.colors.textMuted,
-    background: 'transparent',
-    textDecoration: 'underline',
-    textDecorationColor: theme.colors.borderStrong,
-    textUnderlineOffset: '0.3em',
-    '&:hover:not(:disabled):not([aria-disabled="true"])': {
-      color: theme.colors.text,
-      background: 'transparent',
-      textDecorationColor: theme.colors.accent,
-      transform: 'none',
-    },
-  },
   '& > button[data-project-create="named"]': {
     borderColor: theme.colors.accent,
     color: theme.colors.onAccent,

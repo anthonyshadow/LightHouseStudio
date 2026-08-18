@@ -1,4 +1,4 @@
-import type { PromptBuilderDraft } from '../prompt-authoring';
+import type { PromptBuilderDraft } from '@studio/domain';
 import type { ModelModeId, VtonInputKind } from './types';
 
 export interface RecipeSelection {

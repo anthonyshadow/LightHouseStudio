@@ -1,4 +1,4 @@
-import { createPromptBuilderDraft } from '../prompt-authoring';
+import { createPromptBuilderDraft } from '@studio/domain';
 import { describe, expect, it, vi } from 'vitest';
 import { createCreativeAssetRepository } from './repository';
 import {

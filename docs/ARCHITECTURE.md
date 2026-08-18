@@ -116,7 +116,7 @@ The mounted Studio owns focused controllers for:
 - local/realtime media and per-mode drafts;
 - recording, review, and voice processing;
 - existing-video selection, local inspection, and one mutually exclusive batch transformation;
-- Character Builder, Outfit Builder, Prompt Workshop, and compatibility prompt-library handoff;
+- Character Builder, Outfit Builder, and compatibility prompt-library handoff;
 - Campaign/Project lifecycle queries and mutations, plus Saved Videos, Saved Characters, and Saved
   Outfits library presentation and handoff;
 - account navigation and ordered logout cleanup;
@@ -216,15 +216,17 @@ footer remains sticky and safe-area-aware. `useVideoEditSession` is the sole own
 source, baseline, draft, 50-entry grouped history, generation, candidate, and worker cancellation.
 
 At the existing `64rem` desktop breakpoint, the focused Studio header has no AI selection control.
-The creative-tool rail owns **Edit Video**, **Select Character**, **Select Outfit**, and
-**Workshop**. The persistent header owner renders one navigation chrome for every protected surface:
+The creative-tool rail owns **Edit Video**, **Select Character**, and **Select Outfit**. The
+persistent header owner renders one navigation chrome for every protected surface:
 a left rail at `48rem` and above, and a compact top bar plus four-item bottom navigation below it.
 The rail contains the brand, **Quick Create**, primary navigation, and mutually exclusive
 integration/account popovers. Dashboard, Assets, Projects, Campaigns and focused Create all mount
 that same shell, so the studio surfaces keep the rail and the bottom navigation rather than a
 standalone header. Character and Outfit choices use
-the same AI chooser and creation overlays while the compact tool rail retains Edit Video and
-Workshop. All responsive
+the same AI chooser and creation overlays while the compact tool rail retains Edit Video. The
+reference-hydration failure notice is `ReferenceUseFailureNotice`, a sibling of the rail rather than
+part of it — the failure belongs to hydration, not to any tool — so a failed restore is visible
+wherever the selection began. All responsive
 presentations share one overlay controller, creative-selection handoff, activity locks, and
 return-focus behavior. They never mount duplicate stateful selectors or start media/provider work.
 
@@ -316,8 +318,10 @@ neutral gray for optimize, generate, edit, and composition routes, while the fin
 requires one centered character, even lighting, no scene/depth cues, and no unrelated props.
 Existing uploaded or immutable references are not rewritten.
 
-Prompt Workshop owns only Add, Replace, and Restyle structured object settings. The creative
-library owns saved/recent/character metadata and atomic reuse. Retained internal recipe-shaped
+Structured prompt authoring has no UI: the retired Prompt Workshop's Add, Replace and Restyle
+intents remain in `packages/domain/src/prompts` only because stored character records are still
+sanitized against `PROMPT_INTENTS`. AI Settings takes a plain **Character direction** or **Garment
+direction**. The creative library owns saved/recent/character metadata and atomic reuse. Retained internal recipe-shaped
 records support compatibility and provider requests but have no Assets route, card, chooser, count,
 or Studio presentation as Recipes. Character, Outfit, and AI Settings surfaces use the retained
 data only through their own product vocabulary. Neither owner controls Character generation or a
@@ -908,7 +912,7 @@ provider path and never causes provider fallback.
 | Decart                      | `POST /api/realtime-token`                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Existing-video processing   | `GET /api/video-jobs` lists the owner queue; `PUT /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId/content`, and `DELETE /api/video-jobs/:jobId` own temporary submission/delivery; acknowledged `POST /api/video-jobs/:jobId/abandon` durably releases local tracking without claiming provider cancellation                                                                                      |
 | Saved videos                | `POST/GET /api/videos`, `GET/PATCH/DELETE /api/videos/:videoId`, `POST /api/videos/:videoId/versions`, owner-checked current/version content, and optional thumbnail upload/content. Authoritative Neon/R2 also registers `POST /api/videos/uploads`, staged part list/sign/complete, and `DELETE /api/videos/uploads/:uploadId`; all expose only the app upload UUID.                                                               |
-| Creative library            | `GET/PUT /api/creative-library` with an owner-derived revision compare-and-swap when Neon is authoritative                                                                                                                                                                                                                                                                                                                           |
+| Creative library            | `GET/PUT /api/creative-library` with an owner-derived revision compare-and-swap when Neon is authoritative. A paused mirror is recoverable from the browser: `CreativeLibrarySyncNotice` offers Try again, Keep this browser's copy (fresh read, then full-store PUT) and Use the cloud copy (`replaceFromRemote`). No merge exists, because the contract has no per-record identity                                                 |
 | Reference optimization/work | `POST /api/reference-images/optimize`, `POST /api/reference-images`, `POST /api/reference-images/import`, `POST /api/reference-images/:sourceAssetId/edits`, `POST /api/reference-images/:sourceAssetId/compositions`, `POST /api/reference-images/:sourceAssetId/outfit-try-ons`                                                                                                                                                    |
 | Reference asset lifecycle   | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`, trusted-origin `DELETE /api/reference-images/:assetId`                                                                                                                                                                                                                                                     |
 | Saved-Voice relationship    | Authenticated `GET /api/elevenlabs/voices/:voiceId/relationship`; returns only the submitted ID and current owner's saved boolean without provider contact                                                                                                                                                                                                                                                                           |

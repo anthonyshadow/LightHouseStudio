@@ -1,5 +1,5 @@
 import { useTheme } from '@emotion/react';
-import { Button, StatusNotice, TextAreaField } from '../../ui';
+import { StatusNotice, TextAreaField } from '../../ui';
 import type { StudioSessionController } from './types';
 import {
   enhancementToggleStyles,
@@ -11,14 +11,9 @@ import { ReferenceImageField } from './ReferenceImageField';
 export interface ModelRecipeFieldsProps {
   session: StudioSessionController;
   recording: boolean;
-  onOpenWorkshop: () => void;
 }
 
-export const ModelRecipeFields = ({
-  session,
-  recording,
-  onOpenWorkshop,
-}: ModelRecipeFieldsProps) => {
+export const ModelRecipeFields = ({ session, recording }: ModelRecipeFieldsProps) => {
   const theme = useTheme();
   if (session.draft.mode === 'local') return null;
 
@@ -50,12 +45,6 @@ export const ModelRecipeFields = ({
         hint="A prompt, reference image, or both is required. Draft edits never apply silently."
         onChange={(event) => session.updatePrompt(event.target.value)}
       />
-
-      {mode === 'lucy-latest' ? (
-        <Button variant="quiet" disabled={recording} onClick={onOpenWorkshop}>
-          Open structured prompt workshop
-        </Button>
-      ) : null}
 
       <ReferenceImageField
         mode={mode}

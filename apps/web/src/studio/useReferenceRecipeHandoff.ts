@@ -8,8 +8,7 @@ import {
   MODE_REPLACEMENT_CONFIRMATION,
   modeReplacementNeedsConfirmation,
 } from '../features/media-session/draftPolicy';
-import type { StudioMode, StudioSessionController } from '../features/media-session/types';
-import type { PromptWorkshopAction } from '../features/prompt-authoring/CharacterPromptWorkshop';
+import type { StudioSessionController } from '../features/media-session/types';
 import {
   activeRecipeReducer,
   INITIAL_ACTIVE_RECIPE_STATE,
@@ -21,38 +20,31 @@ import {
   useReferenceRecipeAttribution,
 } from './useReferenceRecipeAttribution';
 import { useReferenceRecipeHydration } from './useReferenceRecipeHydration';
-import { useReferenceRecipeWorkshop } from './useReferenceRecipeWorkshop';
 import type { ConfirmationRequest } from '../ui';
 
 export { isExactActiveRecipe } from './referenceRecipeIdentity';
 type UseReferenceRecipeHandoffOptions = {
-  readonly ownerUserId: string;
   readonly repository: CreativeAssetRepository;
   readonly store: CreativeAssetStore;
   readonly session: StudioSessionController;
   readonly mediaLocked: boolean;
-  readonly recordingActive: boolean;
   readonly sessionModeLocked: boolean;
   readonly characterBuilderOpenBlockedReason: string | undefined;
-  readonly openWorkshopOverlay: () => void;
   readonly closeOverlay: () => void;
   readonly confirmation: ConfirmationRequest;
 };
 
 /**
- * Stable Studio facade for recipe identity, hydration, Workshop coordination,
- * Builder preload, and successful-use attribution.
+ * Stable Studio facade for recipe identity, hydration, Builder preload, and
+ * successful-use attribution.
  */
 export const useReferenceRecipeHandoff = ({
-  ownerUserId,
   repository,
   store,
   session,
   mediaLocked,
-  recordingActive,
   sessionModeLocked,
   characterBuilderOpenBlockedReason,
-  openWorkshopOverlay,
   closeOverlay,
   confirmation,
 }: UseReferenceRecipeHandoffOptions) => {
@@ -64,34 +56,6 @@ export const useReferenceRecipeHandoff = ({
     () => resolveActiveRecipe(activeRecipeState, store, session.draft),
     [activeRecipeState, session.draft, store],
   );
-  const selectModeWithDraftProtection = useCallback(
-    async (mode: StudioMode): Promise<boolean> => {
-      if (mediaLocked) return false;
-      if (
-        modeReplacementNeedsConfirmation(session.draft, mode) &&
-        !(await confirmation.ask(MODE_REPLACEMENT_CONFIRMATION))
-      ) {
-        return false;
-      }
-      return session.selectMode(mode);
-    },
-    [confirmation, mediaLocked, session],
-  );
-  const selectLucyMode = useCallback(
-    () => selectModeWithDraftProtection('lucy-latest'),
-    [selectModeWithDraftProtection],
-  );
-
-  const workshop = useReferenceRecipeWorkshop({
-    ownerUserId,
-    repository,
-    session,
-    recordingActive,
-    activeRecipe: activeRecipe.recipe,
-    selectLucyMode,
-    openWorkshopOverlay,
-  });
-
   const hydration = useReferenceRecipeHydration({
     // Deliberately not `async`: an `async` arrow would return a promise even when the answer is
     // already known, turning every hydration start into a deferred one. Only the branch that
@@ -112,7 +76,6 @@ export const useReferenceRecipeHandoff = ({
       if (!committed) return false;
 
       await attribution.commitHydratedRecipe(result);
-      workshop.completeUse(result.pending);
       closeOverlay();
       return true;
     },
@@ -154,13 +117,6 @@ export const useReferenceRecipeHandoff = ({
     return true;
   }, [activeRecipe.recipe, session, sessionModeLocked]);
 
-  const applyWorkshopPrompt = useCallback(
-    (action: PromptWorkshopAction) => {
-      hydration.useRecipe(workshop.createPendingUse(action));
-    },
-    [hydration, workshop],
-  );
-
   const recipeInsertionBlocked =
     mediaLocked || (sessionModeLocked && session.draft.mode === 'local');
 
@@ -170,8 +126,6 @@ export const useReferenceRecipeHandoff = ({
       activeCharacter: activeRecipe.character,
       activeCharacterName: activeRecipe.characterName,
       activeRecipeLabel: activeRecipe.label,
-      workshopDraft: workshop.draft,
-      workshopDrafts: workshop.drafts,
       referenceUsePending: hydration.pending,
       referenceUseFailureMessage: hydration.failureMessage,
       canContinueReferenceUseWithoutImage: hydration.canContinueWithoutReference,
@@ -180,17 +134,12 @@ export const useReferenceRecipeHandoff = ({
     },
     actions: {
       recordCommittedPrompt: attribution.recordCommittedPrompt,
-      rememberWorkshopDraft: workshop.rememberDraft,
       useRecipe,
       clearActiveCharacter,
       clearActiveRecipe,
       retryReferenceUse: hydration.retry,
       continueReferenceUseWithoutImage: hydration.continueWithoutReference,
       saveBuiltCharacter: attribution.saveBuiltCharacter,
-      openSavedWorkshop: workshop.openSavedWorkshop,
-      applyWorkshopPrompt,
-      saveWorkshopPrompt: workshop.saveWorkshopPrompt,
-      openWorkshop: workshop.openWorkshop,
     },
   } as const;
 };

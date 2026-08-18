@@ -1,5 +1,5 @@
 import type { ReferenceImageAsset } from '@studio/contracts';
-import { canonicalPrompt } from '@studio/domain';
+import { canonicalPrompt, type PromptBuilderDraft } from '@studio/domain';
 import { useCallback, useEffect, useReducer, useRef } from 'react';
 import {
   ApiClientError,
@@ -8,7 +8,6 @@ import {
 } from '../adapters/api-client/apiClient';
 import type { ModelMode } from '../application/types';
 import type { SessionReferenceImage } from '../features/media-session/types';
-import type { PromptBuilderDraft } from '../features/prompt-authoring/model';
 import type { VtonInputKind } from '../features/creative-assets/types';
 
 export type PendingReferenceRecipeUse = {
@@ -23,7 +22,6 @@ export type PendingReferenceRecipeUse = {
   readonly savedCharacterPromptId?: string;
   readonly savedCharacterVariantId?: string;
   readonly characterName?: string;
-  readonly destination: 'selection' | 'workshop';
 };
 
 export type ReferenceRecipeHydrationResult = {
@@ -90,7 +88,7 @@ type ActiveHydrationOperation = {
 };
 
 /**
- * Owns the sole selection/Workshop reference hydration operation and its retryable pending input.
+ * Owns the sole selection reference hydration operation and its retryable pending input.
  * The caller remains the authoritative composition boundary for the atomic session commit.
  */
 export const useReferenceRecipeHydration = ({

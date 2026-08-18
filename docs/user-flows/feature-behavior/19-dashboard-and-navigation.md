@@ -8,15 +8,16 @@ resources, and browse reusable Assets without activating media or a provider.
 ## Observable behavior
 
 1. Successful Login and a restored authenticated visit to `/` replace-navigate to `/dashboard`
-   unless a validated protected deep link is waiting. Dashboard exposes Create Video, Browse
-   Assets, New Project, and New Campaign plus independent bounded recent queries. Every recent row
+   unless a validated protected deep link is waiting. Dashboard exposes Create Video and Browse
+   Assets in its header, reaches New Project and New Campaign through Quick Create and its own
+   empty states, and runs independent bounded recent queries. Every recent row
    opens the exact record it names — a video row opens that Saved Video's preview in the Videos
    library, not the unfiltered library.
 2. Canonical organization routes are `/dashboard`, `/campaigns`, `/projects`, and `/assets`.
    Project and Campaign detail/workspace children remain deep-linkable. Former `/studio/...`
-   organization and library URLs replace-redirect to the corresponding canonical path; the former
-   singular `/campaign` and `/campaign/:campaignId` redirect to their plural equivalents; the former
-   Recipe URL redirects to `/assets`.
+   organization and library URLs replace-redirect to the corresponding canonical path, and the
+   former singular `/campaign` and `/campaign/:campaignId` redirect to their plural equivalents. The
+   former Recipe URL is no longer registered at all.
 3. `/studio/create` remains standalone creation, `/studio/create/live` remains configuration-gated
    Live AI, and UUID-only `/studio/:videoId` opens the current Saved Video Version in review.
    Reserved `create` routes are matched before the UUID route.

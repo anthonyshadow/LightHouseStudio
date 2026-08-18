@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useTheme } from '@emotion/react';
 import {
-  Button,
   ConfirmationRequestDialog,
   SegmentedControl,
   StatusNotice,
@@ -33,7 +32,6 @@ export interface SessionComposerProps {
   recording: boolean;
   lockReason?: string | undefined;
   modelStartBlockedReason?: string | undefined;
-  onOpenWorkshop: () => void;
   embedded?: boolean;
   activeCharacterName?: string | undefined;
 }
@@ -43,7 +41,6 @@ export const SessionComposer = ({
   recording,
   lockReason,
   modelStartBlockedReason,
-  onOpenWorkshop,
   embedded = false,
   activeCharacterName,
 }: SessionComposerProps) => {
@@ -135,27 +132,11 @@ export const SessionComposer = ({
 
           <SessionStatus session={session} />
 
-          {!model ? (
-            <Button
-              variant="secondary"
-              disabled={modeLocked}
-              title={
-                modeLocked
-                  ? 'Release camera and finish active work before opening Prompt Workshop.'
-                  : undefined
-              }
-              onClick={onOpenWorkshop}
-            >
-              Open structured prompt workshop
-            </Button>
-          ) : null}
-
           {model ? (
             <ModelRecipeFields
               key={`${session.draft.mode}-${modelFieldsRevision}`}
               session={session}
               recording={recording}
-              onOpenWorkshop={onOpenWorkshop}
             />
           ) : null}
 

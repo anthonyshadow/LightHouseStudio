@@ -6,7 +6,6 @@ import { createPromptBuilderDraft } from '@studio/domain';
 import type {
   CreativeAssetRepository,
   CreativeAssetStore,
-  SavedCharacterPrompt,
   SavedPrompt,
 } from '../features/creative-assets/types';
 import {
@@ -186,7 +185,6 @@ describe('reference recipe handoff', () => {
     store,
     referenceAsset,
     mediaLocked = false,
-    recordingActive = false,
     sessionModeLocked = false,
     characterBuilderOpenBlockedReason,
     canReplaceRecipeDraft = true,
@@ -250,19 +248,15 @@ describe('reference recipe handoff', () => {
       canReplaceRecipeDraft: vi.fn(() => canReplaceRecipeDraft),
       selectMode,
     } as unknown as StudioSessionController;
-    const openWorkshopOverlay = vi.fn();
     const closeOverlay = vi.fn();
     const result = renderHook(() =>
       useReferenceRecipeHandoff({
-        ownerUserId: 'test-owner',
         repository,
         store,
         session,
         mediaLocked,
-        recordingActive,
         sessionModeLocked,
         characterBuilderOpenBlockedReason,
-        openWorkshopOverlay,
         closeOverlay,
         confirmation: {
           pending: null,
@@ -277,7 +271,6 @@ describe('reference recipe handoff', () => {
       closeOverlay,
       draft,
       hydrated,
-      openWorkshopOverlay,
       recordSuccessfulPrompt,
       replaceRecipeDraft,
       repository,
@@ -743,81 +736,6 @@ describe('reference recipe handoff', () => {
     );
     expect(harness.replaceRecipeDraft).toHaveBeenCalledTimes(2);
     expect(harness.closeOverlay).toHaveBeenCalledOnce();
-  });
-
-  it('coordinates a legacy Workshop source through open, atomic use, and save', async () => {
-    const workshopDraft = createPromptBuilderDraft('add-object');
-    const character: SavedCharacterPrompt = {
-      id: 'legacy-workshop-character',
-      name: 'Legacy object edit',
-      prompt: 'Add a brass desk lamp beside the presenter.',
-      source: 'generator',
-      promptIntent: 'add-object',
-      builderDraft: workshopDraft,
-      guidedDesign: null,
-      referenceImageStatus: 'prompt-only',
-      referenceImageAssetId: null,
-      uploadedReferenceImageAssetId: null,
-      finalReferenceKind: null,
-      selectedWardrobeVariantId: null,
-      defaultVoice: null,
-      notes: '',
-      tags: [],
-      createdAt: '2026-07-21T12:00:00.000Z',
-      updatedAt: '2026-07-21T12:00:00.000Z',
-      lastUsedAt: null,
-      useCount: 0,
-    };
-    const store: CreativeAssetStore = {
-      schemaVersion: 7,
-      savedPrompts: [],
-      recentPrompts: [],
-      savedCharacterPrompts: [character],
-      savedCharacterVariants: [],
-    };
-    const harness = renderHandoff({ store, referenceAsset: uploadedAsset });
-
-    await act(async () => {
-      await harness.result.current.actions.openSavedWorkshop(workshopDraft, character);
-    });
-    expect(harness.openWorkshopOverlay).toHaveBeenCalledOnce();
-    expect(harness.result.current.state.workshopDraft).toEqual(workshopDraft);
-
-    act(() => {
-      harness.result.current.actions.applyWorkshopPrompt({
-        prompt: character.prompt,
-        draft: workshopDraft,
-        validation: { valid: true, blocking: [], warnings: [] },
-        referenceImageAssetId: null,
-      });
-    });
-    await waitFor(() =>
-      expect(harness.result.current.state.activeRecipe).toEqual({
-        origin: 'character-prompt',
-        assetId: character.id,
-      }),
-    );
-    expect(fetchReferenceImageMetadata).not.toHaveBeenCalled();
-    expect(harness.replaceRecipeDraft).toHaveBeenCalledOnce();
-
-    await act(async () => {
-      await harness.result.current.actions.saveWorkshopPrompt({
-        name: 'Saved object edit',
-        prompt: character.prompt,
-        draft: workshopDraft,
-        validation: { valid: true, blocking: [], warnings: [] },
-        referenceImageAssetId: null,
-      });
-    });
-    expect(harness.repository.createSavedCharacterPrompt).toHaveBeenCalledWith({
-      name: 'Saved object edit',
-      prompt: character.prompt,
-      source: 'generator',
-      promptIntent: 'add-object',
-      builderDraft: workshopDraft,
-      referenceImageStatus: 'prompt-only',
-      referenceImageAssetId: null,
-    });
   });
 
   it('restores and attributes an enhanced prompt outfit without media or reference hydration', async () => {

@@ -27,7 +27,6 @@ import {
   emptyRecentStyles,
   onboardingStyles,
   processingQueueStyles,
-  quickActionsStyles,
   recentFilterStyles,
   recentListStyles,
   recentWorkStyles,
@@ -241,11 +240,9 @@ export const DashboardRouteSurface = ({
     <section css={dashboardStyles(theme)} aria-labelledby="dashboard-heading">
       <header css={dashboardHeaderStyles(theme)}>
         <div>
-          <span data-dashboard-eyebrow title={`Welcome back, ${displayName}`}>
-            Authenticated Studio
-          </span>
-          <h1 id="dashboard-heading" aria-label="Dashboard" tabIndex={-1}>
-            Momentum Workspace
+          <span data-dashboard-eyebrow>Welcome back, {displayName}</span>
+          <h1 id="dashboard-heading" tabIndex={-1}>
+            Dashboard
           </h1>
           <p>Resume focused Project work or start a standalone video.</p>
         </div>
@@ -383,22 +380,6 @@ export const DashboardRouteSurface = ({
                 </Button>
               </div>
             ) : null}
-          </section>
-
-          <section aria-labelledby="start-new-heading">
-            <h2 id="start-new-heading" css={sectionEyebrowStyles(theme)}>
-              Start New
-            </h2>
-            <div css={quickActionsStyles(theme)}>
-              <Button variant="quiet" onClick={onCreateProject}>
-                <AppIcon name="projects" />
-                New Project
-              </Button>
-              <Button variant="quiet" onClick={onCreateCampaign}>
-                <AppIcon name="campaigns" />
-                New Campaign
-              </Button>
-            </div>
           </section>
         </div>
 

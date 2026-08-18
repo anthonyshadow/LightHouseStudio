@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
+import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { SessionComposer } from '@web/features/media-session/SessionComposer';
 import { ModelRecipeFields } from '@web/features/media-session/ModelRecipeFields';
 import { ReferenceImageField } from '@web/features/media-session/ReferenceImageField';
@@ -41,7 +41,6 @@ export const PrivateLocalCapture: Story = {
   args: {
     session: createSessionController('local'),
     recording: false,
-    onOpenWorkshop: fn(),
   },
   render: (args) => frame(<SessionComposer {...args} />),
 };
@@ -58,7 +57,6 @@ export const CharacterDraft: Story = {
     }),
     recording: false,
     activeCharacterName: 'Midnight culture host',
-    onOpenWorkshop: fn(),
   },
   render: (args) => frame(<SessionComposer {...args} />),
 };
@@ -86,7 +84,6 @@ export const LiveAppliedRecipe: Story = {
       transformedVideoUsable: true,
     }),
     recording: false,
-    onOpenWorkshop: fn(),
   },
   render: (args) => frame(<SessionComposer {...args} />),
 };
@@ -108,7 +105,6 @@ export const EphemeralReferenceInteraction: Story = {
       },
     }),
     recording: false,
-    onOpenWorkshop: fn(),
   },
   render: (args) => frame(<SessionComposer {...args} />),
   play: async ({ canvasElement, args }) => {

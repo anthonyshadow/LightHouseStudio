@@ -49,10 +49,10 @@ const createSession = (
   ...overrides,
 });
 
-const renderComposer = (session: StudioSessionController, onOpenWorkshop = vi.fn()) =>
+const renderComposer = (session: StudioSessionController) =>
   render(
     <StudioDesignProvider>
-      <SessionComposer session={session} recording={false} onOpenWorkshop={onOpenWorkshop} />
+      <SessionComposer session={session} recording={false} />
     </StudioDesignProvider>,
   );
 
@@ -69,10 +69,8 @@ describe('SessionComposer', () => {
     expect(session.selectMode).toHaveBeenCalledWith('lucy-latest');
   });
 
-  it('preserves the visible portrait guidance and explicit workshop action', async () => {
-    const user = userEvent.setup();
-    const onOpenWorkshop = vi.fn();
-    renderComposer(createSession('lucy-latest'), onOpenWorkshop);
+  it('preserves the visible portrait guidance beside the character direction field', () => {
+    renderComposer(createSession('lucy-latest'));
 
     expect(screen.getByLabelText('Optional portrait reference')).toHaveAttribute(
       'accept',
@@ -81,9 +79,7 @@ describe('SessionComposer', () => {
     expect(
       screen.getByText(/Use a clear, well-lit portrait for the most consistent character/u),
     ).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Open structured prompt workshop' }));
-    expect(onOpenWorkshop).toHaveBeenCalledOnce();
+    expect(screen.getByLabelText('Character direction')).toBeEnabled();
   });
 
   it('keeps the action footer persistent and explains why an empty AI draft cannot start', () => {
@@ -129,7 +125,6 @@ describe('SessionComposer', () => {
           session={session}
           recording={false}
           modelStartBlockedReason="Project provider processing is unavailable until recoverable Project processing is enabled."
-          onOpenWorkshop={vi.fn()}
         />
       </StudioDesignProvider>,
     );
@@ -177,7 +172,6 @@ describe('SessionComposer', () => {
             transformedVideoUsable: true,
           })}
           recording={false}
-          onOpenWorkshop={vi.fn()}
         />
       </StudioDesignProvider>,
     );
@@ -193,7 +187,7 @@ describe('SessionComposer', () => {
     });
     render(
       <StudioDesignProvider>
-        <SessionComposer session={session} recording onOpenWorkshop={vi.fn()} />
+        <SessionComposer session={session} recording />
       </StudioDesignProvider>,
     );
 
@@ -231,7 +225,6 @@ describe('SessionComposer', () => {
             localStream: {} as MediaStream,
           })}
           recording={false}
-          onOpenWorkshop={vi.fn()}
         />
       </StudioDesignProvider>,
     );
@@ -241,7 +234,7 @@ describe('SessionComposer', () => {
 
     view.rerender(
       <StudioDesignProvider>
-        <SessionComposer session={idle} recording={false} onOpenWorkshop={vi.fn()} />
+        <SessionComposer session={idle} recording={false} />
       </StudioDesignProvider>,
     );
     await waitFor(() =>

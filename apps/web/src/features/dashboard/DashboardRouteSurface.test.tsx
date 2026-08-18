@@ -118,7 +118,11 @@ describe('DashboardRouteSurface', () => {
     const user = userEvent.setup();
     const { actions } = renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
 
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+    const heading = screen.getByRole('heading', { name: 'Dashboard' });
+    expect(heading).toBeVisible();
+    expect(heading).toHaveTextContent('Dashboard');
+    expect(screen.getByText('Welcome back, Demo Creator')).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Start New' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Create video' }));
     expect(actions.onCreateVideo).toHaveBeenCalledOnce();
     expect(await screen.findByRole('button', { name: 'Continue Launch cut' })).toBeVisible();

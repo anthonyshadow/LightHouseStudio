@@ -239,7 +239,8 @@ test('Projects quick creation, lifecycle, refresh, and explicit Assets exit keep
   await expect(page.getByText('No active Projects yet', { exact: true })).toBeVisible();
   // The Projects list owns no live media, so no stage is mounted for it at all.
   await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Quick project' }).click();
+  await page.getByRole('button', { name: 'New Project' }).click();
+  await page.getByRole('button', { name: 'Create without a name' }).click();
 
   await expect(page).toHaveURL(new RegExp(`/projects/${TEST_PROJECT_ID}$`, 'u'));
   await expect(page.getByRole('heading', { name: 'Untitled Project' })).toBeVisible();

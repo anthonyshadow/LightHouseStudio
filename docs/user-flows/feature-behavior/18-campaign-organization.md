@@ -28,7 +28,7 @@ making Campaign setup a prerequisite for creative work.
 7. Restore an archived Campaign to accept membership again. To delete the organizer, first move or
    detach every active and archived Project, then explicitly confirm **Delete Campaign**. A
    nonempty Campaign is blocked and no cascade action is offered.
-8. **Create another Campaign** reuses the same canonical dialog from Campaign detail. Successful
+8. **Create Campaign** on the Campaigns list reuses the same canonical dialog. Successful
    related Project creation opens `/projects/:projectId` with the existing `campaignId` relation.
 
 ## Boundaries

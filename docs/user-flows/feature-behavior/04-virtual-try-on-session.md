@@ -7,7 +7,7 @@ in the primary editor.
 ## Journey
 
 1. Prepare an Outfit before starting media. On desktop, **Select Outfit** appears after **Select
-   Character** and immediately before **Workshop** in the creative-tool rail. At any viewport,
+   Character** and is the last action in the creative-tool rail. At any viewport,
    **Quick Create → Create Asset → Outfit** opens the same Builder, and `/assets/outfits` exposes
    saved Outfits.
 2. The Outfit panel has **Saved** and **Recent** views plus **Create new outfit**. Successful live

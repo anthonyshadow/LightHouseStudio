@@ -8,6 +8,12 @@ import { createMemoryRouter, RouterProvider, useLocation, type InitialEntry } fr
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from '../application/auth/AuthProvider';
 import type { AuthenticatedShellProps } from './shell/AuthenticatedShell';
+import { RouteErrorBoundary } from './AppRouter';
+import {
+  CLIENT_DIAGNOSTIC_LIMIT,
+  clearClientDiagnostics,
+  readClientDiagnostics,
+} from './clientDiagnostics';
 import { focusesMainOnNavigation } from './paths';
 import { StudioDesignProvider } from '../ui';
 
@@ -239,7 +245,6 @@ describe('AppRouter', () => {
     ],
     ['/studio/assets', '/assets'],
     ['/studio/videos', '/assets/videos'],
-    ['/studio/assets/recipes', '/assets'],
   ])('redirects the legacy route %s to %s', async (path, target) => {
     const { router } = renderApplication(path);
 
@@ -269,6 +274,7 @@ describe('AppRouter', () => {
     '/projects/project-42/history',
     '/studio/not-a-route',
     '/assets/recipes',
+    '/studio/assets/recipes',
     '/not-a-route?project=untrusted',
   ])('replaces the noncanonical path %s with the entry page', async (path) => {
     authApi.fetchCurrentSession.mockRejectedValue(new Error('No session'));
@@ -278,5 +284,74 @@ describe('AppRouter', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     expect(router.state.location.search).toBe('');
     expect(appHarness.mountCount).toBe(0);
+  });
+
+  describe('route error boundary', () => {
+    const Boom = ({ error }: { readonly error: Error }) => {
+      throw error;
+    };
+
+    const renderBoundary = (error: Error) => {
+      // React logs a caught render error itself; the assertion is about what we record, not that.
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      render(
+        <StudioDesignProvider>
+          <RouteErrorBoundary resetKey="k">
+            <Boom error={error} />
+          </RouteErrorBoundary>
+        </StudioDesignProvider>,
+      );
+      return consoleError;
+    };
+
+    beforeEach(() => {
+      clearClientDiagnostics();
+    });
+
+    it('shows the generic fallback and records one local diagnostic for a crash', () => {
+      const consoleError = renderBoundary(new Error('exploded while rendering'));
+
+      expect(screen.getByRole('heading', { name: 'Studio could not load' })).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Reload' })).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Copy diagnostic details' })).toBeVisible();
+      // The raw message stays out of the UI; it is only retrievable on request.
+      expect(screen.queryByText(/exploded while rendering/u)).not.toBeInTheDocument();
+
+      const recorded = readClientDiagnostics();
+      expect(recorded).toHaveLength(1);
+      expect(recorded[0]?.message).toBe('exploded while rendering');
+      expect(recorded[0]?.componentStack).toContain('Boom');
+      consoleError.mockRestore();
+    });
+
+    it('tells the operator a stale chunk needs a reload rather than reporting a crash', () => {
+      const consoleError = renderBoundary(
+        new Error('Failed to fetch dynamically imported module: /assets/shell-a1b2c3.js'),
+      );
+
+      expect(
+        screen.getByRole('heading', { name: 'A newer version of Lightframe is available' }),
+      ).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Reload' })).toBeVisible();
+      consoleError.mockRestore();
+    });
+
+    it('bounds the diagnostic buffer so a crash loop cannot grow it', () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      for (let attempt = 0; attempt < CLIENT_DIAGNOSTIC_LIMIT + 3; attempt += 1) {
+        render(
+          <StudioDesignProvider>
+            <RouteErrorBoundary resetKey={`k${attempt}`}>
+              <Boom error={new Error(`crash ${attempt}`)} />
+            </RouteErrorBoundary>
+          </StudioDesignProvider>,
+        );
+      }
+
+      const recorded = readClientDiagnostics();
+      expect(recorded).toHaveLength(CLIENT_DIAGNOSTIC_LIMIT);
+      expect(recorded.at(-1)?.message).toBe(`crash ${CLIENT_DIAGNOSTIC_LIMIT + 2}`);
+      consoleError.mockRestore();
+    });
   });
 });

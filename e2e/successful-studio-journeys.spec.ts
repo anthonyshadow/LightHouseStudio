@@ -132,23 +132,6 @@ for (const viewport of exactViewports) {
     await expectActionInsideViewport(page, 'Record New Video');
     const stableStageRect = await readStageRect(page);
 
-    await page.getByRole('button', { name: 'Workshop', exact: true }).click();
-    await expect(
-      page.getByRole('heading', { name: 'Direct one clear visual change' }),
-    ).toBeVisible();
-    const workshopScroll = await expectInternalScrollOwnership(
-      page,
-      '[data-scroll-region="prompt-workshop"]',
-    );
-    if (viewport.width <= 390) {
-      expect(workshopScroll.scrollHeight).toBeGreaterThan(workshopScroll.clientHeight);
-    }
-    await expectNoDocumentOverflow(page);
-    await expectStableStageRect(page, stableStageRect);
-    await page.getByRole('button', { name: 'Close creative tool' }).click();
-    await expect(page.getByRole('dialog', { name: 'Prompt Workshop' })).toBeHidden();
-    await expectStableStageRect(page, stableStageRect);
-
     await page.getByRole('button', { name: 'Open capture settings' }).click();
     const settingsDialog = page.getByRole('dialog', { name: 'Capture Settings' });
     await expect(settingsDialog).toBeVisible();
@@ -453,7 +436,7 @@ test('no-key Local Camera records and finalizes without provider HTTP, WebSocket
 
   await startLocalPreview(page);
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Workshop', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Select Character' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Select Outfit' })).toBeEnabled();
   await expect(page.getByRole('button', { name: /Recipe|Shelf|Dock/u })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Record' })).toBeEnabled();
@@ -768,7 +751,7 @@ test('a Lucy model take finalizes before the provider session is released', asyn
   );
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Start AI' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Workshop' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Select Character' })).toBeDisabled();
 
   const browser = await readBrowserState(page);
   expect(browser.recorderStarts).toBe(2);

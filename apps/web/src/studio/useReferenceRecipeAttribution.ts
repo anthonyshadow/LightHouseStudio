@@ -67,7 +67,6 @@ export const createPendingReferenceRecipeUse = (
     vtonInputKind: selectedVtonInputKind,
     enhancePrompt: selectedEnhancePrompt,
     preserveCurrentReference: false,
-    destination: 'selection',
     ...(selection.builderDraft ? { builderDraft: selection.builderDraft } : {}),
     ...(selection.characterName ? { characterName: selection.characterName } : {}),
     ...(selection.origin === 'saved-prompt' && selection.assetId

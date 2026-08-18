@@ -3,10 +3,18 @@
 Consolidated findings from the code-first audit. Every item cites the code that produced it.
 Severities are **Critical / High / Medium / Low / Observation**.
 
-**Status:** the four **High** product gaps — G1, G2, G3 and G4 — are closed, and so are all of
-**Tier 1**, **Tier 2** and **Tier 3**: B1, B3, G7/M6, the §7 terminology pass, and N4, N2, N3, B2,
-N10, N1 and G6. **R3** closed as a consequence of G6. Each entry below records what shipped.
-Everything else remains an open finding.
+**Status:** every tier is now closed. The four **High** product gaps — G1, G2, G3 and G4 — plus
+**Tier 1** (B1, B3), **Tier 2** (G3, G4, G7/M6, the §7 terminology pass), **Tier 3** (N4, N2, N3,
+B2, N10, N1, G6) and **Tier 4** (N7/T7, N5, G8, N8, N9, B6, B8/T6, R1, R4, R5). **R3** closed as a
+consequence of G6. Each entry below records what shipped. Everything else remains an open finding.
+
+**Two Tier 4 findings were already closed before the tier ran** — N7/T7 and G8's dead guide — by
+refactors that landed for other reasons. Their entries below record that correction rather than new
+work; verifying a finding still holds before acting on it is part of the job.
+
+**Not a finding, but shipped alongside Tier 4:** the **Prompt Workshop was removed** as a product
+decision. It was _not_ dead code — it had four live entry points and four E2E specs that drove it —
+so this is recorded as a deliberate removal, not hygiene. See the note at the end of §5.
 
 Two framing notes before the list:
 
@@ -171,13 +179,17 @@ outranks it. A query parameter rather than a path segment because the anchored
 with unsaved changes. Task changes `replace` rather than push, or `useRouteBack` would walk back
 through tasks instead of leaving. This also closes **M6**.
 
-### G8 — First-time-user guidance is one dismissible card (Medium)
+### G8 — First-time-user guidance is one dismissible card (Medium) — **partly resolved**
 
 `dashboardOnboarding.ts` stores a single boolean. Once dismissed, no product surface ever explains
-Projects vs Campaigns vs Assets again. The Studio "first take guide"
-(`StudioWorkspace.tsx`) is gated on `firstSuccessGuideVisible`, which is initialised to
-`false` in `StudioApp.tsx` and never set to `true` anywhere in the codebase — **the guide is
-therefore unreachable in the current build**.
+Projects vs Campaigns vs Assets again. **That half of the finding is still open**, and is tracked
+alongside **M7**.
+
+_Correction:_ the second half — the unreachable Studio "first take guide" gated on
+`firstSuccessGuideVisible` — **no longer exists**. The symbol and the guide markup were both removed
+by the shell/runtime split, before Tier 4 ran. Nothing was left behind: `firstSuccessGuide` matches
+nowhere in `apps/web/src`. Tier 4 item 17 asked to "wire it up or delete the dead markup"; deleting
+it had already happened.
 
 ## 3. UX and navigation problems
 
@@ -269,12 +281,28 @@ video already on screen costs no extra request and one from a later page costs o
 preview would have made anyway. An unknown or removed id surfaces the gallery's existing danger
 notice instead of an empty overlay.
 
-### N5 — Two competing create actions on the Projects list (Medium)
+### N5 — Two competing create actions on the Projects list (Medium) — **Resolved**
 
-**Quick project** creates an "Untitled Project" immediately and navigates into it; **New Project**
-opens a naming dialog (`ProjectRouteSurface.tsx:319-337`). The buttons sit side by side with no
-explanation; the difference is only described in the empty-state paragraph below them
-(`:162`), which disappears as soon as one project exists.
+**Quick project** created an "Untitled Project" immediately and navigated into it; **New Project**
+opened a naming dialog. The buttons sat side by side with no explanation; the difference was only
+described in the empty-state paragraph below them, which disappeared as soon as one project existed.
+
+_Shipped:_ merged rather than relabelled. The header keeps one primary **New Project**, and
+`NewProjectDialog` gained a quiet **Create without a name** beside **Create Project**. Standing
+next to the naming field, it reads as "skip this" — which two unexplained header buttons never did.
+
+No new controller work was needed: the dialog already held `useProjectsController()`, which exposes
+both `createNamedMutation` and `createMutation`, and the quick path already accepted a `campaignId`.
+That last part is the merge's actual gain — the unnamed action now carries whichever Campaign the
+dialog has selected, which the standalone header button could never do. No opt-in prop:
+`CampaignRouteSurface` mounts the same dialog with `campaignLocked`, an untitled Project inside that
+Campaign is what that flow wants, and a flag with one meaningful value would be dead weight.
+
+The dialog's error state is now scoped to the action that produced it — a named failure still blames
+the name field, an unnamed one renders a `StatusNotice`, because it has no field to blame. The
+page-level `createError` and its "Retry quick project" notice had exactly one writer and are gone.
+The idempotency-key retention that made the old quick path replay-safe is unchanged and still
+tested, now driven through the dialog.
 
 ### N6 — No nav item is active while in Studio (Low)
 
@@ -283,29 +311,49 @@ explanation; the difference is only described in the empty-state paragraph below
 Assets (`StudioHeader.tsx:279-286`). In the product's main creation surface, the navigation shows
 no current location.
 
-### N7 — Two different confirmation mechanisms (Medium)
+### N7 — Two different confirmation mechanisms (Medium) — **Resolved, before Tier 4**
 
-The app has a well-built `ConfirmationDialog` primitive and uses it widely, yet two destructive or
-consequential actions use the native `window.confirm`:
+The app had a well-built `ConfirmationDialog` primitive and used it widely, yet two consequential
+actions used the native `window.confirm`: switching experience mode over an existing draft, and
+replacing the loaded gallery version.
 
-- switching experience mode over an existing draft (`StudioApp.tsx` via
-  `confirmModeReplacement`)
-- replacing the loaded gallery version (`useStudioSavedVideoController.ts:267-273`)
+_Correction:_ **this was already fixed** when Tier 4 began. `apps/web/src` contains **zero**
+`window.confirm` calls, and `confirmModeReplacement` no longer exists. Both sites now `await` a real
+dialog through `useConfirmationRequest` / `ConfirmationRequestDialog`
+(`ui/primitives/confirmationRequest.tsx`), built on a generic `useAwaitableQuestion` whose docstring
+records the reasons this finding gave — main-thread blocking, no theming, invisible to the overlay
+stack's focus-return contract, and needing `window` stubbed to test. Mode replacement is gated by
+`modeReplacementNeedsConfirmation` in `features/media-session/draftPolicy.ts`; the version replace
+asks at `useStudioSavedVideoController.ts:278`.
 
-Native dialogs are unstyled, not screen-reader-consistent with the rest of the app, and block the
-event loop.
+The lesson is the finding's, not the fix's: an audit entry is a claim about a moment, and it needs
+re-checking before it is acted on.
 
-### N8 — The dashboard greets the user in a tooltip (Low)
+### N8 — The dashboard greets the user in a tooltip (Low) — **Resolved**
 
-`DashboardRouteSurface.tsx:247` renders the visible text "Authenticated Studio" with
-`title={`Welcome back, ${displayName}`}`. The human-readable greeting is only available on hover;
-the visible text is implementation vocabulary.
+The header rendered the visible text "Authenticated Studio" with
+`title={`Welcome back, ${displayName}`}`. The human-readable greeting was only available on hover,
+and only to a pointer; the visible text was implementation vocabulary.
 
-### N9 — The dashboard heading and its accessible name disagree (Low)
+_Shipped:_ the eyebrow is now the greeting itself — visible text, no `title` attribute. Its styling
+moved with it: the old uppercase, `0.2em`-tracked, `0.625rem` treatment made "Welcome back, …" read
+as a category label rather than a sentence addressed to the operator, so it is now sentence case at
+a readable size.
 
-`<h1 id="dashboard-heading" aria-label="Dashboard">Momentum Workspace</h1>`
-(`DashboardRouteSurface.tsx:250-252`). Sighted users see "Momentum Workspace"; assistive technology
-announces "Dashboard".
+### N9 — The dashboard heading and its accessible name disagree (Low) — **Resolved**
+
+`<h1 id="dashboard-heading" aria-label="Dashboard">Momentum Workspace</h1>`. Sighted users saw
+"Momentum Workspace"; assistive technology announced "Dashboard".
+
+_Shipped:_ the `h1` reads **Dashboard** and the `aria-label` is gone, so the visible text _is_ the
+accessible name. `id="dashboard-heading"` stays — the section's `aria-labelledby` is its only
+consumer, and the whole landmark was already named "Dashboard" through the override — as does
+`tabIndex={-1}`, the focus target.
+
+Every existing `getByRole('heading', { name: 'Dashboard' })` assertion keeps passing, which is the
+point: they were passing on an override that contradicted the screen. Only the
+`getByText('Momentum Workspace')` assertion changed, and a new one asserts the greeting is visible.
+This also retires two of the six competing app names in §7.
 
 ### N10 — Archived projects ignore the campaign filter (Medium) — **Resolved**
 
@@ -352,14 +400,45 @@ Both list surfaces show `{items.length} loaded` (`ProjectRouteSurface.tsx:145`,
 
 Deliberately conservative — each item was verified before listing.
 
-| #      | Item                                                                                                                                                                                                                                                                                                                                                            | Evidence                                                            |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| R1     | **"Create another Campaign" on the Campaign detail page.** A secondary action competing with "New Project" on the surface whose job is to fill _this_ campaign. The same action exists in Quick Create and on the Campaigns list.                                                                                                                               | `CampaignRouteSurface.tsx:471-478`                                  |
-| R2     | **Four paths to create a video** — Dashboard "Create video", Quick Create ▸ New video, Quick Create ▸ Create Asset ▸ Video ▸ New Video, Assets "Upload video". Three land on `/studio/create` with different intents; the difference is not explained.                                                                                                          | `StudioApp.tsx:1106, 1179, 1236-1244`, `AssetsRouteSurface.tsx:145` |
-| ~~R3~~ | ~~**Duplicate campaign error surface.** `actionError` renders both inline on the page and inside the open dialog.~~ — **resolved with G6**: each shared dialog owns its error, so the page-level `actionError` has no writer left                                                                                                                               | `CampaignDialogs.tsx`                                               |
-| R4     | **"Start New" section on the dashboard** duplicates Quick Create ▸ New Project / New Campaign and the empty-state buttons directly above it.                                                                                                                                                                                                                    | `DashboardRouteSurface.tsx:391-405`                                 |
-| R5     | **`/studio/assets/recipes`** — a compatibility route for a UI that no longer exists; it silently redirects to `/assets`.                                                                                                                                                                                                                                        | `paths.ts:18-19, 169-170`                                           |
-| R6     | **`studioVideoPath()`** is exported and unit-tested but never called by application code, so `/studio/{videoId}` is an orphaned deep link. **Still open, deliberately** — N4 considered and rejected linking to it, because the route resets in-memory work and is outside `StudioExitGuard` (**B4**). Closing R6 means fixing B4 first, or deleting the route. | `grep studioVideoPath` matches only `paths.ts` and `paths.test.ts`  |
+| #      | Item                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Evidence                                                            |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| ~~R1~~ | ~~**"Create another Campaign" on the Campaign detail page.**~~ — **Removed.** It competed with "New Project" on the surface whose job is to fill _this_ campaign, and the same action already exists in Quick Create and on the Campaigns list. Its `creatingCampaign` state and the `CampaignFormDialog` it was the only writer for went with it; `returnFocusRef` stayed, because New Project, Edit and Archive share it. No test clicked it.                                                                                                                                                                                       | `CampaignRouteSurface.tsx`                                          |
+| R2     | **Four paths to create a video** — Dashboard "Create video", Quick Create ▸ New video, Quick Create ▸ Create Asset ▸ Video ▸ New Video, Assets "Upload video". Three land on `/studio/create` with different intents; the difference is not explained.                                                                                                                                                                                                                                                                                                                                                                                | `StudioApp.tsx:1106, 1179, 1236-1244`, `AssetsRouteSurface.tsx:145` |
+| ~~R3~~ | ~~**Duplicate campaign error surface.** `actionError` renders both inline on the page and inside the open dialog.~~ — **resolved with G6**: each shared dialog owns its error, so the page-level `actionError` has no writer left                                                                                                                                                                                                                                                                                                                                                                                                     | `CampaignDialogs.tsx`                                               |
+| ~~R4~~ | ~~**"Start New" section on the dashboard.**~~ — **Removed.** Literal duplication, not merely visual: both buttons called the same `nav.createProject` / `nav.createCampaign` the Quick Create menu uses, and **New Project** was repeated seven lines above in the Continue Work empty panel. `quickActionsStyles`, whose only call site it was, went with it. Its one real coupling was the `dashboard-overview` visual scenario, which gated on a visible **New Campaign** button that only Start New supplied on a seeded dashboard; that gate now uses the **All Campaigns** footer link.                                         | `DashboardRouteSurface.tsx`                                         |
+| ~~R5~~ | ~~**`/studio/assets/recipes`**~~ — **Removed.** The constant and its `LEGACY_PATH_REDIRECTS` entry were the whole route: it was never in `PROTECTED_ROUTES` or `PROTECTED_LEAF_PATHS`, so deleting them makes `isProtectedAppPath` stop matching and the `*` branch send it to `/`. Three assertions moved; `/assets/recipes` (a different path) stays in both rejection lists, and `/studio/assets/recipes` joins them. The unrelated technical `recipes` identifiers in `existingVideoRecipes.ts`, the existing-video chooser and `packages/domain` are untouched — `feature-behavior/06-recipe-shelf.md` keeps those deliberately. | `paths.ts`                                                          |
+| R6     | **`studioVideoPath()`** is exported and unit-tested but never called by application code, so `/studio/{videoId}` is an orphaned deep link. **Still open, deliberately** — N4 considered and rejected linking to it, because the route resets in-memory work and is outside `StudioExitGuard` (**B4**). Closing R6 means fixing B4 first, or deleting the route.                                                                                                                                                                                                                                                                       | `grep studioVideoPath` matches only `paths.ts` and `paths.test.ts`  |
+
+**The Prompt Workshop was removed** alongside Tier 4, as a product decision rather than a §5 finding.
+It is recorded here because the premise matters: it was **not** dead code. It had four live entry
+points — the **Workshop** tool-rail button, **Open structured prompt workshop** in AI Settings and
+again inside `lucy-latest` recipe fields, and the Project **Choose another ▸ prompt** path — and four
+E2E specs that clicked it. Only `openSavedWorkshop` and the entire never-rendered save chain were
+genuinely dead.
+
+Prompt authoring survives: `ModelRecipeFields` already rendered the plain **Character direction** /
+**Garment direction** field the Workshop's only output path wrote into, and VTO never showed a
+Workshop button at all. Character Builder is untouched — it uses the `character-transform` intent,
+which the Workshop explicitly early-returned on.
+
+Three consequences worth stating:
+
+- **The reference-hydration failure notice moved, and improved.** "Reference image could not be
+  restored", with **Retry** and **Continue without reference**, rendered _only inside the Workshop
+  panel_ — so it was already invisible to an operator who had not opened that panel, which every
+  path that can produce it fails to do. It is now `ReferenceUseFailureNotice`, rendered
+  unconditionally as a sibling of the tool rail: the failure belongs to reference hydration, not to
+  any tool, so the rail does not own it.
+- **`packages/domain/src/prompts` stays.** `PROMPT_INTENTS` is load-bearing for stored-record
+  sanitization (`packages/domain/src/assets/sanitize.ts`), so the three Workshop-only intents cannot
+  leave the domain without a separate stored-data compatibility decision.
+- **Stray `lightframe.workshop-drafts.*` localStorage entries remain** in existing browsers. They are
+  unsaved scratch text that never reached the API, nothing enumerates them, and a cleanup path whose
+  only purpose is a deleted feature would have a very short useful life. Recorded rather than fixed.
+
+`repository.createSavedCharacterPrompt` lost its only production caller and was **kept**: five test
+files use it to seed characters, and `persistSavedCharacterPrompt` has different semantics, so
+deleting it would have churned unrelated tests to change what they exercise.
 
 ## 6. Potential bugs
 
@@ -460,13 +539,49 @@ capture a second time. It predates the B1 fix — the search string changes too,
 predecessor. The real fix is not to auto-start until the project context resolves, which is this
 finding's territory rather than B1's.
 
-### B6 — Cloud creative-library sync has no recovery path (Medium)
+### B6 — Cloud creative-library sync has no recovery path (Medium) — **Resolved**
 
-`useCreativeLibraryCloudSync` fails closed on conflict or transport error, unsubscribes, and shows
-a notice (`useCreativeLibraryCloudSync.ts:40-45, 63-76, 106-112`). Nothing in the UI can resume
-sync — the user must reload the page, and reload will hit the same divergence and pause again. A
-user whose two browsers both have local characters is permanently unsynced with no merge, no
-"keep mine / keep theirs", and no visible diff.
+`useCreativeLibraryCloudSync` failed closed on conflict or transport error, unsubscribed, and set a
+notice. Nothing in the UI could resume sync — the user had to reload, and reload hit the same
+divergence and paused again.
+
+**Correction to the original finding: it was worse than "no recovery path".** The finding says the
+hook "shows a notice". It did not. `setSyncNotice` wrote into `state.notice`, and **no component in
+`apps/web/src` read that field**. A user whose two browsers both held local Characters was
+permanently unsynced with no merge, no "keep mine / keep theirs", _and no visible indication that
+anything had stopped_.
+
+_Shipped:_ `useCreativeLibraryCloudSync` now owns a structured `CreativeLibrarySyncStatus` and
+returns it beside its actions. A sentence cannot be branched on without matching its own copy, and
+the recovery surface needs different actions per reason. The status lives with the hook, **not** in
+the repository: the repository owns _local_ storage, and the old `setSyncNotice` seam was writing
+cloud state into `state.notice`, a field that also carries storage health. Removing the seam
+entirely leaves the repository smaller than before this work started, and spares every repository
+test fake a field it never cared about.
+
+The hook keeps its single effect and gains the operator's answer in its deps, so each attempt runs
+exactly once — the `useProjectVideoAttachment` re-arm shape. `notice` stays for **local storage
+health** alone.
+
+`CreativeLibrarySyncNotice` offers **Try again** · **Keep this browser's copy** · **Use the cloud
+copy**, the last two behind `ConfirmationDialog` because both overwrite data. **Keep this browser's
+copy re-reads the revision first** — the one the hook was holding when it paused is precisely the
+one the server rejected, so a fresh read is required, not an optimization. `unavailable` offers only
+**Try again**; there is nothing to choose between.
+
+It mounts **once**, in `ShellChrome`. The pause affects every Character and Outfit save wherever the
+operator is, not just `/assets`; the Asset libraries are fullscreen overlays that would hide a
+hub-level notice; and a chrome-level slot sits outside `mainGridStyles`, so it cannot disturb the
+Studio stage or any visual baseline. There is no intermediate `syncing` state — the notice renders
+nothing but a pause, so a status the UI cannot show would be pure re-render noise.
+
+**No merge, deliberately.** Divergence is a whole-store `JSON.stringify` comparison, the contract
+exposes only a full-store PUT with a numeric CAS, and there is no per-record identity or timestamp.
+A "merge" would be invented semantics. Picking a side is the honest option the finding asked for.
+
+**Discovered and left open:** the storage-health `notice` — recovered records, session-only
+fallback, IndexedDB CAS conflicts — is still rendered nowhere. That is a separate finding with a
+separate owner, recorded here rather than fixed under a cloud-sync heading.
 
 ### B7 — Thumbnail generation failure is swallowed (Low)
 
@@ -474,11 +589,34 @@ user whose two browsers both have local characters is permanently unsynced with 
 (`useSaveVideo.ts:49-61`). The gallery then renders a placeholder with the label "Thumbnail
 unavailable", and the user is never told the save partially degraded.
 
-### B8 — Route errors are silently swallowed (Low)
+### B8 — Route errors are silently swallowed (Low) — **Resolved**
 
-`RouteErrorBoundary.componentDidCatch` has an empty body with a comment explaining that raw errors
-are not exposed (`AppRouter.tsx`). Nothing is logged or reported anywhere, so a production
-crash leaves no trace beyond the fallback screen.
+`RouteErrorBoundary.componentDidCatch` had an empty body with a comment explaining that raw errors
+are not exposed. Nothing was logged or reported anywhere, so a production crash left no trace beyond
+the fallback screen — and `apps/web` had no logger, no `console.*`, no telemetry and no `VITE_*`
+variable of any kind.
+
+_Shipped:_ local only. Nothing leaves the browser, no endpoint was added, no dependency, no flag.
+`app/clientDiagnostics.ts` keeps a bounded ten-entry in-memory ring buffer — bounded because a crash
+loop must not grow the heap it is already failing in — holding error name, message, a stack
+truncated to twelve lines, and the component stack. `componentDidCatch` records into it and
+`console.error`s.
+
+The original comment's rationale survives and is restated rather than deleted: the fallback copy
+stays generic, and the raw message is never rendered. What changed is that the detail is now
+_retrievable_ — **Copy diagnostic details** puts it on the operator's clipboard, so a report is
+possible without devtools.
+
+**This also closes M10.** The boundary now keeps the caught error, so a stale-deploy chunk miss is
+told apart from a crash: `LazyAuthenticatedShell` and thirteen other `lazy()` sites all sit inside
+this boundary, and a 404 on a hashed chunk used to read as "Studio could not load". It now reads
+"A newer version of Lightframe is available", with the same reload button. Detection matches Vite's
+and the browsers' own messages plus `ChunkLoadError`, because no error class is shared across
+engines.
+
+`vite.config.ts` sets `sourcemap: false`, so a production stack is minified. That is stated rather
+than papered over. **T6** is downgraded, not closed: field failures are now legible to a user who
+asks for them, but nothing is aggregated.
 
 ### B9 — Dashboard "Continue Work" assumes list ordering (Low, unverified)
 
@@ -499,14 +637,14 @@ closure until GC. No user-visible effect was identified.
 
 The product uses several vocabularies at once. Every term below is user-visible.
 
-| Concept                    | Terms in the UI                                                                                                        |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| A retained video           | "Video", "Saved Video", "Asset", "Version", "output", "retained Version"                                               |
-| Work in progress           | "take", "temporary take", "in-memory take", "presented media", "working media", "draft", "proposal", "candidate"       |
-| Saving                     | "Save to Assets", "Save as New Video", "Add Version", "adopt", "checkpoint", "commit", "retain", "Save creative setup" |
-| A reusable creative record | "Character", "Outfit", "saved prompt", "recipe", "creative resource", "creative asset"                                 |
-| Creating a project         | "Quick project", "New Project", "Untitled Project"                                                                     |
-| The app itself             | "Lightframe", "Lightframe Studio", "Studio", "Momentum Workspace", "Authenticated Studio"                              |
+| Concept                    | Terms in the UI                                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| A retained video           | "Video", "Saved Video", "Asset", "Version", "output", "retained Version"                                                        |
+| Work in progress           | "take", "temporary take", "in-memory take", "presented media", "working media", "draft", "proposal", "candidate"                |
+| Saving                     | "Save to Assets", "Save as New Video", "Add Version", "adopt", "checkpoint", "commit", "retain", "Save creative setup"          |
+| A reusable creative record | "Character", "Outfit", "saved prompt", "recipe", "creative resource", "creative asset"                                          |
+| Creating a project         | "New Project", "Create without a name", "Untitled Project" — down from three competing verbs to one action and its opt-out (N5) |
+| The app itself             | "Lightframe", "Lightframe Studio", "Studio" — "Momentum Workspace" and "Authenticated Studio" retired (N8/N9)                   |
 
 ~~Domain vocabulary that leaks directly into user-facing copy:~~ — **the six worst strings are
 rewritten.** They were _accurate_, and also written for the person who implemented the aggregate
@@ -552,9 +690,9 @@ less.
 
 1. **The vocabulary must be learned before the product can be used.** Project vs Campaign vs Asset
    vs Version vs source vs working media is six concepts before the first video.
-2. **The first-take guide never appears** (`firstSuccessGuideVisible` is initialised `false` and
-   never set — `StudioApp.tsx`), so the Studio's only inline coaching is dead code from the
-   user's perspective.
+2. ~~**The first-take guide never appears.**~~ — resolved: the flag and the guide markup were both
+   removed by the shell/runtime split (see G8). The Studio now has no inline coaching at all, which
+   is honest rather than dead, and the remaining gap is the one **M7** tracks.
 3. ~~**"Continue editing" on an empty project** implies prior work that does not exist~~ —
    resolved (G3): the label reads **Add source** and the Source task is on the overview.
 4. **Nothing explains that Studio work is temporary** until the user tries to leave and hits a
@@ -588,8 +726,8 @@ concerns:
 | ~~T3~~ | ~~**The Studio shell never unmounts.**~~ **Resolved.** The persistent shell now owns only what a session needs — remote state, lifecycle, chrome, creative library — and the capture runtime mounts only on routes that own live media (`isStudioRuntimePath`), shedding ~319 KB and the whole capture graph everywhere else. | In-memory Studio state no longer accumulates across "pages"; capture device choices and unsaved Workshop drafts are persisted so they still survive |
 | T4     | **Provider work is billable and only partially cancellable.** The UI says so honestly (`DashboardRouteSurface.tsx:490`, `ProjectProcessingStatusPanel.tsx:52-55`), but "Remove from queue" reads like a cancel.                                                                                                               | Users may believe they stopped a charge                                                                                                             |
 | T5     | **300 MB client-side bounds** on every media read (`useStudioSavedVideoController.ts:139`, `useProjectSourceController.ts:21`).                                                                                                                                                                                               | Larger legitimate videos fail with a safety-limit message rather than a size-policy explanation up front                                            |
-| T6     | **No client-side telemetry or error reporting** (B8).                                                                                                                                                                                                                                                                         | Field failures are invisible                                                                                                                        |
-| T7     | **`window.confirm` in two flows** (N7) blocks the event loop and cannot be automated or styled.                                                                                                                                                                                                                               | Inconsistent behaviour under test and on mobile                                                                                                     |
+| T6     | **No client-side telemetry or aggregation.** Downgraded, not closed (B8): a route crash is now recorded locally and the operator can copy it, and a stale-chunk failure is told apart from a crash — but nothing is collected anywhere, and production stacks are minified (`sourcemap: false`).                              | A field failure is legible to a user who is asked for it, and invisible otherwise                                                                   |
+| ~~T7~~ | ~~**`window.confirm` in two flows** (N7).~~ **Resolved before Tier 4** — `apps/web/src` has none. Both sites `await` a real dialog through `useConfirmationRequest`.                                                                                                                                                          | —                                                                                                                                                   |
 
 ## 11. Recommended priorities
 
@@ -639,16 +777,27 @@ independent.
     extracting the dialogs and sharing them with the detail page rather than copying them — which
     also closed **R3**.
 
-**Tier 4 — consistency and hygiene**
+**Tier 4 — consistency and hygiene** — **complete**
 
-15. **N7** — replace both `window.confirm` calls with `ConfirmationDialog`.
-16. **N5** — clarify or merge "Quick project" and "New Project".
-17. **G8** — either wire up `firstSuccessGuideVisible` or delete the dead guide markup.
-18. **N8/N9** — make the dashboard greeting visible and align the heading with its accessible name.
-19. **B6** — give cloud-library sync a retry and an explicit "keep local / keep cloud" choice.
-20. **B8/T6** — add minimal error reporting behind the existing route error boundary.
-21. **R1/R4/R5** — remove the redundant surfaces once the flows above settle. (**R3** already went
-    with G6.)
+15. ~~**N7** — replace both `window.confirm` calls with `ConfirmationDialog`.~~ **Already done**
+    before the tier ran, by `useConfirmationRequest`. Verified, and the entry corrected.
+16. ~~**N5** — clarify or merge "Quick project" and "New Project".~~ **Done** — merged. The unnamed
+    action lives in the dialog, where it can carry the Campaign the standalone button never could.
+17. ~~**G8** — either wire up `firstSuccessGuideVisible` or delete the dead guide markup.~~
+    **Already deleted**, with nothing left behind. The onboarding half of G8 stays open with **M7**.
+18. ~~**N8/N9** — make the dashboard greeting visible and align the heading with its accessible
+    name.~~ **Done** — and it retired two of §7's six app names as a side effect.
+19. ~~**B6** — give cloud-library sync a retry and an explicit "keep local / keep cloud" choice.~~
+    **Done**, plus the surface the finding assumed already existed and did not.
+20. ~~**B8/T6** — add minimal error reporting behind the existing route error boundary.~~ **Done**,
+    local only. **M10** closed with it; **T6** is downgraded rather than closed.
+21. ~~**R1/R4/R5** — remove the redundant surfaces once the flows above settle.~~ **Done**, all
+    three. (**R3** already went with G6.) **R6** stays open on purpose — it needs **B4** first.
+
+**What is left.** Every tier is closed. The open findings are G5, the onboarding half of G8, N6,
+N11, M3–M9 and M11–M12, B4, B5, B7, B9, B10, R2, R6, the §7 vocabulary consolidation, P2–P5, and
+T1/T2/T4/T5/T6. None is a broken flow; the largest of them (**G5**, account and settings) is a
+missing surface rather than a defect.
 
 ## 12. Unverified items
 
@@ -674,3 +823,32 @@ caveats recorded honestly: **N2 has no automated coverage** (see its entry — n
 video content bytes), and `e2e/app-routing.spec.ts` "a Project saves exact Versions, reconciles
 response loss, and retains truthful history" fails **on the unmodified baseline too**, so it is a
 pre-existing failure rather than a Tier 3 regression.
+
+The Tier 4 fixes (N5, N8, N9, B6, B8/T6, R1, R4, R5) and the Prompt Workshop removal were validated
+with the full `apps/web` unit suite, `bun run quality`, `bun run check:docs`, and the Chromium E2E
+suite. Recorded honestly:
+
+- **`bun run check:dead-code:production` fails on the unmodified baseline** as well, on
+  `apps/api/src/infrastructure/database/scripted-database.test-support.ts`. Confirmed by stashing
+  the change and re-running; it is pre-existing, not a Tier 4 regression. (`bun run quality`, which
+  runs the non-production `check:dead-code`, passes.)
+- **Three `e2e/local-first-preparation.spec.ts` cases fail on the unmodified baseline too**, all at
+  the same `expect(login.ok()).toBe(true)` before reaching any assertion this work touched.
+  Environmental, and confirmed by the same stash-and-re-run.
+- **One genuine accessibility defect surfaced and was fixed.** Removing the Workshop step from the
+  full-desktop axe scan exposed a `color-contrast` violation on the _selected_ capture-format
+  option's caption: `textFaint` on the `accentSoft` background. It had been hidden because the scan
+  previously ran with the Workshop overlay open, which made the rest of the page inert. Only the
+  selected state needed the step up to `textMuted`.
+- **The `dashboard-overview` Darwin baselines were regenerated, and only those.** N8/N9 and R4 both
+  change the dashboard header and body. The update was run with `--grep "dashboard-overview"`
+  deliberately: **26 of the 35 curated cases already fail on the unmodified tree** in this
+  environment, so a blanket `test:visual:update` would have rewritten 26 unrelated baselines to one
+  machine's rendering — exactly what `docs/TESTING.md` forbids. Both regenerated images were
+  inspected. `node scripts/prune-visual-baselines.mjs --check` reports 35 curated baselines across
+  2 platforms and nothing to prune.
+- **The two `chromium-linux` `11-dashboard/overview.png` baselines are still stale** and cannot be
+  produced on macOS. They must be regenerated where Linux images are made.
+- **The Workshop removal deleted three screenshot scenarios** (`03-character-workshop`) from
+  `capture-screenshots.screenshots.ts`. No _visual baseline_ was affected: the visual matrix never
+  contained a Workshop scenario, and `screenshots/` has no such directory.

@@ -1,10 +1,8 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { fn } from 'storybook/test';
 import {
-  CreativePanelContent,
   CreativeWorkspace,
-  type AuxiliaryPanel,
   type CreativeWorkspaceActions,
   type CreativeWorkspaceState,
 } from '@web/studio/CreativeWorkspace';
@@ -13,12 +11,11 @@ import { StoryColumn } from '../support/StoryLayout';
 const meta = {
   title: 'Studio/Creative Workspace',
   component: CreativeWorkspace,
-  subcomponents: { CreativePanelContent },
   parameters: {
     docs: {
       description: {
         component:
-          'CreativeWorkspace owns the desktop Character, Outfit, Workshop, and Edit Video preparation rail, responsive overlay placement, and cross-feature locks. Retired Recipe Shelf controls are intentionally absent.',
+          'CreativeWorkspace owns the desktop Character, Outfit, and Edit Video preparation rail, responsive overlay placement, and cross-feature locks. Retired Recipe Shelf and Prompt Workshop controls are intentionally absent.',
       },
     },
   },
@@ -28,34 +25,20 @@ export default meta;
 type Story = StoryObj;
 
 const WorkspaceHarness = () => {
-  const [panel, setPanel] = useState<AuxiliaryPanel>('closed');
   const editVideoToggleRef = useRef<HTMLButtonElement>(null);
   const characterToggleRef = useRef<HTMLButtonElement>(null);
   const outfitToggleRef = useRef<HTMLButtonElement>(null);
-  const workshopToggleRef = useRef<HTMLButtonElement>(null);
 
   const state: CreativeWorkspaceState = {
-    panel,
-    activeTool: panel === 'closed' ? null : panel,
+    activeTool: null,
     showDesktopAiTools: true,
-    activeSessionMode: 'local',
-    workshopDrafts: {},
     recordingActive: false,
-    sessionModeLocked: false,
-    hasReferenceImage: false,
-    referenceUsePending: false,
-    referenceUseFailure: null,
     hasPlaybackVideo: true,
   };
   const actions: CreativeWorkspaceActions = {
     onOpenEditVideo: fn(),
     onOpenCharacter: fn(),
     onOpenOutfit: fn(),
-    onOpenWorkshop: () => setPanel('workshop'),
-    onClose: () => setPanel('closed'),
-    onWorkshopDraftChange: fn(),
-    onUseWorkshop: fn(),
-    onSaveWorkshop: fn(),
   };
 
   return (
@@ -76,7 +59,6 @@ const WorkspaceHarness = () => {
             editVideoToggleRef,
             characterToggleRef,
             outfitToggleRef,
-            workshopToggleRef,
           }}
         />
       </div>

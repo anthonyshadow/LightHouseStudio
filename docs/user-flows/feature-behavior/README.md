@@ -24,7 +24,6 @@ future features current.
 | Preview and record without provider work                 | [Local camera capture](02-local-camera-capture.md)                             |
 | Run and record a live character transformation           | [Live character transformation](03-character-ai-session.md)                    |
 | Run and record live virtual try-on                       | [Virtual try-on session](04-virtual-try-on-session.md)                         |
-| Build Add, Replace, or Restyle directions                | [Structured prompt workshop](05-structured-prompt-workshop.md)                 |
 | Understand retained creative-storage compatibility       | [Retired Recipe UI boundary](06-recipe-shelf.md)                               |
 | Review, save, and release a take                         | [Take review and cleanup](07-take-review-and-cleanup.md)                       |
 | Apply browser-local voice effects                        | [Local voice treatments](08-local-voice-treatments.md)                         |
@@ -56,15 +55,16 @@ future features current.
   not request provider credentials, load the Decart SDK, or send media externally.
 - The primary flow records or uploads a source, reviews it, and optionally applies Character Swap,
   Virtual Try On, and/or Voice, then saves the result before exact Download from Videos in Assets.
-  Live Character/VTO transformation and Workshop are advanced flows.
+  Live Character/VTO transformation is an advanced flow.
 - Campaign and Project lifecycle/source management is user-facing, including optional membership,
   move/detach, the virtual No Campaign group, durable source resume, and guarded bounded session
   autosave. Creative/edit checkpoints, recoverable visual processing, and exact output save are
   implemented. Bounded Project changes, processing attempts/results, and output-Version history
   support exact preview, explicit reuse, and Download. Provider Voice and advanced live Project
   starts remain gated when they cannot meet durable reconnect/result-retention requirements.
-- Character Builder owns true character creation and editing. Prompt Workshop owns Add, Replace,
-  and Restyle directions without exposing Recipe as an Asset type.
+- Character Builder owns true character creation and editing. Prompt authoring outside it is a
+  plain direction field in AI Settings; the structured Prompt Workshop is retired, and Recipe was
+  never exposed as an Asset type.
 - Saved Character Wardrobe owns normalized original/variant browsing and variant creation while
   reusing the same compatibility metadata, immutable reference store, and overlay/media ownership.
 - Studio keeps one mounted media stage and one temporary take pipeline. Organization pages mount

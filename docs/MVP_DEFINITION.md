@@ -253,7 +253,7 @@ Log in to Dashboard
   ↓
 Open Projects, or open/create a Campaign
   ↓
-Create a named Project, or use Quick project for an untitled standalone Project
+Create a named Project, or create it without a name for an untitled standalone Project
   ↓
 Record, upload, or reuse an exact Saved Video Version as source
   ↓
@@ -364,7 +364,7 @@ persistence mode unless a mode is explicitly and canonically unsupported before 
    workspace organized through optional Campaigns and Projects.
 2. The user can create, rename/edit, archive, restore, guarded-tombstone, list, and open a Campaign
    with name and optional brief; tombstone is blocked while Projects remain attached.
-3. The user can create a named standalone or Campaign Project, or use Quick project without
+3. The user can create a named standalone or Campaign Project, or create one without a name without
    unnecessary required metadata; any Project may intentionally remain collection-only.
 4. The user can move/detach a Project and use the virtual No Campaign view; Campaign lifecycle does
    not cascade.

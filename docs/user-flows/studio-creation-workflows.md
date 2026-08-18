@@ -37,7 +37,8 @@ experience**, mute microphone, camera on/off, stop model, stop recording, plus r
 (discard, voice treatments, **Save**, **Replace saved version**).
 
 To the side, `CreativeWorkspace` (`studio/CreativeWorkspace.tsx`) renders a tool rail:
-**Edit Video** · **Character** · **Outfit** · **Workshop**.
+**Edit Video** · **Character** · **Outfit**. It also owns the "Reference image could not be
+restored" notice, with **Retry** and **Continue without reference**.
 
 ## Flow: Record a local video
 

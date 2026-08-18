@@ -22,11 +22,8 @@ import {
 import { hasDraftContent } from '../features/media-session';
 import { persistedReferenceAssetId } from '../features/media-session/types';
 import { useStudioSession } from '../orchestration/session';
-import {
-  CreativeWorkspace,
-  type AuxiliaryPanel,
-  type CreativeWorkspaceState,
-} from './CreativeWorkspace';
+import { ReferenceUseFailureNotice } from './ReferenceUseFailureNotice';
+import { CreativeWorkspace, type CreativeWorkspaceState } from './CreativeWorkspace';
 import { StudioExitGuard } from './StudioExitGuard';
 import { isStudioFormError } from './studioStageNotices';
 import { deriveStudioContextualNotices } from './studioContextualNotices';
@@ -52,14 +49,8 @@ import { useSaveVideo } from '../features/saved-videos/useSaveVideo';
 
 const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
-const creativePanelForOverlay = (overlay: ActiveOverlay): AuxiliaryPanel => {
-  if (overlay === 'workshop') return 'workshop';
-  return 'closed';
-};
-
 const creativeToolForOverlay = (
   overlay: ActiveOverlay,
-  panel: AuxiliaryPanel,
   videoEditing: boolean,
 ): CreativeWorkspaceState['activeTool'] => {
   if (videoEditing) return 'edit-video';
@@ -73,7 +64,7 @@ const creativeToolForOverlay = (
     case 'outfit-builder':
       return 'outfit';
     default:
-      return panel === 'closed' ? null : panel;
+      return null;
   }
 };
 
@@ -118,7 +109,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     editVideoToggleRef,
   } = services;
   // Runtime-local: nothing outside the capture graph reads these.
-  const workshopToggleRef = useRef<HTMLButtonElement>(null);
   const uploadToggleRef = useRef<HTMLButtonElement>(null);
   const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
   const {
@@ -273,7 +263,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
 
   const {
     aiSessionActive,
-    sessionModeLocked,
     finalizing,
     creativeConfigurationMediaLocked,
     creativeConfigurationSessionModeLocked,
@@ -298,17 +287,13 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     onClearExistingVideoIntent: clearExistingVideoIntent,
   });
 
-  const openWorkshopOverlay = useCallback(() => openOverlay('workshop'), [openOverlay]);
   const handoff = useReferenceRecipeHandoff({
-    ownerUserId: auth.session!.user.id,
     repository,
     store: repositoryStore,
     session,
     mediaLocked: creativeConfigurationMediaLocked,
-    recordingActive,
     sessionModeLocked: creativeConfigurationSessionModeLocked,
     characterBuilderOpenBlockedReason,
-    openWorkshopOverlay,
     closeOverlay,
     confirmation,
   });
@@ -317,25 +302,18 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     activeCharacter,
     activeCharacterName,
     activeRecipeLabel,
-    workshopDraft,
-    workshopDrafts,
-    referenceUsePending,
     referenceUseFailureMessage,
     canContinueReferenceUseWithoutImage,
     characterBuilderSaveBlockedReason,
   } = handoff.state;
   const {
     recordCommittedPrompt,
-    rememberWorkshopDraft,
     useRecipe: applyRecipeSelection,
     clearActiveCharacter,
     clearActiveRecipe,
     retryReferenceUse,
     continueReferenceUseWithoutImage,
     saveBuiltCharacter,
-    applyWorkshopPrompt,
-    saveWorkshopPrompt,
-    openWorkshop,
   } = handoff.actions;
   const projectCreative = useProjectCreativeSessionAdapter({
     projectId: activeProjectId,
@@ -397,8 +375,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     stageNotices,
   } = stage;
 
-  const closeCreativePanel = closeOverlay;
-
   const openCaptureSettings = () => {
     if (recordingActive) return;
     if (desktopStudioLayout) {
@@ -412,8 +388,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   const openSavedCharacters = useCallback(() => openOverlay('saved-characters'), [openOverlay]);
   const openOutfitSelector = useCallback(() => openOverlay('outfit-selector'), [openOverlay]);
 
-  const creativePanel = creativePanelForOverlay(activeOverlay);
-  const activeCreativeTool = creativeToolForOverlay(activeOverlay, creativePanel, videoEditing);
+  const activeCreativeTool = creativeToolForOverlay(activeOverlay, videoEditing);
   const activeRecordingSource = recordingActive
     ? recording.activeSource
     : reviewLocked
@@ -626,71 +601,54 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
         openPlaybackEditor();
         return;
       }
-      if (kind === 'prompt' || kind === 'recipe') {
-        openWorkshopOverlay();
-        return;
-      }
-      if (kind === 'reference') {
+      if (kind === 'prompt' || kind === 'recipe' || kind === 'reference') {
         openOverlay('ai-settings');
         return;
       }
       openCharacterSelector();
     },
-    [
-      openCharacterSelector,
-      openOutfitSelector,
-      openOverlay,
-      openPlaybackEditor,
-      openWorkshopOverlay,
-    ],
+    [openCharacterSelector, openOutfitSelector, openOverlay, openPlaybackEditor],
   );
   const creativeWorkspace = (
-    <CreativeWorkspace
-      state={{
-        panel: creativePanel,
-        activeTool: activeCreativeTool,
-        showDesktopAiTools: desktopStudioLayout,
-        liveToolsAvailableDuringPlayback: projectContextActive,
-        activeCharacterLabel: activeCharacterName,
-        activeOutfitLabel:
-          session.draft.mode === 'lucy-vton-latest' && hasDraftContent(session.draft)
-            ? (activeRecipeLabel ?? 'Configured VTO')
-            : undefined,
-        activeSessionMode: session.draft.mode,
-        workshopDraft,
-        workshopDrafts,
-        recordingActive,
-        sessionModeLocked,
-        hasReferenceImage: Boolean(session.draft.referenceImage),
-        referenceUsePending,
-        referenceUseFailure: referenceUseFailureMessage
-          ? {
-              message: referenceUseFailureMessage,
-              onRetry: retryReferenceUse,
-              ...(canContinueReferenceUseWithoutImage
-                ? { onContinueWithoutReference: continueReferenceUseWithoutImage }
-                : {}),
-            }
-          : null,
-        hasPlaybackVideo: Boolean(recording.presented),
-      }}
-      refs={{
-        workshopToggleRef,
-        editVideoToggleRef,
-        characterToggleRef: characterSelectorRef,
-        outfitToggleRef,
-      }}
-      actions={{
-        onOpenEditVideo: openPlaybackEditor,
-        onOpenCharacter: openCharacterSelector,
-        onOpenOutfit: openOutfitSelector,
-        onOpenWorkshop: () => void openWorkshop(),
-        onClose: closeCreativePanel,
-        onWorkshopDraftChange: rememberWorkshopDraft,
-        onUseWorkshop: applyWorkshopPrompt,
-        onSaveWorkshop: (action) => void saveWorkshopPrompt(action),
-      }}
-    />
+    <>
+      <CreativeWorkspace
+        state={{
+          activeTool: activeCreativeTool,
+          showDesktopAiTools: desktopStudioLayout,
+          liveToolsAvailableDuringPlayback: projectContextActive,
+          activeCharacterLabel: activeCharacterName,
+          activeOutfitLabel:
+            session.draft.mode === 'lucy-vton-latest' && hasDraftContent(session.draft)
+              ? (activeRecipeLabel ?? 'Configured VTO')
+              : undefined,
+          recordingActive,
+          hasPlaybackVideo: Boolean(recording.presented),
+        }}
+        refs={{
+          editVideoToggleRef,
+          characterToggleRef: characterSelectorRef,
+          outfitToggleRef,
+        }}
+        actions={{
+          onOpenEditVideo: openPlaybackEditor,
+          onOpenCharacter: openCharacterSelector,
+          onOpenOutfit: openOutfitSelector,
+        }}
+      />
+      <ReferenceUseFailureNotice
+        failure={
+          referenceUseFailureMessage
+            ? {
+                message: referenceUseFailureMessage,
+                onRetry: retryReferenceUse,
+                ...(canContinueReferenceUseWithoutImage
+                  ? { onContinueWithoutReference: continueReferenceUseWithoutImage }
+                  : {}),
+              }
+            : null
+        }
+      />
+    </>
   );
   const projectCreativeCheckpoint = projectContextActive ? (
     <ProjectCreativeCheckpointPanel

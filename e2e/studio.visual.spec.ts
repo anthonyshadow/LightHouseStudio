@@ -332,7 +332,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       ).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Continue Work' })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Recent Work' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'New Campaign' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'All Campaigns' })).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
     },
   },

@@ -26,14 +26,15 @@ export const dashboardHeaderStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.lg,
   paddingBlockEnd: theme.space.xl,
   borderBlockEnd: `1px solid ${theme.colors.border}`,
+  // A greeting, not a category label: the old uppercase 0.2em-tracked 0.625rem treatment made
+  // "Welcome back, …" read as an eyebrow rather than as a sentence addressed to the operator.
   '& [data-dashboard-eyebrow]': {
     display: 'block',
     marginBlockEnd: theme.space.xs,
-    color: theme.colors.accent,
-    fontSize: '0.625rem',
-    fontWeight: 850,
-    letterSpacing: '0.2em',
-    textTransform: 'uppercase',
+    color: theme.colors.textMuted,
+    fontSize: '0.9375rem',
+    fontWeight: 600,
+    letterSpacing: '-0.01em',
   },
   '& h1': {
     margin: 0,
@@ -253,22 +254,6 @@ export const continuePanelStyles = (theme: Theme): CSSObject => ({
   },
   '&:focus-within, &:hover': { borderColor: theme.colors.borderStrong },
   '@media (max-width: 30rem)': { '& > button': { marginBlockStart: theme.space.xl } },
-});
-
-export const quickActionsStyles = (theme: Theme): CSSObject => ({
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: `${theme.space.md} ${theme.space.xxl}`,
-  '& button': {
-    minHeight: '2.75rem',
-    justifyContent: 'flex-start',
-    paddingInline: theme.space.xxs,
-    color: theme.colors.textMuted,
-    background: 'transparent',
-  },
-  '& button:first-of-type svg': { color: theme.colors.accent },
-  '& button:last-of-type svg': { color: theme.colors.violet },
-  '& svg': { width: '1.2rem', height: '1.2rem' },
 });
 
 export const recentWorkStyles = (theme: Theme): CSSObject => ({

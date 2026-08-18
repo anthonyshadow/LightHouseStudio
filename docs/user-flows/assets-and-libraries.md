@@ -133,15 +133,39 @@ per environment scope (`persistence/environmentScope.ts`, `studio/useStudioCreat
 exists (relational database modes only — see `app.ts:432-436` and the route inventory oracle at
 `apps/api/src/route-inventory.test.ts:81-84`). The sync is deliberately **fail-closed**:
 
-| Situation                                           | Behaviour                                 |
-| --------------------------------------------------- | ----------------------------------------- |
-| Remote empty, local non-empty, production scope     | Push local up                             |
-| Remote empty, local non-empty, non-production scope | Overwrite local from remote               |
-| Remote non-empty, local empty                       | Pull remote down                          |
-| Both non-empty and different                        | **Pause sync**, keep local, show a notice |
-| Revision conflict or transport failure              | Pause sync, keep local, show a notice     |
+| Situation                                           | Behaviour                                         |
+| --------------------------------------------------- | ------------------------------------------------- |
+| Remote empty, local non-empty, production scope     | Push local up                                     |
+| Remote empty, local non-empty, non-production scope | Overwrite local from remote                       |
+| Remote non-empty, local empty                       | Pull remote down                                  |
+| Both non-empty and different                        | **Pause sync** (`reason: 'diverged'`), keep local |
+| Revision conflict                                   | Pause sync (`reason: 'conflict'`), keep local     |
+| Transport failure                                   | Pause sync (`reason: 'unavailable'`), keep local  |
 
-There is no merge and no manual resolution UI — the notice is terminal for the session.
+**A pause is recoverable.** `useCreativeLibraryCloudSync` owns a structured
+`CreativeLibrarySyncStatus` — the repository owns _local_ storage and neither stores nor reads cloud
+status — and `CreativeLibrarySyncNotice` renders it once, in `ShellChrome`, on every
+protected route — the pause affects every Character and Outfit save, not only `/assets`, and the
+Asset libraries are fullscreen overlays that would hide a hub-level notice. It offers:
+
+- **Try again** — re-runs the whole startup sequence, including the divergence check;
+- **Keep this browser's copy** — re-reads the current server revision, then PUTs the local store
+  over it. The revision the hook was holding when it paused is the one the server already rejected,
+  so the fresh read is required rather than an optimization;
+- **Use the cloud copy** — pulls the remote store through `replaceFromRemote`, which re-sanitizes it
+  and refuses a non-canonical remote.
+
+Both resolutions overwrite one copy with the other and are confirmed through `ConfirmationDialog`.
+A transport failure offers only **Try again**, because there is nothing to choose between.
+
+**There is still no merge, and that is deliberate.** Divergence is detected by a whole-store
+deep-equality comparison, the contract exposes only a full-store PUT with a numeric CAS, and no
+per-record identity or timestamp is available — so a "merge" would be invented semantics rather
+than a reconciliation. Picking a side is the honest option.
+
+The repository's separate `notice` field carries **local storage health** (recovered records,
+session-only fallback, IndexedDB CAS conflicts). It is still rendered nowhere; that is an open gap
+tracked in [`gaps-and-usability-audit.md`](gaps-and-usability-audit.md), not part of cloud sync.
 
 ## Reference images
 

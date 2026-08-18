@@ -477,14 +477,6 @@ test('image-backed save preserves the exact generated asset and optimized Lucy p
     }),
   ).toBeVisible();
 
-  await page.getByRole('button', { name: 'Workshop', exact: true }).click();
-  const workshop = page.getByRole('dialog', { name: 'Prompt Workshop' });
-  await expect(workshop.getByRole('button', { name: 'Transform character' })).toHaveCount(0);
-  await expect(workshop.getByRole('button', { name: /Detach generated reference/u })).toHaveCount(
-    0,
-  );
-  await workshop.getByRole('button', { name: 'Close creative tool' }).click();
-
   await page.getByRole('button', { name: 'Record New Video' }).click();
   await page.getByRole('button', { name: 'Start AI', exact: true }).click();
   await page
