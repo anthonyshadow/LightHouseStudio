@@ -1,0 +1,45 @@
+name: Playwright browsers
+description: Restore cached Playwright browsers and install the system dependencies a job needs.
+
+inputs:
+  browsers:
+    description: Space-separated Playwright browser names, for example "chromium webkit".
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Key the cache on the installed Playwright version so a dependency bump invalidates it.
+    - name: Resolve Playwright version
+      id: playwright
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      run: |
+        {
+          echo "version=$(node -p "require('@playwright/test/package.json').version")"
+          echo "slug=${BROWSERS// /-}"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Restore browser binaries
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}-${{ steps.playwright.outputs.slug }}
+
+    # $BROWSERS is deliberately unquoted below: Playwright takes one argument per browser.
+    - name: Download browsers and install system dependencies
+      if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      run: bunx playwright install --with-deps $BROWSERS
+
+    # Browser binaries came from the cache, but apt packages live in the runner image and do not.
+    - name: Install system dependencies
+      if: ${{ steps.cache.outputs.cache-hit == 'true' }}
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      run: bunx playwright install-deps $BROWSERS

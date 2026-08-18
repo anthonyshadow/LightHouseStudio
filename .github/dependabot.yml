@@ -15,7 +15,9 @@ updates:
           - patch
 
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - /
+      - /.github/actions/playwright-browsers
     target-branch: develop
     schedule:
       interval: monthly
