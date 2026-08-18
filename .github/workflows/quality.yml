@@ -31,7 +31,9 @@ jobs:
       - run: bun ci
       - run: bun run audit:all
       - run: bun run quality
-      - run: bunx playwright install --with-deps chromium
+      - uses: ./.github/actions/playwright-browsers
+        with:
+          browsers: chromium
       - run: bun run test:production
       - name: Upload unit failure report
         if: ${{ failure() }}
@@ -79,7 +81,9 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: bun ci
-      - run: bunx playwright install --with-deps chromium webkit
+      - uses: ./.github/actions/playwright-browsers
+        with:
+          browsers: chromium webkit
       - run: bun run test:e2e
         env:
           LIGHTFRAME_ENV_SOURCE: process
@@ -166,7 +170,9 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: bun ci
-      - run: bunx playwright install --with-deps chromium
+      - uses: ./.github/actions/playwright-browsers
+        with:
+          browsers: chromium
       - run: bun run test:visual
       - name: Upload visual failure artifacts
         if: ${{ failure() }}
@@ -193,7 +199,9 @@ jobs:
         with:
           node-version-file: .nvmrc
       - run: bun ci
-      - run: bunx playwright install --with-deps chromium
+      - uses: ./.github/actions/playwright-browsers
+        with:
+          browsers: chromium
       - run: bun run screenshots:capture
       - name: Upload broad captures
         if: ${{ always() }}
