@@ -2,6 +2,9 @@ name: Quality
 
 on:
   push:
+    branches:
+      - develop
+      - main
   pull_request:
   workflow_dispatch:
 
@@ -22,14 +25,15 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: .bun-version
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-      - run: bun ci
+      - uses: ./.github/actions/setup-workspace
       - run: bun run audit:all
+      - name: Restore ESLint cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .eslintcache
+          key: eslint-${{ runner.os }}-${{ hashFiles('eslint.config.mjs', 'bun.lock') }}-${{ github.sha }}
+          restore-keys: |
+            eslint-${{ runner.os }}-${{ hashFiles('eslint.config.mjs', 'bun.lock') }}-
       - run: bun run quality
       - uses: ./.github/actions/playwright-browsers
         with:
@@ -51,13 +55,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: .bun-version
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-      - run: bun ci
+      - uses: ./.github/actions/setup-workspace
       - run: bun run test:coverage
       - name: Upload coverage report
         if: ${{ always() }}
@@ -74,13 +72,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: .bun-version
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-      - run: bun ci
+      - uses: ./.github/actions/setup-workspace
       - uses: ./.github/actions/playwright-browsers
         with:
           browsers: chromium webkit
@@ -138,13 +130,7 @@ jobs:
       AUTH_JWT_SECRET: lightframe-ci-signing-key-with-at-least-32-characters
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: .bun-version
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-      - run: bun ci
+      - uses: ./.github/actions/setup-workspace
       - run: bun run db:migrate:development
       - run: bun run --filter @studio/api db:check
       - run: bun run db:smoke:development
@@ -163,13 +149,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: .bun-version
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-      - run: bun ci
+      - uses: ./.github/actions/setup-workspace
       - uses: ./.github/actions/playwright-browsers
         with:
           browsers: chromium
@@ -192,13 +172,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: .bun-version
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-      - run: bun ci
+      - uses: ./.github/actions/setup-workspace
       - uses: ./.github/actions/playwright-browsers
         with:
           browsers: chromium

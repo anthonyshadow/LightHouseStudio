@@ -3,6 +3,7 @@ node_modules/
 .pnpm-store/
 dist/
 coverage/
+.eslintcache
 playwright-report/
 test-results/
 storybook-static/
