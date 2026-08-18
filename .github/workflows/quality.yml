@@ -70,13 +70,8 @@ jobs:
     name: Browser journeys
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Browsers and their system libraries are baked into this image, which removes the apt install
-    # and the browser download from the longest job. The tag must track @playwright/test in
-    # package.json; Playwright refuses to run against a mismatched browser bundle.
-    container:
-      image: mcr.microsoft.com/playwright:v1.62.1-noble
-    # `bun run dev` starts PostgreSQL through Docker Compose, which a job container cannot do.
-    # `dev:ci` skips that step and talks to this service instead.
+    # `bun run dev` starts PostgreSQL through Docker Compose. `dev:ci` skips that and uses this
+    # service instead, mapped onto loopback because a development API refuses any other host.
     services:
       postgres:
         image: postgres:17.6-alpine
@@ -84,6 +79,8 @@ jobs:
           POSTGRES_DB: lightframe_development
           POSTGRES_USER: lightframe
           POSTGRES_PASSWORD: lightframe-local-development
+        ports:
+          - 5433:5432
         options: >-
           --health-cmd "pg_isready -U lightframe -d lightframe_development"
           --health-interval 2s
@@ -92,15 +89,15 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-workspace
+      - uses: ./.github/actions/playwright-browsers
         with:
-          bun-source: npm
+          browsers: chromium webkit
       - run: bun run test:e2e
         env:
           LIGHTFRAME_ENV_SOURCE: process
           NODE_ENV: development
           DATABASE_MODE: postgres
-          # Service containers are reached by label on their own port, not through a host mapping.
-          DATABASE_URL: postgresql://lightframe:lightframe-local-development@postgres:5432/lightframe_development
+          DATABASE_URL: postgresql://lightframe:lightframe-local-development@127.0.0.1:5433/lightframe_development
           ASSET_STORE_PROVIDER: r2
           R2_ACCOUNT_ID: 0123456789abcdef0123456789abcdef
           R2_ACCESS_KEY_ID: ci-fake-access-key
