@@ -33,6 +33,10 @@ type ProjectProcessingControllerState = Readonly<{
   attempt: ProjectProcessingAttempt | null;
   message: string | null;
   unverifiedOperationId: string | null;
+  // Whether the durable operation authority for this exact Project has actually been read.
+  // "No attempt in local state" is not the same fact as "no accepted operation exists", and only
+  // the second one may enable a potentially billable Start.
+  authorityLoaded: boolean;
 }>;
 
 const initialState = (projectId: string | null): ProjectProcessingControllerState => ({
@@ -41,7 +45,14 @@ const initialState = (projectId: string | null): ProjectProcessingControllerStat
   attempt: null,
   message: null,
   unverifiedOperationId: null,
+  authorityLoaded: false,
 });
+
+// A background status check that goes unanswered is not a broken operation. Keep presenting the
+// accepted work across a blip and try again, rather than tearing the panel down into an error that
+// also stops the poll; surface the failure once it is persistent enough to be real.
+const BACKGROUND_POLL_FAILURE_TOLERANCE = 3;
+const BACKGROUND_POLL_RETRY_MS = 4_000;
 
 const isRecoverableHistoricalAttempt = (attempt: ProjectProcessingAttempt): boolean =>
   attempt.nextPollAfterMs !== null ||
@@ -82,6 +93,10 @@ export const useProjectProcessingController = ({
   const pollControllerRef = useRef<AbortController | null>(null);
   const commandActiveRef = useRef<symbol | null>(null);
   const pollActiveRef = useRef<symbol | null>(null);
+  const pollFailuresRef = useRef(0);
+  // Re-arms the poll effect after a tolerated background failure, which deliberately leaves every
+  // presented value untouched and so would otherwise change nothing for the effect to key on.
+  const [pollRetryNonce, setPollRetryNonce] = useState(0);
   const startOperation = useStableOperationKey();
   const retryOperation = useStableOperationKey();
 
@@ -147,6 +162,7 @@ export const useProjectProcessingController = ({
         attempt,
         message: null,
         unverifiedOperationId: null,
+        authorityLoaded: true,
       });
       if (attemptNeedsProjectRefresh(attempt)) {
         try {
@@ -204,6 +220,7 @@ export const useProjectProcessingController = ({
           attempt,
           message: null,
           unverifiedOperationId: null,
+          authorityLoaded: true,
         });
         if (attempt !== null && attemptNeedsProjectRefresh(attempt)) {
           try {
@@ -268,6 +285,7 @@ export const useProjectProcessingController = ({
         activeProjectId === null ||
         activeSession === null ||
         commandActiveRef.current !== null ||
+        !currentState.authorityLoaded ||
         currentState.unverifiedOperationId !== null ||
         (currentState.attempt !== null &&
           (currentState.attempt.isCurrent || currentState.attempt.nextPollAfterMs !== null))
@@ -452,14 +470,24 @@ export const useProjectProcessingController = ({
     }
   }, [applyMutation, patchState]);
 
-  const reconcile = useCallback(
-    async (operationId?: string): Promise<boolean> => {
+  /**
+   * One status read, in two modes.
+   *
+   * A user asking "check this operation" is a visible command and reports as one. The automatic
+   * poll behind an accepted operation is not: it must leave `phase` alone so the surface keeps
+   * presenting steady progress instead of flipping between "processing" and "checking" on every
+   * tick, and so a status read is never mistaken for work the user started.
+   */
+  const runReconcile = useCallback(
+    async (operationId: string | undefined, background: boolean): Promise<boolean> => {
       const activeProjectId = projectIdRef.current;
       const targetOperationId = operationId ?? stateRef.current.attempt?.operationId ?? null;
       if (
         activeProjectId === null ||
         targetOperationId === null ||
-        pollActiveRef.current !== null
+        pollActiveRef.current !== null ||
+        // A poll never competes with a command for the phase; the command reads authority itself.
+        (background && commandActiveRef.current !== null)
       ) {
         return false;
       }
@@ -468,7 +496,7 @@ export const useProjectProcessingController = ({
       const controller = new AbortController();
       pollControllerRef.current?.abort('project-processing-status-replaced');
       pollControllerRef.current = controller;
-      patchState({ phase: 'refreshing', message: null });
+      if (!background) patchState({ phase: 'refreshing', message: null });
       try {
         const response = await reconcileProjectProcessing({
           projectId: activeProjectId,
@@ -476,12 +504,19 @@ export const useProjectProcessingController = ({
           signal: controller.signal,
         });
         if (projectIdRef.current !== activeProjectId) return false;
+        pollFailuresRef.current = 0;
         await applyMutation(response, controller.signal, activeProjectId);
         return true;
       } catch (error) {
-        if (!controller.signal.aborted && projectIdRef.current === activeProjectId) {
-          patchState({ phase: 'error', message: commandErrorMessage(error) });
+        if (controller.signal.aborted || projectIdRef.current !== activeProjectId) return false;
+        pollFailuresRef.current += 1;
+        if (background && pollFailuresRef.current < BACKGROUND_POLL_FAILURE_TOLERANCE) {
+          // Keep the accepted operation on screen and re-arm the poll: nothing about the durable
+          // operation changed just because one status read did not come back.
+          setPollRetryNonce((value) => value + 1);
+          return false;
         }
+        patchState({ phase: 'error', message: commandErrorMessage(error) });
         return false;
       } finally {
         if (pollActiveRef.current === pollToken) pollActiveRef.current = null;
@@ -489,6 +524,11 @@ export const useProjectProcessingController = ({
       }
     },
     [applyMutation, patchState],
+  );
+
+  const reconcile = useCallback(
+    (operationId?: string): Promise<boolean> => runReconcile(operationId, false),
+    [runReconcile],
   );
 
   const refresh = useCallback(async (): Promise<boolean> => {
@@ -514,11 +554,13 @@ export const useProjectProcessingController = ({
     pollActiveRef.current = null;
     startOperation.reset();
     retryOperation.reset();
+    pollFailuresRef.current = 0;
     replaceState({
       phase: projectId === null || sessionProjectId === null ? 'idle' : 'loading',
       attempt: null,
       message: null,
       unverifiedOperationId: null,
+      authorityLoaded: false,
     });
     if (
       projectId === null ||
@@ -545,7 +587,7 @@ export const useProjectProcessingController = ({
   ]);
 
   // State belonging to another Project is not a partial view of this one — discard all of it.
-  const { attempt, phase, message, unverifiedOperationId } =
+  const { attempt, authorityLoaded, phase, message, unverifiedOperationId } =
     state.projectId === projectId ? state : initialState(projectId);
 
   useEffect(() => {
@@ -556,11 +598,14 @@ export const useProjectProcessingController = ({
     ) {
       return;
     }
-    const timer = window.setTimeout(() => {
-      void reconcile(attempt.operationId);
-    }, attempt.nextPollAfterMs);
+    const timer = window.setTimeout(
+      () => {
+        void runReconcile(attempt.operationId, true);
+      },
+      pollFailuresRef.current > 0 ? BACKGROUND_POLL_RETRY_MS : attempt.nextPollAfterMs,
+    );
     return () => window.clearTimeout(timer);
-  }, [attempt, phase, reconcile]);
+  }, [attempt, phase, pollRetryNonce, runReconcile]);
 
   useEffect(
     () => () => {
@@ -581,14 +626,25 @@ export const useProjectProcessingController = ({
         phase,
       ),
       active: attempt?.nextPollAfterMs !== null && attempt?.nextPollAfterMs !== undefined,
-      authorityReady: phase === 'idle' && unverifiedOperationId === null,
+      authorityReady: phase === 'idle' && unverifiedOperationId === null && authorityLoaded,
       start,
       retry,
       cancel,
       reconcile,
       refresh,
     }),
-    [attempt, cancel, message, phase, reconcile, refresh, retry, start, unverifiedOperationId],
+    [
+      attempt,
+      authorityLoaded,
+      cancel,
+      message,
+      phase,
+      reconcile,
+      refresh,
+      retry,
+      start,
+      unverifiedOperationId,
+    ],
   );
 };
 

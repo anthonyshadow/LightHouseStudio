@@ -8,6 +8,7 @@ import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import type { RecordingArtifact } from '../recording/types';
 import { ExistingVideoPanel } from './ExistingVideoPanel';
 import { ReferenceImageInputField } from '../reference-images/ReferenceImageInputField';
+import type { ProjectProcessingController } from '../projects/useProjectProcessingController';
 import type {
   ExistingVideoVoiceSelection,
   ExistingVideoWorkflow,
@@ -190,6 +191,25 @@ const readyCharacterWorkflow = (
     updateStep: updateStep as ExistingVideoWorkflow['updateStep'],
   });
 };
+
+const runningProjectOperation = (
+  overrides: Partial<ProjectProcessingController> = {},
+): ProjectProcessingController =>
+  ({
+    phase: 'idle',
+    attempt: null,
+    message: null,
+    unverifiedOperationId: null,
+    busy: false,
+    active: true,
+    authorityReady: false,
+    start: vi.fn(() => Promise.resolve(true)),
+    retry: vi.fn(() => Promise.resolve(true)),
+    cancel: vi.fn(() => Promise.resolve(true)),
+    reconcile: vi.fn(() => Promise.resolve(true)),
+    refresh: vi.fn(() => Promise.resolve(true)),
+    ...overrides,
+  });
 
 beforeEach(() => {
   api.hydrateReferenceImage.mockReset();
@@ -1697,6 +1717,26 @@ describe('ExistingVideoPanel', () => {
     ).toHaveAttribute('src', 'blob:reference-preview');
     unmount();
     expect(revokeObjectUrl).toHaveBeenCalledWith('blob:reference-preview');
+  });
+
+  it('stops a second edit being configured while a Project operation holds the plan', () => {
+    const updateStep = vi.fn();
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={readyCharacterWorkflow(updateStep)}
+          videoProcessingAvailable
+          onFinish={vi.fn()}
+          projectProcessing={runningProjectOperation()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    // The local workflow is idle in Project context, so only the Project operation can say that
+    // an edit is already committed to a provider.
+    expect(screen.getByRole('button', { name: 'Character Swap' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Virtual Try On' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Voice' })).toBeDisabled();
   });
 
   it('keeps recipe fields editable after an accepted job interruption and explains resume semantics', () => {
