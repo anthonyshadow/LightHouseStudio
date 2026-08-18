@@ -35,7 +35,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'bun run dev',
+    // CI supplies PostgreSQL as a service container, so the Docker Compose step inside `dev`
+    // is neither needed nor available there.
+    command: runningInCi ? 'bun run dev:ci' : 'bun run dev',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !runningInCi,
     timeout: 120_000,
