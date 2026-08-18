@@ -164,6 +164,16 @@ describe('ExistingVideoActionBar Project gate', () => {
     expect(value.submitPlan).not.toHaveBeenCalled();
   });
 
+  it('withholds Start until the durable operation authority has actually been read', () => {
+    const value = workflow(true);
+    const controller = projectController({ authorityReady: false });
+    renderBar(value, controller);
+
+    expect(screen.getByRole('button', { name: 'Start Project Character Swap' })).toBeDisabled();
+    expect(screen.getByText(/Start stays unavailable until that is known/u)).toBeInTheDocument();
+    expect(controller.start).not.toHaveBeenCalled();
+  });
+
   it('keeps Project provider Voice gated because it has no durable reconnect identity', () => {
     const value = {
       ...workflow(false),

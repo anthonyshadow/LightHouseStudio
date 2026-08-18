@@ -532,4 +532,134 @@ describe('useProjectProcessingController', () => {
     expect(hook.result.current.attempt).toBeNull();
     expect(second.acceptCurrent).not.toHaveBeenCalled();
   });
+
+  it('polls an accepted operation without ever reporting it as a user-visible command', async () => {
+    const { session } = createSession();
+    let resolveReconcile!: (response: Response) => void;
+    let reconcileStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      reconcileStarted = resolve;
+    });
+    const response = new Promise<Response>((resolve) => {
+      resolveReconcile = resolve;
+    });
+    mockApiServer.use(
+      jsonScenario('GET', currentPath, {
+        body: currentResponse(attempt({ phase: 'processing', nextPollAfterMs: 20 })),
+      }),
+      jsonScenario('GET', `/api/projects/${ids.project}`, { body: currentProject() }),
+      http.post(`*/api/projects/${ids.project}/processing/reconcile`, () => {
+        reconcileStarted();
+        return response;
+      }),
+    );
+
+    const hook = renderHook(() =>
+      useProjectProcessingController({
+        projectId: ids.project,
+        session,
+        checkpointCreative: vi.fn(() => Promise.resolve(true)),
+      }),
+    );
+
+    await waitFor(() => expect(hook.result.current.attempt?.phase).toBe('processing'));
+    await started;
+
+    // The automatic poll is in flight right now. It reads status; it is not work the user started,
+    // so the accepted operation stays presented exactly as it was rather than the surface being
+    // told to tear that down and show a command running.
+    expect(hook.result.current.phase).toBe('idle');
+    expect(hook.result.current.busy).toBe(false);
+    expect(hook.result.current.active).toBe(true);
+    expect(hook.result.current.attempt?.phase).toBe('processing');
+
+    resolveReconcile(
+      HttpResponse.json(
+        {
+          replayed: true,
+          attempt: attempt({
+            phase: 'cancelled',
+            cancellation: 'cancelled',
+            blocksArchive: false,
+            nextPollAfterMs: null,
+          }),
+        },
+        { status: 200 },
+      ),
+    );
+    await waitFor(() => expect(hook.result.current.attempt?.phase).toBe('cancelled'));
+    expect(hook.result.current.active).toBe(false);
+  });
+
+  it('keeps an accepted operation presented when one background status check fails', async () => {
+    const { session } = createSession();
+    let reconcileCount = 0;
+    mockApiServer.use(
+      jsonScenario('GET', currentPath, {
+        body: currentResponse(attempt({ phase: 'processing', nextPollAfterMs: 20 })),
+      }),
+      http.post(`*/api/projects/${ids.project}/processing/reconcile`, () => {
+        reconcileCount += 1;
+        return HttpResponse.json(
+          { error: { code: 'unexpected', message: 'Status unavailable.' } },
+          { status: 503 },
+        );
+      }),
+    );
+
+    const hook = renderHook(() =>
+      useProjectProcessingController({
+        projectId: ids.project,
+        session,
+        checkpointCreative: vi.fn(() => Promise.resolve(true)),
+      }),
+    );
+
+    await waitFor(() => expect(reconcileCount).toBeGreaterThanOrEqual(1));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    expect(hook.result.current.phase).toBe('idle');
+    expect(hook.result.current.attempt?.phase).toBe('processing');
+    expect(hook.result.current.active).toBe(true);
+    // Backed off rather than retried against the 20ms cadence of the operation itself.
+    expect(reconcileCount).toBe(1);
+  });
+
+  it('withholds Start until the durable operation authority has actually been read', async () => {
+    const { session } = createSession();
+    let submitCount = 0;
+    mockApiServer.use(
+      jsonScenario('GET', currentPath, { body: currentResponse(null) }),
+      jsonScenario('GET', historyPath, { body: { attempts: [], nextCursor: null } }),
+      http.post(`*/api/projects/${ids.project}/processing/submit`, () => {
+        submitCount += 1;
+        return HttpResponse.json({ replayed: false, attempt: attempt() }, { status: 202 });
+      }),
+    );
+
+    const hook = renderHook(
+      ({ session: port }: { session: ProjectSessionPort | null }) =>
+        useProjectProcessingController({
+          projectId: ids.project,
+          session: port,
+          checkpointCreative: vi.fn(() => Promise.resolve(true)),
+        }),
+      { initialProps: { session: null as ProjectSessionPort | null } },
+    );
+
+    // No session yet: nothing is loading and no attempt is held, which is exactly the state that
+    // must not read as "this Project has no accepted operation, go ahead and submit".
+    expect(hook.result.current.phase).toBe('idle');
+    expect(hook.result.current.attempt).toBeNull();
+    expect(hook.result.current.authorityReady).toBe(false);
+    await act(async () => {
+      expect(await hook.result.current.start('character-swap')).toBe(false);
+    });
+    expect(submitCount).toBe(0);
+
+    hook.rerender({ session });
+    await waitFor(() => expect(hook.result.current.authorityReady).toBe(true));
+  });
 });
