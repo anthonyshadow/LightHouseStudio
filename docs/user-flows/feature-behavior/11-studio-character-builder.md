@@ -6,7 +6,7 @@ The current live character workflow uses Lucy 2.5.
 
 ## Entry and journey
 
-Enter the authenticated Studio; the one Studio stage stays mounted behind the fullscreen Builder. Create from the
+Enter the authenticated Studio; the one Studio stage stays mounted behind the fullscreen Builder. The Builder itself is shell-owned, so Quick Create can also open it from a Project route, where no stage exists. Create from the
 desktop Character rail, **Quick Create → Create Asset → Character**, `/assets/characters`, or from
 **Create A Character** at the end of an uploaded video's saved-character chooser. **Create new
 character** in Saved Characters opens the same Builder with a

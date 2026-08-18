@@ -50,13 +50,18 @@ optional organizer for Projects.
 | **Reference image**             | Account  | API (`reference_image_assets` + byte store)                       | Generated or uploaded character/outfit imagery                 |
 | **Video job**                   | Account  | API (`processing_jobs`)                                           | A provider Character Swap / Virtual Try-On operation           |
 
-Key architectural fact that shapes every flow: **the entire authenticated app is one React shell**
-(`apps/web/src/studio/StudioApp.tsx`). It is not a tree of nested routes. `StudioWorkspace`
-(`apps/web/src/studio/StudioWorkspace.tsx`) conditionally renders the Dashboard, Assets, Projects,
-Campaigns and Live-beta surfaces _alongside_ a persistent media stage, and the asset libraries are
+Key architectural fact that shapes every flow: **the authenticated app is one persistent shell
+with a runtime that comes and goes** (`apps/web/src/app/shell/AuthenticatedShell.tsx`). It is not a
+tree of nested routes. `ShellMain` (`apps/web/src/app/shell/ShellMain.tsx`) conditionally renders
+the Dashboard, Assets, Projects, Campaigns and Live-beta surfaces, and the asset libraries are
 full-screen **overlays keyed off `location.pathname`**
-(`apps/web/src/studio/StudioLibraryOverlays.tsx`). This is why capture state, a reviewed take, and
-an in-progress edit survive navigation between Dashboard, Projects and Assets.
+(`apps/web/src/studio/StudioLibraryOverlays.tsx`).
+
+The Studio's capture runtime mounts only where the stage is visible — `/studio/create`,
+`/studio/{videoId}` and `/projects/:projectId/workspace` (`isStudioRuntimePath`). Capture state, a
+reviewed take and an in-progress edit therefore do **not** survive leaving Studio: `StudioExitGuard`
+prompts before that happens, and the choices that are not transient — camera, microphone, capture
+format, unsaved Workshop drafts — are persisted so they do.
 
 ## Navigation model
 
@@ -67,7 +72,7 @@ Both carry Dashboard, Projects, Campaigns and Assets; the rail also holds the Qu
 integration-status menu, and the account menu.
 
 `organizationRouteActive` in `StudioApp.tsx` no longer selects a chrome. It only decides which
-surface renders inside the shell — specifically, whether the persistent media stage is hidden.
+surface renders inside the shell. Whether a media stage exists at all is `isStudioRuntimePath`.
 
 ```text
 /  (Entry)
@@ -133,7 +138,7 @@ surface renders inside the shell — specifically, whether the persistent media 
 2. Arrive at `/dashboard`, which shows a dismissible "Start with the outcome you need" card
    explaining that organization is optional.
 3. Press **Create video** → `/studio/create` → **Record New Video** or **Upload Video**.
-4. Review the take on the persistent stage; optionally apply one visual edit plus voice.
+4. Review the take on the Studio stage; optionally apply one visual edit plus voice.
 5. Press **Save to Assets** → the video becomes Version 1 of a Saved Video, and a completion panel
    offers **Download**, **View in Assets** and **Create another**.
 6. Only if resumable, multi-session work is needed: create a Project, give it an immutable source,

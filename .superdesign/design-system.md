@@ -6,8 +6,9 @@ Lightframe Studio is a local-first, single-operator browser video studio. The pr
 is Dashboard → Create, Assets, Projects, or Campaigns. `/studio` is the authenticated Dashboard and
 `/studio/create` is the standalone creation workspace. The workspace flow is Record or Upload →
 Review → optional Virtual Try On, Character Swap, and/or Voice → Save to Assets or Download. It is a
-fixed-viewport workspace with one persistent media stage; tools are focus-managed overlays and must
-never remount the media. Live AI camera transformation is an explicitly gated Beta flow.
+fixed-viewport workspace with one media stage for as long as the operator is in Studio; tools are
+focus-managed overlays and must never remount the media while they are open. Leaving Studio releases
+the stage entirely — organization routes mount no media at all. Live AI camera transformation is an explicitly gated Beta flow.
 Character Builder creates a reusable Lucy 2.5 character from approachable visual choices, an
 optional upload, and an optional paid reference generation. The post-recording editor adopts a
 validated upload or normalized local recording as an immutable source, then allows zero or one
@@ -93,7 +94,7 @@ card/button language.
 ## Post-recording editor UX direction
 
 - Keep the current video visually stable and prominent. The upload-panel player may borrow the
-  current artifact URL, but the persistent Studio stage remains mounted and authoritative.
+  current artifact URL, but the Studio stage remains mounted and authoritative.
 - Present one understandable progression: Source → Edit → Review. Show the current phase and the
   next meaningful action without turning the flow into a rigid wizard.
 - Once a source is ready, summarize its technical metadata compactly instead of allowing details
@@ -146,7 +147,7 @@ card/button language.
   Campaigns: the exact existing left navigation rail at widths of 48rem and above, and the exact
   existing compact mobile header plus four-item bottom navigation below 48rem. Projects remains the
   active destination. Do not create a second or workspace-specific navigation system.
-- Keep the one persistent media stage mounted and visibly framed at every supported viewport. The
+- Keep the one media stage mounted and visibly framed at every supported viewport in Studio. The
   video must never collapse to zero height, disappear behind the Project panel, or be obscured by
   the mobile bottom navigation.
 - At 1440x960 and 1280x720, the video stage remains dominant beside a compact Project workflow

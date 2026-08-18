@@ -18,14 +18,14 @@ never carries automatically to a later browser/OS release.
 
 ## Layout contract
 
-Studio is a viewport-bound workspace: the document does not scroll, the persistent stage does not
+Studio is a viewport-bound workspace: the document does not scroll, the stage does not
 remount, and named overlay bodies own scrolling. Stage video uses `object-fit: contain`; only local
 preview is mirrored.
 
 Automated layout/visual checks cover:
 
 - `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`;
-- one persistent live/playback video;
+- one live/playback video;
 - stable stage geometry across mode, warning, recording, finalizing, playback, and overlay states;
 - reachable Record/Stop, device settings, close, and primary overlay actions;
 - Campaign/Project workspace, small-mobile Project output review, and selected 200%-text

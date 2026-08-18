@@ -92,15 +92,18 @@ routes are matched before the UUID-only Saved Video route. Legacy organization, 
 and `/studio/live` URLs replace-navigate to their canonical replacements.
 The data-router form is required for route blocking. Route metadata, protected
 Login return, focus handoff, and loading/error surfaces remain router-owned; unknown paths return
-to `/`. All Studio children render the same `StudioApp` instance so moving between a workspace and
-its libraries preserves the one media-stage owner and active controller state.
+to `/`. Every authenticated route renders the same `AuthenticatedShell` instance, so moving between a
+workspace and its libraries preserves the remote-state cache, the session lifecycle and the creative
+library. The Studio's capture runtime is a child of that shell and belongs only to the routes that
+own live media.
 
 The entry does not mount `StudioApp`, request capabilities, acquire media, load Decart, open a
-WebSocket, or contact a provider. `StudioApp.tsx` remains the sole runtime composition boundary.
-There is no second product shell, media session, global client store, or provider client.
+WebSocket, or contact a provider. `AuthenticatedShell.tsx` is the persistent authenticated
+composition boundary and `StudioApp.tsx` the live-media runtime inside it. There is no second
+product shell, media session, global client store, or provider client.
 
 Studio initializes the session draft in Local Camera mode and the media lifecycle at `idle`.
-Dashboard and organization routes hide the stage but retain the same composition owner. Entry
+Dashboard and organization routes mount no stage and no capture graph, and retain the same shell. Entry
 intent on `/studio/create` may open the upload panel or start the explicit local-recording flow,
 but it never starts AI or provider work. The control-bar **Record New Video** action starts a normal
 local take and enters Latest Take review after finalization. The upload panel's **Record a local
@@ -164,8 +167,10 @@ artifact is created. Each immutable video version stores the parent character na
 filter key and an optional exact variant name as display-only metadata. Voice and later local edits
 inherit that pinned attribution; the gallery never treats variants as separate character facets.
 
-`MediaStage` stays mounted once and owns one `<video>` element. Dashboard, Assets, Campaign, Project
-list, and Project overview routes hide it. A Project's explicit `/workspace` route renders its
+`MediaStage` is mounted once per Studio visit and owns one `<video>` element. Dashboard, Assets,
+Campaign, Project list, and Project overview routes mount none: the runtime that owns it is not
+there. A hidden stage would still hold a camera and the whole capture graph on a route with no use
+for either. A Project's explicit `/workspace` route renders its
 workspace beside this existing stage and hydrates its accepted
 source through the recording-artifact owner; it never creates another player, media session, object
 URL owner, or Project authority. A discriminated presentation state
@@ -188,7 +193,7 @@ preview above the authoritative video. **Before** temporarily removes that canva
 or mutating history. Crop mode instead draws the full rotated source and a keyboard/pointer crop
 overlay. The shared color shader is framework-independent and is reused by the export worker.
 
-The standard Studio workspace uses that same persistent stage for both landscape and portrait
+The standard Studio workspace uses that same stage for both landscape and portrait
 capture. At large desktop widths it is centered between the existing creative-tool rail and the
 session/device region; tablet and mobile stack those same regions below it. The session control
 bar is an in-flow sibling immediately below the bounded video frame, so Record, Stop, and take
@@ -205,7 +210,7 @@ on mount and `devicechange`, and failed live replacement restores the last appli
 preserving the visible safe error. There are no manual Apply, Refresh, or Discard actions.
 
 `video-edit` is a Studio-owned workspace mode rather than an overlay. It replaces the capture/tool
-regions while active: desktop uses categories / persistent stage / named-scroll settings columns;
+regions while active: desktop uses categories / stage / named-scroll settings columns;
 tablet and mobile use stage / horizontal category strip / bounded settings rows. The settings
 footer remains sticky and safe-area-aware. `useVideoEditSession` is the sole owner of the pinned
 source, baseline, draft, 50-entry grouped history, generation, candidate, and worker cancellation.
@@ -288,7 +293,7 @@ draft preserved.
 Capture preferences are tab-memory state, not recipe data. Device enumeration does not request
 permission and device IDs are not persisted. Local format is an app-owned 16:9 or 9:16 choice:
 orchestration swaps the selected quality profile's width/height, the browser adapter constrains
-the camera aspect, and the persistent stage follows the applied format. Recording continues to
+the camera aspect, and the stage follows the applied format. Recording continues to
 borrow that same negotiated source track. Apply during local preview performs atomic stream
 replacement. Source changes are blocked while AI or recording owns the source. Facing-mode and
 track zoom controls appear only when the active camera exposes those capabilities.
@@ -431,7 +436,7 @@ intact. Provider compatibility is derived from edited output geometry; only 16:9
 the existing 1% tolerance can create Character Swap or VTO intent, while Voice and Save remain
 available for uploaded or edited sources at other ratios.
 
-The finalized or validated source replaces live media on the same persistent stage. The artifact
+The finalized or validated source replaces live media on the same stage. The artifact
 owner creates and revokes every source/visual/voice URL. Changing source invalidates downstream
 layers. During a combined edit, the transcoded visual is staged privately while voice conversion
 runs; only the healthy voiced result is published. If Voice fails or is canceled, the healthy
@@ -959,7 +964,7 @@ Tests keep provider and browser effects behind injectable seams:
 - Playwright uses deterministic synthetic media and denies unexpected HTTP/WebSockets;
 - live provider and physical-device checks are manual release evidence.
 
-The visual and responsive suites protect all five canonical viewports, one persistent player,
+The visual and responsive suites protect all five canonical viewports, one player per Studio visit,
 bounded scrolling, accessible actions, source continuity, finalization ordering, and provider-free
 local preparation. See [testing strategy](TESTING.md),
 [screenshot coverage](screenshot-test-coverage.md), [manual QA](MANUAL_QA.md), and

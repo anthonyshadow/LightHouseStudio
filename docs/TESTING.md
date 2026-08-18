@@ -74,9 +74,9 @@ The retained suite protects:
   automatic media/AI before authenticated Studio entry;
 - Dashboard at `/dashboard`, the focused creator at `/studio/create`, direct Saved Video review at
   UUID-only `/studio/:videoId`, canonical Campaign/Project routes, and `/assets/*` libraries inside
-  one mounted runtime; legacy organization and Recipe URLs replace-normalize without loops,
-  centralized logout cleanup remains intact, and one persistent media stage is hidden rather than
-  duplicated on organization routes;
+  one persistent authenticated shell; legacy organization and Recipe URLs replace-normalize without
+  loops, centralized logout cleanup remains intact, and organization routes mount no media stage at
+  all while Studio routes mount exactly one;
 - idempotent Save Video, immutable append-only replacement, cross-owner denial, metadata-first
   gallery pagination, lazy thumbnail fallback, range content delivery, tombstones, local-only byte
   retention, and relationship-safe retryable deletion of R2 versions/thumbnails;
@@ -179,7 +179,7 @@ The retained suite protects:
   that relationship removal never calls provider voice deletion;
 - loopback Host/Origin, explicit provider intent, bounded response/stream handling, SSRF-resistant
   image downloads/imports, DNS pinning, redirect/byte/content limits, safe errors, and no provider fallback;
-- one persistent media stage, shared overlay focus/inert/Escape behavior, dominant recording Stop,
+- one media stage per Studio visit, shared overlay focus/inert/Escape behavior, dominant recording Stop,
   200% text, and constrained mobile scrolling; and
 - unexpected external HTTP and WebSocket denial in ordinary automated tests.
 

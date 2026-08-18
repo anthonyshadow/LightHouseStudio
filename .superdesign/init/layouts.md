@@ -1,6 +1,7 @@
 # Shared layouts
 
-Lightframe is not a conventional multi-page shell. `/studio` owns one persistent media stage and
+Lightframe is not a conventional multi-page shell. `AuthenticatedShell` persists across every
+authenticated route; `/studio/*` and the Project workspace own one media stage and
 opens tools through one shared overlay system.
 
 ## Studio design boundary
@@ -82,6 +83,6 @@ The design must keep this DOM/lifecycle owner and must not introduce a second mo
 ## Studio runtime composition
 
 - Source: `apps/web/src/studio/StudioApp.tsx`
-- Owns one persistent `MediaStage`, one `OverlayPanel` system, shared controller contracts, and all
+- Owns one `MediaStage` per Studio visit, one `OverlayPanel` system, shared controller contracts, and all
   tool launch/close coordination. The Character builder is mounted through
   `apps/web/src/features/character-builder/CharacterBuilderCoordinator.tsx`.

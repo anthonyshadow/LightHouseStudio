@@ -5,7 +5,7 @@ without starting media or contacting a provider.
 
 ## Journey
 
-1. On a large desktop, use the persistent **Capture settings** region beside the stage. On tablet
+1. On a large desktop, use the **Capture settings** region beside the stage. On tablet
    and mobile, open **Device settings** (**Open capture settings**) to use the same controller in a
    compact overlay.
 2. Wait for automatic device discovery. Listing devices does not request permission; labels may

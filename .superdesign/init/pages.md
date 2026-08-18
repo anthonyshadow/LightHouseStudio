@@ -9,7 +9,7 @@ Entry: `apps/web/src/app/EntryPage.tsx`
   - `apps/web/src/ui/StudioDesignProvider.tsx`
   - `apps/web/src/ui/theme.ts`
 
-## `/studio` — persistent Studio runtime
+## `/studio/*` — the Studio runtime
 
 Entry: `apps/web/src/studio/StudioApp.tsx`
 

@@ -8,9 +8,9 @@ overlays.
 `/assets/videos`, `/assets/characters`, `/assets/outfits` and `/assets/voices` are **not separate
 pages**. `AssetsRouteSurface` renders for all five paths (because `isAssetsPath` matches them all,
 `paths.ts:99-104`), and `StudioLibraryOverlays` layers a `placement="fullscreen"` `OverlayPanel`
-whose `open` prop is a pathname comparison (`StudioLibraryOverlays.tsx:66,84,124,146`). The hub
-grid is behind the overlay; the persistent Studio media stage is hidden on these routes
-(`StudioWorkspace.tsx:223`).
+whose `open` prop is a pathname comparison (`StudioLibraryOverlays.tsx`). The hub
+grid is behind the overlay; no Studio media stage is mounted on these routes at all, because a
+library needs no camera.
 
 Each overlay's close control calls `nav.closeAssetLibrary`, a history-aware back
 (`useRouteBack`): it consumes the entry the library was opened with, falling back to a `replace`
@@ -27,7 +27,7 @@ panel's "View in Assets" — closes back to that origin rather than to `/assets`
 1. Header: `h1` "Assets", a one-paragraph explanation that _"Saving to Assets never silently adds
    content to a Project or Campaign"_, and a primary **Upload video** action.
 2. **Upload video** navigates to `/studio/create` with router state `{ creationIntent: 'upload' }`,
-   which the Studio shell converts into an open video-upload overlay (`StudioApp.tsx:304-318`).
+   which the Studio shell converts into an open video-upload overlay (`StudioApp.tsx`).
 3. Four cards: Videos · Characters · Outfits · Voices. Characters and Outfits show a live "N saved"
    count sourced from the local creative repository; Videos and Voices show no count.
 4. Each card has an **Open {name}** button.
@@ -85,7 +85,7 @@ Rendered by `SavedCharacterLibrary` (`features/account-library/SavedCreativeLibr
   **Use in Studio** · create-a-copy · **Wardrobe** · delete (confirmation dialog with a failure
   message).
 - Every action navigates to `/studio/create` first and then opens the relevant builder overlay
-  (`StudioApp.tsx:1305-1328`).
+  (`StudioApp.tsx`).
 - Empty state: _"No saved characters yet — Create a character in Studio and save it to see it here."_
 
 ## Flow: Outfits library (`/assets/outfits`)
@@ -93,7 +93,7 @@ Rendered by `SavedCharacterLibrary` (`features/account-library/SavedCreativeLibr
 Rendered by `SavedOutfitLibrary` (`SavedCreativeLibrary.tsx:352`).
 
 - Source is `store.savedPrompts` filtered to `modelModeId === 'lucy-vton-latest'`
-  (`StudioLibraryOverlays.tsx:133`).
+  (`StudioLibraryOverlays.tsx`).
 - **Create new saved outfit** sits inside the body (not in the overlay header, unlike Characters).
 - Card: reference image if present, title, prompt (or "Reference-image outfit"), **Use in Studio**,
   **Delete** (confirmation dialog).
@@ -102,7 +102,7 @@ Rendered by `SavedOutfitLibrary` (`SavedCreativeLibrary.tsx:352`).
 ## Flow: Voices library (`/assets/voices`)
 
 Rendered by `VoiceLibrary` with the same interactive contract as every other mount
-(`StudioLibraryOverlays.tsx:145-166`).
+(`StudioLibraryOverlays.tsx`).
 
 - Browse the provider catalog, preview a sample, **Add to Saved**, **Remove**, and **Use in Studio**
   are all available. The per-voice action is labelled by the hosting surface through

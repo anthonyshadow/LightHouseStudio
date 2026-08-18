@@ -1,5 +1,11 @@
 # Product evolution
 
+> **Superseded.** This document describes an architecture in which one `StudioApp` stayed mounted
+> across every authenticated route and organization pages hid its media stage. The Studio's capture
+> runtime now mounts only on routes that own live media (`isStudioRuntimePath` in
+> `apps/web/src/app/paths.ts`); the persistent piece is `AuthenticatedShell`. Read the
+> always-mounted claims below as a record of what was true at the time.
+
 This file preserves durable rationale for intentional product changes. Current behavior belongs in
 [Architecture](../ARCHITECTURE.md) and the [observable user stories](../user-flows/feature-behavior/README.md). Current
 positioning and future direction belong in [Product Vision](../PRODUCT_VISION.md) and
