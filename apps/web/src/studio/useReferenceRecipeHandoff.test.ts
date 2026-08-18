@@ -254,6 +254,7 @@ describe('reference recipe handoff', () => {
     const closeOverlay = vi.fn();
     const result = renderHook(() =>
       useReferenceRecipeHandoff({
+        ownerUserId: 'test-owner',
         repository,
         store,
         session,
