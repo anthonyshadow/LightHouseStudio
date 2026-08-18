@@ -15,7 +15,12 @@ test('serves the built entry, direct Studio, and local health endpoint from one 
   await login.getByLabel('Password').fill('lightframe-demo');
   await login.getByRole('button', { name: 'Log in' }).click();
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-  await page.getByRole('button', { name: 'Create video' }).click();
+  // Scoped to the header action: an account with no recent work also renders a 'Create video'
+  // button in the empty Recent Work panel, and the production demo account starts empty.
+  await page
+    .locator('[data-dashboard-actions]')
+    .getByRole('button', { name: 'Create video' })
+    .click();
   await expect(page.getByRole('button', { name: 'Record New Video' })).toBeVisible();
 
   await page.goto('/studio/create');

@@ -157,6 +157,9 @@ const synchronizeModalIsolation = (): void => {
 
 export const isTopmostOverlay = (id: string): boolean => overlayStack.at(-1)?.id === id;
 
+export const isOverlayRegistered = (id: string): boolean =>
+  overlayStack.some((entry) => entry.id === id);
+
 const getTopmostDialog = (): HTMLElement | null =>
   overlayStack.at(-1)?.root.querySelector<HTMLElement>('[role="dialog"]') ?? null;
 
