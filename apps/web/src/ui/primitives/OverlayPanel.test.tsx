@@ -375,6 +375,39 @@ describe('OverlayPanel', () => {
     );
   });
 
+  it('keeps heading focus when the effect re-runs instead of tearing down', async () => {
+    // Leaving fullscreen moves the portal host, so the focus effect tears down and sets up again
+    // around a panel that never closed. The teardown's focus restore then found its opener inert
+    // behind the isolation the new setup had just re-applied, fell through to the topmost dialog,
+    // and left focus on the close button instead of the heading the setup had just placed.
+    const fullscreenHost = document.createElement('section');
+    fullscreenHost.setAttribute('data-test-fullscreen-host', '');
+    document.body.append(fullscreenHost);
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: fullscreenHost,
+    });
+
+    const user = userEvent.setup();
+    render(<Harness initialFocus="heading" />);
+
+    await user.click(screen.getByRole('button', { name: 'Open tools' }));
+    const heading = screen.getByRole('heading', { name: 'Studio tools' });
+    await waitFor(() => expect(heading).toHaveFocus());
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: null,
+    });
+    fireEvent(document, new Event('fullscreenchange'));
+
+    await waitFor(() =>
+      expect(document.body.querySelector(':scope > [data-overlay-panel-root]')).toBeInTheDocument(),
+    );
+    expect(screen.getByRole('heading', { name: 'Studio tools' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Close panel' })).not.toHaveFocus();
+  });
+
   it('skips the exit delay when reduced motion is requested', async () => {
     vi.stubGlobal(
       'matchMedia',

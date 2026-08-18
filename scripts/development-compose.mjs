@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { resolveDockerComposeCommand } from './docker-compose-command.mjs';
@@ -15,6 +15,36 @@ const command = process.argv[2];
 if (!(command in commands)) {
   throw new Error('Use development-compose.mjs with up, down, logs, or reset.');
 }
+
+// Ensure Docker daemon is running (via colima)
+const ensureDockerRunning = async () => {
+  try {
+    execFileSync('docker', ['info'], { stdio: 'ignore', timeout: 5000 });
+  } catch {
+    console.log('Docker daemon not responding. Restarting colima...');
+    try {
+      // Stop colima if it's running
+      spawnSync('colima', ['stop'], { stdio: 'ignore', timeout: 60000 });
+      // Short delay to ensure clean shutdown
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Start colima fresh
+      spawnSync('colima', ['start', '--runtime', 'docker'], { stdio: 'inherit', timeout: 180000 });
+      // Give the socket a moment to become available
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Verify Docker is now responding
+      execFileSync('docker', ['info'], { stdio: 'ignore', timeout: 5000 });
+      console.log('Docker daemon is ready.');
+    } catch (error) {
+      console.error(
+        'Failed to start Docker:',
+        error instanceof Error ? error.message : String(error),
+      );
+      process.exit(1);
+    }
+  }
+};
+
+await ensureDockerRunning();
 
 const dockerConfig = path.resolve('.lightframe-data/docker-config');
 await mkdir(dockerConfig, { recursive: true });

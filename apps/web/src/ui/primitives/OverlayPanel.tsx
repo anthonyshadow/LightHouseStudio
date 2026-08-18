@@ -36,6 +36,7 @@ import {
   focusTopmostDialog,
   getFocusableElements,
   isFocusableElement,
+  isOverlayRegistered,
   isTopmostOverlay,
   registerOverlay,
 } from './overlayStack';
@@ -235,6 +236,11 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
       unregister();
 
       queueMicrotask(() => {
+        // A re-run rather than a teardown: React's development remount, or a portal-host change,
+        // unregisters this overlay and registers it again before the microtask lands. The panel is
+        // still open and the re-run has already taken its initial focus, so returning focus to the
+        // opener here would pull it back out of a live dialog.
+        if (isOverlayRegistered(overlayId)) return;
         const returnTarget = returnFocusTargetRef.current?.current ?? opener;
         if (canRestoreFocus(returnTarget)) returnTarget?.focus();
         else focusTopmostDialog();
