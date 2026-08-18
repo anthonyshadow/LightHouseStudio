@@ -86,9 +86,21 @@ Instrumentation can therefore make the observer issue one unnecessary status req
 terminal response settles. The implementation will return a validated terminal seed before
 constructing the observer and retain the existing no-resubmission contract.
 
-The authenticated Studio static closure is also at 1,025,796 of its 1,032,000-byte budget (99.4%).
-Several route- or action-only surfaces are still imported eagerly. They can be split at existing
-UI ownership boundaries without changing the stage or media lifecycle.
+The authenticated Studio static closure was at 1,025,796 of its 1,032,000-byte budget (99.4%), with
+several route- or action-only surfaces still imported eagerly. **Resolved** by separating the
+persistent authenticated shell from the Studio's capture runtime and mounting the runtime only on
+routes that own live media:
+
+| Static closure                                           |    Before |   After |
+| -------------------------------------------------------- | --------: | ------: |
+| Every authenticated route (`AuthenticatedShell`)         | 1,003,473 | 696,856 |
+| A Studio route (shell plus capture runtime, `StudioApp`) | 1,003,473 | 860,277 |
+
+Roughly 307 KB and the entire capture graph — media session, recorder, take review, upload
+workflow, video editor and the `MediaStage` itself — no longer load on `/dashboard`, `/assets`,
+`/campaigns`, the Projects list or a Project overview. `FORBIDDEN_CLOSURE_DEPENDENCIES` in
+`scripts/check-build-manifest.mjs` names those couplings so re-introducing one fails the build
+rather than quietly raising a budget.
 
 ### Pre-change measurements
 
