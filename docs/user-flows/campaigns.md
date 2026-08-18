@@ -69,8 +69,10 @@ router state `{ campaignCreated: id }`.
 1. `useCampaignDetail` issues `GET /api/campaigns/{id}`. Pending renders "Loading Campaign…";
    error renders a danger notice with **Back to Campaigns** (`:322-336`).
 2. Header: "← All Campaigns" breadcrumb, name, status pill, "Updated", brief.
-3. Actions: **New Project** (hidden when archived) · **Create another Campaign** · **Edit** ·
-   **Archive**/**Restore** · **Delete Campaign** (archived only).
+3. Actions: **New Project** (hidden when archived) · **Edit** ·
+   **Archive**/**Restore** · **Delete Campaign** (archived only). Creating a _different_ Campaign
+   belongs to Quick Create and the Campaigns list, not to the surface whose job is to fill this
+   one.
 4. When arriving straight from creation, a success notice appears: _"Campaign created — Create the
    first Project in {name}, or continue organizing later."_ with **Create Project in Campaign** and
    **Not now**. Both dismiss the router state (`:401-424`). This is the product's clearest
@@ -117,7 +119,6 @@ does not linger on the page behind it.
 ## Exit points
 
 - `/projects/{id}` from a project row or after creating a project in the campaign
-- `/campaigns/{newId}` from "Create another Campaign"
 - `/campaigns` after deletion or via the breadcrumb
 
 ## Answers to specific questions

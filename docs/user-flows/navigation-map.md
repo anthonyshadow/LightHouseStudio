@@ -18,7 +18,7 @@ Consequences that matter for every flow:
   library. The capture runtime mounts only where the stage is visible — `isStudioRuntimePath` in
   `paths.ts` — and is torn down on the way out. Camera state, a reviewed take and an in-flight edit
   do **not** survive leaving Studio; `StudioExitGuard` prompts before that happens, and capture
-  device choices and unsaved Workshop drafts are persisted so they do survive.
+  device choices are persisted so they do survive.
 - Surface selection is `if`-based inside `ShellMain`, keyed on the route context rather than on
   nested route elements.
 - Asset libraries are `OverlayPanel`s whose `open` prop is a pathname comparison
@@ -63,15 +63,13 @@ Consequences that matter for every flow:
 | `/studio/characters`, `/studio/assets/characters` | `/assets/characters`       |
 | `/studio/outfits`, `/studio/assets/outfits`       | `/assets/outfits`          |
 | `/studio/assets/voices`                           | `/assets/voices`           |
-| `/studio/assets/recipes`                          | `/assets`                  |
 | `/studio/live`                                    | `/studio/create/live`      |
 
-`/studio/assets/recipes` is documented in code as "Compatibility-only route. Recipe UI has no
-canonical destination." No Recipe UI exists in the current build. `/campaign` carries the same
-compatibility comment: neither is a member of `PROTECTED_LEAF_PATHS`, so both are reachable only
-through the final `canonicalizeLegacyAppPath` clause of `isProtectedAppPath`, and
-`canonicalizeProtectedDestination` still resolves them in one hop (so a login return to
-`/campaign?x=1` lands on `/campaigns?x=1`).
+`/studio/assets/recipes` was removed with the retired Recipe UI; it now falls through to the entry
+page like any other unknown path. `/campaign` carries a compatibility comment and is **not** a
+member of `PROTECTED_LEAF_PATHS`, so it is reachable only through the final
+`canonicalizeLegacyAppPath` clause of `isProtectedAppPath`, and `canonicalizeProtectedDestination`
+still resolves it in one hop (so a login return to `/campaign?x=1` lands on `/campaigns?x=1`).
 
 ## Reachability graph (what links to what)
 
@@ -113,7 +111,7 @@ Videos overlay (VideoGallery)
   └─ close ─────────────────────────────► back one entry, fallback /assets
 
 ProjectsWorkspace
-  ├─ Quick project ─────────────────────► /projects/{new id}
+  ├─ New Project ▸ Create without a name ► /projects/{new id}
   ├─ New Project (dialog) ──────────────► /projects/{new id}
   └─ row ▸ Open ────────────────────────► /projects/{id}
 
@@ -141,7 +139,6 @@ CampaignsWorkspace
 CampaignDetail
   ├─ ← All Campaigns ───────────────────► back, fallback /campaigns
   ├─ New Project ───────────────────────► /projects/{new id}
-  ├─ Create another Campaign ───────────► /campaigns/{new id}
   ├─ project ▸ Open ────────────────────► /projects/{id}
   └─ project ▸ Move or detach ──────────► MoveProjectDialog
 

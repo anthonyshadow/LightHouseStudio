@@ -75,7 +75,7 @@ source, then edit either base, save, start over, or discard.
    Explicitly closing the panel retains the tab-local selection and plan; an **Edit video** action
    in the recorded-take controls reopens the same workflow. Whenever a playback is retained and
    **Edit Video** is available, the main Studio tool row/column disables its live-only **Select
-   Character**, **Select Outfit**, and **Workshop** launchers. The editor's own Character Swap,
+   Character** and **Select Outfit** launchers. The editor's own Character Swap,
    Virtual Try On, Voice, saved-resource, and builder controls remain governed only by the editor
    workflow and stay available when their existing step-specific requirements are met.
 7. VTO uses exactly one input mode. **Saved or recent outfit** selects a saved Outfit or tab-local

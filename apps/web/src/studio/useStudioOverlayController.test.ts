@@ -3,11 +3,15 @@ import { studioOverlayReducer } from './useStudioOverlayController';
 
 describe('studioOverlayReducer', () => {
   it('opens, closes, and toggles one overlay at a time', () => {
-    expect(studioOverlayReducer(null, { type: 'open', overlay: 'workshop' })).toBe('workshop');
-    expect(studioOverlayReducer('workshop', { type: 'toggle', overlay: 'workshop' })).toBeNull();
-    expect(studioOverlayReducer('workshop', { type: 'toggle', overlay: 'outfit-selector' })).toBe(
-      'outfit-selector',
+    expect(studioOverlayReducer(null, { type: 'open', overlay: 'ai-settings' })).toBe(
+      'ai-settings',
     );
+    expect(
+      studioOverlayReducer('ai-settings', { type: 'toggle', overlay: 'ai-settings' }),
+    ).toBeNull();
+    expect(
+      studioOverlayReducer('ai-settings', { type: 'toggle', overlay: 'outfit-selector' }),
+    ).toBe('outfit-selector');
     expect(studioOverlayReducer('outfit-selector', { type: 'close' })).toBeNull();
   });
 
@@ -19,10 +23,10 @@ describe('studioOverlayReducer', () => {
       }),
     ).toBeNull();
     expect(
-      studioOverlayReducer('workshop', {
+      studioOverlayReducer('ai-settings', {
         type: 'close-if',
         overlays: ['take-review', 'voice-treatments'],
       }),
-    ).toBe('workshop');
+    ).toBe('ai-settings');
   });
 });

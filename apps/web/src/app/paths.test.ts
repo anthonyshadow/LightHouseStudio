@@ -158,7 +158,6 @@ describe('authenticated application paths', () => {
     expect(canonicalizeLegacyAppPath('/studio/assets/outfits')).toBe(APP_PATHS.outfits);
     expect(canonicalizeLegacyAppPath('/studio/outfits')).toBe(APP_PATHS.outfits);
     expect(canonicalizeLegacyAppPath('/studio/assets/voices')).toBe(APP_PATHS.voices);
-    expect(canonicalizeLegacyAppPath('/studio/assets/recipes')).toBe(APP_PATHS.assets);
     expect(canonicalizeLegacyAppPath('/studio/live')).toBe(APP_PATHS.live);
   });
 
@@ -187,6 +186,7 @@ describe('authenticated application paths', () => {
       '/projects/%E0%A4%A',
       '/advanced',
       '/assets/recipes',
+      '/studio/assets/recipes',
       `/campaigns/${campaignId}/projects`,
     ]) {
       expect(isProtectedAppPath(path)).toBe(false);

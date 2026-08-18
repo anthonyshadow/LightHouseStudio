@@ -158,7 +158,7 @@ The retained suite protects:
   denial of unexpected external HTTP and WebSocket traffic;
 - Campaign domain/contract parity, v1→v2 local migration, restart-safe receipts, owner/CAS and
   active-membership rules, relational same-owner/restrict constraints, authenticated routes,
-  create/detail/post-create offer/New Project/Create another Campaign, move/detach, virtual No
+  create/detail/post-create offer/New Project, move/detach, virtual No
   Campaign filtering, non-cascading lifecycle, blocked nonempty tombstone, and archived-empty
   tombstone;
 - Project asset-membership domain/contract parity, deterministic local and relational backfill,
@@ -179,6 +179,9 @@ The retained suite protects:
   that relationship removal never calls provider voice deletion;
 - loopback Host/Origin, explicit provider intent, bounded response/stream handling, SSRF-resistant
   image downloads/imports, DNS pinning, redirect/byte/content limits, safe errors, and no provider fallback;
+- a route crash recorded as one bounded local diagnostic behind a generic fallback, a stale
+  lazy-chunk failure told apart from a crash, and cloud creative-library recovery through retry,
+  keep-local and keep-cloud;
 - one media stage per Studio visit, shared overlay focus/inert/Escape behavior, dominant recording Stop,
   200% text, and constrained mobile scrolling; and
 - unexpected external HTTP and WebSocket denial in ordinary automated tests.

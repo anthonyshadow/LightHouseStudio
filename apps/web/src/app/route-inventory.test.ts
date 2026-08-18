@@ -93,7 +93,6 @@ describe('protected route inventory', () => {
       APP_PATHS.legacyOutfits,
       APP_PATHS.legacyVoices,
       APP_PATHS.legacyLive,
-      APP_PATHS.recipes,
       '/studio/assets/videos',
       '/studio/assets/characters',
       '/studio/assets/outfits',

@@ -57,7 +57,7 @@ import {
   workspaceInnerStyles,
   workspaceMastheadStyles,
 } from './ProjectRouteSurface.styles';
-import { useProjectList, useProjectsController } from './useProjectsController';
+import { useProjectList } from './useProjectsController';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
 import { ProjectWorkingMediaSection } from './ProjectWorkingMediaSection';
 import type { ProjectWorkingMediaActivity } from './ProjectWorkingMediaSection';
@@ -167,7 +167,7 @@ const ProjectListSection = ({
               ? campaignId === 'none'
                 ? 'Archived Projects with no Campaign appear here and can be restored.'
                 : 'Archived work appears here and can be restored.'
-              : 'Quick project creates an unassigned Project immediately. Name one instead when the work already has a clear purpose.'}
+              : 'Start a Project to keep related videos, sources and saved changes together. Naming it is optional — you can rename it later.'}
           </p>
         </div>
       ) : null}
@@ -250,7 +250,6 @@ const ProjectsWorkspace = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const controller = useProjectsController();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const dialogReturnRef = useRef<HTMLElement | null>(null);
   const [renameProject, setRenameProject] = useState<ProjectContract | null>(null);
@@ -260,7 +259,6 @@ const ProjectsWorkspace = () => {
   } | null>(null);
   const [deleteProject, setDeleteProject] = useState<ProjectContract | null>(null);
   const [announcement, setAnnouncement] = useState<string | null>(null);
-  const [createError, setCreateError] = useState<string | null>(null);
   const [activeGroup, setActiveGroup] = useState<'all' | 'none'>('all');
   const [creating, setCreating] = useState(false);
   const routeCreateRequested =
@@ -279,17 +277,6 @@ const ProjectsWorkspace = () => {
    */
   const clearRouteCreateIntent = () => {
     if (routeCreateRequested) void navigate(location.pathname, { replace: true, state: null });
-  };
-
-  const quickStart = async () => {
-    setCreateError(null);
-    try {
-      const current = await controller.createMutation.mutateAsync(null);
-      setAnnouncement('Untitled Project created.');
-      void navigate(projectPath(current.project.id));
-    } catch (caught) {
-      setCreateError(safeProjectError(caught));
-    }
   };
 
   const closeDialog = () => {
@@ -332,13 +319,6 @@ const ProjectsWorkspace = () => {
         </div>
         <div css={projectsHeaderActionsStyles(theme)} data-project-header-actions="">
           <Button
-            data-project-create="quick"
-            busy={controller.createMutation.isPending}
-            onClick={() => void quickStart()}
-          >
-            Quick project
-          </Button>
-          <Button
             variant="primary"
             data-project-create="named"
             onClick={(event) => {
@@ -351,14 +331,6 @@ const ProjectsWorkspace = () => {
         </div>
       </header>
 
-      {createError ? (
-        <StatusNotice role="alert" tone="danger" title="Project not created">
-          <p>{createError}</p>
-          <Button size="small" onClick={() => void quickStart()}>
-            Retry quick project
-          </Button>
-        </StatusNotice>
-      ) : null}
       <div role="status" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
@@ -423,6 +395,7 @@ const ProjectsWorkspace = () => {
           onClose={closeCreateDialog}
           onCreated={(current) => {
             clearRouteCreateIntent();
+            setAnnouncement(`${current.project.title} created.`);
             void navigate(projectPath(current.project.id));
           }}
         />

@@ -392,7 +392,6 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
   const [moveProject, setMoveProject] = useState<ProjectContract | null>(null);
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [creatingProject, setCreatingProject] = useState(false);
-  const [creatingCampaign, setCreatingCampaign] = useState(false);
   const createdCampaignId = (location.state as { readonly campaignCreated?: unknown } | null)
     ?.campaignCreated;
   const showCreatedNextStep = createdCampaignId === campaignId;
@@ -461,14 +460,6 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
                 New Project
               </Button>
             ) : null}
-            <Button
-              onClick={(event) => {
-                returnFocusRef.current = event.currentTarget;
-                setCreatingCampaign(true);
-              }}
-            >
-              Create another Campaign
-            </Button>
             <Button onClick={(event) => openDialog('edit', event.currentTarget)}>Edit</Button>
             <Button
               variant={archived ? 'primary' : 'danger'}
@@ -581,17 +572,6 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
           returnFocusRef={returnFocusRef}
           onClose={() => setCreatingProject(false)}
           onCreated={(current) => void navigate(projectPath(current.project.id))}
-        />
-      ) : null}
-      {creatingCampaign ? (
-        <CampaignFormDialog
-          returnFocusRef={returnFocusRef}
-          onClose={() => setCreatingCampaign(false)}
-          onSaved={(created) =>
-            void navigate(campaignPath(created.id), {
-              state: { campaignCreated: created.id },
-            })
-          }
         />
       ) : null}
     </div>

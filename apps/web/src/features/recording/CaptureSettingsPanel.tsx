@@ -140,6 +140,9 @@ const aspectRatioFieldsetStyles = (theme: Theme): CSSObject => ({
   '& [data-format-label]': { minWidth: 0, display: 'grid', gap: theme.space.xxs },
   '& strong': { fontSize: theme.fontSizes.metadata },
   '& small': { color: theme.colors.textFaint, fontSize: theme.fontSizes.caption },
+  // The selected option swaps to the accent-soft background, where faint caption text no longer
+  // clears AA. Only the selected state needs the step up.
+  '& label[data-selected="true"] small': { color: theme.colors.textMuted },
   '& > p': {
     margin: 0,
     color: theme.colors.textFaint,

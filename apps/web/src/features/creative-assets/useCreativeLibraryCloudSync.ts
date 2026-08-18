@@ -1,10 +1,28 @@
 import type { CreativeAssetStore } from '@studio/domain';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   readCreativeLibrary,
   replaceCreativeLibrary,
 } from '../../adapters/api-client/creativeLibraryApi';
 import type { CreativeAssetRepository } from './types';
+
+/**
+ * Why the cloud mirror stopped, in a form the UI can act on.
+ *
+ * A sentence cannot be branched on without matching its own copy, and the recovery surface offers
+ * different actions for "the two copies diverged" (pick a side) and "the server could not be
+ * reached" (try again). It lives with the hook rather than in the repository because the repository
+ * owns *local* storage: cloud status is neither its data nor anything it reads.
+ */
+export type CreativeLibrarySyncStatus =
+  | { readonly state: 'idle' }
+  | {
+      readonly state: 'paused';
+      readonly reason: 'diverged' | 'conflict' | 'unavailable';
+      readonly message: string;
+    };
+
+const IDLE: CreativeLibrarySyncStatus = { state: 'idle' };
 
 const itemCount = (store: CreativeAssetStore): number =>
   store.savedPrompts.length +
@@ -12,23 +30,55 @@ const itemCount = (store: CreativeAssetStore): number =>
   store.savedCharacterPrompts.length +
   store.savedCharacterVariants.length;
 
-const replaceRemote = async (
-  expectedRevision: number,
-  repository: CreativeAssetRepository,
-  signal: AbortSignal,
-) => replaceCreativeLibrary(expectedRevision, repository.getSnapshot().store, signal);
+const DIVERGED_MESSAGE =
+  'Cloud library sync paused because this browser and the cloud both contain changes. The local copy was preserved.';
+const CONFLICT_MESSAGE =
+  'Cloud library sync paused because another session changed the library. Your local copy was preserved.';
+const INITIALIZED_ELSEWHERE_MESSAGE =
+  'Cloud library sync paused because another session initialized it first.';
+const UNAVAILABLE_MESSAGE =
+  'Cloud library sync is unavailable. Your local copy remains available on this browser.';
+
+/**
+ * How the operator answered a divergence, carried into the next attempt.
+ *
+ * There is no third answer. The comparison that detects divergence is a whole-store deep equality
+ * with no per-record identity, and the contract exposes only a full-store PUT — so a merge would
+ * be invented semantics rather than a reconciliation. Picking a side is the honest choice.
+ */
+export type CreativeLibrarySyncResolution = 'keep-local' | 'keep-cloud';
 
 export interface CreativeLibraryCloudSyncOptions {
   readonly initializeEmptyRemoteFromLocal?: boolean;
 }
 
+export interface CreativeLibraryCloudSync {
+  readonly status: CreativeLibrarySyncStatus;
+  /** Re-runs the whole startup sequence, including the divergence check. */
+  readonly retry: () => void;
+  /** Overwrites the cloud copy with this browser's. */
+  readonly keepLocal: () => void;
+  /** Overwrites this browser's copy with the cloud's. */
+  readonly keepCloud: () => void;
+}
+
 export const useCreativeLibraryCloudSync = (
   repository: CreativeAssetRepository,
   { initializeEmptyRemoteFromLocal = false }: CreativeLibraryCloudSyncOptions = {},
-): void => {
+): CreativeLibraryCloudSync => {
+  const [status, setStatus] = useState<CreativeLibrarySyncStatus>(IDLE);
+  /**
+   * The re-arm signal. Sync used to fail closed for the lifetime of the repository: the effect ran
+   * once, dropped its subscription, and only a new owner or a page reload could start it again —
+   * and a reload met the same divergence and paused again. A fresh object per click re-runs the
+   * effect exactly once, which is what turns a terminal notice into a recovery path.
+   */
+  const [attempt, setAttempt] = useState<{
+    readonly resolution: CreativeLibrarySyncResolution | null;
+  }>({ resolution: null });
+
   useEffect(() => {
-    if (repository.replaceFromRemote === undefined || repository.setSyncNotice === undefined)
-      return;
+    if (repository.replaceFromRemote === undefined) return;
     const controller = new AbortController();
     let active = true;
     let revision = 0;
@@ -37,11 +87,30 @@ export const useCreativeLibraryCloudSync = (
     let pending = false;
     let unsubscribe: (() => void) | null = null;
 
-    const failClosed = (message: string) => {
+    const failClosed = (reason: 'diverged' | 'conflict' | 'unavailable', message: string) => {
       if (!active) return;
-      repository.setSyncNotice?.(message);
+      setStatus({ state: 'paused', reason, message });
       unsubscribe?.();
       unsubscribe = null;
+    };
+
+    const settle = () => {
+      if (active) setStatus(IDLE);
+    };
+
+    /** Full-store PUT plus its one failure mode; the three callers differ only in expectations. */
+    const pushLocal = async (expectedRevision: number, conflictMessage = CONFLICT_MESSAGE) => {
+      const result = await replaceCreativeLibrary(
+        expectedRevision,
+        repository.getSnapshot().store,
+        controller.signal,
+      );
+      if (result === 'conflict') {
+        failClosed('conflict', conflictMessage);
+        return false;
+      }
+      revision = result;
+      return true;
     };
 
     const flush = async (): Promise<void> => {
@@ -52,21 +121,9 @@ export const useCreativeLibraryCloudSync = (
       writing = true;
       pending = false;
       try {
-        const result = await replaceRemote(revision, repository, controller.signal);
-        if (result === 'conflict') {
-          failClosed(
-            'Cloud library sync paused because another session changed the library. Your local copy was preserved.',
-          );
-          return;
-        }
-        revision = result;
-        repository.setSyncNotice?.(null);
+        if (await pushLocal(revision)) settle();
       } catch {
-        if (!controller.signal.aborted) {
-          failClosed(
-            'Cloud library sync is unavailable. Your local copy remains available on this browser.',
-          );
-        }
+        if (!controller.signal.aborted) failClosed('unavailable', UNAVAILABLE_MESSAGE);
       } finally {
         writing = false;
         if (pending && active) void flush();
@@ -83,14 +140,15 @@ export const useCreativeLibraryCloudSync = (
         const localStore = repository.getSnapshot().store;
         const localCount = itemCount(localStore);
         const remoteCount = itemCount(remote.store);
-        if (remote.revision === 0 && localCount > 0) {
+        if (attempt.resolution === 'keep-cloud') {
+          await repository.replaceFromRemote?.(remote.store);
+        } else if (attempt.resolution === 'keep-local') {
+          // Deliberately `remote.revision`, freshly read: the revision this hook was holding when
+          // it paused is exactly the one the server already rejected.
+          if (!(await pushLocal(remote.revision))) return;
+        } else if (remote.revision === 0 && localCount > 0) {
           if (initializeEmptyRemoteFromLocal) {
-            const result = await replaceRemote(0, repository, controller.signal);
-            if (result === 'conflict') {
-              failClosed('Cloud library sync paused because another session initialized it first.');
-              return;
-            }
-            revision = result;
+            if (!(await pushLocal(0, INITIALIZED_ELSEWHERE_MESSAGE))) return;
           } else {
             await repository.replaceFromRemote?.(remote.store);
           }
@@ -100,13 +158,11 @@ export const useCreativeLibraryCloudSync = (
           remote.revision > 0 &&
           JSON.stringify(localStore) !== JSON.stringify(remote.store)
         ) {
-          failClosed(
-            'Cloud library sync paused because this browser and the cloud both contain changes. The local copy was preserved.',
-          );
+          failClosed('diverged', DIVERGED_MESSAGE);
           return;
         }
         if (!active) return;
-        repository.setSyncNotice?.(null);
+        settle();
         unsubscribe = repository.subscribe(() => {
           if (timer !== null) clearTimeout(timer);
           timer = setTimeout(() => void flush(), 250);
@@ -114,9 +170,7 @@ export const useCreativeLibraryCloudSync = (
       } catch {
         if (!controller.signal.aborted) {
           // A local-only server intentionally has no sync route; 404 was handled above.
-          failClosed(
-            'Cloud library sync is unavailable. Your local copy remains available on this browser.',
-          );
+          failClosed('unavailable', UNAVAILABLE_MESSAGE);
         }
       }
     })();
@@ -127,5 +181,20 @@ export const useCreativeLibraryCloudSync = (
       if (timer !== null) clearTimeout(timer);
       unsubscribe?.();
     };
-  }, [initializeEmptyRemoteFromLocal, repository]);
+  }, [attempt, initializeEmptyRemoteFromLocal, repository]);
+
+  const rearm = useCallback(
+    (resolution: CreativeLibrarySyncResolution | null) => setAttempt({ resolution }),
+    [],
+  );
+
+  return useMemo(
+    () => ({
+      status,
+      retry: () => rearm(null),
+      keepLocal: () => rearm('keep-local'),
+      keepCloud: () => rearm('keep-cloud'),
+    }),
+    [rearm, status],
+  );
 };

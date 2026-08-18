@@ -11,8 +11,6 @@ export const APP_PATHS = Object.freeze({
   characters: '/assets/characters',
   outfits: '/assets/outfits',
   voices: '/assets/voices',
-  /** Compatibility-only route. Recipe UI has no canonical destination. */
-  recipes: '/studio/assets/recipes',
   legacyProjects: '/studio/projects',
   legacyCampaigns: '/studio/campaigns',
   /** Compatibility-only route. Campaigns were singular before every other collection was plural. */
@@ -188,7 +186,6 @@ const LEGACY_PATH_REDIRECTS: Readonly<Record<string, string>> = {
   '/studio/assets/outfits': APP_PATHS.outfits,
   [APP_PATHS.legacyOutfits]: APP_PATHS.outfits,
   [APP_PATHS.legacyVoices]: APP_PATHS.voices,
-  [APP_PATHS.recipes]: APP_PATHS.assets,
   [APP_PATHS.legacyLive]: APP_PATHS.live,
 };
 

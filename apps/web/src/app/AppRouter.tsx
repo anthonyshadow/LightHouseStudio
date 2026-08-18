@@ -17,6 +17,7 @@ import {
   useLocation,
 } from 'react-router';
 import { Button } from '../ui/primitives/Button';
+import { formatClientDiagnostics, isChunkLoadError, recordClientError } from './clientDiagnostics';
 import { EntryPage } from './EntryPage';
 import {
   APP_PATHS,
@@ -72,45 +73,82 @@ const StudioLoading = () => (
   </main>
 );
 
-const RouteErrorFallback = () => (
-  <main role="alert" css={routeSurfaceStyles}>
-    <div>
-      <h1>Studio could not load</h1>
-      <p>Reload Lightframe to try again. Your saved account content is unchanged.</p>
-      <Button variant="primary" onClick={() => window.location.reload()}>
-        Reload
-      </Button>
-    </div>
-  </main>
-);
+const RouteErrorFallback = ({ stale }: { readonly stale: boolean }) => {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <main role="alert" css={routeSurfaceStyles}>
+      <div>
+        <h1>{stale ? 'A newer version of Lightframe is available' : 'Studio could not load'}</h1>
+        <p>
+          {stale
+            ? 'Reload to continue with the current version. Your saved account content is unchanged.'
+            : 'Reload Lightframe to try again. Your saved account content is unchanged.'}
+        </p>
+        <Button variant="primary" onClick={() => window.location.reload()}>
+          Reload
+        </Button>
+        {/*
+          The copy is deliberately generic — see `componentDidCatch`. This hands the operator the
+          detail on request instead, so a report is possible without devtools and without the
+          fallback screen putting a raw error on the page.
+        */}
+        <Button
+          onClick={() => {
+            void navigator.clipboard?.writeText(formatClientDiagnostics()).then(
+              () => setCopied(true),
+              () => setCopied(false),
+            );
+          }}
+        >
+          Copy diagnostic details
+        </Button>
+        <span role="status" aria-live="polite">
+          {copied ? 'Diagnostic details copied.' : ''}
+        </span>
+      </div>
+    </main>
+  );
+};
 
 interface RouteErrorBoundaryProps extends PropsWithChildren {
   readonly resetKey: string;
 }
 
+/** One discriminant: `{failed: false, stale: true}` was a state that could never mean anything. */
 interface RouteErrorBoundaryState {
-  readonly failed: boolean;
+  readonly failure: 'crash' | 'stale' | null;
 }
 
-class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBoundaryState> {
-  override state: RouteErrorBoundaryState = { failed: false };
+export class RouteErrorBoundary extends Component<
+  RouteErrorBoundaryProps,
+  RouteErrorBoundaryState
+> {
+  override state: RouteErrorBoundaryState = { failure: null };
 
-  static getDerivedStateFromError(): RouteErrorBoundaryState {
-    return { failed: true };
+  static getDerivedStateFromError(error: unknown): RouteErrorBoundaryState {
+    return { failure: isChunkLoadError(error) ? 'stale' : 'crash' };
   }
 
-  override componentDidCatch(_error: Error, _errorInfo: ErrorInfo): void {
-    // The route fallback intentionally avoids exposing raw runtime errors.
+  override componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    // The fallback still avoids exposing raw runtime errors. Recording them locally is not the
+    // same thing: nothing is rendered, nothing is sent, and the operator chooses to copy it.
+    recordClientError(error, errorInfo.componentStack);
+    console.error('Lightframe route error', error);
   }
 
   override componentDidUpdate(previousProps: RouteErrorBoundaryProps): void {
-    if (this.state.failed && previousProps.resetKey !== this.props.resetKey) {
-      this.setState({ failed: false });
+    if (this.state.failure !== null && previousProps.resetKey !== this.props.resetKey) {
+      this.setState({ failure: null });
     }
   }
 
   override render(): ReactNode {
-    return this.state.failed ? <RouteErrorFallback /> : this.props.children;
+    return this.state.failure === null ? (
+      this.props.children
+    ) : (
+      <RouteErrorFallback stale={this.state.failure === 'stale'} />
+    );
   }
 }
 

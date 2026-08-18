@@ -94,8 +94,7 @@ configured `DATABASE_MODE`; otherwise the routes are absent and the client sees 
 
 1. `ProjectRouteSurface` sees no project id in the pathname and renders `ProjectsWorkspace`
    (`ProjectRouteSurface.tsx:1196-1200`).
-2. Header: `h1` "Projects", subtitle, and two create actions — **Quick project** (secondary) and
-   **New Project** (primary).
+2. Header: `h1` "Projects", subtitle, and one create action — **New Project** (primary).
 3. A group filter with two options: **All Active** and **No Campaign** (`:352-369`).
 4. Two `ProjectListSection`s render — `lifecycle="active"` and `lifecycle="archived"` — and the
    group filter applies to **both**. Selecting "No Campaign" retitles them "No Campaign" and
@@ -107,10 +106,12 @@ configured `DATABASE_MODE`; otherwise the routes are absent and the client sees 
 6. "N loaded" is shown, not a total; **Load more** appears while `hasNextPage`.
 
 **System behaviour** — `useProjectList` issues
-`GET /api/projects?lifecycle=…&pageSize=20[&campaignId=none]`. **Quick project** calls
-`createMutation.mutateAsync(null)` with a retained idempotency key, which posts
-`{ title: 'Untitled Project' }`, then navigates to `/projects/{id}`
-(`ProjectRouteSurface.tsx:268-277`).
+`GET /api/projects?lifecycle=…&pageSize=20[&campaignId=none]`. `NewProjectDialog` owns both create
+paths: **Create Project** calls `createNamedMutation`, and **Create without a name** calls
+`createMutation.mutateAsync(campaignId)` with a retained idempotency key, posting
+`{ title: 'Untitled Project' }`. Both navigate to `/projects/{id}`. The unnamed action reuses the
+Campaign already picked in the dialog, which the former standalone **Quick project** header button
+could not do.
 
 **States** — loading, error+retry, and distinct active/archived empty states are all present
 (`:147-165`).

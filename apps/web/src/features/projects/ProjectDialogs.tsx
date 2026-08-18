@@ -31,21 +31,33 @@ export const NewProjectDialog = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState('');
   const [campaignId, setCampaignId] = useState(defaultCampaignId ?? 'none');
-  const [error, setError] = useState<string | null>(null);
-  const busy = controller.createNamedMutation.isPending;
+  // Scoped, because the two actions fail in different places: a named create can blame the name
+  // field, an unnamed one has no field to blame.
+  const [error, setError] = useState<{
+    readonly scope: 'named' | 'unnamed';
+    readonly message: string;
+  } | null>(null);
+  const busy = controller.createNamedMutation.isPending || controller.createMutation.isPending;
 
-  const submit = async (event?: FormEvent) => {
-    event?.preventDefault();
+  /**
+   * Both create paths. The unnamed one is the former "Quick project" button, moved to where the
+   * choice is actually made: standing beside the naming field it reads as "skip this", which two
+   * unexplained buttons on the list header never did — and it reuses the Campaign already picked
+   * here, which that button could not.
+   */
+  const create = async (scope: 'named' | 'unnamed') => {
     setError(null);
     try {
       onCreated(
-        await controller.createNamedMutation.mutateAsync({
-          title,
-          campaignId: projectCampaignId(campaignId),
-        }),
+        await (scope === 'named'
+          ? controller.createNamedMutation.mutateAsync({
+              title,
+              campaignId: projectCampaignId(campaignId),
+            })
+          : controller.createMutation.mutateAsync(projectCampaignId(campaignId))),
       );
     } catch (caught) {
-      setError(safeProjectError(caught));
+      setError({ scope, message: safeProjectError(caught) });
     }
   };
 
@@ -56,8 +68,8 @@ export const NewProjectDialog = ({
       title="New Project"
       description={
         campaignLocked
-          ? 'Name the Project. It will be created inside the current Campaign.'
-          : 'Name the work now. A Campaign is optional, and the Project may remain collection-only until you add a video.'
+          ? 'Name the Project, or create it untitled and rename it later. It will be created inside the current Campaign.'
+          : 'Name the work now, or create it untitled and rename it later. A Campaign is optional, and the Project may remain collection-only until you add a video.'
       }
       placement="bottom"
       size="standard"
@@ -71,17 +83,32 @@ export const NewProjectDialog = ({
             Cancel
           </Button>
           <Button
+            data-project-create="unnamed"
+            busy={controller.createMutation.isPending}
+            disabled={busy}
+            onClick={() => void create('unnamed')}
+          >
+            Create without a name
+          </Button>
+          <Button
             variant="primary"
-            busy={busy}
-            disabled={title.trim().length === 0 || title.trim().length > 120}
-            onClick={() => void submit()}
+            data-project-create="named"
+            busy={controller.createNamedMutation.isPending}
+            disabled={busy || title.trim().length === 0 || title.trim().length > 120}
+            onClick={() => void create('named')}
           >
             Create Project
           </Button>
         </div>
       }
     >
-      <form onSubmit={(event) => void submit(event)} css={{ display: 'grid', gap: theme.space.md }}>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void create('named');
+        }}
+        css={{ display: 'grid', gap: theme.space.md }}
+      >
         <TextField
           ref={inputRef}
           label="Project name"
@@ -89,7 +116,7 @@ export const NewProjectDialog = ({
           required
           maxLength={120}
           disabled={busy}
-          {...(error ? { error } : {})}
+          {...(error?.scope === 'named' ? { error: error.message } : {})}
           onChange={(event) => setTitle(event.target.value)}
         />
         <ProjectCampaignPicker
@@ -98,6 +125,11 @@ export const NewProjectDialog = ({
           disabled={busy || campaignLocked}
           onValueChange={(value) => setCampaignId(value)}
         />
+        {error?.scope === 'unnamed' ? (
+          <StatusNotice role="alert" tone="danger" title="Project not created">
+            {error.message}
+          </StatusNotice>
+        ) : null}
       </form>
     </OverlayPanel>
   );

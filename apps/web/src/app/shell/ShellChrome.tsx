@@ -1,6 +1,7 @@
 import { useTheme } from '@emotion/react';
 import type { AuthenticatedUser } from '@studio/contracts';
 import { useRef, useState } from 'react';
+import { CreativeLibrarySyncNotice } from '../../features/creative-assets/CreativeLibrarySyncNotice';
 import { AssetCreationLauncher } from '../../studio/AssetCreationLauncher';
 import { headerRegionStyles } from '../../studio/StudioApp.styles';
 import { StudioHeader } from '../../studio/StudioHeader';
@@ -33,7 +34,7 @@ export const ShellChrome = ({ services, user, logout }: ShellChromeProps) => {
   const { route, nav, browser, provider, creative, character, outfit, libraryHandoff, mainRef } =
     services;
   const { availability, state: capabilityState } = provider;
-  const { repository, store } = creative;
+  const { repository, store, sync } = creative;
 
   return (
     <>
@@ -69,6 +70,13 @@ export const ShellChrome = ({ services, user, logout }: ShellChromeProps) => {
           onOpenLive={nav.openLive}
           onLogout={() => void logout.request()}
         />
+        {/*
+          One mount, in the chrome rather than on `/assets`. A paused library silently affects every
+          Character and Outfit save wherever the operator is, the Asset libraries are fullscreen
+          overlays that would hide a hub-level notice, and sitting outside the main grid keeps it
+          clear of the Studio stage.
+        */}
+        <CreativeLibrarySyncNotice {...sync} />
       </div>
 
       <AssetCreationLauncher

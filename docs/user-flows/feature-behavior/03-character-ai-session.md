@@ -7,7 +7,7 @@ pinned `lucy-latest` model.
 ## Journey
 
 1. Create or choose a saved Character. On desktop, **Select Character** is the first AI preparation
-   action in the creative-tool rail, immediately before **Select Outfit** and **Workshop**. At any
+   action in the creative-tool rail, immediately before **Select Outfit**. At any
    viewport, **Quick Create → Create Asset → Character** opens the same Character Builder; the
    canonical Characters library is `/assets/characters`. Saving selects the Character but never
    starts AI. The Character panel exposes **Unselect character** when opened from the desktop rail.

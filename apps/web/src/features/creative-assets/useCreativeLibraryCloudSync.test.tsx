@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { http, HttpResponse } from 'msw';
 import { describe, expect, it } from 'vitest';
 import { createEmptyCreativeAssetStore } from '@studio/domain';
 import { createCreativeAssetRepository } from './repository';
@@ -42,7 +43,7 @@ describe('useCreativeLibraryCloudSync', () => {
       expectedRevision: 0,
       store: { savedPrompts: [{ title: 'Local look' }] },
     });
-    expect(repository.getSnapshot().notice).toBeNull();
+    expect(rendered.result.current.status).toEqual({ state: 'idle' });
 
     mockApiServer.use(serverConflictScenario('PUT', '/api/creative-library'));
     await repository.createSavedPrompt({
@@ -51,7 +52,10 @@ describe('useCreativeLibraryCloudSync', () => {
       modelModeId: 'lucy-vton-latest',
     });
     await waitFor(() =>
-      expect(repository.getSnapshot().notice).toContain('another session changed the library'),
+      expect(rendered.result.current.status).toMatchObject({
+        state: 'paused',
+        reason: 'conflict',
+      }),
     );
     expect(repository.getSnapshot().store.savedPrompts).toHaveLength(2);
     rendered.unmount();
@@ -73,7 +77,7 @@ describe('useCreativeLibraryCloudSync', () => {
 
     await waitFor(() => expect(repository.getSnapshot().store.savedPrompts).toEqual([]));
     expect(requests).toHaveLength(1);
-    expect(repository.getSnapshot().notice).toBeNull();
+    expect(rendered.result.current.status).toEqual({ state: 'idle' });
     rendered.unmount();
   });
 
@@ -94,10 +98,114 @@ describe('useCreativeLibraryCloudSync', () => {
 
     await act(async () => Promise.resolve());
     await waitFor(() =>
-      expect(repository.getSnapshot().notice).toContain('local copy was preserved'),
+      expect(rendered.result.current.status).toMatchObject({
+        state: 'paused',
+        reason: 'diverged',
+      }),
     );
     expect(repository.getSnapshot().store.savedPrompts[0]?.title).toBe('Browser look');
     expect(requests).toHaveLength(1);
+    rendered.unmount();
+  });
+
+  it('pushes the browser copy over the cloud on keep-local, against a freshly read revision', async () => {
+    const repository = addPrompt('Browser look');
+    const remoteRepository = addPrompt('Cloud look');
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'GET',
+        '/api/creative-library',
+        { body: { revision: 4, store: remoteRepository.getSnapshot().store } },
+        observe,
+      ),
+      jsonScenario('PUT', '/api/creative-library', { body: { revision: 5 } }, observe),
+    );
+
+    const rendered = renderHook(() => useCreativeLibraryCloudSync(repository));
+    await waitFor(() =>
+      expect(rendered.result.current.status).toMatchObject({ state: 'paused', reason: 'diverged' }),
+    );
+
+    act(() => rendered.result.current.keepLocal());
+
+    await waitFor(() => expect(requests).toHaveLength(3));
+    expect(requests[1]!.method).toBe('GET');
+    expect(requests[2]!.method).toBe('PUT');
+    // The revision it paused holding is the one the server already rejected; only a fresh read works.
+    await expect(requests[2]!.json()).resolves.toMatchObject({
+      expectedRevision: 4,
+      store: { savedPrompts: [{ title: 'Browser look' }] },
+    });
+    await waitFor(() => expect(rendered.result.current.status).toEqual({ state: 'idle' }));
+    expect(repository.getSnapshot().store.savedPrompts[0]?.title).toBe('Browser look');
+    rendered.unmount();
+  });
+
+  it('adopts the cloud copy on keep-cloud and resumes syncing', async () => {
+    const repository = addPrompt('Browser look');
+    const remoteRepository = addPrompt('Cloud look');
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'GET',
+        '/api/creative-library',
+        { body: { revision: 4, store: remoteRepository.getSnapshot().store } },
+        observe,
+      ),
+    );
+
+    const rendered = renderHook(() => useCreativeLibraryCloudSync(repository));
+    await waitFor(() =>
+      expect(rendered.result.current.status).toMatchObject({ state: 'paused', reason: 'diverged' }),
+    );
+
+    act(() => rendered.result.current.keepCloud());
+
+    await waitFor(() =>
+      expect(repository.getSnapshot().store.savedPrompts[0]?.title).toBe('Cloud look'),
+    );
+    await waitFor(() => expect(rendered.result.current.status).toEqual({ state: 'idle' }));
+    expect(requests).toHaveLength(2);
+    rendered.unmount();
+  });
+
+  it('recovers from an unavailable server when the operator retries', async () => {
+    const repository = addPrompt('Browser look');
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(http.get('*/api/creative-library', () => HttpResponse.error()));
+
+    const rendered = renderHook(() => useCreativeLibraryCloudSync(repository));
+    await waitFor(() =>
+      expect(rendered.result.current.status).toMatchObject({
+        state: 'paused',
+        reason: 'unavailable',
+      }),
+    );
+
+    mockApiServer.use(
+      jsonScenario(
+        'GET',
+        '/api/creative-library',
+        { body: { revision: 0, store: createEmptyCreativeAssetStore() } },
+        observe,
+      ),
+      jsonScenario('PUT', '/api/creative-library', { body: { revision: 1 } }, observe),
+    );
+    act(() => rendered.result.current.retry());
+
+    await waitFor(() => expect(rendered.result.current.status).toEqual({ state: 'idle' }));
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.method).toBe('GET');
+
+    // The subscription is live again, so an ordinary local edit reaches the cloud.
+    await repository.createSavedPrompt({
+      title: 'After recovery',
+      prompt: 'After recovery prompt',
+      modelModeId: 'lucy-vton-latest',
+    });
+    await waitFor(() => expect(requests).toHaveLength(2));
+    expect(requests[1]!.method).toBe('PUT');
     rendered.unmount();
   });
 });

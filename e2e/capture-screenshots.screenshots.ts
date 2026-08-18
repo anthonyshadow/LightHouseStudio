@@ -240,11 +240,6 @@ const showVoiceTreatment = async (page: Page): Promise<void> => {
   await heading.scrollIntoViewIfNeeded();
 };
 
-const openWorkshop = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: 'Workshop', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Direct one clear visual change' })).toBeVisible();
-};
-
 const SCENARIOS: readonly Scenario[] = [
   {
     group: '01-studio',
@@ -367,54 +362,6 @@ const SCENARIOS: readonly Scenario[] = [
           return image.naturalWidth > 0 && image.naturalHeight > 0;
         }),
       ).toBe(true);
-    },
-  },
-  {
-    group: '03-character-workshop',
-    filename: 'add-one-object.png',
-    preparationOnly: true,
-    setup: async (page) => {
-      await openWorkshop(page);
-      await page.getByRole('button', { name: 'Add one object' }).click();
-      await page
-        .getByRole('textbox', { name: 'Object to add', exact: true })
-        .fill('a copper field notebook');
-      await page
-        .getByRole('textbox', { name: 'Specific placement', exact: true })
-        .fill('held at chest height');
-    },
-  },
-  {
-    group: '03-character-workshop',
-    filename: 'replace-one-object.png',
-    preparationOnly: true,
-    setup: async (page) => {
-      await openWorkshop(page);
-      await page.getByRole('button', { name: 'Replace one object' }).click();
-      await page
-        .getByRole('textbox', { name: 'Visible object to replace', exact: true })
-        .fill('the paper notebook');
-      await page
-        .getByRole('textbox', { name: 'Replacement', exact: true })
-        .fill('a compact field recorder');
-    },
-  },
-  {
-    group: '03-character-workshop',
-    filename: 'restyle-one-object.png',
-    preparationOnly: true,
-    setup: async (page) => {
-      await openWorkshop(page);
-      await page.getByRole('button', { name: 'Restyle one object' }).click();
-      await page
-        .getByRole('textbox', { name: 'Object to restyle', exact: true })
-        .fill('the field jacket');
-      await page
-        .getByRole('textbox', { name: 'Attribute', exact: true })
-        .fill('material and color');
-      await page
-        .getByRole('textbox', { name: 'New look or value', exact: true })
-        .fill('burnished amber canvas');
     },
   },
   {

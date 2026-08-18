@@ -41,7 +41,7 @@ export const useStudioCreativeRepository = (ownerUserId: string) => {
   );
 
   useEffect(() => () => repository.close?.(), [repository]);
-  useCreativeLibraryCloudSync(repository, {
+  const sync = useCreativeLibraryCloudSync(repository, {
     initializeEmptyRemoteFromLocal: persistenceScope === 'production',
   });
 
@@ -54,7 +54,8 @@ export const useStudioCreativeRepository = (ownerUserId: string) => {
   );
 
   return useMemo(
-    () => ({ repository, store, existingVideoSavedRecipes, recordAcceptedBatchStep }) as const,
-    [existingVideoSavedRecipes, recordAcceptedBatchStep, repository, store],
+    () =>
+      ({ repository, store, sync, existingVideoSavedRecipes, recordAcceptedBatchStep }) as const,
+    [existingVideoSavedRecipes, recordAcceptedBatchStep, repository, store, sync],
   );
 };

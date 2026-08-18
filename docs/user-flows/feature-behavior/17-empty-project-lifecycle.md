@@ -14,8 +14,9 @@ provider work.
    overview; `/projects/:projectId/workspace` opens its guided video workspace inside the same
    responsive organization navigation shell. All are protected, deep-linkable, and return to the
    same URL after Login.
-2. **New Project** asks for a name and optional Campaign. **Quick project** creates `Untitled
-Project` without requiring a Campaign, brief, source, tag, or provider choice. Either path may
+2. **New Project** asks for a name and optional Campaign, and its **Create without a name** action
+   creates `Untitled Project` in the same dialog without requiring a name, brief, source, tag, or
+   provider choice — carrying whichever Campaign is selected. Either path may
    intentionally remain collection-only. The browser supplies one operation key and reuses it
    after an uncertain response so the server's durable receipt can reconcile an exact replay.
 3. Summary rows show only title, derived Project status, and updated time. Active and archived

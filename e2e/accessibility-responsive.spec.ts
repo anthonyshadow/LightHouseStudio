@@ -294,17 +294,10 @@ for (const viewport of representativeViewports) {
     await page.keyboard.press('Enter');
     await expect(page.getByRole('main')).toBeFocused();
     await expectNoDocumentOverflow(page);
-    await expect(page.getByRole('button', { name: 'Workshop' })).toHaveAccessibleDescription(
-      'Advanced · build one visual change',
+    await expect(page.getByRole('button', { name: 'Edit Video' })).toHaveAccessibleDescription(
+      'Open the video editor',
     );
-    await expect(page.getByRole('button', { name: /Recipe|Shelf|Dock/u })).toHaveCount(0);
-
-    const workshop = page.getByRole('button', { name: 'Workshop' });
-    await workshop.focus();
-    await page.keyboard.press('Enter');
-    await expect(
-      page.getByRole('heading', { name: 'Direct one clear visual change' }),
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: /Recipe|Shelf|Dock|Workshop/u })).toHaveCount(0);
 
     await expectNoDocumentOverflow(page);
     await expectNoAxeViolations(page);
@@ -328,7 +321,7 @@ for (const viewport of dashboardViewports) {
     await page.goto('/dashboard');
 
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-    await expect(page.getByText('Momentum Workspace', { exact: true })).toBeVisible();
+    await expect(page.getByText('Welcome back, Lightframe Demo', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Create video' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Continue Work' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent Work' })).toBeVisible();
@@ -590,7 +583,7 @@ test('phone and tablet expose supported creative tools without Recipe UI', async
         .locator('button')
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
     )
-    .toEqual(['Edit Video', 'Select Character', 'Select Outfit', 'Workshop']);
+    .toEqual(['Edit Video', 'Select Character', 'Select Outfit']);
   await expect(page.getByRole('button', { name: /Open Select AI options/u })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Recipe|Shelf|Dock/u })).toHaveCount(0);
 
@@ -601,7 +594,10 @@ test('phone and tablet expose supported creative tools without Recipe UI', async
     await page.setViewportSize(viewport);
     await page.goto('/studio/create');
     const rail = page.getByRole('navigation', { name: 'Creative workspace tools' });
-    await expect(rail.getByRole('button')).toHaveCount(2);
+    // Edit Video alone below the desktop breakpoint: Character and Outfit are desktop-only, and
+    // the Workshop that used to keep it company is retired.
+    await expect(rail.getByRole('button')).toHaveCount(1);
+    await expect(rail.getByRole('button', { name: 'Edit Video' })).toHaveCount(1);
     await expect(rail.getByRole('button', { name: 'Select Character' })).toHaveCount(0);
     await expect(rail.getByRole('button', { name: 'Select Outfit' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /Select AI/u })).toHaveCount(0);

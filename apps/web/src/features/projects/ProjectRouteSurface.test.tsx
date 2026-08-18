@@ -260,14 +260,11 @@ describe('Project route surface', () => {
     expect(await screen.findByRole('heading', { name: 'Archived concept' })).toBeVisible();
     expect(screen.queryByText('No source yet')).not.toBeInTheDocument();
     expect(screen.getByText(/Keep focused video work together/u)).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Quick project' })).toHaveAttribute(
-      'data-project-create',
-      'quick',
-    );
     expect(screen.getByRole('button', { name: 'New Project' })).toHaveAttribute(
       'data-project-create',
       'named',
     );
+    expect(screen.queryByRole('button', { name: 'Quick project' })).not.toBeInTheDocument();
 
     const activeList = screen.getByRole('list', { name: 'Active Projects' });
     expect(
@@ -828,14 +825,16 @@ describe('Project route surface', () => {
     expect(screen.getByRole('img', { name: 'Voice visual for Saved Voice' })).toBeVisible();
   });
 
-  it('reuses the Quick Start operation key after response failure and reconciles replay', async () => {
+  it('creates an unnamed Project from the one dialog and replays its operation key', async () => {
     installProjectLists([], []);
     const created = currentProject(activeId, { title: 'Untitled Project' });
     const operationKeys: string[] = [];
+    const bodies: unknown[] = [];
     let attempts = 0;
     mockApiServer.use(
-      http.post('*/api/projects', ({ request }) => {
+      http.post('*/api/projects', async ({ request }) => {
         operationKeys.push(request.headers.get('idempotency-key') ?? '');
+        bodies.push(await request.json());
         attempts += 1;
         return attempts === 1 ? HttpResponse.error() : HttpResponse.json(created, { status: 201 });
       }),
@@ -844,12 +843,17 @@ describe('Project route surface', () => {
     const { router } = renderProjects();
     const user = userEvent.setup();
 
-    expect(await screen.findByText(/Quick project creates an unassigned Project/u)).toBeVisible();
-    await user.click(await screen.findByRole('button', { name: 'Quick project' }));
+    await user.click(await screen.findByRole('button', { name: 'New Project' }));
+    const unnamed = await screen.findByRole('button', { name: 'Create without a name' });
+    await user.click(unnamed);
     expect(await screen.findByText('Project not created')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Retry quick project' }));
+    await user.click(screen.getByRole('button', { name: 'Create without a name' }));
 
     await waitFor(() => expect(router.state.location.pathname).toBe(`/projects/${activeId}`));
+    expect(bodies).toEqual([
+      { title: 'Untitled Project', campaignId: null },
+      { title: 'Untitled Project', campaignId: null },
+    ]);
     expect(operationKeys).toHaveLength(2);
     expect(operationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
     expect(operationKeys[1]).toBe(operationKeys[0]);

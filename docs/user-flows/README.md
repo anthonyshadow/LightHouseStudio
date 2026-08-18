@@ -61,7 +61,7 @@ The Studio's capture runtime mounts only where the stage is visible — `/studio
 `/studio/{videoId}` and `/projects/:projectId/workspace` (`isStudioRuntimePath`). Capture state, a
 reviewed take and an in-progress edit therefore do **not** survive leaving Studio: `StudioExitGuard`
 prompts before that happens, and the choices that are not transient — camera, microphone, capture
-format, unsaved Workshop drafts — are persisted so they do.
+format — are persisted so they do.
 
 ## Navigation model
 
@@ -128,6 +128,7 @@ surface renders inside the shell. Whether a media stage exists at all is `isStud
 | Attaching assets to a Project                                          | **Complete**            |                                                                                                                                                                                       |
 | **Live AI (realtime) sessions**                                        | **Partial / gated**     | Code paths exist end-to-end but are disabled unless `REALTIME_VIDEO_BETA_ENABLED` **and** a Decart key are configured; `/studio/create/live` otherwise renders an unavailable surface |
 | Voices library page                                                    | **Complete**            | `/assets/voices` browses, previews, saves and removes voices, and hands one to Studio; disabled with an explanation only when ElevenLabs is unconfigured                              |
+| Cloud creative-library sync                                            | **Complete**            | Fails closed on divergence, conflict or transport error, and is recoverable in place: Try again · Keep this browser's copy · Use the cloud copy. No merge exists, by design           |
 | **Project provider voice / live starts**                               | **Deliberately absent** | Blocked with an explicit reason (`ProjectCreativeCheckpointPanel.tsx:14`)                                                                                                             |
 | **`/studio/{videoId}` deep link**                                      | **Orphaned**            | The route loads a Saved Video into review, but no UI in the app ever links to it                                                                                                      |
 | **Account settings**                                                   | **Absent**              | The account menu contains only "Log out" (`AccountMenu.tsx:245-247`)                                                                                                                  |

@@ -715,7 +715,6 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     fontSize: 'inherit',
     fontWeight: 'inherit',
   },
-  '& [data-workshop-label-short]': { display: 'none' },
   '& [data-tool-label] small': {
     maxWidth: '8rem',
     overflow: 'hidden',
@@ -768,8 +767,6 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     },
     '& [data-tool-label] strong': { fontSize: '0.66rem' },
     '& [data-tool-icon]': { width: '0.82rem', height: '0.82rem' },
-    '& [data-workshop-label-long]': { display: 'none' },
-    '& [data-workshop-label-short]': { display: 'inline' },
   },
   '@media (min-width: 64rem)': {
     flexDirection: 'column',
@@ -810,15 +807,4 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     },
     '& > span': { display: 'none' },
   },
-});
-
-export const creativeOverlayContentStyles = (): CSSObject => ({
-  width: '100%',
-  height: '100%',
-  minWidth: 0,
-  minHeight: 0,
-  display: 'grid',
-  gridTemplateRows: 'minmax(0, 1fr)',
-  gap: 0,
-  overflow: 'hidden',
 });

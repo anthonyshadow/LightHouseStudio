@@ -36,9 +36,10 @@ nav items, so no nav item is highlighted while in Studio.
 
 Sections in DOM order:
 
-1. **Header** — eyebrow "Authenticated Studio" (the display name is only in a `title` attribute,
-   `DashboardRouteSurface.tsx:247`), `h1` "Momentum Workspace", and two actions: **Create video**
-   (primary) and **Browse Assets**.
+1. **Header** — a visible greeting, "Welcome back, {display name}", then `h1` **Dashboard** and two
+   actions: **Create video** (primary) and **Browse Assets**. The heading's visible text is also its
+   accessible name; the greeting used to exist only as a `title` tooltip, and the heading used to
+   read "Momentum Workspace" while announcing "Dashboard".
 2. **Getting-started card** — "Start with the outcome you need". Dismissed per account via
    `localStorage` (`dashboardOnboarding.ts`); if the write fails a warning notice appears
    (`DashboardRouteSurface.tsx:280-284`).
@@ -49,13 +50,16 @@ Sections in DOM order:
    `ConfirmationDialog` that explicitly warns the provider may still bill.
 4. **Continue Work** — the first project from the active project list, or an empty panel offering
    **New Project**.
-5. **Start New** — **New Project** and **New Campaign** buttons.
-6. **Recent Work** — merged list of the newest 4 projects, 4 videos and 4 campaigns, sorted by
+5. **Recent Work** — merged list of the newest 4 projects, 4 videos and 4 campaigns, sorted by
    `updatedAt` descending, filtered by an All / Videos / Projects / Campaigns toggle, then sliced to
    4 items. Every row opens the specific record it names: projects go to `/projects/{id}`, campaigns
    to `/campaigns/{id}`, and videos to `/assets/videos?video={id}`, which opens that video's preview
    in the Videos library.
-7. **Footer links** — All Projects · All Videos · All Campaigns.
+6. **Footer links** — All Projects · All Videos · All Campaigns.
+
+There is no separate "Start New" section. It offered **New Project** and **New Campaign**, both
+already reachable from Quick Create, from the Recent Work empty state, and — for New Project —
+from the Continue Work empty panel seven lines above it.
 
 ## System behaviour
 
@@ -111,5 +115,4 @@ and open the respective builder overlay.
 
 ## Unverified
 
-- Whether "Momentum Workspace" is the intended product-facing name for the dashboard, or an
-  internal design label. It is hard-coded at `DashboardRouteSurface.tsx:252`.
+_None outstanding for this surface._

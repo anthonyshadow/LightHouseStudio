@@ -12,16 +12,9 @@ const createProps = (
 ) =>
   ({
     state: {
-      panel: 'closed' as const,
       activeTool: null,
       showDesktopAiTools,
-      activeSessionMode: 'local' as const,
-      workshopDrafts: {},
       recordingActive: false,
-      sessionModeLocked: false,
-      hasReferenceImage: false,
-      referenceUsePending: false,
-      referenceUseFailure: null,
       hasPlaybackVideo: true,
       ...stateOverrides,
     },
@@ -29,14 +22,8 @@ const createProps = (
       onOpenEditVideo: vi.fn(),
       onOpenCharacter: vi.fn(),
       onOpenOutfit: vi.fn(),
-      onOpenWorkshop: vi.fn(),
-      onClose: vi.fn(),
-      onWorkshopDraftChange: vi.fn(),
-      onUseWorkshop: vi.fn(),
-      onSaveWorkshop: vi.fn(),
     },
     refs: {
-      workshopToggleRef: createRef<HTMLButtonElement>(),
       editVideoToggleRef: createRef<HTMLButtonElement>(),
       characterToggleRef: createRef<HTMLButtonElement>(),
       outfitToggleRef: createRef<HTMLButtonElement>(),
@@ -46,7 +33,7 @@ const createProps = (
 afterEach(cleanup);
 
 describe('CreativeWorkspace responsive tools', () => {
-  it('places Character and Outfit directly before Workshop in the desktop rail', () => {
+  it('places Character and Outfit after Edit Video in the desktop rail', () => {
     render(
       <StudioDesignProvider>
         <CreativeWorkspace {...createProps(true)} />
@@ -57,10 +44,10 @@ describe('CreativeWorkspace responsive tools', () => {
       within(rail)
         .getAllByRole('button')
         .map((button) => button.getAttribute('aria-label')),
-    ).toEqual(['Edit Video', 'Select Character', 'Select Outfit', 'Workshop']);
+    ).toEqual(['Edit Video', 'Select Character', 'Select Outfit']);
   });
 
-  it('keeps the compact row focused on editing and the Prompt Workshop', () => {
+  it('keeps the compact row focused on editing', () => {
     render(
       <StudioDesignProvider>
         <CreativeWorkspace {...createProps(false)} />
@@ -71,7 +58,7 @@ describe('CreativeWorkspace responsive tools', () => {
       within(rail)
         .getAllByRole('button')
         .map((button) => button.getAttribute('aria-label')),
-    ).toEqual(['Edit Video', 'Workshop']);
+    ).toEqual(['Edit Video']);
   });
 
   it('enables Edit Video only for inactive playback and invokes the editor action', () => {
@@ -124,7 +111,6 @@ describe('CreativeWorkspace responsive tools', () => {
 
     expect(screen.getByRole('button', { name: 'Select Character' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Select Outfit' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Workshop' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: /Shelf|Dock|Recipe/u })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit Video' })).toBeEnabled();
 
@@ -136,7 +122,6 @@ describe('CreativeWorkspace responsive tools', () => {
 
     expect(screen.getByRole('button', { name: 'Select Character' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Select Outfit' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Workshop' })).toBeEnabled();
   });
 
   it('keeps reusable creative setup available beside Project working-media playback', () => {
@@ -148,19 +133,6 @@ describe('CreativeWorkspace responsive tools', () => {
 
     expect(screen.getByRole('button', { name: 'Select Character' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Select Outfit' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Workshop' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: /Shelf|Dock|Recipe/u })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Edit Video' })).toBeEnabled();
-  });
-
-  it('disables the live Workshop button in the compact tool row during playback', () => {
-    render(
-      <StudioDesignProvider>
-        <CreativeWorkspace {...createProps(false)} />
-      </StudioDesignProvider>,
-    );
-
-    expect(screen.getByRole('button', { name: 'Workshop' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: /Shelf|Dock|Recipe/u })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit Video' })).toBeEnabled();
   });

@@ -1,8 +1,9 @@
 # Retired Recipe UI compatibility boundary
 
 Recipe is no longer a user-facing Asset type. There is no Recipe card, count, filter, menu,
-dialog, Studio Shelf/Dock control, Quick Create choice, or canonical Recipe route. Requests for
-the former `/studio/assets/recipes` location replace-navigate to `/assets`.
+dialog, Studio Shelf/Dock control, Quick Create choice, or Recipe route of any kind. The
+`/studio/assets/recipes` compatibility redirect has itself been retired: the path is now
+unrecognized, like any other unknown URL.
 
 The removal is presentation-only and deliberately non-destructive. Lightframe still retains:
 
@@ -13,7 +14,9 @@ The removal is presentation-only and deliberately non-destructive. Lightframe st
 - legacy stored records as rollback/migration inputs.
 
 Those records are never listed as Recipes or backfilled into Project Asset memberships. Current UI
-uses **Character**, **Outfit**, **AI settings**, **configuration**, and **Prompt Workshop** wording.
+uses **Character**, **Outfit**, **AI settings**, and **configuration** wording. The Prompt
+Workshop that once shared this compatibility boundary is itself retired; see the note in
+[`../gaps-and-usability-audit.md`](../gaps-and-usability-audit.md).
 Deleting or renaming the remaining technical symbols is outside the current migration because it
 would break supported persistence, historical snapshots, or provider requests.
 

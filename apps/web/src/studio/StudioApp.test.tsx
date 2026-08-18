@@ -689,7 +689,6 @@ vi.mock('./CreativeWorkspace', () => ({
     harness.latestWorkspace = props;
     return (
       <div>
-        <output data-testid="creative-panel">{props.state.panel}</output>
         <button
           type="button"
           disabled={!props.state.hasPlaybackVideo}
@@ -703,16 +702,6 @@ vi.mock('./CreativeWorkspace', () => ({
         <button type="button" onClick={props.actions.onOpenOutfit}>
           Open outfit options
         </button>
-        <button type="button" onClick={() => props.state.referenceUseFailure?.onRetry()}>
-          Retry reference handoff
-        </button>
-        <button
-          type="button"
-          onClick={() => props.state.referenceUseFailure?.onContinueWithoutReference?.()}
-        >
-          Continue reference handoff without image
-        </button>
-        <output data-testid="handoff-error">{props.state.referenceUseFailure?.message}</output>
       </div>
     );
   },
@@ -1274,7 +1263,6 @@ describe('StudioApp composition lifecycle', () => {
     expect(screen.getByTestId('media-stage')).toBe(stage);
     expect(screen.getByTestId('media-stage')).toHaveAttribute('data-edit-preview', 'true');
     expect(screen.queryByText('Recording controls')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('creative-panel')).not.toBeInTheDocument();
     context.mockRestore();
   });
 
@@ -1311,9 +1299,11 @@ describe('StudioApp composition lifecycle', () => {
       .mockResolvedValueOnce(referenceAsset);
     renderStudio();
     await applySavedCharacter();
-    await waitFor(() => expect(screen.getByTestId('handoff-error')).not.toBeEmptyDOMElement());
+    await waitFor(() =>
+      expect(screen.getByLabelText('Reference image could not be restored')).toBeVisible(),
+    );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Retry reference handoff' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(harness.session.replaceRecipeDraft).toHaveBeenCalledOnce());
     expect(harness.fetchReferenceImageMetadata).toHaveBeenCalledTimes(2);
     expect(harness.session.replaceRecipeDraft).toHaveBeenCalledWith({
@@ -1328,11 +1318,11 @@ describe('StudioApp composition lifecycle', () => {
     harness.fetchReferenceImageMetadata.mockRejectedValueOnce(new Error('missing'));
     renderStudio();
     await applySavedCharacter();
-    await waitFor(() => expect(screen.getByTestId('handoff-error')).not.toBeEmptyDOMElement());
-
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Continue reference handoff without image' }),
+    await waitFor(() =>
+      expect(screen.getByLabelText('Reference image could not be restored')).toBeVisible(),
     );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue without reference' }));
     await waitFor(() => expect(harness.session.replaceRecipeDraft).toHaveBeenCalledOnce());
     expect(harness.session.replaceRecipeDraft).toHaveBeenCalledWith({
       mode: 'lucy-latest',

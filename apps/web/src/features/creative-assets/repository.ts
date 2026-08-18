@@ -895,10 +895,5 @@ export const createCreativeAssetRepository = (
         }
         await commit(sanitized.store);
       }),
-    setSyncNotice: (notice) => {
-      if (state.notice === notice) return;
-      state = { ...state, notice };
-      notify();
-    },
   };
 };

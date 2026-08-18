@@ -10,6 +10,8 @@ import {
   type CreativeAssetStore as DomainCreativeAssetStore,
   type GuidedDesignV1 as DomainGuidedDesignV1,
   type ModelModeId as DomainModelModeId,
+  type PromptBuilderDraft,
+  type PromptIntent,
   type RecentPrompt as DomainRecentPrompt,
   type ReferenceImageStatus as DomainReferenceImageStatus,
   type SavedCharacterPrompt as DomainSavedCharacterPrompt,
@@ -22,7 +24,6 @@ import {
   type StorageHealth as DomainStorageHealth,
   type VtonInputKind as DomainVtonInputKind,
 } from '@studio/domain';
-import type { PromptBuilderDraft, PromptIntent } from '../prompt-authoring';
 
 export {
   CREATIVE_ASSET_SCHEMA_VERSION,
@@ -60,6 +61,7 @@ export type CreativeAssetSearchResults = DomainCreativeAssetSearchResults;
 export interface CreativeAssetRepositoryState {
   readonly store: CreativeAssetStore;
   readonly health: StorageHealth;
+  /** Local storage health only. Cloud sync owns its own status; the two fail independently. */
   readonly notice: string | null;
 }
 
@@ -185,7 +187,6 @@ export interface CreativeAssetRepository {
   search: (query: string, modelModeId?: ModelModeId) => CreativeAssetSearchResults;
   /** Cloud-sync seam; local writes remain immediately available while the server CAS settles. */
   replaceFromRemote?: (store: CreativeAssetStore) => Promise<void>;
-  setSyncNotice?: (notice: string | null) => void;
 }
 
 export interface StorageLike {

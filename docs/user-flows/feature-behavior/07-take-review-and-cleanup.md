@@ -19,7 +19,7 @@ deliberately release or discard it.
 5. Confirm **Edit Video** is enabled in the creative tool rail for any finalized playback. An
    editor-backed upload reopens its retained editor state; a local/live-AI take opens
    the existing-video source chooser without automatically adopting the take. While playback is
-   retained, the rail's live-only **Select Character**, **Select Outfit**, and **Workshop** actions
+   retained, the rail's live-only **Select Character** and **Select Outfit** actions
    are disabled. This rail lock does not disable Character Swap, Virtual Try On, Voice, or other
    controls inside the open existing-video editor.
    From that editor, **Adjust video** enters the stage-owned local editing workspace without

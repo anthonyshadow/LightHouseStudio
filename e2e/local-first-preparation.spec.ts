@@ -139,34 +139,12 @@ test('prepares a visual configuration accessibly without camera or provider work
     'aria-pressed',
     'true',
   );
-  await page.getByLabel('Character direction').fill('  An adult documentary photographer  ');
-  const workshopLauncher = page.getByRole('button', {
-    name: 'Open structured prompt workshop',
-  });
-  await workshopLauncher.focus();
-  await expect(workshopLauncher).toBeFocused();
-  await page.keyboard.press('Enter');
-
-  await expect(page.getByRole('heading', { name: 'Direct one clear visual change' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Use in working draft' })).toBeDisabled();
-  await page.getByRole('textbox', { name: 'Object to add', exact: true }).fill('a copper notebook');
-  await page
-    .getByRole('textbox', { name: 'Specific placement', exact: true })
-    .fill('held at chest height');
-  await expect(page.getByRole('button', { name: 'Use in working draft' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Use in working draft' }).click();
-  await expect(page.getByRole('dialog', { name: 'Prompt Workshop' })).toBeHidden();
-
-  const workshopTool = page.getByRole('button', { name: 'Workshop', exact: true });
-  await workshopTool.focus();
-  await expect(workshopTool).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(page.getByRole('textbox', { name: 'Object to add', exact: true })).toHaveValue(
-    'a copper notebook',
-  );
-  await expect(page.getByRole('textbox', { name: 'Specific placement', exact: true })).toHaveValue(
-    'held at chest height',
-  );
+  const direction = page.getByLabel('Character direction');
+  await direction.fill('  An adult documentary photographer  ');
+  await direction.focus();
+  await expect(direction).toBeFocused();
+  await expect(direction).toHaveValue('  An adult documentary photographer  ');
+  await expect(page.getByRole('button', { name: /prompt workshop/iu })).toHaveCount(0);
 
   const cameraCalls = await page.evaluate(() => {
     const testWindow = window as typeof window & {
