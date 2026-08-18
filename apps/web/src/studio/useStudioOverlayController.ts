@@ -1,4 +1,4 @@
-import { useCallback, useReducer } from 'react';
+import { useCallback, useMemo, useReducer } from 'react';
 
 export type ActiveOverlay =
   | 'ai-settings'
@@ -53,5 +53,8 @@ export const useStudioOverlayController = (initial: ActiveOverlay) => {
     dispatch({ type: 'toggle', overlay });
   }, []);
 
-  return { active, open, close, closeIf, toggle } as const;
+  return useMemo(
+    () => ({ active, open, close, closeIf, toggle }) as const,
+    [active, close, closeIf, open, toggle],
+  );
 };

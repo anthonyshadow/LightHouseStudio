@@ -32,7 +32,7 @@ describe('workshop draft persistence', () => {
   it.each([
     ['absent', null],
     ['unparseable', '{'],
-    ['a future version', JSON.stringify({ version: 2, drafts: { 'add-object': {} } })],
+    ['a future version', JSON.stringify({ version: 2, payload: { 'add-object': {} } })],
   ])('returns no drafts when the stored value is %s', (_label, raw) => {
     if (raw !== null) window.localStorage.setItem(workshopDraftsStorageKey(ownerUserId), raw);
 
@@ -43,7 +43,10 @@ describe('workshop draft persistence', () => {
     const draft = createPromptBuilderDraft('add-object');
     window.localStorage.setItem(
       workshopDraftsStorageKey(ownerUserId),
-      JSON.stringify({ version: 1, drafts: { 'add-object': draft, stale: { intent: undefined } } }),
+      JSON.stringify({
+        version: 1,
+        payload: { 'add-object': draft, stale: { intent: undefined } },
+      }),
     );
 
     // A half-understood draft would open the Workshop on something the operator never wrote.

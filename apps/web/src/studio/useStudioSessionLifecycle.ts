@@ -6,7 +6,6 @@ import {
   type StudioRuntimeWork,
 } from '../app/shell/studioRuntimeWork';
 import type { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
-import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 import type { ProjectSourceActivity } from '../features/projects/useProjectSourceController';
 import type { ProjectWorkingMediaActivity } from '../features/projects/ProjectWorkingMediaSection';
 import type { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
@@ -37,7 +36,6 @@ interface UseStudioSessionLifecycleOptions {
   readonly projectWorkingMedia: ReturnType<typeof useProjectWorkingMediaController>;
   readonly projectSourceActivity: ProjectSourceActivity | null;
   readonly projectWorkingMediaActivity: ProjectWorkingMediaActivity | null;
-  readonly projectSession: ProjectSessionPort | null;
   readonly discardSavedVideoWork: () => void;
   readonly discardPendingAdoption: () => void;
   readonly closeOverlay: ReturnType<typeof useStudioOverlayController>['close'];
@@ -69,7 +67,6 @@ export const useStudioSessionLifecycle = ({
   projectWorkingMedia,
   projectSourceActivity,
   projectWorkingMediaActivity,
-  projectSession,
   discardSavedVideoWork,
   discardPendingAdoption,
   closeOverlay,
@@ -127,12 +124,10 @@ export const useStudioSessionLifecycle = ({
       recordingOrFinalizing,
       videoRenderingActive,
       projectSourceActivity,
-      projectSession,
     }),
     [
       creativeWorkDirty,
       hasTemporaryTake,
-      projectSession,
       projectSourceActivity,
       recordingOrFinalizing,
       videoRenderingActive,

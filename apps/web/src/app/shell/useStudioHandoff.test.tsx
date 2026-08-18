@@ -26,7 +26,7 @@ const runtimePorts = (overrides: Partial<StudioRuntimePorts> = {}): StudioRuntim
     isCharacterSwapStep: () => false,
     applyCharacterToStep: () => Promise.resolve(),
   },
-  useSavedVideo: vi.fn(),
+  useSavedVideo: vi.fn(() => Promise.resolve()),
   checkpointProjectCreative: () => Promise.resolve(true),
   saveStudioCharacter: () => Promise.resolve(),
   ...overrides,
@@ -42,76 +42,90 @@ const renderHandoff = (runtimeRouteActive = false, openStudio = vi.fn()) => {
 };
 
 describe('useStudioHandoff', () => {
-  it('applies straight to a mounted runtime without holding anything', () => {
+  it('reaches a mounted runtime immediately', () => {
     const applyRecipe = vi.fn();
-    const ports = runtimePorts({ applyRecipe });
     const { result, openStudio } = renderHandoff(true);
 
-    act(() => result.current.registerPorts(ports));
-    act(() => result.current.applyRecipe(selection));
-
-    expect(applyRecipe).toHaveBeenCalledWith(selection);
-    expect(openStudio).toHaveBeenCalledOnce();
-    expect(result.current.pending).toBeNull();
-  });
-
-  it('holds a selection made where no runtime is mounted, then navigates to one', () => {
-    const { result, openStudio } = renderHandoff(false);
-
-    act(() => result.current.applyRecipe(selection));
-
-    expect(result.current.pending).toEqual({ kind: 'use-recipe', selection });
-    expect(openStudio).toHaveBeenCalledOnce();
-  });
-
-  it('reads ports at call time, so a destination chosen before the runtime existed still lands', () => {
-    const applyRecipe = vi.fn();
-    const { result } = renderHandoff(false);
-
-    // Registration happens after the caller already has its handle on the channel — the case a
-    // captured closure would get wrong.
     act(() => result.current.registerPorts(runtimePorts({ applyRecipe })));
     act(() => result.current.applyRecipe(selection));
 
     expect(applyRecipe).toHaveBeenCalledWith(selection);
-    expect(result.current.pending).toBeNull();
+    expect(openStudio).toHaveBeenCalledOnce();
   });
 
-  it('stops routing into a runtime that has unmounted', () => {
+  it('runs a selection made with no runtime as soon as one registers', () => {
     const applyRecipe = vi.fn();
+    const { result, openStudio } = renderHandoff(false);
+
+    act(() => result.current.applyRecipe(selection));
+    expect(applyRecipe).not.toHaveBeenCalled();
+    expect(openStudio).toHaveBeenCalledOnce();
+
+    act(() => result.current.registerPorts(runtimePorts({ applyRecipe })));
+
+    expect(applyRecipe).toHaveBeenCalledWith(selection);
+  });
+
+  it('drains a held call exactly once, even if the runtime re-registers', () => {
+    const applyRecipe = vi.fn();
+    const { result } = renderHandoff(false);
+
+    act(() => result.current.applyRecipe(selection));
+    act(() => result.current.registerPorts(runtimePorts({ applyRecipe })));
+    // Re-registration happens on every dependency change in the runtime's layout effect; applying
+    // the same selection again would be an action the operator asked for once.
+    act(() => result.current.registerPorts(runtimePorts({ applyRecipe })));
+
+    expect(applyRecipe).toHaveBeenCalledOnce();
+  });
+
+  it('reads ports at call time, so a runtime that arrived later still receives the call', () => {
+    const applyRecipe = vi.fn();
+    const { result } = renderHandoff(false);
+
+    act(() => result.current.registerPorts(runtimePorts({ applyRecipe })));
+    act(() => result.current.applyRecipe(selection));
+
+    expect(applyRecipe).toHaveBeenCalledWith(selection);
+  });
+
+  it('holds rather than calling into a runtime that has unmounted', () => {
+    const applyRecipe = vi.fn();
+    const later = vi.fn();
     const { result } = renderHandoff(true);
 
     act(() => result.current.registerPorts(runtimePorts({ applyRecipe })));
     act(() => result.current.registerPorts(null));
     act(() => result.current.applyRecipe(selection));
-
     expect(applyRecipe).not.toHaveBeenCalled();
-    expect(result.current.pending).toEqual({ kind: 'use-recipe', selection });
+
+    act(() => result.current.registerPorts(runtimePorts({ applyRecipe: later })));
+    expect(later).toHaveBeenCalledWith(selection);
   });
 
-  it('holds a Voice for the source surface rather than navigating on its own', () => {
-    const { result, openStudio } = renderHandoff(false);
+  it('leaves navigation to the caller when a Voice is chosen', () => {
+    const selectVoice = vi.fn();
+    const { result, openStudio } = renderHandoff(true);
 
+    act(() => result.current.registerPorts(runtimePorts({ selectVoice })));
     act(() => result.current.selectVoice('voice-1', 'Aria'));
 
-    expect(result.current.pending).toEqual({
-      kind: 'preselect-voice',
-      voiceId: 'voice-1',
-      voiceName: 'Aria',
-    });
+    expect(selectVoice).toHaveBeenCalledWith('voice-1', 'Aria');
     expect(openStudio).not.toHaveBeenCalled();
   });
 
-  it('drops an undrained selection once the operator leaves Studio again', () => {
+  it('drops an undrained call once the operator leaves Studio again', () => {
+    const applyRecipe = vi.fn();
     const { result, rerender } = renderHandoff(false);
 
     act(() => result.current.applyRecipe(selection));
     rerender({ active: true });
-    expect(result.current.pending).toEqual({ kind: 'use-recipe', selection });
 
-    // Left without the runtime ever draining it: applying on some later visit would be an action
+    // Left without the runtime ever draining it: running it on some later visit would be an action
     // the operator did not ask for.
     rerender({ active: false });
-    expect(result.current.pending).toBeNull();
+    act(() => result.current.registerPorts(runtimePorts({ applyRecipe })));
+
+    expect(applyRecipe).not.toHaveBeenCalled();
   });
 });

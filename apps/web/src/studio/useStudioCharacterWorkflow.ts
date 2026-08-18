@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import type { useStudioHandoff } from '../app/shell/useStudioHandoff';
+import type { ExistingVideoCharacterPort } from '../app/shell/studioHandoff';
 import type {
   CharacterSaveProgress,
   CharacterSaveSnapshot,
@@ -22,7 +22,7 @@ export type CharacterBuilderDestination =
   | Readonly<{ kind: 'existing-video'; stepId: string }>
   | Readonly<{ kind: 'project'; projectId: string }>;
 
-type SaveCharacter = (
+export type SaveCharacter = (
   snapshot: CharacterSaveSnapshot,
   characterId: string,
   stage: CharacterSaveStage,
@@ -34,11 +34,13 @@ interface UseStudioCharacterWorkflowOptions {
   readonly repository: CreativeAssetRepository;
   readonly store: CreativeAssetStore;
   /**
-   * Reads the Studio runtime's ports, or null when none is mounted. Called at the moment of use,
-   * never captured: a Character created from the Characters library picks its destination while no
-   * runtime exists and is saved later inside one.
+   * The upload's Character Swap side, or null when no Studio is mounted. Resolved at the moment of
+   * use, never captured: a Character created from the Characters library picks its destination while
+   * no runtime exists and is saved later inside one.
    */
-  readonly readPorts: ReturnType<typeof useStudioHandoff>['readPorts'];
+  readonly readExistingVideoCharacter: () => ExistingVideoCharacterPort | null;
+  /** Saves into the live session's creative configuration. Throws when no Studio is mounted. */
+  readonly saveToStudioSession: SaveCharacter;
   readonly activityBlockedReason: string | undefined;
   readonly openBlockedReason: string | undefined;
   readonly studioSaveBlockedReason: string | undefined;
@@ -51,7 +53,8 @@ export const useStudioCharacterWorkflow = ({
   ownerUserId,
   repository,
   store,
-  readPorts,
+  readExistingVideoCharacter,
+  saveToStudioSession,
   activityBlockedReason,
   openBlockedReason,
   studioSaveBlockedReason,
@@ -110,13 +113,13 @@ export const useStudioCharacterWorkflow = ({
 
   const createForExistingVideo = useCallback(
     (stepId: string) => {
-      const upload = readPorts()?.existingVideoCharacter;
-      if (activityBlockedReason || upload === undefined || upload.providerActive) return;
+      const upload = readExistingVideoCharacter();
+      if (activityBlockedReason || upload === null || upload.providerActive) return;
       if (!upload.isCharacterSwapStep(stepId)) return;
       setDestination({ kind: 'existing-video', stepId });
       openNewCharacter();
     },
-    [activityBlockedReason, openNewCharacter, readPorts],
+    [activityBlockedReason, openNewCharacter, readExistingVideoCharacter],
   );
 
   const openNewForProject = useCallback(
@@ -139,8 +142,8 @@ export const useStudioCharacterWorkflow = ({
   const saveExistingVideoCharacter = useCallback<SaveCharacter>(
     async (snapshot, characterId, stage, progress) => {
       if (existingVideoSaveBlockedReason) throw new Error(existingVideoSaveBlockedReason);
-      const upload = readPorts()?.existingVideoCharacter;
-      if (destination.kind !== 'existing-video' || upload === undefined) {
+      const upload = readExistingVideoCharacter();
+      if (destination.kind !== 'existing-video' || upload === null) {
         throw new Error('The upload character destination is no longer available.');
       }
       if (!upload.isCharacterSwapStep(destination.stepId)) {
@@ -155,7 +158,7 @@ export const useStudioCharacterWorkflow = ({
       await upload.applyCharacterToStep(destination.stepId, snapshot, characterId);
       await progress.markStudioPreloaded();
     },
-    [destination, existingVideoSaveBlockedReason, readPorts, repository],
+    [destination, existingVideoSaveBlockedReason, readExistingVideoCharacter, repository],
   );
 
   /**
@@ -163,15 +166,6 @@ export const useStudioCharacterWorkflow = ({
    * `/assets/characters` and navigates — and reached where one does. Resolving the port at save
    * time rather than at render is what makes that sequence work.
    */
-  const saveStudioCharacter = useCallback<SaveCharacter>(
-    async (snapshot, characterId, stage, progress) => {
-      const save = readPorts()?.saveStudioCharacter;
-      if (save === undefined) throw new Error('The Studio character destination is not available.');
-      await save(snapshot, characterId, stage, progress);
-    },
-    [readPorts],
-  );
-
   const saveProjectCharacter = useCallback<SaveCharacter>(
     async (snapshot, characterId, stage, progress) => {
       if (destination.kind !== 'project') {
@@ -206,8 +200,8 @@ export const useStudioCharacterWorkflow = ({
 
   const openWardrobeForExistingVideo = useCallback(
     (stepId: string, characterId: string) => {
-      const upload = readPorts()?.existingVideoCharacter;
-      if (upload === undefined || upload.providerActive) return;
+      const upload = readExistingVideoCharacter();
+      if (upload === null || upload.providerActive) return;
       const character = repository
         .getSnapshot()
         .store.savedCharacterPrompts.find((candidate) => candidate.id === characterId);
@@ -217,7 +211,7 @@ export const useStudioCharacterWorkflow = ({
       setWardrobeDirty(false);
       openOverlay('character-wardrobe');
     },
-    [openOverlay, readPorts, repository],
+    [openOverlay, readExistingVideoCharacter, repository],
   );
 
   const closeWardrobe = useCallback(async () => {
@@ -234,7 +228,7 @@ export const useStudioCharacterWorkflow = ({
       return;
     }
     setWardrobeDirty(false);
-    if (wardrobeExistingVideoStepId && readPorts()?.existingVideoCharacter.hasSelection) {
+    if (wardrobeExistingVideoStepId && readExistingVideoCharacter()?.hasSelection) {
       setWardrobeExistingVideoStepId(null);
       openOverlay('video-upload');
       return;
@@ -244,54 +238,85 @@ export const useStudioCharacterWorkflow = ({
     closeOverlay,
     confirmation,
     openOverlay,
-    readPorts,
+    readExistingVideoCharacter,
     wardrobeDirty,
     wardrobeExistingVideoStepId,
   ]);
 
   const finishWardrobeVariantForExistingVideo = useCallback(() => {
-    if (!wardrobeExistingVideoStepId || !readPorts()?.existingVideoCharacter.hasSelection) return;
+    if (!wardrobeExistingVideoStepId || !readExistingVideoCharacter()?.hasSelection) return;
     setWardrobeDirty(false);
     setWardrobeExistingVideoStepId(null);
     openOverlay('video-upload');
-  }, [openOverlay, readPorts, wardrobeExistingVideoStepId]);
+  }, [openOverlay, readExistingVideoCharacter, wardrobeExistingVideoStepId]);
 
   const dismissBuilder = useCallback(() => {
-    if (destination.kind === 'existing-video' && readPorts()?.existingVideoCharacter.hasSelection) {
+    if (destination.kind === 'existing-video' && readExistingVideoCharacter()?.hasSelection) {
       openOverlay('video-upload');
       return;
     }
     closeOverlay();
-  }, [closeOverlay, destination, openOverlay, readPorts]);
+  }, [closeOverlay, destination, openOverlay, readExistingVideoCharacter]);
 
-  return {
-    destination,
-    launch,
-    discardPrompt,
-    launchError,
-    resolveDiscard,
-    dismissLaunchError,
-    openNew,
-    edit,
-    copy,
-    createForExistingVideo,
-    openNewForProject,
-    saveBlockedReason,
-    saveCharacter:
-      destination.kind === 'existing-video'
-        ? saveExistingVideoCharacter
-        : destination.kind === 'project'
-          ? saveProjectCharacter
-          : saveStudioCharacter,
-    dismissBuilder,
-    wardrobeCharacter,
-    wardrobeExistingVideoStepId,
-    wardrobeDirty,
-    setWardrobeDirty,
-    discardWardrobeDirty,
-    openWardrobe,
-    openWardrobeForExistingVideo,
-    closeWardrobe,
-    finishWardrobeVariantForExistingVideo,
-  } as const;
+  const saveCharacter =
+    destination.kind === 'existing-video'
+      ? saveExistingVideoCharacter
+      : destination.kind === 'project'
+        ? saveProjectCharacter
+        : saveToStudioSession;
+
+  // Stable across renders: the shell hands this to every authenticated surface.
+  return useMemo(
+    () =>
+      ({
+        destination,
+        launch,
+        discardPrompt,
+        launchError,
+        resolveDiscard,
+        dismissLaunchError,
+        openNew,
+        edit,
+        copy,
+        createForExistingVideo,
+        openNewForProject,
+        saveBlockedReason,
+        saveCharacter,
+        dismissBuilder,
+        wardrobeCharacter,
+        wardrobeExistingVideoStepId,
+        wardrobeDirty,
+        setWardrobeDirty,
+        discardWardrobeDirty,
+        openWardrobe,
+        openWardrobeForExistingVideo,
+        closeWardrobe,
+        finishWardrobeVariantForExistingVideo,
+      }) as const,
+    [
+      closeWardrobe,
+      copy,
+      createForExistingVideo,
+      destination,
+      discardPrompt,
+      discardWardrobeDirty,
+      dismissBuilder,
+      dismissLaunchError,
+      edit,
+      finishWardrobeVariantForExistingVideo,
+      launch,
+      launchError,
+      openNew,
+      openNewForProject,
+      openWardrobe,
+      openWardrobeForExistingVideo,
+      resolveDiscard,
+      saveBlockedReason,
+      saveCharacter,
+      setWardrobeDirty,
+      wardrobeCharacter,
+      wardrobeDirty,
+      wardrobeExistingVideoStepId,
+    ],
+  );
 };

@@ -60,7 +60,7 @@ describe('useCapturePreferences', () => {
       const { result, rerender } = renderHook(() =>
         useCapturePreferences({
           stream: null,
-          ownerUserId: null,
+          ownerUserId: 'test-owner',
           onApply: vi.fn().mockResolvedValue(undefined),
         }),
       );
@@ -79,7 +79,7 @@ describe('useCapturePreferences', () => {
     const onApply = vi.fn().mockResolvedValue(undefined);
     const { result, rerender } = renderHook(
       ({ stream }: { stream: MediaStream | null }) =>
-        useCapturePreferences({ stream, ownerUserId: null, onApply }),
+        useCapturePreferences({ stream, ownerUserId: 'test-owner', onApply }),
       { initialProps: { stream: null as MediaStream | null } },
     );
 
@@ -120,7 +120,7 @@ describe('useCapturePreferences', () => {
     });
     const onApply = vi.fn().mockResolvedValue(undefined);
     const { result, unmount } = renderHook(() =>
-      useCapturePreferences({ stream: null, ownerUserId: null, onApply }),
+      useCapturePreferences({ stream: null, ownerUserId: 'test-owner', onApply }),
     );
 
     await act(async () => {
@@ -172,7 +172,7 @@ describe('useCapturePreferences', () => {
     const { result } = renderHook(() =>
       useCapturePreferences({
         stream: null,
-        ownerUserId: null,
+        ownerUserId: 'test-owner',
         onApply: vi.fn().mockResolvedValue(undefined),
       }),
     );
@@ -202,7 +202,7 @@ describe('useCapturePreferences', () => {
     const pending = deferred<void>();
     const onApply = vi.fn(() => pending.promise);
     const { result } = renderHook(
-      () => useCapturePreferences({ stream: null, ownerUserId: null, onApply }),
+      () => useCapturePreferences({ stream: null, ownerUserId: 'test-owner', onApply }),
       {
         wrapper: StrictMode,
       },
@@ -260,7 +260,7 @@ describe('useCapturePreferences', () => {
     });
     const onApply = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(() =>
-      useCapturePreferences({ stream: streamWithLiveVideo, ownerUserId: null, onApply }),
+      useCapturePreferences({ stream: streamWithLiveVideo, ownerUserId: 'test-owner', onApply }),
     );
 
     await waitFor(() =>
@@ -277,7 +277,7 @@ describe('useCapturePreferences', () => {
     const pending = deferred<void>();
     const onApply = vi.fn(() => pending.promise);
     const { result, unmount } = renderHook(() =>
-      useCapturePreferences({ stream: null, ownerUserId: null, onApply }),
+      useCapturePreferences({ stream: null, ownerUserId: 'test-owner', onApply }),
     );
 
     act(() => result.current.updateAudioDeviceId('microphone-2'));
@@ -295,7 +295,7 @@ describe('useCapturePreferences', () => {
       .mockRejectedValueOnce(new Error('device failed'))
       .mockResolvedValueOnce(undefined);
     const { result } = renderHook(() =>
-      useCapturePreferences({ stream: null, ownerUserId: null, onApply }),
+      useCapturePreferences({ stream: null, ownerUserId: 'test-owner', onApply }),
     );
 
     act(() => result.current.updateVideoDeviceId('camera-3'));

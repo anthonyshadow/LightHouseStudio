@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchProviderAvailability } from '../adapters/api-client/apiClient';
 import type { ProviderAvailability } from '../features/media-session';
@@ -58,11 +59,10 @@ export const useProviderAvailability = () => {
   });
   const state: CapabilityState = query.isFetching ? 'loading' : query.isError ? 'error' : 'ready';
 
-  return {
-    availability: query.data ?? unavailableProviders,
-    state,
-    retry: () => {
-      void query.refetch();
-    },
-  } as const;
+  const refetch = query.refetch;
+  const retry = useCallback(() => void refetch(), [refetch]);
+  const availability = query.data ?? unavailableProviders;
+
+  // Stable across renders: the shell passes this to every authenticated surface.
+  return useMemo(() => ({ availability, state, retry }) as const, [availability, retry, state]);
 };

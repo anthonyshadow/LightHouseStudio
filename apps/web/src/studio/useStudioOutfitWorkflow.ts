@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { savedPromptToRecipeSelection } from '../features/creative-assets/recipeSelection';
 import type { RecentPrompt, SavedPrompt } from '../features/creative-assets/types';
@@ -171,16 +171,32 @@ export const useStudioOutfitWorkflow = ({
     [closeOverlay, launch, onOpenLibrary, openOverlay, queryClient, selectSaved, updateDirty],
   );
 
-  return {
-    launch,
-    dirty,
-    updateDirty,
-    openNew,
-    openNewForProject,
-    openEditor,
-    openCopy,
-    close,
-    selectSaved,
-    completeSave,
-  } as const;
+  // Stable across renders: the shell hands this to every authenticated surface.
+  return useMemo(
+    () =>
+      ({
+        launch,
+        dirty,
+        updateDirty,
+        openNew,
+        openNewForProject,
+        openEditor,
+        openCopy,
+        close,
+        selectSaved,
+        completeSave,
+      }) as const,
+    [
+      close,
+      completeSave,
+      dirty,
+      launch,
+      openCopy,
+      openEditor,
+      openNew,
+      openNewForProject,
+      selectSaved,
+      updateDirty,
+    ],
+  );
 };

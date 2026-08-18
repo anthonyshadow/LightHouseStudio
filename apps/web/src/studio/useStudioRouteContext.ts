@@ -36,7 +36,6 @@ export type StudioRouteContext = Readonly<{
   liveRouteActive: boolean;
   projectWorkspaceActive: boolean;
   projectOverviewActive: boolean;
-  organizationRouteActive: boolean;
   projectContextActive: boolean;
 }>;
 
@@ -80,34 +79,49 @@ export const useStudioRouteContext = (initialIntent?: StudioCreationIntent): Stu
   const liveRouteActive = location.pathname === APP_PATHS.live;
   const projectWorkspaceActive = isProjectWorkspacePath(location.pathname);
   const projectOverviewActive = projectRouteActive && !projectWorkspaceActive;
-  const organizationRouteActive =
-    dashboardRouteActive ||
-    assetsRouteActive ||
-    liveRouteActive ||
-    projectWorkspaceActive ||
-    projectOverviewActive ||
-    campaignRouteActive;
   const activeProjectId = projectIdFromPath(location.pathname);
   const projectContextActive = projectWorkspaceActive && activeProjectId !== null;
 
-  return {
-    pathname: location.pathname,
-    queryCreationIntent,
-    creationIntent,
-    requestedCreationProjectId,
-    validCreationProjectId,
-    directVideoId,
-    focusedSavedVideoId,
-    routeOriginProjectId,
-    activeProjectId,
-    projectRouteActive,
-    campaignRouteActive,
-    dashboardRouteActive,
-    assetsRouteActive,
-    liveRouteActive,
-    projectWorkspaceActive,
-    projectOverviewActive,
-    organizationRouteActive,
-    projectContextActive,
-  };
+  // Memoized because the authenticated shell hands this object to every surface: a fresh
+  // identity each render would defeat every memo above it.
+  return useMemo(
+    () => ({
+      pathname: location.pathname,
+      queryCreationIntent,
+      creationIntent,
+      requestedCreationProjectId,
+      validCreationProjectId,
+      directVideoId,
+      focusedSavedVideoId,
+      routeOriginProjectId,
+      activeProjectId,
+      projectRouteActive,
+      campaignRouteActive,
+      dashboardRouteActive,
+      assetsRouteActive,
+      liveRouteActive,
+      projectWorkspaceActive,
+      projectOverviewActive,
+      projectContextActive,
+    }),
+    [
+      activeProjectId,
+      assetsRouteActive,
+      campaignRouteActive,
+      creationIntent,
+      dashboardRouteActive,
+      directVideoId,
+      focusedSavedVideoId,
+      liveRouteActive,
+      location.pathname,
+      projectContextActive,
+      projectOverviewActive,
+      projectRouteActive,
+      projectWorkspaceActive,
+      queryCreationIntent,
+      requestedCreationProjectId,
+      routeOriginProjectId,
+      validCreationProjectId,
+    ],
+  );
 };

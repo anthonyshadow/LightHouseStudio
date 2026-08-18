@@ -45,8 +45,8 @@ const initialCapturePreferences = (ownerUserId: string | null): CapturePreferenc
 
 export type UseCapturePreferencesOptions = {
   stream: MediaStream | null;
-  /** Scopes stored choices to the signed-in operator; null skips persistence entirely. */
-  ownerUserId: string | null;
+  /** Scopes stored choices to the signed-in operator. */
+  ownerUserId: string;
   onApply: (preferences: CapturePreferences) => Promise<void>;
 };
 
@@ -205,7 +205,7 @@ export const useCapturePreferences = ({
       setDraft((current) => ({ ...current, aspectRatio }));
       setApplied((current) => {
         const next = { ...current, aspectRatio };
-        if (ownerUserId !== null) persistCapturePreferences(ownerUserId, next);
+        persistCapturePreferences(ownerUserId, next);
         return next;
       });
       return true;
@@ -240,7 +240,7 @@ export const useCapturePreferences = ({
         });
         if (mountedRef.current && applyOperationRef.current === operation) {
           setApplied(preferences);
-          if (ownerUserId !== null) persistCapturePreferences(ownerUserId, preferences);
+          persistCapturePreferences(ownerUserId, preferences);
         }
         return true;
       } catch {
