@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useCallback, useMemo, useRef } from 'react';
 import { useProjectProcessingController } from '../../features/projects/useProjectProcessingController';
 import type { ProjectSessionPort } from '../../features/projects/useProjectSession';
 import { detectBrowserCapabilities } from '../../adapters/browser-media/browserMedia';
@@ -14,7 +13,7 @@ import { useStudioRouteContext } from '../../studio/useStudioRouteContext';
 import { useDesktopStudioLayout } from '../../studio/useDesktopStudioLayout';
 import { useProviderAvailability } from '../../studio/useProviderAvailability';
 import { liveExperienceAvailability } from '../../studio/studioLiveAvailability';
-import { APP_PATHS } from '../paths';
+import type { SaveCharacter } from '../../studio/useStudioCharacterWorkflow';
 import type { ConfirmationRequest } from '../../ui';
 import type { useStudioHandoff } from './useStudioHandoff';
 
@@ -24,8 +23,9 @@ interface UseShellServicesOptions {
   readonly confirmation: ConfirmationRequest;
   readonly handoff: ReturnType<typeof useStudioHandoff>;
   readonly creativeLocks: StudioCreativeLocks;
-  /** The runtime's Project session, or null when no Studio is mounted. */
+  /** The active Project's session, owned by the shell and reported by whichever surface shows it. */
   readonly projectSession: ProjectSessionPort | null;
+  readonly reportProjectSession: (session: ProjectSessionPort | null) => void;
 }
 
 /**
@@ -48,6 +48,7 @@ export const useShellServices = ({
   handoff,
   creativeLocks,
   projectSession,
+  reportProjectSession,
 }: UseShellServicesOptions) => {
   const route = useStudioRouteContext(initialIntent);
   const nav = useStudioNavigationActions();
@@ -64,11 +65,23 @@ export const useShellServices = ({
   const mainRef = useRef<HTMLElement>(null);
   const characterSelectorRef = useRef<HTMLButtonElement>(null);
   const outfitToggleRef = useRef<HTMLButtonElement>(null);
-  const workshopToggleRef = useRef<HTMLButtonElement>(null);
   const editVideoToggleRef = useRef<HTMLButtonElement>(null);
-  const uploadToggleRef = useRef<HTMLButtonElement>(null);
-  const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
 
+  const readPorts = handoff.readPorts;
+  // Narrow capabilities rather than the whole aggregate: each consumer names what it needs, so
+  // adding a port cannot widen a workflow that does not use it.
+  const readExistingVideoCharacter = useCallback(
+    () => readPorts()?.existingVideoCharacter ?? null,
+    [readPorts],
+  );
+  const saveToStudioSession = useCallback<SaveCharacter>(
+    async (snapshot, characterId, stage, progress) => {
+      const save = readPorts()?.saveStudioCharacter;
+      if (save === undefined) throw new Error('The Studio character destination is not available.');
+      await save(snapshot, characterId, stage, progress);
+    },
+    [readPorts],
+  );
   const outfit = useStudioOutfitWorkflow({
     blockedReason: creativeLocks.characterOpen,
     openOverlay,
@@ -83,7 +96,8 @@ export const useShellServices = ({
     ownerUserId,
     repository: creative.repository,
     store: creative.store,
-    readPorts: handoff.readPorts,
+    readExistingVideoCharacter,
+    saveToStudioSession,
     activityBlockedReason: creativeLocks.characterActivity,
     openBlockedReason: creativeLocks.characterOpen,
     studioSaveBlockedReason: creativeLocks.characterSave,
@@ -93,21 +107,18 @@ export const useShellServices = ({
   });
 
   // Server state about the Project, not about a camera: whether an accepted provider operation
-  // blocks archiving has to be known on the Project overview, which mounts no Studio. The
-  // controller scopes itself to a live Project session, and each surface owns one — the workspace's
-  // arrives through the runtime, the overview reports its own here — so it follows whichever
-  // surface is showing rather than resetting when the Studio unmounts.
-  const [overviewProjectSession, setOverviewProjectSession] = useState<ProjectSessionPort | null>(
-    null,
-  );
-  const readPorts = handoff.readPorts;
+  // blocks archiving has to be known on the Project overview, which mounts no Studio.
+  //
+  // `ProjectRouteSurface` owns the session and reports it up in both modes, and the two instances
+  // never coexist — so one shell-owned slot, written by whichever is showing, keeps logout, expiry
+  // and processing reading the same value instead of two transports reconciled with `??`.
   const checkpointProjectCreative = useCallback(
     () => readPorts()?.checkpointProjectCreative() ?? Promise.resolve(false),
     [readPorts],
   );
   const projectProcessing = useProjectProcessingController({
     projectId: route.activeProjectId,
-    session: projectSession ?? overviewProjectSession,
+    session: projectSession,
     checkpointCreative: checkpointProjectCreative,
   });
 
@@ -115,13 +126,7 @@ export const useShellServices = ({
   // beta is actually available it hands straight over to Studio with the chooser open, and the
   // overlay survives the navigation because the overlay controller is the shell's. When it is not,
   // `ShellMain` renders the capability card and no capture graph is fetched at all.
-  const navigate = useNavigate();
-  const { enabled: liveEnabled } = liveExperienceAvailability(provider.availability);
-  useEffect(() => {
-    if (!route.liveRouteActive || provider.state !== 'ready' || !liveEnabled) return;
-    openOverlay('ai-experience');
-    void navigate(APP_PATHS.create, { replace: true, state: null });
-  }, [liveEnabled, navigate, openOverlay, provider.state, route.liveRouteActive]);
+  const liveAvailability = liveExperienceAvailability(provider.availability);
 
   const openVideoUpload = useMemo(() => () => openOverlay('video-upload'), [openOverlay]);
   const libraryHandoff = useStudioLibraryHandoff({
@@ -144,12 +149,14 @@ export const useShellServices = ({
         browser,
         provider,
         creative,
+        liveAvailability,
         overlay,
         outfit,
         character,
         libraryHandoff,
         projectProcessing,
-        reportOverviewProjectSession: setOverviewProjectSession,
+        projectSession,
+        reportProjectSession,
         openVideoUpload,
         confirmation,
         handoff,
@@ -159,10 +166,7 @@ export const useShellServices = ({
         mainRef,
         characterSelectorRef,
         outfitToggleRef,
-        workshopToggleRef,
         editVideoToggleRef,
-        uploadToggleRef,
-        fullscreenWorkspaceRef,
       }) as const,
     [
       browser,
@@ -173,10 +177,13 @@ export const useShellServices = ({
       desktopStudioLayout,
       handoff,
       libraryHandoff,
+      liveAvailability,
       nav,
       openVideoUpload,
       outfit,
       projectProcessing,
+      projectSession,
+      reportProjectSession,
       overlay,
       ownerUserId,
       provider,

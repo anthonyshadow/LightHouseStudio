@@ -18,6 +18,8 @@ const installMediaDevices = (value: Partial<MediaDevices>) => {
 };
 
 afterEach(() => {
+  // Capture choices persist, so a case that applies one must not seed the next.
+  window.localStorage.clear();
   cleanup();
   if (originalMediaDevices) Object.defineProperty(navigator, 'mediaDevices', originalMediaDevices);
   else Reflect.deleteProperty(navigator, 'mediaDevices');
@@ -62,7 +64,11 @@ describe('CaptureSettingsPanel', () => {
     const onApply = vi.fn().mockResolvedValue(undefined);
 
     const Harness = () => {
-      const controller = useCapturePreferences({ stream: null, ownerUserId: null, onApply });
+      const controller = useCapturePreferences({
+        stream: null,
+        ownerUserId: 'test-owner',
+        onApply,
+      });
       return (
         <StudioDesignProvider>
           <CaptureSettingsPanel controller={controller} mode="local" />
@@ -119,7 +125,7 @@ describe('CaptureSettingsPanel', () => {
     const Harness = () => {
       const controller = useCapturePreferences({
         stream: null,
-        ownerUserId: null,
+        ownerUserId: 'test-owner',
         onApply: vi.fn().mockResolvedValue(undefined),
       });
       return (
@@ -149,7 +155,11 @@ describe('CaptureSettingsPanel', () => {
     const onApply = vi.fn().mockRejectedValue(new Error('replacement failed'));
 
     const Harness = () => {
-      const controller = useCapturePreferences({ stream: null, ownerUserId: null, onApply });
+      const controller = useCapturePreferences({
+        stream: null,
+        ownerUserId: 'test-owner',
+        onApply,
+      });
       return (
         <StudioDesignProvider>
           <CaptureSettingsPanel controller={controller} mode="local" />
@@ -181,7 +191,7 @@ describe('CaptureSettingsPanel', () => {
     const Harness = () => {
       const controller = useCapturePreferences({
         stream: null,
-        ownerUserId: null,
+        ownerUserId: 'test-owner',
         onApply: vi.fn().mockResolvedValue(undefined),
       });
       return (
@@ -221,7 +231,7 @@ describe('CaptureSettingsPanel', () => {
     const Harness = () => {
       const controller = useCapturePreferences({
         stream,
-        ownerUserId: null,
+        ownerUserId: 'test-owner',
         onApply: vi.fn().mockResolvedValue(undefined),
       });
       return (
@@ -247,7 +257,7 @@ describe('CaptureSettingsPanel', () => {
     const Harness = () => {
       const controller = useCapturePreferences({
         stream: null,
-        ownerUserId: null,
+        ownerUserId: 'test-owner',
         onApply: vi.fn().mockResolvedValue(undefined),
       });
       return (

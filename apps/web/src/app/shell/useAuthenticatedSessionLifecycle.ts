@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import type { useAuth } from '../../application/auth/AuthProvider';
+import type { ProjectSessionPort } from '../../features/projects/useProjectSession';
 import { SessionCleanupCoordinator } from '../../orchestration/lifecycle/SessionCleanupCoordinator';
 import { useStudioLogoutController } from '../../studio/useStudioLogoutController';
 import { useStudioSessionExpiryController } from '../../studio/useStudioSessionExpiryController';
@@ -26,14 +27,28 @@ import {
  * mounted the answer is {@link NO_STUDIO_RUNTIME_WORK}, which is correct rather than merely safe —
  * nothing transient can exist without the capture graph that owns it.
  */
-export const useAuthenticatedSessionLifecycle = (auth: ReturnType<typeof useAuth>) => {
+export const useAuthenticatedSessionLifecycle = (
+  auth: ReturnType<typeof useAuth>,
+  /** The active Project's session, owned by the shell — see `useShellServices`. */
+  projectSession: ProjectSessionPort | null,
+) => {
   const navigate = useNavigate();
   const [status, setStatus] = useState<StudioRuntimeStatus>(NO_STUDIO_RUNTIME_STATUS);
   const { work, creativeLocks } = status;
   const cleanup = useMemo(() => new SessionCleanupCoordinator(), []);
 
   const registry = useMemo<StudioRuntimeRegistry>(
-    () => ({ cleanup, report: setStatus }),
+    () => ({
+      cleanup,
+      // The runtime reports a fresh wrapper each time its parts change; bailing out on identical
+      // parts keeps an unrelated re-render from cascading through the whole authenticated tree.
+      report: (next) =>
+        setStatus((current) =>
+          current.work === next.work && current.creativeLocks === next.creativeLocks
+            ? current
+            : next,
+        ),
+    }),
     [cleanup],
   );
   const runCleanup = useCallback(async () => {
@@ -49,7 +64,7 @@ export const useAuthenticatedSessionLifecycle = (auth: ReturnType<typeof useAuth
 
   const logout = useStudioLogoutController({
     projectSourceActivity: work.projectSourceActivity,
-    projectSession: work.projectSession,
+    projectSession,
     hasTemporaryWork,
     hasActiveWork,
     runCleanup,
@@ -69,7 +84,7 @@ export const useAuthenticatedSessionLifecycle = (auth: ReturnType<typeof useAuth
   const sessionExpiry = useStudioSessionExpiryController({
     expiring: sessionEnding,
     projectSourceActivity: work.projectSourceActivity,
-    projectSession: work.projectSession,
+    projectSession,
     hasTemporaryWork,
     hasActiveWork,
     runCleanup,

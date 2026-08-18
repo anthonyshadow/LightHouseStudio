@@ -1,77 +1,40 @@
-import { environmentScopedPersistenceName } from '../../persistence/environmentScope';
+import { sanitizePromptBuilderDraft } from '@studio/domain';
+import { createVersionedRecordStore } from '../../persistence/versionedRecord';
 import type { PromptBuilderDraft, PromptIntent } from './model';
 import { isWorkshopDraft } from './workshopModel';
 
-const STORAGE_BASE = 'lightframe.workshop-drafts.v1';
-
 export type StoredWorkshopDrafts = Partial<Record<PromptIntent, PromptBuilderDraft>>;
-
-type WorkshopDraftsEnvelope = Readonly<{
-  version: 1;
-  drafts: StoredWorkshopDrafts;
-}>;
-
-export const workshopDraftsStorageKey = (ownerUserId: string): string =>
-  environmentScopedPersistenceName(STORAGE_BASE, ownerUserId);
-
-/**
- * The intents a Workshop draft can carry.
- *
- * Checked here rather than leaning on `isWorkshopDraft` alone: that guard asks whether a draft the
- * app built is a Workshop one, and answers `true` for anything with an intent that is merely not
- * `character-transform`. Storage is an untrusted boundary — a value written by an older build, or
- * edited by hand, has to be recognised before it is trusted.
- */
-const WORKSHOP_INTENTS: readonly PromptIntent[] = [
-  'add-object',
-  'replace-object',
-  'change-attribute',
-];
 
 /**
  * Unsaved Prompt Workshop drafts.
  *
- * A draft is work the operator typed and has not saved, and the Studio runtime is now torn down on
- * the way out of Studio — so without this, opening the Dashboard mid-sentence would discard it.
- * Each entry is re-validated on read: a draft written by an older shape is dropped rather than
- * hydrated into the Workshop half-formed.
+ * A draft is work the operator typed and has not saved, and the Studio runtime is torn down on the
+ * way out of Studio — so without this, opening the Dashboard mid-sentence would discard it.
+ *
+ * Every entry is re-parsed by the domain's allowlist sanitizer on read. That matters more than a
+ * shape check: `isWorkshopDraft` answers "is this one of ours" for a draft the app just built, and
+ * says yes to anything whose intent is merely not `character-transform`. Storage is untrusted, so
+ * the value has to be rebuilt field by field rather than believed.
  */
-export const loadWorkshopDrafts = (ownerUserId: string): StoredWorkshopDrafts => {
-  try {
-    const raw = window.localStorage.getItem(workshopDraftsStorageKey(ownerUserId));
-    if (raw === null) return {};
-    const parsed = JSON.parse(raw) as unknown;
-    if (
-      typeof parsed !== 'object' ||
-      parsed === null ||
-      (parsed as { version?: unknown }).version !== 1
-    ) {
-      return {};
-    }
-    const { drafts } = parsed as { drafts?: unknown };
-    if (typeof drafts !== 'object' || drafts === null) return {};
+const store = createVersionedRecordStore<StoredWorkshopDrafts>({
+  storageBase: 'lightframe.workshop-drafts',
+  version: 1,
+  parse: (payload) => {
+    if (typeof payload !== 'object' || payload === null) return null;
     const restored: StoredWorkshopDrafts = {};
-    for (const candidate of Object.values(
-      drafts as Record<string, PromptBuilderDraft | undefined>,
-    )) {
-      if (!isWorkshopDraft(candidate) || !WORKSHOP_INTENTS.includes(candidate.intent)) continue;
-      restored[candidate.intent] = candidate;
+    for (const candidate of Object.values(payload as Record<string, unknown>)) {
+      const draft = sanitizePromptBuilderDraft(candidate);
+      if (draft === null || !isWorkshopDraft(draft)) continue;
+      restored[draft.intent] = draft;
     }
     return restored;
-  } catch {
-    return {};
-  }
-};
+  },
+});
 
-export const persistWorkshopDrafts = (
-  ownerUserId: string,
-  drafts: StoredWorkshopDrafts,
-): boolean => {
-  const envelope: WorkshopDraftsEnvelope = { version: 1, drafts };
-  try {
-    window.localStorage.setItem(workshopDraftsStorageKey(ownerUserId), JSON.stringify(envelope));
-    return true;
-  } catch {
-    return false;
-  }
-};
+export const workshopDraftsStorageKey = store.storageKey;
+
+export const loadWorkshopDrafts = (ownerUserId: string): StoredWorkshopDrafts =>
+  store.load(ownerUserId) ?? {};
+
+export const persistWorkshopDrafts = (ownerUserId: string, drafts: StoredWorkshopDrafts): boolean =>
+  store.save(ownerUserId, drafts);

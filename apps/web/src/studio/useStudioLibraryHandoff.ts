@@ -1,4 +1,4 @@
-import type { SavedVideoSummary, VoiceSummary } from '@studio/contracts';
+import type { VoiceSummary } from '@studio/contracts';
 import { useMemo } from 'react';
 import type { useStudioHandoff } from '../app/shell/useStudioHandoff';
 import type { SavedCharacterPrompt, SavedPrompt } from '../features/creative-assets/types';
@@ -38,8 +38,7 @@ export const useStudioLibraryHandoff = ({
   useMemo(
     () =>
       ({
-        useVideo: (video: SavedVideoSummary, intent: 'play' | 'edit') =>
-          useSavedVideo(video, intent),
+        useVideo: useSavedVideo,
         createCharacter: () => {
           nav.openStudio();
           character.openNew();
