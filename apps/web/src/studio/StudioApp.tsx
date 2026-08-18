@@ -179,7 +179,11 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     (...args) => promptCommittedHandlerRef.current(...args),
     [],
   );
-  const session = useStudioSession({ availability, onPromptCommitted: handlePromptCommitted });
+  const session = useStudioSession({
+    availability,
+    ownerUserId: auth.session!.user.id,
+    onPromptCommitted: handlePromptCommitted,
+  });
   const handleReviewCleared = useCallback(
     () => closeOverlayIf(['take-review', 'voice-treatments']),
     [closeOverlayIf],
@@ -283,6 +287,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
 
   const openWorkshopOverlay = useCallback(() => openOverlay('workshop'), [openOverlay]);
   const handoff = useReferenceRecipeHandoff({
+    ownerUserId: auth.session!.user.id,
     repository,
     store: repositoryStore,
     session,

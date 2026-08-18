@@ -54,6 +54,7 @@ describe('useReferenceRecipeWorkshop', () => {
     const openWorkshopOverlay = vi.fn();
     const { result } = renderHook(() =>
       useReferenceRecipeWorkshop({
+        ownerUserId: 'test-owner',
         repository,
         session,
         recordingActive: false,

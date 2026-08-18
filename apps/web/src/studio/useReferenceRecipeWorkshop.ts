@@ -15,6 +15,7 @@ import type { ActiveStudioRecipe } from './referenceRecipeIdentity';
 import type { PendingReferenceRecipeUse } from './useReferenceRecipeHydration';
 
 type UseReferenceRecipeWorkshopOptions = {
+  readonly ownerUserId: string;
   readonly repository: CreativeAssetRepository;
   readonly session: StudioSessionController;
   readonly recordingActive: boolean;
@@ -25,6 +26,7 @@ type UseReferenceRecipeWorkshopOptions = {
 
 /** Coordinates Workshop source identity, per-intent drafts, open policy, use, and save. */
 export const useReferenceRecipeWorkshop = ({
+  ownerUserId,
   repository,
   session,
   recordingActive,
@@ -32,7 +34,7 @@ export const useReferenceRecipeWorkshop = ({
   selectLucyMode,
   openWorkshopOverlay,
 }: UseReferenceRecipeWorkshopOptions) => {
-  const drafts = useWorkshopDrafts();
+  const drafts = useWorkshopDrafts(ownerUserId);
   const sourceRecipeRef = useRef<ActiveStudioRecipe>(null);
 
   const openSavedWorkshop = useCallback(

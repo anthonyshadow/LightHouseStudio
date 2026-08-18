@@ -8,6 +8,7 @@ import {
   supportsLocal1080pProfile,
 } from '../../adapters/browser-media/browserMedia';
 import type { CapturePreferences, LocalCaptureAspectRatio } from '../../application/types';
+import { loadCapturePreferences, persistCapturePreferences } from './capturePreferencesStorage';
 import type {
   CaptureDeviceOption,
   CapturePreferencesController,
@@ -28,13 +29,24 @@ export const defaultLocalCaptureAspectRatio = (): LocalCaptureAspectRatio => {
   return window.matchMedia(DESKTOP_CAPTURE_FORMAT_QUERY).matches ? '16:9' : '9:16';
 };
 
-const initialCapturePreferences = (): CapturePreferences => ({
-  ...DEFAULT_CAPTURE_PREFERENCES,
-  aspectRatio: defaultLocalCaptureAspectRatio(),
-});
+/**
+ * Last session's choices when there are any, otherwise defaults for this viewport.
+ *
+ * Restoring them matters more than it used to: the Studio runtime is torn down on leaving Studio,
+ * so without this the operator re-picks the same camera every time they come back from the
+ * Dashboard.
+ */
+const initialCapturePreferences = (ownerUserId: string | null): CapturePreferences => {
+  const stored = ownerUserId === null ? null : loadCapturePreferences(ownerUserId);
+  return (
+    stored ?? { ...DEFAULT_CAPTURE_PREFERENCES, aspectRatio: defaultLocalCaptureAspectRatio() }
+  );
+};
 
 export type UseCapturePreferencesOptions = {
   stream: MediaStream | null;
+  /** Scopes stored choices to the signed-in operator; null skips persistence entirely. */
+  ownerUserId: string | null;
   onApply: (preferences: CapturePreferences) => Promise<void>;
 };
 
@@ -74,9 +86,10 @@ const selectedDeviceUnavailable = (
 
 export const useCapturePreferences = ({
   stream,
+  ownerUserId,
   onApply,
 }: UseCapturePreferencesOptions): CapturePreferencesController => {
-  const [initialPreferences] = useState(initialCapturePreferences);
+  const [initialPreferences] = useState(() => initialCapturePreferences(ownerUserId));
   const [draft, setDraft] = useState<CapturePreferences>(initialPreferences);
   const [applied, setApplied] = useState<CapturePreferences>(initialPreferences);
   const [cameraDevices, setCameraDevices] = useState<CaptureDeviceOption[]>([]);
@@ -190,10 +203,14 @@ export const useCapturePreferences = ({
       }
       setApplyError(null);
       setDraft((current) => ({ ...current, aspectRatio }));
-      setApplied((current) => ({ ...current, aspectRatio }));
+      setApplied((current) => {
+        const next = { ...current, aspectRatio };
+        if (ownerUserId !== null) persistCapturePreferences(ownerUserId, next);
+        return next;
+      });
       return true;
     },
-    [stream],
+    [ownerUserId, stream],
   );
 
   const apply = useCallback((): Promise<boolean> => {
@@ -223,6 +240,7 @@ export const useCapturePreferences = ({
         });
         if (mountedRef.current && applyOperationRef.current === operation) {
           setApplied(preferences);
+          if (ownerUserId !== null) persistCapturePreferences(ownerUserId, preferences);
         }
         return true;
       } catch {
@@ -241,7 +259,7 @@ export const useCapturePreferences = ({
     })();
     applyInFlightRef.current = request;
     return request;
-  }, [applied, cameraDevices, devicesState, draft, microphoneDevices, onApply]);
+  }, [applied, cameraDevices, devicesState, draft, microphoneDevices, onApply, ownerUserId]);
 
   const discardPending = useCallback(
     (preserveApplyError = false) => {
