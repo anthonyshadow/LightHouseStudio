@@ -157,8 +157,8 @@ once a source is accepted from the overview), `/campaigns/{id}`, `/projects`,
 
 ## Flow: Project workspace (`/projects/{id}/workspace`)
 
-This is the only organization route where the media stage stays visible
-(`StudioWorkspace.tsx:223`), so recording and preview happen in place.
+This is the only organization route that mounts the Studio runtime (`isStudioRuntimePath`), so
+recording and preview happen in place.
 
 **Layout** — a masthead (Overview breadcrumb, title, status, a compact `ProjectWorkflowProgress`
 strip, and a live "All changes saved / Saving changes / Resolve conflict / Changes not saved"
@@ -188,11 +188,11 @@ deep link to a task returns to that task after re-authenticating.
 
 Three ways to give the Project its immutable original (`ProjectSourceSection`, `:515-646`):
 
-| Action              | Behaviour                                                                                                                                                                                                                                                                                                    |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Record**          | Calls `startProjectRecording` (`StudioApp.tsx:608-633`): discards local work, navigates to the workspace path, focuses the stage, and starts local capture. Stopping produces a finalized artifact; the button then becomes **Use finalized recording**, which posts the file to `/api/projects/{id}/source` |
-| **Upload**          | Hidden `<input type="file" accept="video/mp4,video/quicktime,video/webm">`; the file is validated and posted to `/api/projects/{id}/source` with `x-lightframe-project-source` metadata and an Idempotency-Key                                                                                               |
-| **Use Saved Video** | `ProjectSavedVideoPicker` → `POST /api/projects/{id}/source/reuse` with the exact `savedVideoId` + `videoVersionId`                                                                                                                                                                                          |
+| Action              | Behaviour                                                                                                                                                                                                                                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Record**          | Calls `startProjectRecording` (`StudioApp.tsx`): discards local work, navigates to the workspace path, focuses the stage, and starts local capture. Stopping produces a finalized artifact; the button then becomes **Use finalized recording**, which posts the file to `/api/projects/{id}/source` |
+| **Upload**          | Hidden `<input type="file" accept="video/mp4,video/quicktime,video/webm">`; the file is validated and posted to `/api/projects/{id}/source` with `x-lightframe-project-source` metadata and an Idempotency-Key                                                                                       |
+| **Use Saved Video** | `ProjectSavedVideoPicker` → `POST /api/projects/{id}/source/reuse` with the exact `savedVideoId` + `videoVersionId`                                                                                                                                                                                  |
 
 Phases render as notices: `hydrating` → "Preparing source", `preparing` → "Uploading and checking
 your video…", `saving` → "Saving the source video and this change to your Project", `conflict` →
@@ -271,17 +271,17 @@ Project provider **voice** and **live** starts are deliberately unavailable
 
 ## Getting media into a Project — every path found in code
 
-| Path                                              | Where                             | Result                                                                                               |
-| ------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Workspace ▸ Source ▸ Upload                       | `/projects/{id}/workspace`        | Immutable source                                                                                     |
-| Workspace ▸ Source ▸ Record                       | `/projects/{id}/workspace`        | Immutable source from a finalized take                                                               |
-| Workspace ▸ Source ▸ Use Saved Video              | `/projects/{id}/workspace`        | Immutable source referencing an exact Version                                                        |
-| Overview ▸ Source ▸ Record/Upload/Use Saved Video | `/projects/{id}` (empty Project)  | Immutable source; then lands in the workspace                                                        |
-| Overview ▸ Assets ▸ Import Saved Video            | `/projects/{id}`                  | Asset **membership** only — not the source                                                           |
-| Overview ▸ Assets ▸ add video ▸ new/record/upload | → `/studio/create?projectId={id}` | Saves to Assets, then auto-attaches and redirects back to `/projects/{id}` (`StudioApp.tsx:788-826`) |
-| Overview ▸ Assets ▸ attached Video ▸ adopt        | `/projects/{id}`                  | **Use as Project source** on an empty Project (confirmed), **Use as working media** once it has one  |
-| Videos library ▸ ⋯ ▸ Use as Project source        | `/assets/videos`                  | Immutable source of an empty Project — **not** a membership                                          |
-| Quick Create ▸ Video (with a project in context)  | anywhere on a project route       | Same as the Studio path above                                                                        |
+| Path                                              | Where                             | Result                                                                                              |
+| ------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Workspace ▸ Source ▸ Upload                       | `/projects/{id}/workspace`        | Immutable source                                                                                    |
+| Workspace ▸ Source ▸ Record                       | `/projects/{id}/workspace`        | Immutable source from a finalized take                                                              |
+| Workspace ▸ Source ▸ Use Saved Video              | `/projects/{id}/workspace`        | Immutable source referencing an exact Version                                                       |
+| Overview ▸ Source ▸ Record/Upload/Use Saved Video | `/projects/{id}` (empty Project)  | Immutable source; then lands in the workspace                                                       |
+| Overview ▸ Assets ▸ Import Saved Video            | `/projects/{id}`                  | Asset **membership** only — not the source                                                          |
+| Overview ▸ Assets ▸ add video ▸ new/record/upload | → `/studio/create?projectId={id}` | Saves to Assets, then auto-attaches and redirects back to `/projects/{id}` (`StudioApp.tsx`)        |
+| Overview ▸ Assets ▸ attached Video ▸ adopt        | `/projects/{id}`                  | **Use as Project source** on an empty Project (confirmed), **Use as working media** once it has one |
+| Videos library ▸ ⋯ ▸ Use as Project source        | `/assets/videos`                  | Immutable source of an empty Project — **not** a membership                                         |
+| Quick Create ▸ Video (with a project in context)  | anywhere on a project route       | Same as the Studio path above                                                                       |
 
 The distinction between _source_ and _attached asset_ is load-bearing, so the UI now names it:
 every action that sets the immutable original says "source", the attached-assets section states

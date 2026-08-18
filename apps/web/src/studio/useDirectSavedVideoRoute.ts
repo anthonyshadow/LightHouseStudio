@@ -20,7 +20,7 @@ const safeDirectVideoLoadMessage = (error: unknown): string =>
 
 interface UseDirectSavedVideoRouteOptions {
   readonly videoId: string | null;
-  /** History entry identity, so re-entering the same `/studio/<id>` URL re-hydrates it. */
+  /** History entry identity, so re-entering the same `/studio/<id>` URL re-hydrates it, mount or no. */
   readonly locationKey: string;
   readonly load: (detail: SavedVideoDetail, signal: AbortSignal) => Promise<void>;
   readonly reset: () => void;

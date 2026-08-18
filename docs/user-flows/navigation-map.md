@@ -1,43 +1,48 @@
 # Navigation Map
 
 Derived from `apps/web/src/app/paths.ts`, `apps/web/src/app/AppRouter.tsx`,
-`apps/web/src/studio/StudioApp.tsx` and `apps/web/src/studio/StudioWorkspace.tsx`.
+`apps/web/src/app/shell/AuthenticatedShell.tsx` and `apps/web/src/app/shell/ShellMain.tsx`.
 
 ## Router shape
 
-There is exactly one route entry: `createBrowserRouter([{ path: '*', element: <RoutedApplication /> }])`
-(`AppRouter.tsx:216-222`). `RoutedApplication` renders either the public entry page or, for any
-path recognised by `isProtectedAppPath`, the lazily-loaded `StudioApp` shell inside `ProtectedRoute`
-(`AppRouter.tsx:178-206`). Anything unrecognised redirects to `/`.
+There is exactly one route entry: `createBrowserRouter([{ path: '*', element: <RoutedApplication /> }])`.
+`RoutedApplication` renders either the public entry page or, for any path recognised by
+`isProtectedAppPath`, the lazily-loaded `AuthenticatedShell` inside `ProtectedRoute`. Anything
+unrecognised redirects to `/`.
 
 Consequences that matter for every flow:
 
-- **The shell never unmounts** while the user moves between Dashboard, Projects, Campaigns, Assets
-  and Studio. Camera state, a reviewed take, an in-flight edit, and the creative repository all
-  survive those transitions.
-- Surface selection is `if`-based inside `StudioWorkspace`, not route-based.
+- **The shell persists; the Studio runtime does not.** `AuthenticatedShell` stays mounted while the
+  user moves between Dashboard, Projects, Campaigns, Assets and Studio, and owns what has to survive
+  that: the remote-state cache, the session lifecycle, the navigation chrome, and the creative
+  library. The capture runtime mounts only where the stage is visible — `isStudioRuntimePath` in
+  `paths.ts` — and is torn down on the way out. Camera state, a reviewed take and an in-flight edit
+  do **not** survive leaving Studio; `StudioExitGuard` prompts before that happens, and capture
+  device choices and unsaved Workshop drafts are persisted so they do survive.
+- Surface selection is `if`-based inside `ShellMain`, keyed on the route context rather than on
+  nested route elements.
 - Asset libraries are `OverlayPanel`s whose `open` prop is a pathname comparison
-  (`StudioLibraryOverlays.tsx:66,84,124,146`).
+  (`StudioLibraryOverlays.tsx`).
 
 ## Canonical routes
 
-| Path                              | Protected | Surface rendered                          | Notes                                                                                                                                                   |
-| --------------------------------- | --------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                               | No        | `EntryPage`                               | Redirects to `/dashboard` when already authenticated (`EntryPage.tsx:73-80`)                                                                            |
-| `/dashboard`                      | Yes       | `DashboardRouteSurface`                   | Organization chrome                                                                                                                                     |
-| `/studio/create`                  | Yes       | Media stage + `CreativeWorkspace`         | Studio chrome. Accepts `?intent=record\|upload` and `?projectId=<uuid>`                                                                                 |
-| `/studio/create/live`             | Yes       | `LiveBetaRouteSurface`                    | If beta **and** provider are configured, an effect opens the AI-experience overlay and replaces the URL with `/studio/create` (`StudioApp.tsx:320-324`) |
-| `/studio/{videoId}`               | Yes       | Media stage, take review                  | `videoId` must match a UUID (`paths.ts:59-60`). Loads the Saved Video's current Version into review (`StudioApp.tsx:759-781`). **No UI links here**     |
-| `/projects`                       | Yes       | `ProjectsWorkspace`                       | Accepts router state `{ createIntent: 'project' }`                                                                                                      |
-| `/projects/{projectId}`           | Yes       | `ProjectDetail` (overview)                |                                                                                                                                                         |
-| `/projects/{projectId}/workspace` | Yes       | `ProjectDetail` (workspace) + media stage | The only organization route that keeps the stage visible (`StudioWorkspace.tsx:223`)                                                                    |
-| `/campaigns`                      | Yes       | `CampaignsWorkspace`                      | Accepts router state `{ createIntent: 'campaign' }`, consumed and stripped on close or successful create                                                |
-| `/campaigns/{campaignId}`         | Yes       | `CampaignDetail`                          |                                                                                                                                                         |
-| `/assets`                         | Yes       | `AssetsRouteSurface`                      | Hub of four cards                                                                                                                                       |
-| `/assets/videos`                  | Yes       | `AssetsRouteSurface` + Videos overlay     | Optional `?video=<uuid>` opens that Saved Video's preview, then replaces itself away                                                                    |
-| `/assets/characters`              | Yes       | `AssetsRouteSurface` + Characters overlay |                                                                                                                                                         |
-| `/assets/outfits`                 | Yes       | `AssetsRouteSurface` + Outfits overlay    |                                                                                                                                                         |
-| `/assets/voices`                  | Yes       | `AssetsRouteSurface` + Voices overlay     | Browse, preview, save, remove, and **Use in Studio**; disabled only when ElevenLabs is unconfigured                                                     |
+| Path                              | Protected | Surface rendered                          | Notes                                                                                                                                                          |
+| --------------------------------- | --------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                               | No        | `EntryPage`                               | Redirects to `/dashboard` when already authenticated (`EntryPage.tsx:73-80`)                                                                                   |
+| `/dashboard`                      | Yes       | `DashboardRouteSurface`                   | Organization chrome                                                                                                                                            |
+| `/studio/create`                  | Yes       | Media stage + `CreativeWorkspace`         | Studio chrome. Accepts `?intent=record\|upload` and `?projectId=<uuid>`                                                                                        |
+| `/studio/create/live`             | Yes       | `LiveBetaRouteSurface`                    | No stage, so no capture runtime. If beta **and** provider are configured, the shell opens the AI-experience overlay and replaces the URL with `/studio/create` |
+| `/studio/{videoId}`               | Yes       | Media stage, take review                  | `videoId` must match a UUID. Loads the Saved Video's current Version into review. **No UI links here**                                                         |
+| `/projects`                       | Yes       | `ProjectsWorkspace`                       | Accepts router state `{ createIntent: 'project' }`                                                                                                             |
+| `/projects/{projectId}`           | Yes       | `ProjectDetail` (overview)                |                                                                                                                                                                |
+| `/projects/{projectId}/workspace` | Yes       | `ProjectDetail` (workspace) + media stage | The only organization route that mounts the capture runtime, because it records source into the Project                                                        |
+| `/campaigns`                      | Yes       | `CampaignsWorkspace`                      | Accepts router state `{ createIntent: 'campaign' }`, consumed and stripped on close or successful create                                                       |
+| `/campaigns/{campaignId}`         | Yes       | `CampaignDetail`                          |                                                                                                                                                                |
+| `/assets`                         | Yes       | `AssetsRouteSurface`                      | Hub of four cards                                                                                                                                              |
+| `/assets/videos`                  | Yes       | `AssetsRouteSurface` + Videos overlay     | Optional `?video=<uuid>` opens that Saved Video's preview, then replaces itself away                                                                           |
+| `/assets/characters`              | Yes       | `AssetsRouteSurface` + Characters overlay |                                                                                                                                                                |
+| `/assets/outfits`                 | Yes       | `AssetsRouteSurface` + Outfits overlay    |                                                                                                                                                                |
+| `/assets/voices`                  | Yes       | `AssetsRouteSurface` + Voices overlay     | Browse, preview, save, remove, and **Use in Studio**; disabled only when ElevenLabs is unconfigured                                                            |
 
 ## Legacy redirects
 
@@ -79,12 +84,12 @@ EntryPage
 StudioHeader (all protected routes)
   ├─ brand ─────────────────────────────► /dashboard              StudioHeader.tsx:317
   ├─ nav: Dashboard/Projects/Campaigns/Assets                     StudioHeader.tsx:296-301
-  ├─ Quick Create ▸ New video ──────────► /studio/create          StudioApp.tsx:1106
-  │              ▸ New Project ─────────► /projects + createIntent StudioApp.tsx:1110
-  │              ▸ New Campaign ────────► /campaigns + createIntent StudioApp.tsx:1113
-  │              ▸ Create Asset ────────► AssetCreationLauncher    StudioApp.tsx:1116
-  │              ▸ Live AI · Beta ──────► /studio/create/live      StudioApp.tsx:1120
-  └─ Account ▸ Log out ─────────────────► /                        StudioApp.tsx:924
+  ├─ Quick Create ▸ New video ──────────► /studio/create          ShellChrome.tsx
+  │              ▸ New Project ─────────► /projects + createIntent ShellChrome.tsx
+  │              ▸ New Campaign ────────► /campaigns + createIntent ShellChrome.tsx
+  │              ▸ Create Asset ────────► AssetCreationLauncher    ShellChrome.tsx
+  │              ▸ Live AI · Beta ──────► /studio/create/live      ShellChrome.tsx
+  └─ Account ▸ Log out ─────────────────► /                        ShellChrome.tsx
 
 DashboardRouteSurface
   ├─ Create video ──────────────────────► /studio/create
@@ -160,7 +165,7 @@ Studio (create)
 - Every Asset library overlay's close control (fallback `/assets`), via `nav.closeAssetLibrary`.
   A library opened from somewhere other than the hub therefore closes back to _that_ origin — the
   point of the change, since closing used to push `/assets` and cost two Back presses per visit.
-- The Saved-Video-route error notice action (`StudioApp.tsx:845-848`)
+- The Saved-Video-route error notice action (`StudioApp.tsx`)
 - Live-beta "Back to Dashboard"
 
 `StudioExitGuard` (`studio/StudioExitGuard.tsx`) intercepts `popstate` and `beforeunload` while a
@@ -170,14 +175,14 @@ recording, finalization, render, or dirty creative state exists.
 
 | Trigger                                                                  | Effect                                                                                                                                                                       | Code                                                  |
 | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `/studio/create?intent=record`                                           | Starts local capture once per history entry (keyed on `location.key`), so returning to the same URL records again                                                            | `StudioApp.tsx:988-1000`                              |
-| `/studio/create?intent=upload` or router state `creationIntent:'upload'` | Opens the video-upload overlay and strips the state                                                                                                                          | `StudioApp.tsx:304-318`                               |
-| `/studio/create?projectId=…`                                             | Verifies the project is not archived/deleted, else strips the param                                                                                                          | `StudioApp.tsx:257-302`                               |
-| Saving a video while `projectId` context is verified                     | Attaches the new video to the project and replaces the URL with `/projects/{id}`; the save-success panel is suppressed                                                       | `StudioApp.tsx:788-826`                               |
+| `/studio/create?intent=record`                                           | Starts local capture once per history entry (keyed on `location.key`), so returning to the same URL records again — within Studio as well as after leaving it                | `useStudioRecordingLaunch.ts`                         |
+| `/studio/create?intent=upload` or router state `creationIntent:'upload'` | Opens the video-upload overlay and strips the state                                                                                                                          | `StudioApp.tsx`                                       |
+| `/studio/create?projectId=…`                                             | Verifies the project is not archived/deleted, else strips the param                                                                                                          | `StudioApp.tsx`                                       |
+| Saving a video while `projectId` context is verified                     | Attaches the new video to the project and replaces the URL with `/projects/{id}`; the save-success panel is suppressed                                                       | `StudioApp.tsx`                                       |
 | An explicitly requested save outside a project context                   | Opens `SaveVideoSuccessPanel` with Download / View in Assets / Create another                                                                                                | `StudioLifecycleDialogs.tsx`                          |
 | **Use in Studio** on a saved voice                                       | Navigates to `/studio/create`, opens the upload overlay, and holds the voice until a source is ready                                                                         | `existingVideoWorkflowState.ts` (`source-ready`)      |
-| `/studio/{uuid}`                                                         | Resets local work, fetches the Saved Video, loads it into review                                                                                                             | `StudioApp.tsx:759-781`                               |
-| `/studio/create/live` with beta enabled                                  | Opens AI-experience overlay, replaces URL with `/studio/create`                                                                                                              | `StudioApp.tsx:320-324`                               |
+| `/studio/{uuid}`                                                         | Resets local work, fetches the Saved Video, loads it into review                                                                                                             | `StudioApp.tsx`                                       |
+| `/studio/create/live` with beta enabled                                  | Opens AI-experience overlay, replaces URL with `/studio/create`                                                                                                              | `StudioApp.tsx`                                       |
 | `/assets/videos?video=<uuid>`                                            | Opens that Saved Video's preview, then replaces the entry without the parameter so Back cannot re-open it                                                                    | `VideoGallery.tsx`, `useStudioNavigationActions.ts`   |
 | Router state `{ createIntent: 'project' \| 'campaign' }`                 | Auto-opens the corresponding create dialog. Every close path — cancel _and_ a successful create — strips the state with a `replace`, so Back to the list does not re-open it | `ProjectRouteSurface.tsx`, `CampaignRouteSurface.tsx` |
 | Router state `{ campaignCreated: id }`                                   | Shows the "Create the first Project" next-step notice                                                                                                                        | `CampaignRouteSurface.tsx`                            |

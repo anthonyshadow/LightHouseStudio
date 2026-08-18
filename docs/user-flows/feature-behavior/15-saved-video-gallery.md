@@ -25,8 +25,9 @@ Studio stage.
    In authoritative Neon/private-R2 mode, the authenticated API stages the save and the browser
    transfers multipart bytes directly to R2; the result is not visible until the API verifies and
    attaches it. Local and shadow modes retain their existing API-mediated upload behavior.
-3. `/assets/videos` reuses the mounted `StudioApp` and persistent `MediaStage`; the Assets
-   view hides the stage without unmounting its owner. The gallery first loads filtered/sorted
+3. `/assets/videos` reuses the mounted `AuthenticatedShell`; it mounts no `MediaStage` at all,
+   because a library needs no camera. Choosing **Use in Studio** hands the selection to the runtime
+   through the shell's handoff channel and navigates there. The gallery first loads filtered/sorted
    metadata in cursor pages; it does not eagerly load video bytes. The default order is Latest,
    with Oldest, Shortest, and Longest alternatives.
 4. The gallery can show only videos attributed to a chosen saved character and/or the chosen

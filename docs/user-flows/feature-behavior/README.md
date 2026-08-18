@@ -67,8 +67,8 @@ future features current.
   and Restyle directions without exposing Recipe as an Asset type.
 - Saved Character Wardrobe owns normalized original/variant browsing and variant creation while
   reusing the same compatibility metadata, immutable reference store, and overlay/media ownership.
-- Studio keeps one mounted media stage and one temporary take pipeline. Organization pages hide
-  that stage; they do not mount another player. Its immutable source may be recorded, uploaded, or
+- Studio keeps one mounted media stage and one temporary take pipeline. Organization pages mount
+  neither: no stage, no player, no capture graph. Its immutable source may be recorded, uploaded, or
   a validated local edit; presentation selects the voiced, visual, or source layer.
 - An uploaded workflow may run either exact batch model once, never both. The creator may switch
   the single active model before submission; only the active choice is used.

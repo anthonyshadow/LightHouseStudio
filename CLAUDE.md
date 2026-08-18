@@ -126,10 +126,9 @@ check as passing.
   not reach into it from a surface that outlives it: it reports work up through
   `StudioRuntimeRegistry` and receives creative selections through the shell's handoff channel
   (`app/shell/useStudioHandoff.ts`).
-  _Migration in progress_: the runtime is still rendered by the shell on every protected route.
-  Until the gate flips, guard route-triggered effects with `location.key`, not just
-  `pathname + search` — that keying stays correct either way, since it scopes to a visit rather
-  than to a mount.
+  Guard route-triggered effects with `location.key`, not just `pathname + search`: the shell
+  persists, so arriving somewhere is a new history entry rather than a remount, and the same keying
+  is what makes a return _within_ Studio behave like a fresh visit.
 - **Asset libraries are overlays**, not pages — they key off `location.pathname` in
   `StudioLibraryOverlays.tsx`.
 - **Route registration is conditional.** Project source/working-media/output and creative-library

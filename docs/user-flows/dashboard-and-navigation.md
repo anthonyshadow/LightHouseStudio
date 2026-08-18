@@ -3,7 +3,7 @@
 ## Entry point
 
 - Route `/dashboard`, rendered by `apps/web/src/features/dashboard/DashboardRouteSurface.tsx`
-  (lazy-loaded from `StudioWorkspace.tsx:390-406`).
+  (lazy-loaded from `StudioWorkspace.tsx`).
 - Reached from: login success, the brand button, the "Dashboard" nav item, and the Live-beta
   "Back to Dashboard" action.
 
@@ -15,7 +15,7 @@
 ## The shell around it
 
 `StudioHeader` (`apps/web/src/studio/StudioHeader.tsx`) is rendered for every protected route. On
-organization routes (`organizationRouteActive`, `StudioApp.tsx:184-190`) it switches to a rail
+organization routes (`organizationRouteActive`, `StudioApp.tsx`) it switches to a rail
 presentation and additionally renders a mobile bottom nav (`StudioHeader.tsx:381-397`).
 
 Header regions:
@@ -23,7 +23,7 @@ Header regions:
 | Region       | Contents                                                                                                                                         |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Brand        | Logo + "Lightframe"; click → `/dashboard`                                                                                                        |
-| Primary nav  | Dashboard · Projects · Campaigns · Assets, with `aria-current="page"` from `activeDestination` (`StudioApp.tsx:1094-1103`)                       |
+| Primary nav  | Dashboard · Projects · Campaigns · Assets, with `aria-current="page"` from `activeDestination` (`StudioApp.tsx`)                                 |
 | Quick Create | New video · New Project · New Campaign · Create Asset · Live AI · Beta (only when live is enabled)                                               |
 | Status menu  | "Core Studio ready" / "Studio limited" / "Checking integrations" with a breakdown of Local capture, Existing-video AI, Live AI Beta, Voice cloud |
 | Account menu | Display name, login, **Log out** only                                                                                                            |
@@ -98,7 +98,7 @@ with three views:
   and navigates to `/assets/voices`
 
 When opened from a project route, `projectId` is passed through so the created asset is attached to
-that project (`StudioApp.tsx:1231-1264`). Character and Outfit choices navigate to `/studio/create`
+that project (`StudioApp.tsx`). Character and Outfit choices navigate to `/studio/create`
 and open the respective builder overlay.
 
 ## Exit points

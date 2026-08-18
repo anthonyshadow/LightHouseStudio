@@ -18,10 +18,10 @@ Studio is the local-first creation surface at `/studio/create` (plus the deep-li
 | Quick Create ▸ **Live AI · Beta**                  | `/studio/create/live`                                          |
 | Direct URL `/studio/{uuid}`                        | Loads that Saved Video's current Version into review           |
 
-## The persistent stage
+## The Studio stage
 
-`MediaStage` (`features/live-stage/MediaStage.tsx`) is mounted for the whole session and shows one
-of four presentations derived by `deriveTakeStagePresentation`
+`MediaStage` (`features/live-stage/MediaStage.tsx`) is mounted for the whole Studio visit — it
+belongs to the runtime, which leaves when the operator does — and shows one of four presentations derived by `deriveTakeStagePresentation`
 (`studio/useTakeReviewFlow.ts:32-68`):
 
 | Presentation | When                                                                                                         |
@@ -42,7 +42,7 @@ To the side, `CreativeWorkspace` (`studio/CreativeWorkspace.tsx`) renders a tool
 ## Flow: Record a local video
 
 1. Enter `/studio/create`.
-2. Press **Record New Video** → `startLocalRecording` (`StudioApp.tsx:965-971`): clears the
+2. Press **Record New Video** → `startLocalRecording` (`StudioApp.tsx`): clears the
    existing-video intent, closes overlays, focuses the stage, and calls `session.startLocal()`.
    Camera and microphone are requested only here — the app never opens media on route entry.
 3. Capture preferences (source device, format, capture target) come from `CaptureSettingsPanel`,
@@ -128,7 +128,7 @@ Voice is independent of the visual edit and can be applied alone
 
 1. **Edit Video** in the tool rail, or **Edit video** from the Videos library.
 2. `useVideoEditSession` (`features/video-editor/useVideoEditSession.ts`) opens
-   `VideoEditWorkspace` in place of the creative workspace (`StudioWorkspace.tsx:338-346`).
+   `VideoEditWorkspace` in place of the creative workspace (`StudioWorkspace.tsx`).
 3. Rendering happens entirely in the browser: `videoEditRender.worker.ts` + `videoEditShader.ts` +
    `videoEditChunkAccumulator.ts`. No provider call is made.
 4. On completion the phase becomes `awaiting-replacement`. Committing (`commitVideoEdit`,
@@ -153,7 +153,7 @@ Voice is independent of the visual edit and can be applied alone
    alongside the plain save; it calls `POST /api/videos/{videoId}/versions` after a
    `window.confirm` (`useStudioSavedVideoController.ts`).
 5. If the Studio was entered with `?projectId=`, the newly saved video is auto-attached to the
-   project and the app redirects to `/projects/{id}` (`StudioApp.tsx:788-826`), with retry handling
+   project and the app redirects to `/projects/{id}` (`StudioApp.tsx`), with retry handling
    on the attach step.
 
 **A successful standalone save ends with a completion surface.** `SaveVideoSuccessPanel`
@@ -180,7 +180,7 @@ in the take-review dock and in the existing-video result bar, so they survive di
 ## Flow: Live AI (realtime) — gated
 
 - Enabled only when `REALTIME_VIDEO_BETA_ENABLED` is on **and** a Decart token provider is
-  configured **and** `capabilities.decart` is true (`StudioApp.tsx:207-210`).
+  configured **and** `capabilities.decart` is true (`StudioApp.tsx`).
 - When enabled, `/studio/create/live` immediately opens the AI-experience chooser and rewrites the
   URL to `/studio/create`.
 - When not enabled, `LiveBetaRouteSurface` explains precisely why (beta off vs provider not
@@ -189,7 +189,7 @@ in the take-review dock and in the existing-video result bar, so they survive di
   the WebSocket session, and `realtimeSessionClock.ts` enforces the session time limit with
   automatic take finalization.
 - Live starts are unconditionally blocked inside a Project workspace
-  (`StudioApp.tsx:658-662`).
+  (`StudioApp.tsx`).
 
 ## Flow: Character builder and wardrobe
 
@@ -210,7 +210,7 @@ in the take-review dock and in the existing-video result bar, so they survive di
 ## Exit guards
 
 `StudioExitGuard` (`studio/StudioExitGuard.tsx`) blocks `popstate` and `beforeunload` when any of
-these hold (`StudioApp.tsx:1266-1287`): recording or finalizing, a provider job active, a video
+these hold (`StudioApp.tsx`): recording or finalizing, a provider job active, a video
 render or project working-media operation busy, a temporary take present, voice processing running,
 or dirty outfit/wardrobe/editor state. Covered by e2e ("recording and temporary-take work cannot be
 lost silently through Back").

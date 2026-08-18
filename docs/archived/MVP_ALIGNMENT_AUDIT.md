@@ -1,5 +1,11 @@
 # Lightframe Studio MVP alignment audit
 
+> **Superseded.** This document describes an architecture in which one `StudioApp` stayed mounted
+> across every authenticated route and organization pages hid its media stage. The Studio's capture
+> runtime now mounts only on routes that own live media (`isStudioRuntimePath` in
+> `apps/web/src/app/paths.ts`); the persistent piece is `AuthenticatedShell`. Read the
+> always-mounted claims below as a record of what was true at the time.
+
 > **Historical planning record (fully superseded by the Prompt 02–13 implementation program).** The
 > gaps, current-state tables, and recommendations below describe the repository audited on
 > 2026-08-11, not the shipped Campaign/Project workspace. Use the current README, Architecture, user

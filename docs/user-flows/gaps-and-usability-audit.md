@@ -175,8 +175,8 @@ through tasks instead of leaving. This also closes **M6**.
 
 `dashboardOnboarding.ts` stores a single boolean. Once dismissed, no product surface ever explains
 Projects vs Campaigns vs Assets again. The Studio "first take guide"
-(`StudioWorkspace.tsx:236-270`) is gated on `firstSuccessGuideVisible`, which is initialised to
-`false` in `StudioApp.tsx:329` and never set to `true` anywhere in the codebase — **the guide is
+(`StudioWorkspace.tsx`) is gated on `firstSuccessGuideVisible`, which is initialised to
+`false` in `StudioApp.tsx` and never set to `true` anywhere in the codebase — **the guide is
 therefore unreachable in the current build**.
 
 ## 3. UX and navigation problems
@@ -279,7 +279,7 @@ explanation; the difference is only described in the empty-state paragraph below
 ### N6 — No nav item is active while in Studio (Low)
 
 `activeDestination` resolves to `'studio'` on `/studio/create`
-(`StudioApp.tsx:1094-1103`), but the primary nav renders only Dashboard, Projects, Campaigns and
+(`StudioApp.tsx`), but the primary nav renders only Dashboard, Projects, Campaigns and
 Assets (`StudioHeader.tsx:279-286`). In the product's main creation surface, the navigation shows
 no current location.
 
@@ -288,7 +288,7 @@ no current location.
 The app has a well-built `ConfirmationDialog` primitive and uses it widely, yet two destructive or
 consequential actions use the native `window.confirm`:
 
-- switching experience mode over an existing draft (`StudioApp.tsx:667-672` via
+- switching experience mode over an existing draft (`StudioApp.tsx` via
   `confirmModeReplacement`)
 - replacing the loaded gallery version (`useStudioSavedVideoController.ts:267-273`)
 
@@ -344,7 +344,7 @@ Both list surfaces show `{items.length} loaded` (`ProjectRouteSurface.tsx:145`,
 | M7     | A "what is a Project / Campaign / Asset" explanation reachable after onboarding is dismissed                                                                           | Global                             | Medium   |
 | M8     | Confirmation before a project-source upload replaces a previously _failed_ staging attempt                                                                             | `ProjectRouteSurface.tsx:585-621`  | Low      |
 | M9     | Any surfacing of `entitlements` returned by `/api/auth/me`                                                                                                             | Account menu                       | Low      |
-| M10    | An error boundary message that distinguishes a chunk-load failure from an application crash                                                                            | `AppRouter.tsx:104-112`            | Low      |
+| M10    | An error boundary message that distinguishes a chunk-load failure from an application crash                                                                            | `AppRouter.tsx`                    | Low      |
 | M11    | Retry affordance for the Assets hub when the creative repository fails to open                                                                                         | `useStudioCreativeRepository.ts`   | Low      |
 | M12    | Visible indication that `/assets/*` libraries are overlays over the hub (Escape closes to `/assets`, which is not signposted)                                          | `StudioLibraryOverlays.tsx`        | Low      |
 
@@ -365,10 +365,12 @@ Deliberately conservative — each item was verified before listing.
 
 ### B1 — `?intent=record` only ever started recording once per session (Medium) — **Resolved**
 
-`handledRecordIntentRef` was keyed on `${location.pathname}${location.search}`. Because the Studio
-shell never unmounts while the user moves between protected routes, the ref survived navigation, so
-a second visit to the identical URL was a no-op and the user landed on an idle Studio with no
-explanation.
+`handledRecordIntentRef` was keyed on `${location.pathname}${location.search}`. At the time the
+Studio shell never unmounted while the user moved between protected routes, so the ref survived
+navigation, a second visit to the identical URL was a no-op, and the user landed on an idle Studio
+with no explanation. The Studio runtime is now torn down on leaving Studio, which would mask the
+original bug; the `location.key` keying stays because it is what makes a return _within_ Studio
+record again, and a dedicated test covers that path.
 
 _Shipped:_ the guard key is now `` `${location.key}:${location.pathname}${location.search}` ``, with
 `location.key` added to the effect dependencies — the CLAUDE.md gotcha verbatim, and the pattern
@@ -399,7 +401,8 @@ the replace settles before the push, so Back lands on a list entry whose state i
 Consuming the intent on arrival was the other candidate and was rejected: it requires latching the
 dialog's open state into `useState` from inside an effect, which `react-hooks/set-state-in-effect`
 forbids repo-wide, and the workarounds are worse — a mount-time initializer breaks Quick Create
-fired while already on the list (the shell never unmounts, so the component does not remount), and a
+fired while already on the list (the shell persists across protected routes, so the component does
+not remount), and a
 scheduled setter adds async for no reason. Clearing at the close boundary keeps
 `routeCreateRequested` as the single render-time owner and touches nothing else.
 
@@ -441,12 +444,12 @@ logout and expiry share one `SessionCleanupCoordinator` rather than registering 
 `studioWorkspaceKeyFromPath` returns a key only for `/studio/create`, `/studio/create/live` and
 project workspaces (`StudioExitGuard.tsx:34-39`). `/studio/{videoId}` is a full review/edit surface
 that is not covered, and the route's own effect calls `directVideoActionsRef.current.reset()`
-unconditionally on entry (`StudioApp.tsx:763`), discarding local work. Currently only reachable by
+unconditionally on entry (`StudioApp.tsx`), discarding local work. Currently only reachable by
 typing a URL.
 
 ### B5 — `getProject` re-verification runs on every navigation into a project-scoped create (Low)
 
-`creationContextRequestKey` embeds `location.key` (`StudioApp.tsx:219-222`), so returning to the
+`creationContextRequestKey` embeds `location.key` (`StudioApp.tsx`), so returning to the
 same `/studio/create?projectId=…` URL issues a fresh `GET /api/projects/{id}` each time. Correct
 but redundant; on a slow link the Studio renders in an unverified state until it resolves.
 
@@ -474,7 +477,7 @@ unavailable", and the user is never told the save partially degraded.
 ### B8 — Route errors are silently swallowed (Low)
 
 `RouteErrorBoundary.componentDidCatch` has an empty body with a comment explaining that raw errors
-are not exposed (`AppRouter.tsx:117-119`). Nothing is logged or reported anywhere, so a production
+are not exposed (`AppRouter.tsx`). Nothing is logged or reported anywhere, so a production
 crash leaves no trace beyond the fallback screen.
 
 ### B9 — Dashboard "Continue Work" assumes list ordering (Low, unverified)
@@ -550,7 +553,7 @@ less.
 1. **The vocabulary must be learned before the product can be used.** Project vs Campaign vs Asset
    vs Version vs source vs working media is six concepts before the first video.
 2. **The first-take guide never appears** (`firstSuccessGuideVisible` is initialised `false` and
-   never set — `StudioApp.tsx:329`), so the Studio's only inline coaching is dead code from the
+   never set — `StudioApp.tsx`), so the Studio's only inline coaching is dead code from the
    user's perspective.
 3. ~~**"Continue editing" on an empty project** implies prior work that does not exist~~ —
    resolved (G3): the label reads **Add source** and the Source task is on the overview.
@@ -573,20 +576,20 @@ concerns:
 | P1  | ~~The mobile bottom nav only renders on organization routes. On `/studio/create` there is no bottom navigation at all.~~ — resolved: the shell renders one navigation chrome (rail plus bottom bar) on every protected route. | `StudioHeader.tsx`                                 |
 | P2  | The Project workspace tablist is four horizontal tabs; at small widths with large text they compete with the media stage in the same viewport.                                                                                | `ProjectRouteSurface.tsx:870-888`                  |
 | P3  | The account menu becomes a 2.75 rem icon with the label hidden below 48 rem (`AccountMenu.tsx:126-129`), leaving logout behind an unlabelled avatar.                                                                          | `AccountMenu.tsx:126-129`                          |
-| P4  | Asset library overlays are `placement="fullscreen"`, which is correct on mobile but means the hub's context is entirely lost with no breadcrumb (M5, M12).                                                                    | `StudioLibraryOverlays.tsx:70-73`                  |
+| P4  | Asset library overlays are `placement="fullscreen"`, which is correct on mobile but means the hub's context is entirely lost with no breadcrumb (M5, M12).                                                                    | `StudioLibraryOverlays.tsx`                        |
 | P5  | Capture settings collapse from a desktop sidebar to a right-side overlay based on `useDesktopStudioLayout`; the transition point is not aligned with the nav breakpoints.                                                     | `useDesktopStudioLayout.ts`, `StudioApp.styles.ts` |
 
 ## 10. Technical risks affecting user flows
 
-| #   | Risk                                                                                                                                                                                                            | Impact on flows                                                                                                                        |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| T1  | **Creative library is browser-local first.** Characters and Outfits live in IndexedDB; the cloud mirror is best-effort and fails closed (B6).                                                                   | A user on a second device sees an empty Characters library and no explanation beyond a sync notice                                     |
-| T2  | **Feature availability is configuration-dependent at four levels** (`DATABASE_MODE`, `ASSET_STORE_PROVIDER`, provider keys, beta flags). Route registration itself is conditional (`app.ts:327, 412, 507`).     | The same build shows structurally different products; `503 feature_unavailable` is a legitimate response the UI must handle everywhere |
-| T3  | **The Studio shell never unmounts.** This is what makes the persistent stage work, and it is also the root cause of B1 and the reason state leaks across "pages".                                               | Long sessions accumulate in-memory state that only a reload clears                                                                     |
-| T4  | **Provider work is billable and only partially cancellable.** The UI says so honestly (`DashboardRouteSurface.tsx:490`, `ProjectProcessingStatusPanel.tsx:52-55`), but "Remove from queue" reads like a cancel. | Users may believe they stopped a charge                                                                                                |
-| T5  | **300 MB client-side bounds** on every media read (`useStudioSavedVideoController.ts:139`, `useProjectSourceController.ts:21`).                                                                                 | Larger legitimate videos fail with a safety-limit message rather than a size-policy explanation up front                               |
-| T6  | **No client-side telemetry or error reporting** (B8).                                                                                                                                                           | Field failures are invisible                                                                                                           |
-| T7  | **`window.confirm` in two flows** (N7) blocks the event loop and cannot be automated or styled.                                                                                                                 | Inconsistent behaviour under test and on mobile                                                                                        |
+| #      | Risk                                                                                                                                                                                                                                                                                                                          | Impact on flows                                                                                                                                     |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1     | **Creative library is browser-local first.** Characters and Outfits live in IndexedDB; the cloud mirror is best-effort and fails closed (B6).                                                                                                                                                                                 | A user on a second device sees an empty Characters library and no explanation beyond a sync notice                                                  |
+| T2     | **Feature availability is configuration-dependent at four levels** (`DATABASE_MODE`, `ASSET_STORE_PROVIDER`, provider keys, beta flags). Route registration itself is conditional (`app.ts:327, 412, 507`).                                                                                                                   | The same build shows structurally different products; `503 feature_unavailable` is a legitimate response the UI must handle everywhere              |
+| ~~T3~~ | ~~**The Studio shell never unmounts.**~~ **Resolved.** The persistent shell now owns only what a session needs — remote state, lifecycle, chrome, creative library — and the capture runtime mounts only on routes that own live media (`isStudioRuntimePath`), shedding ~319 KB and the whole capture graph everywhere else. | In-memory Studio state no longer accumulates across "pages"; capture device choices and unsaved Workshop drafts are persisted so they still survive |
+| T4     | **Provider work is billable and only partially cancellable.** The UI says so honestly (`DashboardRouteSurface.tsx:490`, `ProjectProcessingStatusPanel.tsx:52-55`), but "Remove from queue" reads like a cancel.                                                                                                               | Users may believe they stopped a charge                                                                                                             |
+| T5     | **300 MB client-side bounds** on every media read (`useStudioSavedVideoController.ts:139`, `useProjectSourceController.ts:21`).                                                                                                                                                                                               | Larger legitimate videos fail with a safety-limit message rather than a size-policy explanation up front                                            |
+| T6     | **No client-side telemetry or error reporting** (B8).                                                                                                                                                                                                                                                                         | Field failures are invisible                                                                                                                        |
+| T7     | **`window.confirm` in two flows** (N7) blocks the event loop and cannot be automated or styled.                                                                                                                                                                                                                               | Inconsistent behaviour under test and on mobile                                                                                                     |
 
 ## 11. Recommended priorities
 

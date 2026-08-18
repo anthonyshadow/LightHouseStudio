@@ -9,7 +9,7 @@
    the existing-video editor does not open a second Voice flow. A confirmed local video edit becomes
    the immutable source and installs its newly extracted sidecar before Voice can start.
 2. Choose **Original**, **Warm studio**, **Clear presenter**, or **Signal robot** from the treatment
-   rail. The source summary remains **Original audio**, and the video remains on the persistent
+   rail. The source summary remains **Original audio**, and the video remains on the Studio
    stage.
 3. In Latest Take, confirm **Apply treatment**. Studio renders the selected treatment from the
    original sidecar offline and

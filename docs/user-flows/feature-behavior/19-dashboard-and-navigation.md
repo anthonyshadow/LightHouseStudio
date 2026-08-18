@@ -21,11 +21,11 @@ resources, and browse reusable Assets without activating media or a provider.
    Live AI, and UUID-only `/studio/:videoId` opens the current Saved Video Version in review.
    Reserved `create` routes are matched before the UUID route.
 4. All protected destinations render through one stable `StudioApp`. Organization collection and
-   overview routes hide the single persistent `MediaStage`; the Project workspace keeps that same
-   stage visible inside the organization shell. Navigation never creates a second stage, media
+   overview routes mount no `MediaStage`; the Project workspace mounts one, because it records
+   source into the Project. Navigation never creates a second stage, media
    owner, overlay system, or global store.
 5. Every protected route at `48rem` and above — including Project workspaces and focused Create —
-   uses the same persistent left rail
+   uses the same left rail
    for Dashboard, Projects, Campaigns, and Assets. **Quick Create** retains New Video, New Project,
    New Campaign, and gated Live AI, and adds **Create Asset**. The shared chooser offers Video,
    Character, Outfit, and **Add Voice** only. Project context is propagated when creation starts
@@ -56,8 +56,8 @@ resources, and browse reusable Assets without activating media or a provider.
   repeated open/close cycles never accumulate history entries the operator must press Back through.
 - `/studio/:videoId` direct entry is refresh-safe, cancellation-safe, and reports normalized
   unavailable/removed/load failures with navigation back to Videos or its originating Project.
-- Dashboard and organization routes acquire no media, issue no provider token, and do not remount
-  the authenticated composition root.
+- Dashboard and organization routes acquire no media, issue no provider token, load no capture
+  graph, and do not remount the authenticated shell.
 - Queue actions are owner-scoped, require the provider-continuation warning, release local admission
   only after the cancelled trace is durable, and never claim the provider stopped or refunded work.
 

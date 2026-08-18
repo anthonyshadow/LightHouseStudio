@@ -3,7 +3,7 @@
 ## Entry point
 
 - Route `/` (`APP_PATHS.entry`), rendered by `apps/web/src/app/EntryPage.tsx`.
-- Any unrecognised path redirects here (`AppRouter.tsx:200-202`).
+- Any unrecognised path redirects here (`AppRouter.tsx`).
 - Any protected path visited while unauthenticated redirects here with router state
   `{ loginRequired: true, from: '<original path+search+hash>' }` (`ProtectedRoute.tsx:15-27`).
 
@@ -36,7 +36,7 @@ is written to `localStorage`; the browser cookie is the only persistence.
 ## Exact user journey — first visit
 
 1. User opens `/`. `AppRouter` renders `EntryPage`; document title becomes
-   "Enter Lightframe Studio" (`AppRouter.tsx:85`).
+   "Enter Lightframe Studio" (`AppRouter.tsx`).
 2. `EntryPage` reads `useAuth()`. While `status === 'unknown'` the primary button shows
    **"Restoring…"** and is disabled (`EntryPage.tsx:100-107`).
 3. An effect calls `auth.restore()` exactly once for the unknown state (`EntryPage.tsx:73-76`),
@@ -106,7 +106,7 @@ only resolves inside the authenticated shell.
 | `referenceImagesAvailable`, `referenceImageEditAvailable`, `referenceImageProviderId/ModelId/Quality` | Image provider (OpenAI / BFL / Wiro)                                                                         | Enables character reference generation and edits                            |
 | `promptOptimizerAvailable` + model/version                                                            | OpenAI prompt optimizer                                                                                      | Enables prompt optimization in the workshop and builder                     |
 | `wardrobeAddOutfitAvailable`                                                                          | Pruna image try-on                                                                                           | Enables adding an outfit to a wardrobe variant                              |
-| `directSavedVideoUploadAvailable`                                                                     | R2 multipart direct upload configured                                                                        | Switches `useSaveVideo` to the direct-upload client (`StudioApp.tsx:211`)   |
+| `directSavedVideoUploadAvailable`                                                                     | R2 multipart direct upload configured                                                                        | Switches `useSaveVideo` to the direct-upload client (`StudioApp.tsx`)       |
 
 `useProviderAvailability` exposes `state: 'loading' | 'ready' | 'error'` plus a `retry`. The header
 status menu renders "checking" / "configuration unavailable" / "configured" per capability
@@ -117,13 +117,13 @@ status menu renders "checking" / "configuration unavailable" / "configured" per 
 1. Account menu → **Log out** (`AccountMenu.tsx:245-247`). The menu contains no other item.
 2. `useStudioLogoutController` (`studio/useStudioLogoutController.ts`) classifies current work:
    - `hasActiveWork` — recording, finalizing, provider job active, video render busy, project
-     working-media busy (`StudioApp.tsx:908-915`)
+     working-media busy (`StudioApp.tsx`)
    - `hasTemporaryWork` — a presented take, voice processing, dirty outfit/wardrobe/editor state,
-     or a busy project source (`StudioApp.tsx:901-907`)
+     or a busy project source (`StudioApp.tsx`)
 3. Confirmation dialogs from `StudioLifecycleDialogs` warn before discarding.
 4. On confirm: temporary state is cleaned up, camera/microphone released via `session.stopCamera()`,
    then `POST /api/auth/logout` (which revokes the session row and clears the cookie), then
-   `navigate('/', { replace: true })` (`StudioApp.tsx:916-936`).
+   `navigate('/', { replace: true })` (`StudioApp.tsx`).
 
 ## Session expiry
 

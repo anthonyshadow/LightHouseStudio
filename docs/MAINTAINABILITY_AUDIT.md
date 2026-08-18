@@ -88,7 +88,7 @@ constructing the observer and retain the existing no-resubmission contract.
 
 The authenticated Studio static closure is also at 1,025,796 of its 1,032,000-byte budget (99.4%).
 Several route- or action-only surfaces are still imported eagerly. They can be split at existing
-UI ownership boundaries without changing the persistent stage or media lifecycle.
+UI ownership boundaries without changing the stage or media lifecycle.
 
 ### Pre-change measurements
 
