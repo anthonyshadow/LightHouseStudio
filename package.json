@@ -33,7 +33,7 @@
     "start:production": "bun run --filter @studio/api start:production",
     "typecheck": "bun run --filter '*' typecheck && bun run typecheck:e2e",
     "typecheck:e2e": "tsc --noEmit -p e2e/tsconfig.json",
-    "lint": "eslint . --max-warnings 0",
+    "lint": "eslint . --max-warnings 0 --cache --cache-strategy content",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
