@@ -199,11 +199,11 @@ const representativeViewports = [
   { name: 'small mobile', ...STUDIO_VIEWPORT_SIZES.smallMobile },
 ] as const;
 
+// The Dashboard layout has one breakpoint at 768. These three cover both sides of it plus the
+// tightest width on each: anything between them re-runs an identical assertion path.
 const dashboardViewports = [
   { name: 'full desktop', ...STUDIO_VIEWPORT_SIZES.fullDesktop },
-  { name: 'compact desktop', ...STUDIO_VIEWPORT_SIZES.compactDesktop },
   { name: 'tablet portrait', ...STUDIO_VIEWPORT_SIZES.tabletPortrait },
-  { name: 'mobile portrait', ...STUDIO_VIEWPORT_SIZES.mobilePortrait },
   { name: 'small mobile', ...STUDIO_VIEWPORT_SIZES.smallMobile },
 ] as const;
 
