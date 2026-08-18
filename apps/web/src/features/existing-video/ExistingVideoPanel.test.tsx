@@ -194,22 +194,21 @@ const readyCharacterWorkflow = (
 
 const runningProjectOperation = (
   overrides: Partial<ProjectProcessingController> = {},
-): ProjectProcessingController =>
-  ({
-    phase: 'idle',
-    attempt: null,
-    message: null,
-    unverifiedOperationId: null,
-    busy: false,
-    active: true,
-    authorityReady: false,
-    start: vi.fn(() => Promise.resolve(true)),
-    retry: vi.fn(() => Promise.resolve(true)),
-    cancel: vi.fn(() => Promise.resolve(true)),
-    reconcile: vi.fn(() => Promise.resolve(true)),
-    refresh: vi.fn(() => Promise.resolve(true)),
-    ...overrides,
-  });
+): ProjectProcessingController => ({
+  phase: 'idle',
+  attempt: null,
+  message: null,
+  unverifiedOperationId: null,
+  busy: false,
+  active: true,
+  authorityReady: false,
+  start: vi.fn(() => Promise.resolve(true)),
+  retry: vi.fn(() => Promise.resolve(true)),
+  cancel: vi.fn(() => Promise.resolve(true)),
+  reconcile: vi.fn(() => Promise.resolve(true)),
+  refresh: vi.fn(() => Promise.resolve(true)),
+  ...overrides,
+});
 
 beforeEach(() => {
   api.hydrateReferenceImage.mockReset();
