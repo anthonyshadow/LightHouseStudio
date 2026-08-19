@@ -66,14 +66,15 @@ _Shipped:_ `SaveVideoSuccessPanel` opens from `StudioLifecycleDialogs` on an exp
 save, naming the Saved Video and its Version, with **Download** · **View in Assets** · **Create
 another** · **Stay in Studio**. The same three actions render inline through
 `SavedVideoSuccessActions` in the take-review dock and the existing-video result bar, so they
-survive dismissing the panel. Download reuses `downloadSavedVideoUrl` and the retained filename;
-**Create another** reuses `discardTemporaryWork` rather than routing through `?intent=record`: the
-panel opens after any explicit save, including one that began as an upload, so auto-starting the
-camera would demand a permission prompt nobody asked for and would push a history entry back onto
-the just-saved state. (It was also a B1 workaround; B1 is now fixed, and the behaviour stands on its
-own merits.) The panel is suppressed while a Project video context owns the save, and a pre-edit
-save inside **Replace and Save** does not trigger it (`useStudioSavedVideoController.saveOutcome`).
-This also closes **M1** and **M2**.
+survive dismissing the panel; **Download** and **View in Assets** render the same way on the Project
+workspace Save tab once an output save settles. Download reuses `downloadSavedVideoUrl` and the
+retained filename; **Create another** reuses `discardTemporaryWork` rather than routing through
+`?intent=record`: the panel opens after any explicit save, including one that began as an upload, so
+auto-starting the camera would demand a permission prompt nobody asked for and would push a history
+entry back onto the just-saved state. (It was also a B1 workaround; B1 is now fixed, and the
+behaviour stands on its own merits.) The panel is suppressed while a Project video context owns the
+save, and a pre-edit save inside **Replace and Save** does not trigger it
+(`useStudioSavedVideoController.saveOutcome`). This also closes **M1** and **M2**.
 
 ### G3 — Project overview hides the entire workflow (High) — **Resolved**
 
@@ -381,20 +382,20 @@ Both list surfaces show `{items.length} loaded` (`ProjectRouteSurface.tsx:145`,
 
 ## 4. Missing UI
 
-| #      | Missing                                                                                                                                                                | Where                              | Severity |
-| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
-| ~~M1~~ | ~~Success state after saving a video~~ — **resolved with G2**                                                                                                          | Studio take review / action bar    | High     |
-| ~~M2~~ | ~~Download affordance anywhere except the Videos gallery and Project History~~ — **resolved with G2** for Studio review; the project workspace Save tab still has none | Studio review                      | High     |
-| M3     | Empty-state call to action on the Outfits library (the create button is above the empty state, not in it)                                                              | `SavedCreativeLibrary.tsx:394-398` | Low      |
-| M4     | Loading/error state for the Assets hub counts (they silently read 0 before the local repository hydrates)                                                              | `AssetsRouteSurface.tsx:139-143`   | Low      |
-| M5     | Breadcrumbs anywhere except Project detail, Project workspace and Campaign detail                                                                                      | Assets libraries, Studio           | Medium   |
-| ~~M6~~ | ~~Progress indication for the Project workflow phase~~ — **resolved with G7**                                                                                          | Project workspace masthead         | Medium   |
-| M7     | A "what is a Project / Campaign / Asset" explanation reachable after onboarding is dismissed                                                                           | Global                             | Medium   |
-| M8     | Confirmation before a project-source upload replaces a previously _failed_ staging attempt                                                                             | `ProjectRouteSurface.tsx:585-621`  | Low      |
-| M9     | Any surfacing of `entitlements` returned by `/api/auth/me`                                                                                                             | Account menu                       | Low      |
-| M10    | An error boundary message that distinguishes a chunk-load failure from an application crash                                                                            | `AppRouter.tsx`                    | Low      |
-| M11    | Retry affordance for the Assets hub when the creative repository fails to open                                                                                         | `useStudioCreativeRepository.ts`   | Low      |
-| M12    | Visible indication that `/assets/*` libraries are overlays over the hub (Escape closes to `/assets`, which is not signposted)                                          | `StudioLibraryOverlays.tsx`        | Low      |
+| #      | Missing                                                                                                                                                                           | Where                              | Severity |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
+| ~~M1~~ | ~~Success state after saving a video~~ — **resolved with G2**                                                                                                                     | Studio take review / action bar    | High     |
+| ~~M2~~ | ~~Download affordance anywhere except the Videos gallery and Project History~~ — **resolved with G2** for Studio review and by the Project workspace Save tab's post-save actions | Studio review, Project Save        | High     |
+| M3     | Empty-state call to action on the Outfits library (the create button is above the empty state, not in it)                                                                         | `SavedCreativeLibrary.tsx:394-398` | Low      |
+| M4     | Loading/error state for the Assets hub counts (they silently read 0 before the local repository hydrates)                                                                         | `AssetsRouteSurface.tsx:139-143`   | Low      |
+| M5     | Breadcrumbs anywhere except Project detail, Project workspace and Campaign detail                                                                                                 | Assets libraries, Studio           | Medium   |
+| ~~M6~~ | ~~Progress indication for the Project workflow phase~~ — **resolved with G7**                                                                                                     | Project workspace masthead         | Medium   |
+| M7     | A "what is a Project / Campaign / Asset" explanation reachable after onboarding is dismissed                                                                                      | Global                             | Medium   |
+| M8     | Confirmation before a project-source upload replaces a previously _failed_ staging attempt                                                                                        | `ProjectRouteSurface.tsx:585-621`  | Low      |
+| M9     | Any surfacing of `entitlements` returned by `/api/auth/me`                                                                                                                        | Account menu                       | Low      |
+| M10    | An error boundary message that distinguishes a chunk-load failure from an application crash                                                                                       | `AppRouter.tsx`                    | Low      |
+| M11    | Retry affordance for the Assets hub when the creative repository fails to open                                                                                                    | `useStudioCreativeRepository.ts`   | Low      |
+| M12    | Visible indication that `/assets/*` libraries are overlays over the hub (Escape closes to `/assets`, which is not signposted)                                                     | `StudioLibraryOverlays.tsx`        | Low      |
 
 ## 5. Unnecessary or redundant UI
 

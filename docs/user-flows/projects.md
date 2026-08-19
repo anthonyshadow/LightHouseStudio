@@ -231,7 +231,9 @@ the app:
 
 1. Renders only when a source exists (`:243`).
 2. Describes the current review media (original / working media / retained Version).
-3. **Save as New Video** opens a title dialog; **Add Version** opens a Saved Video picker then a
+3. **Save as New Video** opens a title dialog whose field is proposed as the Project title plus
+   the change being saved (`defaultProjectOutputTitle`), so successive saves from one Project do
+   not all reach the library under one name; **Add Version** opens a Saved Video picker then a
    confirm dialog showing the target's current Version ordinal.
 4. `begin()` flushes any pending session checkpoint, re-fetches the authoritative project, re-checks
    that ready media still matches, mints an operation id, **persists the pending operation to
@@ -240,6 +242,10 @@ the app:
    never produce a duplicate save (`:163-170`).
 6. Client failures (4xx/conflict) clear the pending record and refresh authoritative state;
    transport failures keep it and offer **Reconcile saved operation**.
+7. A settled save renders `SavedVideoSuccessActions` inside the same polite notice that names the
+   Saved Video and Version — **Download** (`downloadSavedVideoUrl` and the retained filename) and
+   **View in Assets** (`savedVideoLibraryPath`, the Videos library focused on that record). They
+   belong to the settled operation and clear when the next save starts.
 
 Both actions are disabled when archived, busy, `readyMedia === null`, or the project is
 `processing`.
@@ -248,7 +254,9 @@ Both actions are disabled when archived, busy, `readyMedia === null`, or the pro
 
 `ProjectHistorySection` lists retained revisions and outputs and exposes per-output **Download**
 links to `/api/projects/{id}/outputs/{versionId}/content?download=true`
-(`ProjectHistorySection.tsx:311, 449`). This is the only download affordance inside a Project.
+(`ProjectHistorySection.tsx:311, 449`). The Save tab's post-save actions are the other download
+affordance inside a Project, reached through the Saved Video content route rather than this
+Project-scoped one.
 
 ## Flow: Project-scoped provider processing
 

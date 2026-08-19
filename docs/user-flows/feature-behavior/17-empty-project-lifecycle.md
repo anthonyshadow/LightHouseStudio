@@ -139,7 +139,10 @@ provider work.
     distinct completed post-save revision with the exact retained output pointer. Reusing a Saved
     Video Version as source never preselects an Add Version target. A final CAS conflict clears the
     operation and refreshes current Project authority before asking the operator to review and save
-    again.
+    again. A settled save names the Saved Video and Version it produced and offers that exact
+    Version in place — **Download** and **View in Assets** — belonging to the one settled operation.
+    The new-Video title is proposed as the Project title plus the change the save is taken from, so
+    successive saves from one Project stay distinguishable; the operator edits it before committing.
 24. One pending owner/environment/Project-scoped operation survives browser response loss. Reload
     resubmits only the exact stored request and reconciles the original result; a changed replay
     conflicts without another Version or partial aggregate advancement. Removing the Saved Video
