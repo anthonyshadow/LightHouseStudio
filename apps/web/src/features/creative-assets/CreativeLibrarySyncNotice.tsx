@@ -3,7 +3,11 @@ import { useRef, type MouseEvent } from 'react';
 import { Button, ConfirmationRequestDialog, StatusNotice, useConfirmationRequest } from '../../ui';
 import type { CreativeLibraryCloudSync } from './useCreativeLibraryCloudSync';
 
-export type CreativeLibrarySyncNoticeProps = CreativeLibraryCloudSync;
+/** The recovery actions only. Where the library is stored is a different question, asked elsewhere. */
+export type CreativeLibrarySyncNoticeProps = Pick<
+  CreativeLibraryCloudSync,
+  'status' | 'retry' | 'keepLocal' | 'keepCloud'
+>;
 
 const KEEP_LOCAL = {
   title: 'Keep this browser’s creative library?',

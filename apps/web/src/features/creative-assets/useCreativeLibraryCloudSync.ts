@@ -48,12 +48,25 @@ const UNAVAILABLE_MESSAGE =
  */
 export type CreativeLibrarySyncResolution = 'keep-local' | 'keep-cloud';
 
+/**
+ * Where the library actually lives, for surfaces that have to say so without overclaiming.
+ *
+ * `status` cannot answer this: a server with no cloud route and a healthy mirror are both `idle`.
+ * `registerCreativeLibraryRoutes` registers nothing unless a relational database mode supplied a
+ * repository, and `GET /api/creative-library` then answers 404 — which is exactly the observation
+ * this records. It stays `checking` while unknown, including after a transport failure, because
+ * "the server could not be reached" is not evidence either way.
+ */
+export type CreativeLibraryMirror = 'checking' | 'browser-only' | 'cloud';
+
 export interface CreativeLibraryCloudSyncOptions {
   readonly initializeEmptyRemoteFromLocal?: boolean;
 }
 
 export interface CreativeLibraryCloudSync {
   readonly status: CreativeLibrarySyncStatus;
+  /** Whether a cloud copy exists in this configuration at all. */
+  readonly mirror: CreativeLibraryMirror;
   /** Re-runs the whole startup sequence, including the divergence check. */
   readonly retry: () => void;
   /** Overwrites the cloud copy with this browser's. */
@@ -67,6 +80,7 @@ export const useCreativeLibraryCloudSync = (
   { initializeEmptyRemoteFromLocal = false }: CreativeLibraryCloudSyncOptions = {},
 ): CreativeLibraryCloudSync => {
   const [status, setStatus] = useState<CreativeLibrarySyncStatus>(IDLE);
+  const [mirror, setMirror] = useState<CreativeLibraryMirror>('checking');
   /**
    * The re-arm signal. Sync used to fail closed for the lifetime of the repository: the effect ran
    * once, dropped its subscription, and only a new owner or a page reload could start it again —
@@ -135,7 +149,10 @@ export const useCreativeLibraryCloudSync = (
         await repository.ready();
         if (!active) return;
         const remote = await readCreativeLibrary(controller.signal);
-        if (!active || remote === null) return;
+        if (!active) return;
+        // A 404 is the only signal that this deployment has no cloud copy at all.
+        setMirror(remote === null ? 'browser-only' : 'cloud');
+        if (remote === null) return;
         revision = remote.revision;
         const localStore = repository.getSnapshot().store;
         const localCount = itemCount(localStore);
@@ -191,10 +208,11 @@ export const useCreativeLibraryCloudSync = (
   return useMemo(
     () => ({
       status,
+      mirror,
       retry: () => rearm(null),
       keepLocal: () => rearm('keep-local'),
       keepCloud: () => rearm('keep-cloud'),
     }),
-    [rearm, status],
+    [mirror, rearm, status],
   );
 };

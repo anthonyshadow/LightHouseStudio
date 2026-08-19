@@ -170,6 +170,71 @@ describe('useCreativeLibraryCloudSync', () => {
     rendered.unmount();
   });
 
+  it('keeps mirroring after the library is replaced from an exported file', async () => {
+    const repository = addPrompt('Local look');
+    const imported = createCreativeAssetRepository({ storage: null });
+    await imported.createSavedPrompt({
+      title: 'Imported look',
+      prompt: 'Imported look prompt',
+      modelModeId: 'lucy-vton-latest',
+    });
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'GET',
+        '/api/creative-library',
+        { body: { revision: 0, store: createEmptyCreativeAssetStore() } },
+        observe,
+      ),
+      jsonScenario(
+        'PUT',
+        '/api/creative-library',
+        [{ body: { revision: 1 } }, { body: { revision: 2 } }],
+        observe,
+      ),
+    );
+
+    const rendered = renderHook(() =>
+      useCreativeLibraryCloudSync(repository, { initializeEmptyRemoteFromLocal: true }),
+    );
+    await waitFor(() => expect(requests).toHaveLength(2));
+    expect(rendered.result.current.mirror).toBe('cloud');
+
+    // Exactly what an import does: the repository's whole-store replace, nothing sync-specific.
+    await repository.replaceFromRemote!(imported.getSnapshot().store);
+
+    await waitFor(() => expect(requests).toHaveLength(3));
+    expect(requests[2]!.method).toBe('PUT');
+    await expect(requests[2]!.json()).resolves.toMatchObject({
+      expectedRevision: 1,
+      store: { savedPrompts: [{ title: 'Imported look' }] },
+    });
+    expect(rendered.result.current.status).toEqual({ state: 'idle' });
+    rendered.unmount();
+  });
+
+  it('reports a browser-only library when the deployment registers no cloud route', async () => {
+    const repository = addPrompt('Local look');
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'GET',
+        '/api/creative-library',
+        { body: { error: { code: 'not_found', message: 'Unknown route.' } }, status: 404 },
+        observe,
+      ),
+    );
+
+    const rendered = renderHook(() => useCreativeLibraryCloudSync(repository));
+
+    // Idle means "nothing is wrong", not "there is a cloud copy" — only the mirror answers that.
+    await waitFor(() => expect(rendered.result.current.mirror).toBe('browser-only'));
+    expect(rendered.result.current.status).toEqual({ state: 'idle' });
+    expect(repository.getSnapshot().store.savedPrompts).toHaveLength(1);
+    expect(requests).toHaveLength(1);
+    rendered.unmount();
+  });
+
   it('recovers from an unavailable server when the operator retries', async () => {
     const repository = addPrompt('Browser look');
     const { requests, observe } = captureRequests();

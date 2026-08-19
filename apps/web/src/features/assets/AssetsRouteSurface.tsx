@@ -1,10 +1,14 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { type AssetDestination } from '../../app/paths';
+import { creativeLibraryStorageSummary } from '../creative-assets/creativeLibraryStorage';
+import type { CreativeLibraryMirror } from '../creative-assets/useCreativeLibraryCloudSync';
 import { Button } from '../../ui';
 
 type AssetsRouteSurfaceProps = Readonly<{
   characterCount: number;
   outfitCount: number;
+  /** Where the browser-held Character and Outfit libraries actually live in this configuration. */
+  creativeLibraryMirror: CreativeLibraryMirror;
   onOpen: (destination: AssetDestination) => void;
   onUploadVideo: () => void;
 }>;
@@ -75,6 +79,10 @@ const cardStyles = (theme: Theme): CSSObject => ({
     letterSpacing: '0.06em',
     textTransform: 'uppercase',
   },
+  '& [data-asset-storage]': {
+    marginBlockStart: theme.space.xs,
+    fontSize: theme.fontSizes.metadata,
+  },
   '& button': { justifySelf: 'start' },
 });
 
@@ -108,6 +116,7 @@ const assetCards: ReadonlyArray<{
 export const AssetsRouteSurface = ({
   characterCount,
   outfitCount,
+  creativeLibraryMirror,
   onOpen,
   onUploadVideo,
 }: AssetsRouteSurfaceProps) => {
@@ -117,6 +126,12 @@ export const AssetsRouteSurface = ({
     if (destination === 'outfits') return `${outfitCount} saved`;
     return null;
   };
+  // Only the two browser-held libraries. Videos and Voices are the server's and are not covered by
+  // this statement, so they must not carry it.
+  const storageFor = (destination: AssetDestination): string | null =>
+    destination === 'characters' || destination === 'outfits'
+      ? creativeLibraryStorageSummary(creativeLibraryMirror)
+      : null;
 
   return (
     <section css={surfaceStyles(theme)} aria-labelledby="assets-heading">
@@ -138,13 +153,17 @@ export const AssetsRouteSurface = ({
       <div css={gridStyles(theme)}>
         {assetCards.map((card) => {
           const count = countFor(card.destination);
+          const storage = storageFor(card.destination);
           return (
             <article key={card.destination} css={cardStyles(theme)}>
               <div>
                 {count ? <span data-asset-meta>{count}</span> : null}
                 <h2>{card.title}</h2>
               </div>
-              <p>{card.description}</p>
+              <div>
+                <p>{card.description}</p>
+                {storage ? <p data-asset-storage>{storage}</p> : null}
+              </div>
               <Button variant="secondary" onClick={() => onOpen(card.destination)}>
                 Open {card.title}
               </Button>

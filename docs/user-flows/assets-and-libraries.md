@@ -30,10 +30,17 @@ panel's "View in Assets" — closes back to that origin rather than to `/assets`
    which the Studio shell converts into an open video-upload overlay (`StudioApp.tsx`).
 3. Four cards: Videos · Characters · Outfits · Voices. Characters and Outfits show a live "N saved"
    count sourced from the local creative repository; Videos and Voices show no count.
-4. Each card has an **Open {name}** button.
+4. Characters and Outfits additionally state where that library is stored — "Stored in this browser
+   only — clearing site data deletes it." when no cloud route is registered, "Stored in this browser
+   and copied to your account." when one is. Videos and Voices carry no such line, because they are
+   the server's. The distinction comes from `CreativeLibraryCloudSync.mirror`, which records whether
+   `GET /api/creative-library` answered or 404'd; `status: 'idle'` cannot express it, because a
+   deployment with no cloud route and a healthy mirror are both idle.
+5. Each card has an **Open {name}** button.
 
 **Missing** — the hub has no loading or error state of its own, because the two counts come from
-in-memory local state and the other two are not fetched.
+in-memory local state and the other two are not fetched. Until the mirror check resolves the
+storage line says only "Stored in this browser.", which is true in every mode.
 
 ## Flow: Videos library (`/assets/videos`)
 
@@ -81,6 +88,11 @@ Rendered by `SavedCharacterLibrary` (`features/account-library/SavedCreativeLibr
 - Data source is the **local creative repository** (IndexedDB), not the API. Items are
   `store.savedCharacterPrompts`.
 - Overlay header carries a **Create new character** action.
+- Above the grid, `CreativeLibraryPortability` states where the library lives, that an export never
+  contains image bytes, and offers **Export library** / **Import library** — see
+  [Export and import](#export-and-import). It is mounted by `StudioLibraryOverlays`, not by
+  `SavedCharacterLibrary`, because that component also mounts as an in-session character picker
+  where managing the library is not the job.
 - Card: reference image (or an initial placeholder), name, prompt text, and actions
   **Use in Studio** · create-a-copy · **Wardrobe** · delete (confirmation dialog with a failure
   message).
@@ -95,6 +107,8 @@ Rendered by `SavedOutfitLibrary` (`SavedCreativeLibrary.tsx:352`).
 - Source is `store.savedPrompts` filtered to `modelModeId === 'lucy-vton-latest'`
   (`StudioLibraryOverlays.tsx`).
 - **Create new saved outfit** sits inside the body (not in the overlay header, unlike Characters).
+- The same `CreativeLibraryPortability` block sits above it. Both surfaces show it because both
+  export and import the one shared store, not just the records that surface lists.
 - Card: reference image if present, title, prompt (or "Reference-image outfit"), **Use in Studio**,
   **Delete** (confirmation dialog).
 - Empty state present, but with no create call-to-action inside it (the create button is above).
@@ -142,6 +156,12 @@ exists (relational database modes only — see `app.ts:432-436` and the route in
 | Revision conflict                                   | Pause sync (`reason: 'conflict'`), keep local     |
 | Transport failure                                   | Pause sync (`reason: 'unavailable'`), keep local  |
 
+`useCreativeLibraryCloudSync` also reports `mirror` — `'checking'`, `'browser-only'` or `'cloud'` —
+recorded from whether that first `GET` answered or 404'd. It exists because `status` cannot answer
+"is there a cloud copy at all": a deployment with no route and a healthy mirror are both `idle`. A
+transport failure leaves it `'checking'`, because being unable to reach the server is not evidence
+either way, and the surfaces that read it claim nothing in that state.
+
 **A pause is recoverable.** `useCreativeLibraryCloudSync` owns a structured
 `CreativeLibrarySyncStatus` — the repository owns _local_ storage and neither stores nor reads cloud
 status — and `CreativeLibrarySyncNotice` renders it once, in `ShellChrome`, on every
@@ -163,9 +183,60 @@ deep-equality comparison, the contract exposes only a full-store PUT with a nume
 per-record identity or timestamp is available — so a "merge" would be invented semantics rather
 than a reconciliation. Picking a side is the honest option.
 
+An **import** replaces the store through the same `replaceFromRemote` the `keep-cloud` resolution
+uses, so the mirror observes an ordinary local change and pushes it; it does not pause. See
+[Export and import](#export-and-import).
+
 The repository's separate `notice` field carries **local storage health** (recovered records,
 session-only fallback, IndexedDB CAS conflicts). It is still rendered nowhere; that is an open gap
 tracked in [`gaps-and-usability-audit.md`](gaps-and-usability-audit.md), not part of cloud sync.
+
+## Export and import
+
+Rendered by `features/creative-assets/CreativeLibraryPortability.tsx` on `/assets/characters` and
+`/assets/outfits`. It is browser-local: no endpoint was added, and the file never leaves the tab.
+
+**Export** downloads `creative-library-<YYYY-MM-DD>.json` immediately, with no dialog, because
+nothing is destroyed. The envelope is built by `createCreativeLibraryExportFile`
+(`packages/domain/src/assets/portability.ts`):
+
+| Field                    | Contents                                                                 |
+| ------------------------ | ------------------------------------------------------------------------ |
+| `kind`                   | `lightframe.creative-library`                                            |
+| `fileVersion`            | `1` — the envelope's version, independent of the store's `schemaVersion` |
+| `exportedAt`             | ISO timestamp                                                            |
+| `referenceImageAssetIds` | Every reference image the records point at, deduplicated and sorted      |
+| `store`                  | The sanitized `CreativeAssetStore` (schema v7)                           |
+
+**The file holds no image bytes.** `referenceImageAssetIds` is a manifest, so the file states what
+an import expects the account to already hold; the images themselves stay server-side reference
+assets.
+
+**Import** is destructive and goes through `ConfirmationDialog`, which names what the file holds and
+says plainly that anything not in the file is lost. Before that dialog opens, the file must pass
+every rule below; a refusal renders as a `StatusNotice role="alert"` and changes nothing:
+
+| Refusal                     | Cause                                                                    |
+| --------------------------- | ------------------------------------------------------------------------ |
+| `too-large`                 | Larger than 2 MiB — checked against the file, so it is never read        |
+| `unreadable`                | Not JSON                                                                 |
+| `not-a-library-file`        | Wrong `kind`, or a malformed `exportedAt`, manifest or `store`           |
+| `unsupported-file-version`  | Unknown `fileVersion`                                                    |
+| `unsupported-store-version` | The store is not schema v7 — refused, never migrated                     |
+| `lossy`                     | `sanitizeCreativeAssetStore` reports `recovered` or `droppedRecords > 0` |
+
+The last two are the point of the format: a backup that is silently rewritten on the way in is not a
+backup. The `lossy` rule is deliberately the same one `PUT /api/creative-library` applies.
+
+The 2 MiB bound matches that route's `bodyLimit`, so an accepted import can never produce a store
+the cloud mirror would then reject.
+
+A confirmed import replaces through `repository.replaceFromRemote` — the repository's existing
+whole-store swap, which re-sanitizes, refuses a non-canonical store, commits once and notifies
+subscribers. That last part is why the cloud mirror keeps pushing normally afterwards rather than
+pausing: the sync hook's subscription sees an ordinary local change.
+
+**Not offered:** merge semantics of any kind (import replaces), image bytes, and automatic backup.
 
 ## Reference images
 

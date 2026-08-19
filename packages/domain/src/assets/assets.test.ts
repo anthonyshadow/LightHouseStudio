@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createPromptBuilderDraft } from '../prompts';
 import {
   CREATIVE_ASSET_SCHEMA_VERSION,
+  CREATIVE_LIBRARY_EXPORT_FILE_VERSION,
+  CREATIVE_LIBRARY_EXPORT_MAX_BYTES,
   EARLIER_CREATIVE_ASSET_SCHEMA_VERSION,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
@@ -10,6 +12,7 @@ import {
   RECENT_PROMPT_LIMIT,
   SAVED_CHARACTER_VARIANT_LIMIT,
   SAVED_PROMPT_LIMIT,
+  createCreativeLibraryExportFile,
   createEmptyCreativeAssetStore,
   createSavedCharacterPrompt,
   createSavedCharacterVariant,
@@ -19,6 +22,7 @@ import {
   deleteSavedPrompt,
   enrichNewestMatchingRecentWithReferenceImage,
   parseCreativeAssetStore,
+  parseCreativeLibraryExportFile,
   recordSuccessfulPromptUse,
   resolveCharacterVersion,
   sanitizeCreativeAssetStore,
@@ -1294,5 +1298,135 @@ describe('creative asset sanitation and recovery', () => {
     expect(parseCreativeAssetStore('{not json').recovered).toBe(true);
     expect(parseCreativeAssetStore('{not json').store).toEqual(createEmptyCreativeAssetStore());
     expect(sanitizeCreativeAssetStore({ schemaVersion: 99 }).recovered).toBe(true);
+  });
+});
+
+describe('creative library portability', () => {
+  const populatedStore = () => {
+    let store = createSavedCharacterPrompt(
+      createEmptyCreativeAssetStore(),
+      {
+        name: 'Field host',
+        prompt: 'Replace the subject with a field host.',
+        source: 'generator',
+        promptIntent: 'character-transform',
+        referenceImageStatus: 'persisted-reference',
+        referenceImageAssetId: 'host-original',
+        uploadedReferenceImageAssetId: 'host-uploaded',
+      },
+      context('host'),
+    );
+    store = createSavedCharacterVariant(
+      store,
+      {
+        parentCharacterId: 'host',
+        title: 'Evening look',
+        referenceImageAssetId: 'host-evening',
+        creation: {
+          method: 'add-outfit',
+          sourceReferenceImageAssetId: 'host-original',
+          garmentReferenceImageAssetId: 'garment-one',
+        },
+      },
+      context('variant-one', 1),
+    );
+    store = createSavedPrompt(
+      store,
+      {
+        title: 'Evening coat',
+        prompt: 'A long evening coat',
+        modelModeId: 'lucy-vton-latest',
+        source: 'manual',
+        referenceImageAssetId: 'coat-reference',
+      },
+      context('outfit', 2),
+    );
+    return recordSuccessfulPromptUse(
+      store,
+      {
+        prompt: 'A long evening coat',
+        modelModeId: 'lucy-vton-latest',
+        savedPromptId: 'outfit',
+        referenceImageAssetId: 'coat-reference',
+        vtonInputKind: 'saved-outfit',
+      },
+      context('recent', 3),
+    );
+  };
+
+  it('writes every record and the reference images they depend on, and reads them back unchanged', () => {
+    const store = populatedStore();
+
+    const exported = createCreativeLibraryExportFile(store, timestamp(4));
+
+    expect(exported.fileVersion).toBe(CREATIVE_LIBRARY_EXPORT_FILE_VERSION);
+    expect(exported.store).toEqual(store);
+    expect(exported.store.savedCharacterPrompts).toHaveLength(1);
+    expect(exported.store.savedCharacterVariants).toHaveLength(1);
+    expect(exported.store.savedPrompts).toHaveLength(1);
+    expect(exported.store.recentPrompts).toHaveLength(1);
+    // The manifest names the images the records point at; no bytes and no URLs are included.
+    expect(exported.referenceImageAssetIds).toEqual([
+      'coat-reference',
+      'garment-one',
+      'host-evening',
+      'host-original',
+      'host-uploaded',
+    ]);
+    expect(JSON.stringify(exported)).not.toMatch(/(?:data:|blob:|https?:)/u);
+
+    const reread = parseCreativeLibraryExportFile(JSON.stringify(exported));
+
+    expect(reread.ok).toBe(true);
+    expect(reread.ok && reread.file.store).toEqual(store);
+  });
+
+  it('refuses anything it cannot import exactly, naming which rule refused it', () => {
+    const exported = createCreativeLibraryExportFile(populatedStore(), timestamp(4));
+    const refusal = (value: unknown) => {
+      const result = parseCreativeLibraryExportFile(JSON.stringify(value));
+      return result.ok ? null : result.refusal;
+    };
+
+    expect(refusal({ ...exported, fileVersion: CREATIVE_LIBRARY_EXPORT_FILE_VERSION + 1 })).toBe(
+      'unsupported-file-version',
+    );
+    expect(refusal({ ...exported, kind: 'something-else' })).toBe('not-a-library-file');
+    expect(refusal({ ...exported, exportedAt: 'not a date' })).toBe('not-a-library-file');
+    expect(refusal({ ...exported, referenceImageAssetIds: [7] })).toBe('not-a-library-file');
+    expect(refusal({ ...exported, store: 'nope' })).toBe('not-a-library-file');
+    expect(parseCreativeLibraryExportFile('{not json')).toEqual({
+      ok: false,
+      refusal: 'unreadable',
+    });
+    // An older library is refused rather than migrated: a backup must not be rewritten on the way in.
+    expect(
+      refusal({
+        ...exported,
+        store: { ...exported.store, schemaVersion: WARDROBE_CREATIVE_ASSET_SCHEMA_VERSION },
+      }),
+    ).toBe('unsupported-store-version');
+    // The server's rule exactly: a snapshot that has to be repaired is not the one exported.
+    expect(
+      refusal({
+        ...exported,
+        store: {
+          ...exported.store,
+          savedPrompts: [...exported.store.savedPrompts, { id: 'broken' }],
+        },
+      }),
+    ).toBe('lossy');
+  });
+
+  it('bounds the file at the size the cloud mirror would accept', () => {
+    expect(CREATIVE_LIBRARY_EXPORT_MAX_BYTES).toBe(2 * 1024 * 1024);
+  });
+
+  it('exports an empty library as an empty, importable file', () => {
+    const exported = createCreativeLibraryExportFile(createEmptyCreativeAssetStore(), timestamp(0));
+
+    expect(exported.referenceImageAssetIds).toEqual([]);
+    const reread = parseCreativeLibraryExportFile(JSON.stringify(exported));
+    expect(reread.ok && reread.file.store).toEqual(createEmptyCreativeAssetStore());
   });
 });
