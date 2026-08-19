@@ -37,7 +37,9 @@ const api = vi.hoisted(() => ({
     >(),
   saveVideo: vi.fn<(input: SaveVideoInput) => Promise<SavedVideoDetail>>(),
   saveVideoDirect: vi.fn<(input: SaveVideoInput) => Promise<SavedVideoDetail>>(),
-  createSavedVideoThumbnail: vi.fn<(video: Blob, signal: AbortSignal) => Promise<Blob>>(),
+  createSavedVideoThumbnail:
+    vi.fn<(video: Blob, signal: AbortSignal, frame?: 'auto' | 'first') => Promise<Blob>>(),
+  createSavedVideoThumbnailFromImage: vi.fn<(image: Blob, signal: AbortSignal) => Promise<Blob>>(),
 }));
 
 vi.mock('../../adapters/api-client/savedVideosApi', () => ({
@@ -49,6 +51,7 @@ vi.mock('../../adapters/api-client/savedVideosApi', () => ({
 }));
 vi.mock('./thumbnailClient', () => ({
   createSavedVideoThumbnail: api.createSavedVideoThumbnail,
+  createSavedVideoThumbnailFromImage: api.createSavedVideoThumbnailFromImage,
 }));
 
 import { useSaveVideo } from './useSaveVideo';
@@ -126,6 +129,9 @@ describe('useSaveVideo', () => {
     api.createSavedVideoThumbnail
       .mockReset()
       .mockResolvedValue(new Blob(['thumbnail'], { type: 'image/webp' }));
+    api.createSavedVideoThumbnailFromImage
+      .mockReset()
+      .mockResolvedValue(new Blob(['uploaded'], { type: 'image/webp' }));
   });
 
   afterEach(() => {
@@ -170,7 +176,7 @@ describe('useSaveVideo', () => {
 
   it('appends a version, tolerates thumbnail failure, reports save failure, and resets', async () => {
     const { result } = renderHook(() => useSaveVideo());
-    api.createSavedVideoThumbnail.mockRejectedValueOnce(new Error('no frame'));
+    api.createSavedVideoThumbnail.mockRejectedValue(new Error('no frame'));
     await act(async () => {
       await result.current.replace(artifact('edited'), {
         videoId,
@@ -178,6 +184,9 @@ describe('useSaveVideo', () => {
       });
     });
     expect(api.appendSavedVideoVersion).toHaveBeenCalledOnce();
+    // Both attempts failed, so no poster was uploaded — and the save still completed.
+    expect(api.createSavedVideoThumbnail).toHaveBeenCalledTimes(2);
+    expect(api.saveSavedVideoThumbnail).not.toHaveBeenCalled();
     expect(result.current.state.status).toBe('saved');
 
     api.saveVideo.mockRejectedValueOnce(new Error('disk unavailable'));
@@ -191,6 +200,41 @@ describe('useSaveVideo', () => {
 
     act(() => result.current.reset());
     expect(result.current.state).toEqual({ status: 'idle' });
+  });
+
+  it('retries a transient thumbnail failure once and uploads the retried poster', async () => {
+    const { result } = renderHook(() => useSaveVideo());
+    api.createSavedVideoThumbnail
+      .mockRejectedValueOnce(new Error('decoder busy'))
+      .mockResolvedValue(new Blob(['thumbnail'], { type: 'image/webp' }));
+
+    await act(async () => {
+      await result.current.save(artifact());
+    });
+
+    expect(api.createSavedVideoThumbnail).toHaveBeenCalledTimes(2);
+    expect(api.saveSavedVideoThumbnail).toHaveBeenCalledOnce();
+    expect(result.current.state.status).toBe('saved');
+  });
+
+  it('honours the requested poster source, using an uploaded image without decoding video', async () => {
+    const { result } = renderHook(() => useSaveVideo());
+    const image = new File(['poster'], 'poster.png', { type: 'image/png' });
+
+    await act(async () => {
+      await result.current.save(artifact(), undefined, undefined, null, { kind: 'first-frame' });
+    });
+    expect(api.createSavedVideoThumbnail.mock.calls[0]?.[2]).toBe('first');
+
+    await act(async () => {
+      await result.current.save(artifact(), undefined, undefined, null, {
+        kind: 'image',
+        file: image,
+      });
+    });
+    expect(api.createSavedVideoThumbnailFromImage).toHaveBeenCalledWith(image, expect.anything());
+    expect(api.createSavedVideoThumbnail).toHaveBeenCalledOnce();
+    expect(api.saveSavedVideoThumbnail).toHaveBeenCalledTimes(2);
   });
 
   it('selects direct multipart adapters only when the server capability enables them', async () => {

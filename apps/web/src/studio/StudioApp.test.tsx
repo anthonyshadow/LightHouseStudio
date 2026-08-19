@@ -1214,7 +1214,9 @@ describe('StudioApp composition lifecycle', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save to Assets' }));
 
     await waitFor(() =>
-      expect(harness.saveVideo).toHaveBeenCalledWith(presented, 'Studio intro', undefined, null),
+      expect(harness.saveVideo).toHaveBeenCalledWith(presented, 'Studio intro', undefined, null, {
+        kind: 'auto',
+      }),
     );
   });
 

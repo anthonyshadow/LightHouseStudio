@@ -58,6 +58,9 @@ Rendered by `apps/web/src/features/video-gallery/VideoGallery.tsx` — the riche
 2. Grid of cards: thumbnail (with a graceful placeholder when the thumbnail is absent or fails to
    load), duration badge, title, dimensions, created date, and chips for version count, origin,
    format, character name, character variant, non-ready status, and `Unassigned Content`.
+   A record with no thumbnail states `No preview yet` rather than posing as a broken image, and
+   carries an inline **Generate preview** action; one whose stored thumbnail fails to load states
+   `Preview didn't load`.
 3. Card actions:
    - **Preview** (the poster button) — opens a preview overlay with a version selector and a
      download link for the selected version
@@ -77,9 +80,15 @@ Rendered by `apps/web/src/features/video-gallery/VideoGallery.tsx` — the riche
    membership is a different action, available from the Project overview as **Import Saved Video**.
 6. **Download** is a plain anchor to `/api/videos/{id}/content?download=true`.
 7. **Rename** and **Remove** are dialog-confirmed mutations with in-place cache updates.
+8. **Generate preview** opens a repair dialog offering the same three poster sources as the save
+   dialog — an automatic early frame, the first frame, or an uploaded image. A frame source reads
+   the current Version through the shared 300 MB bounded reader; an uploaded image reads no video
+   bytes at all. Generation stays in the browser, the result is `PUT` to the existing thumbnail
+   endpoint, and success invalidates the saved-video lists so the poster appears without a reload.
+   Failure keeps the record unchanged and offers a retry.
 
-**States** — loading, error, empty, per-card busy, thumbnail fallback, and a preview error fallback
-are all present.
+**States** — loading, error, empty, per-card busy, no-preview, thumbnail fallback, preview
+generation in flight/failed, and a preview error fallback are all present.
 
 ## Flow: Characters library (`/assets/characters`)
 

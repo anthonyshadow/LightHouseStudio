@@ -9,15 +9,23 @@ import type * as SavedVideosApiModule from '../../adapters/api-client/savedVideo
 const api = vi.hoisted(() => ({
   deleteSavedVideo: vi.fn(),
   renameSavedVideo: vi.fn(),
+  createSavedVideoThumbnail: vi.fn(),
+  createSavedVideoThumbnailFromImage: vi.fn(),
 }));
 
 vi.mock('../../adapters/api-client/savedVideosApi', async (importOriginal) => ({
   ...(await importOriginal<typeof SavedVideosApiModule>()),
-  ...api,
+  deleteSavedVideo: api.deleteSavedVideo,
+  renameSavedVideo: api.renameSavedVideo,
+}));
+vi.mock('../saved-videos/thumbnailClient', () => ({
+  createSavedVideoThumbnail: api.createSavedVideoThumbnail,
+  createSavedVideoThumbnailFromImage: api.createSavedVideoThumbnailFromImage,
 }));
 
 import { StudioDesignProvider } from '../../ui';
 import { createRemoteStateQueryClient } from '../../application/remote-state/RemoteStateProvider';
+import { HttpResponse, http } from 'msw';
 import { captureRequests, galleryPaginationScenario, jsonScenario } from '../../test/msw/handlers';
 import { mockApiServer } from '../../test/msw/server';
 import { VideoGallery } from './VideoGallery';
@@ -91,6 +99,12 @@ describe('VideoGallery', () => {
   beforeEach(() => {
     api.deleteSavedVideo.mockReset().mockResolvedValue(undefined);
     api.renameSavedVideo.mockReset();
+    api.createSavedVideoThumbnail
+      .mockReset()
+      .mockResolvedValue(new Blob(['poster'], { type: 'image/webp' }));
+    api.createSavedVideoThumbnailFromImage
+      .mockReset()
+      .mockResolvedValue(new Blob(['poster'], { type: 'image/webp' }));
     vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
     vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);
   });
@@ -301,12 +315,123 @@ describe('VideoGallery', () => {
       .querySelector('img');
     expect(thumbnail).not.toBeNull();
     fireEvent.error(thumbnail!);
-    expect(screen.getByLabelText('Thumbnail could not load')).toBeInTheDocument();
+    expect(screen.getByLabelText('Preview could not load')).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('More actions for Morning take'));
     fireEvent.click(screen.getByRole('button', { name: 'Edit video' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('The video could not be loaded.');
     expect(onUse).toHaveBeenCalledWith(item, 'edit');
+  });
+
+  it('offers a deliberate no-preview state and generates a poster without a page reload', async () => {
+    const item = video({ thumbnailAvailable: false });
+    const pages: Record<string, unknown> = { '': page([item]) };
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(galleryPaginationScenario(pages, observe));
+    const uploads: Request[] = [];
+    mockApiServer.use(
+      http.get(`*/api/videos/${item.id}/versions/${item.currentVersion.id}/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+        }),
+      ),
+      http.put(
+        `*/api/videos/${item.id}/versions/${item.currentVersion.id}/thumbnail`,
+        ({ request }) => {
+          uploads.push(request.clone());
+          return HttpResponse.json(detail({ ...item, thumbnailAvailable: true }));
+        },
+      ),
+    );
+    renderGallery();
+    await screen.findByRole('heading', { name: 'Morning take' });
+
+    // No preview yet reads as a state, not as a broken image, and the listing stays one request.
+    expect(screen.getByText('No preview yet')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Preview Morning take' }).querySelector('img'),
+    ).toBeNull();
+    expect(requests).toHaveLength(1);
+
+    pages[''] = page([{ ...item, thumbnailAvailable: true }]);
+    fireEvent.click(screen.getByRole('button', { name: 'Generate preview' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Generate preview' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Generate preview' }));
+
+    await waitFor(() => expect(uploads).toHaveLength(1));
+    expect(uploads[0]!.headers.get('content-type')).toBe('image/webp');
+    expect(api.createSavedVideoThumbnail).toHaveBeenCalledOnce();
+    expect(await screen.findByText('Preview generated for “Morning take”.')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Preview Morning take' }).querySelector('img'),
+      ).toHaveAttribute('src', `/api/videos/${item.id}/thumbnail`),
+    );
+  });
+
+  it('uses an uploaded image as the poster without reading the video bytes', async () => {
+    const item = video({ thumbnailAvailable: false });
+    mockGalleryPages({ '': page([item]) });
+    const contentReads: Request[] = [];
+    const uploads: Request[] = [];
+    mockApiServer.use(
+      http.get(
+        `*/api/videos/${item.id}/versions/${item.currentVersion.id}/content`,
+        ({ request }) => {
+          contentReads.push(request);
+          return HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+            headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+          });
+        },
+      ),
+      http.put(
+        `*/api/videos/${item.id}/versions/${item.currentVersion.id}/thumbnail`,
+        ({ request }) => {
+          uploads.push(request);
+          return HttpResponse.json(detail({ ...item, thumbnailAvailable: true }));
+        },
+      ),
+    );
+    renderGallery();
+    await screen.findByRole('heading', { name: 'Morning take' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Generate preview' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Generate preview' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Upload image' }));
+    const image = new File(['poster'], 'poster.png', { type: 'image/png' });
+    fireEvent.change(within(dialog).getByLabelText('Preview image (optional)'), {
+      target: { files: [image] },
+    });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Use this image' }));
+
+    await waitFor(() => expect(uploads).toHaveLength(1));
+    expect(api.createSavedVideoThumbnailFromImage).toHaveBeenCalledWith(image, expect.anything());
+    expect(api.createSavedVideoThumbnail).not.toHaveBeenCalled();
+    expect(contentReads).toHaveLength(0);
+  });
+
+  it('keeps a failed repair actionable and leaves the record without a preview', async () => {
+    const item = video({ thumbnailAvailable: false });
+    mockGalleryPages({ '': page([item]) });
+    mockApiServer.use(
+      http.get(`*/api/videos/${item.id}/versions/${item.currentVersion.id}/content`, () =>
+        HttpResponse.json(
+          { error: { code: 'storage_failure', message: 'Video bytes unavailable.' } },
+          { status: 503 },
+        ),
+      ),
+    );
+    renderGallery();
+    await screen.findByRole('heading', { name: 'Morning take' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Generate preview' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Generate preview' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Generate preview' }));
+
+    const failure = await within(dialog).findByRole('alert');
+    expect(failure).toHaveTextContent('Video bytes unavailable.');
+    expect(within(failure).getByRole('button', { name: 'Retry' })).toBeEnabled();
+    expect(screen.getByText('No preview yet')).toBeInTheDocument();
   });
 
   it('renames and confirms deletion in focus-managed dialogs without loading media bytes', async () => {
