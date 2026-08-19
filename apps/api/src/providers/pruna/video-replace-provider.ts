@@ -20,6 +20,7 @@ import {
 } from '../video-jobs/video-job-provider.js';
 
 const PRUNA_API_ORIGIN = 'https://api.pruna.ai' as const;
+const DEFAULT_DISABLE_SAFETY_CHECKER = false;
 const PRUNA_FILES_PATH = '/v1/files' as const;
 const PRUNA_PREDICTIONS_PATH = '/v1/predictions' as const;
 const DEFAULT_REPLACEMENT_INSTRUCTION =
@@ -122,6 +123,7 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
   readonly #apiKey: string;
   readonly #fetch: ProviderFetch;
   readonly #timeouts: Readonly<{ uploadMs: number; statusMs: number; downloadMs: number }>;
+  readonly #disableSafetyChecker: boolean;
 
   constructor(
     apiKey: string,
@@ -131,10 +133,12 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
       statusMs: 30_000,
       downloadMs: 180_000,
     },
+    disableSafetyChecker: boolean = DEFAULT_DISABLE_SAFETY_CHECKER,
   ) {
     this.#apiKey = apiKey;
     this.#fetch = fetchImplementation;
     this.#timeouts = timeouts;
+    this.#disableSafetyChecker = disableSafetyChecker;
   }
 
   async #json(
@@ -236,8 +240,7 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
             target_fps: 'original',
             ignore_audio: false,
             instruction_prompt: DEFAULT_REPLACEMENT_INSTRUCTION,
-            //TODO Before making project public, change to false and make configured for local development by environment variable
-            disable_safety_checker: true,
+            disable_safety_checker: this.#disableSafetyChecker,
           },
         }),
       },
