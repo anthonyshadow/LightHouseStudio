@@ -6,6 +6,7 @@ import { Button } from '../../ui';
 type ProjectVideoPreviewPlayerProps = Readonly<{
   src: string;
   title: string;
+  poster?: string | undefined;
 }>;
 
 const playableDuration = (video: HTMLVideoElement): number =>
@@ -14,7 +15,11 @@ const playableDuration = (video: HTMLVideoElement): number =>
 const playableTime = (video: HTMLVideoElement, duration: number): number =>
   Math.min(duration, Math.max(0, Number.isFinite(video.currentTime) ? video.currentTime : 0));
 
-export const ProjectVideoPreviewPlayer = ({ src, title }: ProjectVideoPreviewPlayerProps) => {
+export const ProjectVideoPreviewPlayer = ({
+  src,
+  title,
+  poster,
+}: ProjectVideoPreviewPlayerProps) => {
   const theme = useTheme();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -71,6 +76,7 @@ export const ProjectVideoPreviewPlayer = ({ src, title }: ProjectVideoPreviewPla
         <video
           ref={videoRef}
           src={src}
+          poster={poster}
           playsInline
           preload="metadata"
           aria-label={`Preview of ${title}`}

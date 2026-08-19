@@ -98,7 +98,7 @@ export const AddVideoToProjectDialog = ({
       open
       onClose={onClose}
       title="Use as Project source"
-      description={`Make the current Version of “${video.title}” the immutable original of a Project that does not have one yet. This is not an attachment: it becomes the video the Project is built from. The Asset stays reusable everywhere.`}
+      description={`Make the current Version of “${video.title}” the source of a Project that does not have one yet. This is not an attachment: it becomes the video the Project is built from. The Asset stays reusable everywhere.`}
       placement="bottom"
       size="wide"
       bodyMode="scroll"

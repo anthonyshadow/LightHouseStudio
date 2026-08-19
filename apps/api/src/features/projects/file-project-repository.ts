@@ -64,6 +64,8 @@ import type {
   ProjectSummaryPageInput,
   ProjectSourceAcceptanceResult,
   ProjectSourceRecord,
+  ProjectSourceRemovalResult,
+  RemoveProjectSourcePersistenceInput,
   ProjectWorkingMediaAdoptionResult,
   ProjectWorkingMediaRead,
   ProjectWorkingMediaRecord,
@@ -1481,12 +1483,11 @@ export class FileProjectRepository
       if (aggregate.project.currentRevisionNumber !== input.expectedRevisionNumber) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'revision',
-            projectId: input.projectId,
-            expectedRevisionNumber: input.expectedRevisionNumber,
-            actualRevisionNumber: aggregate.project.currentRevisionNumber,
-          },
+          conflict: projectConflicts.revision(
+            input.projectId,
+            input.expectedRevisionNumber,
+            aggregate.project.currentRevisionNumber,
+          ),
         };
       }
       const nextAggregate = storedAggregateSchema.parse({
@@ -1552,9 +1553,16 @@ export class FileProjectRepository
       if (aggregate === undefined || aggregate.project.deletedAt !== null) {
         return { kind: 'not-found' };
       }
+      // Only the *current* revision decides this. Scanning all history would refuse a fresh source
+      // after a removal, which Postgres allows — the two adapters must answer identically.
+      const acceptedRevision = aggregate.revisions.find(
+        ({ id, revisionNumber }) =>
+          id === aggregate.project.currentRevisionId &&
+          revisionNumber === aggregate.project.currentRevisionNumber,
+      );
       if (
         aggregate.source !== null ||
-        aggregate.revisions.some(({ snapshot }) => snapshot.sourceAssetId !== null)
+        (acceptedRevision?.snapshot.sourceAssetId ?? null) !== null
       ) {
         return {
           kind: 'conflict',
@@ -1642,6 +1650,80 @@ export class FileProjectRepository
         current: { project: input.nextProject, revision: input.revision },
         source,
       };
+    });
+  }
+
+  /**
+   * Whether unresolved provider work is still bound to this Project.
+   *
+   * Shared by archive and source removal so the two refusals cannot drift, mirroring
+   * `DrizzleProjectRepository.#hasBlockingProcessingAttempt`.
+   */
+  #hasBlockingProcessingAttempt(library: ProjectLibrary, project: Project): boolean {
+    if (project.status === 'processing') return true;
+    const attempts = library.processingJobs.filter((attempt) => attempt.projectId === project.id);
+    return attempts.some((attempt) => projectProcessingAttemptBlocksArchive(attempt, attempts));
+  }
+
+  async removeSource(
+    input: RemoveProjectSourcePersistenceInput,
+  ): Promise<ProjectSourceRemovalResult> {
+    return this.#withOwnerLock(input.ownerUserId, async () => {
+      const library = await this.#read(input.ownerUserId);
+      const index = library.projects.findIndex(({ project }) => project.id === input.projectId);
+      const aggregate = library.projects[index];
+      if (aggregate === undefined || aggregate.project.deletedAt !== null) {
+        return { kind: 'not-found' };
+      }
+      if (aggregate.source === null) return { kind: 'not-found' };
+      if (aggregate.project.version !== input.expectedVersion) {
+        return {
+          kind: 'conflict',
+          conflict: projectVersionConflictDetail(
+            input.projectId,
+            input.expectedVersion,
+            aggregate.project.version,
+          ),
+        };
+      }
+      if (aggregate.project.currentRevisionNumber !== input.expectedRevisionNumber) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'revision',
+            projectId: input.projectId,
+            expectedRevisionNumber: input.expectedRevisionNumber,
+            actualRevisionNumber: aggregate.project.currentRevisionNumber,
+          },
+        };
+      }
+      if (this.#hasBlockingProcessingAttempt(library, aggregate.project)) {
+        return { kind: 'conflict', conflict: projectConflicts.activeJobs(input.projectId) };
+      }
+      if (aggregate.source.assetId !== input.removedAssetId) {
+        throw new Error('A Project source removal named a different source asset.');
+      }
+      // `source` drops; `assetLinks` do not. The historical role='source' link is what keeps the
+      // removed bytes retained for any output Version already produced from them.
+      const nextAggregate = storedAggregateSchema.parse({
+        ...aggregate,
+        project: input.nextProject,
+        revisions: [...aggregate.revisions, input.revision],
+        assetLinks: [...aggregate.assetLinks, ...input.assetLinks],
+        source: null,
+      });
+      const projects = [...library.projects];
+      projects[index] = nextAggregate;
+      await this.#write(library, {
+        ...library,
+        revision: library.revision + 1,
+        projects,
+        assetMemberships: mergeAssetMemberships(
+          library.assetMemberships,
+          membershipsForRevisionInput(input),
+        ),
+      });
+      return { kind: 'removed', current: { project: input.nextProject, revision: input.revision } };
     });
   }
 
@@ -1788,16 +1870,10 @@ export class FileProjectRepository
       ) {
         throw new Error('A Project metadata update changed immutable identity.');
       }
-      const projectAttempts = library.processingJobs.filter(
-        (attempt) => attempt.projectId === aggregate.project.id,
-      );
       if (
         aggregate.project.archivedAt === null &&
         nextProject.archivedAt !== null &&
-        (aggregate.project.status === 'processing' ||
-          projectAttempts.some((attempt) =>
-            projectProcessingAttemptBlocksArchive(attempt, projectAttempts),
-          ))
+        this.#hasBlockingProcessingAttempt(library, aggregate.project)
       ) {
         return {
           kind: 'conflict',

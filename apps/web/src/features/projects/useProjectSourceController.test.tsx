@@ -223,6 +223,171 @@ describe('useProjectSourceController', () => {
     expect(secondInput.blob).not.toBe(firstInput.blob);
   });
 
+  it('removes a source, clears the stage, and reopens the add-source controls', async () => {
+    const removed: ProjectCurrentResponse = {
+      project: {
+        ...currentProject(firstProjectId, false).project,
+        version: 3,
+        currentRevisionNumber: 3,
+        currentRevisionId: '5b42c7d8-9b65-4989-b351-293763b45e42',
+      },
+      revision: {
+        ...currentProject(firstProjectId, false).revision,
+        id: '5b42c7d8-9b65-4989-b351-293763b45e42',
+        revisionNumber: 3,
+      },
+    };
+    let removeBody: unknown = null;
+    mockApiServer.use(
+      http.get(`*/api/projects/${firstProjectId}/source`, () =>
+        HttpResponse.json(sourceResponse(firstProjectId)),
+      ),
+      http.get(`*/api/projects/${firstProjectId}/source/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+        }),
+      ),
+      http.post(`*/api/projects/${firstProjectId}/source/remove`, async ({ request }) => {
+        removeBody = await request.json();
+        return HttpResponse.json(removed);
+      }),
+    );
+    const mediaOwner = runtime();
+    const changes: ProjectCurrentResponse[] = [];
+    const hook = renderHook(
+      () => {
+        const [current, setCurrent] = useState(() => currentProject(firstProjectId, true));
+        return useProjectSourceController(
+          firstProjectId,
+          current,
+          mediaOwner,
+          undefined,
+          (next) => {
+            changes.push(next);
+            setCurrent(next);
+          },
+        );
+      },
+      { wrapper: RemoteStateTestProvider },
+    );
+    await waitFor(() => expect(hook.result.current.phase).toBe('saved'));
+    expect(hook.result.current.accepted).toBe(true);
+    const clearsBeforeRemoval = mediaOwner.clear.mock.calls.length;
+
+    await act(async () => {
+      await hook.result.current.remove();
+    });
+
+    expect(removeBody).toEqual({ expectedVersion: 2, expectedRevisionNumber: 2 });
+    await waitFor(() => expect(hook.result.current.phase).toBe('idle'));
+    expect(hook.result.current.source).toBeNull();
+    expect(hook.result.current.accepted).toBe(false);
+    expect(mediaOwner.clear.mock.calls.length).toBeGreaterThan(clearsBeforeRemoval);
+    expect(changes.at(-1)?.revision.snapshot.sourceAssetId).toBeNull();
+  });
+
+  it('treats a CAS conflict as success when the removal already landed', async () => {
+    const removed: ProjectCurrentResponse = {
+      project: {
+        ...currentProject(firstProjectId, false).project,
+        version: 3,
+        currentRevisionNumber: 3,
+      },
+      revision: currentProject(firstProjectId, false).revision,
+    };
+    mockApiServer.use(
+      http.get(`*/api/projects/${firstProjectId}/source`, () =>
+        HttpResponse.json(sourceResponse(firstProjectId)),
+      ),
+      http.get(`*/api/projects/${firstProjectId}/source/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+        }),
+      ),
+      http.post(`*/api/projects/${firstProjectId}/source/remove`, () =>
+        HttpResponse.json(
+          {
+            error: { code: 'conflict', message: 'The Project changed in another session.' },
+            conflict: {
+              kind: 'project-version',
+              projectId: firstProjectId,
+              expectedVersion: 2,
+              actualVersion: 3,
+            },
+          },
+          { status: 409 },
+        ),
+      ),
+      http.get(`*/api/projects/${firstProjectId}`, () => HttpResponse.json(removed)),
+    );
+    const mediaOwner = runtime();
+    const hook = renderHook(
+      () => {
+        const [current, setCurrent] = useState(() => currentProject(firstProjectId, true));
+        return useProjectSourceController(
+          firstProjectId,
+          current,
+          mediaOwner,
+          undefined,
+          setCurrent,
+        );
+      },
+      { wrapper: RemoteStateTestProvider },
+    );
+    await waitFor(() => expect(hook.result.current.phase).toBe('saved'));
+
+    await act(async () => {
+      await hook.result.current.remove();
+    });
+
+    // The conflict only means someone got there first — server authority decides, and it agrees.
+    await waitFor(() => expect(hook.result.current.phase).toBe('idle'));
+    expect(hook.result.current.accepted).toBe(false);
+  });
+
+  it('reports a conflict when the Project still has a source after a failed removal', async () => {
+    mockApiServer.use(
+      http.get(`*/api/projects/${firstProjectId}/source`, () =>
+        HttpResponse.json(sourceResponse(firstProjectId)),
+      ),
+      http.get(`*/api/projects/${firstProjectId}/source/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+        }),
+      ),
+      http.post(`*/api/projects/${firstProjectId}/source/remove`, () =>
+        HttpResponse.json(
+          {
+            error: { code: 'conflict', message: 'The Project has active work.' },
+            conflict: { kind: 'active-jobs', projectId: firstProjectId },
+          },
+          { status: 409 },
+        ),
+      ),
+      http.get(`*/api/projects/${firstProjectId}`, () =>
+        HttpResponse.json(currentProject(firstProjectId, true)),
+      ),
+    );
+    const mediaOwner = runtime();
+    const hook = renderHook(
+      () =>
+        useProjectSourceController(
+          firstProjectId,
+          currentProject(firstProjectId, true),
+          mediaOwner,
+        ),
+      { wrapper: RemoteStateTestProvider },
+    );
+    await waitFor(() => expect(hook.result.current.phase).toBe('saved'));
+
+    await act(async () => {
+      await hook.result.current.remove();
+    });
+
+    await waitFor(() => expect(hook.result.current.phase).toBe('conflict'));
+    expect(hook.result.current.accepted).toBe(true);
+  });
+
   it('hydrates the current adopted working reference while keeping source metadata immutable', async () => {
     const working = adoptedWorkingResponse(firstProjectId);
     const source = {

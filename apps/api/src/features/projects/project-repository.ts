@@ -196,6 +196,24 @@ export interface AcceptProjectSourcePersistenceInput extends AppendProjectRevisi
   readonly source: ProjectSourceRecord;
 }
 
+export interface RemoveProjectSourcePersistenceInput extends AppendProjectRevisionPersistenceInput {
+  /** The exact source asset the caller resolved; the transaction verifies it before deleting. */
+  readonly removedAssetId: string;
+}
+
+export type ProjectSourceRemovalResult =
+  | { readonly kind: 'removed'; readonly current: ProjectCurrentRead }
+  | { readonly kind: 'not-found' }
+  | {
+      readonly kind: 'conflict';
+      readonly conflict: Extract<
+        ProjectConflict,
+        | { readonly kind: 'project-version' }
+        | { readonly kind: 'revision' }
+        | { readonly kind: 'active-jobs' }
+      >;
+    };
+
 export interface ProjectRevisionHistoryPage {
   readonly revisions: readonly ProjectRevision[];
   readonly nextRevisionNumber: number | null;
@@ -386,6 +404,7 @@ export interface ProjectRepository {
     input: AppendProjectRevisionPersistenceInput,
   ): Promise<ProjectPersistenceMutationResult>;
   acceptSource(input: AcceptProjectSourcePersistenceInput): Promise<ProjectSourceAcceptanceResult>;
+  removeSource(input: RemoveProjectSourcePersistenceInput): Promise<ProjectSourceRemovalResult>;
   adoptWorkingMedia(
     input: AdoptProjectWorkingMediaPersistenceInput,
   ): Promise<ProjectWorkingMediaAdoptionResult>;

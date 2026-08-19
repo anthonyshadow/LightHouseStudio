@@ -1,7 +1,7 @@
 # Projects
 
 Projects are the resumable, server-authoritative half of the product. Everything else (Studio,
-Assets) is local-first with an explicit save. A Project wraps **one immutable original video** in a
+Assets) is local-first with an explicit save. A Project wraps **one source video** in a
 linear revision chain plus durable media pointers.
 
 ## Data model
@@ -26,11 +26,11 @@ Project (id, ownerUserId, campaignId?, title, status, version, currentRevisionId
 
 ### The three media pointers — this is the concept a new user must grasp
 
-| Pointer                      | Meaning                                                                                                                                           | Set by                                                                    |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| **Source** (`sourceAssetId`) | The one immutable original. Cannot be replaced once accepted (`acceptProjectSource` returns an `immutable-source` conflict, `rules.ts:1130-1135`) | Upload · finalized recording · reuse of a Saved Video Version             |
-| **Working media**            | The current derived result being worked on                                                                                                        | Local render adoption, provider job promotion, or reuse of retained media |
-| **Presented media**          | What the review surface shows                                                                                                                     | Kept equal to working media by every current command                      |
+| Pointer                      | Meaning                                                                                                                                                                                                                                  | Set by                                                                    |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| **Source** (`sourceAssetId`) | The one video the Project is built from. Immutable _while attached_ — `acceptProjectSource` returns an `immutable-source` conflict rather than overwriting it — but `removeProjectSource` can detach it so a different one can be chosen | Upload · finalized recording · reuse of a Saved Video Version             |
+| **Working media**            | The current derived result being worked on                                                                                                                                                                                               | Local render adoption, provider job promotion, or reuse of retained media |
+| **Presented media**          | What the review surface shows                                                                                                                                                                                                            | Kept equal to working media by every current command                      |
 
 An output can only be saved when `sourceAssetId !== null` **and** `workingMedia` deep-equals
 `presentedMedia` (`rules.ts:939-950`, mirrored client-side in
@@ -68,8 +68,9 @@ response can be safely replayed. Conflicts return `409` with a typed `ProjectCon
 | POST     | `/api/projects/:id/revisions`                                                        | Semantic checkpoint (creative setup autosave)                                |
 | GET/POST | `/api/projects/:id/assets`                                                           | List / attach asset memberships                                              |
 | DELETE   | `/api/projects/:id/assets/:membershipId`                                             | Detach                                                                       |
-| POST     | `/api/projects/:id/source`                                                           | Upload the immutable original (spooled, ≤300 MB, MP4/MOV/WebM)               |
+| POST     | `/api/projects/:id/source`                                                           | Upload the source (spooled, ≤300 MB, MP4/MOV/WebM)                           |
 | POST     | `/api/projects/:id/source/reuse`                                                     | Adopt an exact Saved Video Version as the source                             |
+| POST     | `/api/projects/:id/source/remove`                                                    | Detach the current source (CAS body, no Idempotency-Key)                     |
 | GET      | `/api/projects/:id/source` · `/source/content`                                       | Metadata / bytes (range-capable)                                             |
 | POST     | `/api/projects/:id/working-media`                                                    | Upload a locally rendered edit                                               |
 | POST     | `/api/projects/:id/working-media/reuse`                                              | Adopt retained media                                                         |
@@ -187,18 +188,22 @@ deep link to a task returns to that task after re-authenticating.
 
 ### Task 1 — Source
 
-Three ways to give the Project its immutable original (`ProjectSourceSection`, `:515-646`):
+Three ways to give the Project its source, plus one way to take it back (`ProjectSourceSection`,
+inside `ProjectRouteSurface.tsx`):
 
 | Action              | Behaviour                                                                                                                                                                                                                                                                                            |
 | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Record**          | Calls `startProjectRecording` (`StudioApp.tsx`): discards local work, navigates to the workspace path, focuses the stage, and starts local capture. Stopping produces a finalized artifact; the button then becomes **Use finalized recording**, which posts the file to `/api/projects/{id}/source` |
 | **Upload**          | Hidden `<input type="file" accept="video/mp4,video/quicktime,video/webm">`; the file is validated and posted to `/api/projects/{id}/source` with `x-lightframe-project-source` metadata and an Idempotency-Key                                                                                       |
-| **Use Saved Video** | `ProjectSavedVideoPicker` → `POST /api/projects/{id}/source/reuse` with the exact `savedVideoId` + `videoVersionId`                                                                                                                                                                                  |
+| **Use Saved Video** | `ProjectSavedVideoPicker` → `POST /api/projects/{id}/source/reuse` with the exact `savedVideoId` + `videoVersionId`. Each row shows a poster thumbnail and duration, and **Preview** plays the exact Version inline before it is committed                                                           |
+| **Remove source**   | Shown only once a source exists. A `ConfirmationDialog` explains that the video itself is not deleted, then `POST /api/projects/{id}/source/remove` with both CAS tokens. The Project returns to `draft` on the Source step with its creative setup intact                                           |
 
 Phases render as notices: `hydrating` → "Preparing source", `preparing` → "Uploading and checking
-your video…", `saving` → "Saving the source video and this change to your Project", `conflict` →
-warning, `error` → danger. Once accepted, all three controls are disabled and the panel explains the
-source cannot be swapped out.
+your video…", `saving` → "Saving the source video and this change to your Project", `removing` →
+"Removing source", `conflict` →
+warning, `error` → danger. Once accepted, the three add-controls are disabled and **Remove source**
+appears beside them. Removal is refused — with the reason stated in the dialog — while a provider
+attempt is unresolved, while working media is being adopted, and while a recording is in flight.
 
 On reload, an accepted source is re-hydrated: `GET /api/projects/{id}/source`, then the bytes are
 fetched with a 300 MB bound and pushed onto the stage as a recording artifact
@@ -274,20 +279,20 @@ Project provider **voice** and **live** starts are deliberately unavailable
 
 | Path                                              | Where                             | Result                                                                                              |
 | ------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Workspace ▸ Source ▸ Upload                       | `/projects/{id}/workspace`        | Immutable source                                                                                    |
-| Workspace ▸ Source ▸ Record                       | `/projects/{id}/workspace`        | Immutable source from a finalized take                                                              |
-| Workspace ▸ Source ▸ Use Saved Video              | `/projects/{id}/workspace`        | Immutable source referencing an exact Version                                                       |
-| Overview ▸ Source ▸ Record/Upload/Use Saved Video | `/projects/{id}` (empty Project)  | Immutable source; then lands in the workspace                                                       |
+| Workspace ▸ Source ▸ Upload                       | `/projects/{id}/workspace`        | Source                                                                                              |
+| Workspace ▸ Source ▸ Record                       | `/projects/{id}/workspace`        | Source from a finalized take                                                                        |
+| Workspace ▸ Source ▸ Use Saved Video              | `/projects/{id}/workspace`        | Source referencing an exact Version                                                                 |
+| Overview ▸ Source ▸ Record/Upload/Use Saved Video | `/projects/{id}` (empty Project)  | Source; then lands in the workspace                                                                 |
 | Overview ▸ Assets ▸ Import Saved Video            | `/projects/{id}`                  | Asset **membership** only — not the source                                                          |
 | Overview ▸ Assets ▸ add video ▸ new/record/upload | → `/studio/create?projectId={id}` | Saves to Assets, then auto-attaches and redirects back to `/projects/{id}` (`StudioApp.tsx`)        |
 | Overview ▸ Assets ▸ attached Video ▸ adopt        | `/projects/{id}`                  | **Use as Project source** on an empty Project (confirmed), **Use as working media** once it has one |
-| Videos library ▸ ⋯ ▸ Use as Project source        | `/assets/videos`                  | Immutable source of an empty Project — **not** a membership                                         |
+| Videos library ▸ ⋯ ▸ Use as Project source        | `/assets/videos`                  | Source of an empty Project — **not** a membership                                                   |
 | Quick Create ▸ Video (with a project in context)  | anywhere on a project route       | Same as the Studio path above                                                                       |
 
-The distinction between _source_ and _attached asset_ is load-bearing, so the UI now names it:
-every action that sets the immutable original says "source", the attached-assets section states
-that memberships never change the source, and adopting an attached Video as a source is confirmed
-because `acceptProjectSource` is one-shot.
+The distinction between _source_ and _attached asset_ is load-bearing, so the UI names it: every
+action that sets the source says "source", the attached-assets section states that memberships
+never change the source, and adopting an attached Video as a source is confirmed because it changes
+what the whole Project is built from.
 
 ## State and persistence map
 

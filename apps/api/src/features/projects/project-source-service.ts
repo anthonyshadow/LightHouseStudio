@@ -7,6 +7,7 @@ import {
 import {
   acceptProjectSource,
   ProjectRuleError,
+  removeProjectSource,
   type ProjectConflict,
   type ProjectMediaReference,
   type ProjectSourceKind,
@@ -26,7 +27,7 @@ import {
 } from './project-repository.js';
 import { projectRequestFingerprint } from './project-request-fingerprint.js';
 import { projectAssetLinksForRevision } from './project-snapshot-relations.js';
-import { publicProjectCurrent } from './project-service.js';
+import { publicProjectCurrent, type ProjectServiceMutationResult } from './project-service.js';
 import {
   inspectStoredProjectMedia,
   storedVideoVersionMatchesInspection,
@@ -46,6 +47,13 @@ interface UploadSourceInput {
   readonly sourcePath: string;
   readonly checksumSha256: string;
   readonly filename: string;
+}
+
+interface RemoveSourceInput {
+  readonly ownerUserId: string;
+  readonly projectId: string;
+  readonly expectedVersion: number;
+  readonly expectedRevisionNumber: number;
 }
 
 interface ReuseSourceInput {
@@ -361,6 +369,65 @@ export class ProjectSourceService {
       response: sourceResponse(persisted.current, persisted.source),
       replayed: persisted.kind === 'replayed',
     };
+  }
+
+  /**
+   * Detaches the current source so a different original can be chosen.
+   *
+   * Deliberately does **not** consult `#deleteIfUnretained`: the historical `role='source'` asset
+   * link survives the removal, so Project retention still protects the bytes for any output Version
+   * already produced from them. Deleting them here would strand those Versions.
+   */
+  async remove(input: RemoveSourceInput): Promise<ProjectServiceMutationResult> {
+    const projectRead = await this.projects.getCurrentWithSource(
+      input.ownerUserId,
+      input.projectId,
+    );
+    if (projectRead === null) throw new AppError(404, 'not_found', 'That Project is unavailable.');
+    const { current, source } = projectRead;
+    // Removing a source that is already gone is the requested end state, so it succeeds with
+    // current authority instead of conflicting. That is what makes an operation key unnecessary:
+    // a replay after a lost response converges rather than reporting a confusing version conflict.
+    if (source === null && current.revision.snapshot.sourceAssetId === null) {
+      return { ok: true, current: publicProjectCurrent(current) };
+    }
+    if (source === null || current.revision.snapshot.sourceAssetId !== source.assetId) {
+      throw new AppError(404, 'not_found', 'This Project does not have an accepted source.');
+    }
+    let removed;
+    try {
+      removed = removeProjectSource(
+        projectAggregateForCurrent(current),
+        {
+          expectedProjectVersion: input.expectedVersion,
+          expectedRevisionNumber: input.expectedRevisionNumber,
+          author: { kind: 'user', authorId: input.ownerUserId },
+        },
+        { now: this.#now().toISOString(), createId: this.#createId },
+      );
+    } catch (error) {
+      if (error instanceof ProjectRuleError) {
+        throw new AppError(409, 'conflict', error.message);
+      }
+      throw error;
+    }
+    if (!removed.ok) return { ok: false, conflict: removed.conflict };
+    const revision = removed.value.revisions.at(-1)!;
+    const persisted = await this.projects.removeSource({
+      ownerUserId: input.ownerUserId,
+      projectId: input.projectId,
+      expectedVersion: input.expectedVersion,
+      expectedRevisionNumber: input.expectedRevisionNumber,
+      nextProject: removed.value.project,
+      revision,
+      assetLinks: projectAssetLinksForRevision(revision),
+      removedAssetId: source.assetId,
+    });
+    if (persisted.kind === 'not-found') {
+      throw new AppError(404, 'not_found', 'That Project is unavailable.');
+    }
+    if (persisted.kind === 'conflict') return { ok: false, conflict: persisted.conflict };
+    return { ok: true, current: publicProjectCurrent(persisted.current) };
   }
 
   async get(ownerUserId: string, projectId: string): Promise<ProjectSourceResponse> {

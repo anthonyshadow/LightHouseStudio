@@ -56,15 +56,19 @@ describe('ProjectSourceService local authority', () => {
     return created.current;
   };
 
-  const sourceService = () =>
+  // `createId` is the only axis that varies: tests appending more than one revision need distinct
+  // ids, the rest pin the revision id so they can assert on it.
+  const sourceService = (createId: () => string = () => sourceRevisionId) =>
     new ProjectSourceService(projects, savedVideos, bytes, {
       now: () => new Date(acceptedAt),
-      createId: () => sourceRevisionId,
+      createId,
       inspect: () => Promise.resolve(inspected),
       projectRetention: projects,
     });
 
-  it('durably accepts, hydrates, replays, and keeps the first uploaded original immutable', async () => {
+  const uniqueRevisionSourceService = () => sourceService(randomUUID);
+
+  it('durably accepts, hydrates, replays, and refuses to overwrite an attached source', async () => {
     const current = await createProject();
     const operationKey = randomUUID();
     const input = {
@@ -122,6 +126,121 @@ describe('ProjectSourceService local authority', () => {
       conflict: { kind: 'immutable-source' },
     });
     expect(await bytes.exists(ownerUserId, losingOperationKey)).toBe(false);
+  });
+
+  it('removes an accepted source, retains its bytes, and accepts a different original after', async () => {
+    const current = await createProject('Wrong source');
+    const operationKey = randomUUID();
+    const input = {
+      ownerUserId,
+      projectId: current.project.id,
+      operationKey,
+      expectedVersion: 1,
+      expectedRevisionNumber: 1,
+      kind: 'uploaded' as const,
+      sourcePath,
+      checksumSha256,
+      filename: 'wrong.mp4',
+    };
+    const accepted = await uniqueRevisionSourceService().upload(input);
+    if (!accepted.ok) throw new Error('Expected Project source acceptance.');
+
+    const removed = await uniqueRevisionSourceService().remove({
+      ownerUserId,
+      projectId: current.project.id,
+      expectedVersion: 2,
+      expectedRevisionNumber: 2,
+    });
+
+    expect(removed).toMatchObject({
+      ok: true,
+      current: {
+        project: { status: 'draft', version: 3 },
+        revision: {
+          revisionNumber: 3,
+          snapshot: {
+            sourceAssetId: null,
+            workingMedia: null,
+            presentedMedia: null,
+            workflowPhase: 'source',
+          },
+        },
+      },
+    });
+    await expect(
+      uniqueRevisionSourceService().get(ownerUserId, current.project.id),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    // The removed original stays retained: an output Version could already reference those bytes.
+    expect(await projects.retainsAsset(ownerUserId, operationKey)).toBe(true);
+    expect(await bytes.exists(ownerUserId, operationKey)).toBe(true);
+
+    const replacementKey = randomUUID();
+    const reaccepted = await uniqueRevisionSourceService().upload({
+      ...input,
+      operationKey: replacementKey,
+      expectedVersion: 3,
+      expectedRevisionNumber: 3,
+      filename: 'right.mp4',
+    });
+    expect(reaccepted).toMatchObject({
+      ok: true,
+      response: {
+        project: { status: 'ready', version: 4 },
+        source: { filename: 'right.mp4' },
+        revision: { snapshot: { sourceAssetId: replacementKey } },
+      },
+    });
+  });
+
+  it('converges when there is no source, and refuses a stale or foreign removal', async () => {
+    const current = await createProject('Nothing to remove');
+    // Already in the requested end state: converge on current authority instead of conflicting.
+    await expect(
+      sourceService().remove({
+        ownerUserId,
+        projectId: current.project.id,
+        expectedVersion: 1,
+        expectedRevisionNumber: 1,
+      }),
+    ).resolves.toMatchObject({
+      ok: true,
+      current: { project: { version: 1 }, revision: { snapshot: { sourceAssetId: null } } },
+    });
+
+    const accepted = await sourceService().upload({
+      ownerUserId,
+      projectId: current.project.id,
+      operationKey: randomUUID(),
+      expectedVersion: 1,
+      expectedRevisionNumber: 1,
+      kind: 'uploaded' as const,
+      sourcePath,
+      checksumSha256,
+      filename: 'stale.mp4',
+    });
+    if (!accepted.ok) throw new Error('Expected Project source acceptance.');
+
+    await expect(
+      sourceService().remove({
+        ownerUserId,
+        projectId: current.project.id,
+        expectedVersion: 1,
+        expectedRevisionNumber: 1,
+      }),
+    ).resolves.toMatchObject({
+      ok: false,
+      conflict: { kind: 'project-version', expectedVersion: 1, actualVersion: 2 },
+    });
+    await expect(
+      sourceService().remove({
+        ownerUserId: otherOwnerUserId,
+        projectId: current.project.id,
+        expectedVersion: 2,
+        expectedRevisionNumber: 2,
+      }),
+    ).rejects.toMatchObject({ statusCode: 404 });
   });
 
   it('recovers a prepared source journal and reconciles the original operation after restart', async () => {

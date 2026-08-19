@@ -38,7 +38,9 @@ provider work.
    server authority. The overview truthfully explains that an intentionally empty collection is
    valid, names the workflow as Source → Create → Save → History with the current step marked, and
    presents the Source task itself: **No source yet** offers **Record**, **Upload**, and **Use Saved
-   Video** without a wizard. The primary action reads **Add source** until a source exists and
+   Video** without a wizard. The Saved Video chooser shows a poster thumbnail and duration per row
+   and can play the exact Version inline before it is committed, so the wrong video is caught before
+   it is chosen rather than after. The primary action reads **Add source** until a source exists and
    **Continue editing** afterwards. Accepting a source from the overview continues into the
    workspace, and **Record** starts capture only after navigating there. A source-bearing Project
    does not mount the Source task on the overview, so opening it never re-reads source bytes. Upload previews immediately on the stage;
@@ -59,9 +61,18 @@ provider work.
    **Conflict**, and safe failure. A Project becomes resumable only after durable byte storage or
    exact Version verification, server inspection, checksum/owner validation, and atomic source
    revision acceptance. A failed/unaccepted staging attempt can be replaced.
-10. The first accepted source is the immutable original. A different accepted original requires a
-    new Project. Exact Saved Video Version reuse references existing bytes and used-by lineage; it
-    does not claim that the Project produced that Version or infer a later Add Version target.
+10. A Project's source is immutable _while it is attached_: a second acceptance conflicts rather
+    than overwriting it. **Remove source** detaches it explicitly, returning the Project to the
+    Source step as a `draft` with its creative setup — Character, Outfit, Voice, prompt, treatment,
+    local edit — intact, and clearing only the derived working and presented media. Removal is
+    refused while a provider attempt is unresolved and on an archived or deleted Project, and the
+    reason is stated rather than left to guesswork. It never deletes the video, an earlier revision,
+    a saved output Version, or retained bytes: historical source lineage keeps protecting them.
+    It creates no provider work and carries no operation key — removing an already-removed source
+    converges on current authority, so a lost response is safe to replay, while a stale attempt
+    against a source that has since been replaced conflicts instead. Exact Saved Video Version
+    reuse references existing bytes and used-by lineage; it does not claim that the Project produced
+    that Version or infer a later Add Version target.
 11. Accepted source metadata exposes only normalized media facts and a controlled Project content
     URL. Owner-checked range/HEAD content rehydrates a fresh Blob through the existing recording
     artifact owner after navigation, browser refresh/restart, or app restart. Blob/data URLs,
@@ -149,8 +160,8 @@ provider work.
     create a source, working media, output, or retention claim. Archived Projects show the
     collection read-only. Missing underlying records remain visible as unavailable until explicitly
     detached. Adopting an attached Video is named for its consequence: **Use as Project source** on
-    a Project without one, confirmed because the original cannot be replaced afterwards, and **Use
-    as working media** once a source exists. Either adopts the exact current Version before
+    a Project without one, confirmed because it changes what the whole Project is built from, and
+    **Use as working media** once a source exists. Either adopts the exact current Version before
     navigating to `/projects/:projectId/workspace`, and the working-media path never changes the
     immutable source.
 28. **Add Asset** can attach existing records or launch Project-aware creation. Record/Upload uses

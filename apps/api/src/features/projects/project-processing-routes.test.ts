@@ -449,6 +449,16 @@ describe('Project processing route authority', () => {
     });
     expect(archive.statusCode).toBe(409);
     expect(archive.json()).toMatchObject({ conflict: { kind: 'active-jobs' } });
+    // Unresolved provider work blocks moving the source out from under it, the same way it
+    // blocks archive.
+    const removeSource = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/source/remove`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { expectedVersion: 5, expectedRevisionNumber: 4 },
+    });
+    expect(removeSource.statusCode).toBe(409);
+    expect(removeSource.json()).toMatchObject({ conflict: { kind: 'active-jobs' } });
 
     provider.nextStatus = 'completed';
     let retained: ProjectProcessingMutationResponse | null = null;

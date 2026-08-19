@@ -342,6 +342,25 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   expect(await stageVideo.getAttribute('src')).not.toBe(firstObjectUrl);
   await expect(page.getByRole('button', { name: 'Upload' })).toBeDisabled();
   expect(projects.sourceOperationKeys).toHaveLength(1);
+
+  // The wrong source is recoverable without deleting the Project: remove it and choose again.
+  await page.getByRole('button', { name: 'Remove source' }).click();
+  const removeDialog = page.getByRole('dialog', { name: 'Remove source' });
+  await expect(removeDialog).toBeVisible();
+  await removeDialog.getByRole('button', { name: 'Remove source' }).click();
+
+  await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Upload' })).toBeEnabled();
+  await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
+    name: 'replacement-source.mp4',
+    mimeType: 'video/mp4',
+    buffer: fixture,
+  });
+  await expect(page.getByRole('heading', { name: 'Source video' })).toBeVisible();
+  await expect(page.getByText('replacement-source.mp4')).toBeVisible();
+  expect(projects.sourceOperationKeys).toHaveLength(2);
+  expect(projects.sourceOperationKeys[1]).not.toBe(projects.sourceOperationKeys[0]);
+
   await expect
     .poll(async () => readBrowserState(page))
     .toMatchObject({ requirementModels: [], connections: [] });

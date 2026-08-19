@@ -61,3 +61,33 @@ export const projectProcessingTone = (
   if (attempt.phase === 'cancelled') return 'neutral';
   return 'neutral';
 };
+
+const BLOCKED_REASON_COPY = {
+  archive: {
+    ambiguous:
+      'Archive is blocked because submission acceptance is unresolved. Another attempt may duplicate provider cost; use the explicit retry decision first.',
+    accepted:
+      'Archive is blocked while accepted provider work is active. Leaving or switching does not stop provider work or cost; reopen this Project to reconnect.',
+  },
+  'source-removal': {
+    ambiguous:
+      'Removing the source is blocked because submission acceptance is unresolved. Resolve the attempt first.',
+    accepted:
+      'Removing the source is blocked while accepted provider work is active. Cancel it or let it finish first.',
+  },
+} as const satisfies Record<string, { readonly ambiguous: string; readonly accepted: string }>;
+
+/**
+ * Operator copy for an action refused because provider work is still unresolved.
+ *
+ * Single owner for the `blocksArchive` + `ambiguous` read: every action that has to move a Project
+ * out from under an attempt asks the same question, so only the wording varies.
+ */
+export const projectProcessingBlockedReason = (
+  attempt: ProjectProcessingAttempt | null | undefined,
+  action: keyof typeof BLOCKED_REASON_COPY,
+): string | undefined => {
+  if (attempt?.blocksArchive !== true) return undefined;
+  const copy = BLOCKED_REASON_COPY[action];
+  return attempt.ambiguous ? copy.ambiguous : copy.accepted;
+};

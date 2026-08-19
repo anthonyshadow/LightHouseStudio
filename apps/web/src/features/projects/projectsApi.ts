@@ -365,6 +365,34 @@ export const reuseSavedVideoAsProjectSource = (input: {
     parseProjectConflict,
   );
 
+/**
+ * Detaches the current source. Carries no `Idempotency-Key`: no bytes and no provider work are
+ * created, and the server converges when the source is already gone, so a lost response is safe
+ * to replay.
+ */
+export const removeProjectSource = (input: {
+  readonly projectId: string;
+  readonly expectedVersion: number;
+  readonly expectedRevisionNumber: number;
+  readonly signal?: AbortSignal;
+}): Promise<ProjectCurrentResponse> =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(input.projectId)}/source/remove`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      headers: jsonHeaders,
+      body: JSON.stringify({
+        expectedVersion: input.expectedVersion,
+        expectedRevisionNumber: input.expectedRevisionNumber,
+      }),
+      ...(input.signal ? { signal: input.signal } : {}),
+    },
+    projectCurrentResponseSchema,
+    invalidProjectResponse,
+    parseProjectConflict,
+  );
+
 export const getProjectWorkingMedia = (
   projectId: string,
   signal?: AbortSignal,

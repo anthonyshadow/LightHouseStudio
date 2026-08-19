@@ -21,8 +21,8 @@ records; it does not provide signup, billing, collaboration, or public multi-use
 durable, video-oriented Project authority and lightweight optional Campaigns now support bounded
 lists, named/quick Project creation, open, edit/rename, move/detach, archive, restore, and guarded
 Campaign deletion in every persistence mode. An open Project can now durably accept one inspected
-upload, finalized local recording, or exact active Saved Video Version as its immutable original
-and restore it from the same URL. Project creative configuration is now available through explicit
+upload, finalized local recording, or exact active Saved Video Version as its source, remove that
+source to choose a different one, and restore it from the same URL. Project creative configuration is now available through explicit
 semantic checkpoints: reusable Character/Variant, Outfit, Voice, prompt,
 treatment, capture metadata, and validated local-edit state save through the one Project session.
 A validated local Render preview or exact same-owner retained Media Asset/Saved Video Version can

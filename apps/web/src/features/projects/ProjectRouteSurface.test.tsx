@@ -606,7 +606,7 @@ describe('Project route surface', () => {
     const confirmation = await screen.findByRole('dialog', {
       name: 'Make this the Project source?',
     });
-    expect(confirmation).toHaveTextContent('this cannot be undone or replaced');
+    expect(confirmation).toHaveTextContent('You can remove the source later');
     await userEvent.click(
       within(confirmation).getByRole('button', { name: 'Use as Project source' }),
     );
@@ -1209,6 +1209,126 @@ describe('Project route surface', () => {
     expect(sourceHeading.parentElement).toHaveTextContent(
       'accepted-source.mp4 · 640×360 · 1 seconds',
     );
+  });
+
+  it('removes an accepted source after confirmation and reopens the add-source controls', async () => {
+    const durable = acceptedProject();
+    const source = acceptedSourceResponse();
+    const emptied = currentProject(activeId, {
+      status: 'draft',
+      version: 3,
+      currentRevisionId: secondActiveId,
+      currentRevisionNumber: 3,
+    });
+    const present = vi.fn<ProjectSourceRuntime['present']>();
+    const clear = vi.fn<ProjectSourceRuntime['clear']>();
+    let removeBody: unknown = null;
+    let hasSource = true;
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () =>
+        HttpResponse.json(hasSource ? durable : emptied),
+      ),
+      http.get(`*/api/projects/${activeId}/source`, () =>
+        hasSource
+          ? HttpResponse.json(source)
+          : HttpResponse.json(
+              { error: { code: 'not_found', message: 'No source.' } },
+              { status: 404 },
+            ),
+      ),
+      http.get(`*/api/projects/${activeId}/source/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+        }),
+      ),
+      http.post(`*/api/projects/${activeId}/source/remove`, async ({ request }) => {
+        removeBody = await request.json();
+        hasSource = false;
+        return HttpResponse.json(emptied);
+      }),
+    );
+    const user = userEvent.setup();
+    renderProjects(`/projects/${activeId}/workspace?task=source`, {
+      sourceRuntime: { present, clear },
+    });
+
+    await waitFor(() => expect(present).toHaveBeenCalledOnce());
+    expect(screen.getByRole('heading', { name: 'Source video' })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Remove source' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove source' });
+    expect(dialog).toHaveTextContent('The video itself is not deleted');
+    expect(dialog).toHaveTextContent('accepted-source.mp4');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Remove source' }));
+
+    expect(removeBody).toEqual({ expectedVersion: 2, expectedRevisionNumber: 2 });
+    expect(await screen.findByRole('heading', { name: 'No source yet' })).toBeVisible();
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Remove source' })).not.toBeInTheDocument(),
+    );
+    // The three ways back to a source are live again, and Remove is gone with the source.
+    expect(screen.getByRole('button', { name: 'Upload' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Use Saved Video' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Remove source' })).not.toBeInTheDocument();
+    expect(clear).toHaveBeenCalledWith(activeId);
+  });
+
+  it('keeps the removal dialog open and explains a refused removal', async () => {
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(acceptedProject())),
+      http.get(`*/api/projects/${activeId}/source`, () =>
+        HttpResponse.json(acceptedSourceResponse()),
+      ),
+      http.get(`*/api/projects/${activeId}/source/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+        }),
+      ),
+      http.post(`*/api/projects/${activeId}/source/remove`, () =>
+        HttpResponse.json(
+          {
+            error: { code: 'conflict', message: 'The Project has active work.' },
+            conflict: { kind: 'active-jobs', projectId: activeId },
+          },
+          { status: 409 },
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderProjects(`/projects/${activeId}/workspace?task=source`, {
+      sourceRuntime: { present: vi.fn(), clear: vi.fn() },
+    });
+
+    await user.click(await screen.findByRole('button', { name: 'Remove source' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove source' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remove source' }));
+
+    // The dialog is where the operator is looking, so the refusal has to land there.
+    expect(await within(dialog).findByText('Source not removed')).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Remove source' })).toBeVisible();
+    // Still retryable rather than dismissed with the source silently intact behind it.
+    expect(within(dialog).getByRole('button', { name: 'Remove source' })).toBeEnabled();
+  });
+
+  it('does not offer source removal on the overview or for an empty Project', async () => {
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(acceptedProject())),
+      http.get(`*/api/projects/${activeId}/source`, () =>
+        HttpResponse.json(acceptedSourceResponse()),
+      ),
+      http.get(`*/api/projects/${activeId}/source/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+        }),
+      ),
+    );
+    renderProjects(`/projects/${activeId}`);
+
+    // A source-bearing Project must not mount the Source task on the overview: doing so would
+    // re-read the source bytes just to show a button.
+    expect(await screen.findByText(/Source ready/u)).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Remove source' })).not.toBeInTheDocument();
   });
 
   it('accepts one finalized recording while exposing bounded source activity', async () => {

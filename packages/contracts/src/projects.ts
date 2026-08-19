@@ -776,6 +776,13 @@ export const reuseProjectSourceRequestSchema = z
   })
   .strict();
 
+export const removeProjectSourceRequestSchema = z
+  .object({
+    expectedVersion: z.number().int().positive(),
+    expectedRevisionNumber: z.number().int().positive(),
+  })
+  .strict();
+
 export const projectWorkingMediaUploadMetadataSchema = z
   .object({
     expectedVersion: z.number().int().positive(),
@@ -1031,6 +1038,7 @@ export type ProjectOutputHistoryResponse = z.infer<typeof projectOutputHistoryRe
 export type ProjectSourceKindContract = z.infer<typeof projectSourceKindSchema>;
 export type ProjectSourceUploadMetadata = z.infer<typeof projectSourceUploadMetadataSchema>;
 export type ReuseProjectSourceRequest = z.infer<typeof reuseProjectSourceRequestSchema>;
+export type RemoveProjectSourceRequest = z.infer<typeof removeProjectSourceRequestSchema>;
 export type ProjectSourceResponse = z.infer<typeof projectSourceResponseSchema>;
 export type ProjectWorkingMediaUploadMetadata = z.infer<
   typeof projectWorkingMediaUploadMetadataSchema

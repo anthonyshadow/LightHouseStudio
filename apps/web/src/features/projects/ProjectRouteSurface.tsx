@@ -21,8 +21,9 @@ import {
   projectWorkspacePath,
 } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
-import { AppIcon, Button, StatusNotice } from '../../ui';
+import { AppIcon, Button, ConfirmationDialog, StatusNotice } from '../../ui';
 import { useCampaignDetail } from '../campaigns/useCampaignsController';
+import { projectProcessingBlockedReason } from './projectProcessingPresentation';
 import {
   NewProjectDialog,
   DeleteProjectDialog,
@@ -487,6 +488,12 @@ const projectSourceNotice = (
         tone: 'neutral',
         body: 'Saving the source video and this change to your Project.',
       };
+    case 'removing':
+      return {
+        title: 'Removing source',
+        tone: 'neutral',
+        body: 'Clearing the source video from this Project.',
+      };
     case 'saved':
       return null;
     case 'conflict':
@@ -511,6 +518,7 @@ const ProjectSourceSection = ({
   runtime,
   recordingCandidate,
   recordingActive = false,
+  removalBlockedReason,
   onStartRecording,
   onActivityChange,
   onCurrentChange,
@@ -519,6 +527,7 @@ const ProjectSourceSection = ({
   readonly runtime: ProjectSourceRuntime;
   readonly recordingCandidate?: ProjectRecordingCandidate | null | undefined;
   readonly recordingActive?: boolean | undefined;
+  readonly removalBlockedReason?: string | undefined;
   readonly onStartRecording?: (() => void) | undefined;
   readonly onActivityChange?: ((activity: ProjectSourceActivity) => void) | undefined;
   readonly onCurrentChange?: ((current: ProjectCurrentResponse) => void) | undefined;
@@ -526,7 +535,9 @@ const ProjectSourceSection = ({
   const theme = useTheme();
   const inputRef = useRef<HTMLInputElement>(null);
   const savedVideoTriggerRef = useRef<HTMLButtonElement>(null);
+  const removeTriggerRef = useRef<HTMLButtonElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const controller = useProjectSourceController(
     current.project.id,
     current,
@@ -537,6 +548,12 @@ const ProjectSourceSection = ({
   const archived = current.project.archivedAt !== null;
   const controlsDisabled = archived || controller.busy || controller.accepted;
   const stateNotice = projectSourceNotice(controller.phase, controller.message);
+  // The controller's phase/message stay the single owner of the failure text; the dialog just
+  // renders it where the operator is looking when a removal is refused.
+  const removalFailure =
+    controller.phase === 'conflict' || controller.phase === 'error'
+      ? (controller.message ?? undefined)
+      : undefined;
 
   return (
     <>
@@ -554,13 +571,13 @@ const ProjectSourceSection = ({
               <p>
                 {controller.source.kind === 'saved-video-version'
                   ? 'This Project references the exact Saved Video Version and its existing bytes; it does not claim to have produced it.'
-                  : 'This Project keeps this video as its source and it cannot be swapped out. Start a new Project to work from a different video.'}
+                  : 'This Project works from this video. Remove it to start from a different one.'}
               </p>
             </>
           ) : (
             <p>
               Choose the one video this Project works from. You can try again if an upload fails,
-              but once a source is saved it cannot be changed.
+              and you can remove a saved source later to choose a different one.
             </p>
           )}
           {stateNotice ? (
@@ -620,9 +637,51 @@ const ProjectSourceSection = ({
           >
             Use Saved Video
           </Button>
+          {controller.accepted ? (
+            <Button
+              ref={removeTriggerRef}
+              variant="danger"
+              data-source-action="remove"
+              disabled={archived || controller.busy}
+              onClick={() => setRemoveDialogOpen(true)}
+            >
+              Remove source
+            </Button>
+          ) : null}
           <small>Choosing, recording, or reopening a source never starts paid AI work.</small>
         </div>
       </section>
+      {removeDialogOpen ? (
+        <ConfirmationDialog
+          open
+          title="Remove source"
+          description="This Project goes back to choosing a source."
+          body={
+            <>
+              <p>
+                Remove “{controller.source?.filename ?? 'this video'}” as the source of this
+                Project? The video itself is not deleted, and saved Versions, Project history and
+                your creative setup are all kept.
+              </p>
+              {removalBlockedReason === undefined ? null : <p>{removalBlockedReason}</p>}
+            </>
+          }
+          confirmLabel="Remove source"
+          cancelLabel="Cancel"
+          danger
+          busy={controller.busy}
+          confirmDisabled={removalBlockedReason !== undefined}
+          alert={removalFailure}
+          alertTitle="Source not removed"
+          returnFocusRef={removeTriggerRef}
+          onCancel={() => setRemoveDialogOpen(false)}
+          onConfirm={() => {
+            void controller.remove().then((removed) => {
+              if (removed) setRemoveDialogOpen(false);
+            });
+          }}
+        />
+      ) : null}
       <ProjectSavedVideoPicker
         open={pickerOpen}
         busy={controller.busy}
@@ -746,6 +805,8 @@ const ProjectDetail = ({
   const [campaignDialog, setCampaignDialog] = useState(false);
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [sourceActivity, setSourceActivity] = useState<ProjectSourceActivity | null>(null);
+  const [workingMediaActivity, setWorkingMediaActivity] =
+    useState<ProjectWorkingMediaActivity | null>(null);
   const requestedWorkspaceTask = new URLSearchParams(location.search).get('task');
   const pinnedWorkspaceTask = isProjectWorkspaceTask(requestedWorkspaceTask)
     ? requestedWorkspaceTask
@@ -779,6 +840,14 @@ const ProjectDetail = ({
     },
     [onSourceActivityChange],
   );
+  const handleWorkingMediaActivity = useCallback(
+    (activity: ProjectWorkingMediaActivity) => {
+      setWorkingMediaActivity(activity);
+      onWorkingMediaActivityChange?.(activity);
+    },
+    [onWorkingMediaActivityChange],
+  );
+  const archiveBlockedReason = projectProcessingBlockedReason(processing?.attempt, 'archive');
   const detailContentStyles = workspaceMode ? workspaceInnerStyles : projectOverviewInnerStyles;
   const acceptSession = session.acceptCurrent;
   // Accepting a source from the overview lands the operator in the workspace, where the media stage
@@ -844,6 +913,17 @@ const ProjectDetail = ({
 
   if (workspaceMode) {
     const saveStatus = projectWorkspaceSaveStatus(session, sourceActivity?.busy ?? false);
+    // Removing the source moves the Project out from under anything still deriving from it. The
+    // server refuses these too; naming the reason here keeps the operator from guessing.
+    //
+    // Deliberately not gated on `recordingActive`: that stays true for the whole live workspace,
+    // not just while a take is capturing, so gating on it would disable removal permanently.
+    // Capture writes no Project revision, and the server's CAS settles any genuine race.
+    const sourceRemovalBlockedReason =
+      projectProcessingBlockedReason(processing?.attempt, 'source-removal') ??
+      (workingMediaActivity?.busy
+        ? 'Finish adopting the current working media before removing the source.'
+        : undefined);
     const activeWorkspaceTask =
       pinnedWorkspaceTask ?? enteredWorkspaceTask ?? stepForSnapshot(current.revision.snapshot);
     const focusWorkspaceTask = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -940,7 +1020,7 @@ const ProjectDetail = ({
             >
               <header>
                 <h2>Project Source</h2>
-                <p>Select the immutable original video.</p>
+                <p>Select the original video this Project works from.</p>
               </header>
               <ProjectSourceSection
                 key={current.project.id}
@@ -948,6 +1028,7 @@ const ProjectDetail = ({
                 runtime={sourceRuntime}
                 recordingCandidate={recordingCandidate}
                 recordingActive={recordingActive}
+                removalBlockedReason={sourceRemovalBlockedReason}
                 onStartRecording={onStartRecording}
                 onActivityChange={handleSourceActivity}
                 onCurrentChange={session.acceptCurrent}
@@ -972,9 +1053,7 @@ const ProjectDetail = ({
                 current={current}
                 session={session.port}
                 archived={archived}
-                {...(onWorkingMediaActivityChange
-                  ? { onActivityChange: onWorkingMediaActivityChange }
-                  : {})}
+                onActivityChange={handleWorkingMediaActivity}
               />
               {processing ? (
                 <ProjectProcessingStatusPanel controller={processing} />
@@ -1206,12 +1285,8 @@ const ProjectDetail = ({
         <ProjectLifecycleDialog
           action={lifecycleDialog.action}
           project={lifecycleDialog.project}
-          {...(lifecycleDialog.action === 'archive' && processing?.attempt?.blocksArchive
-            ? {
-                archiveBlockedReason: processing.attempt.ambiguous
-                  ? 'Archive is blocked because submission acceptance is unresolved. Another attempt may duplicate provider cost; use the explicit retry decision first.'
-                  : 'Archive is blocked while accepted provider work is active. Leaving or switching does not stop provider work or cost; reopen this Project to reconnect.',
-              }
+          {...(lifecycleDialog.action === 'archive' && archiveBlockedReason !== undefined
+            ? { archiveBlockedReason }
             : {})}
           returnFocusRef={dialogReturnRef}
           onClose={closeDialog}

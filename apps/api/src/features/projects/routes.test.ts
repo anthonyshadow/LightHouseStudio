@@ -427,6 +427,110 @@ describe('Project lifecycle routes', () => {
     expect(head.headers['content-length']).toBe(String(fixture.byteLength));
   });
 
+  it('removes an accepted Project source and accepts a different original afterwards', async () => {
+    const app = localApp();
+    const created = (await create(app, 'Wrong source')).response;
+    const projectId = json<{ project: { id: string } }>(created).project.id;
+    const fixture = Buffer.from(
+      (
+        await readFile(
+          new URL('../../../../../e2e/fixtures/decodable-h264-video.base64', import.meta.url),
+          'utf8',
+        )
+      ).replaceAll(/\s/gu, ''),
+      'base64',
+    );
+    const upload = (expectedVersion: number, filename: string) =>
+      app.inject({
+        method: 'POST',
+        url: `/api/projects/${projectId}/source`,
+        headers: {
+          ...browserHeaders,
+          'content-type': 'video/mp4',
+          'idempotency-key': randomUUID(),
+          'x-lightframe-project-source': encodeURIComponent(
+            JSON.stringify({
+              expectedVersion,
+              expectedRevisionNumber: expectedVersion,
+              kind: 'uploaded',
+              filename,
+            }),
+          ),
+        },
+        payload: fixture,
+      });
+    const remove = (expectedVersion: number, expectedRevisionNumber: number) =>
+      app.inject({
+        method: 'POST',
+        url: `/api/projects/${projectId}/source/remove`,
+        headers: { ...browserHeaders, 'content-type': 'application/json' },
+        payload: { expectedVersion, expectedRevisionNumber },
+      });
+
+    expect((await upload(1, 'wrong.mp4')).statusCode).toBe(201);
+
+    const removed = await remove(2, 2);
+    expect(removed.statusCode).toBe(200);
+    expect(removed.json()).toMatchObject({
+      project: { id: projectId, status: 'draft', version: 3 },
+      revision: {
+        revisionNumber: 3,
+        snapshot: {
+          sourceAssetId: null,
+          workingMedia: null,
+          presentedMedia: null,
+          workflowPhase: 'source',
+        },
+      },
+    });
+    expect(removed.json()).not.toHaveProperty('source');
+
+    const hydrated = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/source`,
+      headers: browserHeaders,
+    });
+    expect(hydrated.statusCode).toBe(404);
+
+    // A replayed removal whose response was lost converges on current authority rather than
+    // conflicting: the requested end state already holds. This is why no operation key is needed.
+    const replayed = await remove(2, 2);
+    expect(replayed.statusCode).toBe(200);
+    expect(replayed.json()).toMatchObject({
+      project: { version: 3 },
+      revision: { revisionNumber: 3, snapshot: { sourceAssetId: null } },
+    });
+
+    const reaccepted = await upload(3, 'right.mp4');
+    expect(reaccepted.statusCode).toBe(201);
+    expect(reaccepted.json()).toMatchObject({
+      project: { status: 'ready', version: 4 },
+      source: { filename: 'right.mp4' },
+    });
+
+    const staleAfterReplacement = await remove(2, 2);
+    expect(staleAfterReplacement.statusCode).toBe(409);
+    expect(staleAfterReplacement.json()).toMatchObject({
+      error: { code: 'conflict' },
+      conflict: { kind: 'project-version', expectedVersion: 2, actualVersion: 4 },
+    });
+    const stillAttached = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/source`,
+      headers: browserHeaders,
+    });
+    expect(stillAttached.statusCode).toBe(200);
+    expect(stillAttached.json()).toMatchObject({ source: { filename: 'right.mp4' } });
+
+    const malformed = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/source/remove`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { expectedVersion: 4 },
+    });
+    expect(malformed.statusCode).toBe(400);
+  });
+
   it('adopts a validated local render explicitly and range-streams it without changing source', async () => {
     const app = localApp();
     const created = (await create(app, 'Local render adoption')).response;

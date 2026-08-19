@@ -15,6 +15,7 @@ import {
   projectStatusAfterProcessingTrace,
   promoteProjectJobResult,
   ProjectRuleError,
+  removeProjectSource,
   renameProject,
   restoreProject,
   saveProjectOutput,
@@ -398,6 +399,173 @@ describe('Project aggregate rules', () => {
         { now: later, createId: () => '80eb98cb-0dd4-4aac-8507-084789045d71' },
       ),
     ).toEqual({ ok: false, conflict: { kind: 'immutable-source', projectId } });
+  });
+
+  it('removes a source, resets derived media, and keeps the creative setup', () => {
+    const accepted = acceptProjectSource(
+      emptyProject(),
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        assetId: sourceAssetId,
+        mediaReference: { kind: 'asset', assetId: sourceAssetId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    if (!accepted.ok) throw new Error('Expected Project source acceptance.');
+    const configuredSnapshot = {
+      ...accepted.value.revisions.at(-1)!.snapshot,
+      creativeIntent: {
+        ...accepted.value.revisions.at(-1)!.snapshot.creativeIntent,
+        userIntent: 'Warm handheld promo',
+      },
+      updatedAt: latest,
+    };
+    const configured = appendProjectRevision(
+      accepted.value,
+      {
+        expectedProjectVersion: 2,
+        expectedRevisionNumber: 2,
+        snapshot: configuredSnapshot,
+        author: { kind: 'user', authorId: ownerUserId },
+        source: 'user-edit',
+        facts: readyFacts,
+      },
+      { now: latest, createId: () => '2fd0fd54-2f2a-4f83-9d84-4be07d20d2c1' },
+    );
+    if (!configured.ok) throw new Error('Expected a creative checkpoint.');
+
+    const removed = removeProjectSource(
+      configured.value,
+      {
+        expectedProjectVersion: 3,
+        expectedRevisionNumber: 3,
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => '9f5b2ad6-4f4b-4e13-9a03-2ef6b6c1a51e' },
+    );
+
+    expect(removed.ok).toBe(true);
+    if (!removed.ok) return;
+    expect(removed.value.project).toMatchObject({
+      status: 'draft',
+      version: 4,
+      currentRevisionNumber: 4,
+    });
+    expect(removed.value.revisions.at(-1)).toMatchObject({
+      source: 'user-edit',
+      parentRevisionNumber: 3,
+      snapshot: {
+        sourceAssetId: null,
+        workingMedia: null,
+        presentedMedia: null,
+        lastSuccessfulOutput: null,
+        workflowPhase: 'source',
+      },
+    });
+    // The usual reason to remove a source is to point the same setup at the right video.
+    expect(removed.value.revisions.at(-1)?.snapshot.creativeIntent.userIntent).toBe(
+      'Warm handheld promo',
+    );
+    // Earlier revisions keep naming the removed asset, which is what protects its bytes.
+    expect(removed.value.revisions[1]?.snapshot.sourceAssetId).toBe(sourceAssetId);
+  });
+
+  it('accepts a different source after the first one is removed', () => {
+    const accepted = acceptProjectSource(
+      emptyProject(),
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        assetId: sourceAssetId,
+        mediaReference: { kind: 'asset', assetId: sourceAssetId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    if (!accepted.ok) throw new Error('Expected Project source acceptance.');
+    const removed = removeProjectSource(
+      accepted.value,
+      {
+        expectedProjectVersion: 2,
+        expectedRevisionNumber: 2,
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => '9f5b2ad6-4f4b-4e13-9a03-2ef6b6c1a51e' },
+    );
+    if (!removed.ok) throw new Error('Expected Project source removal.');
+
+    const replacementAssetId = '65cd938f-5ff6-4730-953b-4137136354c7';
+    const reaccepted = acceptProjectSource(
+      removed.value,
+      {
+        expectedProjectVersion: 3,
+        expectedRevisionNumber: 3,
+        assetId: replacementAssetId,
+        mediaReference: { kind: 'asset', assetId: replacementAssetId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => 'c0d0b2b5-2e3f-4a3a-9f2e-6b0f5f2f9a11' },
+    );
+
+    expect(reaccepted.ok).toBe(true);
+    if (!reaccepted.ok) return;
+    expect(reaccepted.value.revisions.at(-1)?.snapshot).toMatchObject({
+      sourceAssetId: replacementAssetId,
+      workflowPhase: 'creative',
+    });
+    expect(reaccepted.value.project.status).toBe('ready');
+  });
+
+  it('refuses to remove a source on stale CAS tokens, or when there is nothing to remove', () => {
+    const accepted = acceptProjectSource(
+      emptyProject(),
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        assetId: sourceAssetId,
+        mediaReference: { kind: 'asset', assetId: sourceAssetId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    if (!accepted.ok) throw new Error('Expected Project source acceptance.');
+    const context = { now: latest, createId: () => '9f5b2ad6-4f4b-4e13-9a03-2ef6b6c1a51e' };
+    const author = { kind: 'user', authorId: ownerUserId } as const;
+
+    expect(
+      removeProjectSource(
+        accepted.value,
+        { expectedProjectVersion: 1, expectedRevisionNumber: 2, author },
+        context,
+      ),
+    ).toEqual({
+      ok: false,
+      conflict: { kind: 'project-version', projectId, expectedVersion: 1, actualVersion: 2 },
+    });
+    expect(
+      removeProjectSource(
+        accepted.value,
+        { expectedProjectVersion: 2, expectedRevisionNumber: 1, author },
+        context,
+      ),
+    ).toEqual({
+      ok: false,
+      conflict: {
+        kind: 'revision',
+        projectId,
+        expectedRevisionNumber: 1,
+        actualRevisionNumber: 2,
+      },
+    });
+    expect(() =>
+      removeProjectSource(
+        emptyProject(),
+        { expectedProjectVersion: 1, expectedRevisionNumber: 1, author },
+        context,
+      ),
+    ).toThrow(ProjectRuleError);
   });
 
   it('adopts validated working media without replacing the immutable original or creating output provenance', () => {

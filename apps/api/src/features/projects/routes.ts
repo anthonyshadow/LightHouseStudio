@@ -22,6 +22,7 @@ import {
   projectWorkingMediaUploadMetadataSchema,
   saveProjectOutputRequestSchema,
   saveProjectOutputResponseSchema,
+  removeProjectSourceRequestSchema,
   reuseProjectSourceRequestSchema,
   moveProjectCampaignRequestSchema,
   projectParamsSchema,
@@ -87,13 +88,13 @@ const conflictMessage = (conflict: ProjectConflict): string => {
     case 'revision':
       return 'The Project revision changed in another session. Refresh it before retrying.';
     case 'active-jobs':
-      return 'The Project has active work and cannot be archived yet.';
+      return 'The Project has active work. Wait for it to finish, cancel it, or reconcile it first.';
     case 'relation-mismatch':
       return 'The Project relationship changed and the request was not applied.';
     case 'campaign-membership':
       return 'Choose an active Campaign you can access, or detach the Project.';
     case 'immutable-source':
-      return 'This Project already has its immutable original. Start a new Project for a different source.';
+      return 'This Project already has a source. Remove the current source before choosing another.';
     case 'saved-video-version':
       return 'The selected Saved Video changed. Confirm its current Version before adding another.';
   }
@@ -327,6 +328,22 @@ export const registerProjectRoutes = (
           ownerUserId: ownerUserIdForRequest(request),
           projectId: params.data.projectId,
           operationKey: operationKey.data,
+          ...body.data,
+        }),
+      );
+    });
+
+    app.post('/api/projects/:projectId/source/remove', async (request, reply) => {
+      const params = projectParamsSchema.safeParse(request.params);
+      const body = removeProjectSourceRequestSchema.safeParse(request.body);
+      if (!params.success || !body.success) {
+        throw new AppError(400, 'validation_error', 'Provide a valid Project and version.');
+      }
+      return sendMutation(
+        reply,
+        await sourceService.remove({
+          ownerUserId: ownerUserIdForRequest(request),
+          projectId: params.data.projectId,
           ...body.data,
         }),
       );

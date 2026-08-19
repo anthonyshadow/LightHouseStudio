@@ -19,7 +19,8 @@ qualifications:
 - Campaign is a deliberately lightweight optional organizer with name, optional brief, lifecycle,
   version CAS, and non-cascading Project membership.
 - Project has domain rules, contracts, local and relational authority, authenticated lifecycle and
-  immutable-source/working-media APIs, and browser lifecycle/source UI. Snapshot v2 is
+  source/working-media APIs, and browser lifecycle/source UI. A source is immutable while attached
+  and explicitly removable, which never deletes a revision, output Version, or retained bytes. Snapshot v2 is
   video-oriented by design; durable source and current working-media resume plus explicit creative
   checkpoints are implemented. Project-bound Character Swap/VTO now use the backend admission,
   recovery, and durable result-retention authority through visible Start/status/retry UX. Project
@@ -27,7 +28,7 @@ qualifications:
   implemented. Bounded Project changes, processing attempts/results, and output-Version history
   plus exact-Version preview/reuse/Download are implemented without a restore or Export aggregate.
   A separately persisted non-owning collection can associate Videos, Characters, Outfits, and
-  Voices without changing the immutable source, active snapshot, output, history, or retention
+  Voices without changing the Project source, active snapshot, output, history, or retention
   authorities.
 - Dashboard, Create, and Assets are browser information-architecture surfaces over existing owners;
   they are not new domain aggregates or persistence authorities.
@@ -567,7 +568,8 @@ The Project aggregate is implemented in domain, contracts, versioned local metad
 relational persistence, and feature-local browser adapters/controllers. Authenticated routes back
 `/projects`, `/projects/:projectId`, and the focused `/projects/:projectId/workspace`, where the
 operator can list, create named or quick
-Projects, inspect, open, rename, archive, restore, attach one immutable source, checkpoint creative intent, adopt working
+Projects, inspect, open, rename, archive, restore, attach one source, remove that source to choose
+another, checkpoint creative intent, adopt working
 media, reconnect visual processing, save exact outputs, and browse bounded history. `Project` is the
 owner-scoped durable workspace for one focused production effort; Saved Videos remain outputs and
 immutable output versions rather than work-in-progress authority. One Project can link any number
@@ -611,7 +613,16 @@ creative-library records, undo history, render candidates, and browser or React 
 A source-bearing Project is resumable only after the same-owner media asset is `ready` in the
 configured durable byte store.
 
-The first accepted Project source is immutable for MVP. Upload and finalized-recording commands
+A Project source is immutable while it is attached: a second acceptance returns an
+`immutable-source` conflict rather than overwriting the first. Removal is a separate explicit
+command that appends a sourceless revision and deletes only the current `project_sources` pointer
+row in the same transaction, under the same Project-version and revision CAS and the same
+active-attempt refusal that guards archive. The revision-scoped `project_assets` `role='source'`
+link is deliberately left in place, so the owner-scoped Project retention policy keeps protecting
+the removed bytes for any output Version already produced from them; no byte deletion is performed
+and no physical purge is claimed. The command creates no bytes and no provider work, so it carries
+no operation receipt: removing an already-removed source converges on current authority instead of
+conflicting. Upload and finalized-recording commands
 store an owner-bound ready asset, server-computed checksum, inspected video metadata, source record,
 and revision-scoped source/working/presented links before claiming resume. Exact Saved Video Version
 reuse verifies an active same-owner Version and references its existing asset without copying bytes;

@@ -17,13 +17,11 @@ import {
 } from '../../adapters/api-client/savedVideosApi';
 import { studioCreatePath } from '../../app/paths';
 import { AppIcon, Button, ConfirmationDialog, OverlayPanel, StatusNotice } from '../../ui';
+import { kindLabel, ProjectAssetThumbnail } from './ProjectAssetThumbnail';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
 import { safeProjectError } from './ProjectDialogs';
 import {
   addAssetActionStyles,
-  assetThumbnailFallbackStyles,
-  assetThumbnailPlayStyles,
-  assetThumbnailStyles,
   projectAssetActionsStyles,
   projectAssetFiltersStyles,
   projectAssetGridStyles,
@@ -58,21 +56,18 @@ const FILTERS: readonly { readonly value: AssetFilter; readonly label: string }[
   { value: 'voice', label: 'Voices' },
 ];
 
-const kindLabel = (kind: ProjectAssetKindContract): string =>
-  kind === 'video' ? 'Video' : kind.charAt(0).toUpperCase() + kind.slice(1);
-
 const abbreviatedId = (value: string): string =>
   value.length > 16 ? `${value.slice(0, 8)}…${value.slice(-6)}` : value;
 
 // Opening an attached Video in the workspace means two materially different things depending on
-// whether the Project already has its immutable original, so the control has to say which one.
+// whether the Project already has a source, so the control has to say which one.
 const projectWorkspaceAdoptionLabel = (projectHasSource: boolean): string =>
   projectHasSource ? 'Use as working media' : 'Use as Project source';
 
 const projectWorkspaceAdoptionHint = (projectHasSource: boolean): string =>
   projectHasSource
     ? 'Loads this Video as the current editable media. The Project source stays unchanged.'
-    : 'This Project has no source yet, so this Video becomes its immutable original.';
+    : 'This Project has no source yet, so this Video becomes the video it works from.';
 
 const labelForMembership = (
   membership: ProjectAssetMembershipContract,
@@ -124,84 +119,6 @@ const labelForMembership = (
     unavailable: false,
     thumbnailUrl: null,
   };
-};
-
-const AssetKindIcon = ({ kind }: { readonly kind: ProjectAssetKindContract }) => {
-  if (kind === 'video') {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <rect x="3" y="5" width="18" height="14" rx="2" />
-        <path d="m10 9 5 3-5 3Z" fill="currentColor" stroke="none" />
-      </svg>
-    );
-  }
-  if (kind === 'character') {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <circle cx="12" cy="8" r="3.25" />
-        <path d="M5.5 20c.6-4 2.8-6 6.5-6s5.9 2 6.5 6" />
-      </svg>
-    );
-  }
-  if (kind === 'outfit') {
-    return (
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-        <path d="m8.5 3-5 2.5L5 10l3-1.2V21h8V8.8l3 1.2 1.5-4.5-5-2.5a4 4 0 0 1-7 0Z" />
-      </svg>
-    );
-  }
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-      <rect x="9" y="3" width="6" height="11" rx="3" />
-      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7" />
-    </svg>
-  );
-};
-
-const AssetThumbnail = ({
-  kind,
-  label,
-  thumbnailUrl,
-  unavailable,
-}: {
-  readonly kind: ProjectAssetKindContract;
-  readonly label: string;
-  readonly thumbnailUrl: string | null;
-  readonly unavailable: boolean;
-}) => {
-  const theme = useTheme();
-  const [brokenThumbnailUrl, setBrokenThumbnailUrl] = useState<string | null>(null);
-  const showThumbnail = thumbnailUrl !== null && brokenThumbnailUrl !== thumbnailUrl;
-
-  return (
-    <div
-      role="img"
-      aria-label={
-        showThumbnail ? `Thumbnail for ${label}` : `${kindLabel(kind)} visual for ${label}`
-      }
-      css={assetThumbnailStyles(theme, unavailable)}
-    >
-      {showThumbnail ? (
-        <img
-          src={thumbnailUrl}
-          alt=""
-          loading="lazy"
-          css={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          onError={() => setBrokenThumbnailUrl(thumbnailUrl)}
-        />
-      ) : (
-        <span aria-hidden="true" css={assetThumbnailFallbackStyles(theme)}>
-          <AssetKindIcon kind={kind} />
-          <small>{unavailable ? 'Asset unavailable' : `${kindLabel(kind)} preview`}</small>
-        </span>
-      )}
-      {kind === 'video' && !unavailable && showThumbnail ? (
-        <span aria-hidden="true" css={assetThumbnailPlayStyles(theme)}>
-          <AssetKindIcon kind="video" />
-        </span>
-      ) : null}
-    </div>
-  );
 };
 
 const ProjectVideoPreview = ({
@@ -361,8 +278,8 @@ export const ProjectAssetsSection = ({
     }
   };
 
-  // Accepting a source is one-shot and cannot be undone, so that branch is confirmed. Adopting
-  // working media stays a single click because it can be replaced at any time.
+  // Accepting a source changes what the whole Project is built from, so that branch is confirmed.
+  // Adopting working media stays a single click because it can be replaced at any time.
   const requestVideoInWorkspace = (video: SavedVideoSummary) => {
     if (projectHasSource) {
       void openVideoInWorkspace(video);
@@ -470,7 +387,7 @@ export const ProjectAssetsSection = ({
             return (
               <li key={membership.id}>
                 <article css={projectAssetItemStyles(theme)}>
-                  <AssetThumbnail
+                  <ProjectAssetThumbnail
                     kind={membership.kind}
                     label={resolved.label}
                     thumbnailUrl={resolved.thumbnailUrl}
@@ -683,7 +600,7 @@ export const ProjectAssetsSection = ({
         title="Make this the Project source?"
         description={
           sourceAdoptionCandidate
-            ? `“${sourceAdoptionCandidate.title}” becomes this Project's immutable original. A Project keeps one original for its whole life, so this cannot be undone or replaced — a different original needs a new Project. The Asset stays reusable everywhere.`
+            ? `“${sourceAdoptionCandidate.title}” becomes the video this Project is built from. You can remove the source later from the workspace Source step to choose a different one. The Asset stays reusable everywhere.`
             : ''
         }
         confirmLabel="Use as Project source"

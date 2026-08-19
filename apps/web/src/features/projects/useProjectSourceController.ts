@@ -9,12 +9,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClientError, apiFetch } from '../../adapters/api-client/apiClient';
 import { readBoundedBlob } from '../../adapters/api-client/readBoundedBlob';
 import type { RestorePersistedOriginalInput } from '../recording/types';
-import { projectQueryKeys } from './useProjectsController';
+import { projectQueryKeys, reconcileProject } from './useProjectsController';
 import { useStableOperationKey } from './useStableOperationKey';
 import {
+  getProject,
   getProjectSource,
   getProjectWorkingMedia,
   ProjectApiConflictError,
+  removeProjectSource,
   reuseSavedVideoAsProjectSource,
   uploadProjectSource,
 } from './projectsApi';
@@ -22,7 +24,7 @@ import {
 const MAXIMUM_SOURCE_BYTES = 300_000_000;
 
 export type ProjectSourcePhase =
-  'idle' | 'hydrating' | 'preparing' | 'saving' | 'saved' | 'conflict' | 'error';
+  'idle' | 'hydrating' | 'preparing' | 'saving' | 'removing' | 'saved' | 'conflict' | 'error';
 
 export interface ProjectSourceActivity {
   readonly projectId: string;
@@ -144,7 +146,7 @@ export const useProjectSourceController = (
   const hydratedMediaRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
 
-  const busy = phase === 'preparing' || phase === 'saving';
+  const busy = phase === 'preparing' || phase === 'saving' || phase === 'removing';
   const accepted = source !== null || current.revision.snapshot.sourceAssetId !== null;
   const effectivePhase =
     phase === 'idle' && current.revision.snapshot.sourceAssetId !== null ? 'hydrating' : phase;
@@ -301,6 +303,77 @@ export const useProjectSourceController = (
     [onCurrentChange, operation, presentAccepted, projectId, queryClient, runtime],
   );
 
+  const finishRemoval = useCallback(
+    async (next: ProjectCurrentResponse, controller: AbortController, generation: number) => {
+      if (controller.signal.aborted || generation !== generationRef.current || !mountedRef.current)
+        return;
+      // Clearing the hydration marker matters: without it, re-accepting media the Project once
+      // presented would be treated as already on the stage and never re-hydrated.
+      hydratedMediaRef.current = null;
+      operation.reset();
+      runtime.clear(projectId);
+      setSource(null);
+      setMessage(null);
+      setPhase('idle');
+      await reconcileProject(queryClient, next);
+      onCurrentChange?.(next);
+    },
+    [onCurrentChange, operation, projectId, queryClient, runtime],
+  );
+
+  /**
+   * Resolves to whether the source is gone, so a confirmation dialog knows whether to close. The
+   * failure text is not returned: `phase`/`message` stay the single owner of it.
+   */
+  const remove = useCallback(async (): Promise<boolean> => {
+    const generation = ++generationRef.current;
+    const controller = new AbortController();
+    controllerRef.current?.abort('project-source-replaced');
+    controllerRef.current = controller;
+    setPhase('removing');
+    setMessage(null);
+    try {
+      const next = await removeProjectSource({
+        projectId,
+        expectedVersion: current.project.version,
+        expectedRevisionNumber: current.project.currentRevisionNumber,
+        signal: controller.signal,
+      });
+      await finishRemoval(next, controller, generation);
+      return true;
+    } catch (error) {
+      if (controller.signal.aborted || generation !== generationRef.current) return false;
+      if (error instanceof ProjectApiConflictError) {
+        // The removal may simply have already landed and lost its response. Server authority
+        // decides, not the conflict.
+        try {
+          const reconciled = await getProject(projectId, controller.signal);
+          if (reconciled.revision.snapshot.sourceAssetId === null) {
+            await finishRemoval(reconciled, controller, generation);
+            return true;
+          }
+          if (controller.signal.aborted || generation !== generationRef.current) return false;
+          await reconcileProject(queryClient, reconciled);
+          onCurrentChange?.(reconciled);
+        } catch {
+          if (controller.signal.aborted || generation !== generationRef.current) return false;
+        }
+      }
+      setPhase(error instanceof ProjectApiConflictError ? 'conflict' : 'error');
+      setMessage(safeMessage(error));
+      return false;
+    } finally {
+      if (controllerRef.current === controller) controllerRef.current = null;
+    }
+  }, [
+    current.project.currentRevisionNumber,
+    current.project.version,
+    finishRemoval,
+    onCurrentChange,
+    projectId,
+    queryClient,
+  ]);
+
   const runAcceptance = useCallback(
     async ({
       signature,
@@ -409,6 +482,7 @@ export const useProjectSourceController = (
     upload,
     acceptRecording,
     reuseSavedVideo,
+    remove,
     abort,
   } as const;
 };

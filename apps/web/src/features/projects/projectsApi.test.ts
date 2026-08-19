@@ -11,6 +11,7 @@ import {
   getProject,
   listProjects,
   ProjectApiConflictError,
+  removeProjectSource,
   renameProject,
   restoreProject,
   tombstoneProject,
@@ -163,6 +164,69 @@ describe('Projects API adapter', () => {
     expect(await observed.requests[0]!.json()).toEqual({
       expectedVersion: 4,
       confirmation: 'permanent-delete',
+    });
+  });
+
+  it('removes a Project source with both CAS tokens and no idempotency key', async () => {
+    const observed = captureRequests();
+    const base = currentProject();
+    const removedRevisionId = '5b42c7d8-9b65-4989-b351-293763b45e42';
+    const removed: ProjectCurrentResponse = {
+      project: {
+        ...base.project,
+        version: 3,
+        currentRevisionNumber: 3,
+        currentRevisionId: removedRevisionId,
+      },
+      revision: {
+        ...base.revision,
+        id: removedRevisionId,
+        revisionNumber: 3,
+        parentRevisionId: base.revision.id,
+        parentRevisionNumber: 2,
+        snapshot: { ...base.revision.snapshot, sourceAssetId: null, workflowPhase: 'source' },
+      },
+    };
+    mockApiServer.use(
+      jsonScenario(
+        'POST',
+        `/api/projects/${projectId}/source/remove`,
+        { body: removed },
+        observed.observe,
+      ),
+    );
+
+    await expect(
+      removeProjectSource({ projectId, expectedVersion: 2, expectedRevisionNumber: 2 }),
+    ).resolves.toEqual(removed);
+    await expect(observed.requests[0]!.json()).resolves.toEqual({
+      expectedVersion: 2,
+      expectedRevisionNumber: 2,
+    });
+    // Removal creates no bytes and no provider work, so it carries no receipt.
+    expect(observed.requests[0]!.headers.get('idempotency-key')).toBeNull();
+  });
+
+  it('surfaces a typed conflict when a source removal loses CAS', async () => {
+    mockApiServer.use(
+      jsonScenario('POST', `/api/projects/${projectId}/source/remove`, {
+        status: 409,
+        body: {
+          error: { code: 'conflict', message: 'The Project changed in another session.' },
+          conflict: {
+            kind: 'project-version',
+            projectId,
+            expectedVersion: 2,
+            actualVersion: 3,
+          },
+        },
+      }),
+    );
+
+    await expect(
+      removeProjectSource({ projectId, expectedVersion: 2, expectedRevisionNumber: 2 }),
+    ).rejects.toMatchObject({
+      conflict: { kind: 'project-version', expectedVersion: 2, actualVersion: 3 },
     });
   });
 

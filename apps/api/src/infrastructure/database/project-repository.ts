@@ -53,6 +53,8 @@ import type {
   ProjectSummaryPageInput,
   ProjectSourceAcceptanceResult,
   ProjectSourceRecord,
+  ProjectSourceRemovalResult,
+  RemoveProjectSourcePersistenceInput,
   ProjectWorkingMediaAdoptionResult,
   ProjectWorkingMediaRead,
   ProjectWorkingMediaRecord,
@@ -1839,6 +1841,158 @@ export class DrizzleProjectRepository
     });
   }
 
+  /**
+   * Whether unresolved provider work is still bound to this Project.
+   *
+   * Shared by archive and source removal: both refuse to move a Project out from under an attempt
+   * whose acceptance Lightframe cannot yet account for.
+   */
+  async #hasBlockingProcessingAttempt(
+    tx: DatabaseExecutor,
+    projectId: string,
+    ownerUserId: string,
+  ): Promise<boolean> {
+    const processing = await tx
+      .select({
+        id: processingJobs.id,
+        status: processingJobs.status,
+        retryOfJobId: processingJobs.retryOfJobId,
+        createdAt: processingJobs.createdAt,
+      })
+      .from(projectJobs)
+      .innerJoin(
+        processingJobs,
+        and(
+          eq(processingJobs.id, projectJobs.jobId),
+          eq(processingJobs.ownerUserId, projectJobs.ownerUserId),
+        ),
+      )
+      .where(and(eq(projectJobs.projectId, projectId), eq(projectJobs.ownerUserId, ownerUserId)))
+      .for('share');
+    const attempts = processing.map(({ id, status, retryOfJobId, createdAt }) => ({
+      operationId: id,
+      status,
+      retryOfOperationId: retryOfJobId,
+      createdAt: toIsoTimestamp(createdAt),
+    }));
+    return attempts.some((attempt) => projectProcessingAttemptBlocksArchive(attempt, attempts));
+  }
+
+  async removeSource(
+    input: RemoveProjectSourcePersistenceInput,
+  ): Promise<ProjectSourceRemovalResult> {
+    return this.db.transaction(async (tx) => {
+      // `acceptSource` takes its first lock on `project_sources`; leading with `projects` here
+      // would open an ABBA deadlock window against a concurrent accept.
+      const [priorSource] = await tx
+        .select({
+          projectId: projectSources.projectId,
+          assetId: projectSources.assetId,
+        })
+        .from(projectSources)
+        .where(
+          and(
+            eq(projectSources.projectId, input.projectId),
+            eq(projectSources.ownerUserId, input.ownerUserId),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (priorSource === undefined) return { kind: 'not-found' } as const;
+      const [current] = await tx
+        .select()
+        .from(projects)
+        .where(
+          and(
+            eq(projects.id, input.projectId),
+            eq(projects.ownerUserId, input.ownerUserId),
+            isNull(projects.deletedAt),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (current === undefined) return { kind: 'not-found' } as const;
+      if (current.version !== input.expectedVersion) {
+        return {
+          kind: 'conflict',
+          conflict: projectVersionConflictDetail(
+            input.projectId,
+            input.expectedVersion,
+            current.version,
+          ),
+        } as const;
+      }
+      if (current.currentRevisionNumber !== input.expectedRevisionNumber) {
+        return {
+          kind: 'conflict',
+          conflict: projectConflicts.revision(
+            input.projectId,
+            input.expectedRevisionNumber,
+            current.currentRevisionNumber,
+          ),
+        } as const;
+      }
+      if (await this.#hasBlockingProcessingAttempt(tx, current.id, current.ownerUserId)) {
+        return { kind: 'conflict', conflict: projectConflicts.activeJobs(current.id) } as const;
+      }
+      const revision: ProjectRevision = {
+        ...input.revision,
+        snapshot: projectSnapshotSchema.parse(input.revision.snapshot),
+      };
+      const validNextState =
+        priorSource.assetId === input.removedAssetId &&
+        input.nextProject.id === current.id &&
+        input.nextProject.ownerUserId === current.ownerUserId &&
+        input.nextProject.version === current.version + 1 &&
+        current.archivedAt === null &&
+        revision.snapshot.sourceAssetId === null &&
+        revision.projectId === current.id &&
+        revision.ownerUserId === current.ownerUserId &&
+        revision.parentRevisionId === current.currentRevisionId &&
+        revision.parentRevisionNumber === current.currentRevisionNumber &&
+        revision.revisionNumber === current.currentRevisionNumber + 1 &&
+        input.nextProject.currentRevisionId === revision.id &&
+        input.nextProject.currentRevisionNumber === revision.revisionNumber;
+      if (!validNextState) {
+        throw new ProjectPersistenceError(
+          'invalid-aggregate',
+          'The Project source removal revision does not continue the locked aggregate.',
+        );
+      }
+      assertRevisionAssetLinks(revision, input.assetLinks);
+      await assertReadyAssets(tx, input.ownerUserId, input.assetLinks);
+      await tx.insert(projectRevisions).values(revisionValues(revision));
+      // A sourceless revision references no media, so it contributes no asset or version links
+      // beyond any creative references the snapshot still carries.
+      if (input.assetLinks.length > 0) {
+        await tx.insert(projectAssets).values(input.assetLinks.map(assetLinkValues));
+      }
+      await this.#persistAssetMemberships(tx, membershipsForRevisionInput(input));
+      // Only the current-source pointer goes. The historical `project_assets` row with
+      // role='source' stays, so `DrizzleProjectRetentionPolicy` keeps retaining the bytes for any
+      // output Version already produced from them.
+      await tx
+        .delete(projectSources)
+        .where(
+          and(
+            eq(projectSources.projectId, input.projectId),
+            eq(projectSources.ownerUserId, input.ownerUserId),
+          ),
+        );
+      await tx
+        .update(projects)
+        .set({
+          status: input.nextProject.status,
+          version: input.nextProject.version,
+          currentRevisionId: input.nextProject.currentRevisionId,
+          currentRevisionNumber: input.nextProject.currentRevisionNumber,
+          updatedAt: toIsoTimestamp(input.nextProject.updatedAt),
+        })
+        .where(and(eq(projects.id, current.id), eq(projects.ownerUserId, current.ownerUserId)));
+      return { kind: 'removed', current: { project: input.nextProject, revision } } as const;
+    });
+  }
+
   async adoptWorkingMedia(
     input: AdoptProjectWorkingMediaPersistenceInput,
   ): Promise<ProjectWorkingMediaAdoptionResult> {
@@ -2963,38 +3117,7 @@ export class DrizzleProjectRepository
         );
       }
       if (current.archivedAt === null && nextProject.archivedAt !== null) {
-        const processing = await tx
-          .select({
-            id: processingJobs.id,
-            status: processingJobs.status,
-            retryOfJobId: processingJobs.retryOfJobId,
-            createdAt: processingJobs.createdAt,
-          })
-          .from(projectJobs)
-          .innerJoin(
-            processingJobs,
-            and(
-              eq(processingJobs.id, projectJobs.jobId),
-              eq(processingJobs.ownerUserId, projectJobs.ownerUserId),
-            ),
-          )
-          .where(
-            and(
-              eq(projectJobs.projectId, current.id),
-              eq(projectJobs.ownerUserId, current.ownerUserId),
-            ),
-          )
-          .for('share');
-        const attempts = processing.map(({ id, status, retryOfJobId, createdAt }) => ({
-          operationId: id,
-          status,
-          retryOfOperationId: retryOfJobId,
-          createdAt: toIsoTimestamp(createdAt),
-        }));
-        const activeJob = attempts.find((attempt) =>
-          projectProcessingAttemptBlocksArchive(attempt, attempts),
-        );
-        if (activeJob !== undefined) {
+        if (await this.#hasBlockingProcessingAttempt(tx, current.id, current.ownerUserId)) {
           return {
             kind: 'conflict',
             conflict: projectConflicts.activeJobs(current.id),

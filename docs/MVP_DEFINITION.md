@@ -153,9 +153,11 @@ default,” and it does not duplicate an entire reusable library record.
 - Create is idempotent and may use a generated `Untitled Project` title that can be renamed later.
 - Empty Projects are valid drafts, so organization does not force a source upload.
 - A Project becomes safely resumable only after its source is durably stored, inspected, and ready.
-- The first accepted source is the Project's immutable original. Failed or unaccepted staging may
-  be replaced; choosing a different accepted original starts a new Project. Local edits and
-  transformations advance working/presented media without replacing the original.
+- A Project's source is immutable while it is attached: a second acceptance conflicts rather than
+  overwriting it. Failed or unaccepted staging may be replaced, and an accepted source can be
+  explicitly removed to choose a different one without deleting the Project, its history, or any
+  saved output Version. Local edits and transformations advance working/presented media without
+  replacing the source.
 - Status reflects the current revision and current active attempt: draft, ready, processing,
   needs-attention, or completed. Historical failures do not poison newer work.
 - The current revision is completed only when its validated `lastSuccessfulOutput` names an exact

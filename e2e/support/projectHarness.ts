@@ -18,6 +18,7 @@ import type { Page } from '@playwright/test';
 export const TEST_PROJECT_ID = '18b120ac-1578-46e3-8c3d-42307772f391';
 const PROJECT_REVISION_ID = '89a972fe-bfb5-4214-94f7-4bd54f12ce06';
 const PROJECT_SOURCE_REVISION_ID = '4159225b-60f4-4f94-a3d5-08feee91a91d';
+const PROJECT_SOURCE_REMOVED_REVISION_ID = '5b42c7d8-9b65-4989-b351-293763b45e42';
 const PROJECT_CREATIVE_REVISION_ID = '3ac244b9-ec36-4a1e-b95e-7bcf37eb0b2d';
 const PROJECT_WORKING_MEDIA_REVISION_ID = '80eb98cb-0dd4-4aac-8507-084789045d71';
 const PROJECT_POST_ADOPTION_CREATIVE_REVISION_ID = '66517242-ccf5-4fa5-bcee-5831039119c9';
@@ -221,6 +222,7 @@ export const installProjectHarness = async (
     const method = request.method();
     const detailPath = `/api/projects/${TEST_PROJECT_ID}`;
     const sourcePath = `${detailPath}/source`;
+    const sourceRemovePath = `${sourcePath}/remove`;
     const sourceContentPath = `${sourcePath}/content`;
     const revisionsPath = `${detailPath}/revisions`;
     const workingMediaPath = `${detailPath}/working-media`;
@@ -820,6 +822,46 @@ export const installProjectHarness = async (
         status: 201,
         contentType: 'application/json',
         body: JSON.stringify(source),
+      });
+      return;
+    }
+    if (url.pathname === sourceRemovePath && method === 'POST' && current) {
+      const body = request.postDataJSON() as {
+        expectedVersion: number;
+        expectedRevisionNumber: number;
+      };
+      current = {
+        project: {
+          ...current.project,
+          status: 'draft',
+          version: body.expectedVersion + 1,
+          currentRevisionId: PROJECT_SOURCE_REMOVED_REVISION_ID,
+          currentRevisionNumber: body.expectedRevisionNumber + 1,
+          updatedAt: '2030-01-01T00:04:00.000Z',
+        },
+        revision: {
+          ...current.revision,
+          id: PROJECT_SOURCE_REMOVED_REVISION_ID,
+          revisionNumber: body.expectedRevisionNumber + 1,
+          parentRevisionId: current.revision.id,
+          parentRevisionNumber: current.revision.revisionNumber,
+          snapshot: {
+            ...current.revision.snapshot,
+            sourceAssetId: null,
+            workingMedia: null,
+            presentedMedia: null,
+            workflowPhase: 'source',
+            updatedAt: '2030-01-01T00:04:00.000Z',
+          },
+          source: 'user-edit',
+          createdAt: '2030-01-01T00:04:00.000Z',
+        },
+      };
+      source = null;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(current),
       });
       return;
     }

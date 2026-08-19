@@ -921,6 +921,90 @@ export const acceptProjectSource = (
   );
 };
 
+export interface RemoveProjectSourceInput {
+  readonly expectedProjectVersion: number;
+  readonly expectedRevisionNumber: number;
+  readonly author: ProjectRevisionAuthor;
+}
+
+/**
+ * Detaches the current source so a different original can be chosen.
+ *
+ * The source is immutable *while it is attached* — `acceptProjectSource` still refuses to overwrite
+ * one — but the Project is no longer a dead end when the wrong video was chosen. Removal only
+ * appends a revision: earlier revisions, produced output Versions and their asset lineage are
+ * untouched, so nothing that referenced the removed bytes loses them.
+ *
+ * Derived media goes with the source it was derived from. Creative configuration does not: the
+ * usual reason to remove a source is to point the same setup at the right video.
+ *
+ * CAS is checked before the semantic guards, matching `saveProjectOutput`, so a stale caller is
+ * told the Project moved rather than that its source vanished. Removing a source that is already
+ * gone never reaches this rule — the application converges on current authority first — which is
+ * what lets the command carry no operation receipt.
+ */
+export const removeProjectSource = (
+  aggregate: ProjectAggregate,
+  input: RemoveProjectSourceInput,
+  context: ProjectMutationContext,
+): ProjectMutationResult<ProjectAggregate> => {
+  const { project } = aggregate;
+  if (project.version !== input.expectedProjectVersion) {
+    return projectVersionConflict(project, input.expectedProjectVersion);
+  }
+  if (project.currentRevisionNumber !== input.expectedRevisionNumber) {
+    return {
+      ok: false,
+      conflict: projectConflicts.revision(
+        project.id,
+        input.expectedRevisionNumber,
+        project.currentRevisionNumber,
+      ),
+    };
+  }
+  const currentRevision = aggregate.revisions.find(({ id }) => id === project.currentRevisionId);
+  if (currentRevision === undefined) {
+    throw new ProjectRuleError('invalid-snapshot', 'The current project revision is missing.');
+  }
+  if (currentRevision.snapshot.sourceAssetId === null) {
+    throw new ProjectRuleError(
+      'invalid-transition',
+      'This Project does not have a source to remove.',
+    );
+  }
+  // Cheap first refusal. Whether provider work is genuinely still open is a persistence fact, so
+  // the repository transaction stays authoritative for it — and answering with the same typed
+  // conflict it returns keeps one shape on the wire whichever layer refuses first.
+  if (project.status === 'processing') {
+    return { ok: false, conflict: projectConflicts.activeJobs(project.id) };
+  }
+  const now = requireTimestamp(context.now);
+  return appendProjectRevision(
+    aggregate,
+    {
+      expectedProjectVersion: input.expectedProjectVersion,
+      expectedRevisionNumber: input.expectedRevisionNumber,
+      snapshot: {
+        ...currentRevision.snapshot,
+        sourceAssetId: null,
+        workingMedia: null,
+        presentedMedia: null,
+        lastSuccessfulOutput: null,
+        workflowPhase: 'source',
+        updatedAt: now,
+      },
+      author: input.author,
+      source: 'user-edit',
+      facts: {
+        sourceStatus: 'none',
+        currentAttempt: { status: 'none' },
+        validatedLastSuccessfulOutput: null,
+      },
+    },
+    { ...context, now },
+  );
+};
+
 export interface AdoptProjectWorkingMediaInput {
   readonly expectedProjectVersion: number;
   readonly expectedRevisionNumber: number;
