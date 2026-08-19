@@ -18,6 +18,7 @@ describe('AssetsRouteSurface', () => {
         <AssetsRouteSurface
           characterCount={2}
           outfitCount={3}
+          creativeLibraryMirror="browser-only"
           onOpen={onOpen}
           onUploadVideo={onUploadVideo}
         />
@@ -36,5 +37,44 @@ describe('AssetsRouteSurface', () => {
     expect(onUploadVideo).toHaveBeenCalledOnce();
     await user.click(screen.getByRole('button', { name: 'Open Voices' }));
     expect(onOpen).toHaveBeenCalledWith('voices');
+  });
+
+  it('states where the browser-held libraries live, and says it only of those two', () => {
+    const { rerender } = render(
+      <StudioDesignProvider>
+        <AssetsRouteSurface
+          characterCount={0}
+          outfitCount={0}
+          creativeLibraryMirror="browser-only"
+          onOpen={vi.fn()}
+          onUploadVideo={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    // Characters and Outfits only: Videos and Voices are the server's and are not covered by it.
+    expect(
+      screen.getAllByText('Stored in this browser only — clearing site data deletes it.'),
+    ).toHaveLength(2);
+
+    rerender(
+      <StudioDesignProvider>
+        <AssetsRouteSurface
+          characterCount={0}
+          outfitCount={0}
+          creativeLibraryMirror="cloud"
+          onOpen={vi.fn()}
+          onUploadVideo={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    // A cloud copy is claimed only where the route that provides it is actually registered.
+    expect(
+      screen.queryByText('Stored in this browser only — clearing site data deletes it.'),
+    ).not.toBeInTheDocument();
+    expect(screen.getAllByText('Stored in this browser and copied to your account.')).toHaveLength(
+      2,
+    );
   });
 });

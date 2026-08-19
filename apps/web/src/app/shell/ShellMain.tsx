@@ -136,6 +136,7 @@ export const ShellMain = ({ services, displayName, studioRuntime }: ShellMainPro
               creative.store.savedPrompts.filter((item) => item.modelModeId === 'lucy-vton-latest')
                 .length
             }
+            creativeLibraryMirror={creative.sync.mirror}
             onOpen={nav.openAssetLibrary}
             onUploadVideo={nav.uploadVideo}
           />

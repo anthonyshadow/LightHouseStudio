@@ -119,6 +119,7 @@ export const ShellChrome = ({ services, user, logout }: ShellChromeProps) => {
         mainRef={mainRef}
         repository={repository}
         store={store}
+        creativeLibraryMirror={sync.mirror}
         onClose={nav.closeAssetLibrary}
         focusedSavedVideoId={route.focusedSavedVideoId}
         onFocusedSavedVideoConsumed={nav.clearFocusedSavedVideo}

@@ -1,4 +1,5 @@
 import type { SavedVideoSummary, VoiceSummary } from '@studio/contracts';
+import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { lazy, Suspense, type RefObject } from 'react';
 import { APP_PATHS } from '../app/paths';
 import type {
@@ -7,8 +8,14 @@ import type {
   SavedCharacterPrompt,
   SavedPrompt,
 } from '../features/creative-assets/types';
+import type { CreativeLibraryMirror } from '../features/creative-assets/useCreativeLibraryCloudSync';
 import { Button, OverlayPanel } from '../ui';
 
+const CreativeLibraryPortability = lazy(() =>
+  import('../features/creative-assets/CreativeLibraryPortability').then((module) => ({
+    default: module.CreativeLibraryPortability,
+  })),
+);
 const SavedCharacterLibrary = lazy(() =>
   import('../features/account-library/SavedCreativeLibrary').then((module) => ({
     default: module.SavedCharacterLibrary,
@@ -31,11 +38,19 @@ const VoiceLibrary = lazy(() =>
 );
 const deferredLibraryFallback = <p role="status">Loading studio tool…</p>;
 
+/** Keeps the export/import block clear of the grid the library below it lays out for itself. */
+const managedLibraryStyles = (theme: Theme): CSSObject => ({
+  display: 'grid',
+  gap: theme.space.lg,
+});
+
 interface StudioLibraryOverlaysProps {
   readonly pathname: string;
   readonly mainRef: RefObject<HTMLElement | null>;
   readonly repository: CreativeAssetRepository;
   readonly store: CreativeAssetStore;
+  /** Where the creative library is actually stored, so these surfaces can say so accurately. */
+  readonly creativeLibraryMirror: CreativeLibraryMirror;
   /** Leaves the library by consuming its history entry rather than pushing the hub on top of it. */
   readonly onClose: () => void;
   readonly focusedSavedVideoId: string | null;
@@ -56,6 +71,7 @@ export const StudioLibraryOverlays = ({
   mainRef,
   repository,
   store,
+  creativeLibraryMirror,
   onClose,
   focusedSavedVideoId,
   onFocusedSavedVideoConsumed,
@@ -69,6 +85,8 @@ export const StudioLibraryOverlays = ({
   voiceLibraryUnavailableReason,
   onUseVoice,
 }: StudioLibraryOverlaysProps) => {
+  const theme = useTheme();
+
   return (
     <>
       <OverlayPanel
@@ -122,13 +140,20 @@ export const StudioLibraryOverlays = ({
       >
         {pathname === APP_PATHS.characters ? (
           <Suspense fallback={deferredLibraryFallback}>
-            <SavedCharacterLibrary
-              items={store.savedCharacterPrompts}
-              repository={repository}
-              onCreateFrom={onCopyCharacter}
-              onOpenWardrobe={onOpenWardrobe}
-              onUse={onUseCharacter}
-            />
+            <div css={managedLibraryStyles(theme)}>
+              <CreativeLibraryPortability
+                repository={repository}
+                store={store}
+                mirror={creativeLibraryMirror}
+              />
+              <SavedCharacterLibrary
+                items={store.savedCharacterPrompts}
+                repository={repository}
+                onCreateFrom={onCopyCharacter}
+                onOpenWardrobe={onOpenWardrobe}
+                onUse={onUseCharacter}
+              />
+            </div>
           </Suspense>
         ) : null}
       </OverlayPanel>
@@ -145,12 +170,19 @@ export const StudioLibraryOverlays = ({
       >
         {pathname === APP_PATHS.outfits ? (
           <Suspense fallback={deferredLibraryFallback}>
-            <SavedOutfitLibrary
-              items={store.savedPrompts.filter((item) => item.modelModeId === 'lucy-vton-latest')}
-              repository={repository}
-              onCreate={onCreateOutfit}
-              onUse={onUseOutfit}
-            />
+            <div css={managedLibraryStyles(theme)}>
+              <CreativeLibraryPortability
+                repository={repository}
+                store={store}
+                mirror={creativeLibraryMirror}
+              />
+              <SavedOutfitLibrary
+                items={store.savedPrompts.filter((item) => item.modelModeId === 'lucy-vton-latest')}
+                repository={repository}
+                onCreate={onCreateOutfit}
+                onUse={onUseOutfit}
+              />
+            </div>
           </Suspense>
         ) : null}
       </OverlayPanel>
