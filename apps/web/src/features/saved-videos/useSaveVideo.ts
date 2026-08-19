@@ -10,7 +10,11 @@ import {
 } from '../../adapters/api-client/savedVideosApi';
 import type { RecordingArtifact } from '../recording/types';
 import { savedVideoQueryKeys } from './savedVideoQueryKeys';
-import { createSavedVideoThumbnail } from './thumbnailClient';
+import {
+  createThumbnailForChoice,
+  DEFAULT_SAVED_VIDEO_THUMBNAIL_CHOICE,
+  type SavedVideoThumbnailChoice,
+} from './thumbnailSource';
 
 export type SaveVideoState =
   | { readonly status: 'idle' }
@@ -45,15 +49,18 @@ const originForArtifact = (artifact: RecordingArtifact): SavedVideoOrigin => {
   }
 };
 
+/**
+ * A poster frame is never a precondition for saving: generation retries once, and a persistent
+ * failure leaves the saved record intact and repairable from the Videos library.
+ */
 const saveThumbnailWhenAvailable = async (
   video: SavedVideoDetail,
   media: Blob,
   signal: AbortSignal,
+  thumbnail: SavedVideoThumbnailChoice,
 ): Promise<SavedVideoDetail> =>
-  createSavedVideoThumbnail(media, signal)
-    .then((thumbnail) =>
-      saveSavedVideoThumbnail(video.id, video.currentVersion.id, thumbnail, signal),
-    )
+  createThumbnailForChoice(thumbnail, media, signal)
+    .then((poster) => saveSavedVideoThumbnail(video.id, video.currentVersion.id, poster, signal))
     .catch((error: unknown) => {
       if (signal.aborted) throw error;
       return video;
@@ -81,6 +88,7 @@ export const useSaveVideo = (directMultipartUpload = false) => {
       title?: string,
       source?: { readonly videoId: string; readonly versionId: string },
       character?: SavedVideoCharacterAttribution | null,
+      thumbnail: SavedVideoThumbnailChoice = DEFAULT_SAVED_VIDEO_THUMBNAIL_CHOICE,
     ) => {
       if (controller.current !== null) return null;
       const idempotencyKey = keys.current.get(artifact.id) ?? crypto.randomUUID();
@@ -101,7 +109,12 @@ export const useSaveVideo = (directMultipartUpload = false) => {
           sourceVersionId: source?.versionId ?? null,
           signal: active.signal,
         });
-        const saved = await saveThumbnailWhenAvailable(video, artifact.media, active.signal);
+        const saved = await saveThumbnailWhenAvailable(
+          video,
+          artifact.media,
+          active.signal,
+          thumbnail,
+        );
         if (active.signal.aborted) return null;
         completeSave(artifact.id, saved);
         return saved;
@@ -126,6 +139,7 @@ export const useSaveVideo = (directMultipartUpload = false) => {
       target: { readonly videoId: string; readonly currentVersionId: string },
       title?: string,
       character?: SavedVideoCharacterAttribution | null,
+      thumbnail: SavedVideoThumbnailChoice = DEFAULT_SAVED_VIDEO_THUMBNAIL_CHOICE,
     ) => {
       if (controller.current !== null) return null;
       const keyId = `${artifact.id}:replace:${target.videoId}:${target.currentVersionId}`;
@@ -150,7 +164,12 @@ export const useSaveVideo = (directMultipartUpload = false) => {
           sourceVersionId: target.currentVersionId,
           signal: active.signal,
         });
-        const saved = await saveThumbnailWhenAvailable(video, artifact.media, active.signal);
+        const saved = await saveThumbnailWhenAvailable(
+          video,
+          artifact.media,
+          active.signal,
+          thumbnail,
+        );
         if (active.signal.aborted) return null;
         completeSave(artifact.id, saved);
         return saved;

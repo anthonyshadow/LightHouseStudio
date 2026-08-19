@@ -27,6 +27,7 @@ import {
 import { Button, OverlayPanel, SelectField, StatusNotice, TextField } from '../../ui';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { AddVideoToProjectDialog } from '../projects/AddVideoToProjectDialog';
+import { GeneratePreviewDialog } from './GeneratePreviewDialog';
 import {
   actionMenuPopoverStyles,
   actionMenuStyles,
@@ -41,6 +42,7 @@ import {
   galleryStyles,
   gallerySummaryStyles,
   gridStyles,
+  noPreviewActionStyles,
   paginationStyles,
   playBadgeStyles,
   posterButtonStyles,
@@ -105,6 +107,7 @@ const VideoGalleryGrid = ({
   brokenThumbnails,
   onThumbnailError,
   onOpenPreview,
+  onGeneratePreview,
   onUse,
   onAddToProject,
   onRename,
@@ -115,6 +118,7 @@ const VideoGalleryGrid = ({
   brokenThumbnails: ReadonlySet<string>;
   onThumbnailError: (videoId: string) => void;
   onOpenPreview: (video: SavedVideoSummary, trigger: HTMLButtonElement) => void;
+  onGeneratePreview: (video: SavedVideoSummary, trigger: HTMLElement) => void;
   onUse: (video: SavedVideoSummary, intent: 'play' | 'edit') => Promise<void>;
   onAddToProject: (video: SavedVideoSummary, trigger: HTMLElement) => void;
   onRename: (video: SavedVideoSummary, trigger: HTMLElement) => void;
@@ -151,13 +155,13 @@ const VideoGalleryGrid = ({
                   <span
                     css={thumbnailPlaceholderStyles(theme)}
                     aria-label={
-                      video.thumbnailAvailable
-                        ? 'Thumbnail could not load'
-                        : 'Thumbnail unavailable'
+                      video.thumbnailAvailable ? 'Preview could not load' : 'No preview yet'
                     }
                   >
                     <VideoPlaceholderIcon />
-                    <span>Preview available</span>
+                    <span>
+                      {video.thumbnailAvailable ? 'Preview didn’t load' : 'No preview yet'}
+                    </span>
                   </span>
                 )}
                 <span data-gallery-play="" css={playBadgeStyles(theme)}>
@@ -195,6 +199,19 @@ const VideoGalleryGrid = ({
                   <span css={chipStyles(theme)}>Unassigned Content</span>
                 ) : null}
               </div>
+              {video.thumbnailAvailable ? null : (
+                <div css={noPreviewActionStyles(theme)}>
+                  <span>This video has no preview image.</span>
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    disabled={busy || video.status !== 'ready'}
+                    onClick={(event) => onGeneratePreview(video, event.currentTarget)}
+                  >
+                    Generate preview
+                  </Button>
+                </div>
+              )}
               <div css={actionsStyles(theme)}>
                 <Button
                   variant="primary"
@@ -300,6 +317,7 @@ export const VideoGallery = ({
     readonly video: SavedVideoSummary;
   } | null>(null);
   const [projectTarget, setProjectTarget] = useState<SavedVideoSummary | null>(null);
+  const [previewRepairTarget, setPreviewRepairTarget] = useState<SavedVideoSummary | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [brokenThumbnails, setBrokenThumbnails] = useState<ReadonlySet<string>>(() => new Set());
@@ -310,6 +328,7 @@ export const VideoGallery = ({
   const renameInputRef = useRef<HTMLInputElement | null>(null);
   const actionCancelRef = useRef<HTMLButtonElement | null>(null);
   const projectTriggerRef = useRef<HTMLElement | null>(null);
+  const previewRepairTriggerRef = useRef<HTMLElement | null>(null);
 
   const videosQuery = useInfiniteQuery({
     queryKey: [
@@ -617,6 +636,11 @@ export const VideoGallery = ({
             setBrokenThumbnails((current) => new Set(current).add(videoId))
           }
           onOpenPreview={openPreview}
+          onGeneratePreview={(video, trigger) => {
+            previewRepairTriggerRef.current = trigger;
+            setNotice(null);
+            setPreviewRepairTarget(video);
+          }}
           onUse={handleUseVideo}
           onAddToProject={(video, trigger) => {
             projectTriggerRef.current = trigger;
@@ -689,6 +713,29 @@ export const VideoGallery = ({
           video={projectTarget}
           returnFocusRef={projectTriggerRef}
           onClose={() => setProjectTarget(null)}
+        />
+      ) : null}
+
+      {previewRepairTarget ? (
+        <GeneratePreviewDialog
+          video={previewRepairTarget}
+          returnFocusRef={previewRepairTriggerRef}
+          onClose={() => setPreviewRepairTarget(null)}
+          onGenerated={(video) => {
+            setPreviewRepairTarget(null);
+            // A repaired record may still carry a stale broken-image mark from an earlier load.
+            setBrokenThumbnails((current) => {
+              if (!current.has(video.id)) return current;
+              const next = new Set(current);
+              next.delete(video.id);
+              return next;
+            });
+            setNotice({
+              role: 'status',
+              tone: 'success',
+              message: `Preview generated for “${video.title}”.`,
+            });
+          }}
         />
       ) : null}
 

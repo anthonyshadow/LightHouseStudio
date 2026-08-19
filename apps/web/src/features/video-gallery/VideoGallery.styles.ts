@@ -201,6 +201,25 @@ export const chipStyles = (theme: Theme): CSSObject => ({
   lineHeight: 1.2,
 });
 
+/** The deliberate no-preview state: a plain statement of fact and the action that resolves it. */
+export const noPreviewActionStyles = (theme: Theme): CSSObject => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: theme.space.xs,
+  padding: `${theme.space.xs} ${theme.space.sm}`,
+  border: `1px dashed ${theme.colors.borderStrong}`,
+  borderRadius: theme.radii.medium,
+  background: theme.colors.surfaceStrong,
+  '& > span': {
+    minWidth: 0,
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSizes.caption,
+    lineHeight: 1.4,
+  },
+});
+
 export const actionsStyles = (theme: Theme): CSSObject => ({
   position: 'relative',
   display: 'flex',

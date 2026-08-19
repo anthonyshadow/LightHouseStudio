@@ -14,6 +14,7 @@ import type {
   SavedVideoCharacterAttribution,
   useSaveVideo,
 } from '../features/saved-videos/useSaveVideo';
+import type { SavedVideoThumbnailChoice } from '../features/saved-videos/thumbnailSource';
 import { isVideoEditBusy } from '../features/video-editor/types';
 import type { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import type { useTakeReviewFlow } from './useTakeReviewFlow';
@@ -337,7 +338,7 @@ export const useStudioSavedVideoController = ({
   }, [returnFromVideoEditor, videoEditor.dirty, videoEditor.phase]);
 
   const commitVideoEdit = useCallback(
-    async (saveCurrent: boolean, name?: string) => {
+    async (saveCurrent: boolean, name?: string, thumbnail?: SavedVideoThumbnailChoice) => {
       const source = videoEditor.source;
       const candidate = videoEditor.candidate;
       if (!source || !candidate || videoEditor.phase !== 'awaiting-replacement') return;
@@ -354,6 +355,7 @@ export const useStudioSavedVideoController = ({
                 }
               : undefined,
             presentedCharacter,
+            thumbnail,
           );
           if (!saved) {
             videoEditor.failCommit(
@@ -415,16 +417,16 @@ export const useStudioSavedVideoController = ({
   }, [videoEditor]);
 
   const confirmPendingSave = useCallback(
-    (name?: string) => {
+    (name?: string, thumbnail?: SavedVideoThumbnailChoice) => {
       const pending = pendingSave;
       if (!pending) return;
       setPendingSave(null);
       if (pending.intent === 'video-edit-replacement') {
-        void commitVideoEdit(true, name);
+        void commitVideoEdit(true, name, thumbnail);
         return;
       }
       void saveController
-        .save(pending.artifact, name, pending.source, pending.character)
+        .save(pending.artifact, name, pending.source, pending.character, thumbnail)
         .then((saved) => {
           if (saved) setSaveOutcome(saved);
         });

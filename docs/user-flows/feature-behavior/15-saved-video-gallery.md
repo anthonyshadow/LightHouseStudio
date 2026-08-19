@@ -9,8 +9,11 @@ Studio stage.
 ## Observable behavior
 
 1. A healthy review artifact exposes **Save to Assets** and no Download action **before** it is
-   saved. Saving first prompts for an optional video name; a blank field keeps the existing
-   generated artifact name. Once that exact artifact is retained, review acknowledges completion and
+   saved. Saving first prompts for an optional video name and an optional preview image source; a
+   blank field keeps the existing generated artifact name. The preview source is one of an
+   automatic early frame, the video's first frame, or an uploaded JPEG/PNG/WebP image; choosing
+   Upload without attaching an image falls back to the automatic frame, so deciding nothing keeps
+   the long-standing behaviour. Once that exact artifact is retained, review acknowledges completion and
    offers **Download**, **View in Assets** and **Create another** for that exact Version; a Project
    video context keeps its own attach-and-return behavior instead.
    Saving is explicit, reports progress/result, and repeated submission of the same artifact is
@@ -38,8 +41,16 @@ Studio stage.
    cards and Preview show the variant as additional information. When no retained version has
    attribution yet, the character control remains operable and explains why it has no named option.
 5. Cards show safe title, time, duration, dimensions, format, optional character attribution,
-   origin, version count, and a lazy optional thumbnail. Missing or failed thumbnail generation
-   renders a placeholder and does not fail Save.
+   origin, version count, and a lazy optional thumbnail. Thumbnails preserve the source aspect
+   ratio: the long edge is bounded and the short edge follows, so a 9:16 source produces a portrait
+   poster rather than a centre-cropped landscape tile, and a source already inside the bound is
+   never upscaled.
+   Thumbnail generation is client-side and retried once; missing or failed generation renders a
+   deliberate `No preview yet` placeholder and never fails Save. Such a record offers an inline
+   **Generate preview** action that regenerates from the current Version — automatic frame, first
+   frame, or an uploaded image — uploads it through the existing thumbnail endpoint, and refreshes
+   the card without a page reload. A failed repair reports an actionable message with a retry and
+   leaves the record unchanged. Listing the library issues no per-row request.
 6. Activating a ready thumbnail explicitly fetches owner-checked bytes into a centered video
    preview over a darkened gallery. The dialog traps focus, closes with Escape, returns focus to the
    thumbnail, and detaches its player source when closed; it owns no tracks, object URL, recorder,
