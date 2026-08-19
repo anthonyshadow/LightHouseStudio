@@ -375,7 +375,7 @@ observed. The capture moved above the branch and the archived request is now ass
 
 ### N11 — Project counts are "N loaded", never totals (Low)
 
-Both list surfaces show `{items.length} loaded` (`ProjectRouteSurface.tsx:145`,
+Both list surfaces show `{items.length} loaded` (`ProjectsListSurface.tsx:71`,
 `CampaignRouteSurface.tsx:58`) because the contracts return no total
 (`packages/contracts/src/projects.ts:703-708`). The Videos gallery, by contrast, does have a
 `total`. The word "loaded" exposes pagination mechanics.
@@ -391,7 +391,7 @@ Both list surfaces show `{items.length} loaded` (`ProjectRouteSurface.tsx:145`,
 | M5     | Breadcrumbs anywhere except Project detail, Project workspace and Campaign detail                                                                                                 | Assets libraries, Studio           | Medium   |
 | ~~M6~~ | ~~Progress indication for the Project workflow phase~~ — **resolved with G7**                                                                                                     | Project workspace masthead         | Medium   |
 | M7     | A "what is a Project / Campaign / Asset" explanation reachable after onboarding is dismissed                                                                                      | Global                             | Medium   |
-| M8     | Confirmation before a project-source upload replaces a previously _failed_ staging attempt                                                                                        | `ProjectRouteSurface.tsx:585-621`  | Low      |
+| M8     | Confirmation before a project-source upload replaces a previously _failed_ staging attempt                                                                                        | `ProjectSourceSection.tsx:130-166` | Low      |
 | M9     | Any surfacing of `entitlements` returned by `/api/auth/me`                                                                                                                        | Account menu                       | Low      |
 | M10    | An error boundary message that distinguishes a chunk-load failure from an application crash                                                                                       | `AppRouter.tsx`                    | Low      |
 | M11    | Retry affordance for the Assets hub when the creative repository fails to open                                                                                                    | `useStudioCreativeRepository.ts`   | Low      |
@@ -713,7 +713,7 @@ concerns:
 | #   | Concern                                                                                                                                                                                                                       | Evidence                                           |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
 | P1  | ~~The mobile bottom nav only renders on organization routes. On `/studio/create` there is no bottom navigation at all.~~ — resolved: the shell renders one navigation chrome (rail plus bottom bar) on every protected route. | `StudioHeader.tsx`                                 |
-| P2  | The Project workspace tablist is four horizontal tabs; at small widths with large text they compete with the media stage in the same viewport.                                                                                | `ProjectRouteSurface.tsx:870-888`                  |
+| P2  | The Project workspace tablist is four horizontal tabs; at small widths with large text they compete with the media stage in the same viewport.                                                                                | `ProjectWorkspaceSurface.tsx:244-261`              |
 | P3  | The account menu becomes a 2.75 rem icon with the label hidden below 48 rem (`AccountMenu.tsx:126-129`), leaving logout behind an unlabelled avatar.                                                                          | `AccountMenu.tsx:126-129`                          |
 | P4  | Asset library overlays are `placement="fullscreen"`, which is correct on mobile but means the hub's context is entirely lost with no breadcrumb (M5, M12).                                                                    | `StudioLibraryOverlays.tsx`                        |
 | P5  | Capture settings collapse from a desktop sidebar to a right-side overlay based on `useDesktopStudioLayout`; the transition point is not aligned with the nav breakpoints.                                                     | `useDesktopStudioLayout.ts`, `StudioApp.styles.ts` |

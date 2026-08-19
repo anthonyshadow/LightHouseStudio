@@ -93,10 +93,11 @@ configured `DATABASE_MODE`; otherwise the routes are absent and the client sees 
 
 **Journey**
 
-1. `ProjectRouteSurface` sees no project id in the pathname and renders `ProjectsWorkspace`
-   (`ProjectRouteSurface.tsx:1196-1200`).
+1. `ProjectRouteSurface` sees no project id in the pathname and renders `ProjectsListSurface`
+   (`ProjectRouteSurface.tsx:39-43`).
 2. Header: `h1` "Projects", subtitle, and one create action — **New Project** (primary).
-3. A group filter with two options: **All Active** and **No Campaign** (`:352-369`).
+3. A group filter with two options: **All Active** and **No Campaign**
+   (`ProjectsListSurface.tsx:258-275`).
 4. Two `ProjectListSection`s render — `lifecycle="active"` and `lifecycle="archived"` — and the
    group filter applies to **both**. Selecting "No Campaign" retitles them "No Campaign" and
    "Archived · No Campaign" and issues `campaignId=none` for each; the archived section used to
@@ -115,7 +116,7 @@ Campaign already picked in the dialog, which the former standalone **Quick proje
 could not do.
 
 **States** — loading, error+retry, and distinct active/archived empty states are all present
-(`:147-165`).
+(`ProjectsListSurface.tsx:73-95`).
 
 **Exit** — `/projects/{id}`.
 
@@ -128,7 +129,8 @@ deep link.
 
 1. `useProjectSession(projectId)` hydrates: `GET /api/projects/{id}`. While
    `session.current === null && phase === 'hydrating'`, a `role="status"` "Loading Project…" renders.
-   On failure a danger notice offers **Back to Projects** and **Retry** (`:773-798`).
+   On failure a danger notice offers **Back to Projects** and **Retry**
+   (`ProjectDetailSurface.tsx:144-169`).
 2. Header: a breadcrumb button labelled "← All Projects" or "← {campaign name}", the title, status,
    "Updated", "Revision N", campaign state, a one-line workflow hint —
    _"No source yet • Choose the original video below to begin."_ or
@@ -188,8 +190,8 @@ deep link to a task returns to that task after re-authenticating.
 
 ### Task 1 — Source
 
-Three ways to give the Project its source, plus one way to take it back (`ProjectSourceSection`,
-inside `ProjectRouteSurface.tsx`):
+Three ways to give the Project its source, plus one way to take it back
+(`ProjectSourceSection.tsx`):
 
 | Action                    | Behaviour                                                                                                                                                                                                                                                                                            |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -222,7 +224,7 @@ Contains three stacked blocks:
    reuse retained media (`POST …/working-media/reuse`).
 3. **`ProjectProcessingStatusPanel`** — the recoverable provider operation surface, or a neutral
    "Recoverable Project processing ready" explainer. When no processing service is configured the
-   panel is replaced by "Processing unavailable" (`ProjectRouteSurface.tsx:942-948`).
+   panel is replaced by "Processing unavailable" (`ProjectWorkspaceSurface.tsx:313-319`).
 
 ### Task 3 — Save
 
@@ -278,7 +280,7 @@ Distinct from the standalone Studio path because it must survive reload.
 7. **Remove from processing queue** cancels tracking with an explicit warning that the provider may
    still finish and charge.
 8. Archiving is blocked while an attempt is active or ambiguous, with a specific reason string
-   (`ProjectRouteSurface.tsx:1137-1143`).
+   (`ProjectDetailSurface.tsx:119`).
 
 Project provider **voice** and **live** starts are deliberately unavailable
 (`PROJECT_PROVIDER_START_BLOCKED_REASON`, `ProjectCreativeCheckpointPanel.tsx:14`).

@@ -3,12 +3,13 @@ import { studioTheme } from '../../ui';
 import {
   projectOverviewHeaderStyles,
   projectOverviewInnerStyles,
-  projectOverviewRouteStyles,
+} from './ProjectOverviewSurface.styles';
+import { projectOverviewRouteStyles, projectsIndexRouteStyles } from './ProjectRouteSurface.styles';
+import {
   projectsHeaderActionsStyles,
-  projectsIndexRouteStyles,
   projectsLedgerRowStyles,
   projectsWorkspaceInnerStyles,
-} from './ProjectRouteSurface.styles';
+} from './ProjectsListSurface.styles';
 
 describe('Project index responsive ledger styles', () => {
   it('keeps the index flat and establishes a content-width query boundary', () => {
