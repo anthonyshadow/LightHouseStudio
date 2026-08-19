@@ -225,7 +225,7 @@ implicitly:
 - Provider submissions require a trusted origin **and** an explicit intent header
   (`requireVideoProviderIntent`).
 - Project source selection, hydration, recording acceptance and resume never start a provider
-  (stated in the UI at `ProjectRouteSurface.tsx:629-631`).
+  (stated in the UI at `ProjectSourceSection.tsx:213`).
 - A lost submission response is reconciled, never blindly retried.
 
 ## Unverified
