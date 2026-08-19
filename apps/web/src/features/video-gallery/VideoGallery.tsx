@@ -196,7 +196,7 @@ const VideoGalleryGrid = ({
                   <span css={chipStyles(theme)}>{video.status}</span>
                 ) : null}
                 {video.assignment === 'unassigned' ? (
-                  <span css={chipStyles(theme)}>Unassigned Content</span>
+                  <span css={chipStyles(theme)}>No Project</span>
                 ) : null}
               </div>
               {video.thumbnailAvailable ? null : (
@@ -556,8 +556,8 @@ export const VideoGallery = ({
       <div>
         <h2>No videos in Assets yet</h2>
         <p>
-          Finish a Project with Save as New Video or Add Version, or save a standalone Studio video.
-          Download always selects one exact ready Version.
+          Finish a Project with Save as New Video or Add Version, or save a video straight from
+          Studio.
         </p>
       </div>
     );
@@ -568,13 +568,6 @@ export const VideoGallery = ({
       {notice ? (
         <StatusNotice role={notice.role} tone={notice.tone}>
           {notice.message}
-        </StatusNotice>
-      ) : null}
-      {videos.some((video) => video.assignment === 'unassigned') ? (
-        <StatusNotice role="status" tone="neutral" title="Unassigned Content">
-          These legacy or independently saved videos have no trustworthy producing Project. They
-          remain fully usable; later source reuse records used-by lineage without inventing a
-          producer.
         </StatusNotice>
       ) : null}
       <div css={filterControlsStyles(theme)} aria-label="Filter and sort saved videos">
@@ -666,7 +659,7 @@ export const VideoGallery = ({
         open={action?.kind === 'rename'}
         onClose={closeAction}
         title="Rename saved video"
-        description="Change the library title without changing any immutable Video Version."
+        description="Changes the title in your library. No saved version changes."
         placement="bottom"
         size="standard"
         closeDisabled={renameMutation.isPending}
@@ -743,7 +736,7 @@ export const VideoGallery = ({
         open={action?.kind === 'remove'}
         onClose={closeAction}
         title="Remove video from Assets"
-        description="Hide this video from Assets without claiming physical erasure."
+        description="Hides this video from Assets. Its file is not erased."
         placement="bottom"
         size="standard"
         closeDisabled={deleteMutation.isPending}
@@ -767,8 +760,8 @@ export const VideoGallery = ({
         }
       >
         <p>
-          Remove “{action?.video.title}” from Assets? Exact Versions and bytes remain available from
-          any retaining Project history.
+          Remove “{action?.video.title}” from Assets? Its versions stay available from the history
+          of any Project that kept them.
         </p>
         {actionError ? (
           <StatusNotice role="alert" tone="danger" title="Video not removed">
@@ -781,7 +774,7 @@ export const VideoGallery = ({
         open={previewVideo !== null}
         onClose={closePreview}
         title={previewVideo?.title ?? 'Video preview'}
-        description="Select and preview one exact immutable Version. Selection never changes the Saved Video current pointer."
+        description="Preview any saved version. Choosing one here does not change which version is current."
         placement="fullscreen"
         size="wide"
         height="tall"
@@ -921,8 +914,8 @@ export const VideoGallery = ({
             ) : null}
             {!selectedIsCurrent && selectedVersion ? (
               <p>
-                Use this older Version from a retaining Project&apos;s history. Viewing or Download
-                here does not select an Add Version target.
+                Use this older version from the history of a Project that kept it. Viewing or
+                downloading here does not set a target for Add Version.
               </p>
             ) : null}
           </div>

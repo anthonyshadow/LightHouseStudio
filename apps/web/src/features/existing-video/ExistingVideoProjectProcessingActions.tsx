@@ -54,7 +54,7 @@ const projectProcessingBlockedDetail = ({
     return 'Project provider Voice remains unavailable because its synchronous response cannot reconnect through the durable Project operation authority. Remove Voice to start the visual operation.';
   }
   if (workflow.voiceSelection?.kind === 'local') {
-    return 'Remove Voice before starting Project visual processing. Local Voice can run separately, but its rendered result cannot yet become resumable Project working media.';
+    return 'Remove Voice before starting visual work in this Project. Local Voice can run separately, but its result cannot yet become the current cut.';
   }
   if (projectCapability === null) {
     return 'Project provider Voice remains unavailable. Character Swap and Virtual Try On are the recoverable Project capabilities in this release.';

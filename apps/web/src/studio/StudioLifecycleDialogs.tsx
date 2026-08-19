@@ -90,14 +90,12 @@ export const StudioLifecycleDialogs = ({
       {projectWorkingMedia !== null ? (
         <ConfirmationDialog
           open={videoEditor.phase === 'awaiting-replacement'}
-          title="Adopt Render preview as Project working media?"
+          title="Make this render the current cut?"
           description={
             projectWorkingMedia.message ??
-            'This render only exists on your device until you keep it. Keeping it stores and checks the file, then makes it the video this Project works from. Your original source stays as it is, and no Saved Video or Version is created.'
+            'This render only exists on your device until you keep it. Keeping it stores and checks the file, then makes it what this Project works from now. Your original video stays as it is, and no video or version is saved.'
           }
-          confirmLabel={
-            projectWorkingMedia.busy ? 'Adopting working media…' : 'Adopt as working media'
-          }
+          confirmLabel={projectWorkingMedia.busy ? 'Saving current cut…' : 'Use as the current cut'}
           cancelLabel="Keep editing"
           busy={projectWorkingMedia.busy}
           returnFocusRef={mainRef}

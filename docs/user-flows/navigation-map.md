@@ -127,7 +127,7 @@ ProjectDetail (overview)
 ProjectDetail (workspace)
   ├─ Overview breadcrumb ───────────────► /projects/{id}
   ├─ Source ▸ Record ───────────────────► starts local capture on the stage, stays on route
-  ├─ Create ▸ Save creative setup ──────► checkpoint revision
+  ├─ Create ▸ Save progress ────────────► checkpoint revision
   ├─ Save ▸ Save as New Video ──────────► Saved Video (stays)
   └─ History ▸ Download ────────────────► /api/projects/{id}/outputs/{versionId}/content?download=true
 

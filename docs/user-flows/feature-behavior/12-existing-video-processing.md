@@ -257,7 +257,7 @@ provider, or selecting an Add Version output target. That accepted Project sourc
 rehydrates through the Project content route; this standalone workflow remains temporary.
 
 For a source-bearing Project, the existing-video controls remain the feature-local configuration
-owner for one visual treatment followed by optional Voice. **Save creative setup** checkpoints the
+owner for one visual treatment followed by optional Voice. **Save progress** checkpoints the
 plan without provider contact. Project **Start Character Swap** and **Start Virtual Try On** first
 save that exact setup, then use one app-owned operation command that commits the exact initiating
 revision before provider submission. Refresh/reopen reads current authority and resumes bounded

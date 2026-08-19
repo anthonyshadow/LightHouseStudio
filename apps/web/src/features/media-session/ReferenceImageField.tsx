@@ -104,7 +104,7 @@ export const ReferenceImageField = ({
               byteSize: image.size,
               description:
                 referenceImage?.kind === 'persisted'
-                  ? 'This immutable local asset can be restored with its saved configuration.'
+                  ? 'This stored image is restored with its saved setup.'
                   : 'This manual upload stays in memory and is not added to the saved asset library.',
               removeLabel: 'Clear image',
               removeTitle: 'Remove reference image',

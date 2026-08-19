@@ -94,9 +94,9 @@ export const CharacterNameDialog = ({
       </form>
       {retainsReferenceAsset ? (
         <StatusNotice title="Local reference retention">
-          Saving keeps the selected immutable reference image in the local data directory. Detaching
-          or deleting the character later removes its links, not the stored image bytes. Only
-          whole-environment retirement deletes those local bytes.
+          Saving keeps the reference image in your local data directory. Detaching or deleting the
+          character later removes its links, not the stored image. Only retiring the whole
+          environment deletes those files.
         </StatusNotice>
       ) : (
         <StatusNotice>

@@ -57,7 +57,7 @@ Rendered by `apps/web/src/features/video-gallery/VideoGallery.tsx` — the riche
    pressing Back never re-opens it.
 2. Grid of cards: thumbnail (with a graceful placeholder when the thumbnail is absent or fails to
    load), duration badge, title, dimensions, created date, and chips for version count, origin,
-   format, character name, character variant, non-ready status, and `Unassigned Content`.
+   format, character name, character variant, non-ready status, and `No Project`.
    A record with no thumbnail states `No preview yet` rather than posing as a broken image, and
    carries an inline **Generate preview** action; one whose stored thumbnail fails to load states
    `Preview didn't load`.
@@ -264,5 +264,5 @@ import, upload, edit, composition and outfit try-on all have dedicated routes
 
 ## Unverified
 
-- Whether `Unassigned Content` on a video chip is a user-facing concept anywhere else. The string
+- Whether `No Project` on a video chip is a user-facing concept anywhere else. The string
   appears only in `VideoGallery.tsx:190`.

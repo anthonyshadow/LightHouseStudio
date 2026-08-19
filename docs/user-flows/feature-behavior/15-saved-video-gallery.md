@@ -75,7 +75,7 @@ Studio stage.
    Download is available for the selected exact ready Version through an authenticated content
    response. Project history may also download an exact Project-retained Version.
 9. A legacy or independently saved record with no trustworthy Project output relation is labeled
-   **Unassigned Content**, remains fully usable, and receives no fabricated producer. Later source
+   **No Project**, remains fully usable, and receives no fabricated producer. Later source
    reuse records only truthful used-by lineage.
 
 ## Acceptance checks

@@ -23,7 +23,7 @@ export const ProjectCreativeCheckpointPanel = ({
   return (
     <aside
       data-project-creative-checkpoint=""
-      aria-label="Project creative checkpoint"
+      aria-label="Project creative setup"
       css={{
         display: 'flex',
         alignItems: 'center',
@@ -43,10 +43,10 @@ export const ProjectCreativeCheckpointPanel = ({
       }}
     >
       <div>
-        <strong>Project creative setup</strong>
+        <strong>Creative setup</strong>
         <p>
-          Configuration is local until this explicit checkpoint. Character Swap and Virtual Try On
-          Start save this exact setup before creating one Project-linked provider operation.
+          Your setup stays in this browser until you save it. Starting Character Swap or Virtual Try
+          On saves it first.
         </p>
         {issue ? (
           <StatusNotice tone="warning" title={issue.historicalLabel} role="status">
@@ -72,10 +72,10 @@ export const ProjectCreativeCheckpointPanel = ({
           <StatusNotice
             title={
               workingMedia.phase === 'saved'
-                ? 'Durable working media ready'
+                ? 'Current cut ready'
                 : workingMedia.phase === 'saving'
-                  ? 'Saving working media'
-                  : 'Working media not changed'
+                  ? 'Saving current cut'
+                  : 'Current cut not changed'
             }
             tone={
               workingMedia.phase === 'error'
@@ -102,7 +102,7 @@ export const ProjectCreativeCheckpointPanel = ({
         disabled={controller.phase === 'saving'}
         onClick={() => void controller.checkpoint()}
       >
-        {controller.phase === 'saving' ? 'Saving setup…' : 'Save creative setup'}
+        {controller.phase === 'saving' ? 'Saving progress…' : 'Save progress'}
       </Button>
     </aside>
   );

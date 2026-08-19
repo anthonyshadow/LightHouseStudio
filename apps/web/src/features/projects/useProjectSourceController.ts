@@ -50,8 +50,8 @@ const safeMessage = (error: unknown): string =>
   error instanceof ApiClientError
     ? error.message
     : error instanceof DOMException && error.name === 'AbortError'
-      ? 'Source preparation was cancelled.'
-      : 'The Project source could not be prepared safely.';
+      ? 'Preparing the video was cancelled.'
+      : 'This video could not be prepared safely.';
 
 const artifactInput = (
   file: File,
@@ -158,7 +158,7 @@ export const useProjectSourceController = (
     operation.reset();
     if (current.revision.snapshot.sourceAssetId === null) runtime.clear(projectId);
     setPhase(current.revision.snapshot.sourceAssetId === null ? 'idle' : 'saved');
-    setMessage('Source preparation was cancelled safely.');
+    setMessage('Preparing the video was cancelled safely.');
   }, [current.revision.snapshot.sourceAssetId, operation, projectId, runtime]);
 
   useEffect(() => {
@@ -208,7 +208,7 @@ export const useProjectSourceController = (
         JSON.stringify(working.media.reference) !== JSON.stringify(presented)
       ) {
         throw new ApiClientError(
-          'The current Project working-media reference is unavailable.',
+          'The current cut for this Project is unavailable.',
           409,
           'conflict',
         );

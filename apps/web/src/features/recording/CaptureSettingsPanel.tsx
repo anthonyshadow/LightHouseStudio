@@ -330,8 +330,8 @@ export const CaptureSettingsPanel = ({
         <header css={introductionStyles(theme)}>
           {presentation === 'sidebar' ? <h2>Capture settings</h2> : <h3>Sources and quality</h3>}
           <p>
-            Device choices stay in this tab. Listing devices does not start the camera or
-            microphone. Changes apply automatically.
+            Changes apply automatically. Nothing here starts your camera or microphone until you
+            press Start.
           </p>
         </header>
 
@@ -352,8 +352,7 @@ export const CaptureSettingsPanel = ({
         ) : null}
         {controller.applying ? (
           <StatusNotice tone="neutral" role="status" title="Applying settings">
-            The change is being applied automatically. A live preview stays active until its
-            replacement is ready.
+            The current preview stays live until the new one is ready.
           </StatusNotice>
         ) : null}
         {controller.videoFallbackNotice ? (
@@ -397,28 +396,27 @@ export const CaptureSettingsPanel = ({
               hint={
                 controller.devicesState === 'loading'
                   ? 'Looking for available cameras…'
-                  : 'Every camera exposed by the browser appears here. Labels may remain generic until permission is granted.'
+                  : 'Every camera your browser can see. Names may be generic until you grant permission.'
               }
               onValueChange={(value) => controller.updateVideoDeviceId(value || null)}
             />
 
             {controller.cameraPermissionState === 'denied' ? (
               <StatusNotice tone="warning" role="status" title="Camera permission blocked">
-                Allow camera access in browser or system settings. Studio rescans after a successful
-                Start or a browser-reported device change. Opening this panel never requests
-                permission.
+                Allow camera access in your browser or system settings. Opening this panel never
+                asks for permission; the list updates after a successful Start.
               </StatusNotice>
             ) : controller.cameraPermissionState === 'prompt' ? (
               <StatusNotice tone="neutral" role="status" title="Camera permission not granted">
-                Camera access is requested only after an explicit Start action. Device names may be
-                generic until then.
+                Camera access is only requested when you press Start. Names may be generic until
+                then.
               </StatusNotice>
             ) : null}
 
             {controller.devicesState === 'ready' && controller.cameraDevices.length === 0 ? (
               <StatusNotice tone="warning" role="status" title="No camera available">
-                No camera is currently exposed to this browser. Connect or enable a camera, review
-                permission, and Studio will update when the browser reports the device change.
+                Your browser cannot see a camera. Connect or enable one and check permission — this
+                list updates on its own.
               </StatusNotice>
             ) : null}
 

@@ -51,7 +51,7 @@ const authority = (
 ): ProjectCurrentResponse => ({ project: response.project, revision: response.revision });
 
 export const projectAssetVideoWorkspaceError = (error: unknown): string =>
-  apiErrorMessage(error, 'The selected Video could not be opened as editable Project media.');
+  apiErrorMessage(error, 'This video could not be opened in the Project.');
 
 export const useProjectAssetVideoWorkspaceLauncher = (
   projectId: string,
@@ -74,7 +74,7 @@ export const useProjectAssetVideoWorkspaceLauncher = (
     async (video: SavedVideoSummary): Promise<void> => {
       if (archived) {
         throw new ApiClientError(
-          'Restore this Project before opening a Video Asset as editable workspace media.',
+          'Restore this Project before opening a video in its workspace.',
           409,
           'conflict',
         );
@@ -84,7 +84,7 @@ export const useProjectAssetVideoWorkspaceLauncher = (
       if (!(await session.flush())) {
         setBusyVideoId(null);
         throw new ApiClientError(
-          'Resolve the preserved Project changes before opening this Video in the workspace.',
+          'Save or discard your pending Project changes before opening this video.',
           409,
           'conflict',
         );
@@ -129,7 +129,7 @@ export const useProjectAssetVideoWorkspaceLauncher = (
             });
             if (!sourceMatches(response, video)) {
               throw new ApiClientError(
-                "The selected Video did not become this Project's current source.",
+                'This video did not become the Project’s original video.',
                 409,
                 'conflict',
               );
@@ -156,7 +156,7 @@ export const useProjectAssetVideoWorkspaceLauncher = (
             });
             if (!workingMediaMatches(response, video)) {
               throw new ApiClientError(
-                'The selected Video was retained by historical Project work but did not become current workspace media.',
+                'This video is kept in this Project’s history, but it did not become the current cut.',
                 409,
                 'conflict',
               );

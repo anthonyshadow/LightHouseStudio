@@ -67,15 +67,13 @@ describe('ProjectCreativeCheckpointPanel', () => {
     const { onChooseAnother } = renderPanel(controller, workingMedia);
     const user = userEvent.setup();
 
-    expect(
-      screen.getByRole('complementary', { name: 'Project creative checkpoint' }),
-    ).toBeVisible();
+    expect(screen.getByRole('complementary', { name: 'Project creative setup' })).toBeVisible();
     expect(screen.getByRole('status')).toHaveTextContent('Retired wardrobe');
     expect(screen.getByRole('alert')).toHaveTextContent('A newer Project revision');
 
     await user.click(screen.getByRole('button', { name: 'Choose another' }));
     expect(onChooseAnother).toHaveBeenCalledWith('outfit');
-    await user.click(screen.getByRole('button', { name: 'Save creative setup' }));
+    await user.click(screen.getByRole('button', { name: 'Save progress' }));
     expect(checkpoint).toHaveBeenCalledOnce();
   });
 
@@ -92,7 +90,7 @@ describe('ProjectCreativeCheckpointPanel', () => {
     const user = userEvent.setup();
 
     expect(screen.getByRole('alert')).toHaveTextContent('exact reusable reference');
-    expect(screen.getByRole('status')).toHaveTextContent('Saving working media');
+    expect(screen.getByRole('status')).toHaveTextContent('Saving current cut');
     await user.click(screen.getByRole('button', { name: 'Choose another' }));
     expect(onChooseAnother).toHaveBeenCalledWith('reference');
 
@@ -107,8 +105,8 @@ describe('ProjectCreativeCheckpointPanel', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Saving setup…' })).toBeDisabled();
-    expect(screen.getByText('Durable working media ready')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Saving progress…' })).toBeDisabled();
+    expect(screen.getByText('Current cut ready')).toBeVisible();
   });
 
   it('announces a failed working-media adoption without offering an unrelated replacement', () => {
@@ -116,12 +114,12 @@ describe('ProjectCreativeCheckpointPanel', () => {
       creativeController({ phase: 'saved', message: 'Creative setup saved.' }),
       workingMediaController({
         phase: 'error',
-        message: 'The retained Version could not be adopted safely.',
+        message: 'That version could not be used safely.',
       }),
     );
 
     expect(screen.getAllByRole('alert')).toHaveLength(1);
-    expect(screen.getByRole('alert')).toHaveTextContent('Working media not changed');
+    expect(screen.getByRole('alert')).toHaveTextContent('Current cut not changed');
     expect(screen.queryByRole('button', { name: 'Choose another' })).not.toBeInTheDocument();
   });
 });

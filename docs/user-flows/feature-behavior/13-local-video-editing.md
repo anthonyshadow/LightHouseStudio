@@ -43,7 +43,7 @@ a provider, and replace the immutable source only after a validated export and e
 
 In an open source-bearing Project, the editor uses the same stage, normalized `VideoEditSpec`,
 grouped history, and worker, but the primary action is **Render preview**. The validated candidate
-remains temporary and does not replace the source. **Adopt as working media** flushes the one
+remains temporary and does not replace the source. **Use as the current cut** flushes the one
 Project session, durably stores/inspects/checksums the candidate, and CAS-appends its exact edit plus
 working/presented reference. Success closes the editor only after server acceptance and reports
 that no Saved Video or Version was created. Conflict/failure preserves the candidate for retry.

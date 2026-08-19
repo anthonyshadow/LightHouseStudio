@@ -237,11 +237,6 @@ export const taskPanelStyles = (theme: Theme): CSSObject => ({
     fontSize: theme.fontSizes.metadata,
     lineHeight: 1.45,
   },
-  '& [data-task-revision]': {
-    color: theme.colors.textFaint,
-    fontFamily: theme.type.mono,
-    fontSize: theme.fontSizes.caption,
-  },
   '& > section, & > [role="status"], & > [role="alert"]': {
     boxShadow: 'none',
   },

@@ -93,7 +93,7 @@ export const StudioLibraryOverlays = ({
         open={pathname === APP_PATHS.videos}
         onClose={onClose}
         title="Videos"
-        description="Preview, edit in Studio, download, rename, remove, or inspect exact retained Versions."
+        description="Preview, edit, download, rename or remove your videos, and open any saved version."
         placement="fullscreen"
         size="wide"
         bodyMode="scroll"

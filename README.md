@@ -134,7 +134,7 @@ Landscape, Portrait, or Square format, then ordered by Latest, Oldest, Shortest,
 a Wardrobe variant was used, the card and preview also show that exact variant without splitting
 the parent character's filter group. Preview can select an exact immutable Version and marks the
 current one. Legacy or independently saved records without a trustworthy Project output relation
-are shown as **Unassigned Content** without inventing producer lineage. A thumbnail Preview opens a centered, focus-managed player over
+are shown as **No Project** without inventing producer lineage. A thumbnail Preview opens a centered, focus-managed player over
 the darkened gallery; that scoped player owns no tracks, object URL, recorder, or provider session
 and detaches its authenticated content URL on close. Any saved video can be deleted independently;
 a retained derived video remains usable when its source record is deleted. Removing a Saved Video
@@ -154,9 +154,9 @@ edit requires confirmed discard; an already committed source remains bound to it
 and cannot replace the newly opened stage.
 
 Inside an open source-bearing Project, the existing creative rail remains available beside the one
-stage. **Save creative setup** appends one coalesced semantic checkpoint; it never saves keystrokes,
+stage. **Save progress** appends one coalesced semantic checkpoint; it never saves keystrokes,
 slider ticks, undo history, or provider state. **Edit Video** keeps its worker candidate temporary
-as **Render preview** until **Adopt as working media** stores, inspects, checksums, and CAS-appends
+as **Render preview** until **Use as the current cut** stores, inspects, checksums, and CAS-appends
 the ready result. Refresh restores the current working media while retaining the immutable original.
 Project Character Swap and Virtual Try On use the recoverable Project processing command when the
 configured capability is available. Provider Voice and advanced live starts remain gated because

@@ -168,7 +168,7 @@ const ProjectListSection = ({
               ? campaignId === 'none'
                 ? 'Archived Projects with no Campaign appear here and can be restored.'
                 : 'Archived work appears here and can be restored.'
-              : 'Start a Project to keep related videos, sources and saved changes together. Naming it is optional — you can rename it later.'}
+              : 'Start a Project to keep one video and all the work you do on it together. Naming it is optional — you can rename it later.'}
           </p>
         </div>
       ) : null}
@@ -472,13 +472,13 @@ const projectSourceNotice = (
   switch (phase) {
     case 'hydrating':
       return {
-        title: 'Preparing source',
+        title: 'Preparing video',
         tone: 'neutral',
-        body: 'Loading this Project’s saved source video onto the stage.',
+        body: 'Loading this Project’s original video onto the stage.',
       };
     case 'preparing':
       return {
-        title: 'Preparing source',
+        title: 'Preparing video',
         tone: 'neutral',
         body: 'Uploading and checking your video. You can reopen this Project once it is saved.',
       };
@@ -486,13 +486,13 @@ const projectSourceNotice = (
       return {
         title: 'Saving changes',
         tone: 'neutral',
-        body: 'Saving the source video and this change to your Project.',
+        body: 'Saving the video and this change to your Project.',
       };
     case 'removing':
       return {
-        title: 'Removing source',
+        title: 'Removing video',
         tone: 'neutral',
-        body: 'Clearing the source video from this Project.',
+        body: 'Removing the original video from this Project.',
       };
     case 'saved':
       return null;
@@ -504,9 +504,9 @@ const projectSourceNotice = (
       };
     case 'error':
       return {
-        title: 'Source not saved',
+        title: 'Video not saved',
         tone: 'danger',
-        body: message ?? 'The staged source was not accepted.',
+        body: message ?? 'That video was not accepted.',
       };
     case 'idle':
       return null;
@@ -560,7 +560,7 @@ const ProjectSourceSection = ({
       <section css={emptyProjectStyles(theme)} aria-labelledby="project-source-heading">
         <div>
           <h3 id="project-source-heading">
-            {controller.accepted ? 'Source video' : 'No source yet'}
+            {controller.accepted ? 'Original video ready' : 'No original video yet'}
           </h3>
           {controller.accepted && controller.source ? (
             <>
@@ -570,14 +570,14 @@ const ProjectSourceSection = ({
               </p>
               <p>
                 {controller.source.kind === 'saved-video-version'
-                  ? 'This Project references the exact Saved Video Version and its existing bytes; it does not claim to have produced it.'
+                  ? 'This Project works from a video already in your library. That video is not changed.'
                   : 'This Project works from this video. Remove it to start from a different one.'}
               </p>
             </>
           ) : (
             <p>
               Choose the one video this Project works from. You can try again if an upload fails,
-              and you can remove a saved source later to choose a different one.
+              and you can remove it later to choose a different one.
             </p>
           )}
           {stateNotice ? (
@@ -645,34 +645,34 @@ const ProjectSourceSection = ({
               disabled={archived || controller.busy}
               onClick={() => setRemoveDialogOpen(true)}
             >
-              Remove source
+              Remove original video
             </Button>
           ) : null}
-          <small>Choosing, recording, or reopening a source never starts paid AI work.</small>
+          <small>Choosing, recording, or reopening a video never starts paid AI work.</small>
         </div>
       </section>
       {removeDialogOpen ? (
         <ConfirmationDialog
           open
-          title="Remove source"
-          description="This Project goes back to choosing a source."
+          title="Remove original video"
+          description="This Project goes back to choosing a video."
           body={
             <>
               <p>
-                Remove “{controller.source?.filename ?? 'this video'}” as the source of this
-                Project? The video itself is not deleted, and saved Versions, Project history and
-                your creative setup are all kept.
+                Remove “{controller.source?.filename ?? 'this video'}” as the original video for
+                this Project? The video itself is not deleted, and saved versions, Project history
+                and your saved progress are all kept.
               </p>
               {removalBlockedReason === undefined ? null : <p>{removalBlockedReason}</p>}
             </>
           }
-          confirmLabel="Remove source"
+          confirmLabel="Remove original video"
           cancelLabel="Cancel"
           danger
           busy={controller.busy}
           confirmDisabled={removalBlockedReason !== undefined}
           alert={removalFailure}
-          alertTitle="Source not removed"
+          alertTitle="Original video not removed"
           returnFocusRef={removeTriggerRef}
           onCancel={() => setRemoveDialogOpen(false)}
           onConfirm={() => {
@@ -685,7 +685,7 @@ const ProjectSourceSection = ({
       <ProjectSavedVideoPicker
         open={pickerOpen}
         busy={controller.busy}
-        title="Choose the Project source"
+        title="Choose the original video"
         returnFocusRef={savedVideoTriggerRef}
         onClose={() => setPickerOpen(false)}
         onSelect={(video) => {
@@ -922,7 +922,7 @@ const ProjectDetail = ({
     const sourceRemovalBlockedReason =
       projectProcessingBlockedReason(processing?.attempt, 'source-removal') ??
       (workingMediaActivity?.busy
-        ? 'Finish adopting the current working media before removing the source.'
+        ? 'Finish updating the current cut before removing the original video.'
         : undefined);
     const activeWorkspaceTask =
       pinnedWorkspaceTask ?? enteredWorkspaceTask ?? stepForSnapshot(current.revision.snapshot);
@@ -1019,8 +1019,8 @@ const ProjectDetail = ({
               css={taskPanelStyles(theme)}
             >
               <header>
-                <h2>Project Source</h2>
-                <p>Select the original video this Project works from.</p>
+                <h2>Original video</h2>
+                <p>Choose the one video this Project works from.</p>
               </header>
               <ProjectSourceSection
                 key={current.project.id}
@@ -1045,8 +1045,7 @@ const ProjectDetail = ({
             >
               <header>
                 <h2>Create</h2>
-                <p>Build from the current source and manage durable working media.</p>
-                <span data-task-revision>Revision {project.currentRevisionNumber}</span>
+                <p>Build from the original video and manage the current cut.</p>
               </header>
               {creativeCheckpoint}
               <ProjectWorkingMediaSection
@@ -1074,7 +1073,10 @@ const ProjectDetail = ({
             >
               <header>
                 <h2>Save</h2>
-                <p>Retain the current result as a new Video or an explicit Version.</p>
+                <p>
+                  Keep what you’re viewing as a new video, or as the next version of one you already
+                  saved.
+                </p>
               </header>
               <ProjectOutputSaveSection
                 current={current}
@@ -1094,7 +1096,7 @@ const ProjectDetail = ({
             >
               <header>
                 <h2>History</h2>
-                <p>Review retained revisions, outputs, and processing activity.</p>
+                <p>Every change, saved version and AI run for this Project.</p>
               </header>
               {/* Mounted on demand: this section opens three history queries the other tasks never need. */}
               {activeWorkspaceTask === 'history' ? (
@@ -1140,7 +1142,6 @@ const ProjectDetail = ({
                 Updated{' '}
                 <time dateTime={project.updatedAt}>{formatDateTime(project.updatedAt)}</time>
               </span>
-              <span>Revision {project.currentRevisionNumber}</span>
               {project.campaignId === null ? (
                 <span>No Campaign</span>
               ) : (
@@ -1157,8 +1158,8 @@ const ProjectDetail = ({
               <AppIcon name="info" />
               <span>
                 {overviewHasSource
-                  ? `Source ready • ${projectWorkflowLabel(current.revision.snapshot.workflowPhase)} workflow active.`
-                  : 'No source yet • Choose the original video below to begin.'}
+                  ? `Original video ready • ${projectWorkflowLabel(current.revision.snapshot.workflowPhase)} workflow active.`
+                  : 'No original video yet • Choose one below to begin.'}
               </span>
             </div>
             <ProjectWorkflowProgress snapshot={current.revision.snapshot} />
@@ -1169,7 +1170,11 @@ const ProjectDetail = ({
               data-detail-action="continue"
               onClick={() => void navigate(projectWorkspacePath(project.id))}
             >
-              {archived ? 'View workspace' : overviewHasSource ? 'Continue editing' : 'Add source'}
+              {archived
+                ? 'View workspace'
+                : overviewHasSource
+                  ? 'Continue editing'
+                  : 'Add original video'}
             </Button>
             <Button
               data-detail-action="move"
@@ -1228,7 +1233,7 @@ const ProjectDetail = ({
           data-project-overview-source=""
         >
           <header>
-            <h2 id="project-overview-source-heading">Project source</h2>
+            <h2 id="project-overview-source-heading">Original video</h2>
             <p>
               Every Project is built from one original video that never changes. Choose it here, or
               open the workspace to do it later.

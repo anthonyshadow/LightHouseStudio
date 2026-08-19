@@ -247,7 +247,7 @@ const renderSection = (
 
 const selectSavedVideo = async () => {
   const user = userEvent.setup();
-  await user.click(screen.getByRole('button', { name: 'Use Saved Video as working media' }));
+  await user.click(screen.getByRole('button', { name: 'Use a saved video as the current cut' }));
   const choice = await screen.findByRole('button', { name: /Retained master/u });
   await user.click(choice);
   await waitFor(() =>
@@ -270,9 +270,7 @@ describe('ProjectWorkingMediaSection', () => {
     const onActivityChange = vi.fn();
     const view = renderSection(createSession(), { sourceAssetId: null, onActivityChange });
 
-    expect(
-      screen.queryByRole('heading', { name: 'Durable working media' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Current cut' })).not.toBeInTheDocument();
     expect(onActivityChange).toHaveBeenCalledWith({ projectId: ids.project, busy: false });
     view.unmount();
     expect(onActivityChange).toHaveBeenLastCalledWith({ projectId: ids.project, busy: false });
@@ -281,8 +279,10 @@ describe('ProjectWorkingMediaSection', () => {
   it('disables working-media replacement for an archived Project', () => {
     renderSection(createSession(), { archived: true });
 
-    expect(screen.getByRole('heading', { name: 'Durable working media' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Use Saved Video as working media' })).toBeDisabled();
+    expect(screen.getByRole('heading', { name: 'Current cut' })).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Use a saved video as the current cut' }),
+    ).toBeDisabled();
   });
 
   it('adopts one exact retained Version and announces durable non-copy semantics', async () => {
@@ -313,7 +313,7 @@ describe('ProjectWorkingMediaSection', () => {
         localEdit: null,
       }),
     );
-    expect(screen.getByRole('status')).toHaveTextContent('Saving working media');
+    expect(screen.getByRole('status')).toHaveTextContent('Saving current cut');
     expect(onActivityChange).toHaveBeenCalledWith({ projectId: ids.project, busy: true });
 
     act(() => resolveAdoption(response));
@@ -322,8 +322,8 @@ describe('ProjectWorkingMediaSection', () => {
       project: response.project,
       revision: response.revision,
     });
-    expect(screen.getByRole('status')).toHaveTextContent('Working media ready');
-    expect(screen.getByRole('status')).toHaveTextContent('Bytes were not copied');
+    expect(screen.getByRole('status')).toHaveTextContent('Current cut ready');
+    expect(screen.getByRole('status')).toHaveTextContent('Nothing was copied');
     expect(onActivityChange).toHaveBeenLastCalledWith({ projectId: ids.project, busy: false });
   });
 
@@ -335,7 +335,9 @@ describe('ProjectWorkingMediaSection', () => {
     await selectSavedVideo();
 
     expect(api.reuseProjectWorkingMedia).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('Resolve the preserved Project proposal');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Save or discard your pending Project changes',
+    );
     expect(screen.getByRole('alert')).toHaveTextContent('Conflict');
   });
 
@@ -354,7 +356,7 @@ describe('ProjectWorkingMediaSection', () => {
       project: response.project,
       revision: response.revision,
     });
-    expect(screen.getByRole('status')).toHaveTextContent('Working media ready');
+    expect(screen.getByRole('status')).toHaveTextContent('Current cut ready');
   });
 
   it('does not treat unrelated reconciliation state as proof of adoption', async () => {
@@ -378,8 +380,8 @@ describe('ProjectWorkingMediaSection', () => {
     await selectSavedVideo();
 
     expect(session.acceptCurrent).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('Working media not changed');
-    expect(screen.getByRole('alert')).toHaveTextContent('could not be adopted safely');
+    expect(screen.getByRole('alert')).toHaveTextContent('Current cut not changed');
+    expect(screen.getByRole('alert')).toHaveTextContent('could not be used safely');
   });
 
   it('distinguishes a stale Project conflict from a retained historical revision', async () => {
@@ -396,7 +398,7 @@ describe('ProjectWorkingMediaSection', () => {
     const first = renderSection(firstSession);
 
     await selectSavedVideo();
-    expect(screen.getByRole('alert')).toHaveTextContent('Project changed before this Version');
+    expect(screen.getByRole('alert')).toHaveTextContent('Project changed before this version');
     first.unmount();
 
     installVideoList();
@@ -405,7 +407,11 @@ describe('ProjectWorkingMediaSection', () => {
     renderSection(secondSession);
     await selectSavedVideo();
 
-    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('historical revision'));
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'kept in this Project’s history, but newer work is current',
+      ),
+    );
     expect(secondSession.acceptCurrent).not.toHaveBeenCalled();
   });
 });

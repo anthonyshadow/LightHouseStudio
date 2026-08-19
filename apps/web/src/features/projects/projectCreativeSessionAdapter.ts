@@ -355,14 +355,14 @@ export const resolveProjectCreativeResourceIssues = (
         kind: 'character',
         historicalLabel: label,
         reason: 'missing',
-        message: `${label} is no longer available in this workspace. Its historical applied values remain in the Project.`,
+        message: `${label} is no longer available in this workspace. The values it applied are still saved in the Project.`,
       });
     } else if (!revisionMatches(selectedCharacter.characterRevision, character.updatedAt)) {
       issues.push({
         kind: 'character',
         historicalLabel: label,
         reason: 'changed',
-        message: `${label} changed after this checkpoint. The Project retains the exact historical prompt and reference identity.`,
+        message: `${label} changed after you saved progress. The Project keeps the exact prompt and reference it saved.`,
       });
     }
     if (selectedCharacter.variantId !== null) {
@@ -377,14 +377,14 @@ export const resolveProjectCreativeResourceIssues = (
           kind: 'character-variant',
           historicalLabel: variantLabel,
           reason: 'missing',
-          message: `${variantLabel} is no longer available in this workspace. Its historical applied values remain in the Project.`,
+          message: `${variantLabel} is no longer available in this workspace. The values it applied are still saved in the Project.`,
         });
       } else if (!revisionMatches(selectedCharacter.variantRevision, variant.updatedAt)) {
         issues.push({
           kind: 'character-variant',
           historicalLabel: variantLabel,
           reason: 'changed',
-          message: `${variantLabel} changed after this checkpoint. The Project retains the exact historical reference identity.`,
+          message: `${variantLabel} changed after you saved progress. The Project keeps the exact reference it saved.`,
         });
       }
     }
@@ -402,14 +402,14 @@ export const resolveProjectCreativeResourceIssues = (
         kind: 'outfit',
         historicalLabel: label,
         reason: 'missing',
-        message: `${label} is no longer available in this workspace. Its historical applied values remain in the Project.`,
+        message: `${label} is no longer available in this workspace. The values it applied are still saved in the Project.`,
       });
     } else if (!revisionMatches(selectedOutfit.outfitRevision, outfit.updatedAt)) {
       issues.push({
         kind: 'outfit',
         historicalLabel: label,
         reason: 'changed',
-        message: `${label} changed after this checkpoint. The Project retains the exact historical prompt and reference identity.`,
+        message: `${label} changed after you saved progress. The Project keeps the exact prompt and reference it saved.`,
       });
     }
   }
@@ -423,14 +423,14 @@ export const resolveProjectCreativeResourceIssues = (
         kind: 'prompt',
         historicalLabel: label,
         reason: 'missing',
-        message: `${label} is no longer available in this workspace. Its exact historical prompt remains in the Project.`,
+        message: `${label} is no longer available in this workspace. Its exact prompt is still saved in the Project.`,
       });
     } else if (!revisionMatches(snapshot.creativeIntent.resourceRevision, prompt.updatedAt)) {
       issues.push({
         kind: 'prompt',
         historicalLabel: label,
         reason: 'changed',
-        message: `${label} changed after this checkpoint. The Project retains the exact historical prompt and reference identity.`,
+        message: `${label} changed after you saved progress. The Project keeps the exact prompt and reference it saved.`,
       });
     }
   }

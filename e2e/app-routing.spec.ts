@@ -30,7 +30,7 @@ const loginFromEntry = async (page: Page): Promise<void> => {
 
 const openProjectTask = async (
   page: Page,
-  task: 'Source' | 'Create' | 'Save' | 'History',
+  task: 'Original' | 'Create' | 'Save' | 'History',
 ): Promise<void> => {
   await page.getByRole('tab', { name: task, exact: true }).click();
   await expect(page.getByRole('tabpanel', { name: task, exact: true })).toBeVisible();
@@ -244,9 +244,7 @@ test('Projects quick creation, lifecycle, refresh, and explicit Assets exit keep
 
   await expect(page).toHaveURL(new RegExp(`/projects/${TEST_PROJECT_ID}$`, 'u'));
   await expect(page.getByRole('heading', { name: 'Untitled Project' })).toBeVisible();
-  await expect(
-    page.getByText('No source yet • Choose the original video below to begin.'),
-  ).toBeVisible();
+  await expect(page.getByText('No original video yet • Choose one below to begin.')).toBeVisible();
   expect(projects.operationKeys).toHaveLength(1);
   expect(projects.operationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
   await expect
@@ -293,7 +291,7 @@ test('Project overview gives the title the full tablet content width', async ({ 
   const identity = page.locator('[data-detail-identity]');
   const actions = page.locator('[data-detail-actions]');
   await expect(title).toBeVisible();
-  await expect(actions.getByRole('button', { name: 'Add source' })).toBeVisible();
+  await expect(actions.getByRole('button', { name: 'Add original video' })).toBeVisible();
 
   const [titleBox, identityBox, actionsBox] = await Promise.all([
     title.boundingBox(),
@@ -318,14 +316,14 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   const stage = page.getByLabel('Studio media stage');
   const stageVideo = stage.locator('video');
   await expect(stage).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No original video yet' })).toBeVisible();
   await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
     name: 'project-source.mp4',
     mimeType: 'video/mp4',
     buffer: fixture,
   });
 
-  await expect(page.getByRole('heading', { name: 'Source video' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
   await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();
   await expect(stageVideo).toHaveAttribute('src', /^blob:/u);
   const firstObjectUrl = await stageVideo.getAttribute('src');
@@ -335,8 +333,8 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   await page.reload();
   // Reopening a Project with a source lands on Create, the step it is now up to, so ask for the
   // Source task explicitly to check what the refresh restored.
-  await openProjectTask(page, 'Source');
-  await expect(page.getByRole('heading', { name: 'Source video' })).toBeVisible();
+  await openProjectTask(page, 'Original');
+  await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
   await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();
   await expect(stageVideo).toHaveAttribute('src', /^blob:/u);
   expect(await stageVideo.getAttribute('src')).not.toBe(firstObjectUrl);
@@ -344,19 +342,19 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   expect(projects.sourceOperationKeys).toHaveLength(1);
 
   // The wrong source is recoverable without deleting the Project: remove it and choose again.
-  await page.getByRole('button', { name: 'Remove source' }).click();
-  const removeDialog = page.getByRole('dialog', { name: 'Remove source' });
+  await page.getByRole('button', { name: 'Remove original video' }).click();
+  const removeDialog = page.getByRole('dialog', { name: 'Remove original video' });
   await expect(removeDialog).toBeVisible();
-  await removeDialog.getByRole('button', { name: 'Remove source' }).click();
+  await removeDialog.getByRole('button', { name: 'Remove original video' }).click();
 
-  await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No original video yet' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Upload' })).toBeEnabled();
   await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
     name: 'replacement-source.mp4',
     mimeType: 'video/mp4',
     buffer: fixture,
   });
-  await expect(page.getByRole('heading', { name: 'Source video' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
   await expect(page.getByText('replacement-source.mp4')).toBeVisible();
   expect(projects.sourceOperationKeys).toHaveLength(2);
   expect(projects.sourceOperationKeys[1]).not.toBe(projects.sourceOperationKeys[0]);
@@ -383,7 +381,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
     buffer: fixture,
   });
   await openProjectTask(page, 'Save');
-  await expect(page.getByRole('heading', { name: 'Review and save output' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review and save' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Save as New Video' }).click();
   const createDialog = page.getByRole('dialog', { name: 'Save as New Video' });
@@ -399,7 +397,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   const confirmation = page.getByRole('dialog', { name: 'Confirm Add Version' });
   await expect(confirmation).toContainText('Current Version 1');
   await confirmation.getByRole('button', { name: 'Add Version' }).click();
-  await expect(page.getByText('The save response was unavailable.')).toBeVisible();
+  await expect(page.getByText('The save reply never arrived.')).toBeVisible();
   expect(projects.outputOperationKeys).toHaveLength(2);
   expect(projects.outputRequests[1]?.target).toMatchObject({ kind: 'version' });
 
@@ -419,7 +417,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
     page.getByRole('heading', { name: 'Processing attempts and results' }),
   ).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Project changes' })).toBeVisible();
-  await expect(olderVersion).toContainText('Produced by Project revision 2');
+  await expect(olderVersion).toContainText('Saved at change 2');
   await expect(versionHistory).toContainText('Version 2 · Current in Saved Videos');
 
   const [firstDownload] = await Promise.all([
@@ -433,7 +431,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   await expect(versionPreview.getByLabel('Preview of Launch master, Version 1')).toBeVisible();
   await versionPreview.getByRole('button', { name: 'Use in Project' }).click();
   await expect(
-    page.getByText(/immutable original and Saved Video current pointer were not changed/u),
+    page.getByText(/original video and the video’s current version were not changed/u),
   ).toBeVisible();
   expect(projects.reuseOperationKeys).toHaveLength(1);
   await page.keyboard.press('Escape');
@@ -446,7 +444,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   await page.getByRole('button', { name: 'Assets', exact: true }).click();
   await page.getByRole('button', { name: 'Open Videos' }).click();
   const gallery = page.getByRole('dialog', { name: 'Videos' });
-  await expect(gallery.getByText('Unassigned Content').first()).toBeVisible();
+  await expect(gallery.getByText('No Project').first()).toBeVisible();
   await expect(gallery.getByRole('heading', { name: 'Legacy unassigned' })).toBeVisible();
   await expect(gallery.getByRole('button', { name: 'Open in Studio' }).first()).toBeEnabled();
 
@@ -464,7 +462,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   const retainedOlderVersion = retainedHistory
     .getByRole('listitem')
     .filter({ hasText: 'Version 1' });
-  await expect(retainedOlderVersion).toContainText('Removed from Saved Videos');
+  await expect(retainedOlderVersion).toContainText('Removed from your videos');
   const [retainedDownload] = await Promise.all([
     page.waitForEvent('download'),
     retainedOlderVersion.getByRole('link', { name: 'Download Launch master, Version 1' }).click(),
@@ -491,7 +489,7 @@ test('an accepted Project operation reconnects after refresh and presents its re
     mimeType: 'video/mp4',
     buffer: fixture,
   });
-  await expect(page.getByRole('heading', { name: 'Source video' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
 
   await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Choose saved character' }).click();
@@ -502,8 +500,10 @@ test('an accepted Project operation reconnects after refresh and presents its re
     .getByRole('button', { name: 'Use in Studio' })
     .click();
   await openProjectTask(page, 'Create');
-  await page.getByRole('button', { name: 'Save creative setup' }).click();
-  await expect(page.getByText('Creative setup saved as one Project checkpoint.')).toBeVisible();
+  await page.getByRole('button', { name: 'Save progress' }).click();
+  await expect(
+    page.getByText('Progress saved. Saving on its own starts no paid AI work.'),
+  ).toBeVisible();
   await page
     .getByRole('navigation', { name: 'Creative workspace tools' })
     .getByRole('button', { name: 'Edit Video', exact: true })
@@ -522,7 +522,7 @@ test('an accepted Project operation reconnects after refresh and presents its re
   await page.getByRole('button', { name: 'Archive' }).click();
   const archive = page.getByRole('dialog', { name: 'Archive Project' });
   await expect(archive.getByRole('button', { name: 'Archive Project' })).toBeDisabled();
-  await expect(archive).toContainText('accepted provider work is active');
+  await expect(archive).toContainText('accepted provider work is running');
   await expect(archive).toContainText('accepted remote work may continue');
   await archive.getByRole('button', { name: 'Cancel' }).click();
   await page.getByRole('button', { name: 'Continue editing' }).click();
@@ -531,11 +531,14 @@ test('an accepted Project operation reconnects after refresh and presents its re
   await openProjectTask(page, 'Create');
   await expect(page.getByText('Character Swap accepted / queued', { exact: true })).toBeVisible();
   await expect(page.getByText('Result ready', { exact: true })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('Revision 5', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Studio media stage').locator('video')).toHaveAttribute(
     'src',
     /^blob:/u,
   );
+  await openProjectTask(page, 'History');
+  await expect(
+    page.getByRole('tabpanel', { name: 'History' }).getByText(/^Change 5 ·/u),
+  ).toBeVisible();
   expect(projects.processingOperationKeys).toHaveLength(1);
   expect(projects.processingReconcileCount).toBeGreaterThanOrEqual(1);
   expect(network.apiRequests.some(({ path }) => path.startsWith('/api/video-jobs'))).toBe(false);
@@ -558,7 +561,7 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
     mimeType: 'video/mp4',
     buffer: fixture,
   });
-  await expect(page.getByRole('heading', { name: 'Source video' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
 
   await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Choose saved character' }).click();
@@ -575,15 +578,19 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
     (character) => character.id === 'project-field-host',
   );
   expect(selectedCharacter).toBeDefined();
-  await page.getByRole('button', { name: 'Save creative setup' }).click();
-  await expect(page.getByText('Creative setup saved as one Project checkpoint.')).toBeVisible();
+  await page.getByRole('button', { name: 'Save progress' }).click();
+  await expect(
+    page.getByText('Progress saved. Saving on its own starts no paid AI work.'),
+  ).toBeVisible();
   expect(projects.checkpointRequests).toHaveLength(1);
   expect(projects.checkpointRequests[0]?.proposal.selectedCharacter).toMatchObject({
     characterId: 'project-field-host',
     characterLabel: 'Project Field Host',
     characterRevision: selectedCharacter?.updatedAt,
   });
-  await expect(page.getByText('Project Field Host changed after this checkpoint.')).toHaveCount(0);
+  await expect(page.getByText('Project Field Host changed after you saved progress.')).toHaveCount(
+    0,
+  );
 
   await page
     .getByRole('navigation', { name: 'Creative workspace tools' })
@@ -597,25 +604,30 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
   await page.getByRole('button', { name: 'Render preview' }).click();
 
   const adoption = page.getByRole('dialog', {
-    name: 'Adopt Render preview as Project working media?',
+    name: 'Make this render the current cut?',
   });
   await expect(adoption).toBeVisible({ timeout: 60_000 });
-  await adoption.getByRole('button', { name: 'Adopt as working media' }).click();
+  await adoption.getByRole('button', { name: 'Use as the current cut' }).click();
   await expect(adoption).toBeHidden({ timeout: 30_000 });
-  await expect(page.getByText('Durable working media ready', { exact: true })).toBeVisible();
-  await expect(page.getByText('No Saved Video or Video Version was created')).toBeVisible();
+  await expect(page.getByText('Current cut ready', { exact: true })).toBeVisible();
+  await expect(page.getByText('No video or version was saved')).toBeVisible();
   expect(projects.workingMediaOperationKeys).toHaveLength(1);
   expect(projects.workingMediaOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
 
-  await page.getByRole('button', { name: 'Save creative setup' }).click();
-  await expect(page.getByText('Revision 5', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Save progress' }).click();
   expect(projects.checkpointRequests).toHaveLength(2);
+  await openProjectTask(page, 'History');
+  await expect(
+    page.getByRole('tabpanel', { name: 'History' }).getByText(/^Change 5 ·/u),
+  ).toBeVisible();
 
   await page.reload();
-  await openProjectTask(page, 'Create');
-  await expect(page.getByText('Revision 5', { exact: true })).toBeVisible();
-  await openProjectTask(page, 'Source');
-  await expect(page.getByRole('heading', { name: 'Source video' })).toBeVisible();
+  await openProjectTask(page, 'History');
+  await expect(
+    page.getByRole('tabpanel', { name: 'History' }).getByText(/^Change 5 ·/u),
+  ).toBeVisible();
+  await openProjectTask(page, 'Original');
+  await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
   await expect(page.getByLabel('Studio media stage').locator('video')).toHaveAttribute(
     'src',
     /^blob:/u,
@@ -649,9 +661,7 @@ test('Campaign creation reaches a Campaign Project without activating media or p
   await createProject.getByRole('button', { name: 'Create Project' }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${TEST_PROJECT_ID}$`, 'u'));
   await expect(page.getByRole('heading', { name: 'Launch social cut' })).toBeVisible();
-  await expect(
-    page.getByText('No source yet • Choose the original video below to begin.'),
-  ).toBeVisible();
+  await expect(page.getByText('No original video yet • Choose one below to begin.')).toBeVisible();
   expect(campaigns.campaignOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
   expect(campaigns.projectOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
   await expect
@@ -696,18 +706,18 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   await page.reload();
   await expect(page.getByRole('button', { name: '← Summer launch' })).toBeVisible();
   await expect(page.getByText('Campaign: Summer launch', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Add source' }).click();
+  await page.getByRole('button', { name: 'Add original video' }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${TEST_PROJECT_ID}/workspace$`, 'u'));
   // Both the overview and the workspace expose a Source file input, so scope to the workspace task
   // panel rather than racing the route transition.
-  const workspaceSource = page.getByRole('tabpanel', { name: 'Source' });
+  const workspaceSource = page.getByRole('tabpanel', { name: 'Original' });
   await expect(workspaceSource).toBeVisible();
   await workspaceSource.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
     name: 'campaign-project-source.mp4',
     mimeType: 'video/mp4',
     buffer: fixture,
   });
-  await expect(page.getByRole('heading', { name: 'Source video' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
   expect(projects.sourceOperationKeys).toHaveLength(1);
   expect(projects.sourceOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
 
@@ -720,8 +730,10 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
     .getByRole('button', { name: 'Use in Studio' })
     .click();
   await openProjectTask(page, 'Create');
-  await page.getByRole('button', { name: 'Save creative setup' }).click();
-  await expect(page.getByText('Creative setup saved as one Project checkpoint.')).toBeVisible();
+  await page.getByRole('button', { name: 'Save progress' }).click();
+  await expect(
+    page.getByText('Progress saved. Saving on its own starts no paid AI work.'),
+  ).toBeVisible();
   expect(projects.checkpointRequests).toHaveLength(1);
   expect(projects.checkpointRequests[0]?.proposal.selectedCharacter).toMatchObject({
     characterId: 'project-field-host',
@@ -771,7 +783,7 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
     .getByRole('dialog', { name: 'Confirm Add Version' })
     .getByRole('button', { name: 'Add Version' })
     .click();
-  await expect(page.getByText('The save response was unavailable.')).toBeVisible();
+  await expect(page.getByText('The save reply never arrived.')).toBeVisible();
   expect(projects.outputOperationKeys).toHaveLength(2);
   const pendingAppendKey = projects.outputOperationKeys[1];
   expect(pendingAppendKey).toMatch(/^[0-9a-f-]{36}$/u);
@@ -839,7 +851,7 @@ test('a protected Project deep link returns to the same URL after login', async 
   await expect(login).toBeVisible();
   await login.getByRole('button', { name: 'Log in' }).click();
   await expect(page).toHaveURL(new RegExp(`/projects/${TEST_PROJECT_ID}/workspace$`, 'u'));
-  await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No original video yet' })).toBeVisible();
 });
 
 test('recording and temporary-take work cannot be lost silently through Back', async ({ page }) => {

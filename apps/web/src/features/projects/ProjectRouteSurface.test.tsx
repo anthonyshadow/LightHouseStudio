@@ -258,7 +258,7 @@ describe('Project route surface', () => {
     expect(screen.getByRole('heading', { name: 'Archived' })).toBeVisible();
     expect(await screen.findByRole('heading', { name: 'Launch cut' })).toBeVisible();
     expect(await screen.findByRole('heading', { name: 'Archived concept' })).toBeVisible();
-    expect(screen.queryByText('No source yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('No original video yet')).not.toBeInTheDocument();
     expect(screen.getByText(/Keep focused video work together/u)).toBeVisible();
     expect(screen.getByRole('button', { name: 'New Project' })).toHaveAttribute(
       'data-project-create',
@@ -273,21 +273,23 @@ describe('Project route surface', () => {
     await userEvent.click(within(activeList).getByRole('button', { name: 'Open' }));
     await waitFor(() => expect(router.state.location.pathname).toBe(`/projects/${activeId}`));
     expect(
-      await screen.findByText('No source yet • Choose the original video below to begin.'),
+      await screen.findByText('No original video yet • Choose one below to begin.'),
     ).toBeVisible();
     const progress = screen.getByRole('list', { name: 'Project workflow progress' });
-    expect(within(progress).getByText('Source').closest('li')).toHaveAttribute(
+    expect(within(progress).getByText('Original').closest('li')).toHaveAttribute(
       'aria-current',
       'step',
     );
-    const overviewSource = screen.getByRole('region', { name: 'Project source' });
-    expect(within(overviewSource).getByRole('heading', { name: 'No source yet' })).toBeVisible();
+    const overviewSource = screen.getByRole('region', { name: 'Original video' });
+    expect(
+      within(overviewSource).getByRole('heading', { name: 'No original video yet' }),
+    ).toBeVisible();
     expect(within(overviewSource).getByRole('button', { name: 'Upload' })).toBeVisible();
-    await userEvent.click(screen.getByRole('button', { name: 'Add source' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add original video' }));
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`),
     );
-    expect(await screen.findByRole('heading', { name: 'No source yet' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'No original video yet' })).toBeVisible();
     expect(screen.getByText('All changes saved').closest('[role="status"]')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Record' })).toBeDisabled();
     expect(screen.queryByRole('video')).not.toBeInTheDocument();
@@ -301,18 +303,18 @@ describe('Project route surface', () => {
     renderProjects(`/projects/${activeId}/workspace`);
 
     const tabs = await screen.findByRole('tablist', { name: 'Project tasks' });
-    const sourceTab = within(tabs).getByRole('tab', { name: 'Source' });
+    const sourceTab = within(tabs).getByRole('tab', { name: 'Original' });
     const createTab = within(tabs).getByRole('tab', { name: 'Create' });
 
     expect(within(tabs).getAllByRole('tab')).toHaveLength(4);
     expect(sourceTab).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tabpanel', { name: 'Source' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Project Source' })).toBeVisible();
+    expect(screen.getByRole('tabpanel', { name: 'Original' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Original video' })).toBeVisible();
 
     await user.click(createTab);
     expect(createTab).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tabpanel', { name: 'Create' })).toBeVisible();
-    expect(screen.queryByRole('tabpanel', { name: 'Source' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tabpanel', { name: 'Original' })).not.toBeInTheDocument();
 
     await user.keyboard('{ArrowRight}');
     expect(within(tabs).getByRole('tab', { name: 'Save' })).toHaveAttribute(
@@ -340,7 +342,7 @@ describe('Project route surface', () => {
       'aria-current',
       'step',
     );
-    expect(within(progress).getByText('Source').closest('li')).toHaveAttribute(
+    expect(within(progress).getByText('Original').closest('li')).toHaveAttribute(
       'data-state',
       'done',
     );
@@ -497,14 +499,14 @@ describe('Project route surface', () => {
     const user = userEvent.setup();
     const { router } = renderProjects(`/projects/${activeId}`);
 
-    expect(await screen.findByRole('heading', { name: 'Project Assets' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Used in this Project' })).toBeVisible();
     expect(await screen.findByRole('heading', { name: 'Library source' })).toBeVisible();
     const thumbnail = screen.getByRole('img', { name: 'Thumbnail for Library source' });
     expect(thumbnail.querySelector('img')).toHaveAttribute(
       'src',
       `/api/videos/${savedVideoId}/thumbnail`,
     );
-    expect(screen.getByRole('button', { name: 'Use as Project source' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Use as the original video' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Preview' }));
     const dialog = await screen.findByRole('dialog', { name: 'Library source' });
     const previewBody = dialog.querySelector<HTMLElement>('[data-overlay-body-mode="contained"]');
@@ -512,7 +514,7 @@ describe('Project route surface', () => {
     expect(previewBody).toHaveStyle({ overflow: 'hidden' });
     expect(within(dialog).getByRole('group', { name: 'Video controls' })).toBeVisible();
     expect(within(dialog).getByRole('button', { name: 'Play video' })).toBeVisible();
-    expect(within(dialog).getByRole('button', { name: 'Use as Project source' })).toBeVisible();
+    expect(within(dialog).getByRole('button', { name: 'Use as the original video' })).toBeVisible();
     expect(within(dialog).getByRole('slider', { name: 'Video position' })).toBeVisible();
     expect(within(dialog).getByLabelText('Preview of Library source')).toHaveStyle({
       width: '100%',
@@ -529,12 +531,14 @@ describe('Project route surface', () => {
       ).not.toBeInTheDocument(),
     );
 
-    await user.click(screen.getByRole('button', { name: 'Detach from Project' }));
+    await user.click(screen.getByRole('button', { name: 'Remove from Project' }));
     await waitFor(() => expect(detachCalls).toBe(1));
     await waitFor(() =>
       expect(screen.queryByRole('heading', { name: 'Library source' })).not.toBeInTheDocument(),
     );
-    expect(screen.getByText(/Detaching never deletes an Asset or Project history/u)).toBeVisible();
+    expect(
+      screen.getByText(/Removing an item here never deletes it or this Project.s history/u),
+    ).toBeVisible();
   });
 
   it("opens an attached Video's exact current Version as an empty Project source", async () => {
@@ -601,14 +605,14 @@ describe('Project route surface', () => {
       sourceRuntime: { present, clear: vi.fn() },
     });
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Use as Project source' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Use as the original video' }));
 
     const confirmation = await screen.findByRole('dialog', {
-      name: 'Make this the Project source?',
+      name: 'Make this the original video?',
     });
-    expect(confirmation).toHaveTextContent('You can remove the source later');
+    expect(confirmation).toHaveTextContent('You can remove it later from the workspace');
     await userEvent.click(
-      within(confirmation).getByRole('button', { name: 'Use as Project source' }),
+      within(confirmation).getByRole('button', { name: 'Use as the original video' }),
     );
 
     await waitFor(() =>
@@ -617,8 +621,8 @@ describe('Project route surface', () => {
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
     // The workspace now opens on the step the Project is up to, so reach back to Source to
     // confirm what landed.
-    await userEvent.click(screen.getByRole('tab', { name: 'Source' }));
-    expect(screen.getByRole('heading', { name: 'Source video' })).toBeVisible();
+    await userEvent.click(screen.getByRole('tab', { name: 'Original' }));
+    expect(screen.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
   });
 
   it("opens an attached Video's exact current Version as working media without replacing the source", async () => {
@@ -716,10 +720,10 @@ describe('Project route surface', () => {
       sourceRuntime: { present, clear: vi.fn() },
     });
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Use as working media' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Use as the current cut' }));
 
     expect(
-      screen.queryByRole('dialog', { name: 'Make this the Project source?' }),
+      screen.queryByRole('dialog', { name: 'Make this the original video?' }),
     ).not.toBeInTheDocument();
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`),
@@ -727,8 +731,8 @@ describe('Project route surface', () => {
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
     // The workspace now opens on the step the Project is up to, so reach back to Source to
     // confirm what landed.
-    await userEvent.click(screen.getByRole('tab', { name: 'Source' }));
-    expect(screen.getByRole('heading', { name: 'Source video' })).toBeVisible();
+    await userEvent.click(screen.getByRole('tab', { name: 'Original' }));
+    expect(screen.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
   });
 
   it('shows retained images and type-specific visuals for attached creative Assets', async () => {
@@ -1201,11 +1205,11 @@ describe('Project route surface', () => {
       sourceRuntime: { present, clear },
     });
 
-    expect(await screen.findByText(/Loading this Project.s saved source video/u)).toBeVisible();
+    expect(await screen.findByText(/Loading this Project.s original video/u)).toBeVisible();
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
     expect(present.mock.calls[0]?.[0]).toBe(activeId);
     expect(present.mock.calls[0]?.[1].blob).toBeInstanceOf(File);
-    const sourceHeading = screen.getByRole('heading', { name: 'Source video' });
+    const sourceHeading = screen.getByRole('heading', { name: 'Original video ready' });
     expect(sourceHeading.parentElement).toHaveTextContent(
       'accepted-source.mp4 · 640×360 · 1 seconds',
     );
@@ -1253,24 +1257,26 @@ describe('Project route surface', () => {
     });
 
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
-    expect(screen.getByRole('heading', { name: 'Source video' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: 'Remove source' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove source' });
+    await user.click(screen.getByRole('button', { name: 'Remove original video' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove original video' });
     expect(dialog).toHaveTextContent('The video itself is not deleted');
     expect(dialog).toHaveTextContent('accepted-source.mp4');
 
-    await user.click(within(dialog).getByRole('button', { name: 'Remove source' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Remove original video' }));
 
     expect(removeBody).toEqual({ expectedVersion: 2, expectedRevisionNumber: 2 });
-    expect(await screen.findByRole('heading', { name: 'No source yet' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'No original video yet' })).toBeVisible();
     await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Remove source' })).not.toBeInTheDocument(),
+      expect(
+        screen.queryByRole('dialog', { name: 'Remove original video' }),
+      ).not.toBeInTheDocument(),
     );
     // The three ways back to a source are live again, and Remove is gone with the source.
     expect(screen.getByRole('button', { name: 'Upload' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Use Saved Video' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Remove source' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove original video' })).not.toBeInTheDocument();
     expect(clear).toHaveBeenCalledWith(activeId);
   });
 
@@ -1300,15 +1306,15 @@ describe('Project route surface', () => {
       sourceRuntime: { present: vi.fn(), clear: vi.fn() },
     });
 
-    await user.click(await screen.findByRole('button', { name: 'Remove source' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove source' });
-    await user.click(within(dialog).getByRole('button', { name: 'Remove source' }));
+    await user.click(await screen.findByRole('button', { name: 'Remove original video' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove original video' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remove original video' }));
 
     // The dialog is where the operator is looking, so the refusal has to land there.
-    expect(await within(dialog).findByText('Source not removed')).toBeVisible();
-    expect(screen.getByRole('dialog', { name: 'Remove source' })).toBeVisible();
+    expect(await within(dialog).findByText('Original video not removed')).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Remove original video' })).toBeVisible();
     // Still retryable rather than dismissed with the source silently intact behind it.
-    expect(within(dialog).getByRole('button', { name: 'Remove source' })).toBeEnabled();
+    expect(within(dialog).getByRole('button', { name: 'Remove original video' })).toBeEnabled();
   });
 
   it('does not offer source removal on the overview or for an empty Project', async () => {
@@ -1327,8 +1333,8 @@ describe('Project route surface', () => {
 
     // A source-bearing Project must not mount the Source task on the overview: doing so would
     // re-read the source bytes just to show a button.
-    expect(await screen.findByText(/Source ready/u)).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Remove source' })).not.toBeInTheDocument();
+    expect(await screen.findByText(/Original video ready/u)).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Remove original video' })).not.toBeInTheDocument();
   });
 
   it('accepts one finalized recording while exposing bounded source activity', async () => {
@@ -1359,7 +1365,7 @@ describe('Project route surface', () => {
     expect(await screen.findByText(/Uploading and checking your video/u)).toBeVisible();
     expect(screen.queryByText('All changes saved')).not.toBeInTheDocument();
 
-    expect(await screen.findByRole('heading', { name: 'Source video' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Original video ready' })).toBeVisible();
     expect(present).toHaveBeenCalledWith(activeId, expect.objectContaining({ blob: file }));
     expect(activities).toContainEqual(
       expect.objectContaining({ phase: 'preparing', busy: true, accepted: false }),
@@ -1426,7 +1432,7 @@ describe('Project route surface', () => {
     fireEvent.change(input!, { target: { files: [file] } });
     const error = await screen.findByRole('alert');
     expect(error).toHaveTextContent('Source upload unavailable.');
-    expect(screen.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'No original video yet' })).toBeVisible();
     expect(operationKeys).toHaveLength(2);
     expect(operationKeys[1]).toBe(operationKeys[0]);
   });
@@ -1506,7 +1512,7 @@ describe('Project route surface', () => {
     });
 
     await user.click(await screen.findByRole('button', { name: 'Use Saved Video' }));
-    let dialog = screen.getByRole('dialog', { name: 'Choose the Project source' });
+    let dialog = screen.getByRole('dialog', { name: 'Choose the original video' });
     const unavailable = await within(dialog).findByRole('alert');
     await user.click(within(unavailable).getByRole('button', { name: 'Retry' }));
     await user.click(await within(dialog).findByRole('button', { name: 'Load more Saved Videos' }));
@@ -1519,16 +1525,16 @@ describe('Project route surface', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
     await user.click(screen.getByRole('button', { name: 'Use Saved Video' }));
-    dialog = screen.getByRole('dialog', { name: 'Choose the Project source' });
+    dialog = screen.getByRole('dialog', { name: 'Choose the original video' });
     await user.click(within(dialog).getByRole('button', { name: /Library source/u }));
 
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
     expect(present.mock.calls[0]?.[0]).toBe(activeId);
     expect(present.mock.calls[0]?.[1].blob).toBeInstanceOf(File);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(screen.getByRole('heading', { name: 'Source video' }).parentElement).toHaveTextContent(
-      'This Project references the exact Saved Video Version',
-    );
+    expect(
+      screen.getByRole('heading', { name: 'Original video ready' }).parentElement,
+    ).toHaveTextContent('This Project works from a video already in your library');
   });
 
   it('moves a standalone Project after a recoverable Campaign assignment failure', async () => {

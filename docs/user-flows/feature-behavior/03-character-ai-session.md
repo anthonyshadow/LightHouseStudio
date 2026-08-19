@@ -30,7 +30,7 @@ pinned `lucy-latest` model.
    provider work.
 
 Inside an open source-bearing Project, the same Character/Variant selectors configure the one
-Project session beside current working media. **Save creative setup** records the stable Character
+Project session beside the current cut. **Save progress** records the stable Character
 and Variant IDs plus exact applied labels, resource revisions, immutable reference ID, prompt, and
 treatment settings as one semantic checkpoint. It does not copy or take lifecycle ownership of the
 Character record. If that owner-scoped record later disappears or changes, the Project retains its

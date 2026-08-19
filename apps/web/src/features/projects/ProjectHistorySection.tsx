@@ -24,7 +24,7 @@ import { useStableOperationKey } from './useStableOperationKey';
 const revisionSourceLabel: Record<ProjectCurrentResponse['revision']['source'], string> = {
   create: 'Project created',
   'user-edit': 'Project change',
-  'job-result': 'Processing result adopted',
+  'job-result': 'Processing result used',
   'output-save': 'Saved Version made current',
   restore: 'Project restored',
   migration: 'Project migrated',
@@ -113,7 +113,7 @@ export const ProjectHistorySection = ({
       setError(null);
       setMessage(null);
       if (!(await session.flush())) {
-        setError('Resolve the preserved Project proposal before changing working media.');
+        setError('Save or discard your pending Project changes before changing the current cut.');
         return;
       }
       const latest = session.getCurrent();
@@ -146,14 +146,14 @@ export const ProjectHistorySection = ({
         operation.reset();
         session.acceptCurrent({ project: response.project, revision: response.revision });
         setMessage(
-          `${label} is now working media. The immutable original and Saved Video current pointer were not changed.`,
+          `${label} is now the current cut. Your original video and the video’s current version were not changed.`,
         );
         await queryClient.invalidateQueries({ queryKey: ['projects', 'history', projectId] });
       } catch (caught) {
         setError(
           caught instanceof ProjectApiConflictError
-            ? 'The Project changed before this historical media could be adopted. Refresh and try again.'
-            : 'This historical media could not be validated for current Project use.',
+            ? 'The Project changed before this older result could be used. Refresh and try again.'
+            : 'This older result could not be used in the Project.',
         );
       } finally {
         setBusyItemKey(null);
@@ -190,10 +190,10 @@ export const ProjectHistorySection = ({
   return (
     <section aria-labelledby="project-history-heading" css={panelStyles}>
       <header>
-        <h3 id="project-history-heading">Project history and Versions</h3>
+        <h3 id="project-history-heading">History and versions</h3>
         <p>
-          Changes, processing attempts, and immutable Saved Video Versions remain distinct. Pages
-          contain metadata only; preview and Download fetch one exact retained result.
+          Every change, AI run and saved version for this Project. Preview and Download fetch the
+          exact video.
         </p>
       </header>
       {message ? (
@@ -219,7 +219,7 @@ export const ProjectHistorySection = ({
           </StatusNotice>
         ) : null}
         {!outputs.isPending && !outputs.isError && outputItems.length === 0 ? (
-          <p>No Saved Video Versions have been produced by this Project yet.</p>
+          <p>This Project has not saved any versions yet.</p>
         ) : null}
         <ul css={historyListStyles} aria-label="Saved video Version history">
           {outputItems.map((item) => {
@@ -243,21 +243,21 @@ export const ProjectHistorySection = ({
                   </time>
                 </span>
                 <span>
-                  Produced by Project revision {item.output.producingRevisionNumber}
+                  Saved at change {item.output.producingRevisionNumber}
                   {item.referenceRevision
-                    ? `; made current by revision ${item.referenceRevision.revisionNumber}`
+                    ? `; made current at change ${item.referenceRevision.revisionNumber}`
                     : ''}
-                  {item.isCurrentForProject ? ' · Current Project output' : ''}
+                  {item.isCurrentForProject ? ' · Current in this Project' : ''}
                 </span>
                 {item.savedVideo.libraryStatus === 'removed' ? (
                   <StatusNotice role="status" tone="neutral">
-                    Removed from Saved Videos. This exact Version remains available only because
-                    Project history retains it; no physical erasure is claimed.
+                    Removed from your videos. This version is still here because Project history
+                    keeps it, and its file was not erased.
                   </StatusNotice>
                 ) : null}
                 {item.savedVideo.libraryStatus === 'missing' ? (
                   <StatusNotice role="alert" tone="warning">
-                    This Version metadata remains, but its media is unavailable.
+                    This version’s details are still here, but its video file is unavailable.
                   </StatusNotice>
                 ) : null}
                 <div css={{ display: 'flex', flexWrap: 'wrap', gap: theme.space.sm }}>
@@ -333,14 +333,13 @@ export const ProjectHistorySection = ({
                 {attempt.attemptNumber}
               </strong>
               <span>
-                Revision {attempt.initiatingRevisionNumber} · {attempt.phase} ·{' '}
+                Started from change {attempt.initiatingRevisionNumber} · {attempt.phase} ·{' '}
                 <time dateTime={attempt.createdAt}>{formatDateTime(attempt.createdAt)}</time>
               </span>
               {attempt.result?.historical ? (
                 <>
                   <span>
-                    Retained in this Project as a valid stale result. It was not promoted
-                    automatically.
+                    Kept in this Project as an older result. It was not applied automatically.
                   </span>
                   <Button
                     size="small"
@@ -386,15 +385,13 @@ export const ProjectHistorySection = ({
         <ul css={historyListStyles} aria-label="Project change history">
           {revisionItems.map((revision) => (
             <li key={revision.revisionId} css={itemStyles}>
-              <strong>
-                {revisionSourceLabel[revision.source]} · Revision {revision.revisionNumber}
-              </strong>
+              <strong>{revisionSourceLabel[revision.source]}</strong>
               <span>
-                {revision.workflowPhase} · {revision.authorKind} ·{' '}
-                <time dateTime={revision.createdAt}>{formatDateTime(revision.createdAt)}</time>
+                Change {revision.revisionNumber} · {revision.workflowPhase} · {revision.authorKind}{' '}
+                · <time dateTime={revision.createdAt}>{formatDateTime(revision.createdAt)}</time>
               </span>
               {revision.outputReference ? (
-                <span>This revision references one exact retained output Version.</span>
+                <span>This change points at one saved version.</span>
               ) : null}
             </li>
           ))}
@@ -418,7 +415,7 @@ export const ProjectHistorySection = ({
             ? `${preview.savedVideo.title} · Version ${preview.version.ordinal}`
             : 'Version preview'
         }
-        description="Previewing this exact immutable Version does not change either current pointer."
+        description="Previewing does not change the current cut or the video’s current version."
         placement="fullscreen"
         size="wide"
         centered

@@ -585,7 +585,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
         buffer: fixture,
       });
       await page.getByRole('tab', { name: 'Save', exact: true }).click();
-      const outputHeading = page.getByRole('heading', { name: 'Review and save output' });
+      const outputHeading = page.getByRole('heading', { name: 'Review and save' });
       await expect(outputHeading).toBeVisible();
       await page.getByRole('button', { name: 'Add Version' }).scrollIntoViewIfNeeded();
       await expect(page.getByLabel('Studio media stage')).toBeVisible();

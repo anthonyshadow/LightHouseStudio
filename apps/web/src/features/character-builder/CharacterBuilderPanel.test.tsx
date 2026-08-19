@@ -144,7 +144,7 @@ describe('CharacterBuilderPanel Wave 5 trust boundary', () => {
     await user.click(screen.getByRole('button', { name: /^Preview/i }));
     const generate = screen.getByRole('button', { name: 'Generate Preview' });
     expect(generate).toHaveAccessibleDescription(
-      /OpenAI \(gpt-5.6\).*attempts to optimize.*Black Forest Labs \(flux-2-pro\).*may use provider credits.*immutable local asset.*Upload and Save without generation do not contact/i,
+      /OpenAI \(gpt-5.6\).*attempts to optimize.*Black Forest Labs \(flux-2-pro\).*may use provider credits.*stored in your local data directory.*Upload and Save without generation do not contact/i,
     );
     await user.click(generate);
     expect(onGenerate).toHaveBeenCalledOnce();

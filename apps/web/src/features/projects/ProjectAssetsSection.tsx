@@ -62,12 +62,12 @@ const abbreviatedId = (value: string): string =>
 // Opening an attached Video in the workspace means two materially different things depending on
 // whether the Project already has a source, so the control has to say which one.
 const projectWorkspaceAdoptionLabel = (projectHasSource: boolean): string =>
-  projectHasSource ? 'Use as working media' : 'Use as Project source';
+  projectHasSource ? 'Use as the current cut' : 'Use as the original video';
 
 const projectWorkspaceAdoptionHint = (projectHasSource: boolean): string =>
   projectHasSource
-    ? 'Loads this Video as the current editable media. The Project source stays unchanged.'
-    : 'This Project has no source yet, so this Video becomes the video it works from.';
+    ? 'Loads this video as the current cut. The original video stays unchanged.'
+    : 'This Project has no original video yet, so this becomes the one it works from.';
 
 const labelForMembership = (
   membership: ProjectAssetMembershipContract,
@@ -310,7 +310,7 @@ export const ProjectAssetsSection = ({
       await controller.detachMutation.mutateAsync(membership.id);
       setNotice({
         tone: 'success',
-        message: `${kindLabel(membership.kind)} detached from Project.`,
+        message: `${kindLabel(membership.kind)} removed from this Project.`,
       });
     } catch (caught) {
       setNotice({ tone: 'danger', message: safeProjectError(caught) });
@@ -325,7 +325,7 @@ export const ProjectAssetsSection = ({
   return (
     <section aria-labelledby="project-assets-heading" css={projectAssetsSectionStyles(theme)}>
       <header css={projectAssetsHeaderStyles(theme)}>
-        <h2 id="project-assets-heading">Project Assets</h2>
+        <h2 id="project-assets-heading">Used in this Project</h2>
         {!archived ? (
           <Button
             ref={addTriggerRef}
@@ -342,11 +342,14 @@ export const ProjectAssetsSection = ({
       </header>
 
       <p data-project-assets-explainer css={projectAssetsOwnershipStyles(theme)}>
-        Attached Assets are reusable records kept alongside this Project. They are not its source —
-        that is the one original video the Project is built from.
+        Saved items you use in this Project. None of them is its original video.
       </p>
 
-      <div role="group" aria-label="Filter Project Assets" css={projectAssetFiltersStyles(theme)}>
+      <div
+        role="group"
+        aria-label="Filter items used in this Project"
+        css={projectAssetFiltersStyles(theme)}
+      >
         {FILTERS.map(({ value, label }) => (
           <Button
             key={value}
@@ -365,9 +368,9 @@ export const ProjectAssetsSection = ({
           {notice.message}
         </StatusNotice>
       ) : null}
-      {controller.query.isPending ? <p role="status">Loading Project Assets…</p> : null}
+      {controller.query.isPending ? <p role="status">Loading…</p> : null}
       {controller.query.isError ? (
-        <StatusNotice role="alert" tone="danger" title="Project Assets unavailable">
+        <StatusNotice role="alert" tone="danger" title="This list could not be loaded">
           <p>{safeProjectError(controller.query.error)}</p>
           <Button size="small" onClick={() => void controller.query.refetch()}>
             Retry
@@ -376,12 +379,16 @@ export const ProjectAssetsSection = ({
       ) : null}
       {!controller.query.isPending && !controller.query.isError && memberships.length === 0 ? (
         <div css={projectAssetsEmptyStyles(theme)}>
-          <strong>No {filter === 'all' ? '' : `${kindLabel(filter)} `}Assets attached</strong>
-          <p>Attach an existing Asset or create one. Attaching never changes the Project source.</p>
+          <strong>
+            {filter === 'all'
+              ? 'Nothing used in this Project yet'
+              : `No ${kindLabel(filter)} used in this Project`}
+          </strong>
+          <p>Add a saved item or create one. Adding never changes the original video.</p>
         </div>
       ) : null}
       {memberships.length > 0 ? (
-        <ul aria-label="Assets attached to this Project" css={projectAssetGridStyles(theme)}>
+        <ul aria-label="Items used in this Project" css={projectAssetGridStyles(theme)}>
           {memberships.map((membership) => {
             const resolved = labelForMembership(membership, creativeStore, videoSummaries);
             return (
@@ -402,7 +409,7 @@ export const ProjectAssetsSection = ({
                   <h3>{resolved.label}</h3>
                   {resolved.unavailable ? (
                     <StatusNotice tone="warning">
-                      The underlying Asset is unavailable. This association can still be detached.
+                      This item is unavailable. You can still remove it from this Project.
                     </StatusNotice>
                   ) : null}
                   {(membership.kind === 'video' && !resolved.unavailable) || !archived ? (
@@ -444,7 +451,7 @@ export const ProjectAssetsSection = ({
                           disabled={busy}
                           onClick={() => void detach(membership)}
                         >
-                          Detach from Project
+                          Remove from Project
                         </Button>
                       ) : null}
                     </div>
@@ -465,15 +472,15 @@ export const ProjectAssetsSection = ({
         </Button>
       ) : null}
       <p css={projectAssetsOwnershipStyles(theme)}>
-        Detaching never deletes an Asset or Project history. Assets remain reusable everywhere they
-        are available.
+        Removing an item here never deletes it or this Project’s history. It stays reusable
+        everywhere else.
       </p>
 
       <OverlayPanel
         open={picker === 'choose'}
         onClose={() => setPicker(null)}
         title="Add Asset"
-        description="Attach an existing Asset, or start a Project-aware Video creation flow."
+        description="Add something you already saved, or create a new video for this Project."
         placement="bottom"
         size="wide"
         returnFocusRef={addTriggerRef}
@@ -504,14 +511,14 @@ export const ProjectAssetsSection = ({
         onClose={() => setPicker(null)}
         onSelect={(video) => void attach('video', video.id)}
         title="Import Saved Video"
-        description="Attach the current Saved Video without replacing this Project's immutable source."
+        description="Adds this video to the Project without replacing its original video."
         listLabel="Saved Videos available to attach to this Project"
       />
       <OverlayPanel
         open={picker === 'character' || picker === 'outfit'}
         onClose={() => setPicker(null)}
         title={picker === 'character' ? 'Add Character' : 'Add Outfit'}
-        description="Choose an existing owner-scoped Asset. Creating a new one uses the same Studio builder."
+        description="Choose one you already saved, or create a new one in Studio."
         placement="bottom"
         size="wide"
         bodyMode="scroll"
@@ -566,7 +573,7 @@ export const ProjectAssetsSection = ({
         open={picker === 'video-options'}
         onClose={() => setPicker(null)}
         title="Create Video for Project"
-        description="Recording or uploading stays standalone until you explicitly save the Video to Assets."
+        description="Recording or uploading stays separate until you save the video to Assets."
         placement="right"
         returnFocusRef={addTriggerRef}
       >
@@ -597,13 +604,13 @@ export const ProjectAssetsSection = ({
 
       <ConfirmationDialog
         open={sourceAdoptionCandidate !== null}
-        title="Make this the Project source?"
+        title="Make this the original video?"
         description={
           sourceAdoptionCandidate
-            ? `“${sourceAdoptionCandidate.title}” becomes the video this Project is built from. You can remove the source later from the workspace Source step to choose a different one. The Asset stays reusable everywhere.`
+            ? `“${sourceAdoptionCandidate.title}” becomes the video this Project is built from. You can remove it later from the workspace and choose another. The video itself stays in your library.`
             : ''
         }
-        confirmLabel="Use as Project source"
+        confirmLabel="Use as the original video"
         cancelLabel="Keep this Project empty"
         busy={videoWorkspace.busyVideoId !== null}
         returnFocusRef={previewTriggerRef}

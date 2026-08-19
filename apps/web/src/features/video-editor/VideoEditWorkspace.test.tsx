@@ -203,9 +203,9 @@ describe('VideoEditWorkspace', () => {
 
     expect(
       screen.getByText('Temporary Render preview').closest('[role="status"]'),
-    ).toHaveTextContent('Rendering does not save Project media');
+    ).toHaveTextContent('Rendering saves nothing yet');
     expect(screen.getByText('Applied Project edit').closest('[role="status"]')).toHaveTextContent(
-      'New controls start from that rendered baseline',
+      'New controls start from that render',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Render preview' }));
     expect(session.startRender).toHaveBeenCalledOnce();

@@ -94,7 +94,8 @@ const assetCards: ReadonlyArray<{
   {
     destination: 'videos',
     title: 'Videos',
-    description: 'Preview, edit, download, rename, remove, and inspect immutable Versions.',
+    description:
+      'Preview, edit, download, rename or remove your videos, and open any saved version.',
   },
   {
     destination: 'characters',
@@ -141,8 +142,8 @@ export const AssetsRouteSurface = ({
             Assets
           </h1>
           <p>
-            Find retained videos and reusable creative resources. Saving to Assets never silently
-            adds content to a Project or Campaign.
+            Your videos and the creative pieces you reuse. Saving here never adds anything to a
+            Project or Campaign on its own.
           </p>
         </div>
         <Button variant="primary" onClick={onUploadVideo}>

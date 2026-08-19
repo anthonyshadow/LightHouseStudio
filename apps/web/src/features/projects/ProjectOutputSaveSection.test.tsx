@@ -374,7 +374,7 @@ describe('Project output save UI', () => {
     await user.clear(title);
     await user.type(title, 'Launch master');
     await user.click(within(dialog).getByRole('button', { name: 'Save as New Video' }));
-    expect(await screen.findByText(/save response was unavailable/u)).toBeVisible();
+    expect(await screen.findByText(/save reply never arrived/u)).toBeVisible();
     expect(
       window.localStorage.getItem(projectOutputOperationStorageKey(ownerUserId, projectId)),
     ).not.toBeNull();
@@ -406,7 +406,7 @@ describe('Project output save UI', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Save as New Video' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The authenticated owner could not be bound to this save operation.',
+      'Your account could not be confirmed for this save.',
     );
     expect(outputRequests).toBe(0);
   });
@@ -432,7 +432,7 @@ describe('Project output save UI', () => {
     );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Resolve the preserved Project proposal before saving an output.',
+      'Save or discard your pending Project changes before saving.',
     );
     expect(flush).toHaveBeenCalledOnce();
     expect(outputRequests).toBe(0);
@@ -471,7 +471,7 @@ describe('Project output save UI', () => {
     );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The Project no longer has the exact ready media selected for this save.',
+      'The Project no longer has the media this save was for.',
     );
     expect(outputRequests).toBe(0);
   });
@@ -498,7 +498,7 @@ describe('Project output save UI', () => {
     );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Browser operation storage is unavailable, so the reload-safe output save was not started.',
+      'This browser cannot store the save record, so nothing was saved.',
     );
     expect(outputRequests).toBe(0);
   });
@@ -525,11 +525,11 @@ describe('Project output save UI', () => {
         name: 'Save as New Video',
       }),
     );
-    expect(await screen.findByText(/save response was unavailable/u)).toBeVisible();
+    expect(await screen.findByText(/save reply never arrived/u)).toBeVisible();
     await waitFor(() =>
       expect(screen.queryByRole('dialog', { name: 'Save as New Video' })).not.toBeInTheDocument(),
     );
-    await user.click(screen.getByRole('button', { name: 'Reconcile saved operation' }));
+    await user.click(screen.getByRole('button', { name: 'Check this save' }));
 
     expect(await screen.findByText('Saved “Launch master” as Version 1.')).toBeVisible();
     expect(operationIds).toHaveLength(2);

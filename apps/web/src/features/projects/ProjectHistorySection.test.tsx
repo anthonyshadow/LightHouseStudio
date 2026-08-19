@@ -279,11 +279,9 @@ describe('ProjectHistorySection', () => {
     expect(await screen.findByRole('heading', { name: 'Saved video Versions' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Processing attempts and results' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Project changes' })).toBeVisible();
-    expect(
-      await screen.findByText(/Produced by Project revision 1; made current by revision 2/u),
-    ).toBeVisible();
-    expect(screen.getByText(/Removed from Saved Videos/u)).toBeVisible();
-    expect(screen.getByText(/valid stale result/u)).toBeVisible();
+    expect(await screen.findByText(/Saved at change 1; made current at change 2/u)).toBeVisible();
+    expect(screen.getByText(/Removed from your videos/u)).toBeVisible();
+    expect(screen.getByText(/Kept in this Project as an older result/u)).toBeVisible();
     expect(
       screen.getByRole('link', { name: 'Download Removed master, Version 1' }),
     ).toHaveAttribute(
@@ -318,7 +316,7 @@ describe('ProjectHistorySection', () => {
         revision: adopted.revision,
       }),
     );
-    expect(await screen.findByText(/Saved Video current pointer were not changed/u)).toBeVisible();
+    expect(await screen.findByText(/the video.s current version were not changed/u)).toBeVisible();
   });
 
   it('retries each independent history feed and reaches its empty state', async () => {
@@ -366,9 +364,7 @@ describe('ProjectHistorySection', () => {
     expect(retryButtons).toHaveLength(3);
     for (const button of retryButtons) fireEvent.click(button);
 
-    expect(
-      await screen.findByText('No Saved Video Versions have been produced by this Project yet.'),
-    ).toBeVisible();
+    expect(await screen.findByText('This Project has not saved any versions yet.')).toBeVisible();
     expect(screen.getByText('No processing attempts have been recorded.')).toBeVisible();
     expect(screen.getByRole('list', { name: 'Project change history' })).toBeEmptyDOMElement();
   });
@@ -480,7 +476,7 @@ describe('ProjectHistorySection', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Use in Project' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Resolve the preserved Project proposal before changing working media.',
+      'Save or discard your pending Project changes before changing the current cut.',
     );
     expect(flush).toHaveBeenCalledOnce();
     expect(reuseRequests).toBe(0);
@@ -528,7 +524,7 @@ describe('ProjectHistorySection', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Use in Project' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'This historical media could not be validated for current Project use.',
+      'This older result could not be used in the Project.',
     );
   });
 
@@ -573,7 +569,7 @@ describe('ProjectHistorySection', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Use in Project' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'The Project changed before this historical media could be adopted.',
+      'The Project changed before this older result could be used.',
     );
     expect(accepted).not.toHaveBeenCalled();
   });

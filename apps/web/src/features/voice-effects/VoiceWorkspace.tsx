@@ -60,7 +60,7 @@ const selectionName = (selection: VoiceEffectSelection): string => {
 
 const selectionDescription = (selection: VoiceEffectSelection): string => {
   if (selection.kind === 'none')
-    return 'No processing. The immutable captured audio remains active.';
+    return 'No processing. Your original recorded audio stays as it is.';
   if (selection.kind === 'elevenlabs')
     return 'Preview the saved provider sample before deciding whether to use this voice.';
   return (
@@ -354,7 +354,7 @@ export const VoiceWorkspace = ({
                     {draftSelection.kind === 'local'
                       ? mode === 'select'
                         ? 'Plan-only until the outer Start edit action renders this treatment locally.'
-                        : 'Rendered locally from the immutable Original audio sidecar after Apply.'
+                        : 'Rendered in this browser from your original recorded audio after Apply.'
                       : draftSelection.kind === 'none'
                         ? 'Ready immediately without rendering or provider contact.'
                         : 'Open the Voice Library to preview the provider sample.'}
@@ -445,7 +445,7 @@ export const VoiceWorkspace = ({
                 ) : (
                   <>
                     <span>
-                      Applying sends {clipDurationLabel} of the immutable Original audio sidecar
+                      Applying sends {clipDurationLabel} of your original recorded audio
                       {elevenLabsModel ? ` using ${elevenLabsModel}` : ''}.
                     </span>
                     <strong>

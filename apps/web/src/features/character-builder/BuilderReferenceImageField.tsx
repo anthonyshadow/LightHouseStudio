@@ -31,7 +31,7 @@ export const BuilderReferenceImageField = ({
           kind: 'heading',
           text: 'Optional character reference',
           description:
-            'JPEG, PNG, or WebP up to 10 MiB and 40 megapixels. Selecting a file stores an immutable local asset in the configured data directory. Detaching it later removes the relationship, not the stored bytes.',
+            'JPEG, PNG, or WebP up to 10 MiB and 40 megapixels. Choosing a file stores it in your local data directory. Detaching it later removes the link, not the stored file.',
         }}
         picker={{
           action: pending ? 'Uploading image…' : reference ? 'Replace image' : 'Upload image',
@@ -49,10 +49,10 @@ export const BuilderReferenceImageField = ({
                 name: reference.displayName,
                 byteSize: reference.asset.byteSize,
                 description:
-                  'This immutable local asset will be restored with this builder draft. Detach removes this draft relationship but does not delete the stored bytes.',
+                  'This stored image is restored with this draft. Detach removes the link, not the stored file.',
                 removeLabel: 'Detach uploaded character reference',
                 removeText: 'Detach',
-                removeTitle: 'Detach reference without deleting stored bytes',
+                removeTitle: 'Detach reference without deleting the stored file',
                 onRemove,
               },
             }

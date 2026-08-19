@@ -67,14 +67,14 @@ describe('StudioLifecycleDialogs', () => {
 
     expect(
       await screen.findByRole('heading', {
-        name: 'Adopt Render preview as Project working media?',
+        name: 'Make this render the current cut?',
       }),
     ).toBeVisible();
     expect(
       screen.getAllByText('Store this render as the Project working-media checkpoint.'),
     ).toHaveLength(2);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Adopt as working media' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use as the current cut' }));
     fireEvent.click(screen.getByRole('button', { name: 'Keep editing' }));
 
     expect(adoptRenderPreview).toHaveBeenCalledOnce();

@@ -307,7 +307,7 @@ Using synthetic compatible media and no live provider:
 - remove the Saved Video globally and confirm only its exact retaining Project can still preview,
   use, and download it with truthful retention copy; and
 - open a legacy/independently saved video without a Project output relation and confirm it is usable
-  and labeled **Unassigned Content**, not an error or an invented producing Project.
+  and labeled **No Project**, not an error or an invented producing Project.
 
 At compact/mobile widths and 200% text, verify all three groups, load-more actions, old-Version
 selection, preview focus return/Escape, status announcements, and Download remain reachable. These
