@@ -18,21 +18,22 @@ implemented behaviour and constraints.
 
 ## Where to find things
 
-| I need…                                                     | Read                                                                               |
-| ----------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| What the product does, and how a user moves through it      | [`user-flows/README.md`](user-flows/README.md)                                     |
-| The complete route table and redirects                      | [`user-flows/navigation-map.md`](user-flows/navigation-map.md)                     |
-| Known usability problems, gaps and likely bugs              | [`user-flows/gaps-and-usability-audit.md`](user-flows/gaps-and-usability-audit.md) |
-| The observable contract for one capability                  | [`user-flows/feature-behavior/README.md`](user-flows/feature-behavior/README.md)   |
-| Module boundaries, ownership, lifecycle, API and deployment | [`ARCHITECTURE.md`](ARCHITECTURE.md)                                               |
-| Setup, scripts, configuration and release posture           | [`../README.md`](../README.md)                                                     |
-| How to work in this repository as an agent                  | [`../CLAUDE.md`](../CLAUDE.md), then [`../AGENTS.md`](../AGENTS.md)                |
-| Which tests to run for a change                             | [`TESTING.md`](TESTING.md)                                                         |
-| Data location, provider contact, retention, cost boundaries | [`PRIVACY_AND_TEMPORARY_DATA.md`](PRIVACY_AND_TEMPORARY_DATA.md)                   |
-| Database and object-storage modes, migrations, rollback     | [`CLOUD_PERSISTENCE.md`](CLOUD_PERSISTENCE.md)                                     |
-| Reference-image generation and provider selection           | [`Image_Generation.md`](Image_Generation.md)                                       |
-| An expensive-to-reverse decision and its rationale          | [`decisions/README.md`](decisions/README.md)                                       |
-| Why something is the way it is, historically                | [`archived/README.md`](archived/README.md)                                         |
+| I need…                                                           | Read                                                                               |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| What the product does, and how a user moves through it            | [`user-flows/README.md`](user-flows/README.md)                                     |
+| The complete route table and redirects                            | [`user-flows/navigation-map.md`](user-flows/navigation-map.md)                     |
+| Known usability problems, gaps and likely bugs                    | [`user-flows/gaps-and-usability-audit.md`](user-flows/gaps-and-usability-audit.md) |
+| A cross-functional product assessment and the roadmap it produced | [`product-audit/README.md`](product-audit/README.md)                               |
+| The observable contract for one capability                        | [`user-flows/feature-behavior/README.md`](user-flows/feature-behavior/README.md)   |
+| Module boundaries, ownership, lifecycle, API and deployment       | [`ARCHITECTURE.md`](ARCHITECTURE.md)                                               |
+| Setup, scripts, configuration and release posture                 | [`../README.md`](../README.md)                                                     |
+| How to work in this repository as an agent                        | [`../CLAUDE.md`](../CLAUDE.md), then [`../AGENTS.md`](../AGENTS.md)                |
+| Which tests to run for a change                                   | [`TESTING.md`](TESTING.md)                                                         |
+| Data location, provider contact, retention, cost boundaries       | [`PRIVACY_AND_TEMPORARY_DATA.md`](PRIVACY_AND_TEMPORARY_DATA.md)                   |
+| Database and object-storage modes, migrations, rollback           | [`CLOUD_PERSISTENCE.md`](CLOUD_PERSISTENCE.md)                                     |
+| Reference-image generation and provider selection                 | [`Image_Generation.md`](Image_Generation.md)                                       |
+| An expensive-to-reverse decision and its rationale                | [`decisions/README.md`](decisions/README.md)                                       |
+| Why something is the way it is, historically                      | [`archived/README.md`](archived/README.md)                                         |
 
 ## Current system
 
@@ -49,14 +50,15 @@ implemented behaviour and constraints.
 
 ## Product and user flows
 
-| Document                                                           | Owner               | Source of truth for                                                         |
-| ------------------------------------------------------------------ | ------------------- | --------------------------------------------------------------------------- |
-| [User flows](user-flows/README.md)                                 | Product/engineering | Current route-level journeys, entry points, system behaviour, exit points   |
-| [Navigation map](user-flows/navigation-map.md)                     | Engineering         | Routes, redirects, route-driven side effects, reachability                  |
-| [Gaps and usability audit](user-flows/gaps-and-usability-audit.md) | Product/engineering | Known flow gaps, missing/redundant UI, likely bugs, prioritised remediation |
-| [Feature behaviour](user-flows/feature-behavior/README.md)         | Product/QA          | Per-capability observable behaviour and manual validation limits            |
-| [Product Vision](PRODUCT_VISION.md)                                | Product             | Positioning, audiences, hierarchy, principles, terminology                  |
-| [Campaign and Project MVP definition](MVP_DEFINITION.md)           | Product/engineering | Bounded Campaign/Project/video MVP model and completion criteria            |
+| Document                                                           | Owner               | Source of truth for                                                                        |
+| ------------------------------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------ |
+| [User flows](user-flows/README.md)                                 | Product/engineering | Current route-level journeys, entry points, system behaviour, exit points                  |
+| [Navigation map](user-flows/navigation-map.md)                     | Engineering         | Routes, redirects, route-driven side effects, reachability                                 |
+| [Gaps and usability audit](user-flows/gaps-and-usability-audit.md) | Product/engineering | Known flow gaps, missing/redundant UI, likely bugs, prioritised remediation                |
+| [Product audit (Aug 2026)](product-audit/README.md)                | Product/engineering | Cross-functional assessment, prioritised findings, and the incremental roadmap it produced |
+| [Feature behaviour](user-flows/feature-behavior/README.md)         | Product/QA          | Per-capability observable behaviour and manual validation limits                           |
+| [Product Vision](PRODUCT_VISION.md)                                | Product             | Positioning, audiences, hierarchy, principles, terminology                                 |
+| [Campaign and Project MVP definition](MVP_DEFINITION.md)           | Product/engineering | Bounded Campaign/Project/video MVP model and completion criteria                           |
 
 ## Development guidance
 
