@@ -61,7 +61,7 @@ describe('createExistingVideoProviderRegistry', () => {
     );
 
     expect(createPrunaProvider).toHaveBeenCalledOnce();
-    expect(createPrunaProvider).toHaveBeenCalledWith('pruna-secret', undefined);
+    expect(createPrunaProvider).toHaveBeenCalledWith('pruna-secret', undefined, false);
     expect(registry.characterSwap.pruna).toMatchObject({
       provider: pruna,
       outputResolutions: ['720p', '1080p'],

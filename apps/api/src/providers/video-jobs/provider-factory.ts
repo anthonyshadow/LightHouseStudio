@@ -15,6 +15,7 @@ export interface ExistingVideoProviderFactoryOptions {
   readonly createPrunaProvider?: (
     apiKey: string,
     fetchImplementation?: ProviderFetch,
+    disableSafetyChecker?: boolean,
   ) => ExistingVideoJobProvider;
 }
 
@@ -46,9 +47,18 @@ export const createExistingVideoProviderRegistry = (
       ? options.prunaProvider
       : (
           options.createPrunaProvider ??
-          ((apiKey, fetchImplementation) =>
-            new PrunaVideoReplaceProvider(apiKey, fetchImplementation))
-        )(config.prunaApiKey!, options.fetchImplementation)
+          ((apiKey, fetchImplementation, disableSafetyChecker) =>
+            new PrunaVideoReplaceProvider(
+              apiKey,
+              fetchImplementation,
+              undefined,
+              disableSafetyChecker,
+            ))
+        )(
+          config.prunaApiKey!,
+          options.fetchImplementation,
+          config.prunaVideoReplaceDisableSafetyChecker,
+        )
     : null;
 
   const characterSwap: ExistingVideoProviderRegistry['characterSwap'] = {

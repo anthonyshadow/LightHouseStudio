@@ -115,9 +115,57 @@ describe('PrunaVideoReplaceProvider', () => {
           ignore_audio: false,
           instruction_prompt:
             "Replace the primary person in the source video with the character from reference image 1. Reference image 1 is authoritative for the replacement character's exact identity, body, hair, wardrobe, costume, clothing, footwear, and worn accessories; replace the source person's clothing and do not transfer it onto the reference character. Preserve the source person's facial expressions, gaze, lip sync, pose, hand placement, gestures, movement, timing, and blocking exactly. Preserve the source background, scene structure, camera framing and movement, lighting, audio, and every non-worn object or item the source person holds, carries, touches, picks up, puts down, or otherwise interacts with, including its appearance, visibility, position, grip or contact, occlusion, motion, and interaction timing.",
-          //TODO Before making project public, change to false and make configured for local development by environment variable, and then update docs
-          disable_safety_checker: true,
+          disable_safety_checker: false,
         },
+      });
+    },
+  );
+
+  it.each([
+    ['omitted', undefined, false],
+    ['configured off', false, false],
+    ['configured on', true, true],
+  ] as const)(
+    'submits the %s provider safety-checker option without altering the rest of the payload',
+    async (_label, disableSafetyChecker, expected) => {
+      const { videoPath, referencePath } = await fixture();
+      const fetchImplementation = vi.fn<ProviderFetch>();
+      fetchImplementation
+        .mockResolvedValueOnce(
+          jsonResponse({ urls: { get: 'https://api.pruna.ai/v1/files/file-video' } }, 201),
+        )
+        .mockResolvedValueOnce(
+          jsonResponse({ urls: { get: 'https://api.pruna.ai/v1/files/file-reference' } }, 201),
+        )
+        .mockResolvedValueOnce(
+          jsonResponse(
+            {
+              id: 'prediction-one',
+              get_url: 'https://api.pruna.ai/v1/predictions/status/prediction-one',
+            },
+            201,
+          ),
+        );
+      const provider = new PrunaVideoReplaceProvider(
+        'server-secret',
+        fetchImplementation,
+        undefined,
+        disableSafetyChecker,
+      );
+
+      await provider.submit(submission(videoPath, referencePath));
+
+      const predictionBody = fetchImplementation.mock.calls[2]![1]?.body;
+      if (typeof predictionBody !== 'string') {
+        throw new Error('Expected prediction request JSON.');
+      }
+      expect(JSON.parse(predictionBody).input).toMatchObject({
+        disable_safety_checker: expected,
+        seed: 0,
+        turbo: false,
+        save_audio: true,
+        target_fps: 'original',
+        ignore_audio: false,
       });
     },
   );

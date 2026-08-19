@@ -29,6 +29,7 @@ describe('parseEnvironment', () => {
       realtimeVideoBetaEnabled: false,
       existingVideoCharacterSwapProvider: 'decart',
       prunaVideoReplaceEnabled: false,
+      prunaVideoReplaceDisableSafetyChecker: false,
       prunaImageTryOnEnabled: false,
       elevenLabsModelId: DEFAULT_ELEVENLABS_STS_MODEL_ID,
       elevenLabsEnableLogging: false,
@@ -293,6 +294,7 @@ describe('parseEnvironment', () => {
       { PORT: 'not-a-number' },
       { NODE_ENV: 'staging' },
       { ELEVENLABS_ENABLE_LOGGING: 'FALSE' },
+      { PRUNA_VIDEO_REPLACE_DISABLE_SAFETY_CHECKER: 'TRUE' },
       { OPENAI_PROMPT_OPTIMIZER_REASONING: 'extreme' },
       { OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: '9999' },
       { OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: '180001' },
@@ -320,6 +322,19 @@ describe('parseEnvironment', () => {
         EnvironmentValidationError,
       );
     }
+  });
+
+  it('keeps Pruna provider content filtering enabled unless it is explicitly disabled', () => {
+    expect(parseEnvironment({})).toMatchObject({ prunaVideoReplaceDisableSafetyChecker: false });
+    expect(parseEnvironment({ PRUNA_VIDEO_REPLACE_DISABLE_SAFETY_CHECKER: '' })).toMatchObject({
+      prunaVideoReplaceDisableSafetyChecker: false,
+    });
+    expect(parseEnvironment({ PRUNA_VIDEO_REPLACE_DISABLE_SAFETY_CHECKER: 'false' })).toMatchObject(
+      { prunaVideoReplaceDisableSafetyChecker: false },
+    );
+    expect(parseEnvironment({ PRUNA_VIDEO_REPLACE_DISABLE_SAFETY_CHECKER: 'true' })).toMatchObject({
+      prunaVideoReplaceDisableSafetyChecker: true,
+    });
   });
 
   it('accepts explicit Pruna Character Swap without a server-pinned output resolution', () => {

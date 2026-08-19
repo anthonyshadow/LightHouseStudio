@@ -41,6 +41,7 @@ export const testConfig = (overrides: Partial<RuntimeConfig> = {}): RuntimeConfi
   realtimeVideoBetaEnabled: true,
   existingVideoCharacterSwapProvider: 'decart',
   prunaVideoReplaceEnabled: false,
+  prunaVideoReplaceDisableSafetyChecker: false,
   prunaImageTryOnEnabled: false,
   elevenLabsModelId: 'eleven_multilingual_sts_v2',
   elevenLabsEnableLogging: false,
