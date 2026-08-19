@@ -8,11 +8,14 @@ import type {
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HttpResponse, http } from 'msw';
+import { useState, type ReactElement } from 'react';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { downloadSavedVideoUrl } from '../../adapters/api-client/savedVideosApi';
 import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import { mockApiServer } from '../../test/msw/server';
 import { StudioDesignProvider } from '../../ui';
-import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
+import { defaultProjectOutputTitle, ProjectOutputSaveSection } from './ProjectOutputSaveSection';
 import { projectOutputOperationStorageKey } from './projectOutputOperationStorage';
 import type { ProjectSessionPort } from './useProjectSession';
 
@@ -177,6 +180,28 @@ const session = (acceptCurrent = vi.fn()): ProjectSessionPort => ({
   acceptCurrent,
 });
 
+const workspacePath = `/projects/${projectId}/workspace`;
+
+const renderRouted = (element: ReactElement) => {
+  const router = createMemoryRouter(
+    [
+      { path: '/projects/:projectId/workspace', element },
+      { path: '/assets/videos', element: <p>Videos library</p> },
+    ],
+    { initialEntries: [workspacePath] },
+  );
+  return {
+    ...render(
+      <StudioDesignProvider>
+        <RemoteStateTestProvider>
+          <RouterProvider router={router} />
+        </RemoteStateTestProvider>
+      </StudioDesignProvider>,
+    ),
+    router,
+  };
+};
+
 const renderSection = (
   port = session(),
   {
@@ -189,18 +214,30 @@ const renderSection = (
     readonly archived?: boolean;
   } = {},
 ) =>
-  render(
-    <StudioDesignProvider>
-      <RemoteStateTestProvider>
-        <ProjectOutputSaveSection
-          current={currentValue}
-          session={port}
-          archived={archived}
-          {...(owner === null ? {} : { ownerUserId: owner })}
-        />
-      </RemoteStateTestProvider>
-    </StudioDesignProvider>,
+  renderRouted(
+    <ProjectOutputSaveSection
+      current={currentValue}
+      session={port}
+      archived={archived}
+      {...(owner === null ? {} : { ownerUserId: owner })}
+    />,
   );
+
+/**
+ * Adopts each settled save the way `useProjectSession` does, so the second save proposes its title
+ * from the Project state the first one produced rather than from a fixture.
+ */
+const AdoptingSection = ({ port }: { readonly port: ProjectSessionPort }) => {
+  const [value, setValue] = useState(current());
+  return (
+    <ProjectOutputSaveSection
+      current={value}
+      session={{ ...port, acceptCurrent: setValue }}
+      archived={false}
+      ownerUserId={ownerUserId}
+    />
+  );
+};
 
 beforeEach(() => {
   const values = new Map<string, string>();
@@ -380,7 +417,8 @@ describe('Project output save UI', () => {
     ).not.toBeNull();
 
     first.unmount();
-    renderSection();
+    const acceptCurrent = vi.fn();
+    renderSection(session(acceptCurrent));
     expect(await screen.findByText('Saved “Launch master” as Version 1.')).toBeVisible();
     expect(operations).toHaveLength(2);
     expect(operations[1]).toBe(operations[0]);
@@ -388,6 +426,11 @@ describe('Project output save UI', () => {
     expect(
       window.localStorage.getItem(projectOutputOperationStorageKey(ownerUserId, projectId)),
     ).toBeNull();
+    // One settled result: `acceptCurrent` immediately precedes the two query invalidations, so a
+    // single call is a single invalidation pair — and the recovered save offers one set of actions.
+    expect(acceptCurrent).toHaveBeenCalledOnce();
+    expect(screen.getAllByRole('link', { name: /^Download/u })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'View in Assets' })).toHaveLength(1);
   });
 
   it('refuses to start an output save without an authenticated owner binding', async () => {
@@ -574,5 +617,114 @@ describe('Project output save UI', () => {
     expect(
       window.localStorage.getItem(projectOutputOperationStorageKey(ownerUserId, projectId)),
     ).toBeNull();
+  });
+
+  it('ends a new-Video save with the file in hand and a way into the library', async () => {
+    mockApiServer.use(
+      http.post(`*/api/projects/${projectId}/outputs`, ({ request }) =>
+        HttpResponse.json(outputResponse(request.headers.get('idempotency-key') ?? ''), {
+          status: 201,
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    const { router } = renderSection();
+
+    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
+    const dialog = screen.getByRole('dialog', { name: 'Save as New Video' });
+    await user.click(within(dialog).getByRole('button', { name: 'Save as New Video' }));
+
+    expect(await screen.findByText('Saved “Launch master” as Version 1.')).toBeVisible();
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Save as New Video' })).not.toBeInTheDocument(),
+    );
+    const download = screen.getByRole('link', { name: 'Download Launch master, Version 1' });
+    expect(download).toHaveAttribute('href', downloadSavedVideoUrl(savedVideoId, versionId));
+    expect(download).toHaveAttribute('download', 'existing.mp4');
+    // The operator keeps the focus they had; the actions arrive beside the announcement.
+    expect(screen.getByRole('button', { name: 'Save as New Video' })).toHaveFocus();
+
+    await user.click(screen.getByRole('button', { name: 'View in Assets' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/assets/videos'));
+    expect(router.state.location.search).toBe(`?video=${savedVideoId}`);
+  });
+
+  it('offers the added Version itself after Add Version', async () => {
+    const appendedVersionId = 'c3289672-bfb5-5214-94f7-4bd54f12ce06';
+    mockApiServer.use(
+      http.get('*/api/videos', () =>
+        HttpResponse.json({
+          videos: [savedSummary()],
+          nextCursor: null,
+          total: 1,
+          facets: { characterNames: [], formats: ['landscape'] },
+        }),
+      ),
+      http.post(`*/api/projects/${projectId}/outputs`, ({ request }) =>
+        HttpResponse.json(
+          outputResponse(request.headers.get('idempotency-key') ?? '', { append: true }),
+        ),
+      ),
+    );
+    const user = userEvent.setup();
+    renderSection();
+
+    await user.click(screen.getByRole('button', { name: 'Add Version' }));
+    const picker = await screen.findByRole('dialog', { name: 'Choose Add Version target' });
+    await user.click(within(picker).getByRole('button', { name: /Existing master/u }));
+    const confirmation = await screen.findByRole('dialog', { name: 'Confirm Add Version' });
+    await user.click(within(confirmation).getByRole('button', { name: 'Add Version' }));
+
+    expect(await screen.findByText('Added Version 4 to “Existing master”.')).toBeVisible();
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Confirm Add Version' })).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole('link', { name: 'Download Existing master, Version 4' }),
+    ).toHaveAttribute('href', downloadSavedVideoUrl(savedVideoId, appendedVersionId));
+    expect(screen.getByRole('button', { name: 'View in Assets' })).toBeVisible();
+  });
+
+  it('proposes a different title for each successive save from one Project', async () => {
+    mockApiServer.use(
+      http.post(`*/api/projects/${projectId}/outputs`, ({ request }) =>
+        HttpResponse.json(outputResponse(request.headers.get('idempotency-key') ?? ''), {
+          status: 201,
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderRouted(<AdoptingSection port={session()} />);
+
+    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
+    const first = screen.getByRole('dialog', { name: 'Save as New Video' });
+    const proposed = within(first).getByRole('textbox', { name: 'Video title' });
+    expect(proposed).toHaveValue('Launch cut · change 2');
+    await user.clear(proposed);
+    await user.type(proposed, 'Launch master');
+    await user.click(within(first).getByRole('button', { name: 'Save as New Video' }));
+    expect(await screen.findByText('Saved “Launch master” as Version 1.')).toBeVisible();
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Save as New Video' })).not.toBeInTheDocument(),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
+    expect(
+      within(screen.getByRole('dialog', { name: 'Save as New Video' })).getByRole('textbox', {
+        name: 'Video title',
+      }),
+    ).toHaveValue('Launch cut · change 3');
+  });
+
+  it('proposes a title that stays inside the Saved Video title limit', () => {
+    const project = current().project;
+    const longTitle = { ...project, title: 'L'.repeat(120), currentRevisionNumber: 12 };
+
+    expect(defaultProjectOutputTitle(project)).toBe('Launch cut · change 2');
+    expect(defaultProjectOutputTitle({ ...project, title: '  Launch cut  ' })).toBe(
+      'Launch cut · change 2',
+    );
+    expect(defaultProjectOutputTitle(longTitle)).toHaveLength(120);
+    expect(defaultProjectOutputTitle(longTitle).endsWith('… · change 12')).toBe(true);
   });
 });

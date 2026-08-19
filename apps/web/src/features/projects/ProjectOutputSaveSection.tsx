@@ -1,15 +1,20 @@
-import { useTheme } from '@emotion/react';
+import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import type {
+  ProjectContract,
   ProjectCurrentResponse,
+  SavedVideoDetail,
   SavedVideoSummary,
   SaveProjectOutputRequest,
 } from '@studio/contracts';
 import { projectMediaReferencesEqual } from '@studio/domain';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { ApiClientError } from '../../adapters/api-client/apiClient';
+import { savedVideoLibraryPath } from '../../app/paths';
 import { Button, OverlayPanel, StatusNotice, TextField } from '../../ui';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
+import { SavedVideoSuccessActions } from '../saved-videos/SavedVideoSuccessActions';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
 import {
   clearPendingProjectOutput,
@@ -39,6 +44,29 @@ const outputPhaseNotice = {
   }
 >;
 
+/** Mirrors `savedVideoTitleSchema`, which the save request is validated against. */
+const SAVED_VIDEO_TITLE_LIMIT = 120;
+
+/**
+ * The name a new Saved Video is proposed under. Naming it after the Project alone sent every
+ * save from one Project to the library under one name, so the proposal also carries the change
+ * it was taken from — the number History reports for the same output as “Saved at change N”.
+ * Derived from state already in hand: no clock, no counter and no request, so one Project state
+ * always proposes the same name.
+ */
+export const defaultProjectOutputTitle = (project: ProjectContract): string => {
+  const suffix = ` · change ${project.currentRevisionNumber}`;
+  const base = project.title.trim();
+  const room = SAVED_VIDEO_TITLE_LIMIT - suffix.length;
+  return `${base.length > room ? `${base.slice(0, room - 1).trimEnd()}…` : base}${suffix}`;
+};
+
+// The title is the one decision this dialog asks for, and accepting the proposal unread is what
+// filled the library with indistinguishable records. The field reads as the subject of the panel.
+const titleFieldStyles = (theme: Theme): CSSObject => ({
+  '& input': { fontSize: theme.fontSizes.section },
+});
+
 const readyMediaFor = (
   current: ProjectCurrentResponse,
 ): NonNullable<ProjectCurrentResponse['revision']['snapshot']['workingMedia']> | null => {
@@ -62,6 +90,7 @@ export const ProjectOutputSaveSection = ({
   readonly ownerUserId?: string | undefined;
 }) => {
   const theme = useTheme();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const newTriggerRef = useRef<HTMLButtonElement>(null);
   const appendTriggerRef = useRef<HTMLButtonElement>(null);
@@ -72,9 +101,10 @@ export const ProjectOutputSaveSection = ({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [appendDialogOpen, setAppendDialogOpen] = useState(false);
   const [appendTarget, setAppendTarget] = useState<SavedVideoSummary | null>(null);
-  const [title, setTitle] = useState(current.project.title);
+  const [title, setTitle] = useState(() => defaultProjectOutputTitle(current.project));
   const [phase, setPhase] = useState<OutputPhase>('idle');
   const [message, setMessage] = useState<string | null>(null);
+  const [savedVideo, setSavedVideo] = useState<SavedVideoDetail | null>(null);
   const [pendingAvailable, setPendingAvailable] = useState(false);
   const readyMedia = readyMediaFor(current);
   const busy = phase === 'saving' || phase === 'reconciling';
@@ -85,6 +115,7 @@ export const ProjectOutputSaveSection = ({
     async (pending: PendingProjectOutputOperation, recovered: boolean) => {
       if (inFlightRef.current !== null) return;
       inFlightRef.current = pending.operationId;
+      setSavedVideo(null);
       setPhase(recovered ? 'reconciling' : 'saving');
       setMessage(
         recovered
@@ -108,6 +139,7 @@ export const ProjectOutputSaveSection = ({
           queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists }),
           queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.lists }),
         ]);
+        setSavedVideo(response.savedVideo);
         setPhase('saved');
         setMessage(
           pending.request.target.kind === 'new'
@@ -257,6 +289,12 @@ export const ProjectOutputSaveSection = ({
         {message ? (
           <StatusNotice role={notice.role} tone={notice.tone} title={notice.title}>
             <p>{message}</p>
+            {phase === 'saved' && savedVideo !== null ? (
+              <SavedVideoSuccessActions
+                video={savedVideo}
+                onOpenInAssets={() => void navigate(savedVideoLibraryPath(savedVideo.id))}
+              />
+            ) : null}
             {phase === 'error' && pendingAvailable ? (
               <Button size="small" onClick={retryPending}>
                 Check this save
@@ -272,7 +310,7 @@ export const ProjectOutputSaveSection = ({
             busy={busy}
             disabled={archived || busy || readyMedia === null || processing}
             onClick={() => {
-              setTitle(current.project.title);
+              setTitle(defaultProjectOutputTitle(current.project));
               setNewDialogOpen(true);
             }}
           >
@@ -312,7 +350,7 @@ export const ProjectOutputSaveSection = ({
             <Button
               variant="primary"
               busy={busy}
-              disabled={title.trim().length === 0 || title.trim().length > 120}
+              disabled={title.trim().length === 0 || title.trim().length > SAVED_VIDEO_TITLE_LIMIT}
               onClick={() => void begin({ kind: 'new', title: title.trim() })}
             >
               Save as New Video
@@ -320,15 +358,17 @@ export const ProjectOutputSaveSection = ({
           </div>
         }
       >
-        <TextField
-          ref={titleInputRef}
-          label="Video title"
-          required
-          maxLength={120}
-          value={title}
-          onChange={(event) => setTitle(event.currentTarget.value)}
-          hint="The title names the video in your library. The version itself never changes."
-        />
+        <div css={titleFieldStyles(theme)}>
+          <TextField
+            ref={titleInputRef}
+            label="Video title"
+            required
+            maxLength={SAVED_VIDEO_TITLE_LIMIT}
+            value={title}
+            onChange={(event) => setTitle(event.currentTarget.value)}
+            hint="The title names the video in your library. The proposal marks the change it came from, so saves from one Project stay apart."
+          />
+        </div>
       </OverlayPanel>
 
       <ProjectSavedVideoPicker
