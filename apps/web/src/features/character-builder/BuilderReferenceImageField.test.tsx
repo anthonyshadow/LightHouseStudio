@@ -90,7 +90,7 @@ describe('BuilderReferenceImageField presentation', () => {
     expect(input).toHaveAccessibleName('Upload imageDrag & drop or choose a file');
     expect(input).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp');
     expect(input).toHaveAccessibleDescription(
-      'Optional character referenceJPEG, PNG, or WebP up to 10 MiB and 40 megapixels. Selecting a file stores an immutable local asset in the configured data directory. Detaching it later removes the relationship, not the stored bytes.',
+      'Optional character referenceJPEG, PNG, or WebP up to 10 MiB and 40 megapixels. Choosing a file stores it in your local data directory. Detaching it later removes the link, not the stored file.',
     );
     await user.tab();
     expect(input).toHaveFocus();
@@ -183,7 +183,7 @@ describe('BuilderReferenceImageField presentation', () => {
       uploadedReference.displayName,
     );
     expect(screen.getByText('1.50 MiB')).toBeInTheDocument();
-    expect(screen.getByText(/Detach removes this draft relationship/u)).toBeInTheDocument();
+    expect(screen.getByText(/Detach removes the link, not the stored file/u)).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(
       'The image exceeds the 40-megapixel decoded-image limit.',
     );

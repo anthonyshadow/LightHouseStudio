@@ -86,7 +86,7 @@ recorded there.
 - Saved Video gallery pages select only the parent/current Version projection and one grouped
   Version count for the bounded page; they do not load every historical Version to form summaries.
   An explicit detail read returns that one video's bounded immutable Version metadata for exact
-  selection. The gallery derives **Unassigned Content** from the absence of any Project output
+  selection. The gallery derives its **No Project** chip from the absence of any Project output
   relation; no row, backfill, or synthetic producer is created.
 - Project history reuses existing owner-constrained revision, processing-attempt, and output-link
   indexes. Each category has an independent opaque cursor and metadata-only page. Exact output

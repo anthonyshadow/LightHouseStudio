@@ -9,7 +9,7 @@ type Snapshot = ProjectCurrentResponse['revision']['snapshot'];
  * from this list so the progress a user reads and the tasks they can open cannot drift apart.
  */
 export const PROJECT_WORKFLOW_STEPS = [
-  { id: 'source', label: 'Source' },
+  { id: 'source', label: 'Original' },
   { id: 'create', label: 'Create' },
   { id: 'save', label: 'Save' },
   { id: 'history', label: 'History' },

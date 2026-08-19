@@ -290,7 +290,7 @@ Minimum authenticated destinations are:
 - **Campaigns:** active list, create/open/rename/edit brief/archive, and grouped Projects;
 - **Project overview/workspace:** organization at `/projects/:projectId` and focused media
   work at its `/workspace` child;
-- **Assets:** Videos, Characters, Outfits, and Voices, with “Unassigned Content” for legacy or
+- **Assets:** Videos, Characters, Outfits, and Voices, with a “No Project” chip for legacy or
   independently saved Videos; and
 - current contextual access to Wardrobe and builders.
 
@@ -335,7 +335,7 @@ selection uses contextual pickers or returns through the explicit Project worksp
 - Existing Saved Videos, Video Versions, jobs, Characters, Variants, Outfits, Voices, and recipes
   remain valid and unchanged.
 - Do not bulk-assign legacy content to fake Projects or Campaigns.
-- Existing Saved Videos with no Project output provenance appear as **Unassigned Content**. Reusing
+- Existing Saved Videos with no Project output provenance are chipped **No Project**. Reusing
   an exact Version as Project source/working media adds truthful used-by lineage but does not remove
   unknown-producer status. Only a real Project output relation established by an output save assigns
   producing provenance.
@@ -388,7 +388,7 @@ persistence mode unless a mode is explicitly and canonically unsupported before 
 11. Saving creates a new Saved Video or exact immutable Video Version and links it to the producing
     Project Revision through crash-safe/idempotent orchestration.
 12. The user can browse bounded Project history/outputs, open/use/download an exact previous Video
-    Version, and find legacy Unassigned Content.
+    Version, and find legacy videos with no producing Project.
 13. The user can move coherently among Dashboard, Create, Campaigns, Project overview/workspace,
     and Assets without losing or silently discarding work.
 14. Download selects an exact ready Video Version and is labeled distinctly from **All changes

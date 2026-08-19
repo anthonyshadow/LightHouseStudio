@@ -425,7 +425,7 @@ export const useExistingVideoWorkflow = ({
               : 'Preparing H.264 MP4 source…',
             detail: providerInputNormalization
               ? 'Fitting a temporary submission copy inside 16:9 or 9:16 while preserving the saved result.'
-              : 'Converting a temporary submission copy while preserving the immutable source.',
+              : 'Converting a temporary copy for the provider. Your original video is unchanged.',
           });
           const converted = await transcodeRecordingToMp4(source, {
             requireAudio: selection.metadata.hasAudio,
@@ -752,7 +752,7 @@ export const useExistingVideoWorkflow = ({
     setPhase('ready');
     setMessage(
       comparison === 'original'
-        ? 'Editing the immutable original.'
+        ? 'Editing the original video.'
         : requiresFittedSubmission
           ? 'Editing the latest result. Start edit will fit a temporary submission copy inside 16:9 or 9:16; the saved result stays unchanged.'
           : 'Editing the latest result.',

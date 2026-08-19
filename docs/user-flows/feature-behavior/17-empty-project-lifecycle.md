@@ -62,7 +62,7 @@ provider work.
    exact Version verification, server inspection, checksum/owner validation, and atomic source
    revision acceptance. A failed/unaccepted staging attempt can be replaced.
 10. A Project's source is immutable _while it is attached_: a second acceptance conflicts rather
-    than overwriting it. **Remove source** detaches it explicitly, returning the Project to the
+    than overwriting it. **Remove original video** detaches it explicitly, returning the Project to the
     Source step as a `draft` with its creative setup — Character, Outfit, Voice, prompt, treatment,
     local edit — intact, and clearing only the derived working and presented media. Removal is
     refused while a provider attempt is unresolved and on an archived or deleted Project, and the
@@ -101,7 +101,7 @@ provider work.
 17. The existing creative rail remains available beside one source-bearing Project stage. Character
     and Variant, Outfit, prompt configuration, one visual treatment, optional local/saved Voice, capture
     metadata, and validated local edit map through feature-local adapters into the same Project
-    session. **Save creative setup** is an explicit semantic boundary; keystrokes, frames, slider
+    session. **Save progress** is an explicit semantic boundary; keystrokes, frames, slider
     ticks, and undo/redo entries never append revisions.
 18. Snapshot v2 records stable resource IDs plus only exact applied labels, child/reference IDs,
     prompt/treatment/settings, and resource revisions needed to explain the checkpoint. The V1 read
@@ -110,7 +110,7 @@ provider work.
 19. Owner-scoped hydration restores only exact compatible resources. Missing, tombstoned,
     wrong-owner, or changed records keep the historical applied label/explanation and show
     **Choose another** without failing the source or revealing whether another owner has that ID.
-20. **Render preview** is temporary. **Adopt as working media** accepts a validated local render or
+20. **Render preview** is temporary. **Use as the current cut** accepts a validated local render or
     exact same-owner ready Media Asset/Saved Video Version, flushes the session, verifies both CAS
     tokens and one operation-key fingerprint, and appends working/presented lineage. It never
     changes the immutable source, copies exact retained media unnecessarily, infers Add Version,

@@ -86,7 +86,7 @@ export const StudioTakeOverlays = ({
         open={activeOverlay === 'voice-treatments' && Boolean(recording.presented)}
         onClose={onClose}
         title="Voice Treatments"
-        description="Every treatment starts from the immutable original audio sidecar."
+        description="Every treatment starts from your original recorded audio, which never changes."
         headerEyebrow={
           <button
             type="button"

@@ -18,15 +18,15 @@ export const projectVideoEditOutcome = (
   notices: (
     <>
       <StatusNotice tone="neutral" title="Temporary Render preview" role="status">
-        Rendering does not save Project media. After validation, explicitly adopt the preview to
-        make it durable working media; the immutable original stays unchanged.
+        Rendering saves nothing yet. Keep the preview to make it the current cut; your original
+        video stays unchanged.
       </StatusNotice>
       {appliedProjectEdit ? (
         <StatusNotice tone="neutral" title="Applied Project edit" role="status">
-          The current working-media bytes already include the retained edit from{' '}
+          The current cut already includes the saved edit from{' '}
           {Math.round(appliedProjectEdit.trim.startMs)}–{Math.round(appliedProjectEdit.trim.endMs)}{' '}
           ms, {appliedProjectEdit.crop.preset} crop, and {appliedProjectEdit.filter} filter. New
-          controls start from that rendered baseline so the historical edit is not applied twice.
+          controls start from that render, so the earlier edit is not applied twice.
         </StatusNotice>
       ) : null}
     </>

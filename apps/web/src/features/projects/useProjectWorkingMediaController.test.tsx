@@ -192,7 +192,7 @@ describe('useProjectWorkingMediaController', () => {
     });
     expect(videoEditor.completeCommit).toHaveBeenCalledWith(adoptedAssetId);
     expect(videoEditor.close).toHaveBeenCalledOnce();
-    expect(hook.result.current.message).toContain('No Saved Video or Video Version was created');
+    expect(hook.result.current.message).toContain('No video or version was saved');
   });
 
   it('preserves the temporary candidate and stable operation identity on conflict', async () => {

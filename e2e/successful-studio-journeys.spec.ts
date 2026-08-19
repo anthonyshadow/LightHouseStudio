@@ -252,7 +252,9 @@ test('@cross-browser focused media smoke reaches record, Voice, and review recov
     .click();
   await expect(page.getByRole('dialog', { name: 'Voice Treatments' })).toBeVisible();
   await expect(
-    page.getByText('Every treatment starts from the immutable original audio sidecar.'),
+    page.getByText(
+      'Every treatment starts from your original recorded audio, which never changes.',
+    ),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Back to take review' }).click();
   await discardTake(page, page.getByRole('dialog', { name: 'Latest Take' }));
@@ -519,7 +521,7 @@ test('saved voice preview, Apply, remux, Save, and Restore Original stay explici
   await voiceTreatments.getByRole('button', { name: 'Select Northstar Narrator' }).click();
   await expect(
     voiceTreatments.getByRole('button', { name: 'Apply treatment' }),
-  ).toHaveAccessibleDescription(/Original audio.+provider credits/u);
+  ).toHaveAccessibleDescription(/original recorded audio.+provider credits/u);
   await voiceTreatments.getByRole('button', { name: 'Apply treatment' }).click();
   await expect(voiceTreatments.getByRole('button', { name: 'Treatment applied' })).toBeDisabled();
   await voiceTreatments.getByRole('button', { name: 'Back to take review' }).click();

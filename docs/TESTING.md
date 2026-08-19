@@ -150,7 +150,7 @@ The retained suite protects:
   response-loss refresh reconciliation without a duplicate Version;
 - bounded metadata-only Project revision/output/processing cursors; distinct producing and
   output-reference revisions; exact old-Version selection, preview, reuse, and Download; retained
-  tombstoned Project content; explicit stale-result adoption; legacy Unassigned Content without
+  tombstoned Project content; explicit stale-result adoption; legacy **No Project** videos without
   producer backfill; and proof that these actions do not move the Saved Video pointer or infer an
   Add Version target;
 - a no-provider Chromium journey from reusable Character selection through one Project semantic
@@ -194,7 +194,7 @@ standalone Project creation, durable source, creative checkpoint/local edit, acc
 processing recovery, new-video and Add-Version save, bounded history, exact old-Version Download,
 leave/resume, and non-cascading archive. Focused browser cases cover CAS conflict, response-loss
 replay, refresh during accepted processing, missing reusable resource, cleanup retention, Campaign
-archive, Project switching, exact old-Version Download, and legacy **Unassigned Content**.
+archive, Project switching, exact old-Version Download, and legacy **No Project** videos.
 
 Lower-layer tests remain authoritative for exhaustive owner/CAS/schema/idempotency matrices, but do
 not replace those named browser boundaries. Conversely, one browser happy path does not replace the

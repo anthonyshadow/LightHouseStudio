@@ -52,7 +52,7 @@ export const AddVideoToProjectDialog = ({
           return;
         }
         throw new ProjectSourceOccupiedError(
-          `“${project.title}” already has an immutable source. Choose an empty Project instead.`,
+          `“${project.title}” already has an original video. Choose an empty Project instead.`,
         );
       }
       // Mirrors the server's request fingerprint for `source-accept`. Keying on `projectId` alone

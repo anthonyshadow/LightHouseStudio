@@ -24,12 +24,12 @@ import { projectQueryKeys } from './useProjectsController';
 type OutputPhase = 'idle' | 'saving' | 'reconciling' | 'saved' | 'conflict' | 'error';
 
 const outputPhaseNotice = {
-  idle: { role: 'status', tone: 'neutral', title: 'Output save needs attention' },
-  saving: { role: 'status', tone: 'neutral', title: 'Saving Project output' },
-  reconciling: { role: 'status', tone: 'neutral', title: 'Reconciling Project output' },
-  saved: { role: 'status', tone: 'success', title: 'Project output saved' },
-  conflict: { role: 'alert', tone: 'warning', title: 'Output save conflict' },
-  error: { role: 'alert', tone: 'danger', title: 'Output save needs attention' },
+  idle: { role: 'status', tone: 'neutral', title: 'Save needs attention' },
+  saving: { role: 'status', tone: 'neutral', title: 'Saving video' },
+  reconciling: { role: 'status', tone: 'neutral', title: 'Checking your save' },
+  saved: { role: 'status', tone: 'success', title: 'Video saved' },
+  conflict: { role: 'alert', tone: 'warning', title: 'Save conflict' },
+  error: { role: 'alert', tone: 'danger', title: 'Save needs attention' },
 } as const satisfies Record<
   OutputPhase,
   {
@@ -88,8 +88,8 @@ export const ProjectOutputSaveSection = ({
       setPhase(recovered ? 'reconciling' : 'saving');
       setMessage(
         recovered
-          ? 'Checking the saved operation receipt after reload. No new save will be created.'
-          : 'Saving one immutable Video Version and its Project provenance.',
+          ? 'Checking the save that was already started. No second save will be created.'
+          : 'Saving one new version of this video.',
       );
       try {
         const response = await saveProjectOutput({
@@ -140,14 +140,14 @@ export const ProjectOutputSaveSection = ({
           } else {
             setPhase('error');
             setMessage(
-              'The selected Project output could not be saved. Review the current media and target.',
+              'This could not be saved. Check what you’re viewing and the video you chose.',
             );
           }
         } else {
           setPendingAvailable(true);
           setPhase('error');
           setMessage(
-            'The save response was unavailable. The operation ID is retained; retry or reload to reconcile the one possible result.',
+            'The save reply never arrived. This save is remembered — retry or reload, and Lightframe settles the one possible result.',
           );
         }
       } finally {
@@ -170,12 +170,12 @@ export const ProjectOutputSaveSection = ({
     setAppendDialogOpen(false);
     if (ownerUserId === undefined) {
       setPhase('error');
-      setMessage('The authenticated owner could not be bound to this save operation.');
+      setMessage('Your account could not be confirmed for this save.');
       return;
     }
     if (!(await session.flush())) {
       setPhase('conflict');
-      setMessage('Resolve the preserved Project proposal before saving an output.');
+      setMessage('Save or discard your pending Project changes before saving.');
       return;
     }
     let latest: ProjectCurrentResponse;
@@ -185,13 +185,13 @@ export const ProjectOutputSaveSection = ({
       queryClient.setQueryData(projectQueryKeys.detail(latest.project.id), latest);
     } catch {
       setPhase('error');
-      setMessage('The latest Project state could not be verified. No output save was started.');
+      setMessage('The Project’s latest state could not be checked. Nothing was saved.');
       return;
     }
     const media = readyMediaFor(latest);
     if (media === null || latest.project.status === 'processing') {
       setPhase('conflict');
-      setMessage('The Project no longer has the exact ready media selected for this save.');
+      setMessage('The Project no longer has the media this save was for.');
       return;
     }
     const pending: PendingProjectOutputOperation = {
@@ -210,7 +210,7 @@ export const ProjectOutputSaveSection = ({
     if (!storePendingProjectOutput(pending)) {
       setPhase('error');
       setMessage(
-        'Browser operation storage is unavailable, so the reload-safe output save was not started.',
+        'This browser cannot store the save record, so nothing was saved. Reload-safe saving needs it.',
       );
       return;
     }
@@ -228,10 +228,10 @@ export const ProjectOutputSaveSection = ({
   if (current.revision.snapshot.sourceAssetId === null) return null;
   const currentDescription =
     readyMedia?.kind === 'saved-video-version'
-      ? 'Current review media is one exact retained Video Version.'
+      ? 'You’re viewing one saved version.'
       : readyMedia?.assetId === current.revision.snapshot.sourceAssetId
-        ? 'Current review media is the immutable original.'
-        : 'Current review media is durable working media; the immutable original remains retained separately.';
+        ? 'You’re viewing the original video.'
+        : 'You’re viewing the current cut. Your original video is kept separately and never changes.';
 
   return (
     <>
@@ -247,11 +247,11 @@ export const ProjectOutputSaveSection = ({
         }}
       >
         <div>
-          <h3 id="project-output-heading">Review and save output</h3>
+          <h3 id="project-output-heading">Review and save</h3>
           <p>{currentDescription}</p>
           <p>
-            Saving creates a new immutable Version. It does not overwrite the original or any prior
-            Version.
+            Saving creates a new version. It never overwrites your original video or an earlier
+            version.
           </p>
         </div>
         {message ? (
@@ -259,14 +259,12 @@ export const ProjectOutputSaveSection = ({
             <p>{message}</p>
             {phase === 'error' && pendingAvailable ? (
               <Button size="small" onClick={retryPending}>
-                Reconcile saved operation
+                Check this save
               </Button>
             ) : null}
           </StatusNotice>
         ) : null}
-        {processing ? (
-          <p>Wait for the active processing attempt to finish before saving its ready result.</p>
-        ) : null}
+        {processing ? <p>Wait for the current AI run to finish before saving its result.</p> : null}
         <div css={{ display: 'flex', flexWrap: 'wrap', gap: theme.space.sm }}>
           <Button
             ref={newTriggerRef}
@@ -290,8 +288,8 @@ export const ProjectOutputSaveSection = ({
           </Button>
         </div>
         <small>
-          All changes saved describes Project checkpoints. Render preview, Save as New Video, and
-          Add Version are separate explicit actions.
+          “All changes saved” refers to your saved progress. Render preview, Save as New Video and
+          Add Version are separate actions you take yourself.
         </small>
       </section>
 
@@ -299,7 +297,7 @@ export const ProjectOutputSaveSection = ({
         open={newDialogOpen}
         onClose={() => setNewDialogOpen(false)}
         title="Save as New Video"
-        description="Create a named Saved Video with this exact ready media as immutable Version 1."
+        description="Creates a new video in your library, with this as Version 1."
         placement="bottom"
         size="standard"
         closeDisabled={busy}
@@ -329,7 +327,7 @@ export const ProjectOutputSaveSection = ({
           maxLength={120}
           value={title}
           onChange={(event) => setTitle(event.currentTarget.value)}
-          hint="The title names the reusable library record; the Version media remains immutable."
+          hint="The title names the video in your library. The version itself never changes."
         />
       </OverlayPanel>
 
@@ -344,7 +342,7 @@ export const ProjectOutputSaveSection = ({
           setAppendDialogOpen(true);
         }}
         title="Choose Add Version target"
-        description="Select one active Saved Video explicitly. Reusing a Version as Project source never selects this target."
+        description="Choose one of your videos. Using a version as this Project’s original video does not choose it here."
         emptyTitle="No Add Version targets"
         emptyBody="Use Save as New Video first to create a target."
         listLabel="Saved Videos available as an Add Version target"
@@ -354,7 +352,7 @@ export const ProjectOutputSaveSection = ({
         open={appendDialogOpen && appendTarget !== null}
         onClose={() => setAppendDialogOpen(false)}
         title="Confirm Add Version"
-        description="Append without replacing or deleting any prior Version."
+        description="Adds a version without replacing or deleting any earlier one."
         placement="bottom"
         size="standard"
         closeDisabled={busy}
@@ -392,7 +390,7 @@ export const ProjectOutputSaveSection = ({
               Current Version {appendTarget.currentVersion.ordinal} ·{' '}
               {appendTarget.currentVersion.width}×{appendTarget.currentVersion.height}
             </p>
-            <p>The server will reject this save if that current Version changes.</p>
+            <p>If that current version changes first, this save is refused.</p>
           </div>
         ) : null}
       </OverlayPanel>

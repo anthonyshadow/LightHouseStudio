@@ -74,7 +74,8 @@ owns the detailed sequence and launch evidence.
 
 Invariant correction, lifecycle, Campaign organization, durable source/working media, creative
 checkpoints, Project-bound Character Swap/VTO result retention, exact Saved Video/Video Version
-output linking, legacy Unassigned Content, and exact-Version preview/reuse/Download are implemented.
+output linking, legacy videos with no producing Project, and exact-Version preview/reuse/Download
+are implemented.
 The [acceptance runbook](MVP_ACCEPTANCE.md) records the local-only GO and its evidence.
 
 - Preserve the corrected Project foundation's revision and media-reference lineage,

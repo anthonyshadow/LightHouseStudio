@@ -146,7 +146,7 @@ export const useExistingVideoSourceCoordinator = ({
     } catch (error) {
       if (controller.signal.aborted) return;
       const safeMessage =
-        error instanceof Error ? error.message : 'The local recording could not be adopted.';
+        error instanceof Error ? error.message : 'The local recording could not be used.';
       recording.failProcessing(safeMessage);
       setPhase('error');
       setMessage(safeMessage);

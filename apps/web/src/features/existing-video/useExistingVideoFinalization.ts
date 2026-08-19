@@ -55,7 +55,7 @@ export const useExistingVideoFinalization = ({
       generation: number,
       expectedResult: InspectedVideo,
     ): Promise<FinalizedVisual | null> => {
-      if (!selection) throw new Error('The immutable source video is unavailable.');
+      if (!selection) throw new Error('The original video is unavailable.');
       const baseMetadata = editBaseMetadata ?? selection.metadata;
       setPhase('finalizing');
       recording.beginProcessing({
@@ -88,9 +88,7 @@ export const useExistingVideoFinalization = ({
         validatedResult.metadata.width > validatedResult.metadata.height !==
           baseMetadata.width > baseMetadata.height
       ) {
-        throw new Error(
-          'The visual result could not be synchronized safely with the immutable source.',
-        );
+        throw new Error('The visual result could not be matched safely to the original video.');
       }
       const resultCanCommitDirectly =
         !selection.metadata.hasAudio &&
@@ -104,7 +102,7 @@ export const useExistingVideoFinalization = ({
         recording.beginProcessing({
           kind: 'audio-restoration',
           title: 'Restoring source audio…',
-          detail: 'Combining the visual result with the immutable original audio.',
+          detail: 'Combining the visual result with the original audio.',
         });
         let composed;
         try {
@@ -150,7 +148,7 @@ export const useExistingVideoFinalization = ({
       setCompletedStepCount(stepIndex + 1);
       updateSubmissionOperation(null);
       const source = editBase ?? recording.original;
-      if (!source) throw new Error('The immutable source video is unavailable.');
+      if (!source) throw new Error('The original video is unavailable.');
       return {
         blob: normalized.blob,
         mimeType: normalized.mimeType,

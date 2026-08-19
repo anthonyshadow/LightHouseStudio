@@ -20,9 +20,9 @@ export const projectProcessingTitle = (attempt: ProjectProcessingAttempt): strin
     case 'retrieving':
       return `Retrieving ${capability} result`;
     case 'saving-result':
-      return `Retaining ${capability} result`;
+      return `Saving ${capability} result`;
     case 'complete':
-      return attempt.result?.historical ? 'Retained in this Project' : 'Result ready';
+      return attempt.result?.historical ? 'Kept in this Project' : 'Result ready';
     case 'needs-attention':
       return attempt.ambiguous ? 'Submission needs attention' : `${capability} failed`;
     case 'cancelled':
@@ -33,23 +33,23 @@ export const projectProcessingTitle = (attempt: ProjectProcessingAttempt): strin
 export const projectProcessingDetail = (attempt: ProjectProcessingAttempt): string => {
   switch (attempt.phase) {
     case 'submitting':
-      return 'The app-owned operation is linked to this exact Project revision before provider contact. Switching Projects stops only this browser request and does not prove provider cancellation; reopen to verify the same operation.';
+      return 'This run is tied to the Project as it is right now. Switching Projects stops only this browser request — it does not prove the provider stopped. Reopen this Project to check the same run.';
     case 'accepted':
-      return 'The provider accepted this operation. Switching Projects stops only browser status checks; accepted remote work may continue, and reopening checks the same durable operation without submitting it again.';
+      return 'The provider accepted this run. Switching Projects stops only the status checks here; accepted work may continue. Reopening checks the same run without submitting it again.';
     case 'processing':
-      return 'The accepted provider operation is still running. It may continue after this panel or Project is closed.';
+      return 'This run is still going. It may continue after you close this panel or Project.';
     case 'retrieving':
-      return 'Lightframe is retrieving the accepted result without creating another provider submission.';
+      return 'Fetching the result. This does not start another run.';
     case 'saving-result':
-      return 'The result is being stored and inspected before it can become resumable Project working media.';
+      return 'The result is being stored and checked before it becomes the current cut.';
     case 'complete':
       return attempt.result?.historical
-        ? 'A valid result for an earlier revision was retained with this Project. It did not replace the current media or create a saved Video Version.'
-        : 'The retained result is current durable working media. The Project remains Ready; saving an output Version is a separate later action.';
+        ? 'This result is for an earlier change. It was kept, but it did not replace what you’re viewing and no version was saved.'
+        : 'This result is now the current cut. Saving it as a version is a separate step.';
     case 'needs-attention':
-      return attempt.error?.message ?? 'This operation needs an explicit recovery decision.';
+      return attempt.error?.message ?? 'This run needs you to decide what happens next.';
     case 'cancelled':
-      return 'Local tracking and its queue slot were cleared. The provider may still finish remote work or charge for work it already accepted.';
+      return 'Removed from the queue here. The provider may still finish the work, and may still charge for work it already accepted.';
   }
 };
 
@@ -65,15 +65,15 @@ export const projectProcessingTone = (
 const BLOCKED_REASON_COPY = {
   archive: {
     ambiguous:
-      'Archive is blocked because submission acceptance is unresolved. Another attempt may duplicate provider cost; use the explicit retry decision first.',
+      'Archive is blocked while it is unclear whether the provider accepted this run. Another attempt may be charged twice; use the retry decision first.',
     accepted:
-      'Archive is blocked while accepted provider work is active. Leaving or switching does not stop provider work or cost; reopen this Project to reconnect.',
+      'Archive is blocked while accepted provider work is running. Leaving or switching does not stop that work or its cost; reopen this Project to reconnect.',
   },
   'source-removal': {
     ambiguous:
-      'Removing the source is blocked because submission acceptance is unresolved. Resolve the attempt first.',
+      'Removing the original video is blocked while it is unclear whether the provider accepted this run. Resolve the run first.',
     accepted:
-      'Removing the source is blocked while accepted provider work is active. Cancel it or let it finish first.',
+      'Removing the original video is blocked while accepted provider work is running. Cancel it or let it finish first.',
   },
 } as const satisfies Record<string, { readonly ambiguous: string; readonly accepted: string }>;
 

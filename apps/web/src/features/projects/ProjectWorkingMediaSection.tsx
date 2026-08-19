@@ -14,11 +14,11 @@ import { useStableOperationKey } from './useStableOperationKey';
 type AdoptionPhase = 'idle' | 'saving' | 'saved' | 'conflict' | 'error';
 
 const adoptionPhaseNotice = {
-  idle: { role: 'status', tone: 'success', title: 'Working media ready' },
-  saving: { role: 'status', tone: 'neutral', title: 'Saving working media' },
-  saved: { role: 'status', tone: 'success', title: 'Working media ready' },
+  idle: { role: 'status', tone: 'success', title: 'Current cut ready' },
+  saving: { role: 'status', tone: 'neutral', title: 'Saving current cut' },
+  saved: { role: 'status', tone: 'success', title: 'Current cut ready' },
   conflict: { role: 'alert', tone: 'warning', title: 'Conflict' },
-  error: { role: 'alert', tone: 'danger', title: 'Working media not changed' },
+  error: { role: 'alert', tone: 'danger', title: 'Current cut not changed' },
 } as const satisfies Record<
   AdoptionPhase,
   {
@@ -63,7 +63,7 @@ export const ProjectWorkingMediaSection = ({
       setPickerOpen(false);
       if (!(await session.flush())) {
         setPhase('conflict');
-        setMessage('Resolve the preserved Project proposal before changing working media.');
+        setMessage('Save or discard your pending Project changes before changing the current cut.');
         return;
       }
       const latest = session.getCurrent();
@@ -77,7 +77,7 @@ export const ProjectWorkingMediaSection = ({
       });
       const operationKey = operation.keyFor(signature);
       setPhase('saving');
-      setMessage('Validating the exact retained Version and adopting its existing bytes.');
+      setMessage('Checking that version and making it the current cut.');
       try {
         let response;
         try {
@@ -107,23 +107,21 @@ export const ProjectWorkingMediaSection = ({
         }
         if (!response.isCurrent) {
           setPhase('conflict');
-          setMessage(
-            'The exact Version was retained by a historical revision, but newer Project work remains current.',
-          );
+          setMessage('That version is kept in this Project’s history, but newer work is current.');
           return;
         }
         session.acceptCurrent({ project: response.project, revision: response.revision });
         operation.reset();
         setPhase('saved');
         setMessage(
-          'Working media ready from the exact retained Version. Bytes were not copied, the original was not replaced, and no output Version was created.',
+          'The current cut is now that version. Nothing was copied, your original video was not replaced, and no new version was saved.',
         );
       } catch (error) {
         setPhase(error instanceof ProjectApiConflictError ? 'conflict' : 'error');
         setMessage(
           error instanceof ProjectApiConflictError
-            ? 'The Project changed before this Version could become current working media.'
-            : 'The exact retained Version could not be adopted safely.',
+            ? 'The Project changed before this version could become the current cut.'
+            : 'That version could not be used safely.',
         );
       }
     },
@@ -145,10 +143,10 @@ export const ProjectWorkingMediaSection = ({
         }}
       >
         <div>
-          <h3 id="project-working-media-heading">Durable working media</h3>
+          <h3 id="project-working-media-heading">Current cut</h3>
           <p>
-            The media stage presents the current ready working reference. The immutable original
-            remains retained separately even after working media advances.
+            The stage shows what you’re viewing now. Your original video is kept separately and
+            never changes.
           </p>
         </div>
         {message ? (
@@ -167,11 +165,11 @@ export const ProjectWorkingMediaSection = ({
             disabled={archived || phase === 'saving'}
             onClick={() => setPickerOpen(true)}
           >
-            Use Saved Video as working media
+            Use a saved video as the current cut
           </Button>
           <small>
-            Selects one exact same-owner Version. It never infers an Add Version target or Project
-            output provenance.
+            Picks one exact version of one of your own videos, and never sets a target for Add
+            Version.
           </small>
         </div>
       </section>

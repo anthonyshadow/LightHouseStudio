@@ -81,7 +81,7 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
       current.beginProcessing({
         kind: 'voice-conversion',
         title: voiceName ? `Applying ${voiceName}…` : 'Rendering voice treatment…',
-        detail: 'The immutable original audio is being prepared for this video.',
+        detail: 'Your original audio is being prepared for this video.',
       });
       const videoArtifact = explicitVideo ?? current.visual ?? current.original;
       return {

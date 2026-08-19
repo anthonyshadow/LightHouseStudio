@@ -64,12 +64,8 @@ describe('CharacterNameDialog', () => {
 
     expect(screen.getByText('Local reference retention')).toBeVisible();
     expect(
-      screen.getByText(
-        /deleting the character later removes its links, not the stored image bytes/i,
-      ),
+      screen.getByText(/deleting the character later removes its links, not the stored image/i),
     ).toBeVisible();
-    expect(
-      screen.getByText(/whole-environment retirement deletes those local bytes/i),
-    ).toBeVisible();
+    expect(screen.getByText(/retiring the whole environment deletes those files/i)).toBeVisible();
   });
 });

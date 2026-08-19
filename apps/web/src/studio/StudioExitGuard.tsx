@@ -286,7 +286,7 @@ export const StudioExitGuard = ({
       ? {
           title: 'Finish Project media work before switching Projects',
           description:
-            'The current Project has an active local render or working-media adoption. Stay here until it completes or returns to a cancellable checkpoint.',
+            'This Project is still rendering or updating its current cut. Stay here until that finishes or can be cancelled.',
           detail:
             'Finish or cancel the active media operation before choosing another Project or leaving its workspace.',
         }
@@ -331,7 +331,7 @@ export const StudioExitGuard = ({
         open={projectSaveInProgress}
         onClose={stayInStudio}
         title="Saving Project before leaving"
-        description="Lightframe is flushing the current semantic checkpoint before changing Project context."
+        description="Lightframe is saving your progress before leaving this Project."
         placement="bottom"
         size="standard"
         closeOnBackdrop={false}

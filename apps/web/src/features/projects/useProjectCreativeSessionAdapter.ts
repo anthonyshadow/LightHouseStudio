@@ -369,14 +369,11 @@ export const useProjectCreativeSessionAdapter = ({
     if (studioSession.draft.referenceImage?.kind === 'ephemeral') {
       setCheckpoint(
         'error',
-        'This reference is still temporary. Choose a reusable saved reference, or remove it, before saving the Project checkpoint.',
+        'This reference is still temporary. Choose a saved reference, or remove it, before saving progress.',
       );
       return false;
     }
-    setCheckpoint(
-      'saving',
-      'Queuing one semantic creative checkpoint through the Project session.',
-    );
+    setCheckpoint('saving', 'Saving your creative setup to this Project.');
     const proposal = createProjectCreativeProposal({
       current: latest,
       draft: studioSession.draft,
@@ -387,15 +384,15 @@ export const useProjectCreativeSessionAdapter = ({
       voiceSelection: existingVideo.voiceSelection,
     });
     if (!projectSession.propose(proposal)) {
-      setCheckpoint('error', 'The Project session is not ready for this checkpoint.');
+      setCheckpoint('error', 'This Project is not ready to save progress yet.');
       return false;
     }
     const saved = await projectSession.flush();
     setCheckpoint(
       saved ? 'saved' : 'error',
       saved
-        ? 'Creative setup saved as one Project checkpoint. Saving setup alone submitted no provider work.'
-        : 'The creative proposal remains preserved in the Project session. Resolve its save state before retrying.',
+        ? 'Progress saved. Saving on its own starts no paid AI work.'
+        : 'Your changes are still here. Resolve the save error before trying again.',
     );
     return saved;
   }, [

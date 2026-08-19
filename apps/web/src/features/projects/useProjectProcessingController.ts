@@ -303,7 +303,7 @@ export const useProjectProcessingController = ({
         if (!checkpointed) {
           patchState({
             phase: 'error',
-            message: 'Save or resolve the Project creative checkpoint before starting processing.',
+            message: 'Save your progress, or resolve the save error, before starting.',
           });
           return false;
         }
@@ -380,7 +380,7 @@ export const useProjectProcessingController = ({
       if (!(await activeSession.flush())) {
         patchState({
           phase: 'error',
-          message: 'Resolve the preserved Project checkpoint before retrying processing.',
+          message: 'Save or discard your pending Project changes before trying again.',
         });
         return false;
       }

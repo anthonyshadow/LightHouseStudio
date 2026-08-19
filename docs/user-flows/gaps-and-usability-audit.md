@@ -640,8 +640,8 @@ The product uses several vocabularies at once. Every term below is user-visible.
 | Concept                    | Terms in the UI                                                                                                                 |
 | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | A retained video           | "Video", "Saved Video", "Asset", "Version", "output", "retained Version"                                                        |
-| Work in progress           | "take", "temporary take", "in-memory take", "presented media", "working media", "draft", "proposal", "candidate"                |
-| Saving                     | "Save to Assets", "Save as New Video", "Add Version", "adopt", "checkpoint", "commit", "retain", "Save creative setup"          |
+| Work in progress           | "take", "temporary take", "in-memory take", "current cut", "draft", "proposal", "candidate"                                     |
+| Saving                     | "Save to Assets", "Save as New Video", "Add Version", "commit", "retain", "Save progress"                                       |
 | A reusable creative record | "Character", "Outfit", "saved prompt", "recipe", "creative resource", "creative asset"                                          |
 | Creating a project         | "New Project", "Create without a name", "Untitled Project" — down from three competing verbs to one action and its opt-out (N5) |
 | The app itself             | "Lightframe", "Lightframe Studio", "Studio" — "Momentum Workspace" and "Authenticated Studio" retired (N8/N9)                   |

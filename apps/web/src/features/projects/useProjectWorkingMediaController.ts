@@ -19,10 +19,10 @@ type ProjectWorkingMediaState = Readonly<{
 
 const safeMessage = (error: unknown): string =>
   error instanceof ProjectApiConflictError
-    ? 'The Project changed before this render could be adopted. The Render preview is still available.'
+    ? 'The Project changed before this render could be used. The Render preview is still available.'
     : error instanceof ApiClientError
       ? error.message
-      : 'The Render preview could not be adopted. It remains temporary in this edit session.';
+      : 'The Render preview could not be used. It remains temporary in this edit session.';
 
 export const useProjectWorkingMediaController = (
   projectId: string | null,
@@ -102,7 +102,7 @@ export const useProjectWorkingMediaController = (
     const controller = new AbortController();
     controllerRef.current = controller;
     setPhase('saving');
-    setMessage('Storing, inspecting, and adopting the Render preview as durable working media.');
+    setMessage('Storing and checking the render, then making it the current cut.');
     try {
       let response;
       try {
@@ -140,7 +140,7 @@ export const useProjectWorkingMediaController = (
       operation.reset();
       setPhase('saved');
       setMessage(
-        'Working media ready. No Saved Video or Video Version was created, and the immutable original is unchanged.',
+        'The current cut is ready. No video or version was saved, and your original video is unchanged.',
       );
       videoEditor.completeCommit(response.media.assetId);
       videoEditor.close();

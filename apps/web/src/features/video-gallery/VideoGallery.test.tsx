@@ -232,12 +232,12 @@ describe('VideoGallery', () => {
     expect(onUse).not.toHaveBeenCalled();
   });
 
-  it('labels legacy records as Unassigned Content without treating them as errors', async () => {
+  it('marks a record with no producing Project without explaining the model', async () => {
     mockGalleryPages({ '': page([video({ assignment: 'unassigned' })]) });
     renderGallery();
 
-    expect(await screen.findAllByText('Unassigned Content')).toHaveLength(2);
-    expect(screen.getByText(/no trustworthy producing Project/u)).toBeInTheDocument();
+    expect(await screen.findAllByText('No Project')).toHaveLength(1);
+    expect(screen.queryByText(/no trustworthy producing Project/u)).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -472,7 +472,7 @@ describe('VideoGallery', () => {
     const removeDialog = screen.getByRole('dialog', { name: 'Remove video from Assets' });
     expect(within(removeDialog).getByRole('button', { name: 'Keep video' })).toHaveFocus();
     expect(removeDialog).toHaveTextContent(
-      'Exact Versions and bytes remain available from any retaining Project history',
+      'Its versions stay available from the history of any Project that kept them',
     );
     fireEvent.click(within(removeDialog).getByRole('button', { name: 'Remove from Assets' }));
     await waitFor(() => expect(api.deleteSavedVideo).toHaveBeenCalledWith(original.id));
