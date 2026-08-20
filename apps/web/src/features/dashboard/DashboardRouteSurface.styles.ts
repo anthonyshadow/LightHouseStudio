@@ -79,7 +79,7 @@ export const onboardingStyles = (theme: Theme): CSSObject => ({
   alignItems: 'center',
   gap: theme.space.sm,
   paddingBlock: theme.space.xxs,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.border}`,
   color: theme.colors.textMuted,
   fontSize: theme.fontSizes.metadata,
   lineHeight: 1.5,
@@ -120,19 +120,20 @@ export const processingQueueStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gap: theme.space.md,
   paddingBlock: theme.space.xl,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.border}`,
   '& > header': {
     display: 'flex',
     alignItems: 'start',
     justifyContent: 'space-between',
     gap: theme.space.lg,
   },
-  '& > header h2': {
+  '& [data-queue-summary]': { minWidth: 0 },
+  '& [data-queue-summary] h2': {
     margin: 0,
     color: theme.colors.text,
     fontSize: '1rem',
   },
-  '& > header p, & > p[role="status"], & [data-empty-queue]': {
+  '& [data-queue-summary] p': {
     marginBlockStart: theme.space.xxs,
     color: theme.colors.textMuted,
     fontSize: theme.fontSizes.metadata,
@@ -174,6 +175,29 @@ export const processingQueueStyles = (theme: Theme): CSSObject => ({
   '& [data-job-details] span': {
     color: theme.colors.textFaint,
     fontSize: theme.fontSizes.caption,
+  },
+  /*
+   * Nothing is processing, so the queue says so in one line instead of spending a section of the
+   * page on it. Refresh stays on that line: with no job present it is the only way to ask again.
+   */
+  '&[data-queue-state="idle"]': {
+    paddingBlock: theme.space.xs,
+    '& > header': { alignItems: 'center' },
+    '& [data-queue-summary]': {
+      display: 'flex',
+      flexWrap: 'wrap',
+      alignItems: 'baseline',
+      columnGap: theme.space.sm,
+    },
+    '& [data-queue-summary] h2': { ...sectionEyebrowStyles(theme), margin: 0 },
+    '& [data-queue-summary] p': { marginBlockStart: 0 },
+    '& > header > button': {
+      paddingInline: 0,
+      color: theme.colors.textFaint,
+      fontSize: theme.fontSizes.caption,
+      letterSpacing: '0.08em',
+      textTransform: 'uppercase',
+    },
   },
   '@media (max-width: 36rem)': {
     '& > ul > li': { gridTemplateColumns: 'auto minmax(0, 1fr)' },

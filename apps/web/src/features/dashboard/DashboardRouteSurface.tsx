@@ -238,6 +238,8 @@ export const DashboardRouteSurface = ({
   } as const;
   const visibleLoading = visibleKinds.some((kind) => queryState[kind].loading);
   const visibleErrors = visibleKinds.filter((kind) => queryState[kind].error);
+  const queueJobs = processingQueueQuery.data?.jobs ?? [];
+  const queueActive = queueJobs.length > 0;
 
   const dismissOnboarding = () => {
     const persisted = persistDashboardOnboardingDismissed(ownerUserId);
@@ -279,89 +281,6 @@ export const DashboardRouteSurface = ({
           </Button>
         </div>
       </header>
-
-      {onboardingVisible ? (
-        <aside css={onboardingStyles(theme)} aria-labelledby="dashboard-getting-started-heading">
-          <h2 id="dashboard-getting-started-heading" data-onboarding-heading>
-            Start with the outcome you need
-          </h2>
-          <AppIcon name="info" data-onboarding-icon />
-          <p>
-            Organization is optional. Use <strong>Projects</strong> for focused workflows and{' '}
-            <strong>Campaigns</strong> to group initiatives.
-          </p>
-          <Button size="small" variant="quiet" onClick={dismissOnboarding}>
-            Got it
-          </Button>
-        </aside>
-      ) : null}
-      {onboardingStorageWarning ? (
-        <StatusNotice role="status" tone="warning" title="Preference not retained">
-          Lightframe could not save this account-scoped onboarding preference in this browser.
-        </StatusNotice>
-      ) : null}
-
-      <section css={processingQueueStyles(theme)} aria-labelledby="processing-queue-heading">
-        <header>
-          <div>
-            <h2 id="processing-queue-heading">Processing Queue</h2>
-            <p>Queued and active provider video edits for this account.</p>
-          </div>
-          <Button
-            size="small"
-            variant="quiet"
-            disabled={processingQueueQuery.isFetching}
-            onClick={() => void processingQueueQuery.refetch()}
-          >
-            Refresh
-          </Button>
-        </header>
-        {processingQueueQuery.isLoading ? <p role="status">Checking processing jobs…</p> : null}
-        {processingQueueQuery.isError ? (
-          <StatusNotice role="alert" tone="danger" title="Processing queue unavailable">
-            <Button
-              size="small"
-              variant="quiet"
-              onClick={() => void processingQueueQuery.refetch()}
-            >
-              Retry
-            </Button>
-          </StatusNotice>
-        ) : null}
-        {queueNotice ? (
-          <StatusNotice role="status" tone="success" title="Processing slot released">
-            {queueNotice}
-          </StatusNotice>
-        ) : null}
-        {processingQueueQuery.data?.jobs.length ? (
-          <ul>
-            {processingQueueQuery.data.jobs.map((job) => (
-              <li key={job.jobId}>
-                <span data-job-status>{jobStatusLabel(job.status)}</span>
-                <span data-job-details>
-                  <strong>{jobOperationLabel(job.operation)}</strong>
-                  <span>
-                    {job.provider} · Started {formatDateTime(job.createdAt)}
-                  </span>
-                </span>
-                <Button
-                  size="small"
-                  variant="danger"
-                  onClick={() => {
-                    abandonMutation.reset();
-                    setQueueNotice(null);
-                    setSelectedJob(job);
-                  }}
-                >
-                  {jobActionLabel(job.status)}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        ) : !processingQueueQuery.isLoading && !processingQueueQuery.isError ? (
-          <p data-empty-queue>No queued or active video jobs.</p>
-        ) : null}
-      </section>
 
       <div css={dashboardBodyStyles(theme)}>
         <div data-dashboard-primary-column>
@@ -498,6 +417,94 @@ export const DashboardRouteSurface = ({
           </footer>
         </section>
       </div>
+
+      {onboardingVisible ? (
+        <aside css={onboardingStyles(theme)} aria-labelledby="dashboard-getting-started-heading">
+          <h2 id="dashboard-getting-started-heading" data-onboarding-heading>
+            Start with the outcome you need
+          </h2>
+          <AppIcon name="info" data-onboarding-icon />
+          <p>
+            Organization is optional. Use <strong>Projects</strong> for focused workflows and{' '}
+            <strong>Campaigns</strong> to group initiatives.
+          </p>
+          <Button size="small" variant="quiet" onClick={dismissOnboarding}>
+            Got it
+          </Button>
+        </aside>
+      ) : null}
+      {onboardingStorageWarning ? (
+        <StatusNotice role="status" tone="warning" title="Preference not retained">
+          Lightframe could not save this account-scoped onboarding preference in this browser.
+        </StatusNotice>
+      ) : null}
+
+      <section
+        css={processingQueueStyles(theme)}
+        data-queue-state={queueActive ? 'active' : 'idle'}
+        aria-labelledby="processing-queue-heading"
+      >
+        <header>
+          <div data-queue-summary>
+            <h2 id="processing-queue-heading">Processing Queue</h2>
+            {queueActive ? <p>Queued and active provider video edits for this account.</p> : null}
+            {processingQueueQuery.isLoading ? <p role="status">Checking processing jobs…</p> : null}
+            {!queueActive && !processingQueueQuery.isLoading && !processingQueueQuery.isError ? (
+              <p data-empty-queue>No queued or active video jobs.</p>
+            ) : null}
+          </div>
+          <Button
+            size="small"
+            variant="quiet"
+            disabled={processingQueueQuery.isFetching}
+            onClick={() => void processingQueueQuery.refetch()}
+          >
+            Refresh
+          </Button>
+        </header>
+        {processingQueueQuery.isError ? (
+          <StatusNotice role="alert" tone="danger" title="Processing queue unavailable">
+            <Button
+              size="small"
+              variant="quiet"
+              onClick={() => void processingQueueQuery.refetch()}
+            >
+              Retry
+            </Button>
+          </StatusNotice>
+        ) : null}
+        {queueNotice ? (
+          <StatusNotice role="status" tone="success" title="Processing slot released">
+            {queueNotice}
+          </StatusNotice>
+        ) : null}
+        {queueActive ? (
+          <ul>
+            {queueJobs.map((job) => (
+              <li key={job.jobId}>
+                <span data-job-status>{jobStatusLabel(job.status)}</span>
+                <span data-job-details>
+                  <strong>{jobOperationLabel(job.operation)}</strong>
+                  <span>
+                    {job.provider} · Started {formatDateTime(job.createdAt)}
+                  </span>
+                </span>
+                <Button
+                  size="small"
+                  variant="danger"
+                  onClick={() => {
+                    abandonMutation.reset();
+                    setQueueNotice(null);
+                    setSelectedJob(job);
+                  }}
+                >
+                  {jobActionLabel(job.status)}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
 
       <ConfirmationDialog
         open={selectedJob !== null}

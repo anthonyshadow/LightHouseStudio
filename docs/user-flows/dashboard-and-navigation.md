@@ -40,17 +40,9 @@ Sections in DOM order:
    actions: **Create video** (primary) and **Browse Assets**. The heading's visible text is also its
    accessible name; the greeting used to exist only as a `title` tooltip, and the heading used to
    read "Momentum Workspace" while announcing "Dashboard".
-2. **Getting-started card** — "Start with the outcome you need". Dismissed per account via
-   `localStorage` (`dashboardOnboarding.ts`); if the write fails a warning notice appears
-   (`DashboardRouteSurface.tsx:280-284`).
-3. **Processing Queue** — `GET /api/video-jobs` via `listActiveVideoJobs`, polled every 3 s **only
-   while at least one job exists** (`DashboardRouteSurface.tsx:138-142`). Each row shows a derived
-   status ("Queued" / "Finalizing" / "Active"), the operation, the provider, and the start time,
-   plus a destructive **Remove from queue / Stop tracking** action guarded by a
-   `ConfirmationDialog` that explicitly warns the provider may still bill.
-4. **Continue Work** — the first project from the active project list, or an empty panel offering
+2. **Continue Work** — the first project from the active project list, or an empty panel offering
    **New Project**.
-5. **Recent Work** — merged list of the newest 4 projects, 4 videos and 4 campaigns, sorted by
+3. **Recent Work** — merged list of the newest 4 projects, 4 videos and 4 campaigns, sorted by
    `updatedAt` descending, filtered by an All / Videos / Projects / Campaigns toggle, then sliced to
    4 items. Every row opens the specific record it names: projects go to `/projects/{id}`, campaigns
    to `/campaigns/{id}`, and videos to `/assets/videos?video={id}`, which opens that video's preview
@@ -61,7 +53,22 @@ Sections in DOM order:
    costs a request of its own. A row with nothing to show says "No preview yet"; a campaign says
    "Campaign", because it organizes work rather than producing it and no poster is coming.
 
-6. **Footer links** — All Projects · All Videos · All Campaigns.
+4. **Footer links** — All Projects · All Videos · All Campaigns.
+5. **Getting-started card** — "Start with the outcome you need". Dismissed per account via
+   `localStorage` (`dashboardOnboarding.ts`); if the write fails a warning notice appears
+   (`DashboardRouteSurface.tsx:436-440`).
+6. **Processing Queue** — `GET /api/video-jobs` via `listActiveVideoJobs`, polled every 3 s **only
+   while at least one job exists** (`DashboardRouteSurface.tsx:151`).
+
+   With no job, the section is one line: the label, "No queued or active video jobs." and
+   **Refresh**. A job expands it back to a full section — its description, and a row per job
+   showing a derived status ("Queued" / "Finalizing" / "Active"), the operation, the provider and
+   the start time, plus a destructive **Remove from queue / Stop tracking** action guarded by a
+   `ConfirmationDialog` that explicitly warns the provider may still bill.
+
+The work comes first deliberately. The queue is an engineering view of provider jobs, and on most
+visits it has nothing to report; leading with it, and with an explanation of Projects versus
+Campaigns, put two blocks the operator did not ask for above everything they had made.
 
 There is no separate "Start New" section. It offered **New Project** and **New Campaign**, both
 already reachable from Quick Create, from the Recent Work empty state, and — for New Project —
@@ -82,17 +89,17 @@ and displays 4.
 
 ## States
 
-| State                                 | Present?                                    | Where                  |
-| ------------------------------------- | ------------------------------------------- | ---------------------- |
-| Loading — projects                    | Yes, `role="status"` "Finding recent work…" | `:354`                 |
-| Loading — recent work                 | Yes, "Loading recent work…"                 | `:427`                 |
-| Loading — queue                       | Yes, "Checking processing jobs…"            | `:301`                 |
-| Error — projects / videos / campaigns | Yes, per-kind `StatusNotice` with Retry     | `:355-361`, `:428-439` |
-| Error — queue                         | Yes, with Retry                             | `:302-312`             |
-| Empty — continue work                 | Yes, with **New Project**                   | `:380-388`             |
-| Empty — recent work                   | Yes, message + a filter-specific action     | `:458-465`             |
-| Empty — queue                         | Yes, "No queued or active video jobs."      | `:343-345`             |
-| Success feedback                      | Yes, `queueNotice` after abandoning a job   | `:313-317`             |
+| State                                 | Present?                                                                  | Where                  |
+| ------------------------------------- | ------------------------------------------------------------------------- | ---------------------- |
+| Loading — projects                    | Yes, `role="status"` "Finding recent work…"                               | `:291`                 |
+| Loading — recent work                 | Yes, "Loading recent work…"                                               | `:348`                 |
+| Loading — queue                       | Yes, "Checking processing jobs…"                                          | `:451`                 |
+| Error — projects / videos / campaigns | Yes, per-kind `StatusNotice` with Retry                                   | `:292-298`, `:349-359` |
+| Error — queue                         | Yes, `role="alert"` with Retry                                            | `:465-471`             |
+| Empty — continue work                 | Yes, with **New Project**                                                 | `:318-325`             |
+| Empty — recent work                   | Yes, message + a filter-specific action                                   | `:399-404`             |
+| Empty — queue                         | Yes, "No queued or active video jobs.", on the section's one compact line | `:452-454`             |
+| Success feedback                      | Yes, `queueNotice` after abandoning a job                                 | `:476-480`             |
 
 The Dashboard is the most complete surface in the product for loading/empty/error coverage.
 
