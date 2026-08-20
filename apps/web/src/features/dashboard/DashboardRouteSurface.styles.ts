@@ -321,7 +321,7 @@ export const recentListStyles = (theme: Theme): CSSObject => ({
     width: '100%',
     minHeight: '4.5rem',
     display: 'grid',
-    gridTemplateColumns: '2rem minmax(0, 1fr) auto',
+    gridTemplateColumns: 'auto minmax(0, 1fr) auto',
     alignItems: 'center',
     gap: theme.space.md,
     padding: `${theme.space.md} ${theme.space.xs}`,
@@ -337,13 +337,12 @@ export const recentListStyles = (theme: Theme): CSSObject => ({
     outline: `2px solid ${theme.colors.focus}`,
     outlineOffset: '-2px',
   },
-  '& [data-recent-icon]': {
-    width: '1.15rem',
-    height: '1.15rem',
-    justifySelf: 'center',
-    color: theme.colors.textFaint,
-  },
-  '& button:hover [data-recent-icon]': { color: theme.colors.accent },
+  /*
+   * Sized against the viewport rather than the text, so raising the page to 200% grows the title
+   * and leaves the poster where it is. The tile reserves its own height by aspect ratio, so a row
+   * does not move as images arrive.
+   */
+  '& [data-recent-poster]': { width: 'min(4.5rem, 22vw)', justifySelf: 'center' },
   '& [data-recent-title]': { minWidth: 0, display: 'grid', gap: '0.15rem' },
   '& [data-recent-title] strong': {
     overflow: 'hidden',

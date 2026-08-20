@@ -24,8 +24,11 @@ import {
   projectsWorkspaceHeaderStyles,
   projectsWorkspaceInnerStyles,
 } from './ProjectsListSurface.styles';
+import { projectPosterUrls } from './projectPosterPresentation';
 import { projectStatusLabel } from './projectStatusPresentation';
 import { useProjectList } from './useProjectsController';
+import { WorkPosterTile } from './WorkPosterTile';
+import { KIND_ICONS } from './ProjectAssetThumbnail';
 
 interface ProjectListSectionProps {
   readonly lifecycle: 'active' | 'archived';
@@ -56,6 +59,7 @@ const ProjectListSection = ({
     () => query.data?.pages.flatMap((page) => page.projects) ?? [],
     [query.data],
   );
+  const posters = useMemo(() => projectPosterUrls(query.data?.pages), [query.data]);
   const archived = lifecycle === 'archived';
 
   return (
@@ -100,6 +104,20 @@ const ProjectListSection = ({
             <li key={project.id}>
               <article css={projectsLedgerRowStyles(theme)} data-project-ledger-row="">
                 <div data-project-identity>
+                  <span data-project-poster="">
+                    {/* Decorative: the heading beside it already names the Project. */}
+                    <WorkPosterTile
+                      decorative
+                      playBadge
+                      icon={KIND_ICONS.video}
+                      thumbnailUrl={posters.get(project.id) ?? null}
+                      emptyCaption="No preview yet"
+                      failedCaption="Preview didn’t load"
+                      label={project.title}
+                      kindNoun="Project"
+                      unavailable={false}
+                    />
+                  </span>
                   <h4>{project.title}</h4>
                 </div>
                 <div data-project-meta>

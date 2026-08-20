@@ -62,6 +62,7 @@ import type {
   ProjectRevisionHistoryPage,
   ProjectSummaryPage,
   ProjectSummaryPageInput,
+  ProjectSummaryPreview,
   ProjectSourceAcceptanceResult,
   ProjectSourceRecord,
   ProjectSourceRemovalResult,
@@ -113,6 +114,7 @@ import {
 import {
   projectMediaReferencesEqual,
   projectAssetLinksForRevision,
+  projectPosterReferenceForSnapshot,
   projectVersionReferenceLinksForRevision,
 } from './project-snapshot-relations.js';
 import {
@@ -1206,9 +1208,8 @@ export class FileProjectRepository
     if (!Number.isInteger(input.pageSize) || input.pageSize < 1 || input.pageSize > 40) {
       throw new Error('Use a bounded Project summary page.');
     }
-    const projects = (await this.#read(ownerUserId)).projects
-      .map(({ project }) => project)
-      .filter((project) => {
+    const aggregates = (await this.#read(ownerUserId)).projects
+      .filter(({ project }) => {
         const matchesLifecycle =
           project.deletedAt === null &&
           (input.lifecycle === 'archived'
@@ -1228,14 +1229,23 @@ export class FileProjectRepository
       })
       .sort(
         (left, right) =>
-          right.updatedAt.localeCompare(left.updatedAt) || right.id.localeCompare(left.id),
+          right.project.updatedAt.localeCompare(left.project.updatedAt) ||
+          right.project.id.localeCompare(left.project.id),
       );
-    const page = projects.slice(0, input.pageSize);
+    const pageAggregates = aggregates.slice(0, input.pageSize);
+    const page = pageAggregates.map(({ project }) => project);
     const last = page.at(-1);
+    // The revisions are already in the library this read loaded, so the posters cost no extra I/O.
+    const previews: ProjectSummaryPreview[] = [];
+    for (const aggregate of pageAggregates) {
+      const poster = projectPosterReferenceForSnapshot(currentRead(aggregate).revision.snapshot);
+      if (poster !== null) previews.push({ projectId: aggregate.project.id, ...poster });
+    }
     return {
       projects: page,
+      previews,
       nextCursor:
-        projects.length > input.pageSize && last !== undefined
+        aggregates.length > input.pageSize && last !== undefined
           ? { updatedAt: last.updatedAt, projectId: last.id }
           : null,
     };

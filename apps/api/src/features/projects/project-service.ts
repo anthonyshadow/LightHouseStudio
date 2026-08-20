@@ -177,6 +177,11 @@ export class ProjectService {
     });
     return projectsResponseSchema.parse({
       projects: page.projects.map(publicProject),
+      previews: page.previews.map((preview) => ({
+        projectId: preview.projectId,
+        savedVideoId: preview.savedVideoId,
+        videoVersionId: preview.videoVersionId,
+      })),
       nextCursor: page.nextCursor === null ? null : encodeCursor(page.nextCursor, query),
     });
   }

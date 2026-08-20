@@ -701,9 +701,27 @@ export const projectsQuerySchema = z
 export const projectCurrentResponseSchema = z
   .object({ project: projectSchema, revision: projectRevisionSchema })
   .strict();
+/**
+ * The Saved Video Version a Project's own current revision already points at, so a list surface can
+ * show the work instead of describing it.
+ *
+ * It travels beside `projects` rather than inside `projectSchema` because it is a presentation
+ * convenience of the *list*, not part of a Project's identity: the detail response carries the
+ * revision itself and resolves the same reference from it.
+ */
+export const projectPreviewSchema = z
+  .object({
+    projectId: projectIdSchema,
+    savedVideoId: z.uuid(),
+    videoVersionId: z.uuid(),
+  })
+  .strict();
+
 export const projectsResponseSchema = z
   .object({
     projects: z.array(projectSchema).max(40),
+    /** Only the Projects in this page that resolve to one; absent entries have no preview. */
+    previews: z.array(projectPreviewSchema).max(40).default([]),
     nextCursor: z.string().max(500).nullable(),
   })
   .strict();
@@ -1022,6 +1040,7 @@ export type AttachProjectAssetRequest = z.infer<typeof attachProjectAssetRequest
 export type AttachProjectAssetResponse = z.infer<typeof attachProjectAssetResponseSchema>;
 export type DetachProjectAssetResponse = z.infer<typeof detachProjectAssetResponseSchema>;
 export type ProjectContract = z.infer<typeof projectSchema>;
+export type ProjectPreviewContract = z.infer<typeof projectPreviewSchema>;
 export type ProjectRevisionContract = z.infer<typeof projectRevisionSchema>;
 export type ProjectJobLinkContract = z.infer<typeof projectJobLinkSchema>;
 export type ProjectOutputLinkContract = z.infer<typeof projectOutputLinkSchema>;

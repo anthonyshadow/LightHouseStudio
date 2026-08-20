@@ -115,6 +115,16 @@ export const workspaceVoiceRelationshipResponseSchema = z
   })
   .strict();
 
+/**
+ * How many voices this account has kept, read from Lightframe's own saved-voice records.
+ *
+ * Deliberately not the provider's workspace size: this answer has to be available to a surface that
+ * only wants a number, and no count is worth a paid provider call.
+ */
+export const savedVoiceCountResponseSchema = z
+  .object({ count: z.number().int().nonnegative() })
+  .strict();
+
 export const sharedVoiceParamsSchema = z
   .object({ publicOwnerId: providerIdSchema, voiceId: providerIdSchema })
   .strict();
@@ -163,5 +173,6 @@ export type WorkspaceVoiceParams = z.infer<typeof workspaceVoiceParamsSchema>;
 export type WorkspaceVoiceRelationshipResponse = z.infer<
   typeof workspaceVoiceRelationshipResponseSchema
 >;
+export type SavedVoiceCountResponse = z.infer<typeof savedVoiceCountResponseSchema>;
 export type VoiceChangerQuery = z.infer<typeof voiceChangerQuerySchema>;
 export type VoiceConversionContentType = z.infer<typeof voiceConversionContentTypeSchema>;

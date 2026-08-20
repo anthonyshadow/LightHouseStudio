@@ -69,6 +69,7 @@ const alwaysRegisteredRoutes: readonly Route[] = [
   'DELETE /api/reference-images/:assetId',
   'GET /api/reference-images/:assetId/content',
   'GET /api/elevenlabs/voices',
+  'GET /api/elevenlabs/voices/saved-count',
   'GET /api/elevenlabs/voices/:voiceId/relationship',
   'GET /api/elevenlabs/voices/:voiceId/preview',
   'GET /api/elevenlabs/shared-voices',

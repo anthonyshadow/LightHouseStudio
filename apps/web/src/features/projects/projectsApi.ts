@@ -18,6 +18,7 @@ import {
   type ProjectAssetsResponse,
   type ProjectHistoryResponse,
   type ProjectOutputHistoryResponse,
+  type ProjectPreviewContract,
   type ProjectSourceResponse,
   type SaveProjectOutputRequest,
   type SaveProjectOutputResponse,
@@ -33,6 +34,8 @@ import {
 
 export interface ProjectsPage {
   readonly projects: ProjectCurrentResponse['project'][];
+  /** Keyed by Project id, and only for the Projects in this page that have something to show. */
+  readonly previews: readonly ProjectPreviewContract[];
   readonly nextCursor: string | null;
 }
 

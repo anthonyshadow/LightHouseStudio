@@ -1,4 +1,5 @@
 import {
+  savedVoiceCountResponseSchema,
   sharedVoiceParamsSchema,
   sharedVoicesQuerySchema,
   sharedVoicesResponseSchema,
@@ -116,6 +117,14 @@ export const registerVoiceRoutes = (
         }),
       ),
     );
+  });
+
+  // Lightframe's own count of kept voices, so the Assets hub can state one without a paid call.
+  // Registered before the parameterized siblings for the same reason it reads them: it is a fixed
+  // path, not a voice id.
+  app.get('/api/elevenlabs/voices/saved-count', async (request) => {
+    const saved = await savedVoices.list(ownerUserIdForRequest(request));
+    return savedVoiceCountResponseSchema.parse({ count: saved.length });
   });
 
   app.get('/api/elevenlabs/voices/:voiceId/relationship', async (request) => {

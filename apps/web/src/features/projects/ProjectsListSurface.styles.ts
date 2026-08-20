@@ -202,7 +202,19 @@ export const projectsLedgerRowStyles = (theme: Theme): CSSObject => ({
   rowGap: theme.space.sm,
   paddingBlock: theme.space.md,
   borderBlockEnd: `1px solid ${theme.colors.border}`,
-  '& [data-project-identity]': { minWidth: 0 },
+  '& [data-project-identity]': {
+    minWidth: 0,
+    display: 'grid',
+    gridTemplateColumns: 'auto minmax(0, 1fr)',
+    alignItems: 'center',
+    gap: theme.space.md,
+  },
+  /*
+   * Sized against the container rather than the text, so raising the page to 200% grows the title
+   * and leaves the poster alone. `aspect-ratio` inside the tile reserves the height before the
+   * image arrives, so a row never jumps as posters load.
+   */
+  '& [data-project-poster]': { width: 'min(5.5rem, 26cqi)' },
   '& h4': {
     margin: 0,
     overflowWrap: 'anywhere',

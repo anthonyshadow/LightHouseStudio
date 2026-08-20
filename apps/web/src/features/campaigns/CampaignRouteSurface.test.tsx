@@ -124,6 +124,54 @@ afterEach(() => {
 });
 
 describe('Campaign route surface', () => {
+  it('covers Campaign cards deliberately and shows their Projects\u2019 own work', async () => {
+    const preview = {
+      projectId,
+      savedVideoId: 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338',
+      videoVersionId: 'b276694b-58c4-40d3-8fb6-315e32b66fd0',
+    };
+    let listReads = 0;
+    mockApiServer.use(
+      http.get('*/api/campaigns', ({ request }) =>
+        HttpResponse.json({
+          campaigns:
+            new URL(request.url).searchParams.get('lifecycle') === 'active' ? [campaign()] : [],
+          nextCursor: null,
+        }),
+      ),
+      http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(campaign())),
+      http.get('*/api/projects', ({ request }) => {
+        listReads += 1;
+        return new URL(request.url).searchParams.get('lifecycle') === 'archived'
+          ? HttpResponse.json({ projects: [], previews: [], nextCursor: null })
+          : HttpResponse.json({
+              projects: [currentProject().project],
+              previews: [preview],
+              nextCursor: null,
+            });
+      }),
+    );
+    const user = userEvent.setup();
+    renderCampaigns();
+
+    // A Campaign organizes Projects rather than producing video, so its card says what it is
+    // rather than waiting for a poster that will never arrive.
+    expect(await screen.findByRole('heading', { name: 'Summer launch' })).toBeVisible();
+    expect(document.querySelectorAll('[data-campaign-cover] img')).toHaveLength(0);
+    expect(screen.getByText('Campaign', { selector: 'small' })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+
+    expect(await screen.findByRole('heading', { name: 'Launch cut' })).toBeVisible();
+    const posters = document.querySelectorAll<HTMLImageElement>('[data-project-poster] img');
+    expect(posters).toHaveLength(1);
+    expect(posters[0]!.getAttribute('src')).toBe(
+      `/api/videos/${preview.savedVideoId}/thumbnail?v=${preview.videoVersionId}`,
+    );
+    // Two Project lists on the Campaign, two reads — the rows added none.
+    expect(listReads).toBe(2);
+  });
+
   it('does not re-open the create dialog when Back returns to the list that requested it', async () => {
     mockApiServer.use(
       http.get('*/api/campaigns', () => HttpResponse.json({ campaigns: [], nextCursor: null })),

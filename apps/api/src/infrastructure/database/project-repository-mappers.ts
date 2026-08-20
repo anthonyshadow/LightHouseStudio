@@ -1,7 +1,12 @@
-import { projectSnapshotSchema } from '@studio/contracts';
+import {
+  projectMediaReferenceSchema,
+  projectOutputReferenceSchema,
+  projectSnapshotSchema,
+} from '@studio/contracts';
 import {
   PROJECT_SNAPSHOT_SCHEMA_VERSION,
   type Project,
+  type ProjectOutputReference,
   type ProjectAggregate,
   type ProjectAssetLink,
   type ProjectRevision,
@@ -14,6 +19,7 @@ import type {
   ProjectSourceRecord,
   ProjectWorkingMediaRecord,
 } from '../../features/projects/project-repository.js';
+import { projectPosterReferenceForSnapshot } from '../../features/projects/project-snapshot-relations.js';
 import { ProjectPersistenceError } from './project-persistence-errors.js';
 import type {
   projectAssets,
@@ -68,6 +74,30 @@ export const toRevision = (row: ProjectRevisionRow): ProjectRevision => ({
   source: row.source,
   createdAt: toIsoTimestamp(row.createdAt),
 });
+
+/**
+ * A list poster from the two snapshot fields the page read projects out of `jsonb`.
+ *
+ * Reading two keys rather than the whole snapshot keeps a forty-row page small, and the preference
+ * between them stays with {@link projectPosterReferenceForSnapshot} so the relational and file
+ * repositories cannot answer this differently. A snapshot fragment that does not parse yields no
+ * poster: a decoration must never fail a page read.
+ */
+export const toProjectSummaryPoster = (row: {
+  readonly presentedMedia: unknown;
+  readonly lastSuccessfulOutput: unknown;
+}): ProjectOutputReference | null => {
+  const presentedMedia = projectMediaReferenceSchema
+    .nullable()
+    .safeParse(row.presentedMedia ?? null);
+  const lastSuccessfulOutput = projectOutputReferenceSchema
+    .nullable()
+    .safeParse(row.lastSuccessfulOutput ?? null);
+  return projectPosterReferenceForSnapshot({
+    presentedMedia: presentedMedia.success ? presentedMedia.data : null,
+    lastSuccessfulOutput: lastSuccessfulOutput.success ? lastSuccessfulOutput.data : null,
+  });
+};
 
 export const toProject = (row: ProjectRow): Project => {
   if (row.currentRevisionId === null || row.currentRevisionNumber < 1) {

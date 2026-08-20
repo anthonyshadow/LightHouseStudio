@@ -1,9 +1,28 @@
 import type {
   ProjectAssetLink,
+  ProjectOutputReference,
   ProjectRevision,
+  ProjectSnapshot,
   ProjectVersionReferenceLink,
 } from '@studio/domain';
 export { projectMediaReferencesEqual } from '@studio/domain';
+
+/**
+ * The Saved Video Version that best represents a Project right now, or nothing.
+ *
+ * What the operator is looking at wins over what they last produced, so a Project whose current cut
+ * came from a Version shows that Version rather than an older output. A locally rendered cut that
+ * was never saved has no Version to point at, and honestly has no poster.
+ */
+export const projectPosterReferenceForSnapshot = (
+  snapshot: Pick<ProjectSnapshot, 'presentedMedia' | 'lastSuccessfulOutput'>,
+): ProjectOutputReference | null => {
+  const presented = snapshot.presentedMedia;
+  if (presented?.kind === 'saved-video-version') {
+    return { savedVideoId: presented.savedVideoId, videoVersionId: presented.videoVersionId };
+  }
+  return snapshot.lastSuccessfulOutput;
+};
 
 export const projectAssetLinksForRevision = (
   revision: ProjectRevision,
