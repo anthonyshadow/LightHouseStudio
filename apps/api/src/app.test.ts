@@ -70,6 +70,7 @@ describe('API shell', () => {
       },
       wardrobe: { addOutfitAvailable: false },
       savedVideos: { directMultipartUpload: false },
+      creativeLibrary: { cloudMirror: false },
     });
     expect(capabilities.body).not.toContain('apiKey');
   });

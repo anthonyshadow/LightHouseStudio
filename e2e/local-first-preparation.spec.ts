@@ -95,6 +95,7 @@ test.beforeEach(async ({ page, request, baseURL }) => {
         },
         wardrobe: { addOutfitAvailable: false },
         savedVideos: { directMultipartUpload: false },
+        creativeLibrary: { cloudMirror: false },
       } satisfies CapabilitiesResponse),
     });
   });

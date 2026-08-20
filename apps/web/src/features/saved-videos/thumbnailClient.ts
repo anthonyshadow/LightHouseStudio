@@ -45,14 +45,37 @@ const canvasBlob = async (canvas: HTMLCanvasElement | OffscreenCanvas): Promise<
 /** Which frame of the video the poster is taken from. */
 export type SavedVideoThumbnailFrame = 'auto' | 'first';
 
+/**
+ * Where the frame is decoded from.
+ *
+ * The URL form is not a convenience. A poster is one ~20 KB image, and the saved-video content
+ * route serves byte ranges, so mediabunny fetches the container header and the bytes around the
+ * target keyframe rather than the whole file — which for a Saved Video may be up to the 300 MB
+ * app-owned ceiling. The blob form is for media already in memory, where a request is pure waste.
+ */
+export type SavedVideoThumbnailMedia =
+  { readonly kind: 'blob'; readonly blob: Blob } | { readonly kind: 'url'; readonly url: string };
+
 export const createSavedVideoThumbnail = async (
-  video: Blob,
+  media: SavedVideoThumbnailMedia,
   signal: AbortSignal,
   frame: SavedVideoThumbnailFrame = 'auto',
 ): Promise<Blob> => {
   if (signal.aborted) throw new DOMException('Thumbnail creation was aborted.', 'AbortError');
-  const { ALL_FORMATS, BlobSource, CanvasSink, Input } = await import('mediabunny');
-  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(video) });
+  const { ALL_FORMATS, BlobSource, CanvasSink, Input, UrlSource } = await import('mediabunny');
+  const input = new Input({
+    formats: ALL_FORMATS,
+    source:
+      media.kind === 'blob'
+        ? new BlobSource(media.blob)
+        : // Bounded deliberately: the default policy retries a failed request with exponential
+          // backoff and never gives up, so one unreachable video would never settle into a failure
+          // the operator can act on. The caller already retries once.
+          new UrlSource(media.url, { getRetryDelay: () => null }),
+  });
+  // The signal cannot reach the ranged fetches; disposing the input is how they are cancelled.
+  const disposeInput = () => input.dispose();
+  signal.addEventListener('abort', disposeInput, { once: true });
   try {
     if (!(await input.canRead())) throw new Error('The video cannot be decoded for a thumbnail.');
     const track = await input.getPrimaryVideoTrack();
@@ -66,7 +89,8 @@ export const createSavedVideoThumbnail = async (
     if (signal.aborted) throw new DOMException('Thumbnail creation was aborted.', 'AbortError');
     return thumbnail;
   } finally {
-    input.dispose();
+    signal.removeEventListener('abort', disposeInput);
+    if (!input.disposed) input.dispose();
   }
 };
 
@@ -93,7 +117,8 @@ const drawToCanvas = (
 
 /**
  * Re-encodes an operator-supplied image as the same bounded WebP poster the video path produces,
- * so an uploaded preview keeps its own aspect ratio and stays inside the upload limit.
+ * so an uploaded preview keeps its own aspect ratio. The `THUMBNAIL_LONG_EDGE` cap is what keeps
+ * the result far inside `SAVED_VIDEO_THUMBNAIL_MAX_BYTES`, whatever was picked.
  */
 export const createSavedVideoThumbnailFromImage = async (
   image: Blob,

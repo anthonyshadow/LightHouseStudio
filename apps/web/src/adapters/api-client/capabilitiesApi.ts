@@ -31,5 +31,6 @@ export const fetchProviderAvailability = async (
     referenceImageOptimizerVersion: payload.referenceImages.optimizer.version,
     wardrobeAddOutfitAvailable: payload.wardrobe.addOutfitAvailable,
     directSavedVideoUploadAvailable: payload.savedVideos.directMultipartUpload,
+    creativeLibraryCloudMirror: payload.creativeLibrary.cloudMirror,
   };
 };

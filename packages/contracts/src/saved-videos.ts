@@ -12,7 +12,16 @@ export const SAVED_VIDEO_ORIGINS = [
 ] as const;
 export const savedVideoOriginSchema = z.enum(SAVED_VIDEO_ORIGINS);
 export const savedVideoStatusSchema = z.enum(['ready', 'processing', 'failed', 'missing']);
-export const savedVideoTitleSchema = z.string().trim().min(1).max(120);
+/**
+ * The largest poster body `PUT /api/videos/:videoId/versions/:versionId/thumbnail` accepts.
+ *
+ * This bounds the re-encoded WebP the browser produces, not the image an operator picks: the
+ * poster is capped at a 480px long edge, so it lands orders of magnitude under this. It exists so
+ * the client and the route state the same number instead of each keeping its own.
+ */
+export const SAVED_VIDEO_THUMBNAIL_MAX_BYTES = 5 * 1024 * 1024;
+export const SAVED_VIDEO_TITLE_MAX_LENGTH = 120;
+export const savedVideoTitleSchema = z.string().trim().min(1).max(SAVED_VIDEO_TITLE_MAX_LENGTH);
 export const savedVideoCharacterNameSchema = z.string().trim().min(1).max(120);
 export const savedVideoCharacterVariantNameSchema = z.string().trim().min(1).max(120);
 export const savedVideoIdSchema = z.uuid();

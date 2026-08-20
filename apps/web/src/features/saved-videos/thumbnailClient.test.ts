@@ -10,17 +10,32 @@ const media = vi.hoisted(() => ({
   duration: 12,
   sinkOptions: [] as SinkOptions[],
   timestamps: [] as number[],
+  sources: [] as { readonly kind: 'blob' | 'url'; readonly url?: string }[],
+  disposals: 0,
 }));
 
 vi.mock('mediabunny', () => ({
   ALL_FORMATS: [],
-  BlobSource: class {},
+  BlobSource: class {
+    constructor() {
+      media.sources.push({ kind: 'blob' });
+    }
+  },
+  UrlSource: class {
+    constructor(url: string) {
+      media.sources.push({ kind: 'url', url });
+    }
+  },
   Input: class {
+    disposed = false;
     canRead = () => Promise.resolve(true);
     getPrimaryVideoTrack = () =>
       Promise.resolve({ displayWidth: media.displayWidth, displayHeight: media.displayHeight });
     getDurationFromMetadata = () => Promise.resolve(media.duration);
-    dispose = () => undefined;
+    dispose = () => {
+      this.disposed = true;
+      media.disposals += 1;
+    };
   },
   CanvasSink: class {
     constructor(_track: unknown, options: SinkOptions) {
@@ -39,7 +54,7 @@ vi.mock('mediabunny', () => ({
 
 import { createSavedVideoThumbnail } from './thumbnailClient';
 
-const video = () => new Blob(['video'], { type: 'video/mp4' });
+const video = () => ({ kind: 'blob', blob: new Blob(['video'], { type: 'video/mp4' }) }) as const;
 
 describe('createSavedVideoThumbnail', () => {
   beforeEach(() => {
@@ -48,6 +63,8 @@ describe('createSavedVideoThumbnail', () => {
     media.duration = 12;
     media.sinkOptions.length = 0;
     media.timestamps.length = 0;
+    media.sources.length = 0;
+    media.disposals = 0;
   });
 
   it('bounds the long edge and lets the other edge follow the source aspect ratio', async () => {
@@ -89,6 +106,22 @@ describe('createSavedVideoThumbnail', () => {
 
     await createSavedVideoThumbnail(video(), new AbortController().signal, 'first');
     expect(media.timestamps[2]).toBe(0);
+  });
+
+  it('range-reads a URL rather than downloading the whole video for one frame', async () => {
+    await createSavedVideoThumbnail(
+      { kind: 'url', url: '/api/videos/v-1/versions/ver-1/content' },
+      new AbortController().signal,
+    );
+    expect(media.sources).toEqual([{ kind: 'url', url: '/api/videos/v-1/versions/ver-1/content' }]);
+
+    await createSavedVideoThumbnail(video(), new AbortController().signal);
+    expect(media.sources[1]).toEqual({ kind: 'blob' });
+  });
+
+  it('disposes the input exactly once, whichever way it finishes', async () => {
+    await createSavedVideoThumbnail(video(), new AbortController().signal);
+    expect(media.disposals).toBe(1);
   });
 
   it('refuses to start once the signal is aborted', async () => {

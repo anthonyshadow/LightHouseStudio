@@ -127,12 +127,6 @@ export const AssetsRouteSurface = ({
     if (destination === 'outfits') return `${outfitCount} saved`;
     return null;
   };
-  // Only the two browser-held libraries. Videos and Voices are the server's and are not covered by
-  // this statement, so they must not carry it.
-  const storageFor = (destination: AssetDestination): string | null =>
-    destination === 'characters' || destination === 'outfits'
-      ? creativeLibraryStorageSummary(creativeLibraryMirror)
-      : null;
 
   return (
     <section css={surfaceStyles(theme)} aria-labelledby="assets-heading">
@@ -154,7 +148,7 @@ export const AssetsRouteSurface = ({
       <div css={gridStyles(theme)}>
         {assetCards.map((card) => {
           const count = countFor(card.destination);
-          const storage = storageFor(card.destination);
+          const storage = creativeLibraryStorageSummary(card.destination, creativeLibraryMirror);
           return (
             <article key={card.destination} css={cardStyles(theme)}>
               <div>

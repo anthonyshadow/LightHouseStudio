@@ -51,6 +51,7 @@ const capabilityPayload: CapabilitiesResponse = {
   },
   wardrobe: { addOutfitAvailable: true },
   savedVideos: { directMultipartUpload: true },
+  creativeLibrary: { cloudMirror: true },
 };
 
 const availableProviders: ProviderAvailability = {
@@ -70,6 +71,7 @@ const availableProviders: ProviderAvailability = {
   referenceImageOptimizerVersion: 'lucy-character-reference-v1',
   wardrobeAddOutfitAvailable: true,
   directSavedVideoUploadAvailable: true,
+  creativeLibraryCloudMirror: true,
 };
 
 const flushPromises = async (): Promise<void> => {

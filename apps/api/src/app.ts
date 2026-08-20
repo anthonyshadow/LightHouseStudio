@@ -448,6 +448,9 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
     promptOptimizerVersion: dependencies.config.openAiPromptOptimizerVersion,
     wardrobeAddOutfitAvailable: outfitTryOnService.available,
     directSavedVideoUploadAvailable: directSavedVideoUploadService !== undefined,
+    // The same condition `registerCreativeLibraryRoutes` registers on, so the advertised capability
+    // and the routes that back it cannot disagree.
+    creativeLibraryCloudMirrorAvailable: dependencies.persistence?.creativeLibraries !== undefined,
   });
   registerRealtimeRoutes(app, decartProvider, dependencies.config.realtimeVideoBetaEnabled);
   registerVideoJobRoutes(app, videoJobService);

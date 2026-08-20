@@ -35,6 +35,14 @@ export interface ProjectSourceActivity {
 }
 
 export interface ProjectSourceRuntime {
+  /**
+   * Whether this runtime actually owns live media, or only absorbs the calls.
+   *
+   * Stated by the runtime rather than inferred by comparing it against a particular no-op object:
+   * a surface has no way to know which instance it was handed, and a wrapper, memoized copy or
+   * test double around a real runtime is still a real runtime.
+   */
+  readonly available: boolean;
   readonly present: (projectId: string, input: RestorePersistedOriginalInput) => void;
   readonly clear: (projectId: string) => void;
 }

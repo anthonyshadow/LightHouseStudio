@@ -1,3 +1,4 @@
+import { SAVED_VIDEO_TITLE_MAX_LENGTH } from '@studio/contracts';
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { Button, OverlayPanel, TextField } from '../../ui';
 import { ThumbnailSourceChooser } from './ThumbnailSourceChooser';
@@ -5,8 +6,6 @@ import {
   DEFAULT_SAVED_VIDEO_THUMBNAIL_CHOICE,
   type SavedVideoThumbnailChoice,
 } from './thumbnailSource';
-
-const SAVED_VIDEO_NAME_MAX_LENGTH = 120;
 
 export interface SaveVideoDialogProps {
   readonly fallbackName: string;
@@ -53,9 +52,9 @@ export const SaveVideoDialog = ({ fallbackName, onCancel, onSave }: SaveVideoDia
         <TextField
           ref={fieldRef}
           label="Video name (optional)"
-          hint={`Up to ${SAVED_VIDEO_NAME_MAX_LENGTH} characters. Leave blank to use “${fallbackName}”.`}
+          hint={`Up to ${SAVED_VIDEO_TITLE_MAX_LENGTH} characters. Leave blank to use “${fallbackName}”.`}
           value={name}
-          maxLength={SAVED_VIDEO_NAME_MAX_LENGTH}
+          maxLength={SAVED_VIDEO_TITLE_MAX_LENGTH}
           autoComplete="off"
           onChange={(event) => setName(event.currentTarget.value)}
         />

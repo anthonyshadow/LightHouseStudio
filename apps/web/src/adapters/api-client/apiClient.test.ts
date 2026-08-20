@@ -264,6 +264,7 @@ describe('reference image API client', () => {
           },
           wardrobe: { addOutfitAvailable: true },
           savedVideos: { directMultipartUpload: true },
+          creativeLibrary: { cloudMirror: true },
         },
       }),
     );

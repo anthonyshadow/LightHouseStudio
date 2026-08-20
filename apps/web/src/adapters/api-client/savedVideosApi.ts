@@ -4,6 +4,7 @@ import {
   directSavedVideoUploadResponseSchema,
   savedVideoDetailSchema,
   savedVideosResponseSchema,
+  VIDEO_RESULT_MAX_BYTES,
   type SavedVideoDetail,
   type SavedVideoFormat,
   type SavedVideoOrigin,
@@ -11,6 +12,7 @@ import {
   type SavedVideosResponse,
 } from '@studio/contracts';
 import { ApiClientError, apiFetch, requestJson } from './apiClient';
+import { readBoundedBlob } from './readBoundedBlob';
 
 const invalidResponse = () =>
   new ApiClientError('The saved video response was invalid.', 502, 'invalid-response');
@@ -359,5 +361,50 @@ export const savedVideoContentUrl = (videoId: string, versionId?: string): strin
 export const downloadSavedVideoUrl = (videoId: string, versionId?: string): string =>
   `${savedVideoContentUrl(videoId, versionId)}?download=true`;
 
-export const savedVideoThumbnailUrl = (videoId: string): string =>
-  `/api/videos/${encodeURIComponent(videoId)}/thumbnail`;
+/**
+ * The bounded streaming read every saved-video byte path shares. The 300 MB ceiling, the content
+ * negotiation and the two failure codes are stated here once so a caller cannot drift from them.
+ */
+export const readSavedVideoContent = async ({
+  videoId,
+  versionId,
+  mimeType,
+  signal,
+  abortMessage,
+}: Readonly<{
+  videoId: string;
+  versionId?: string | undefined;
+  mimeType: string;
+  signal: AbortSignal;
+  abortMessage: string;
+}>): Promise<Blob> => {
+  const response = await apiFetch(savedVideoContentUrl(videoId, versionId), {
+    cache: 'no-store',
+    headers: { Accept: mimeType },
+    signal,
+  });
+  return readBoundedBlob(response, {
+    maximumBytes: VIDEO_RESULT_MAX_BYTES,
+    signal,
+    acceptsContentType: (contentType) => contentType === mimeType,
+    createError: (failure) =>
+      new ApiClientError(
+        failure === 'too-large'
+          ? 'The saved video exceeded the app-owned 300 MB safety limit.'
+          : 'The saved video response was empty or invalid.',
+        502,
+        failure === 'too-large' ? 'result_too_large' : 'result_invalid',
+      ),
+    abortMessage,
+  });
+};
+
+/**
+ * The poster for a video's current Version.
+ *
+ * The route always serves whichever poster is current and sends no cache headers, so the version
+ * id is carried as a cache key: repairing or replacing a poster changes the URL, and every surface
+ * showing it refetches without any of them tracking staleness by hand.
+ */
+export const savedVideoThumbnailUrl = (videoId: string, versionId: string): string =>
+  `/api/videos/${encodeURIComponent(videoId)}/thumbnail?v=${encodeURIComponent(versionId)}`;

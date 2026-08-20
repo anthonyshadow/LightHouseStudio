@@ -59,12 +59,29 @@ const saveThumbnailWhenAvailable = async (
   signal: AbortSignal,
   thumbnail: SavedVideoThumbnailChoice,
 ): Promise<SavedVideoDetail> =>
-  createThumbnailForChoice(thumbnail, media, signal)
+  // The bytes are already in hand from the capture or edit that produced them; re-requesting them
+  // over a range would be slower than decoding what is in memory.
+  createThumbnailForChoice(thumbnail, { kind: 'blob', blob: media }, signal)
     .then((poster) => saveSavedVideoThumbnail(video.id, video.currentVersion.id, poster, signal))
     .catch((error: unknown) => {
       if (signal.aborted) throw error;
       return video;
     });
+
+/**
+ * Everything a save may carry besides the bytes. Named rather than positional: these are all
+ * optional and two of them are adjacent nullables, so argument order was the only thing keeping a
+ * caller from silently swapping them.
+ */
+export type SaveVideoOptions = Readonly<{
+  title?: string | undefined;
+  source?: { readonly videoId: string; readonly versionId: string } | undefined;
+  character?: SavedVideoCharacterAttribution | null | undefined;
+  thumbnail?: SavedVideoThumbnailChoice | undefined;
+}>;
+
+/** The same, for a replacement — whose target names the source, so it carries none. */
+export type ReplaceVideoOptions = Omit<SaveVideoOptions, 'source'>;
 
 export const useSaveVideo = (directMultipartUpload = false) => {
   const queryClient = useQueryClient();
@@ -85,10 +102,12 @@ export const useSaveVideo = (directMultipartUpload = false) => {
   const save = useCallback(
     async (
       artifact: RecordingArtifact,
-      title?: string,
-      source?: { readonly videoId: string; readonly versionId: string },
-      character?: SavedVideoCharacterAttribution | null,
-      thumbnail: SavedVideoThumbnailChoice = DEFAULT_SAVED_VIDEO_THUMBNAIL_CHOICE,
+      {
+        title,
+        source,
+        character,
+        thumbnail = DEFAULT_SAVED_VIDEO_THUMBNAIL_CHOICE,
+      }: SaveVideoOptions = {},
     ) => {
       if (controller.current !== null) return null;
       const idempotencyKey = keys.current.get(artifact.id) ?? crypto.randomUUID();
@@ -137,9 +156,11 @@ export const useSaveVideo = (directMultipartUpload = false) => {
     async (
       artifact: RecordingArtifact,
       target: { readonly videoId: string; readonly currentVersionId: string },
-      title?: string,
-      character?: SavedVideoCharacterAttribution | null,
-      thumbnail: SavedVideoThumbnailChoice = DEFAULT_SAVED_VIDEO_THUMBNAIL_CHOICE,
+      {
+        title,
+        character,
+        thumbnail = DEFAULT_SAVED_VIDEO_THUMBNAIL_CHOICE,
+      }: ReplaceVideoOptions = {},
     ) => {
       if (controller.current !== null) return null;
       const keyId = `${artifact.id}:replace:${target.videoId}:${target.currentVersionId}`;

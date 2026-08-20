@@ -147,6 +147,8 @@ describe('saved videos API client', () => {
       `/api/videos/${videoId}/versions/${versionId}/content`,
     );
     expect(downloadSavedVideoUrl(videoId)).toBe(`/api/videos/${videoId}/content?download=true`);
-    expect(savedVideoThumbnailUrl(videoId)).toBe(`/api/videos/${videoId}/thumbnail`);
+    expect(savedVideoThumbnailUrl(videoId, versionId)).toBe(
+      `/api/videos/${videoId}/thumbnail?v=${versionId}`,
+    );
   });
 });

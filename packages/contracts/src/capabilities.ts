@@ -76,6 +76,17 @@ export const capabilitiesResponseSchema = z
         directMultipartUpload: z.boolean(),
       })
       .strict(),
+    creativeLibrary: z
+      .object({
+        /**
+         * Whether this deployment keeps a server-side copy of the creative library at all. The
+         * creative-library routes are registered only when a relational database mode supplied a
+         * repository, and a surface that tells the operator where their work lives needs that fact
+         * stated rather than inferred from a 404.
+         */
+        cloudMirror: z.boolean(),
+      })
+      .strict(),
   })
   .strict();
 

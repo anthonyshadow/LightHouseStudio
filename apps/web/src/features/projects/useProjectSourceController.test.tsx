@@ -170,7 +170,7 @@ const adoptedWorkingResponse = (projectId: string): ProjectWorkingMediaResponse 
 const runtime = () => {
   const present = vi.fn<ProjectSourceRuntime['present']>();
   const clear = vi.fn<ProjectSourceRuntime['clear']>();
-  return { present, clear } satisfies ProjectSourceRuntime;
+  return { available: true, present, clear } satisfies ProjectSourceRuntime;
 };
 
 afterEach(() => {
@@ -430,6 +430,7 @@ describe('useProjectSourceController', () => {
       ),
     );
     const mediaOwner: ProjectSourceRuntime = {
+      available: true,
       present: vi.fn(() => events.push('present')),
       clear: vi.fn(() => events.push('clear')),
     };

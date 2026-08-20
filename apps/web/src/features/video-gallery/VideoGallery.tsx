@@ -115,8 +115,9 @@ const VideoGalleryGrid = ({
 }: {
   videos: readonly SavedVideoSummary[];
   busyId: string | null;
+  /** Keyed by poster URL, so a repaired poster — which has a new URL — is tried again. */
   brokenThumbnails: ReadonlySet<string>;
-  onThumbnailError: (videoId: string) => void;
+  onThumbnailError: (thumbnailUrl: string) => void;
   onOpenPreview: (video: SavedVideoSummary, trigger: HTMLButtonElement) => void;
   onGeneratePreview: (video: SavedVideoSummary, trigger: HTMLElement) => void;
   onUse: (video: SavedVideoSummary, intent: 'play' | 'edit') => Promise<void>;
@@ -132,6 +133,7 @@ const VideoGalleryGrid = ({
       {videos.map((video) => {
         const version = video.currentVersion;
         const busy = busyId === video.id;
+        const thumbnailUrl = savedVideoThumbnailUrl(video.id, version.id);
         return (
           <article key={video.id} css={cardStyles(theme)} aria-busy={busy || undefined}>
             <button
@@ -142,14 +144,14 @@ const VideoGalleryGrid = ({
               onClick={(event) => onOpenPreview(video, event.currentTarget)}
             >
               <span css={posterStyles(theme)}>
-                {video.thumbnailAvailable && !brokenThumbnails.has(video.id) ? (
+                {video.thumbnailAvailable && !brokenThumbnails.has(thumbnailUrl) ? (
                   <img
                     css={thumbnailStyles(theme)}
                     data-gallery-thumbnail=""
-                    src={savedVideoThumbnailUrl(video.id)}
+                    src={thumbnailUrl}
                     alt=""
                     loading="lazy"
-                    onError={() => onThumbnailError(video.id)}
+                    onError={() => onThumbnailError(thumbnailUrl)}
                   />
                 ) : (
                   <span
@@ -625,8 +627,8 @@ export const VideoGallery = ({
           videos={videos}
           busyId={busyId}
           brokenThumbnails={brokenThumbnails}
-          onThumbnailError={(videoId) =>
-            setBrokenThumbnails((current) => new Set(current).add(videoId))
+          onThumbnailError={(thumbnailUrl) =>
+            setBrokenThumbnails((current) => new Set(current).add(thumbnailUrl))
           }
           onOpenPreview={openPreview}
           onGeneratePreview={(video, trigger) => {
@@ -716,13 +718,6 @@ export const VideoGallery = ({
           onClose={() => setPreviewRepairTarget(null)}
           onGenerated={(video) => {
             setPreviewRepairTarget(null);
-            // A repaired record may still carry a stale broken-image mark from an earlier load.
-            setBrokenThumbnails((current) => {
-              if (!current.has(video.id)) return current;
-              const next = new Set(current);
-              next.delete(video.id);
-              return next;
-            });
             setNotice({
               role: 'status',
               tone: 'success',

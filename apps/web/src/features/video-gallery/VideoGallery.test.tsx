@@ -124,7 +124,7 @@ describe('VideoGallery', () => {
     expect(document.querySelector('video')).toBeNull();
     expect(
       screen.getByRole('button', { name: 'Preview Morning take' }).querySelector('img'),
-    ).toHaveAttribute('src', `/api/videos/${item.id}/thumbnail`);
+    ).toHaveAttribute('src', `/api/videos/${item.id}/thumbnail?v=${item.currentVersion.id}`);
     expect(screen.getByText('0:12')).toBeInTheDocument();
     expect(screen.getAllByText('Landscape').length).toBeGreaterThan(0);
     expect(screen.getByText('Mara')).toBeInTheDocument();
@@ -360,12 +360,17 @@ describe('VideoGallery', () => {
 
     await waitFor(() => expect(uploads).toHaveLength(1));
     expect(uploads[0]!.headers.get('content-type')).toBe('image/webp');
-    expect(api.createSavedVideoThumbnail).toHaveBeenCalledOnce();
+    // The Version's content URL, not its bytes: one frame must not cost a whole-file download.
+    expect(api.createSavedVideoThumbnail).toHaveBeenCalledExactlyOnceWith(
+      { kind: 'url', url: `/api/videos/${item.id}/versions/${item.currentVersion.id}/content` },
+      expect.anything(),
+      'auto',
+    );
     expect(await screen.findByText('Preview generated for “Morning take”.')).toBeInTheDocument();
     await waitFor(() =>
       expect(
         screen.getByRole('button', { name: 'Preview Morning take' }).querySelector('img'),
-      ).toHaveAttribute('src', `/api/videos/${item.id}/thumbnail`),
+      ).toHaveAttribute('src', `/api/videos/${item.id}/thumbnail?v=${item.currentVersion.id}`),
     );
   });
 
@@ -413,14 +418,8 @@ describe('VideoGallery', () => {
   it('keeps a failed repair actionable and leaves the record without a preview', async () => {
     const item = video({ thumbnailAvailable: false });
     mockGalleryPages({ '': page([item]) });
-    mockApiServer.use(
-      http.get(`*/api/videos/${item.id}/versions/${item.currentVersion.id}/content`, () =>
-        HttpResponse.json(
-          { error: { code: 'storage_failure', message: 'Video bytes unavailable.' } },
-          { status: 503 },
-        ),
-      ),
-    );
+    // An unreadable Version fails the decode itself, which is where the ranged read happens now.
+    api.createSavedVideoThumbnail.mockRejectedValue(new Error('The video cannot be decoded.'));
     renderGallery();
     await screen.findByRole('heading', { name: 'Morning take' });
 
@@ -429,7 +428,9 @@ describe('VideoGallery', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Generate preview' }));
 
     const failure = await within(dialog).findByRole('alert');
-    expect(failure).toHaveTextContent('Video bytes unavailable.');
+    expect(failure).toHaveTextContent(
+      'The preview could not be generated from this video. Try again, or upload an image instead.',
+    );
     expect(within(failure).getByRole('button', { name: 'Retry' })).toBeEnabled();
     expect(screen.getByText('No preview yet')).toBeInTheDocument();
   });

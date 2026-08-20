@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
 
-import type {
-  ProjectCurrentResponse,
-  SavedVideoSummary,
-  SaveProjectOutputResponse,
+import {
+  SAVED_VIDEO_TITLE_MAX_LENGTH,
+  type ProjectCurrentResponse,
+  type SavedVideoSummary,
+  type SaveProjectOutputResponse,
 } from '@studio/contracts';
+import {
+  defaultProjectOutputTitle,
+  SAVED_VIDEO_TITLE_MAX_LENGTH as DOMAIN_TITLE_MAX_LENGTH,
+} from '@studio/domain';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HttpResponse, http } from 'msw';
@@ -15,7 +20,7 @@ import { downloadSavedVideoUrl } from '../../adapters/api-client/savedVideosApi'
 import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import { mockApiServer } from '../../test/msw/server';
 import { StudioDesignProvider } from '../../ui';
-import { defaultProjectOutputTitle, ProjectOutputSaveSection } from './ProjectOutputSaveSection';
+import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
 import { projectOutputOperationStorageKey } from './projectOutputOperationStorage';
 import type { ProjectSessionPort } from './useProjectSession';
 
@@ -716,15 +721,14 @@ describe('Project output save UI', () => {
     ).toHaveValue('Launch cut · change 3');
   });
 
-  it('proposes a title that stays inside the Saved Video title limit', () => {
-    const project = current().project;
-    const longTitle = { ...project, title: 'L'.repeat(120), currentRevisionNumber: 12 };
-
-    expect(defaultProjectOutputTitle(project)).toBe('Launch cut · change 2');
-    expect(defaultProjectOutputTitle({ ...project, title: '  Launch cut  ' })).toBe(
-      'Launch cut · change 2',
-    );
-    expect(defaultProjectOutputTitle(longTitle)).toHaveLength(120);
-    expect(defaultProjectOutputTitle(longTitle).endsWith('… · change 12')).toBe(true);
+  it('bounds the proposed title by the same number the save request is validated against', () => {
+    // The naming rule itself is covered headlessly in `packages/domain`. What this asserts is the
+    // pairing the dialog depends on: two packages that deliberately do not import each other each
+    // state this bound, and nothing else would catch them drifting into a proposal the server
+    // refuses.
+    expect(DOMAIN_TITLE_MAX_LENGTH).toBe(SAVED_VIDEO_TITLE_MAX_LENGTH);
+    expect(
+      defaultProjectOutputTitle({ title: 'L'.repeat(400), currentRevisionNumber: 12 }).length,
+    ).toBeLessThanOrEqual(SAVED_VIDEO_TITLE_MAX_LENGTH);
   });
 });

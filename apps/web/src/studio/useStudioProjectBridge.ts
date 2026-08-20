@@ -42,6 +42,7 @@ export const useStudioProjectBridge = ({
 
   const sourceRuntime = useMemo<ProjectSourceRuntime>(
     () => ({
+      available: true,
       present: (candidateProjectId, input) => {
         if (projectIdRef.current !== candidateProjectId) return;
         presentSourceRef.current(input);

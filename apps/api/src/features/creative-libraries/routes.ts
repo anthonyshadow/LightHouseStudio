@@ -1,4 +1,4 @@
-import { sanitizeCreativeAssetStore } from '@studio/domain';
+import { CREATIVE_LIBRARY_EXPORT_MAX_BYTES, sanitizeCreativeAssetStore } from '@studio/domain';
 import type { ApplicationRuntime } from '../../application/application-runtime.js';
 import { z } from 'zod';
 import { ownerUserIdForRequest } from '../../http/authentication.js';
@@ -9,6 +9,10 @@ import type { ReferenceImageAssetStore } from '../reference-images/asset-store.j
 const replaceRequestSchema = z
   .object({ expectedRevision: z.number().int().nonnegative(), store: z.unknown() })
   .strict();
+
+// The same bound the browser refuses an oversized import against, so a file the export path
+// accepts can never be one this route rejects.
+const replaceRouteOptions = { bodyLimit: CREATIVE_LIBRARY_EXPORT_MAX_BYTES };
 
 export const registerCreativeLibraryRoutes = (
   app: ApplicationRuntime,
@@ -23,7 +27,7 @@ export const registerCreativeLibraryRoutes = (
     return snapshot;
   });
 
-  app.put('/api/creative-library', { bodyLimit: 2 * 1024 * 1024 }, async (request) => {
+  app.put('/api/creative-library', replaceRouteOptions, async (request) => {
     const parsed = replaceRequestSchema.safeParse(request.body);
     if (!parsed.success) {
       throw new AppError(400, 'validation_error', 'Provide a valid creative library snapshot.');

@@ -17,7 +17,10 @@ import {
   type AcceptedExistingVideoBatchStep,
 } from './existingVideoRecipes';
 
-export const useStudioCreativeRepository = (ownerUserId: string) => {
+export const useStudioCreativeRepository = (
+  ownerUserId: string,
+  { cloudMirror }: { readonly cloudMirror?: boolean | undefined } = {},
+) => {
   const persistenceScope = currentBrowserPersistenceScope();
   const repository = useMemo(
     () =>
@@ -43,6 +46,7 @@ export const useStudioCreativeRepository = (ownerUserId: string) => {
   useEffect(() => () => repository.close?.(), [repository]);
   const sync = useCreativeLibraryCloudSync(repository, {
     initializeEmptyRemoteFromLocal: persistenceScope === 'production',
+    cloudMirror,
   });
 
   const store = useCreativeAssetSelector(repository, (state) => state.store);

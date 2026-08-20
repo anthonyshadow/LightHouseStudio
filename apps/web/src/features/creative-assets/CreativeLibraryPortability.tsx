@@ -26,6 +26,14 @@ const portabilityStyles = (theme: Theme): CSSObject => ({
   },
 });
 
+/**
+ * The result of the last export or import attempt. One value, because there is only ever one: a
+ * refusal carries its own title, since an export that fails is not a file that was refused.
+ */
+type CreativeLibraryPortabilityOutcome =
+  | { readonly kind: 'success'; readonly message: string }
+  | { readonly kind: 'failure'; readonly title: string; readonly message: string };
+
 interface CreativeLibraryPortabilityProps {
   readonly repository: CreativeAssetRepository;
   readonly store: CreativeAssetStore;
@@ -49,23 +57,21 @@ export const CreativeLibraryPortability = ({
   const theme = useTheme();
   const pickerRef = useRef<HTMLInputElement>(null);
   const importTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const [announcement, setAnnouncement] = useState<string | null>(null);
-  /** Carries its own title: an export that fails is not a file that was refused. */
-  const [failure, setFailure] = useState<{ title: string; message: string } | null>(null);
+  const [outcome, setOutcome] = useState<CreativeLibraryPortabilityOutcome | null>(null);
   const [candidate, setCandidate] = useState<CreativeLibraryExportFile | null>(null);
   const [replaceFailure, setReplaceFailure] = useState<string | null>(null);
   const [replacing, setReplacing] = useState(false);
 
   const exportLibrary = () => {
-    setFailure(null);
-    setAnnouncement(null);
     try {
       const exported = downloadCreativeLibraryExport(store, new Date().toISOString());
-      setAnnouncement(
-        `Creative library exported: ${describeCreativeLibraryContents(exported.store)}.`,
-      );
+      setOutcome({
+        kind: 'success',
+        message: `Creative library exported: ${describeCreativeLibraryContents(exported.store)}.`,
+      });
     } catch {
-      setFailure({
+      setOutcome({
+        kind: 'failure',
         title: 'The library was not exported',
         message: 'This browser could not save the file. Your library is unchanged.',
       });
@@ -73,11 +79,10 @@ export const CreativeLibraryPortability = ({
   };
 
   const chooseFile = async (file: File) => {
-    setFailure(null);
-    setAnnouncement(null);
+    setOutcome(null);
     const result = await readCreativeLibraryFile(file);
     if (!result.ok) {
-      setFailure({ title: 'That file was not imported', message: result.message });
+      setOutcome({ kind: 'failure', title: 'That file was not imported', message: result.message });
       return;
     }
     setReplaceFailure(null);
@@ -102,9 +107,10 @@ export const CreativeLibraryPortability = ({
     try {
       await replace(candidate.store);
       setCandidate(null);
-      setAnnouncement(
-        `Creative library replaced from the file: ${describeCreativeLibraryContents(candidate.store)}.`,
-      );
+      setOutcome({
+        kind: 'success',
+        message: `Creative library replaced from the file: ${describeCreativeLibraryContents(candidate.store)}.`,
+      });
     } catch {
       setReplaceFailure(
         'The creative library could not be replaced. Your library is unchanged — try the file again.',
@@ -147,11 +153,13 @@ export const CreativeLibraryPortability = ({
         </div>
         {/* Persistent, so an outcome inserted into it is announced rather than merely rendered. */}
         <div role="status">
-          {announcement ? <StatusNotice tone="success">{announcement}</StatusNotice> : null}
+          {outcome?.kind === 'success' ? (
+            <StatusNotice tone="success">{outcome.message}</StatusNotice>
+          ) : null}
         </div>
-        {failure ? (
-          <StatusNotice role="alert" tone="danger" title={failure.title}>
-            {failure.message}
+        {outcome?.kind === 'failure' ? (
+          <StatusNotice role="alert" tone="danger" title={outcome.title}>
+            {outcome.message}
           </StatusNotice>
         ) : null}
       </div>

@@ -6,15 +6,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { APP_PATHS, campaignIdFromPath, campaignPath, projectPath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
 import { Button, StatusNotice } from '../../ui';
-import {
-  detailHeaderStyles,
-  emptyListStyles,
-  listSectionStyles,
-  statusPillStyles,
-  workspaceHeaderStyles,
-  workspaceInnerStyles,
-  workspaceStyles,
-} from '../projects/ProjectRouteSurface.styles';
+import { workspaceInnerStyles, workspaceStyles } from '../projects/ProjectRouteSurface.styles';
 import { NewProjectDialog } from '../projects/ProjectDialogs';
 import { useProjectList } from '../projects/useProjectsController';
 import {
@@ -22,7 +14,12 @@ import {
   campaignCardMetaStyles,
   campaignCardStyles,
   campaignGridStyles,
+  detailHeaderStyles,
+  emptyListStyles,
+  listSectionStyles,
   projectGroupStyles,
+  statusPillStyles,
+  workspaceHeaderStyles,
 } from './CampaignRouteSurface.styles';
 import {
   CampaignFormDialog,
