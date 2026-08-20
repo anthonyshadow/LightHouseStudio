@@ -124,6 +124,52 @@ describe('CreativeWorkspace responsive tools', () => {
     expect(screen.getByRole('button', { name: 'Select Outfit' })).toBeEnabled();
   });
 
+  it('says what a disabled tool is waiting on rather than only greying it out', () => {
+    render(
+      <StudioDesignProvider>
+        <CreativeWorkspace
+          {...createProps(true, {
+            hasPlaybackVideo: false,
+            editVideoBlockedReason: 'Record or upload a video to edit it.',
+            liveToolBlockedReason: 'Finish recording and finalization before building a character.',
+          })}
+        />
+      </StudioDesignProvider>,
+    );
+
+    const editVideo = screen.getByRole('button', { name: 'Edit Video' });
+    expect(editVideo).toBeDisabled();
+    expect(editVideo).toHaveAccessibleDescription('Record or upload a video to edit it.');
+    expect(editVideo).toHaveAttribute('title', 'Record or upload a video to edit it.');
+    // Nothing blocks the live tools before media exists: choosing a Character is how the operator
+    // prepares one. They keep their purpose, not a reason they are not waiting on.
+    const character = screen.getByRole('button', { name: 'Select Character' });
+    expect(character).toBeEnabled();
+    expect(character).toHaveAccessibleDescription('Choose or build an AI character');
+    expect(character).not.toHaveAttribute('title');
+  });
+
+  it('drops a tool reason the moment the tool can act', () => {
+    render(
+      <StudioDesignProvider>
+        <CreativeWorkspace
+          {...createProps(true, {
+            editVideoBlockedReason: 'Record or upload a video to edit it.',
+            liveToolBlockedReason:
+              'Save and release or discard the current take before building a character.',
+          })}
+        />
+      </StudioDesignProvider>,
+    );
+
+    const editVideo = screen.getByRole('button', { name: 'Edit Video' });
+    expect(editVideo).toBeEnabled();
+    expect(editVideo).toHaveAccessibleDescription('Open the video editor');
+    expect(screen.getByRole('button', { name: 'Select Outfit' })).toHaveAccessibleDescription(
+      'Save and release or discard the current take before building a character.',
+    );
+  });
+
   it('keeps reusable creative setup available beside Project working-media playback', () => {
     render(
       <StudioDesignProvider>

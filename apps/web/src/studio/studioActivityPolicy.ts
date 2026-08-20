@@ -27,6 +27,37 @@ export const characterBuilderBlockedReasons = ({
   };
 };
 
+/**
+ * Why a creative-tool rail entry cannot act, in the same words the rest of the Studio uses.
+ *
+ * The conditions mirror the rail's own disabled states, so a greyed tool always has a sentence to
+ * go with it. The live tools reuse the Character Builder's reasons rather than inventing a second
+ * vocabulary for locks that are already named; only the editor, which simply has nothing to open
+ * until media exists, needs words of its own.
+ */
+export const creativeToolBlockedReasons = ({
+  recordingActive,
+  finalizing,
+  reviewLocked,
+  liveToolsAvailableDuringPlayback,
+}: FinalizationState & {
+  readonly reviewLocked: boolean;
+  readonly liveToolsAvailableDuringPlayback: boolean;
+}): {
+  readonly editVideo: string | undefined;
+  readonly liveTools: string | undefined;
+} => ({
+  editVideo: recordingActive
+    ? 'Finish the current take before editing.'
+    : reviewLocked
+      ? undefined
+      : 'Record or upload a video to edit it.',
+  liveTools:
+    recordingActive || (reviewLocked && !liveToolsAvailableDuringPlayback)
+      ? characterBuilderBlockedReasons({ recordingActive, finalizing, reviewLocked }).open
+      : undefined,
+});
+
 export const captureBlockedReason = ({
   reviewLocked,
 }: {

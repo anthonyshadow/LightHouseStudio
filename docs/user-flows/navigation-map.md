@@ -81,7 +81,8 @@ EntryPage
 
 StudioHeader (all protected routes)
   ├─ brand ─────────────────────────────► /dashboard              StudioHeader.tsx:317
-  ├─ nav: Dashboard/Projects/Campaigns/Assets                     StudioHeader.tsx:296-301
+  ├─ nav: Dashboard/Studio/Projects/Campaigns/Assets              StudioHeader.tsx
+  │      Studio ──────────────────────► /studio/create            useStudioNavigationActions.ts
   ├─ Quick Create ▸ New video ──────────► /studio/create          ShellChrome.tsx
   │              ▸ New Project ─────────► /projects + createIntent ShellChrome.tsx
   │              ▸ New Campaign ────────► /campaigns + createIntent ShellChrome.tsx

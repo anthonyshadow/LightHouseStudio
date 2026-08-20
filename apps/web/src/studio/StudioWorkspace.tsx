@@ -3,6 +3,7 @@ import type { CreativeAssetStore } from '@studio/domain';
 import { lazy, Suspense, type ReactNode, type RefObject } from 'react';
 import type { BrowserCapabilities } from '../application/types';
 import { CaptureSettingsPanel, RecordingAction, RecordingControls } from '../features/recording';
+import { cameraAvailabilityNotices } from '../features/recording/cameraAvailability';
 import type { RecordingSource } from '../features/recording';
 import type {
   SavedVideoCharacterAttribution,
@@ -54,6 +55,8 @@ interface StudioWorkspaceProps {
   readonly environment: {
     readonly browser: BrowserCapabilities;
     readonly desktopLayout: boolean;
+    /** Whether the docked desktop capture settings are open. They rest collapsed. */
+    readonly captureSettingsExpanded: boolean;
     readonly ownerUserId: string;
     readonly creativeStore: CreativeAssetStore;
     readonly onCreateProjectCharacter: (projectId: string) => void;
@@ -88,6 +91,7 @@ interface StudioWorkspaceProps {
     readonly openAiExperience: () => void;
     readonly openExistingVideo: () => void;
     readonly openCaptureSettings: () => void;
+    readonly toggleCaptureSettings: () => void;
     readonly startProjectRecording: () => void;
   };
 }
@@ -109,7 +113,12 @@ export const StudioWorkspace = ({
   const { fullscreen: fullscreenWorkspaceRef, uploadToggle: uploadToggleRef } = refs;
   const { projectContextActive, projectRecordingAvailable } = route;
   const { session, takeReview, videoEditor, savedVideo, project, projectProcessing } = controllers;
-  const { browser, desktopLayout: desktopStudioLayout, ownerUserId } = environment;
+  const {
+    browser,
+    desktopLayout: desktopStudioLayout,
+    captureSettingsExpanded,
+    ownerUserId,
+  } = environment;
   const {
     presentation: stagePresentation,
     aspectRatio: stageAspectRatio,
@@ -130,6 +139,7 @@ export const StudioWorkspace = ({
     openAiExperience: onOpenAiExperience,
     openExistingVideo: onOpenExistingVideo,
     openCaptureSettings: onOpenCaptureSettings,
+    toggleCaptureSettings: onToggleCaptureSettings,
     startProjectRecording: onStartProjectRecording,
   } = actions;
   const {
@@ -142,6 +152,15 @@ export const StudioWorkspace = ({
     finishTake,
   } = takeReview;
   const videoEditing = videoEditor.phase !== 'closed';
+  // The stage takes the settings column back whenever the docked panel is not actually open. Only
+  // the standalone capture layout has one: the Project workspace and the editor own their columns.
+  const captureSettingsCollapsed =
+    desktopStudioLayout && !projectContextActive && !videoEditing && !captureSettingsExpanded;
+  const captureIssues = cameraAvailabilityNotices({
+    permissionState: session.capturePreferences.cameraPermissionState,
+    devicesState: session.capturePreferences.devicesState,
+    cameraCount: session.capturePreferences.cameraDevices.length,
+  }).filter((notice) => notice.blocking);
 
   return (
     <>
@@ -150,6 +169,7 @@ export const StudioWorkspace = ({
         css={stageColumnStyles(theme)}
         data-video-edit-active={videoEditing ? 'true' : 'false'}
         data-project-context={projectContextActive ? 'true' : undefined}
+        data-capture-settings={captureSettingsCollapsed ? 'collapsed' : undefined}
       >
         <MediaStage
           presentation={stagePresentation}
@@ -249,6 +269,9 @@ export const StudioWorkspace = ({
               source={activeRecordingSource}
               mode={effectiveRecordingMode}
               {...(!desktopStudioLayout ? { onOpenSettings: onOpenCaptureSettings } : {})}
+              desktopSettingsExpanded={captureSettingsExpanded}
+              onToggleDesktopSettings={onToggleCaptureSettings}
+              captureIssues={captureIssues}
               desktopSettings={
                 desktopStudioLayout ? (
                   <div

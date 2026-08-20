@@ -295,8 +295,9 @@ for (const viewport of representativeViewports) {
     await page.keyboard.press('Enter');
     await expect(page.getByRole('main')).toBeFocused();
     await expectNoDocumentOverflow(page);
+    // With no media the editor has nothing to open, and says so rather than only greying out.
     await expect(page.getByRole('button', { name: 'Edit Video' })).toHaveAccessibleDescription(
-      'Open the video editor',
+      'Record or upload a video to edit it.',
     );
     await expect(page.getByRole('button', { name: /Recipe|Shelf|Dock|Workshop/u })).toHaveCount(0);
 
@@ -700,7 +701,9 @@ test('explicit local Start surfaces a sanitized camera denial without provider w
   await alert.getByRole('button', { name: 'Capture settings' }).click();
   const inlineSettings = page.locator('[data-desktop-capture-settings]');
   if ((await inlineSettings.count()) > 0) {
+    // Recovery opens the collapsed desktop panel and lands focus inside it.
     await expect(inlineSettings).toBeVisible();
+    await expect(inlineSettings).toBeFocused();
   } else {
     await expect(page.getByRole('dialog', { name: 'Capture Settings' })).toBeVisible();
     await page.getByRole('button', { name: 'Close panel' }).click();

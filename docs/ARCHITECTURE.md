@@ -219,7 +219,7 @@ source, baseline, draft, 50-entry grouped history, generation, candidate, and wo
 At the existing `64rem` desktop breakpoint, the focused Studio header has no AI selection control.
 The creative-tool rail owns **Edit Video**, **Select Character**, and **Select Outfit**. The
 persistent header owner renders one navigation chrome for every protected surface:
-a left rail at `48rem` and above, and a compact top bar plus four-item bottom navigation below it.
+a left rail at `48rem` and above, and a compact top bar plus five-item bottom navigation below it.
 The rail contains the brand, **Quick Create**, primary navigation, and mutually exclusive
 integration/account popovers. Dashboard, Assets, Projects, Campaigns and focused Create all mount
 that same shell, so the studio surfaces keep the rail and the bottom navigation rather than a

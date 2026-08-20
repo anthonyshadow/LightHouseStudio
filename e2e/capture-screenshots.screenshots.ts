@@ -451,7 +451,12 @@ const expectCaptureDevicesSettled = async (page: Page): Promise<void> => {
 
 const openCaptureSettingsSurface = async (page: Page): Promise<Locator> => {
   const inlineSettings = page.locator('[data-desktop-capture-settings]');
-  if ((await inlineSettings.count()) > 0) return inlineSettings;
+  if ((await inlineSettings.count()) > 0) {
+    // The docked desktop panel rests collapsed.
+    await page.locator('[data-desktop-capture-settings-toggle]').click();
+    await expect(inlineSettings).toBeVisible();
+    return inlineSettings;
+  }
 
   await page.getByRole('button', { name: 'Open capture settings' }).click();
   const dialog = page.getByRole('dialog', { name: 'Capture Settings' });

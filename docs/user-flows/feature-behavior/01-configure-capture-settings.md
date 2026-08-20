@@ -5,9 +5,10 @@ without starting media or contacting a provider.
 
 ## Journey
 
-1. On a large desktop, use the **Capture settings** region beside the stage. On tablet
-   and mobile, open **Device settings** (**Open capture settings**) to use the same controller in a
-   compact overlay.
+1. On a large desktop, the settings rest collapsed beside the stage: the column keeps the current
+   camera and microphone, any blocked or missing camera, and a **Capture settings** control that
+   opens the panel in place. On tablet and mobile, open **Device settings**
+   (**Open capture settings**) to use the same controller in a compact overlay.
 2. Wait for automatic device discovery. Listing devices does not request permission; labels may
    stay generic until a later explicit camera start. Studio rescans after a successful Start and
    when the browser reports `devicechange`.
@@ -26,7 +27,8 @@ without starting media or contacting a provider.
 5. Confirm the negotiated sources and resolution under **Active capture**. Device discovery runs
    when the settings surface mounts and again on browser `devicechange`; there are no Apply,
    Refresh, or Discard actions. The stage uses the applied format, and the recorder borrows that
-   same camera track.
+   same camera track. Collapsing the desktop panel hides it without unmounting it, so discovery and
+   an in-flight automatic apply are unaffected, and no draft choice is lost.
 
 The list refreshes on `devicechange` and after a successful Start. Studio never auto-selects a
 newly attached phone. During an eligible local preview, the stage exposes **Switch camera** only
@@ -34,13 +36,17 @@ for browser-reported front/rear modes and hardware zoom only when the track repo
 
 ## Guards and recovery
 
+- A blocked or missing camera stays on the surface while the desktop panel is collapsed; the
+  collapsed column repeats the same titles the open panel explains in full.
 - If a selected device disappears, Studio retains the choice, explains that the browser default
   will be used, and allows reselection after reconnection.
 - A failed live replacement leaves the current preview active and reports **Settings unchanged**.
 - If a camera cannot satisfy the selected aspect ratio, Start or automatic live replacement fails
   safely instead of silently recording the previous format. Active capture reports the
   browser-negotiated result.
-- Settings are disabled during AI start/live, recording/finalization, and take review.
+- Settings are disabled during AI start/live, recording/finalization, and take review. They can
+  still be opened and read while disabled, and say why they are unavailable.
+- A session error that points at capture settings opens the desktop panel and moves focus to it.
 - Preferences are in-memory for the tab; device IDs are not written to creative-library storage.
 - In an open Project, **Save progress** may checkpoint only the applied format class and
   app-owned audio-source mode as live metadata. It never stores device IDs, starts media, or writes

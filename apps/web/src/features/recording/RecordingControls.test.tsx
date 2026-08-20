@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
-import { RecordingControls } from './RecordingControls';
+import { cameraAvailabilityNotices } from './cameraAvailability';
+import { DESKTOP_CAPTURE_SETTINGS_PANEL_ID, RecordingControls } from './RecordingControls';
 import type { RecordingController, RecordingSource } from './types';
 
 const recording = (
@@ -75,5 +76,68 @@ describe('RecordingControls', () => {
   it('truthfully reports inactive devices without constructing a source', () => {
     renderControls(recording('idle'), null, undefined);
     expect(screen.getByText('Camera and microphone are off')).toBeInTheDocument();
+  });
+
+  it('rests with the docked settings collapsed, still showing devices and a blocked camera', () => {
+    const onToggleDesktopSettings = vi.fn();
+    render(
+      <StudioDesignProvider>
+        <RecordingControls
+          recording={recording('idle')}
+          source={null}
+          mode="local"
+          desktopSettings={<div data-testid="docked-capture-settings" />}
+          onToggleDesktopSettings={onToggleDesktopSettings}
+          captureIssues={cameraAvailabilityNotices({
+            permissionState: 'denied',
+            devicesState: 'ready',
+            cameraCount: 0,
+          }).filter((notice) => notice.blocking)}
+        />
+      </StudioDesignProvider>,
+    );
+
+    const toggle = screen.getByRole('button', { name: 'Capture settings', hidden: true });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls', DESKTOP_CAPTURE_SETTINGS_PANEL_ID);
+    // Mounted, so device discovery and the auto-apply guard survive the toggle.
+    expect(screen.getByTestId('docked-capture-settings')).toBeInTheDocument();
+    expect(document.getElementById(DESKTOP_CAPTURE_SETTINGS_PANEL_ID)).toHaveAttribute('hidden');
+    expect(screen.getByText('Camera and microphone are off')).toBeInTheDocument();
+    expect(screen.getByText('Camera permission blocked')).toBeInTheDocument();
+    expect(screen.getByText('No camera available')).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(onToggleDesktopSettings).toHaveBeenCalledOnce();
+  });
+
+  it('hands the surface to the docked settings once they are open', () => {
+    render(
+      <StudioDesignProvider>
+        <RecordingControls
+          recording={recording('idle')}
+          source={null}
+          mode="local"
+          desktopSettings={<div data-testid="docked-capture-settings" />}
+          desktopSettingsExpanded
+          onToggleDesktopSettings={vi.fn()}
+          captureIssues={cameraAvailabilityNotices({
+            permissionState: 'denied',
+            devicesState: 'ready',
+            cameraCount: 0,
+          }).filter((notice) => notice.blocking)}
+        />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Capture settings', hidden: true })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(document.getElementById(DESKTOP_CAPTURE_SETTINGS_PANEL_ID)).not.toHaveAttribute(
+      'hidden',
+    );
+    // The open panel states each one in full; repeating the summary would say it twice.
+    expect(screen.queryByText('Camera permission blocked')).not.toBeInTheDocument();
   });
 });
