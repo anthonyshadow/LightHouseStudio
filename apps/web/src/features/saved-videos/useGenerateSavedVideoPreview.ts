@@ -1,8 +1,7 @@
-import { VIDEO_RESULT_MAX_BYTES, type SavedVideoSummary } from '@studio/contracts';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { SavedVideosResponse, SavedVideoSummary } from '@studio/contracts';
+import { useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
-import { ApiClientError, apiErrorMessage, apiFetch } from '../../adapters/api-client/apiClient';
-import { readBoundedBlob } from '../../adapters/api-client/readBoundedBlob';
+import { apiErrorMessage } from '../../adapters/api-client/apiClient';
 import {
   savedVideoContentUrl,
   saveSavedVideoThumbnail,
@@ -16,34 +15,10 @@ export type GenerateSavedVideoPreviewInput = Readonly<{
   choice: SavedVideoThumbnailChoice;
 }>;
 
-/** The same bounded streaming read every other saved-video byte path uses. */
-const readVersionBytes = async (video: SavedVideoSummary, signal: AbortSignal): Promise<Blob> => {
-  const version = video.currentVersion;
-  const response = await apiFetch(savedVideoContentUrl(video.id, version.id), {
-    cache: 'no-store',
-    headers: { Accept: version.mimeType },
-    signal,
-  });
-  return readBoundedBlob(response, {
-    maximumBytes: VIDEO_RESULT_MAX_BYTES,
-    signal,
-    acceptsContentType: (contentType) => contentType === version.mimeType,
-    createError: (failure) =>
-      new ApiClientError(
-        failure === 'too-large'
-          ? 'The saved video exceeded the app-owned 300 MB safety limit.'
-          : 'The saved video response was empty or invalid.',
-        502,
-        failure === 'too-large' ? 'result_too_large' : 'result_invalid',
-      ),
-    abortMessage: 'Preview generation was cancelled.',
-  });
-};
-
 /**
- * Repairs a Saved Video that has no poster frame. Generation stays in the browser: the current
- * Version's bytes are read only when the chosen source is a frame, and an uploaded image needs no
- * read at all.
+ * Repairs a Saved Video that has no poster frame. Generation stays in the browser, and reads only
+ * what the frame needs: a frame source is decoded straight from the Version's content URL, which
+ * the API serves in byte ranges, and an uploaded image needs no read at all.
  */
 export const useGenerateSavedVideoPreview = () => {
   const queryClient = useQueryClient();
@@ -58,7 +33,10 @@ export const useGenerateSavedVideoPreview = () => {
       controller.current = active;
       try {
         const media = thumbnailChoiceNeedsVideo(choice)
-          ? await readVersionBytes(video, active.signal)
+          ? ({
+              kind: 'url',
+              url: savedVideoContentUrl(video.id, video.currentVersion.id),
+            } as const)
           : null;
         const poster = await createThumbnailForChoice(choice, media, active.signal);
         return await saveSavedVideoThumbnail(
@@ -80,8 +58,22 @@ export const useGenerateSavedVideoPreview = () => {
         if (controller.current === active) controller.current = null;
       }
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.lists });
+    // The response already carries the repaired record, so the loaded pages are patched in place
+    // rather than refetched — the same treatment rename gives its result.
+    onSuccess: (updated) => {
+      queryClient.setQueriesData<InfiniteData<SavedVideosResponse>>(
+        { queryKey: savedVideoQueryKeys.lists },
+        (current) =>
+          current
+            ? {
+                ...current,
+                pages: current.pages.map((page) => ({
+                  ...page,
+                  videos: page.videos.map((video) => (video.id === updated.id ? updated : video)),
+                })),
+              }
+            : current,
+      );
     },
   });
 };

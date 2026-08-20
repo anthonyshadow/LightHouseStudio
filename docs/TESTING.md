@@ -46,6 +46,16 @@ opens those stories.
 | `bun run db:smoke:development`          | Local PostgreSQL connection, transaction, seeded-user, and cleanup smoke          |
 | `bun run --filter @studio/api db:check` | Validate Drizzle migration history                                                |
 
+`bun run lint` raises Node's heap to 8 GB. Type-aware linting builds TypeScript programs for the
+whole workspace in a single process and peaks just over 4 GB; on the default heap ESLint dies with
+an out-of-memory fatal error rather than reporting lint results. Raise it further rather than
+lowering it if the workspace grows.
+
+Type-aware lint rules and `bun run typecheck` do not use the same compiler: `tsc` resolves to the
+native TypeScript, while `typescript-eslint` loads the `typescript` package. Code that only one of
+them accepts fails the gate, so a lint error with no matching type error is still a real typing
+problem — check it against both before treating it as a false positive.
+
 The focused Project repository transaction test runs automatically in the CI database environment.
 Against the isolated local development database, run it explicitly after migrations:
 

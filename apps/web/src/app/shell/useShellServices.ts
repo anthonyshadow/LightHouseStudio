@@ -55,7 +55,9 @@ export const useShellServices = ({
   const desktopStudioLayout = useDesktopStudioLayout();
   const browser = useMemo(() => detectBrowserCapabilities(), []);
   const provider = useProviderAvailability();
-  const creative = useStudioCreativeRepository(ownerUserId);
+  const creative = useStudioCreativeRepository(ownerUserId, {
+    cloudMirror: provider.availability.creativeLibraryCloudMirror,
+  });
 
   const overlay = useStudioOverlayController(
     route.creationIntent === 'upload' ? 'video-upload' : null,

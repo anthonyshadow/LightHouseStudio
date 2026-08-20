@@ -148,7 +148,9 @@ export const ProjectSavedVideoPicker = ({
             const unavailable = video.status !== 'ready';
             const disabled = busy || unavailable;
             const previewOpen = previewVideoId === video.id;
-            const thumbnailUrl = video.thumbnailAvailable ? savedVideoThumbnailUrl(video.id) : null;
+            const thumbnailUrl = video.thumbnailAvailable
+              ? savedVideoThumbnailUrl(video.id, video.currentVersion.id)
+              : null;
             const duration = formatDuration(video.currentVersion.durationMs);
             return (
               <li key={video.id}>

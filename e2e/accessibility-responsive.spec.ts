@@ -119,6 +119,7 @@ const installProviderFreeStudio = async (page: Page): Promise<MockStudioState> =
             },
             wardrobe: { addOutfitAvailable: false },
             savedVideos: { directMultipartUpload: false },
+            creativeLibrary: { cloudMirror: false },
           } satisfies CapabilitiesResponse),
         });
         return;

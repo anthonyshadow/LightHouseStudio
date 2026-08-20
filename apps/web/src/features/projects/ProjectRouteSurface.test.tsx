@@ -504,7 +504,7 @@ describe('Project route surface', () => {
     const thumbnail = screen.getByRole('img', { name: 'Thumbnail for Library source' });
     expect(thumbnail.querySelector('img')).toHaveAttribute(
       'src',
-      `/api/videos/${savedVideoId}/thumbnail`,
+      `/api/videos/${savedVideoId}/thumbnail?v=${videoVersionId}`,
     );
     expect(screen.getByRole('button', { name: 'Use as the original video' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Preview' }));
@@ -602,7 +602,7 @@ describe('Project route surface', () => {
       ),
     );
     const { router } = renderProjects(`/projects/${activeId}`, {
-      sourceRuntime: { present, clear: vi.fn() },
+      sourceRuntime: { available: true, present, clear: vi.fn() },
     });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Use as the original video' }));
@@ -717,7 +717,7 @@ describe('Project route surface', () => {
       ),
     );
     const { router } = renderProjects(`/projects/${activeId}`, {
-      sourceRuntime: { present, clear: vi.fn() },
+      sourceRuntime: { available: true, present, clear: vi.fn() },
     });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Use as the current cut' }));
@@ -1202,7 +1202,7 @@ describe('Project route surface', () => {
       ),
     );
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { present, clear },
+      sourceRuntime: { available: true, present, clear },
     });
 
     expect(await screen.findByText(/Loading this Project.s original video/u)).toBeVisible();
@@ -1253,7 +1253,7 @@ describe('Project route surface', () => {
     );
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { present, clear },
+      sourceRuntime: { available: true, present, clear },
     });
 
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
@@ -1303,7 +1303,7 @@ describe('Project route surface', () => {
     );
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { present: vi.fn(), clear: vi.fn() },
+      sourceRuntime: { available: true, present: vi.fn(), clear: vi.fn() },
     });
 
     await user.click(await screen.findByRole('button', { name: 'Remove original video' }));
@@ -1356,7 +1356,7 @@ describe('Project route surface', () => {
     );
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { present, clear },
+      sourceRuntime: { available: true, present, clear },
       recordingCandidate: { file, ready: true },
       onSourceActivityChange: (activity) => activities.push(activity),
     });
@@ -1417,7 +1417,7 @@ describe('Project route surface', () => {
     );
     const inputClick = vi.spyOn(HTMLInputElement.prototype, 'click');
     const view = renderProjects(`/projects/${activeId}/workspace`, {
-      sourceRuntime: { present, clear },
+      sourceRuntime: { available: true, present, clear },
     });
     const user = userEvent.setup();
 
@@ -1508,7 +1508,7 @@ describe('Project route surface', () => {
     );
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { present, clear },
+      sourceRuntime: { available: true, present, clear },
     });
 
     await user.click(await screen.findByRole('button', { name: 'Use Saved Video' }));

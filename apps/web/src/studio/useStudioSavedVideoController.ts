@@ -1,12 +1,7 @@
-import {
-  VIDEO_RESULT_MAX_BYTES,
-  type SavedVideoDetail,
-  type SavedVideoSummary,
-} from '@studio/contracts';
+import type { SavedVideoDetail, SavedVideoSummary } from '@studio/contracts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ApiClientError, apiFetch } from '../adapters/api-client/apiClient';
-import { readBoundedBlob } from '../adapters/api-client/readBoundedBlob';
-import { savedVideoContentUrl } from '../adapters/api-client/savedVideosApi';
+import { ApiClientError } from '../adapters/api-client/apiClient';
+import { readSavedVideoContent } from '../adapters/api-client/savedVideosApi';
 import type { ExistingVideoSavedRecipe } from '../features/existing-video/ExistingVideoRecipeChooser';
 import type { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import type { RecordingArtifact } from '../features/recording/types';
@@ -140,23 +135,10 @@ export const useStudioSavedVideoController = ({
       if (options.signal?.aborted) abortFromCaller();
       else options.signal?.addEventListener('abort', abortFromCaller, { once: true });
       try {
-        const response = await apiFetch(savedVideoContentUrl(video.id), {
-          cache: 'no-store',
-          headers: { Accept: video.currentVersion.mimeType },
+        const blob = await readSavedVideoContent({
+          videoId: video.id,
+          mimeType: video.currentVersion.mimeType,
           signal: controller.signal,
-        });
-        const blob = await readBoundedBlob(response, {
-          maximumBytes: VIDEO_RESULT_MAX_BYTES,
-          signal: controller.signal,
-          acceptsContentType: (contentType) => contentType === video.currentVersion.mimeType,
-          createError: (failure) =>
-            new ApiClientError(
-              failure === 'too-large'
-                ? 'The saved video exceeded the app-owned 300 MB safety limit.'
-                : 'The saved video response was empty or invalid.',
-              502,
-              failure === 'too-large' ? 'result_too_large' : 'result_invalid',
-            ),
           abortMessage: 'Saved video loading was cancelled.',
         });
         controller.signal.throwIfAborted();
@@ -284,12 +266,9 @@ export const useStudioSavedVideoController = ({
     ) {
       return;
     }
-    const video = await saveController.replace(
-      artifact,
-      activeLoadedSource,
-      undefined,
-      presentedCharacter,
-    );
+    const video = await saveController.replace(artifact, activeLoadedSource, {
+      character: presentedCharacter,
+    });
     if (video) {
       setLoadedSource((current) =>
         current?.videoId === video.id
@@ -345,18 +324,19 @@ export const useStudioSavedVideoController = ({
       videoEditor.beginCommit();
       try {
         if (saveCurrent) {
-          const saved = await saveController.save(
-            source.artifact,
-            name,
-            activeLoadedSource
+          const saved = await saveController.save(source.artifact, {
+            title: name,
+            ...(activeLoadedSource
               ? {
-                  videoId: activeLoadedSource.videoId,
-                  versionId: activeLoadedSource.currentVersionId,
+                  source: {
+                    videoId: activeLoadedSource.videoId,
+                    versionId: activeLoadedSource.currentVersionId,
+                  },
                 }
-              : undefined,
-            presentedCharacter,
+              : {}),
+            character: presentedCharacter,
             thumbnail,
-          );
+          });
           if (!saved) {
             videoEditor.failCommit(
               'The current video could not be saved, so it was not replaced. Your source remains unchanged.',
@@ -426,7 +406,12 @@ export const useStudioSavedVideoController = ({
         return;
       }
       void saveController
-        .save(pending.artifact, name, pending.source, pending.character, thumbnail)
+        .save(pending.artifact, {
+          title: name,
+          source: pending.source,
+          character: pending.character,
+          thumbnail,
+        })
         .then((saved) => {
           if (saved) setSaveOutcome(saved);
         });

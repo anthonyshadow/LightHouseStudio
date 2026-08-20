@@ -1,6 +1,7 @@
-import { validateImageDescriptor } from '@studio/domain';
-import { useEffect, useRef, useState } from 'react';
+import { MAX_IMAGE_BYTES, validateImageDescriptor } from '@studio/domain';
+import { useRef, useState } from 'react';
 import { REFERENCE_IMAGE_ACCEPT } from '../../adapters/browser-media/imageValidation';
+import { useObjectUrlPreview } from '../../adapters/browser-media/useObjectUrlPreview';
 import { ImagePickerDropField, SegmentedControl, StatusNotice } from '../../ui';
 import type { SavedVideoThumbnailChoice } from './thumbnailSource';
 
@@ -44,23 +45,7 @@ export const ThumbnailSourceChooser = ({
   // Switching to a frame source and back should not silently discard an attached image.
   const attached = useRef<File | null>(file);
   const [rejected, setRejected] = useState<string | null>(null);
-  const [preview, setPreview] = useState<{ readonly file: File; readonly url: string } | null>(
-    null,
-  );
-
-  useEffect(() => {
-    if (file) attached.current = file;
-    if (!file || typeof URL.createObjectURL !== 'function') return;
-    const objectUrl = URL.createObjectURL(file);
-    let active = true;
-    queueMicrotask(() => {
-      if (active) setPreview({ file, url: objectUrl });
-    });
-    return () => {
-      active = false;
-      URL.revokeObjectURL(objectUrl);
-    };
-  }, [file]);
+  const visiblePreview = useObjectUrlPreview(file);
 
   const chooseKind = (next: ThumbnailSourceKind) => {
     setKind(next);
@@ -80,10 +65,9 @@ export const ThumbnailSourceChooser = ({
       return;
     }
     setRejected(null);
+    attached.current = candidate;
     onChange({ kind: 'image', file: candidate });
   };
-
-  const visiblePreview = preview?.file === file ? preview : null;
 
   return (
     <div css={{ display: 'grid', gap: '0.75rem' }}>
@@ -102,7 +86,7 @@ export const ThumbnailSourceChooser = ({
           guidance={{
             kind: 'input-label',
             text: 'Preview image (optional)',
-            description: 'JPEG, PNG, or WebP, up to 10 MiB.',
+            description: `JPEG, PNG, or WebP, up to ${MAX_IMAGE_BYTES / 1024 / 1024} MiB. It is resized before it is stored.`,
           }}
           picker={{
             action: file ? 'Replace preview image' : 'Attach preview image',

@@ -29,6 +29,7 @@ export interface CapabilityAvailability {
   readonly promptOptimizerVersion: string;
   readonly wardrobeAddOutfitAvailable: boolean;
   readonly directSavedVideoUploadAvailable: boolean;
+  readonly creativeLibraryCloudMirrorAvailable: boolean;
 }
 
 export const registerSystemRoutes = (
@@ -108,6 +109,9 @@ export const registerSystemRoutes = (
       },
       savedVideos: {
         directMultipartUpload: availability.directSavedVideoUploadAvailable,
+      },
+      creativeLibrary: {
+        cloudMirror: availability.creativeLibraryCloudMirrorAvailable,
       },
     }),
   );

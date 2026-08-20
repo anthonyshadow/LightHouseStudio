@@ -40,6 +40,9 @@ const unavailableProviders: ProviderAvailability = {
   referenceImageOptimizerVersion: null,
   wardrobeAddOutfitAvailable: false,
   directSavedVideoUploadAvailable: false,
+  // Deliberately absent rather than `false`: before the read resolves, and after it fails, whether
+  // this deployment keeps a cloud copy is unknown, and a surface must not claim either answer.
+  creativeLibraryCloudMirror: undefined,
 };
 
 /**

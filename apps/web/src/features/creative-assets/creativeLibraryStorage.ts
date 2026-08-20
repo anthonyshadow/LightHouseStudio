@@ -1,4 +1,5 @@
 import type { CreativeAssetStore } from '@studio/domain';
+import type { AssetDestination } from '../../app/paths';
 import type { CreativeLibraryMirror } from './useCreativeLibraryCloudSync';
 
 /**
@@ -27,9 +28,17 @@ const STORAGE_DETAILS: Readonly<Record<CreativeLibraryMirror, string>> = {
 export const CREATIVE_LIBRARY_EXPORT_CONTENTS_NOTE =
   'An exported file lists the reference images each record uses, but never contains the images themselves.';
 
-/** One short line for a hub card. */
-export const creativeLibraryStorageSummary = (mirror: CreativeLibraryMirror): string =>
-  STORAGE_SUMMARIES[mirror];
+/**
+ * The destinations this statement is about. Videos and Voices are the server's and are not covered
+ * by it, so they must not carry it — stated here rather than at each surface that renders a card.
+ */
+const BROWSER_HELD_DESTINATIONS: ReadonlySet<AssetDestination> = new Set(['characters', 'outfits']);
+
+/** One short line for a hub card, or nothing for a destination this statement does not cover. */
+export const creativeLibraryStorageSummary = (
+  destination: AssetDestination,
+  mirror: CreativeLibraryMirror,
+): string | null => (BROWSER_HELD_DESTINATIONS.has(destination) ? STORAGE_SUMMARIES[mirror] : null);
 
 /** The fuller statement for the surface where the library is managed. */
 export const creativeLibraryStorageDetail = (mirror: CreativeLibraryMirror): string =>

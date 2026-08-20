@@ -43,6 +43,8 @@ export type ProviderAvailability = {
   referenceImageOptimizerVersion?: string | null;
   wardrobeAddOutfitAvailable?: boolean;
   directSavedVideoUploadAvailable?: boolean;
+  /** `undefined` until the capability read resolves — not the same answer as `false`. */
+  creativeLibraryCloudMirror?: boolean | undefined;
 };
 
 export type BrowserCapabilities = {

@@ -52,15 +52,20 @@ export type CreativeLibrarySyncResolution = 'keep-local' | 'keep-cloud';
  * Where the library actually lives, for surfaces that have to say so without overclaiming.
  *
  * `status` cannot answer this: a server with no cloud route and a healthy mirror are both `idle`.
- * `registerCreativeLibraryRoutes` registers nothing unless a relational database mode supplied a
- * repository, and `GET /api/creative-library` then answers 404 — which is exactly the observation
- * this records. It stays `checking` while unknown, including after a transport failure, because
- * "the server could not be reached" is not evidence either way.
+ * The deployment states it directly through the `creativeLibrary.cloudMirror` capability, so no
+ * surface has to guess from a failed request. It stays `checking` while the capability read is
+ * unresolved, including after it fails, because "the server could not be reached" is not evidence
+ * either way.
  */
 export type CreativeLibraryMirror = 'checking' | 'browser-only' | 'cloud';
 
 export interface CreativeLibraryCloudSyncOptions {
   readonly initializeEmptyRemoteFromLocal?: boolean;
+  /**
+   * Whether this deployment keeps a cloud copy, from `GET /api/capabilities`. `undefined` while
+   * that read is unresolved.
+   */
+  readonly cloudMirror?: boolean | undefined;
 }
 
 export interface CreativeLibraryCloudSync {
@@ -77,10 +82,18 @@ export interface CreativeLibraryCloudSync {
 
 export const useCreativeLibraryCloudSync = (
   repository: CreativeAssetRepository,
-  { initializeEmptyRemoteFromLocal = false }: CreativeLibraryCloudSyncOptions = {},
+  { initializeEmptyRemoteFromLocal = false, cloudMirror }: CreativeLibraryCloudSyncOptions = {},
 ): CreativeLibraryCloudSync => {
   const [status, setStatus] = useState<CreativeLibrarySyncStatus>(IDLE);
-  const [mirror, setMirror] = useState<CreativeLibraryMirror>('checking');
+  // Both halves have to hold for a cloud copy to exist: the deployment must register the routes,
+  // and this repository must be able to take a remote store. A repository that cannot is
+  // browser-only however the deployment is configured.
+  const mirror: CreativeLibraryMirror =
+    cloudMirror === undefined
+      ? 'checking'
+      : cloudMirror && repository.replaceFromRemote !== undefined
+        ? 'cloud'
+        : 'browser-only';
   /**
    * The re-arm signal. Sync used to fail closed for the lifetime of the repository: the effect ran
    * once, dropped its subscription, and only a new owner or a page reload could start it again —
@@ -150,8 +163,7 @@ export const useCreativeLibraryCloudSync = (
         if (!active) return;
         const remote = await readCreativeLibrary(controller.signal);
         if (!active) return;
-        // A 404 is the only signal that this deployment has no cloud copy at all.
-        setMirror(remote === null ? 'browser-only' : 'cloud');
+        // A deployment with no creative-library routes answers 404; there is nothing to sync with.
         if (remote === null) return;
         revision = remote.revision;
         const localStore = repository.getSnapshot().store;

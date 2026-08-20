@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { REFERENCE_IMAGE_ACCEPT } from '../../adapters/browser-media/imageValidation';
+import { useObjectUrlPreview } from '../../adapters/browser-media/useObjectUrlPreview';
 import { ImagePickerDropField } from '../../ui';
 import { RemoteReferenceImageUrlInput } from './RemoteReferenceImageUrlInput';
 
@@ -23,25 +24,8 @@ export const ReferenceImageInputField = ({
   allowUrlImport = false,
   label = 'Reference image',
 }: ReferenceImageInputFieldProps) => {
-  const [preview, setPreview] = useState<{ readonly file: File; readonly url: string } | null>(
-    null,
-  );
   const [urlImporting, setUrlImporting] = useState(false);
-
-  useEffect(() => {
-    if (!file || typeof URL.createObjectURL !== 'function') return;
-    const objectUrl = URL.createObjectURL(file);
-    let active = true;
-    queueMicrotask(() => {
-      if (active) setPreview({ file, url: objectUrl });
-    });
-    return () => {
-      active = false;
-      URL.revokeObjectURL(objectUrl);
-    };
-  }, [file]);
-
-  const visiblePreview = preview?.file === file ? preview : null;
+  const visiblePreview = useObjectUrlPreview(file);
   const guidance =
     kind === 'character'
       ? 'Use a clear portrait or character reference.'

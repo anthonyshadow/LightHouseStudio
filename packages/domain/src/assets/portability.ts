@@ -1,3 +1,4 @@
+import { isRecord, isTimestamp } from '../common/guards';
 import { sanitizeCreativeAssetStore } from './sanitize';
 import { CREATIVE_ASSET_SCHEMA_VERSION, type CreativeAssetStore } from './types';
 
@@ -42,12 +43,6 @@ export type CreativeLibraryImportRefusal =
 export type CreativeLibraryImportResult =
   | { readonly ok: true; readonly file: CreativeLibraryExportFile }
   | { readonly ok: false; readonly refusal: CreativeLibraryImportRefusal };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const isTimestamp = (value: unknown): value is string =>
-  typeof value === 'string' && Number.isFinite(new Date(value).valueOf());
 
 const isAssetIdList = (value: unknown): value is readonly string[] =>
   Array.isArray(value) && value.every((id) => typeof id === 'string' && id.trim().length > 0);

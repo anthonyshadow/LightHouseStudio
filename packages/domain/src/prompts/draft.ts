@@ -1,3 +1,4 @@
+import { isRecord } from '../common/guards';
 import { BUILDER_DETAIL_MAX_LENGTH, normalizeWhitespace } from '../common/text';
 import {
   ADULT_AGE_CHOICES,
@@ -108,8 +109,6 @@ export const normalizePromptBuilderDraft = (draft: PromptBuilderDraft): PromptBu
   }
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 const stringField = (record: Record<string, unknown>, key: string): string =>
   typeof record[key] === 'string' ? record[key] : '';
 const nullableStringField = (record: Record<string, unknown>, key: string): string | null =>

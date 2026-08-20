@@ -1,12 +1,12 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectContract, ProjectCurrentResponse } from '@studio/contracts';
 import { formatDateTime, type CreativeAssetStore } from '@studio/domain';
-import type { Dispatch, RefObject, SetStateAction } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { APP_PATHS, campaignPath, projectWorkspacePath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
 import { AppIcon, Button } from '../../ui';
-import type { useCampaignDetail } from '../campaigns/useCampaignsController';
+import { useCampaignDetail } from '../campaigns/useCampaignsController';
 import { ProjectAssetsSection } from './ProjectAssetsSection';
 import {
   DeleteProjectDialog,
@@ -30,7 +30,7 @@ const projectWorkflowLabel = (
   phase: ProjectCurrentResponse['revision']['snapshot']['workflowPhase'],
 ): string => phase.charAt(0).toUpperCase() + phase.slice(1);
 
-export interface ProjectLifecycleDialogTarget {
+interface ProjectLifecycleDialogTarget {
   readonly action: LifecycleAction;
   readonly project: ProjectContract;
 }
@@ -38,25 +38,7 @@ export interface ProjectLifecycleDialogTarget {
 interface ProjectOverviewSurfaceProps {
   readonly current: ProjectCurrentResponse;
   readonly session: ReturnType<typeof useProjectSession>;
-  readonly campaign: ReturnType<typeof useCampaignDetail>;
-  readonly campaignName: string | null;
-  readonly archived: boolean;
-  readonly overviewHasSource: boolean;
-  readonly announcement: string | null;
-  readonly setAnnouncement: Dispatch<SetStateAction<string | null>>;
-  readonly headingRef: RefObject<HTMLHeadingElement | null>;
-  readonly dialogReturnRef: RefObject<HTMLElement | null>;
-  readonly renameTarget: ProjectContract | null;
-  readonly setRenameTarget: Dispatch<SetStateAction<ProjectContract | null>>;
-  readonly lifecycleDialog: ProjectLifecycleDialogTarget | null;
-  readonly setLifecycleDialog: Dispatch<SetStateAction<ProjectLifecycleDialogTarget | null>>;
-  readonly deleteTarget: ProjectContract | null;
-  readonly setDeleteTarget: Dispatch<SetStateAction<ProjectContract | null>>;
-  readonly campaignDialog: boolean;
-  readonly setCampaignDialog: Dispatch<SetStateAction<boolean>>;
-  readonly closeDialog: () => void;
   readonly archiveBlockedReason: string | undefined;
-  readonly acceptOverviewSource: (next: ProjectCurrentResponse) => void;
   readonly sourceRuntime: ProjectSourceRuntime;
   readonly recordingCandidate?: ProjectRecordingCandidate | null | undefined;
   readonly recordingActive?: boolean | undefined;
@@ -70,25 +52,7 @@ interface ProjectOverviewSurfaceProps {
 export const ProjectOverviewSurface = ({
   current,
   session,
-  campaign,
-  campaignName,
-  archived,
-  overviewHasSource,
-  announcement,
-  setAnnouncement,
-  headingRef,
-  dialogReturnRef,
-  renameTarget,
-  setRenameTarget,
-  lifecycleDialog,
-  setLifecycleDialog,
-  deleteTarget,
-  setDeleteTarget,
-  campaignDialog,
-  setCampaignDialog,
-  closeDialog,
   archiveBlockedReason,
-  acceptOverviewSource,
   sourceRuntime,
   recordingCandidate,
   recordingActive,
@@ -102,6 +66,36 @@ export const ProjectOverviewSurface = ({
   const navigate = useNavigate();
   const goBack = useRouteBack();
   const project = current.project;
+  const campaign = useCampaignDetail(project.campaignId);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const dialogReturnRef = useRef<HTMLElement | null>(null);
+  const [renameTarget, setRenameTarget] = useState<ProjectContract | null>(null);
+  const [lifecycleDialog, setLifecycleDialog] = useState<ProjectLifecycleDialogTarget | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ProjectContract | null>(null);
+  const [campaignDialog, setCampaignDialog] = useState(false);
+  const [announcement, setAnnouncement] = useState<string | null>(null);
+  const archived = project.archivedAt !== null;
+  const overviewHasSource = current.revision.snapshot.sourceAssetId !== null;
+  const campaignName = campaign.data?.name ?? null;
+  const closeDialog = () => {
+    setRenameTarget(null);
+    setLifecycleDialog(null);
+    setDeleteTarget(null);
+    setCampaignDialog(false);
+  };
+  const acceptSession = session.acceptCurrent;
+  // Accepting a source from the overview lands the operator in the workspace, where the media stage
+  // holding the accepted original is visible. The identity must stay stable: the source controller
+  // re-runs its hydration effect whenever this callback changes.
+  const acceptOverviewSource = useCallback(
+    (next: ProjectCurrentResponse) => {
+      acceptSession(next);
+      if (next.revision.snapshot.sourceAssetId !== null) {
+        void navigate(projectWorkspacePath(next.project.id));
+      }
+    },
+    [acceptSession, navigate],
+  );
 
   return (
     <div css={projectOverviewInnerStyles(theme)} data-project-overview="">

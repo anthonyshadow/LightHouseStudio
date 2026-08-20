@@ -159,13 +159,15 @@ describe('PrunaVideoReplaceProvider', () => {
       if (typeof predictionBody !== 'string') {
         throw new Error('Expected prediction request JSON.');
       }
-      expect(JSON.parse(predictionBody).input).toMatchObject({
-        disable_safety_checker: expected,
-        seed: 0,
-        turbo: false,
-        save_audio: true,
-        target_fps: 'original',
-        ignore_audio: false,
+      expect(JSON.parse(predictionBody)).toMatchObject({
+        input: {
+          disable_safety_checker: expected,
+          seed: 0,
+          turbo: false,
+          save_audio: true,
+          target_fps: 'original',
+          ignore_audio: false,
+        },
       });
     },
   );

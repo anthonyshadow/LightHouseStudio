@@ -16,7 +16,9 @@ export interface ProjectRecordingCandidate {
   readonly ready: boolean;
 }
 
+/** The stand-in for a surface mounted where no live-media runtime exists to take a source. */
 export const unavailableSourceRuntime: ProjectSourceRuntime = {
+  available: false,
   present: () => undefined,
   clear: () => undefined,
 };
@@ -187,14 +189,14 @@ export const ProjectSourceSection = ({
             </Button>
           )}
           <Button
-            disabled={controlsDisabled || runtime === unavailableSourceRuntime}
+            disabled={controlsDisabled || !runtime.available}
             onClick={() => inputRef.current?.click()}
           >
             Upload
           </Button>
           <Button
             ref={savedVideoTriggerRef}
-            disabled={controlsDisabled || runtime === unavailableSourceRuntime}
+            disabled={controlsDisabled || !runtime.available}
             onClick={() => setPickerOpen(true)}
           >
             Use Saved Video

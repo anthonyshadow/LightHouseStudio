@@ -39,9 +39,7 @@ import {
   type SavedPromptSource,
   type VtonInputKind,
 } from './types';
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
+import { isRecord, isTimestamp } from '../common/guards';
 
 const stableJson = (value: unknown): string | undefined =>
   JSON.stringify(value, (_key, candidate: unknown) =>
@@ -54,11 +52,8 @@ const stableJson = (value: unknown): string | undefined =>
       : candidate,
   );
 
-const validDate = (value: unknown): string | null => {
-  if (typeof value !== 'string') return null;
-  const date = new Date(value);
-  return Number.isFinite(date.valueOf()) ? date.toISOString() : null;
-};
+const validDate = (value: unknown): string | null =>
+  isTimestamp(value) ? new Date(value).toISOString() : null;
 
 const normalizedId = (value: unknown): string | null => {
   if (typeof value !== 'string') return null;

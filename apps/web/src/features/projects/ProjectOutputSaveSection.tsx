@@ -1,12 +1,12 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import type {
-  ProjectContract,
-  ProjectCurrentResponse,
-  SavedVideoDetail,
-  SavedVideoSummary,
-  SaveProjectOutputRequest,
+import {
+  SAVED_VIDEO_TITLE_MAX_LENGTH,
+  type ProjectCurrentResponse,
+  type SavedVideoDetail,
+  type SavedVideoSummary,
+  type SaveProjectOutputRequest,
 } from '@studio/contracts';
-import { projectMediaReferencesEqual } from '@studio/domain';
+import { defaultProjectOutputTitle, projectMediaReferencesEqual } from '@studio/domain';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -43,23 +43,6 @@ const outputPhaseNotice = {
     readonly title: string;
   }
 >;
-
-/** Mirrors `savedVideoTitleSchema`, which the save request is validated against. */
-const SAVED_VIDEO_TITLE_LIMIT = 120;
-
-/**
- * The name a new Saved Video is proposed under. Naming it after the Project alone sent every
- * save from one Project to the library under one name, so the proposal also carries the change
- * it was taken from — the number History reports for the same output as “Saved at change N”.
- * Derived from state already in hand: no clock, no counter and no request, so one Project state
- * always proposes the same name.
- */
-export const defaultProjectOutputTitle = (project: ProjectContract): string => {
-  const suffix = ` · change ${project.currentRevisionNumber}`;
-  const base = project.title.trim();
-  const room = SAVED_VIDEO_TITLE_LIMIT - suffix.length;
-  return `${base.length > room ? `${base.slice(0, room - 1).trimEnd()}…` : base}${suffix}`;
-};
 
 // The title is the one decision this dialog asks for, and accepting the proposal unread is what
 // filled the library with indistinguishable records. The field reads as the subject of the panel.
@@ -350,7 +333,9 @@ export const ProjectOutputSaveSection = ({
             <Button
               variant="primary"
               busy={busy}
-              disabled={title.trim().length === 0 || title.trim().length > SAVED_VIDEO_TITLE_LIMIT}
+              disabled={
+                title.trim().length === 0 || title.trim().length > SAVED_VIDEO_TITLE_MAX_LENGTH
+              }
               onClick={() => void begin({ kind: 'new', title: title.trim() })}
             >
               Save as New Video
@@ -363,7 +348,7 @@ export const ProjectOutputSaveSection = ({
             ref={titleInputRef}
             label="Video title"
             required
-            maxLength={SAVED_VIDEO_TITLE_LIMIT}
+            maxLength={SAVED_VIDEO_TITLE_MAX_LENGTH}
             value={title}
             onChange={(event) => setTitle(event.currentTarget.value)}
             hint="The title names the video in your library. The proposal marks the change it came from, so saves from one Project stay apart."

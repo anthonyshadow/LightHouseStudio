@@ -1,7 +1,8 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectCurrentResponse } from '@studio/contracts';
-import type { KeyboardEvent, ReactNode, RefObject } from 'react';
-import { projectPath } from '../../app/paths';
+import { useCallback, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router';
+import { projectPath, projectWorkspacePath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
 import { AppIcon, Button, StatusNotice } from '../../ui';
 import { projectProcessingBlockedReason } from './projectProcessingPresentation';
@@ -125,16 +126,9 @@ const projectWorkspaceSaveStatus = (
 interface ProjectWorkspaceSurfaceProps {
   readonly current: ProjectCurrentResponse;
   readonly session: ReturnType<typeof useProjectSession>;
-  readonly archived: boolean;
-  readonly announcement: string | null;
-  readonly headingRef: RefObject<HTMLHeadingElement | null>;
-  readonly sourceActivity: ProjectSourceActivity | null;
-  readonly workingMediaActivity: ProjectWorkingMediaActivity | null;
-  readonly pinnedWorkspaceTask: ProjectWorkspaceTask | null;
-  readonly enteredWorkspaceTask: ProjectWorkspaceTask | null;
-  readonly selectWorkspaceTask: (task: ProjectWorkspaceTask) => void;
-  readonly handleSourceActivity: (activity: ProjectSourceActivity) => void;
-  readonly handleWorkingMediaActivity: (activity: ProjectWorkingMediaActivity) => void;
+  readonly onSourceActivityChange?: ((activity: ProjectSourceActivity) => void) | undefined;
+  readonly onWorkingMediaActivityChange?:
+    ((activity: ProjectWorkingMediaActivity) => void) | undefined;
   readonly sourceRuntime: ProjectSourceRuntime;
   readonly recordingCandidate?: ProjectRecordingCandidate | null | undefined;
   readonly recordingActive?: boolean | undefined;
@@ -147,16 +141,8 @@ interface ProjectWorkspaceSurfaceProps {
 export const ProjectWorkspaceSurface = ({
   current,
   session,
-  archived,
-  announcement,
-  headingRef,
-  sourceActivity,
-  workingMediaActivity,
-  pinnedWorkspaceTask,
-  enteredWorkspaceTask,
-  selectWorkspaceTask,
-  handleSourceActivity,
-  handleWorkingMediaActivity,
+  onSourceActivityChange,
+  onWorkingMediaActivityChange,
   sourceRuntime,
   recordingCandidate,
   recordingActive,
@@ -167,7 +153,49 @@ export const ProjectWorkspaceSurface = ({
 }: ProjectWorkspaceSurfaceProps) => {
   const theme = useTheme();
   const goBack = useRouteBack();
+  const navigate = useNavigate();
+  const location = useLocation();
   const project = current.project;
+  const archived = project.archivedAt !== null;
+  const [sourceActivity, setSourceActivity] = useState<ProjectSourceActivity | null>(null);
+  const [workingMediaActivity, setWorkingMediaActivity] =
+    useState<ProjectWorkingMediaActivity | null>(null);
+  const handleSourceActivity = useCallback(
+    (activity: ProjectSourceActivity) => {
+      setSourceActivity(activity);
+      onSourceActivityChange?.(activity);
+    },
+    [onSourceActivityChange],
+  );
+  const handleWorkingMediaActivity = useCallback(
+    (activity: ProjectWorkingMediaActivity) => {
+      setWorkingMediaActivity(activity);
+      onWorkingMediaActivityChange?.(activity);
+    },
+    [onWorkingMediaActivityChange],
+  );
+  // Replace rather than push: an entry per tab click would make the masthead's Overview button
+  // (useRouteBack) walk back through tasks instead of leaving the workspace.
+  const selectWorkspaceTask = useCallback(
+    (task: ProjectWorkspaceTask) => {
+      void navigate(projectWorkspacePath(project.id, task), { replace: true });
+    },
+    [navigate, project.id],
+  );
+  const requestedWorkspaceTask = new URLSearchParams(location.search).get('task');
+  const pinnedWorkspaceTask = isProjectWorkspaceTask(requestedWorkspaceTask)
+    ? requestedWorkspaceTask
+    : null;
+  // Latched on entry, deliberately: the workspace should open on the step the Project is up to,
+  // but a phase change mid-session must not pull the open panel out from under the user. Their own
+  // choice pins itself in the URL and outranks both. Adjusted during render rather than in an
+  // effect so the first paint already shows the right task — this component only mounts inside the
+  // workspace, so leaving it discards the latch and reopening derives afresh.
+  const [enteredWorkspaceTask, setEnteredWorkspaceTask] = useState<ProjectWorkspaceTask | null>(
+    null,
+  );
+  if (enteredWorkspaceTask === null)
+    setEnteredWorkspaceTask(stepForSnapshot(current.revision.snapshot));
   const saveStatus = projectWorkspaceSaveStatus(session, sourceActivity?.busy ?? false);
   // Removing the source moves the Project out from under anything still deriving from it. The
   // server refuses these too; naming the reason here keeps the operator from guessing.
@@ -184,23 +212,16 @@ export const ProjectWorkspaceSurface = ({
     pinnedWorkspaceTask ?? enteredWorkspaceTask ?? stepForSnapshot(current.revision.snapshot);
   const focusWorkspaceTask = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const lastIndex = projectWorkspaceTasks.length - 1;
-    const nextIndex =
-      event.key === 'ArrowRight'
-        ? index === lastIndex
-          ? 0
-          : index + 1
-        : event.key === 'ArrowLeft'
-          ? index === 0
-            ? lastIndex
-            : index - 1
-          : event.key === 'Home'
-            ? 0
-            : event.key === 'End'
-              ? lastIndex
-              : null;
-    if (nextIndex === null) return;
+    const nextIndex: Record<string, number | undefined> = {
+      ArrowRight: index === lastIndex ? 0 : index + 1,
+      ArrowLeft: index === 0 ? lastIndex : index - 1,
+      Home: 0,
+      End: lastIndex,
+    };
+    const target = nextIndex[event.key];
+    if (target === undefined) return;
     event.preventDefault();
-    const nextTask = projectWorkspaceTasks[nextIndex];
+    const nextTask = projectWorkspaceTasks[target];
     if (!nextTask) return;
     selectWorkspaceTask(nextTask.id);
     window.requestAnimationFrame(() => {
@@ -222,9 +243,7 @@ export const ProjectWorkspaceSurface = ({
         </Button>
         <span data-workspace-divider aria-hidden="true" />
         <div data-workspace-title>
-          <h1 ref={headingRef} tabIndex={-1}>
-            {project.title}
-          </h1>
+          <h1 tabIndex={-1}>{project.title}</h1>
           <span data-workspace-project-status>{projectStatusLabel(project.status)}</span>
         </div>
         <ProjectWorkflowProgress snapshot={current.revision.snapshot} variant="masthead" />
@@ -261,9 +280,6 @@ export const ProjectWorkspaceSurface = ({
         </div>
 
         <div css={taskBodyStyles(theme)}>
-          <div role="status" aria-live="polite" aria-atomic="true">
-            {announcement}
-          </div>
           <ProjectSessionNotice session={session} sourceBusy={sourceActivity?.busy ?? false} />
 
           <section

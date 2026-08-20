@@ -410,6 +410,7 @@ export const installProviderNetworkDriver = async (
             addOutfitAvailable: options.wardrobeAddOutfitAvailable ?? false,
           },
           savedVideos: { directMultipartUpload: false },
+          creativeLibrary: { cloudMirror: false },
         } satisfies CapabilitiesResponse),
       });
       return;

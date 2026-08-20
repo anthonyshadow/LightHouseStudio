@@ -143,9 +143,9 @@ describe('useSaveVideo', () => {
     const original = artifact('recorded');
 
     await act(async () => {
-      await result.current.save(original, '  Explicit title  ', undefined, {
-        characterName: 'Mara',
-        characterVariantName: 'Evening',
+      await result.current.save(original, {
+        title: '  Explicit title  ',
+        character: { characterName: 'Mara', characterVariantName: 'Evening' },
       });
       await result.current.save(original);
       for (const kind of ['uploaded', 'edited', 'visual', 'voice'] as const) {
@@ -222,15 +222,12 @@ describe('useSaveVideo', () => {
     const image = new File(['poster'], 'poster.png', { type: 'image/png' });
 
     await act(async () => {
-      await result.current.save(artifact(), undefined, undefined, null, { kind: 'first-frame' });
+      await result.current.save(artifact(), { thumbnail: { kind: 'first-frame' } });
     });
     expect(api.createSavedVideoThumbnail.mock.calls[0]?.[2]).toBe('first');
 
     await act(async () => {
-      await result.current.save(artifact(), undefined, undefined, null, {
-        kind: 'image',
-        file: image,
-      });
+      await result.current.save(artifact(), { thumbnail: { kind: 'image', file: image } });
     });
     expect(api.createSavedVideoThumbnailFromImage).toHaveBeenCalledWith(image, expect.anything());
     expect(api.createSavedVideoThumbnail).toHaveBeenCalledOnce();

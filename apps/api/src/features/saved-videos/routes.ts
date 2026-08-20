@@ -6,6 +6,7 @@ import {
   directSavedVideoUploadPartsResponseSchema,
   directSavedVideoUploadPartUrlSchema,
   directSavedVideoUploadResponseSchema,
+  SAVED_VIDEO_THUMBNAIL_MAX_BYTES,
   savedVideoDetailSchema,
   savedVideoIdempotencyKeySchema,
   savedVideoParamsSchema,
@@ -64,8 +65,6 @@ const sendContent = async (
     filename: result.version.filename,
   });
 };
-
-const THUMBNAIL_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 
 export const registerSavedVideoRoutes = (
   app: ApplicationRuntime,
@@ -252,7 +251,7 @@ export const registerSavedVideoRoutes = (
   app.put(
     '/api/videos/:videoId/versions/:versionId/thumbnail',
     {
-      bodyLimit: THUMBNAIL_UPLOAD_MAX_BYTES,
+      bodyLimit: SAVED_VIDEO_THUMBNAIL_MAX_BYTES,
       bodyParser: 'buffer',
       acceptedContentTypePrefixes: ['image/'],
       unsupportedMediaType: {

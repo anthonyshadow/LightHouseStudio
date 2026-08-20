@@ -74,6 +74,23 @@ const FILTER_IDS: Record<VideoEditSpec['filter'], number> = {
 
 type RenderCanvas = HTMLCanvasElement | OffscreenCanvas;
 
+/**
+ * The WebGL context for either canvas kind.
+ *
+ * `getContext` cannot be called on the union directly: each canvas type declares its own overload
+ * set, and calling through the union collapses them to the widest return, `RenderingContext` —
+ * which includes the 2D context and so answers none of the WebGL calls below. Narrowing first lets
+ * each type resolve its own `'webgl'` overload. The test is a property rather than
+ * `instanceof HTMLCanvasElement` because the render worker has no DOM constructors to test against.
+ */
+const webglContext = (
+  canvas: RenderCanvas,
+  attributes: WebGLContextAttributes,
+): WebGLRenderingContext | null =>
+  'transferControlToOffscreen' in canvas
+    ? canvas.getContext('webgl', attributes)
+    : canvas.getContext('webgl', attributes);
+
 const compileShader = (gl: WebGLRenderingContext, type: number, source: string): WebGLShader => {
   const shader = gl.createShader(type);
   if (!shader) throw new Error('The video editor could not allocate a GPU shader.');
@@ -92,7 +109,7 @@ export type VideoEditFrameRenderer = Readonly<{
 }>;
 
 export const createVideoEditFrameRenderer = (canvas: RenderCanvas): VideoEditFrameRenderer => {
-  const gl = canvas.getContext('webgl', {
+  const gl = webglContext(canvas, {
     alpha: false,
     antialias: false,
     preserveDrawingBuffer: false,

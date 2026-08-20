@@ -84,7 +84,9 @@ const labelForMembership = (
       ? {
           label: video.title,
           unavailable: false,
-          thumbnailUrl: video.thumbnailAvailable ? savedVideoThumbnailUrl(video.id) : null,
+          thumbnailUrl: video.thumbnailAvailable
+            ? savedVideoThumbnailUrl(video.id, video.currentVersion.id)
+            : null,
         }
       : { label: 'Saved Video unavailable', unavailable: true, thumbnailUrl: null };
   }

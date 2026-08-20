@@ -195,7 +195,10 @@ describe('useCreativeLibraryCloudSync', () => {
     );
 
     const rendered = renderHook(() =>
-      useCreativeLibraryCloudSync(repository, { initializeEmptyRemoteFromLocal: true }),
+      useCreativeLibraryCloudSync(repository, {
+        initializeEmptyRemoteFromLocal: true,
+        cloudMirror: true,
+      }),
     );
     await waitFor(() => expect(requests).toHaveLength(2));
     expect(rendered.result.current.mirror).toBe('cloud');
@@ -225,13 +228,35 @@ describe('useCreativeLibraryCloudSync', () => {
       ),
     );
 
-    const rendered = renderHook(() => useCreativeLibraryCloudSync(repository));
+    const rendered = renderHook(() =>
+      useCreativeLibraryCloudSync(repository, { cloudMirror: false }),
+    );
 
-    // Idle means "nothing is wrong", not "there is a cloud copy" — only the mirror answers that.
+    // Idle means "nothing is wrong", not "there is a cloud copy" — only the mirror answers that,
+    // and it answers from the capability rather than from this 404.
     await waitFor(() => expect(rendered.result.current.mirror).toBe('browser-only'));
     expect(rendered.result.current.status).toEqual({ state: 'idle' });
     expect(repository.getSnapshot().store.savedPrompts).toHaveLength(1);
     expect(requests).toHaveLength(1);
+    rendered.unmount();
+  });
+
+  it('stays unresolved until the capability read answers', () => {
+    const rendered = renderHook(() => useCreativeLibraryCloudSync(addPrompt('Local look')));
+    expect(rendered.result.current.mirror).toBe('checking');
+    rendered.unmount();
+  });
+
+  it('reports browser-only when the repository cannot take a remote store', () => {
+    const { replaceFromRemote, ...withoutRemoteReplace } = addPrompt('Local look');
+    expect(replaceFromRemote).toBeDefined();
+
+    // The deployment offers a cloud copy, but this repository can never receive one, so claiming
+    // the library is copied to the account would be false.
+    const rendered = renderHook(() =>
+      useCreativeLibraryCloudSync(withoutRemoteReplace, { cloudMirror: true }),
+    );
+    expect(rendered.result.current.mirror).toBe('browser-only');
     rendered.unmount();
   });
 
