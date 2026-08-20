@@ -16,6 +16,12 @@ export const gallerySummaryStyles = (theme: Theme): CSSObject => ({
   '& strong': { color: theme.colors.text, fontWeight: 760 },
 });
 
+export const gallerySearchRowStyles = (): CSSObject => ({
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  '@media (min-width: 64rem)': { maxWidth: '32rem' },
+});
+
 export const filterControlsStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gridTemplateColumns: 'minmax(0, 1fr)',

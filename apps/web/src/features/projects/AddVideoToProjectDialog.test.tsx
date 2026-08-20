@@ -171,7 +171,11 @@ describe('AddVideoToProjectDialog', () => {
     let requestBody: unknown;
     mockApiServer.use(
       http.get('*/api/projects', () =>
-        HttpResponse.json({ projects: [emptyProject.project], nextCursor: null }),
+        HttpResponse.json({
+          projects: [emptyProject.project],
+          nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
+        }),
       ),
       http.get(`*/api/projects/${projectId}`, () => HttpResponse.json(emptyProject)),
       http.post(`*/api/projects/${projectId}/source/reuse`, async ({ request }) => {

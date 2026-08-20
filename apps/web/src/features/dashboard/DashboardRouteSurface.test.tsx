@@ -101,10 +101,18 @@ describe('DashboardRouteSurface', () => {
   it('orients an established account with bounded recent work and direct actions', async () => {
     mockApiServer.use(
       http.get('*/api/projects', () =>
-        HttpResponse.json({ projects: [project], nextCursor: null }),
+        HttpResponse.json({
+          projects: [project],
+          nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
+        }),
       ),
       http.get('*/api/campaigns', () =>
-        HttpResponse.json({ campaigns: [campaign], nextCursor: null }),
+        HttpResponse.json({
+          campaigns: [campaign],
+          nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
+        }),
       ),
       http.get('*/api/videos', () =>
         HttpResponse.json({
@@ -152,11 +160,16 @@ describe('DashboardRouteSurface', () => {
           projects: [project],
           previews: [projectPreview],
           nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
         });
       }),
       http.get('*/api/campaigns', ({ request }) => {
         apiReads.push(new URL(request.url).pathname);
-        return HttpResponse.json({ campaigns: [campaign], nextCursor: null });
+        return HttpResponse.json({
+          campaigns: [campaign],
+          nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
+        });
       }),
       http.get('*/api/videos', ({ request }) => {
         apiReads.push(new URL(request.url).pathname);
@@ -189,8 +202,20 @@ describe('DashboardRouteSurface', () => {
 
   it('opens the exact Saved Video a Recent Work row names, not the whole library', async () => {
     mockApiServer.use(
-      http.get('*/api/projects', () => HttpResponse.json({ projects: [], nextCursor: null })),
-      http.get('*/api/campaigns', () => HttpResponse.json({ campaigns: [], nextCursor: null })),
+      http.get('*/api/projects', () =>
+        HttpResponse.json({
+          projects: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
+      http.get('*/api/campaigns', () =>
+        HttpResponse.json({
+          campaigns: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
       http.get('*/api/videos', () =>
         HttpResponse.json({
           videos: [video],
@@ -211,8 +236,20 @@ describe('DashboardRouteSurface', () => {
 
   it('persists lightweight onboarding separately for each account', async () => {
     mockApiServer.use(
-      http.get('*/api/projects', () => HttpResponse.json({ projects: [], nextCursor: null })),
-      http.get('*/api/campaigns', () => HttpResponse.json({ campaigns: [], nextCursor: null })),
+      http.get('*/api/projects', () =>
+        HttpResponse.json({
+          projects: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
+      http.get('*/api/campaigns', () =>
+        HttpResponse.json({
+          campaigns: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
       http.get('*/api/videos', () =>
         HttpResponse.json({
           videos: [],
@@ -241,8 +278,20 @@ describe('DashboardRouteSurface', () => {
 
   it('turns an empty recent-work filter into the appropriate next action', async () => {
     mockApiServer.use(
-      http.get('*/api/projects', () => HttpResponse.json({ projects: [], nextCursor: null })),
-      http.get('*/api/campaigns', () => HttpResponse.json({ campaigns: [], nextCursor: null })),
+      http.get('*/api/projects', () =>
+        HttpResponse.json({
+          projects: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
+      http.get('*/api/campaigns', () =>
+        HttpResponse.json({
+          campaigns: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
       http.get('*/api/videos', () =>
         HttpResponse.json({
           videos: [],
@@ -292,8 +341,20 @@ describe('DashboardRouteSurface', () => {
         active = false;
         return new HttpResponse(null, { status: 204 });
       }),
-      http.get('*/api/projects', () => HttpResponse.json({ projects: [], nextCursor: null })),
-      http.get('*/api/campaigns', () => HttpResponse.json({ campaigns: [], nextCursor: null })),
+      http.get('*/api/projects', () =>
+        HttpResponse.json({
+          projects: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
+      http.get('*/api/campaigns', () =>
+        HttpResponse.json({
+          campaigns: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
       http.get('*/api/videos', () =>
         HttpResponse.json({
           videos: [],

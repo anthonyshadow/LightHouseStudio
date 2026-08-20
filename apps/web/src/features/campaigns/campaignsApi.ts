@@ -5,6 +5,7 @@ import {
   type CampaignConflictContract,
   type CampaignContract,
   type CampaignsQuery,
+  type ListTotal,
 } from '@studio/contracts';
 import {
   ApiClientError,
@@ -16,6 +17,8 @@ import {
 export interface CampaignsPage {
   readonly campaigns: CampaignContract[];
   readonly nextCursor: string | null;
+  /** How many Campaigns match the query, counted to a ceiling rather than censused. */
+  readonly total: ListTotal;
 }
 
 export class CampaignApiConflictError extends ApiClientError {
@@ -44,6 +47,7 @@ const jsonHeaders = { Accept: 'application/json', 'Content-Type': 'application/j
 
 export const listCampaigns = (
   input: Pick<CampaignsQuery, 'lifecycle' | 'pageSize'> & {
+    readonly search?: string | undefined;
     readonly cursor?: string | undefined;
     readonly signal?: AbortSignal | undefined;
   },
@@ -53,6 +57,7 @@ export const listCampaigns = (
     pageSize: String(input.pageSize),
   });
   if (input.cursor) query.set('cursor', input.cursor);
+  if (input.search) query.set('search', input.search);
   return requestJson(
     `/api/campaigns?${query.toString()}`,
     {

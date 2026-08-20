@@ -12,7 +12,7 @@ import {
   type SavedVideoUploadMetadata,
   type InspectedVideo,
 } from '@studio/contracts';
-import { normalizeSavedVideoTitle } from '@studio/domain';
+import { matchesSearchTerm, normalizeSavedVideoTitle } from '@studio/domain';
 import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
 import type { ProjectRepository, ProjectRetentionPolicy } from '../projects/project-repository.js';
 import { AppError } from '../../http/app-error.js';
@@ -104,6 +104,7 @@ const cursorQueryKey = (query: SavedVideosQuery): string =>
   JSON.stringify({
     characterName: query.characterName ?? null,
     format: query.format ?? null,
+    search: query.search ?? null,
     pageSize: query.pageSize,
     sort: query.sort,
   });
@@ -571,10 +572,11 @@ export class SavedVideoService {
     ].sort((left, right) => left.localeCompare(right));
     const availableFormats = new Set(all.map(({ format }) => format));
     const formats = SAVED_VIDEO_FORMATS.filter((format) => availableFormats.has(format));
-    const filtered = all.filter(({ format, version }) => {
+    const filtered = all.filter(({ aggregate, format, version }) => {
       return (
         (query.characterName === undefined || version.characterName === query.characterName) &&
-        (query.format === undefined || format === query.format)
+        (query.format === undefined || format === query.format) &&
+        (query.search === undefined || matchesSearchTerm(aggregate.video.title, query.search))
       );
     });
     filtered.sort((left, right) => {

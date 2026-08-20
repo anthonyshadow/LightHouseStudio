@@ -88,7 +88,11 @@ describe('Projects API adapter', () => {
         'GET',
         '/api/projects',
         {
-          body: { projects: [currentProject().project], nextCursor: 'next-page' },
+          body: {
+            projects: [currentProject().project],
+            nextCursor: 'next-page',
+            total: { count: 1, exceedsCeiling: false },
+          },
         },
         observed.observe,
       ),
@@ -101,6 +105,7 @@ describe('Projects API adapter', () => {
       // A page that names no posters is a page with nothing to show, not a missing field.
       previews: [],
       nextCursor: 'next-page',
+      total: { count: 1, exceedsCeiling: false },
     });
     const url = new URL(observed.requests[0]!.url);
     expect(url.searchParams.get('lifecycle')).toBe('active');
@@ -117,7 +122,12 @@ describe('Projects API adapter', () => {
     };
     mockApiServer.use(
       jsonScenario('GET', '/api/projects', {
-        body: { projects: [currentProject().project], previews: [preview], nextCursor: null },
+        body: {
+          projects: [currentProject().project],
+          previews: [preview],
+          nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
+        },
       }),
     );
 
@@ -131,6 +141,7 @@ describe('Projects API adapter', () => {
           projects: [currentProject().project],
           previews: [{ ...preview, savedVideoId: 'not-a-video' }],
           nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
         },
       }),
     );

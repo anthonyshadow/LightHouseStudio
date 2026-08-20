@@ -1,5 +1,6 @@
 import type { Campaign } from '@studio/domain';
 import { and, desc, eq, isNull, lt, or, sql } from 'drizzle-orm';
+import { boundedListTotal, LIST_TOTAL_PROBE_LIMIT } from '../../application/list-total.js';
 import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestamps.js';
 import type {
   CampaignCreatePersistenceResult,
@@ -11,6 +12,7 @@ import type {
   CampaignWithAttachedProjectCount,
 } from '../../features/campaigns/campaign-repository.js';
 import type { LightframeDatabase } from './client.js';
+import { searchTermMatches } from './search-pattern.js';
 import { campaignOperationReceipts, campaigns, projects } from './schema.js';
 
 type CampaignRow = typeof campaigns.$inferSelect;
@@ -155,27 +157,41 @@ export class DrizzleCampaignRepository implements CampaignRepository {
     }
     const cursorTimestamp =
       input.cursor === undefined ? undefined : toIsoTimestamp(input.cursor.updatedAt);
-    const rows = await this.db
-      .select()
-      .from(campaigns)
-      .where(
-        and(
-          eq(campaigns.ownerUserId, ownerUserId),
-          eq(campaigns.status, input.lifecycle),
-          isNull(campaigns.deletedAt),
-          input.cursor === undefined
-            ? undefined
-            : or(
-                lt(campaigns.updatedAt, cursorTimestamp!),
-                and(
-                  eq(campaigns.updatedAt, cursorTimestamp!),
-                  lt(campaigns.id, input.cursor.campaignId),
+    // Shared by the page and the count, and deliberately free of the cursor: a total is of the
+    // query, not of what is left after paging.
+    const filters = and(
+      eq(campaigns.ownerUserId, ownerUserId),
+      eq(campaigns.status, input.lifecycle),
+      isNull(campaigns.deletedAt),
+      input.search === undefined ? undefined : searchTermMatches(campaigns.name, input.search),
+    );
+    const [rows, countRows] = await Promise.all([
+      this.db
+        .select()
+        .from(campaigns)
+        .where(
+          and(
+            filters,
+            input.cursor === undefined
+              ? undefined
+              : or(
+                  lt(campaigns.updatedAt, cursorTimestamp!),
+                  and(
+                    eq(campaigns.updatedAt, cursorTimestamp!),
+                    lt(campaigns.id, input.cursor.campaignId),
+                  ),
                 ),
-              ),
-        ),
-      )
-      .orderBy(desc(campaigns.updatedAt), desc(campaigns.id))
-      .limit(input.pageSize + 1);
+          ),
+        )
+        .orderBy(desc(campaigns.updatedAt), desc(campaigns.id))
+        .limit(input.pageSize + 1),
+      // Stops one row past the ceiling: enough to know it was passed, never a full scan.
+      this.db
+        .select({ id: campaigns.id })
+        .from(campaigns)
+        .where(filters)
+        .limit(LIST_TOTAL_PROBE_LIMIT),
+    ]);
     const page = rows.slice(0, input.pageSize).map(toCampaign);
     const last = page.at(-1);
     return {
@@ -184,6 +200,7 @@ export class DrizzleCampaignRepository implements CampaignRepository {
         rows.length > input.pageSize && last !== undefined
           ? { updatedAt: last.updatedAt, campaignId: last.id }
           : null,
+      total: boundedListTotal(countRows.length),
     };
   }
 

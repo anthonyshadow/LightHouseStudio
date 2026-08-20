@@ -57,6 +57,76 @@ describe('FileProjectRepository', () => {
     ).resolves.toMatchObject({ projects: [{ id: created.current.project.id }], nextCursor: null });
   });
 
+  it('finds Projects by title, pages the matches, and counts the query rather than the page', async () => {
+    let tick = 0;
+    const service = new ProjectService(new FileProjectRepository(directory), {
+      now: () => new Date(Date.parse(now) + tick++ * 1_000),
+    });
+    for (const title of ['Launch cut', 'Winter promo', 'Launch teaser', 'Launch trailer']) {
+      await service.create(ownerUserId, randomUUID(), title);
+    }
+
+    // Case-insensitive containment, composed with the lifecycle filter the surface already had.
+    const first = await service.list(ownerUserId, {
+      lifecycle: 'active',
+      pageSize: 2,
+      search: 'launch',
+    });
+    expect(first.projects.map(({ title }) => title)).toEqual(['Launch trailer', 'Launch teaser']);
+    expect(first.total).toEqual({ count: 3, exceedsCeiling: false });
+    expect(first.nextCursor).not.toBeNull();
+
+    // Page two continues the search. The total is unchanged, because it describes the query and
+    // not what is left of it.
+    const second = await service.list(ownerUserId, {
+      lifecycle: 'active',
+      pageSize: 2,
+      search: 'launch',
+      cursor: first.nextCursor ?? undefined,
+    });
+    expect(second.projects.map(({ title }) => title)).toEqual(['Launch cut']);
+    expect(second.total).toEqual({ count: 3, exceedsCeiling: false });
+    expect(second.nextCursor).toBeNull();
+
+    // A cursor names a position in one ordered result set, so another term cannot replay it.
+    await expect(
+      service.list(ownerUserId, {
+        lifecycle: 'active',
+        pageSize: 2,
+        search: 'winter',
+        cursor: first.nextCursor ?? undefined,
+      }),
+    ).rejects.toThrow();
+
+    // Cleared, the list is whole again.
+    const cleared = await service.list(ownerUserId, { lifecycle: 'active', pageSize: 20 });
+    expect(cleared.projects).toHaveLength(4);
+    expect(cleared.total).toEqual({ count: 4, exceedsCeiling: false });
+  });
+
+  it('searches Campaigns by name and leaves an unsearched list exactly as it was', async () => {
+    let tick = 0;
+    const repository = new FileProjectRepository(directory);
+    const campaigns = new CampaignService(repository, {
+      now: () => new Date(Date.parse(now) + tick++ * 1_000),
+    });
+    for (const name of ['Summer launch', 'Winter promo', 'Launch retro']) {
+      await campaigns.create(ownerUserId, randomUUID(), { name });
+    }
+
+    const matched = await campaigns.list(ownerUserId, {
+      lifecycle: 'active',
+      pageSize: 20,
+      search: 'LAUNCH',
+    });
+    expect(matched.campaigns.map(({ name }) => name)).toEqual(['Launch retro', 'Summer launch']);
+    expect(matched.total).toEqual({ count: 2, exceedsCeiling: false });
+
+    const all = await campaigns.list(ownerUserId, { lifecycle: 'active', pageSize: 20 });
+    expect(all.campaigns).toHaveLength(3);
+    expect(all.total).toEqual({ count: 3, exceedsCeiling: false });
+  });
+
   it('recovers a prepared create journal without duplicating the Project or receipt', async () => {
     const operationKey = randomUUID();
     const interrupted = new ProjectService(
@@ -612,7 +682,11 @@ describe('FileProjectRepository', () => {
     await expect(repository.getCampaign(otherOwnerUserId, created.campaign.id)).resolves.toBeNull();
     await expect(
       repository.listCampaigns(otherOwnerUserId, { lifecycle: 'active', pageSize: 20 }),
-    ).resolves.toEqual({ campaigns: [], nextCursor: null });
+    ).resolves.toEqual({
+      campaigns: [],
+      nextCursor: null,
+      total: { count: 0, exceedsCeiling: false },
+    });
     const projects = new ProjectService(repository);
     await expect(
       projects.create(otherOwnerUserId, randomUUID(), 'Cross-owner Project', created.campaign.id),

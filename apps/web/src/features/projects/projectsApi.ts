@@ -24,6 +24,7 @@ import {
   type SaveProjectOutputResponse,
   type ProjectWorkingMediaResponse,
   type ProjectsQuery,
+  type ListTotal,
 } from '@studio/contracts';
 import {
   ApiClientError,
@@ -37,6 +38,8 @@ export interface ProjectsPage {
   /** Keyed by Project id, and only for the Projects in this page that have something to show. */
   readonly previews: readonly ProjectPreviewContract[];
   readonly nextCursor: string | null;
+  /** How many Projects match the query, counted to a ceiling rather than censused. */
+  readonly total: ListTotal;
 }
 
 export class ProjectApiConflictError extends ApiClientError {
@@ -67,6 +70,7 @@ const jsonHeaders = { Accept: 'application/json', 'Content-Type': 'application/j
 export const listProjects = (
   input: Pick<ProjectsQuery, 'lifecycle' | 'pageSize'> & {
     readonly campaignId?: ProjectsQuery['campaignId'];
+    readonly search?: string | undefined;
     readonly cursor?: string | undefined;
     readonly signal?: AbortSignal | undefined;
   },
@@ -77,6 +81,7 @@ export const listProjects = (
   });
   if (input.cursor) query.set('cursor', input.cursor);
   if (input.campaignId) query.set('campaignId', input.campaignId);
+  if (input.search) query.set('search', input.search);
   return requestJson(
     `/api/projects?${query.toString()}`,
     {

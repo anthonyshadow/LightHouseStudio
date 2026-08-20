@@ -11,6 +11,16 @@ import { mockApiServer } from '../../test/msw/server';
 import { StudioDesignProvider } from '../../ui';
 import { CampaignRouteSurface } from './CampaignRouteSurface';
 
+/**
+ * A list page body whose total agrees with its own rows, the way the API's does — so a fixture can
+ * never claim a count the page it returns does not support.
+ */
+const listBody = (key: 'projects' | 'campaigns', rows: readonly unknown[]) => ({
+  [key]: rows,
+  nextCursor: null,
+  total: { count: rows.length, exceedsCeiling: false },
+});
+
 const campaignId = '20ce94fa-15d1-42c6-abd3-77ff61516b48';
 const secondCampaignId = '312490eb-3e08-4f89-9246-fb2e917063ce';
 const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
@@ -113,7 +123,13 @@ const renderCampaigns = (path = '/campaigns', previousPath?: string, routeState?
 
 const installEmptyProjects = () => {
   mockApiServer.use(
-    http.get('*/api/projects', () => HttpResponse.json({ projects: [], nextCursor: null })),
+    http.get('*/api/projects', () =>
+      HttpResponse.json({
+        projects: [],
+        nextCursor: null,
+        total: { count: 0, exceedsCeiling: false },
+      }),
+    ),
   );
 };
 
@@ -133,21 +149,28 @@ describe('Campaign route surface', () => {
     let listReads = 0;
     mockApiServer.use(
       http.get('*/api/campaigns', ({ request }) =>
-        HttpResponse.json({
-          campaigns:
+        HttpResponse.json(
+          listBody(
+            'campaigns',
             new URL(request.url).searchParams.get('lifecycle') === 'active' ? [campaign()] : [],
-          nextCursor: null,
-        }),
+          ),
+        ),
       ),
       http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(campaign())),
       http.get('*/api/projects', ({ request }) => {
         listReads += 1;
         return new URL(request.url).searchParams.get('lifecycle') === 'archived'
-          ? HttpResponse.json({ projects: [], previews: [], nextCursor: null })
+          ? HttpResponse.json({
+              projects: [],
+              previews: [],
+              nextCursor: null,
+              total: { count: 0, exceedsCeiling: false },
+            })
           : HttpResponse.json({
               projects: [currentProject().project],
               previews: [preview],
               nextCursor: null,
+              total: { count: 1, exceedsCeiling: false },
             });
       }),
     );
@@ -174,7 +197,13 @@ describe('Campaign route surface', () => {
 
   it('does not re-open the create dialog when Back returns to the list that requested it', async () => {
     mockApiServer.use(
-      http.get('*/api/campaigns', () => HttpResponse.json({ campaigns: [], nextCursor: null })),
+      http.get('*/api/campaigns', () =>
+        HttpResponse.json({
+          campaigns: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
       http.post('*/api/campaigns', () => HttpResponse.json(campaign(), { status: 201 })),
       http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(campaign())),
     );
@@ -206,10 +235,9 @@ describe('Campaign route surface', () => {
     mockApiServer.use(
       http.get('*/api/campaigns', ({ request }) => {
         const lifecycle = new URL(request.url).searchParams.get('lifecycle');
-        return HttpResponse.json({
-          campaigns: created && lifecycle === 'active' ? [campaign()] : [],
-          nextCursor: null,
-        });
+        return HttpResponse.json(
+          listBody('campaigns', created && lifecycle === 'active' ? [campaign()] : []),
+        );
       }),
       http.post('*/api/campaigns', async ({ request }) => {
         expect(request.headers.get('idempotency-key')).toMatch(/^[0-9a-f-]{36}$/u);
@@ -277,12 +305,24 @@ describe('Campaign route surface', () => {
         const lifecycle = url.searchParams.get('lifecycle');
         const cursor = url.searchParams.get('cursor');
         if (lifecycle === 'archived') {
-          return HttpResponse.json({ campaigns: [archivedCampaign], nextCursor: null });
+          return HttpResponse.json({
+            campaigns: [archivedCampaign],
+            nextCursor: null,
+            total: { count: 1, exceedsCeiling: false },
+          });
         }
         activeCursors.push(cursor);
         return cursor === 'active-next'
-          ? HttpResponse.json({ campaigns: [secondCampaign], nextCursor: null })
-          : HttpResponse.json({ campaigns: [campaign()], nextCursor: 'active-next' });
+          ? HttpResponse.json({
+              campaigns: [secondCampaign],
+              nextCursor: null,
+              total: { count: 1, exceedsCeiling: false },
+            })
+          : HttpResponse.json({
+              campaigns: [campaign()],
+              nextCursor: 'active-next',
+              total: { count: 1, exceedsCeiling: false },
+            });
       }),
       http.get(`*/api/campaigns/${secondCampaignId}`, () => HttpResponse.json(secondCampaign)),
     );
@@ -316,11 +356,12 @@ describe('Campaign route surface', () => {
     let requestBody: unknown;
     mockApiServer.use(
       http.get('*/api/campaigns', ({ request }) =>
-        HttpResponse.json({
-          campaigns:
+        HttpResponse.json(
+          listBody(
+            'campaigns',
             new URL(request.url).searchParams.get('lifecycle') === 'archived' ? archived : [],
-          nextCursor: null,
-        }),
+          ),
+        ),
       ),
       http.post(`*/api/campaigns/${campaignId}/tombstone`, async ({ request }) => {
         requestBody = await request.json();
@@ -350,11 +391,12 @@ describe('Campaign route surface', () => {
     let archiveBody: unknown;
     mockApiServer.use(
       http.get('*/api/campaigns', ({ request }) =>
-        HttpResponse.json({
-          campaigns:
+        HttpResponse.json(
+          listBody(
+            'campaigns',
             new URL(request.url).searchParams.get('lifecycle') === 'archived' ? archived : active,
-          nextCursor: null,
-        }),
+          ),
+        ),
       ),
       http.patch(`*/api/campaigns/${campaignId}`, async ({ request }) => {
         editBody = await request.json();
@@ -415,11 +457,12 @@ describe('Campaign route surface', () => {
     const restoreBodies: unknown[] = [];
     mockApiServer.use(
       http.get('*/api/campaigns', ({ request }) =>
-        HttpResponse.json({
-          campaigns:
+        HttpResponse.json(
+          listBody(
+            'campaigns',
             new URL(request.url).searchParams.get('lifecycle') === 'archived' ? archived : [],
-          nextCursor: null,
-        }),
+          ),
+        ),
       ),
       http.post(`*/api/campaigns/${campaignId}/restore`, async ({ request }) => {
         restoreBodies.push(await request.json());
@@ -463,7 +506,11 @@ describe('Campaign route surface', () => {
             { status: 503 },
           );
         }
-        return HttpResponse.json({ campaigns: [], nextCursor: null });
+        return HttpResponse.json({
+          campaigns: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        });
       }),
     );
     const user = userEvent.setup();
@@ -494,7 +541,13 @@ describe('Campaign route surface', () => {
           { status: 503 },
         ),
       ),
-      http.get('*/api/campaigns', () => HttpResponse.json({ campaigns: [], nextCursor: null })),
+      http.get('*/api/campaigns', () =>
+        HttpResponse.json({
+          campaigns: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
     );
     const user = userEvent.setup();
     const { router } = renderCampaigns(`/campaigns/${campaignId}`);
@@ -513,8 +566,20 @@ describe('Campaign route surface', () => {
     let editBody: unknown;
     mockApiServer.use(
       http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(detail)),
-      http.get('*/api/projects', () => HttpResponse.json({ projects: [], nextCursor: null })),
-      http.get('*/api/campaigns', () => HttpResponse.json({ campaigns: [], nextCursor: null })),
+      http.get('*/api/projects', () =>
+        HttpResponse.json({
+          projects: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
+      http.get('*/api/campaigns', () =>
+        HttpResponse.json({
+          campaigns: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
       http.patch(`*/api/campaigns/${campaignId}`, async ({ request }) => {
         editBody = await request.json();
         detail = campaign({ name: 'Summer launch revised', brief: null, version: 2 });
@@ -572,9 +637,19 @@ describe('Campaign route surface', () => {
     mockApiServer.use(
       http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(campaign())),
       http.get('*/api/campaigns', () =>
-        HttpResponse.json({ campaigns: [campaign()], nextCursor: null }),
+        HttpResponse.json({
+          campaigns: [campaign()],
+          nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
+        }),
       ),
-      http.get('*/api/projects', () => HttpResponse.json({ projects: [], nextCursor: null })),
+      http.get('*/api/projects', () =>
+        HttpResponse.json({
+          projects: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
       http.post('*/api/projects', () =>
         HttpResponse.json(
           { error: { code: 'unavailable', message: 'upstream project failure' } },
@@ -608,14 +683,23 @@ describe('Campaign route surface', () => {
         const lifecycle = url.searchParams.get('lifecycle');
         const cursor = url.searchParams.get('cursor');
         if (lifecycle === 'archived') {
-          return HttpResponse.json({ projects: [], nextCursor: null });
+          return HttpResponse.json({
+            projects: [],
+            nextCursor: null,
+            total: { count: 0, exceedsCeiling: false },
+          });
         }
         activeCursors.push(cursor);
         return cursor === 'project-next'
-          ? HttpResponse.json({ projects: [secondProject], nextCursor: null })
+          ? HttpResponse.json({
+              projects: [secondProject],
+              nextCursor: null,
+              total: { count: 1, exceedsCeiling: false },
+            })
           : HttpResponse.json({
               projects: [currentProject().project],
               nextCursor: 'project-next',
+              total: { count: 1, exceedsCeiling: false },
             });
       }),
     );
@@ -644,16 +728,23 @@ describe('Campaign route surface', () => {
       http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(campaign())),
       http.get('*/api/projects', ({ request }) => {
         const lifecycle = new URL(request.url).searchParams.get('lifecycle');
-        return HttpResponse.json({
-          projects: lifecycle === 'active' ? [currentProject().project] : [],
-          nextCursor: null,
-        });
+        return HttpResponse.json(
+          listBody('projects', lifecycle === 'active' ? [currentProject().project] : []),
+        );
       }),
       http.get('*/api/campaigns', ({ request }) => {
         const cursor = new URL(request.url).searchParams.get('cursor');
         return cursor === 'campaign-next'
-          ? HttpResponse.json({ campaigns: [targetCampaign], nextCursor: null })
-          : HttpResponse.json({ campaigns: [campaign()], nextCursor: 'campaign-next' });
+          ? HttpResponse.json({
+              campaigns: [targetCampaign],
+              nextCursor: null,
+              total: { count: 1, exceedsCeiling: false },
+            })
+          : HttpResponse.json({
+              campaigns: [campaign()],
+              nextCursor: 'campaign-next',
+              total: { count: 1, exceedsCeiling: false },
+            });
       }),
       http.post(`*/api/projects/${projectId}/campaign`, async ({ request }) => {
         movedBody = await request.json();
@@ -706,19 +797,21 @@ describe('Campaign route surface', () => {
     mockApiServer.use(
       http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(detail)),
       http.get('*/api/campaigns', ({ request }) =>
-        HttpResponse.json({
-          campaigns:
+        HttpResponse.json(
+          listBody(
+            'campaigns',
             new URL(request.url).searchParams.get('lifecycle') === 'active' ? [detail] : [],
-          nextCursor: null,
-        }),
+          ),
+        ),
       ),
       http.get('*/api/projects', ({ request }) => {
         const url = new URL(request.url);
-        return HttpResponse.json({
-          projects:
+        return HttpResponse.json(
+          listBody(
+            'projects',
             url.searchParams.get('lifecycle') === 'active' ? [currentProject().project] : [],
-          nextCursor: null,
-        });
+          ),
+        );
       }),
       http.post(`*/api/projects/${projectId}/campaign`, async ({ request }) => {
         movedBody = await request.json();
@@ -757,13 +850,14 @@ describe('Campaign route surface', () => {
     mockApiServer.use(
       http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(archived)),
       http.get('*/api/projects', ({ request }) =>
-        HttpResponse.json({
-          projects:
+        HttpResponse.json(
+          listBody(
+            'projects',
             new URL(request.url).searchParams.get('lifecycle') === 'active'
               ? [currentProject().project]
               : [],
-          nextCursor: null,
-        }),
+          ),
+        ),
       ),
       http.post(`*/api/campaigns/${campaignId}/tombstone`, () =>
         HttpResponse.json(
@@ -793,22 +887,23 @@ describe('Campaign route surface', () => {
     let restoreAttempts = 0;
     mockApiServer.use(
       http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(detail)),
-      http.get('*/api/campaigns', () => HttpResponse.json({ campaigns: [], nextCursor: null })),
+      http.get('*/api/campaigns', () =>
+        HttpResponse.json({
+          campaigns: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
       http.get('*/api/projects', ({ request }) => {
         const lifecycle = new URL(request.url).searchParams.get('lifecycle');
-        return HttpResponse.json({
-          projects:
+        return HttpResponse.json(
+          listBody(
+            'projects',
             lifecycle === 'archived'
-              ? [
-                  currentProject({
-                    status: 'archived',
-                    version: 2,
-                    archivedAt: now,
-                  }).project,
-                ]
+              ? [currentProject({ status: 'archived', version: 2, archivedAt: now }).project]
               : [],
-          nextCursor: null,
-        });
+          ),
+        );
       }),
       http.post(`*/api/campaigns/${campaignId}/restore`, async ({ request }) => {
         expect(await request.json()).toEqual({ expectedVersion: 2 });
@@ -861,8 +956,20 @@ describe('Campaign route surface', () => {
     let tombstoneBody: unknown;
     mockApiServer.use(
       http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(archived)),
-      http.get('*/api/projects', () => HttpResponse.json({ projects: [], nextCursor: null })),
-      http.get('*/api/campaigns', () => HttpResponse.json({ campaigns: [], nextCursor: null })),
+      http.get('*/api/projects', () =>
+        HttpResponse.json({
+          projects: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
+      http.get('*/api/campaigns', () =>
+        HttpResponse.json({
+          campaigns: [],
+          nextCursor: null,
+          total: { count: 0, exceedsCeiling: false },
+        }),
+      ),
       http.post(`*/api/campaigns/${campaignId}/tombstone`, async ({ request }) => {
         tombstoneBody = await request.json();
         return HttpResponse.json(

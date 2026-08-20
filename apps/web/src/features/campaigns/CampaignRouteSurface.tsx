@@ -5,18 +5,27 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { APP_PATHS, campaignIdFromPath, campaignPath, projectPath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
-import { AppIcon, Button, StatusNotice } from '../../ui';
+import {
+  AppIcon,
+  Button,
+  ListSearchField,
+  listTotalLabel,
+  StatusNotice,
+  useListSearch,
+} from '../../ui';
 import { workspaceInnerStyles, workspaceStyles } from '../projects/ProjectRouteSurface.styles';
 import { NewProjectDialog } from '../projects/ProjectDialogs';
 import { KIND_ICONS } from '../projects/ProjectAssetThumbnail';
 import { projectPosterUrls } from '../projects/projectPosterPresentation';
 import { useProjectList } from '../projects/useProjectsController';
+import { projectCountLabel } from '../projects/projectStatusPresentation';
 import { WorkPosterTile } from '../projects/WorkPosterTile';
 import {
   campaignBriefStyles,
   campaignCardMetaStyles,
   campaignCardStyles,
   campaignGridStyles,
+  campaignSearchRowStyles,
   detailHeaderStyles,
   emptyListStyles,
   listSectionStyles,
@@ -44,27 +53,42 @@ interface CampaignListSectionProps {
     trigger: HTMLButtonElement,
   ) => void;
   readonly onDelete: (campaign: CampaignContract, trigger: HTMLButtonElement) => void;
+  readonly search?: string;
+  readonly onClearSearch: () => void;
 }
 
 const CampaignListSection = ({
   lifecycle,
+  search,
+  onClearSearch,
   onOpen,
   onEdit,
   onLifecycle,
   onDelete,
 }: CampaignListSectionProps) => {
   const theme = useTheme();
-  const query = useCampaignList(lifecycle);
+  const query = useCampaignList(lifecycle, search);
   const campaigns = useMemo(
     () => query.data?.pages.flatMap((page) => page.campaigns) ?? [],
     [query.data],
   );
   const archived = lifecycle === 'archived';
+  const total = query.data?.pages.at(-1)?.total ?? null;
   return (
     <section css={listSectionStyles(theme)} aria-labelledby={`${lifecycle}-campaigns-heading`}>
       <header>
         <h3 id={`${lifecycle}-campaigns-heading`}>{archived ? 'Archived' : 'Active Campaigns'}</h3>
-        <span>{campaigns.length} loaded</span>
+        {/* Polite, so a settled search states its result count without interrupting typing. */}
+        <span role="status" aria-live="polite">
+          {total === null
+            ? null
+            : listTotalLabel(
+                total,
+                archived ? 'archived Campaign' : 'Campaign',
+                archived ? 'archived Campaigns' : 'Campaigns',
+                search,
+              )}
+        </span>
       </header>
       {query.isPending ? <p role="status">Loading {lifecycle} Campaigns…</p> : null}
       {query.isError ? (
@@ -77,12 +101,26 @@ const CampaignListSection = ({
       ) : null}
       {!query.isPending && !query.isError && campaigns.length === 0 ? (
         <div css={emptyListStyles(theme)}>
-          <strong>{archived ? 'No archived Campaigns' : 'No Campaigns yet'}</strong>
-          <p>
-            {archived
-              ? 'Archived Campaigns remain available here until explicitly deleted.'
-              : 'Create a lightweight organizer, or keep using standalone Projects.'}
-          </p>
+          {search === undefined ? (
+            <>
+              <strong>{archived ? 'No archived Campaigns' : 'No Campaigns yet'}</strong>
+              <p>
+                {archived
+                  ? 'Archived Campaigns remain available here until explicitly deleted.'
+                  : 'Create a lightweight organizer, or keep using standalone Projects.'}
+              </p>
+            </>
+          ) : (
+            <>
+              <strong>
+                No {archived ? 'archived ' : ''}Campaigns match “{search}”
+              </strong>
+              <p>Try a shorter term, or clear the search to see everything again.</p>
+              <Button size="small" onClick={onClearSearch}>
+                Clear search
+              </Button>
+            </>
+          )}
         </div>
       ) : null}
       {campaigns.length > 0 ? (
@@ -200,6 +238,7 @@ const CampaignsWorkspace = () => {
   } | null>(null);
   const [deleteCampaign, setDeleteCampaign] = useState<CampaignContract | null>(null);
   const [announcement, setAnnouncement] = useState<string | null>(null);
+  const search = useListSearch();
   const routeCreateRequested =
     (location.state as { readonly createIntent?: string } | null)?.createIntent === 'campaign';
   const setHeadingRef = useCallback(
@@ -261,10 +300,19 @@ const CampaignsWorkspace = () => {
       <div role="status" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
+      <div css={campaignSearchRowStyles(theme)}>
+        <ListSearchField
+          label="Search Campaigns by name"
+          placeholder="Campaign name"
+          search={search}
+        />
+      </div>
       {(['active', 'archived'] as const).map((lifecycle) => (
         <CampaignListSection
           key={lifecycle}
           lifecycle={lifecycle}
+          {...(search.term === undefined ? {} : { search: search.term })}
+          onClearSearch={search.clear}
           onOpen={(campaign) => void navigate(campaignPath(campaign.id))}
           onEdit={(campaign, trigger) =>
             openWithReturnFocus(trigger, () => setEditCampaign(campaign))
@@ -339,13 +387,18 @@ const CampaignProjectGroup = ({
     [query.data],
   );
   const posters = useMemo(() => projectPosterUrls(query.data?.pages), [query.data]);
+  const projectGroupTotal = query.data?.pages.at(-1)?.total ?? null;
   return (
     <section css={projectGroupStyles(theme)} aria-labelledby={`${lifecycle}-campaign-projects`}>
       <header>
         <h3 id={`${lifecycle}-campaign-projects`}>
           {lifecycle === 'active' ? 'Active Projects' : 'Archived Projects'}
         </h3>
-        <span>{projects.length} loaded</span>
+        <span role="status" aria-live="polite">
+          {projectGroupTotal === null
+            ? null
+            : projectCountLabel(projectGroupTotal, lifecycle === 'archived')}
+        </span>
       </header>
       {query.isPending ? <p role="status">Loading {lifecycle} Projects…</p> : null}
       {query.isError ? (

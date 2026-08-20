@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { opaquePageTokenSchema } from './common';
+import { listSearchSchema, listTotalSchema, opaquePageTokenSchema } from './common';
 
 export const CAMPAIGN_STATUSES = ['active', 'archived', 'deleted'] as const;
 export const campaignIdSchema = z.uuid();
@@ -42,6 +42,7 @@ export const campaignParamsSchema = z.object({ campaignId: campaignIdSchema }).s
 export const campaignsQuerySchema = z
   .object({
     lifecycle: z.enum(['active', 'archived']).default('active'),
+    search: listSearchSchema,
     cursor: opaquePageTokenSchema.optional(),
     pageSize: z.coerce.number().int().min(1).max(40).default(20),
   })
@@ -70,6 +71,8 @@ export const campaignsResponseSchema = z
   .object({
     campaigns: z.array(campaignSchema).max(40),
     nextCursor: z.string().max(500).nullable(),
+    /** How many Campaigns match the query, counted to a ceiling rather than censused. */
+    total: listTotalSchema,
   })
   .strict();
 export const campaignConflictResponseSchema = z

@@ -49,7 +49,9 @@ Membership is a Project mutation, not a Campaign mutation. `moveProjectToCampaig
    (`CampaignRouteSurface.tsx:617-621`).
 2. Header: `h1` "Campaigns", an explanation that Campaigns are optional, and a single primary
    **Create Campaign** button.
-3. Two sections — Active and Archived — each a card grid. Each card shows a cover, the name, the
+3. A search input — "Search Campaigns by name" — with the same behaviour as the Projects list:
+   debounced, applied from two characters, searching both sections, cleared immediately.
+4. Two sections — Active and Archived — each a card grid. Each card shows a cover, the name, the
    brief (or "No brief yet."), "Updated <date>" and a status pill, plus the same actions the
    Projects list offers: **Open** · **Edit** (active only) · **Archive**/**Restore** · **Delete**
    (archived only). Every mutating action takes its `expectedVersion` from the row itself, because
@@ -59,7 +61,9 @@ Membership is a Project mutation, not a Campaign mutation. `moveProjectToCampaig
    Projects, so resolving one would mean a Project query per card; the surface will not spend that.
    The Campaign's own page shows its Projects' work instead.
 
-4. Loading / error+retry / per-lifecycle empty states are present.
+5. Each section states a real bounded count in a polite live region, and an empty search names the
+   term with a **Clear search** action.
+6. Loading / error+retry / per-lifecycle empty states are present.
 
 **Create** — `CampaignFormDialog` (name required, brief optional with a live character count) posts
 `/api/campaigns` with a retained idempotency key, then navigates to `/campaigns/{id}` carrying
@@ -113,15 +117,15 @@ does not linger on the page behind it.
 
 ## System behaviour summary
 
-| UI action       | Request                                         | Follow-up                                                    |
-| --------------- | ----------------------------------------------- | ------------------------------------------------------------ |
-| Open list       | `GET /api/campaigns?lifecycle=…&pageSize=20`    | infinite query; rows carry `version`, so the list can mutate |
-| Create          | `POST /api/campaigns` + Idempotency-Key         | cache detail, invalidate lists, navigate                     |
-| Edit            | `PATCH /api/campaigns/{id}`                     | cache detail, invalidate lists                               |
-| Archive/Restore | `POST …/archive` / `…/restore`                  | same                                                         |
-| Delete          | `POST …/tombstone`                              | invalidate all campaign queries, navigate to `/campaigns`    |
-| Move project    | `POST /api/projects/{id}/campaign`              | project caches invalidated                                   |
-| Project groups  | `GET /api/projects?lifecycle=…&campaignId={id}` | infinite query                                               |
+| UI action       | Request                                                 | Follow-up                                                    |
+| --------------- | ------------------------------------------------------- | ------------------------------------------------------------ |
+| Open list       | `GET /api/campaigns?lifecycle=…&pageSize=20[&search=…]` | infinite query; rows carry `version`, so the list can mutate |
+| Create          | `POST /api/campaigns` + Idempotency-Key                 | cache detail, invalidate lists, navigate                     |
+| Edit            | `PATCH /api/campaigns/{id}`                             | cache detail, invalidate lists                               |
+| Archive/Restore | `POST …/archive` / `…/restore`                          | same                                                         |
+| Delete          | `POST …/tombstone`                                      | invalidate all campaign queries, navigate to `/campaigns`    |
+| Move project    | `POST /api/projects/{id}/campaign`                      | project caches invalidated                                   |
+| Project groups  | `GET /api/projects?lifecycle=…&campaignId={id}`         | infinite query                                               |
 
 ## Exit points
 

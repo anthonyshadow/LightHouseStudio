@@ -4,7 +4,7 @@ import { formatDateTime } from '@studio/domain';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { projectPath } from '../../app/paths';
-import { Button, StatusNotice } from '../../ui';
+import { Button, ListSearchField, StatusNotice, useListSearch } from '../../ui';
 import {
   NewProjectDialog,
   DeleteProjectDialog,
@@ -15,6 +15,7 @@ import {
 } from './ProjectDialogs';
 import {
   projectsGroupFilterStyles,
+  projectsSearchRowStyles,
   projectsHeaderActionsStyles,
   projectsLedgerEmptyStyles,
   projectsLedgerLayoutStyles,
@@ -25,7 +26,7 @@ import {
   projectsWorkspaceInnerStyles,
 } from './ProjectsListSurface.styles';
 import { projectPosterUrls } from './projectPosterPresentation';
-import { projectStatusLabel } from './projectStatusPresentation';
+import { projectCountLabel, projectStatusLabel } from './projectStatusPresentation';
 import { useProjectList } from './useProjectsController';
 import { WorkPosterTile } from './WorkPosterTile';
 import { KIND_ICONS } from './ProjectAssetThumbnail';
@@ -33,6 +34,8 @@ import { KIND_ICONS } from './ProjectAssetThumbnail';
 interface ProjectListSectionProps {
   readonly lifecycle: 'active' | 'archived';
   readonly campaignId?: string;
+  readonly search?: string;
+  readonly onClearSearch: () => void;
   readonly heading?: string;
   readonly onOpen: (project: ProjectContract) => void;
   readonly onRename: (project: ProjectContract, trigger: HTMLButtonElement) => void;
@@ -47,6 +50,8 @@ interface ProjectListSectionProps {
 const ProjectListSection = ({
   lifecycle,
   campaignId,
+  search,
+  onClearSearch,
   heading,
   onOpen,
   onRename,
@@ -54,13 +59,14 @@ const ProjectListSection = ({
   onDelete,
 }: ProjectListSectionProps) => {
   const theme = useTheme();
-  const query = useProjectList(lifecycle, campaignId);
+  const query = useProjectList(lifecycle, campaignId, search);
   const projects = useMemo(
     () => query.data?.pages.flatMap((page) => page.projects) ?? [],
     [query.data],
   );
   const posters = useMemo(() => projectPosterUrls(query.data?.pages), [query.data]);
   const archived = lifecycle === 'archived';
+  const total = query.data?.pages.at(-1)?.total ?? null;
 
   return (
     <section
@@ -72,7 +78,10 @@ const ProjectListSection = ({
         <h3 id={`${lifecycle}-${campaignId ?? 'all'}-projects-heading`}>
           {heading ?? (archived ? 'Archived' : 'Active Projects')}
         </h3>
-        <span>{projects.length} loaded</span>
+        {/* Polite, so a settled search states its result count without interrupting typing. */}
+        <span role="status" aria-live="polite">
+          {total === null ? null : projectCountLabel(total, archived, search)}
+        </span>
       </header>
       {query.isPending ? <p role="status">Loading {lifecycle} Projects…</p> : null}
       {query.isError ? (
@@ -85,14 +94,28 @@ const ProjectListSection = ({
       ) : null}
       {!query.isPending && !query.isError && projects.length === 0 ? (
         <div css={projectsLedgerEmptyStyles(theme)}>
-          <strong>{archived ? 'No archived Projects' : 'No active Projects yet'}</strong>
-          <p>
-            {archived
-              ? campaignId === 'none'
-                ? 'Archived Projects with no Campaign appear here and can be restored.'
-                : 'Archived work appears here and can be restored.'
-              : 'Start a Project to keep one video and all the work you do on it together. Naming it is optional — you can rename it later.'}
-          </p>
+          {search === undefined ? (
+            <>
+              <strong>{archived ? 'No archived Projects' : 'No active Projects yet'}</strong>
+              <p>
+                {archived
+                  ? campaignId === 'none'
+                    ? 'Archived Projects with no Campaign appear here and can be restored.'
+                    : 'Archived work appears here and can be restored.'
+                  : 'Start a Project to keep one video and all the work you do on it together. Naming it is optional — you can rename it later.'}
+              </p>
+            </>
+          ) : (
+            <>
+              <strong>
+                No {archived ? 'archived ' : ''}Projects match “{search}”
+              </strong>
+              <p>Try a shorter term, or clear the search to see everything again.</p>
+              <Button size="small" onClick={onClearSearch}>
+                Clear search
+              </Button>
+            </>
+          )}
         </div>
       ) : null}
       {projects.length > 0 ? (
@@ -199,6 +222,7 @@ export const ProjectsListSurface = () => {
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [activeGroup, setActiveGroup] = useState<'all' | 'none'>('all');
   const [creating, setCreating] = useState(false);
+  const search = useListSearch();
   const routeCreateRequested =
     (location.state as { readonly createIntent?: string } | null)?.createIntent === 'project';
   const setHeadingRef = useCallback(
@@ -273,6 +297,14 @@ export const ProjectsListSurface = () => {
         {announcement}
       </div>
 
+      <div css={projectsSearchRowStyles(theme)}>
+        <ListSearchField
+          label="Search Projects by name"
+          placeholder="Project name"
+          search={search}
+        />
+      </div>
+
       <div css={projectsGroupFilterStyles(theme)} aria-label="Project groups">
         <Button
           variant="quiet"
@@ -298,6 +330,8 @@ export const ProjectsListSurface = () => {
           {...(activeGroup === 'none'
             ? { campaignId: 'none' as const, heading: 'No Campaign' }
             : {})}
+          {...(search.term === undefined ? {} : { search: search.term })}
+          onClearSearch={search.clear}
           onOpen={openProject}
           onRename={openRenameDialog}
           onLifecycle={openLifecycleDialog}
@@ -309,6 +343,8 @@ export const ProjectsListSurface = () => {
           {...(activeGroup === 'none'
             ? { campaignId: 'none' as const, heading: 'Archived · No Campaign' }
             : {})}
+          {...(search.term === undefined ? {} : { search: search.term })}
+          onClearSearch={search.clear}
           onOpen={openProject}
           onRename={openRenameDialog}
           onLifecycle={openLifecycleDialog}

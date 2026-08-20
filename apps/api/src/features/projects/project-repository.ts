@@ -16,7 +16,7 @@ import type {
   StoredSavedVideoAggregate,
   StoredVideoVersion,
 } from '../saved-videos/saved-video-repository.js';
-import type { ProjectOutputSaveResult } from '@studio/contracts';
+import type { ListTotal, ProjectOutputSaveResult } from '@studio/contracts';
 
 export type ProjectPersistenceMutationResult =
   | { readonly kind: 'updated' }
@@ -227,6 +227,11 @@ export interface ProjectSummaryCursor {
 export interface ProjectSummaryPageInput {
   readonly lifecycle: 'active' | 'archived';
   readonly campaignId?: string;
+  /**
+   * Matched case-insensitively against the Project title. Already trimmed and length-bounded by
+   * the contract, so an implementation applies it rather than re-validating it.
+   */
+  readonly search?: string;
   readonly cursor?: ProjectSummaryCursor;
   readonly pageSize: number;
 }
@@ -250,6 +255,11 @@ export interface ProjectSummaryPage {
    */
   readonly previews: readonly ProjectSummaryPreview[];
   readonly nextCursor: ProjectSummaryCursor | null;
+  /**
+   * How many Projects match the query as a whole, independent of where the cursor is: a total that
+   * shrank as the operator paged would not be a total. Bounded, so it never costs a full scan.
+   */
+  readonly total: ListTotal;
 }
 
 export type ProjectLinkHistoryKind = 'asset' | 'version-reference' | 'job' | 'output';

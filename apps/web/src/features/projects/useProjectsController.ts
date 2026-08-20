@@ -1,5 +1,6 @@
 import type { ProjectContract, ProjectCurrentResponse } from '@studio/contracts';
 import {
+  keepPreviousData,
   useInfiniteQuery,
   useMutation,
   useQueryClient,
@@ -42,19 +43,29 @@ export const reconcileProject = async (
 const lifecycleForProject = (project: ProjectContract): 'active' | 'archived' =>
   project.archivedAt === null ? 'active' : 'archived';
 
-export const useProjectList = (lifecycle: 'active' | 'archived', campaignId?: string) =>
+/**
+ * `search` is part of the key, not just the request: a term identifies a different result set, so
+ * its pages — and the cursors that walk them — must never be mixed with another term's.
+ */
+export const useProjectList = (
+  lifecycle: 'active' | 'archived',
+  campaignId?: string,
+  search?: string,
+) =>
   useInfiniteQuery({
-    queryKey: [...projectQueryKeys.list(lifecycle), campaignId ?? 'all'],
+    queryKey: [...projectQueryKeys.list(lifecycle), campaignId ?? 'all', search ?? ''],
     queryFn: ({ pageParam, signal }) =>
       listProjects({
         lifecycle,
         ...(campaignId === undefined ? {} : { campaignId }),
+        ...(search === undefined ? {} : { search }),
         pageSize: PROJECT_PAGE_SIZE,
         ...(pageParam ? { cursor: pageParam } : {}),
         signal,
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
+    placeholderData: keepPreviousData,
   });
 
 export const useProjectsController = () => {

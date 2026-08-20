@@ -21,6 +21,16 @@ import { ProjectRouteSurface, type ProjectRouteSurfaceProps } from './ProjectRou
 import type { ProjectSourceRuntime } from './useProjectSourceController';
 import type { ProjectSessionPort } from './useProjectSession';
 
+/**
+ * A list page body whose total agrees with its own rows, the way the API's does — so a fixture can
+ * never claim a count the page it returns does not support.
+ */
+const listBody = (key: 'projects' | 'campaigns', rows: readonly unknown[]) => ({
+  [key]: rows,
+  nextCursor: null,
+  total: { count: rows.length, exceedsCeiling: false },
+});
+
 const activeId = '18b120ac-1578-46e3-8c3d-42307772f391';
 const archivedId = '3b41f4fc-0881-4313-878d-d77a1b43f192';
 const secondActiveId = '730c73ca-a6af-4509-83c0-b3c18c1ee81a';
@@ -231,10 +241,7 @@ const installProjectLists = (
   mockApiServer.use(
     http.get('*/api/projects', ({ request }) => {
       const lifecycle = new URL(request.url).searchParams.get('lifecycle');
-      return HttpResponse.json({
-        projects: lifecycle === 'archived' ? archived : active,
-        nextCursor: null,
-      });
+      return HttpResponse.json(listBody('projects', lifecycle === 'archived' ? archived : active));
     }),
   );
 };
@@ -263,11 +270,13 @@ describe('Project route surface', () => {
               projects: [currentProject(archivedId).project],
               previews: [],
               nextCursor: null,
+              total: { count: 1, exceedsCeiling: false },
             })
           : HttpResponse.json({
               projects: [currentProject(activeId).project],
               previews: [preview],
               nextCursor: null,
+              total: { count: 1, exceedsCeiling: false },
             });
       }),
     );
@@ -932,17 +941,23 @@ describe('Project route surface', () => {
       http.get('*/api/projects', ({ request }) => {
         const url = new URL(request.url);
         if (url.searchParams.get('lifecycle') === 'archived') {
-          return HttpResponse.json({ projects: [], nextCursor: null });
+          return HttpResponse.json({
+            projects: [],
+            nextCursor: null,
+            total: { count: 0, exceedsCeiling: false },
+          });
         }
         if (url.searchParams.get('cursor') === 'active-next') {
           return HttpResponse.json({
             projects: [currentProject(secondActiveId, { title: 'Second page' }).project],
             nextCursor: null,
+            total: { count: 1, exceedsCeiling: false },
           });
         }
         return HttpResponse.json({
           projects: [currentProject(activeId).project],
           nextCursor: 'active-next',
+          total: { count: 1, exceedsCeiling: false },
         });
       }),
     );
@@ -960,7 +975,11 @@ describe('Project route surface', () => {
     mockApiServer.use(
       http.get('*/api/projects', ({ request }) => {
         if (new URL(request.url).searchParams.get('lifecycle') === 'archived') {
-          return HttpResponse.json({ projects: [], nextCursor: null });
+          return HttpResponse.json({
+            projects: [],
+            nextCursor: null,
+            total: { count: 0, exceedsCeiling: false },
+          });
         }
         activeReads += 1;
         return activeReads === 1
@@ -968,7 +987,11 @@ describe('Project route surface', () => {
               { error: { code: 'feature_unavailable', message: 'Projects are starting.' } },
               { status: 503 },
             )
-          : HttpResponse.json({ projects: [currentProject(activeId).project], nextCursor: null });
+          : HttpResponse.json({
+              projects: [currentProject(activeId).project],
+              nextCursor: null,
+              total: { count: 1, exceedsCeiling: false },
+            });
       }),
     );
     const user = userEvent.setup();
@@ -985,11 +1008,12 @@ describe('Project route surface', () => {
     let archived: ProjectCurrentResponse['project'][] = [];
     mockApiServer.use(
       http.get('*/api/projects', ({ request }) =>
-        HttpResponse.json({
-          projects:
+        HttpResponse.json(
+          listBody(
+            'projects',
             new URL(request.url).searchParams.get('lifecycle') === 'archived' ? archived : active,
-          nextCursor: null,
-        }),
+          ),
+        ),
       ),
       http.post(`*/api/projects/${activeId}/archive`, async ({ request }) => {
         expect(await request.json()).toEqual({ expectedVersion: 1 });
@@ -1034,11 +1058,12 @@ describe('Project route surface', () => {
     let requestBody: unknown;
     mockApiServer.use(
       http.get('*/api/projects', ({ request }) =>
-        HttpResponse.json({
-          projects:
+        HttpResponse.json(
+          listBody(
+            'projects',
             new URL(request.url).searchParams.get('lifecycle') === 'archived' ? archived : [],
-          nextCursor: null,
-        }),
+          ),
+        ),
       ),
       http.post(`*/api/projects/${archivedId}/tombstone`, async ({ request }) => {
         requestBody = await request.json();
@@ -1132,13 +1157,14 @@ describe('Project route surface', () => {
         // Captured before the lifecycle branch: reading it after was why N10 went unnoticed.
         if (url.searchParams.get('lifecycle') === 'archived') {
           archivedCampaignFilters.push(filter);
-          return HttpResponse.json({ projects: [], nextCursor: null });
+          return HttpResponse.json({
+            projects: [],
+            nextCursor: null,
+            total: { count: 0, exceedsCeiling: false },
+          });
         }
         activeCampaignFilters.push(filter);
-        return HttpResponse.json({
-          projects: filter === 'none' ? [] : [listedProject],
-          nextCursor: null,
-        });
+        return HttpResponse.json(listBody('projects', filter === 'none' ? [] : [listedProject]));
       }),
       http.patch(`*/api/projects/${activeId}`, async ({ request }) => {
         expect(await request.json()).toEqual({ title: 'Launch master', expectedVersion: 1 });
@@ -1584,7 +1610,11 @@ describe('Project route surface', () => {
     mockApiServer.use(
       http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(initial)),
       http.get('*/api/campaigns', () =>
-        HttpResponse.json({ campaigns: [campaign()], nextCursor: null }),
+        HttpResponse.json({
+          campaigns: [campaign()],
+          nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
+        }),
       ),
       http.get(`*/api/campaigns/${campaignId}`, () => HttpResponse.json(campaign())),
       http.post(`*/api/projects/${activeId}/campaign`, async ({ request }) => {

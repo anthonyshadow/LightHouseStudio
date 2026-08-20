@@ -373,12 +373,17 @@ The finding survived this long because the surface's own test handler short-circ
 lifecycle **before** reading `campaignId`, so the request it should have asserted was never
 observed. The capture moved above the branch and the archived request is now asserted.
 
-### N11 — Project counts are "N loaded", never totals (Low)
+### N11 — Project counts are "N loaded", never totals (Low) — **Resolved**
 
-Both list surfaces show `{items.length} loaded` (`ProjectsListSurface.tsx:71`,
-`CampaignRouteSurface.tsx:58`) because the contracts return no total
-(`packages/contracts/src/projects.ts:703-708`). The Videos gallery, by contrast, does have a
-`total`. The word "loaded" exposes pagination mechanics.
+Both list surfaces showed `{items.length} loaded` because the contracts returned no total. The
+Videos gallery, by contrast, already had one. The word "loaded" exposed pagination mechanics.
+
+_Shipped:_ the Project and Campaign list responses now carry a bounded `total`
+(`listTotalSchema`), counted before the cursor is applied so it describes the query rather than the
+remainder. Every surface states a real count in a polite live region — "3 Projects", or "More than
+200 Projects" once the count is only a floor. No surface says "loaded" any more. The bound is
+deliberate: a total must not become an unbounded `COUNT(*)` behind a search box, so both Project
+repositories and both Campaign repositories stop counting one row past `LIST_TOTAL_CEILING`.
 
 ## 4. Missing UI
 
@@ -796,7 +801,7 @@ independent.
     three. (**R3** already went with G6.) **R6** stays open on purpose — it needs **B4** first.
 
 **What is left.** Every tier is closed. The open findings are G5, the onboarding half of G8, N6,
-N11, M3–M9 and M11–M12, B4, B5, B7, B9, B10, R2, R6, the §7 vocabulary consolidation, P2–P5, and
+M3–M9 and M11–M12, B4, B5, B7, B9, B10, R2, R6, the §7 vocabulary consolidation, P2–P5, and
 T1/T2/T4/T5/T6. None is a broken flow; the largest of them (**G5**, account and settings) is a
 missing surface rather than a defect.
 

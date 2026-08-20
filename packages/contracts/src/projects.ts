@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { opaquePageTokenSchema } from './common';
+import { listSearchSchema, listTotalSchema, opaquePageTokenSchema } from './common';
 import {
   savedVideoDetailSchema,
   savedVideoSummarySchema,
@@ -694,6 +694,7 @@ export const projectsQuerySchema = z
   .object({
     lifecycle: z.enum(['active', 'archived']).default('active'),
     campaignId: z.union([z.uuid(), z.literal('none')]).optional(),
+    search: listSearchSchema,
     cursor: opaquePageTokenSchema.optional(),
     pageSize: z.coerce.number().int().min(1).max(40).default(20),
   })
@@ -723,6 +724,8 @@ export const projectsResponseSchema = z
     /** Only the Projects in this page that resolve to one; absent entries have no preview. */
     previews: z.array(projectPreviewSchema).max(40).default([]),
     nextCursor: z.string().max(500).nullable(),
+    /** How many Projects match the query, counted to a ceiling rather than censused. */
+    total: listTotalSchema,
   })
   .strict();
 export const projectConflictResponseSchema = z

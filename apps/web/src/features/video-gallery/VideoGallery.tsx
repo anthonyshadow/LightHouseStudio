@@ -24,7 +24,15 @@ import {
   savedVideoContentUrl,
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
-import { Button, OverlayPanel, SelectField, StatusNotice, TextField } from '../../ui';
+import {
+  Button,
+  ListSearchField,
+  OverlayPanel,
+  SelectField,
+  StatusNotice,
+  TextField,
+  useListSearch,
+} from '../../ui';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { AddVideoToProjectDialog } from '../projects/AddVideoToProjectDialog';
 import { GeneratePreviewDialog } from './GeneratePreviewDialog';
@@ -39,6 +47,7 @@ import {
   chipStyles,
   durationBadgeStyles,
   filterControlsStyles,
+  gallerySearchRowStyles,
   galleryStyles,
   gallerySummaryStyles,
   gridStyles,
@@ -305,6 +314,7 @@ export const VideoGallery = ({
   const [characterName, setCharacterName] = useState('');
   const [format, setFormat] = useState<SavedVideoFormat | ''>('');
   const [sort, setSort] = useState<SavedVideoSort>('latest');
+  const search = useListSearch();
   const [notice, setNotice] = useState<{
     readonly role: 'status' | 'alert';
     readonly tone: 'neutral' | 'success' | 'danger';
@@ -338,6 +348,7 @@ export const VideoGallery = ({
       {
         characterName: characterName || null,
         format: format || null,
+        search: search.term ?? null,
         sort,
       },
     ],
@@ -346,6 +357,7 @@ export const VideoGallery = ({
         ...(pageParam ? { cursor: pageParam } : {}),
         ...(characterName ? { characterName } : {}),
         ...(format ? { format } : {}),
+        ...(search.term === undefined ? {} : { search: search.term }),
         sort,
         signal,
       }),
@@ -572,6 +584,11 @@ export const VideoGallery = ({
           {notice.message}
         </StatusNotice>
       ) : null}
+      {/* Its own row, above the filter grid: search joins the filters rather than displacing them,
+          and the grid's tested three-fields-plus-button layout stays exactly as it was. */}
+      <div css={gallerySearchRowStyles()}>
+        <ListSearchField label="Search videos by title" placeholder="Video title" search={search} />
+      </div>
       <div css={filterControlsStyles(theme)} aria-label="Filter and sort saved videos">
         <SelectField
           label="Character used"
@@ -611,16 +628,31 @@ export const VideoGallery = ({
           Clear filters
         </Button>
       </div>
-      <div css={gallerySummaryStyles(theme)}>
+      {/* Polite, so a settled search states its result count without interrupting typing. */}
+      <div css={gallerySummaryStyles(theme)} role="status" aria-live="polite">
         <span>
           <strong>{total}</strong> matching {total === 1 ? 'video' : 'videos'}
+          {search.term === undefined ? '' : ` for “${search.term}”`}
         </span>
-        {videos.length < total ? <span>{videos.length} loaded</span> : null}
+        {videos.length < total ? <span>Showing the first {videos.length}</span> : null}
       </div>
       {videos.length === 0 ? (
         <div>
-          <h2>No saved videos match these filters</h2>
-          <p>Choose a different character or video format, or clear the filters.</p>
+          <h2>
+            {search.term === undefined
+              ? 'No saved videos match these filters'
+              : `No saved videos match “${search.term}”`}
+          </h2>
+          <p>
+            {search.term === undefined
+              ? 'Choose a different character or video format, or clear the filters.'
+              : 'Try a shorter term, or clear the search to see everything again.'}
+          </p>
+          {search.term === undefined ? null : (
+            <Button size="small" onClick={search.clear}>
+              Clear search
+            </Button>
+          )}
         </div>
       ) : (
         <VideoGalleryGrid

@@ -1,4 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { Readable } from 'node:stream';
 import {
   acceptProjectSource,
@@ -15,6 +18,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPostgresDatabase, type DatabaseConnection } from './client.js';
 import { DrizzleAssetLifecycleRegistry } from './asset-lifecycle-registry.js';
 import { DrizzleProjectRepository } from './project-repository.js';
+import { FileProjectRepository } from '../../features/projects/file-project-repository.js';
 import { DrizzleProjectRetentionPolicy } from './project-retention-policy.js';
 import { ProjectService } from '../../features/projects/project-service.js';
 import { ProjectOutputService } from '../../features/projects/project-output-service.js';
@@ -59,6 +63,115 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
 
   afterAll(async () => {
     await connection.close();
+  });
+
+  it('matches a search term identically in the file and Drizzle Project repositories', async () => {
+    const ownerUserId = randomUUID();
+    const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-search-parity-'));
+    const drizzle = new DrizzleProjectRepository(connection.db);
+    const file = new FileProjectRepository(directory);
+    /**
+     * Titles chosen for where the two implementations could diverge: case folding, a match that is
+     * not a prefix, and the three characters `LIKE` reads as syntax. If the SQL side failed to
+     * escape them, `50%` and `a_b` would match rows that JavaScript containment never would.
+     */
+    const titles = [
+      'Launch cut',
+      'Relaunch teaser',
+      'Winter promo',
+      'Save 50% now',
+      'Save 5000 now',
+      'Take a_b final',
+      'Take axb final',
+      'Path C:\\temp',
+    ];
+    const projectIds = titles.map(() => randomUUID());
+
+    try {
+      await connection.db.insert(users).values({
+        id: ownerUserId,
+        login: `${ownerUserId}@parity.test`,
+        normalizedLogin: `${ownerUserId}@parity.test`,
+        username: `s-${ownerUserId}`,
+        email: `${ownerUserId}@parity.test`,
+        displayName: 'Search Parity',
+      });
+
+      for (const [index, title] of titles.entries()) {
+        // Distinct timestamps, so ordering is decided by the data rather than by insertion race.
+        const now = new Date(Date.parse('2026-08-11T12:00:00.000Z') + index * 1_000).toISOString();
+        const projectId = projectIds[index]!;
+        const aggregate = createProject(
+          {
+            id: projectId,
+            ownerUserId,
+            title,
+            snapshot: createEmptyProjectSnapshot(now),
+            author: { kind: 'user', authorId: ownerUserId },
+            facts: {
+              sourceStatus: 'none',
+              currentAttempt: { status: 'none' },
+              validatedLastSuccessfulOutput: null,
+            },
+          },
+          { now, createId: () => randomUUID() },
+        );
+        const receipt = {
+          operationKey: randomUUID(),
+          requestFingerprint: createHash('sha256').update(`parity-${index}`).digest('hex'),
+          projectId,
+          createdAt: now,
+        };
+        await drizzle.createIdempotent({ aggregate, receipt });
+        await file.createIdempotent({ aggregate, receipt });
+      }
+
+      const terms = [undefined, 'launch', 'LAUNCH', 'LaUnCh', '50%', 'a_b', 'C:\\', 'nothing here'];
+      for (const search of terms) {
+        const input = {
+          lifecycle: 'active' as const,
+          pageSize: 3,
+          ...(search === undefined ? {} : { search }),
+        };
+        const fromDrizzle = await drizzle.list(ownerUserId, input);
+        const fromFile = await file.list(ownerUserId, input);
+        expect(fromFile, `term ${String(search)}`).toEqual(fromDrizzle);
+
+        // And the next page, so the two agree on the cursor as well as on the match.
+        if (fromDrizzle.nextCursor !== null) {
+          const next = { ...input, cursor: fromDrizzle.nextCursor };
+          expect(await file.list(ownerUserId, next), `term ${String(search)} page two`).toEqual(
+            await drizzle.list(ownerUserId, next),
+          );
+        }
+      }
+
+      // The escaping is load-bearing, not incidental: a literal % must not behave as a wildcard.
+      expect(
+        (await drizzle.list(ownerUserId, { lifecycle: 'active', pageSize: 20, search: '50%' }))
+          .projects,
+      ).toHaveLength(1);
+      expect(
+        (await drizzle.list(ownerUserId, { lifecycle: 'active', pageSize: 20, search: 'a_b' }))
+          .projects,
+      ).toHaveLength(1);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+      for (const projectId of projectIds) {
+        await connection.db
+          .update(projects)
+          .set({ currentRevisionId: null, currentRevisionNumber: 0 })
+          .where(eq(projects.id, projectId));
+        await connection.db
+          .delete(projectRevisions)
+          .where(eq(projectRevisions.projectId, projectId));
+        await connection.db.delete(projects).where(eq(projects.id, projectId));
+      }
+      await connection.db
+        .delete(projectOperationReceipts)
+        .where(eq(projectOperationReceipts.ownerUserId, ownerUserId));
+      await connection.db.delete(users).where(eq(users.id, ownerUserId));
+    }
   });
 
   it('commits exact revision links, rejects replay lies, and retains Project bytes', async () => {

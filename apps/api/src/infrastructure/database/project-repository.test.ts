@@ -363,7 +363,7 @@ describe('Project persistence mapping and transactions', () => {
     expect(replayDatabase.remaining()).toBe(0);
   });
 
-  it('returns bounded lifecycle summaries and their posters in one joined query', async () => {
+  it('returns bounded lifecycle summaries and their posters in a joined query', async () => {
     const aggregate = sourceAggregate();
     const project = {
       ...aggregate.project,
@@ -372,17 +372,20 @@ describe('Project persistence mapping and transactions', () => {
       createdAt: postgresNow,
       updatedAt: postgresNow,
     };
-    const scripted = scriptedDatabase([
-      {
-        project,
-        presentedMedia: {
-          kind: 'saved-video-version',
-          savedVideoId: videoId,
-          videoVersionId: versionId,
+    const scripted = scriptedDatabase(
+      [
+        {
+          project,
+          presentedMedia: {
+            kind: 'saved-video-version',
+            savedVideoId: videoId,
+            videoVersionId: versionId,
+          },
+          lastSuccessfulOutput: null,
         },
-        lastSuccessfulOutput: null,
-      },
-    ]);
+      ],
+      [{ id: projectId }],
+    );
     await expect(
       new DrizzleProjectRepository(scripted.db).list(ownerUserId, {
         lifecycle: 'active',
@@ -392,9 +395,11 @@ describe('Project persistence mapping and transactions', () => {
       projects: [{ id: projectId }],
       previews: [{ projectId, savedVideoId: videoId, videoVersionId: versionId }],
       nextCursor: null,
+      total: { count: 1, exceedsCeiling: false },
     });
-    // The poster is joined, never asked for per row: one select for the whole page.
-    expect(scripted.calls.filter(({ operation }) => operation === 'select')).toHaveLength(1);
+    // The poster is joined, never asked for per row: one select for the whole page, plus the
+    // bounded count behind the total. Neither grows with the number of rows.
+    expect(scripted.calls.filter(({ operation }) => operation === 'select')).toHaveLength(2);
     expect(scripted.remaining()).toBe(0);
   });
 
@@ -408,7 +413,7 @@ describe('Project persistence mapping and transactions', () => {
       updatedAt: postgresNow,
     };
     const listOnce = async (row: Record<string, unknown>) => {
-      const scripted = scriptedDatabase([{ project, ...row }]);
+      const scripted = scriptedDatabase([{ project, ...row }], [{ id: projectId }]);
       const page = await new DrizzleProjectRepository(scripted.db).list(ownerUserId, {
         lifecycle: 'active',
         pageSize: 20,
