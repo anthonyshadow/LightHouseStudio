@@ -3,10 +3,12 @@ import {
   VOICE_PREVIEW_MAX_BYTES,
   VOICE_PROVIDER_INTENT_HEADER,
   VOICE_PROVIDER_INTENT_VALUE,
+  savedVoiceCountResponseSchema,
   sharedVoicesResponseSchema,
   voiceLibraryMutationResponseSchema,
   workspaceVoiceRelationshipResponseSchema,
   workspaceVoicesResponseSchema,
+  type SavedVoiceCountResponse,
   type SharedVoicesQuery,
   type VoiceLibraryMutationResponse,
   type WorkspaceVoiceRelationshipResponse,
@@ -73,6 +75,18 @@ export const fetchWorkspaceVoiceRelationship = async (
     { signal, cache: 'no-store' },
     workspaceVoiceRelationshipResponseSchema,
     () => invalidResponse('saved voice relationship'),
+  );
+
+/**
+ * How many voices this account has kept. App-owned data, so no provider intent and no provider
+ * call — a surface that only wants the number never triggers a paid one.
+ */
+export const fetchSavedVoiceCount = (signal?: AbortSignal): Promise<SavedVoiceCountResponse> =>
+  requestJson(
+    '/api/elevenlabs/voices/saved-count',
+    { cache: 'no-store', ...(signal ? { signal } : {}) },
+    savedVoiceCountResponseSchema,
+    () => invalidResponse('saved voice count'),
   );
 
 const voiceParams = (criteria: VoiceFilterCriteria): URLSearchParams => {

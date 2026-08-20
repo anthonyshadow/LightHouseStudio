@@ -343,6 +343,8 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await expect(page.getByRole('heading', { name: 'Assets' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Open Videos' })).toBeVisible();
       await expect(page.getByRole('button', { name: 'Open Voices' })).toBeVisible();
+      // Every card has resolved its size, so no skeleton is captured mid-count.
+      await expect(page.getByText(/^Counting /u)).toHaveCount(0);
       await expect(page.getByText(/Recipe/u)).toHaveCount(0);
       await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
     },

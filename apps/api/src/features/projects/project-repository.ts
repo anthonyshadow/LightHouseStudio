@@ -231,8 +231,24 @@ export interface ProjectSummaryPageInput {
   readonly pageSize: number;
 }
 
+/**
+ * The Saved Video Version a listed Project can be shown by, resolved from the Project's own current
+ * revision. Only Projects that resolve to one appear here, so `previews` is never row-aligned with
+ * `projects` — callers key it by `projectId`.
+ */
+export interface ProjectSummaryPreview {
+  readonly projectId: string;
+  readonly savedVideoId: string;
+  readonly videoVersionId: string;
+}
+
 export interface ProjectSummaryPage {
   readonly projects: readonly Project[];
+  /**
+   * Resolved inside the page read, never per row: a list surface that showed the work by asking one
+   * question per Project would turn a page into a round trip per row.
+   */
+  readonly previews: readonly ProjectSummaryPreview[];
   readonly nextCursor: ProjectSummaryCursor | null;
 }
 

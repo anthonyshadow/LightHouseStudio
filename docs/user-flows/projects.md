@@ -102,13 +102,24 @@ configured `DATABASE_MODE`; otherwise the routes are absent and the client sees 
    group filter applies to **both**. Selecting "No Campaign" retitles them "No Campaign" and
    "Archived · No Campaign" and issues `campaignId=none` for each; the archived section used to
    ignore the filter, so half the screen contradicted the other half.
-5. Each row shows title, status label, "Updated <date>", and actions:
+5. Each row leads with a poster, then title, status label, "Updated <date>", and actions:
    - active: **Open** · **Rename** · **Archive**
    - archived: **Open** · **Restore** · **Delete**
+
+   Every action stays visible without hovering. The poster is decorative — the heading beside it
+   names the Project — and a Project with nothing to show says "No preview yet" rather than
+   rendering a broken image.
+
 6. "N loaded" is shown, not a total; **Load more** appears while `hasNextPage`.
 
 **System behaviour** — `useProjectList` issues
-`GET /api/projects?lifecycle=…&pageSize=20[&campaignId=none]`. `NewProjectDialog` owns both create
+`GET /api/projects?lifecycle=…&pageSize=20[&campaignId=none]`. The response carries `previews`
+beside `projects`: one `{ projectId, savedVideoId, videoVersionId }` for each listed Project whose
+current revision presents a Saved Video Version, or failing that names a last successful output
+(`projectPosterReferenceForSnapshot`). Only Projects that resolve to one appear, so the array is
+keyed by Project rather than aligned with the page. Both repositories resolve it inside the page
+read — the file repository from the library it already loaded, the relational one by joining the
+current revision and projecting two `jsonb` keys — so showing the work costs no request per row. `NewProjectDialog` owns both create
 paths: **Create Project** calls `createNamedMutation`, and **Create without a name** calls
 `createMutation.mutateAsync(campaignId)` with a retained idempotency key, posting
 `{ title: 'Untitled Project' }`. Both navigate to `/projects/{id}`. The unnamed action reuses the

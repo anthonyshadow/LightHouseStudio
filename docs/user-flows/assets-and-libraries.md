@@ -28,8 +28,20 @@ panel's "View in Assets" — closes back to that origin rather than to `/assets`
    content to a Project or Campaign"_, and a primary **Upload video** action.
 2. **Upload video** navigates to `/studio/create` with router state `{ creationIntent: 'upload' }`,
    which the Studio shell converts into an open video-upload overlay (`StudioApp.tsx`).
-3. Four cards: Videos · Characters · Outfits · Voices. Characters and Outfits show a live "N saved"
-   count sourced from the local creative repository; Videos and Voices show no count.
+3. Four cards: Videos · Characters · Outfits · Voices. Every card states its size, and each has
+   three states — counting, a resolved count, and "Count unavailable" with a **Retry**. A card never
+   renders `0` for a library it has not read.
+   - **Videos** — the `total` of `GET /api/videos?pageSize=1`, one page of one for the number beside
+     it. It is cached outside `savedVideoQueryKeys.lists`, because the Videos library rewrites every
+     query under that key as paged data. The hub unmounts on leaving `/assets`, so the next visit
+     reads it again.
+   - **Voices** — `GET /api/elevenlabs/voices/saved-count`, which reads Lightframe's own saved-voice
+     records. No provider intent header and no provider call: the number is not worth a paid one.
+     It counts voices this account has kept in Lightframe, which is empty until the first visit to
+     the Voices library migrates a pre-existing ElevenLabs workspace.
+   - **Characters** and **Outfits** — the shell's creative store, reported as counting until
+     `repository.ready()` resolves and as unavailable when IndexedDB could not be opened at all
+     (`health === 'session-only'`), where **Retry** reopens the repository.
 4. Characters and Outfits additionally state where that library is stored — "Stored in this browser
    only — clearing site data deletes it." when no cloud route is registered, "Stored in this browser
    and copied to your account." when one is. Videos and Voices carry no such line, because they are
@@ -38,9 +50,8 @@ panel's "View in Assets" — closes back to that origin rather than to `/assets`
    deployment with no cloud route and a healthy mirror are both idle.
 5. Each card has an **Open {name}** button.
 
-**Missing** — the hub has no loading or error state of its own, because the two counts come from
-in-memory local state and the other two are not fetched. Until the mirror check resolves the
-storage line says only "Stored in this browser.", which is true in every mode.
+**Missing** — the hub shows no poster for any library. Until the mirror check resolves the storage
+line says only "Stored in this browser.", which is true in every mode.
 
 ## Flow: Videos library (`/assets/videos`)
 

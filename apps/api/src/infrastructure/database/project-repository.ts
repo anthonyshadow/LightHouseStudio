@@ -51,6 +51,7 @@ import type {
   ProjectRevisionHistoryPage,
   ProjectSummaryPage,
   ProjectSummaryPageInput,
+  ProjectSummaryPreview,
   ProjectSourceAcceptanceResult,
   ProjectSourceRecord,
   ProjectSourceRemovalResult,
@@ -106,6 +107,7 @@ import {
   revisionValues,
   toProject,
   toProjectSource,
+  toProjectSummaryPoster,
   toProjectWorkingMedia,
   toRevision,
   versionReferenceValues,
@@ -1003,8 +1005,22 @@ export class DrizzleProjectRepository
     const cursorTimestamp =
       input.cursor === undefined ? undefined : toIsoTimestamp(input.cursor.updatedAt);
     const rows = await this.db
-      .select()
+      .select({
+        project: projects,
+        // Two keys, not the whole snapshot: the poster is decoration and must not make a page read
+        // carry forty full revisions. Joined rather than asked for afterwards, so listing Projects
+        // stays one query no matter how many rows it returns.
+        presentedMedia: sql`${projectRevisions.snapshot} -> 'presentedMedia'`,
+        lastSuccessfulOutput: sql`${projectRevisions.snapshot} -> 'lastSuccessfulOutput'`,
+      })
       .from(projects)
+      .leftJoin(
+        projectRevisions,
+        and(
+          eq(projectRevisions.id, projects.currentRevisionId),
+          eq(projectRevisions.ownerUserId, projects.ownerUserId),
+        ),
+      )
       .where(
         and(
           eq(projects.ownerUserId, ownerUserId),
@@ -1030,10 +1046,17 @@ export class DrizzleProjectRepository
       )
       .orderBy(desc(projects.updatedAt), desc(projects.id))
       .limit(input.pageSize + 1);
-    const page = rows.slice(0, input.pageSize).map(toProject);
+    const pageRows = rows.slice(0, input.pageSize);
+    const page = pageRows.map((row) => toProject(row.project));
     const last = page.at(-1);
+    const previews: ProjectSummaryPreview[] = [];
+    for (const row of pageRows) {
+      const poster = toProjectSummaryPoster(row);
+      if (poster !== null) previews.push({ projectId: row.project.id, ...poster });
+    }
     return {
       projects: page,
+      previews,
       nextCursor:
         rows.length > input.pageSize && last !== undefined
           ? { updatedAt: last.updatedAt, projectId: last.id }

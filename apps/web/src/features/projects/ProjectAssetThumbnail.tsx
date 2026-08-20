@@ -1,18 +1,13 @@
-import { useTheme } from '@emotion/react';
 import type { ProjectAssetKindContract } from '@studio/contracts';
-import { useState, type ReactElement, type ReactNode } from 'react';
-import {
-  assetThumbnailFallbackStyles,
-  assetThumbnailPlayStyles,
-  assetThumbnailStyles,
-} from './ProjectAssetsSection.styles';
+import type { ReactElement, ReactNode } from 'react';
+import { WorkPosterTile } from './WorkPosterTile';
 
 export const kindLabel = (kind: ProjectAssetKindContract): string =>
   kind === 'video' ? 'Video' : kind.charAt(0).toUpperCase() + kind.slice(1);
 
 // Keyed rather than an if-chain so a new Asset kind fails to compile instead of silently
 // rendering the voice icon.
-const KIND_ICONS: Record<ProjectAssetKindContract, ReactElement> = {
+export const KIND_ICONS: Record<ProjectAssetKindContract, ReactElement> = {
   video: (
     <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
       <rect x="3" y="5" width="18" height="14" rx="2" />
@@ -39,10 +34,12 @@ const KIND_ICONS: Record<ProjectAssetKindContract, ReactElement> = {
 };
 
 /**
- * One poster tile for an Asset, with server thumbnail, icon fallback, and broken-image recovery.
+ * One poster tile for an Asset in a Project's library strip.
  *
- * `decorative` drops the `role="img"` label so the tile can sit inside a control that already
- * names itself from its own text content — otherwise the tile's label would be read twice.
+ * The tile itself — server thumbnail, icon fallback, broken-image recovery — belongs to
+ * {@link WorkPosterTile}; this only decides what an Asset kind looks like and is called. The strip
+ * names an Asset the same way whether the poster is missing or merely broken, because either way
+ * the operator is looking at the Asset they attached, not at a preview that failed.
  */
 export const ProjectAssetThumbnail = ({
   kind,
@@ -59,42 +56,20 @@ export const ProjectAssetThumbnail = ({
   readonly decorative?: boolean;
   readonly children?: ReactNode;
 }) => {
-  const theme = useTheme();
-  const [brokenThumbnailUrl, setBrokenThumbnailUrl] = useState<string | null>(null);
-  const showThumbnail = thumbnailUrl !== null && brokenThumbnailUrl !== thumbnailUrl;
-
+  const caption = unavailable ? 'Asset unavailable' : `${kindLabel(kind)} preview`;
   return (
-    <div
-      {...(decorative
-        ? { 'aria-hidden': true }
-        : {
-            role: 'img',
-            'aria-label': showThumbnail
-              ? `Thumbnail for ${label}`
-              : `${kindLabel(kind)} visual for ${label}`,
-          })}
-      css={assetThumbnailStyles(theme, unavailable)}
+    <WorkPosterTile
+      icon={KIND_ICONS[kind]}
+      thumbnailUrl={thumbnailUrl}
+      emptyCaption={caption}
+      failedCaption={caption}
+      label={label}
+      kindNoun={kindLabel(kind)}
+      unavailable={unavailable}
+      decorative={decorative}
+      playBadge={kind === 'video'}
     >
-      {showThumbnail ? (
-        <img
-          src={thumbnailUrl}
-          alt=""
-          loading="lazy"
-          css={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          onError={() => setBrokenThumbnailUrl(thumbnailUrl)}
-        />
-      ) : (
-        <span aria-hidden="true" css={assetThumbnailFallbackStyles(theme)}>
-          {KIND_ICONS[kind]}
-          <small>{unavailable ? 'Asset unavailable' : `${kindLabel(kind)} preview`}</small>
-        </span>
-      )}
-      {kind === 'video' && !unavailable && showThumbnail ? (
-        <span aria-hidden="true" css={assetThumbnailPlayStyles(theme)}>
-          {KIND_ICONS.video}
-        </span>
-      ) : null}
       {children}
-    </div>
+    </WorkPosterTile>
   );
 };

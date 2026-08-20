@@ -363,15 +363,24 @@ describe('Project persistence mapping and transactions', () => {
     expect(replayDatabase.remaining()).toBe(0);
   });
 
-  it('returns bounded lifecycle summaries in stable recent order', async () => {
+  it('returns bounded lifecycle summaries and their posters in one joined query', async () => {
     const aggregate = sourceAggregate();
+    const project = {
+      ...aggregate.project,
+      archivedAt: null,
+      deletedAt: null,
+      createdAt: postgresNow,
+      updatedAt: postgresNow,
+    };
     const scripted = scriptedDatabase([
       {
-        ...aggregate.project,
-        archivedAt: null,
-        deletedAt: null,
-        createdAt: postgresNow,
-        updatedAt: postgresNow,
+        project,
+        presentedMedia: {
+          kind: 'saved-video-version',
+          savedVideoId: videoId,
+          videoVersionId: versionId,
+        },
+        lastSuccessfulOutput: null,
       },
     ]);
     await expect(
@@ -379,9 +388,48 @@ describe('Project persistence mapping and transactions', () => {
         lifecycle: 'active',
         pageSize: 20,
       }),
-    ).resolves.toMatchObject({ projects: [{ id: projectId }], nextCursor: null });
+    ).resolves.toMatchObject({
+      projects: [{ id: projectId }],
+      previews: [{ projectId, savedVideoId: videoId, videoVersionId: versionId }],
+      nextCursor: null,
+    });
+    // The poster is joined, never asked for per row: one select for the whole page.
     expect(scripted.calls.filter(({ operation }) => operation === 'select')).toHaveLength(1);
     expect(scripted.remaining()).toBe(0);
+  });
+
+  it('falls back to the last successful output, and to no poster at all', async () => {
+    const aggregate = sourceAggregate();
+    const project = {
+      ...aggregate.project,
+      archivedAt: null,
+      deletedAt: null,
+      createdAt: postgresNow,
+      updatedAt: postgresNow,
+    };
+    const listOnce = async (row: Record<string, unknown>) => {
+      const scripted = scriptedDatabase([{ project, ...row }]);
+      const page = await new DrizzleProjectRepository(scripted.db).list(ownerUserId, {
+        lifecycle: 'active',
+        pageSize: 20,
+      });
+      return page.previews;
+    };
+
+    // A locally rendered cut presents an asset, so the Project falls back to what it last produced.
+    await expect(
+      listOnce({
+        presentedMedia: { kind: 'asset', assetId },
+        lastSuccessfulOutput: { savedVideoId: videoId, videoVersionId: versionId },
+      }),
+    ).resolves.toEqual([{ projectId, savedVideoId: videoId, videoVersionId: versionId }]);
+    await expect(listOnce({ presentedMedia: null, lastSuccessfulOutput: null })).resolves.toEqual(
+      [],
+    );
+    // A snapshot fragment that cannot be read costs the poster, never the page.
+    await expect(
+      listOnce({ presentedMedia: { kind: 'nonsense' }, lastSuccessfulOutput: 'broken' }),
+    ).resolves.toEqual([]);
   });
 
   it('rejects a source relationship unless the same-owner asset is ready', async () => {

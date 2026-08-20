@@ -1,12 +1,28 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
+import { useQuery } from '@tanstack/react-query';
+import { listSavedVideos } from '../../adapters/api-client/savedVideosApi';
+import { fetchSavedVoiceCount } from '../../adapters/api-client/voicesApi';
 import { type AssetDestination } from '../../app/paths';
 import { creativeLibraryStorageSummary } from '../creative-assets/creativeLibraryStorage';
 import type { CreativeLibraryMirror } from '../creative-assets/useCreativeLibraryCloudSync';
-import { Button } from '../../ui';
+import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
+import { Button, VisuallyHidden } from '../../ui';
+
+/**
+ * What a card knows about its own size.
+ *
+ * Three states rather than a number, because "none saved" and "not read yet" are different answers
+ * and a hub that renders `0` for the second one is lying about an empty library.
+ */
+export type AssetCountState =
+  | { readonly status: 'loading' }
+  | { readonly status: 'ready'; readonly count: number }
+  | { readonly status: 'error'; readonly retry: () => void };
 
 type AssetsRouteSurfaceProps = Readonly<{
-  characterCount: number;
-  outfitCount: number;
+  /** The browser-held libraries are the shell's, so their counts arrive already resolved. */
+  characters: AssetCountState;
+  outfits: AssetCountState;
   /** Where the browser-held Character and Outfit libraries actually live in this configuration. */
   creativeLibraryMirror: CreativeLibraryMirror;
   onOpen: (destination: AssetDestination) => void;
@@ -79,6 +95,24 @@ const cardStyles = (theme: Theme): CSSObject => ({
     letterSpacing: '0.06em',
     textTransform: 'uppercase',
   },
+  '& [data-asset-count-pending]': { color: theme.colors.textFaint },
+  /*
+   * The same footprint the resolved count occupies, so a card does not resize under the heading
+   * when its number arrives.
+   */
+  '& [data-asset-count-skeleton]': {
+    display: 'inline-block',
+    width: '4.5rem',
+    height: '0.75em',
+    borderRadius: theme.radii.small,
+    background: theme.colors.border,
+    verticalAlign: 'middle',
+  },
+  '& [data-asset-count-retry]': {
+    minHeight: '2.75rem',
+    paddingInline: 0,
+    fontSize: theme.fontSizes.caption,
+  },
   '& [data-asset-storage]': {
     marginBlockStart: theme.space.xs,
     fontSize: theme.fontSizes.metadata,
@@ -90,42 +124,113 @@ const assetCards: ReadonlyArray<{
   destination: AssetDestination;
   title: string;
   description: string;
+  /** The word after the number. Kept per card so "3 saved" never becomes "3 videos saved". */
+  noun: string;
 }> = [
   {
     destination: 'videos',
     title: 'Videos',
     description:
       'Preview, edit, download, rename or remove your videos, and open any saved version.',
+    noun: 'saved',
   },
   {
     destination: 'characters',
     title: 'Characters',
     description: 'Manage reusable characters, copies, and Wardrobe variants.',
+    noun: 'saved',
   },
   {
     destination: 'outfits',
     title: 'Outfits',
     description: 'Reuse saved Virtual Try-On outfits in new or existing video work.',
+    noun: 'saved',
   },
   {
     destination: 'voices',
     title: 'Voices',
     description: 'Preview the catalog, keep the voices you want, and send one to Studio.',
+    noun: 'kept',
   },
 ];
 
+const AssetCount = ({
+  state,
+  title,
+  noun,
+}: {
+  readonly state: AssetCountState;
+  readonly title: string;
+  readonly noun: string;
+}) => {
+  if (state.status === 'loading') {
+    return (
+      <span data-asset-meta data-asset-count-pending="">
+        <span aria-hidden="true" data-asset-count-skeleton="" />
+        <VisuallyHidden>Counting {title}…</VisuallyHidden>
+      </span>
+    );
+  }
+  if (state.status === 'error') {
+    return (
+      <span data-asset-meta data-asset-count-pending="">
+        <span>Count unavailable</span>{' '}
+        <Button
+          size="small"
+          variant="quiet"
+          data-asset-count-retry=""
+          aria-label={`Retry counting ${title}`}
+          onClick={state.retry}
+        >
+          Retry
+        </Button>
+      </span>
+    );
+  }
+  return (
+    <span data-asset-meta>
+      {state.count} {noun}
+    </span>
+  );
+};
+
 export const AssetsRouteSurface = ({
-  characterCount,
-  outfitCount,
+  characters,
+  outfits,
   creativeLibraryMirror,
   onOpen,
   onUploadVideo,
 }: AssetsRouteSurfaceProps) => {
   const theme = useTheme();
-  const countFor = (destination: AssetDestination): string | null => {
-    if (destination === 'characters') return `${characterCount} saved`;
-    if (destination === 'outfits') return `${outfitCount} saved`;
-    return null;
+  /*
+   * One page of one, for the total beside it — the hub wants a number, not a library.
+   *
+   * Deliberately outside `savedVideoQueryKeys.lists`: the Videos library rewrites every query under
+   * that key as paged data, and a plain page cached there would be reshaped into a crash. The hub
+   * unmounts when the operator leaves it, so the next visit reads the count again.
+   */
+  const videosQuery = useQuery({
+    queryKey: savedVideoQueryKeys.total,
+    queryFn: ({ signal }) => listSavedVideos({ pageSize: 1, signal }),
+  });
+  const voicesQuery = useQuery({
+    queryKey: ['voices', 'saved-count'],
+    queryFn: ({ signal }) => fetchSavedVoiceCount(signal),
+  });
+
+  const countFor = (destination: AssetDestination): AssetCountState => {
+    if (destination === 'characters') return characters;
+    if (destination === 'outfits') return outfits;
+    const query = destination === 'videos' ? videosQuery : voicesQuery;
+    if (query.isError) return { status: 'error', retry: () => void query.refetch() };
+    if (destination === 'videos') {
+      return videosQuery.data === undefined
+        ? { status: 'loading' }
+        : { status: 'ready', count: videosQuery.data.total };
+    }
+    return voicesQuery.data === undefined
+      ? { status: 'loading' }
+      : { status: 'ready', count: voicesQuery.data.count };
   };
 
   return (
@@ -147,12 +252,15 @@ export const AssetsRouteSurface = ({
 
       <div css={gridStyles(theme)}>
         {assetCards.map((card) => {
-          const count = countFor(card.destination);
           const storage = creativeLibraryStorageSummary(card.destination, creativeLibraryMirror);
           return (
             <article key={card.destination} css={cardStyles(theme)}>
               <div>
-                {count ? <span data-asset-meta>{count}</span> : null}
+                <AssetCount
+                  state={countFor(card.destination)}
+                  title={card.title}
+                  noun={card.noun}
+                />
                 <h2>{card.title}</h2>
               </div>
               <div>

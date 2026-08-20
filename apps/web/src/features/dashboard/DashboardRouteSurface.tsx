@@ -8,11 +8,14 @@ import type {
 import { formatDate, formatDateTime } from '@studio/domain';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { listSavedVideos } from '../../adapters/api-client/savedVideosApi';
+import { listSavedVideos, savedVideoThumbnailUrl } from '../../adapters/api-client/savedVideosApi';
 import { abandonVideoJob, listActiveVideoJobs } from '../../adapters/api-client/videoJobsApi';
 import { AppIcon, Button, ConfirmationDialog, StatusNotice } from '../../ui';
 import { useCampaignList } from '../campaigns/useCampaignsController';
+import { KIND_ICONS } from '../projects/ProjectAssetThumbnail';
+import { projectPosterUrls } from '../projects/projectPosterPresentation';
 import { useProjectList } from '../projects/useProjectsController';
+import { WorkPosterTile } from '../projects/WorkPosterTile';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import {
   loadDashboardOnboardingDismissed,
@@ -74,6 +77,8 @@ type RecentWorkItem = Readonly<{
   title: string;
   meta: string;
   updatedAt: string;
+  /** Resolved from data these lists already carry, so a row costs no request of its own. */
+  posterUrl: string | null;
   open: () => void;
 }>;
 
@@ -93,6 +98,15 @@ const recentKindIcon = (kind: ItemKind) => {
       return 'campaigns' as const;
   }
 };
+
+/**
+ * What a row says when it has no poster.
+ *
+ * A Campaign never has one — it organizes Projects rather than producing video — so saying "no
+ * preview yet" there would describe a wait that is never coming.
+ */
+const recentEmptyCaption = (kind: ItemKind): string =>
+  kind === 'campaigns' ? 'Campaign' : 'No preview yet';
 
 export const DashboardRouteSurface = ({
   ownerUserId,
@@ -160,6 +174,10 @@ export const DashboardRouteSurface = ({
     [videosQuery.data],
   );
   const continueProject = projects[0] ?? null;
+  const projectPosters = useMemo(
+    () => projectPosterUrls(projectsQuery.data?.pages),
+    [projectsQuery.data],
+  );
   const recentItems = useMemo<readonly RecentWorkItem[]>(
     () =>
       [
@@ -169,6 +187,7 @@ export const DashboardRouteSurface = ({
           title: project.title,
           meta: project.campaignId === null ? 'No Campaign' : 'Campaign Project',
           updatedAt: project.updatedAt,
+          posterUrl: projectPosters.get(project.id) ?? null,
           open: () => onOpenProject(project.id),
         })),
         ...videos.map((video: SavedVideoSummary) => ({
@@ -177,6 +196,10 @@ export const DashboardRouteSurface = ({
           title: video.title,
           meta: `${video.versionCount} Version${video.versionCount === 1 ? '' : 's'}`,
           updatedAt: video.updatedAt,
+          // The list response already says whether a poster exists, so no row asks for one blindly.
+          posterUrl: video.thumbnailAvailable
+            ? savedVideoThumbnailUrl(video.id, video.currentVersion.id)
+            : null,
           open: () => onOpenVideo(video.id),
         })),
         ...campaigns.map((campaign: CampaignContract) => ({
@@ -185,10 +208,11 @@ export const DashboardRouteSurface = ({
           title: campaign.name,
           meta: campaign.brief ?? 'No brief yet',
           updatedAt: campaign.updatedAt,
+          posterUrl: null,
           open: () => onOpenCampaign(campaign.id),
         })),
       ].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
-    [campaigns, onOpenCampaign, onOpenProject, onOpenVideo, projects, videos],
+    [campaigns, onOpenCampaign, onOpenProject, onOpenVideo, projectPosters, projects, videos],
   );
   const visibleItems = recentItems
     .filter((item) => recentKind === 'all' || item.kind === recentKind)
@@ -421,7 +445,26 @@ export const DashboardRouteSurface = ({
               {visibleItems.map((item) => (
                 <li key={`${item.kind}-${item.id}`}>
                   <button type="button" onClick={item.open}>
-                    <AppIcon name={recentKindIcon(item.kind)} data-recent-icon />
+                    <span data-recent-poster="">
+                      {/* Decorative: the button's own text already names the work. */}
+                      <WorkPosterTile
+                        decorative
+                        playBadge={item.kind !== 'campaigns'}
+                        icon={
+                          item.kind === 'campaigns' ? (
+                            <AppIcon name={recentKindIcon(item.kind)} />
+                          ) : (
+                            KIND_ICONS.video
+                          )
+                        }
+                        thumbnailUrl={item.posterUrl}
+                        emptyCaption={recentEmptyCaption(item.kind)}
+                        failedCaption="Preview didn’t load"
+                        label={item.title}
+                        kindNoun={recentKindLabel[item.kind]}
+                        unavailable={false}
+                      />
+                    </span>
                     <span data-recent-title>
                       <strong>{item.title}</strong>
                       <span>

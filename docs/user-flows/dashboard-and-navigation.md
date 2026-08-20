@@ -55,6 +55,12 @@ Sections in DOM order:
    4 items. Every row opens the specific record it names: projects go to `/projects/{id}`, campaigns
    to `/campaigns/{id}`, and videos to `/assets/videos?video={id}`, which opens that video's preview
    in the Videos library.
+
+   Each row leads with a poster resolved from the list responses it already has: a project from the
+   `previews` its list carries, a video from `thumbnailAvailable` and its current Version. Neither
+   costs a request of its own. A row with nothing to show says "No preview yet"; a campaign says
+   "Campaign", because it organizes work rather than producing it and no poster is coming.
+
 6. **Footer links** — All Projects · All Videos · All Campaigns.
 
 There is no separate "Start New" section. It offered **New Project** and **New Campaign**, both

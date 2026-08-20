@@ -96,12 +96,46 @@ describe('Projects API adapter', () => {
 
     await expect(
       listProjects({ lifecycle: 'active', pageSize: 20, cursor: 'first-page' }),
-    ).resolves.toEqual({ projects: [currentProject().project], nextCursor: 'next-page' });
+    ).resolves.toEqual({
+      projects: [currentProject().project],
+      // A page that names no posters is a page with nothing to show, not a missing field.
+      previews: [],
+      nextCursor: 'next-page',
+    });
     const url = new URL(observed.requests[0]!.url);
     expect(url.searchParams.get('lifecycle')).toBe('active');
     expect(url.searchParams.get('pageSize')).toBe('20');
     expect(url.searchParams.get('cursor')).toBe('first-page');
     expect(JSON.stringify(await observed.requests[0]!.clone().text())).not.toContain('snapshot');
+  });
+
+  it('carries the poster references the page resolved, and rejects a malformed one', async () => {
+    const preview = {
+      projectId: currentProject().project.id,
+      savedVideoId: 'e1cfa9a0-9dd2-4c8e-8db7-3b0d5d1f8f70',
+      videoVersionId: '0b4a5b6a-9f6c-4a0c-9a44-9a7e0f9a1c3d',
+    };
+    mockApiServer.use(
+      jsonScenario('GET', '/api/projects', {
+        body: { projects: [currentProject().project], previews: [preview], nextCursor: null },
+      }),
+    );
+
+    await expect(listProjects({ lifecycle: 'active', pageSize: 20 })).resolves.toMatchObject({
+      previews: [preview],
+    });
+
+    mockApiServer.use(
+      jsonScenario('GET', '/api/projects', {
+        body: {
+          projects: [currentProject().project],
+          previews: [{ ...preview, savedVideoId: 'not-a-video' }],
+          nextCursor: null,
+        },
+      }),
+    );
+
+    await expect(listProjects({ lifecycle: 'active', pageSize: 20 })).rejects.toThrow();
   });
 
   it('sends one app-owned operation key and owner-free Quick Start body', async () => {

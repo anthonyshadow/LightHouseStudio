@@ -70,6 +70,33 @@ describe('ElevenLabs voice API', () => {
     expect(wrongOwner.json()).toEqual({ voiceId: 'saved-for-other-owner', saved: false });
   });
 
+  it('counts kept voices per owner without contacting the provider', async () => {
+    const savedVoices = new MemorySavedVoiceRepository();
+    const host = 'localhost:5173';
+    const digest = createHash('sha256').update(host).digest('hex');
+    const requestOwnerId = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+    await savedVoices.save(requestOwnerId, 'kept-one', null, '2026-08-13T12:00:00.000Z');
+    await savedVoices.save(requestOwnerId, 'kept-two', null, '2026-08-13T12:00:00.000Z');
+    await savedVoices.save(
+      '2e3bfa18-4421-473d-86bd-80a5c0564a8b',
+      'another-owners-voice',
+      null,
+      '2026-08-13T12:00:00.000Z',
+    );
+    // No provider is configured at all, so a count that reached one could not answer.
+    const app = createApp({ config: testConfig(), persistence: { savedVoices } });
+    apps.push(app);
+
+    const counted = await app.inject({
+      method: 'GET',
+      url: '/api/elevenlabs/voices/saved-count',
+      headers: { host },
+    });
+
+    expect(counted.statusCode).toBe(200);
+    expect(counted.json()).toEqual({ count: 2 });
+  });
+
   it('trims workspace search, caps paging, and returns every saved voice category', async () => {
     const { app, provider } = setup();
     provider.workspaceVoices = [

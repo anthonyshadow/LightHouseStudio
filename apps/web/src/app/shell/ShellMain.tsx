@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { mainGridStyles } from '../../studio/StudioApp.styles';
+import type { AssetCountState } from '../../features/assets/AssetsRouteSurface';
 import { APP_PATHS, focusesMainOnNavigation } from '../paths';
 import type { ShellServices } from './useShellServices';
 
@@ -91,6 +92,20 @@ export const ShellMain = ({ services, displayName, studioRuntime }: ShellMainPro
     openOverlay('ai-experience');
     void navigate(APP_PATHS.create, { replace: true, state: null });
   }, [navigate, openOverlay]);
+  /*
+   * Both browser-held libraries answer from the same store, so they share one state: unread until
+   * IndexedDB has loaded, and unavailable — with a reopen — when it could not be opened at all.
+   */
+  const creativeReopen = creative.reopen;
+  const creativeCount = useCallback(
+    (count: number): AssetCountState =>
+      creative.health === 'session-only'
+        ? { status: 'error', retry: creativeReopen }
+        : creative.hydrated
+          ? { status: 'ready', count }
+          : { status: 'loading' },
+    [creative.health, creative.hydrated, creativeReopen],
+  );
 
   // Not a mount-time effect: the shell stays mounted, so arriving somewhere new is a change of
   // `location.key` rather than a remount. 'default' is a cold direct entry, where stealing focus
@@ -131,11 +146,11 @@ export const ShellMain = ({ services, displayName, studioRuntime }: ShellMainPro
       {route.assetsRouteActive ? (
         <Suspense fallback={<p role="status">Loading Assets…</p>}>
           <AssetsRouteSurface
-            characterCount={creative.store.savedCharacterPrompts.length}
-            outfitCount={
+            characters={creativeCount(creative.store.savedCharacterPrompts.length)}
+            outfits={creativeCount(
               creative.store.savedPrompts.filter((item) => item.modelModeId === 'lucy-vton-latest')
-                .length
-            }
+                .length,
+            )}
             creativeLibraryMirror={creative.sync.mirror}
             onOpen={nav.openAssetLibrary}
             onUploadVideo={nav.uploadVideo}

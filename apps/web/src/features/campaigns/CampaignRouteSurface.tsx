@@ -5,10 +5,13 @@ import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { APP_PATHS, campaignIdFromPath, campaignPath, projectPath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
-import { Button, StatusNotice } from '../../ui';
+import { AppIcon, Button, StatusNotice } from '../../ui';
 import { workspaceInnerStyles, workspaceStyles } from '../projects/ProjectRouteSurface.styles';
 import { NewProjectDialog } from '../projects/ProjectDialogs';
+import { KIND_ICONS } from '../projects/ProjectAssetThumbnail';
+import { projectPosterUrls } from '../projects/projectPosterPresentation';
 import { useProjectList } from '../projects/useProjectsController';
+import { WorkPosterTile } from '../projects/WorkPosterTile';
 import {
   campaignBriefStyles,
   campaignCardMetaStyles,
@@ -91,7 +94,27 @@ const CampaignListSection = ({
             <li key={campaign.id}>
               <article css={campaignCardStyles(theme)}>
                 <div>
-                  <h4>{campaign.name}</h4>
+                  <div data-campaign-identity>
+                    <span data-campaign-cover="">
+                      {/*
+                       * Deliberately not a poster. A Campaign is an organizer, and its Projects'
+                       * posters are not resolvable from the Campaign list response — reaching for
+                       * them would cost one request per card, which this surface will not spend.
+                       * Its Projects show their own work on the Campaign itself.
+                       */}
+                      <WorkPosterTile
+                        decorative
+                        icon={<AppIcon name="campaigns" />}
+                        thumbnailUrl={null}
+                        emptyCaption="Campaign"
+                        failedCaption="Campaign"
+                        label={campaign.name}
+                        kindNoun="Campaign"
+                        unavailable={false}
+                      />
+                    </span>
+                    <h4>{campaign.name}</h4>
+                  </div>
                   <p>{campaign.brief ?? 'No brief yet.'}</p>
                   {/* Status is metadata, not an action — and the action row now holds up to four
                       buttons, which must stay reflowable at 200% text on a small screen. A span,
@@ -315,6 +338,7 @@ const CampaignProjectGroup = ({
     () => query.data?.pages.flatMap((page) => page.projects) ?? [],
     [query.data],
   );
+  const posters = useMemo(() => projectPosterUrls(query.data?.pages), [query.data]);
   return (
     <section css={projectGroupStyles(theme)} aria-labelledby={`${lifecycle}-campaign-projects`}>
       <header>
@@ -344,7 +368,23 @@ const CampaignProjectGroup = ({
           {projects.map((project) => (
             <li key={project.id}>
               <article>
-                <h4>{project.title}</h4>
+                <div data-project-identity>
+                  <span data-project-poster="">
+                    {/* Decorative: the heading beside it already names the Project. */}
+                    <WorkPosterTile
+                      decorative
+                      playBadge
+                      icon={KIND_ICONS.video}
+                      thumbnailUrl={posters.get(project.id) ?? null}
+                      emptyCaption="No preview yet"
+                      failedCaption="Preview didn’t load"
+                      label={project.title}
+                      kindNoun="Project"
+                      unavailable={false}
+                    />
+                  </span>
+                  <h4>{project.title}</h4>
+                </div>
                 <div data-project-actions>
                   <Button
                     size="small"

@@ -49,11 +49,16 @@ Membership is a Project mutation, not a Campaign mutation. `moveProjectToCampaig
    (`CampaignRouteSurface.tsx:617-621`).
 2. Header: `h1` "Campaigns", an explanation that Campaigns are optional, and a single primary
    **Create Campaign** button.
-3. Two sections — Active and Archived — each a card grid. Each card shows the name, the brief (or
-   "No brief yet."), "Updated <date>" and a status pill, plus the same actions the Projects list
-   offers: **Open** · **Edit** (active only) · **Archive**/**Restore** · **Delete** (archived only).
-   Every mutating action takes its `expectedVersion` from the row itself, because the list response
-   returns full Campaign records — no detail fetch is needed to manage one.
+3. Two sections — Active and Archived — each a card grid. Each card shows a cover, the name, the
+   brief (or "No brief yet."), "Updated <date>" and a status pill, plus the same actions the
+   Projects list offers: **Open** · **Edit** (active only) · **Archive**/**Restore** · **Delete**
+   (archived only). Every mutating action takes its `expectedVersion` from the row itself, because
+   the list response returns full Campaign records — no detail fetch is needed to manage one.
+
+   The cover is deliberately not a poster. `GET /api/campaigns` carries nothing about a Campaign's
+   Projects, so resolving one would mean a Project query per card; the surface will not spend that.
+   The Campaign's own page shows its Projects' work instead.
+
 4. Loading / error+retry / per-lifecycle empty states are present.
 
 **Create** — `CampaignFormDialog` (name required, brief optional with a live character count) posts
@@ -67,7 +72,9 @@ router state `{ campaignCreated: id }`.
 **Journey**
 
 1. `useCampaignDetail` issues `GET /api/campaigns/{id}`. Pending renders "Loading Campaign…";
-   error renders a danger notice with **Back to Campaigns** (`:322-336`).
+   error renders a danger notice with **Back to Campaigns** (`:322-336`). Its two Project sections
+   read the ordinary Project list, so each Project row leads with the same poster the Projects list
+   shows, from the same `previews` and with no extra request.
 2. Header: "← All Campaigns" breadcrumb, name, status pill, "Updated", brief.
 3. Actions: **New Project** (hidden when archived) · **Edit** ·
    **Archive**/**Restore** · **Delete Campaign** (archived only). Creating a _different_ Campaign

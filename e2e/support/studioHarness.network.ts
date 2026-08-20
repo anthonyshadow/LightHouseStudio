@@ -716,6 +716,20 @@ export const installProviderNetworkDriver = async (
       return;
     }
 
+    // App-owned and provider-free, so it is not recorded as voice provider traffic.
+    if (
+      requestUrl.pathname === '/api/elevenlabs/voices/saved-count' &&
+      route.request().method() === 'GET'
+    ) {
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ count: 0 }),
+      });
+      return;
+    }
+
     if (requestUrl.pathname === '/api/elevenlabs/voices' && route.request().method() === 'GET') {
       network.apiRequests.push({ path: requestUrl.pathname, model: null });
       network.voiceRequests.push({

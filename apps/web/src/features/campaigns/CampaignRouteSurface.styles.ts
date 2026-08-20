@@ -37,6 +37,15 @@ export const campaignCardStyles = (theme: Theme): CSSObject => ({
   borderRadius: theme.radii.large,
   background: theme.colors.surface,
   boxShadow: theme.shadows.soft,
+  '& [data-campaign-identity]': {
+    minWidth: 0,
+    display: 'grid',
+    gridTemplateColumns: 'auto minmax(0, 1fr)',
+    alignItems: 'center',
+    gap: theme.space.md,
+  },
+  /* Fixed against the viewport, not the text, so 200% text grows the name and not the cover. */
+  '& [data-campaign-cover]': { width: 'min(4.5rem, 20vw)' },
   '& h4': { margin: 0, overflowWrap: 'anywhere', fontSize: theme.fontSizes.section },
   '& p': {
     display: '-webkit-box',
@@ -84,6 +93,14 @@ export const projectGroupStyles = (theme: Theme): CSSObject => ({
     background: theme.colors.surface,
   },
   '& article h4': { margin: 0, overflowWrap: 'anywhere' },
+  '& [data-project-identity]': {
+    minWidth: 0,
+    display: 'grid',
+    gridTemplateColumns: 'auto minmax(0, 1fr)',
+    alignItems: 'center',
+    gap: theme.space.md,
+  },
+  '& [data-project-poster]': { width: 'min(5rem, 22vw)' },
   '& [data-project-actions]': { display: 'flex', flexWrap: 'wrap', gap: theme.space.sm },
   '@media (max-width: 39.99rem)': {
     '& article': { gridTemplateColumns: 'minmax(0, 1fr)' },

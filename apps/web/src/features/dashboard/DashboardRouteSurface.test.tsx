@@ -138,6 +138,55 @@ describe('DashboardRouteSurface', () => {
     expect(actions.onOpenCampaigns).toHaveBeenCalledOnce();
   });
 
+  it('shows recent work, and says what has no preview instead of showing a broken one', async () => {
+    const projectPreview = {
+      projectId: project.id,
+      savedVideoId: 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338',
+      videoVersionId: 'b276694b-58c4-40d3-8fb6-315e32b66fd0',
+    };
+    const apiReads: string[] = [];
+    mockApiServer.use(
+      http.get('*/api/projects', ({ request }) => {
+        apiReads.push(new URL(request.url).pathname);
+        return HttpResponse.json({
+          projects: [project],
+          previews: [projectPreview],
+          nextCursor: null,
+        });
+      }),
+      http.get('*/api/campaigns', ({ request }) => {
+        apiReads.push(new URL(request.url).pathname);
+        return HttpResponse.json({ campaigns: [campaign], nextCursor: null });
+      }),
+      http.get('*/api/videos', ({ request }) => {
+        apiReads.push(new URL(request.url).pathname);
+        return HttpResponse.json({
+          videos: [{ ...video, thumbnailAvailable: true }],
+          nextCursor: null,
+          total: 1,
+          facets: { characterNames: [], formats: ['landscape'] },
+        });
+      }),
+    );
+    renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
+
+    const posters = await waitFor(() => {
+      const images = document.querySelectorAll<HTMLImageElement>('[data-recent-poster] img');
+      expect(images).toHaveLength(2);
+      return [...images];
+    });
+    // The Project's own list response named the Version; the Video's said a poster exists.
+    expect(posters.map((image) => image.getAttribute('src'))).toEqual([
+      `/api/videos/${projectPreview.savedVideoId}/thumbnail?v=${projectPreview.videoVersionId}`,
+      `/api/videos/${video.id}/thumbnail?v=${video.currentVersion.id}`,
+    ]);
+    expect(posters.every((image) => image.getAttribute('loading') === 'lazy')).toBe(true);
+    // A Campaign organizes work rather than producing it, so it says so instead of waiting.
+    expect(screen.getByText('Campaign', { selector: 'small' })).toBeVisible();
+    // Three list reads for three lists — the rows added none of their own.
+    expect(apiReads.filter((path) => path !== '/api/video-jobs')).toHaveLength(3);
+  });
+
   it('opens the exact Saved Video a Recent Work row names, not the whole library', async () => {
     mockApiServer.use(
       http.get('*/api/projects', () => HttpResponse.json({ projects: [], nextCursor: null })),

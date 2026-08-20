@@ -247,6 +247,46 @@ afterEach(() => {
 });
 
 describe('Project route surface', () => {
+  it('shows each Project by its work, and names the absence when there is none', async () => {
+    const preview = {
+      projectId: activeId,
+      savedVideoId: 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338',
+      videoVersionId: 'b276694b-58c4-40d3-8fb6-315e32b66fd0',
+    };
+    let listReads = 0;
+    mockApiServer.use(
+      http.get('*/api/projects', ({ request }) => {
+        listReads += 1;
+        const lifecycle = new URL(request.url).searchParams.get('lifecycle');
+        return lifecycle === 'archived'
+          ? HttpResponse.json({
+              projects: [currentProject(archivedId).project],
+              previews: [],
+              nextCursor: null,
+            })
+          : HttpResponse.json({
+              projects: [currentProject(activeId).project],
+              previews: [preview],
+              nextCursor: null,
+            });
+      }),
+    );
+    renderProjects();
+
+    expect(await screen.findByRole('heading', { name: 'Launch cut' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Archived concept' })).toBeVisible();
+    const posters = document.querySelectorAll<HTMLImageElement>('[data-project-poster] img');
+    expect(posters).toHaveLength(1);
+    expect(posters[0]!.getAttribute('src')).toBe(
+      `/api/videos/${preview.savedVideoId}/thumbnail?v=${preview.videoVersionId}`,
+    );
+    expect(posters[0]!.getAttribute('loading')).toBe('lazy');
+    // Deliberate, not broken: the archived row says it has nothing to show yet.
+    expect(screen.getByText('No preview yet')).toBeVisible();
+    // Two lifecycle lists, two reads. Neither row asked a question of its own.
+    expect(listReads).toBe(2);
+  });
+
   it('renders bounded active/archived summaries and opens server-owned empty detail', async () => {
     installProjectLists();
     mockApiServer.use(

@@ -76,6 +76,8 @@ const harness = vi.hoisted(() => {
   };
   const repository = {
     getSnapshot: vi.fn(() => ({ store, health: 'ready' as const, notice: null })),
+    // The shell awaits this before letting any surface state a library size.
+    ready: vi.fn(() => Promise.resolve()),
     subscribe: vi.fn(() => () => undefined),
     createSavedPrompt: vi.fn(),
     updateSavedPrompt: vi.fn(),
@@ -599,6 +601,7 @@ vi.mock('../ui', async () => {
   const { useEffect, useRef } = await import('react');
   const { StudioDesignProvider } = await import('../ui/StudioDesignProvider');
   const { Button } = await import('../ui/primitives/Button');
+  const { VisuallyHidden } = await import('../ui/primitives/VisuallyHidden');
   // The confirmation mechanism is plain state with no styling, so the real one is used here: a
   // stub would let a shell change that stops asking pass unnoticed.
   const { useConfirmationRequest, ConfirmationRequestDialog } =
@@ -634,6 +637,7 @@ vi.mock('../ui', async () => {
   return {
     StudioDesignProvider,
     Button,
+    VisuallyHidden,
     useConfirmationRequest,
     ConfirmationRequestDialog,
     useAwaitableQuestion,

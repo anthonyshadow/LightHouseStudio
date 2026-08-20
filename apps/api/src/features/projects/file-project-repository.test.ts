@@ -203,6 +203,87 @@ describe('FileProjectRepository', () => {
     ).toBeNull();
   });
 
+  it('resolves list posters from each Project\u2019s own current revision, preferring what is presented', async () => {
+    const service = new ProjectService(new FileProjectRepository(directory));
+    const presenting = await service.create(ownerUserId, randomUUID(), 'Presenting a Version');
+    const produced = await service.create(ownerUserId, randomUUID(), 'Produced an output');
+    const plain = await service.create(ownerUserId, randomUUID(), 'Nothing to show yet');
+    if (!presenting.ok || !produced.ok || !plain.ok) throw new Error('Expected three Projects.');
+    const presentedVideoId = randomUUID();
+    const presentedVersionId = randomUUID();
+    const outputVideoId = randomUUID();
+    const outputVersionId = randomUUID();
+
+    const paths = metadataPaths(directory, ownerUserId);
+    const library = JSON.parse(await readFile(paths.primary, 'utf8')) as {
+      projects: Array<{
+        project: { id: string; ownerUserId: string };
+        outputLinks: Array<Record<string, unknown>>;
+        revisions: Array<{
+          id: string;
+          revisionNumber: number;
+          snapshot: { presentedMedia: unknown; lastSuccessfulOutput: unknown };
+        }>;
+      }>;
+    };
+    const aggregateFor = (projectId: string) => {
+      const aggregate = library.projects.find(({ project }) => project.id === projectId);
+      if (aggregate === undefined) throw new Error('Expected the Project to be persisted.');
+      return aggregate;
+    };
+    // The stored library only accepts an output pointer with its retained producer relation.
+    const recordOutput = (projectId: string) => {
+      const aggregate = aggregateFor(projectId);
+      const revision = aggregate.revisions[0]!;
+      revision.snapshot.lastSuccessfulOutput = {
+        savedVideoId: outputVideoId,
+        videoVersionId: outputVersionId,
+      };
+      aggregate.outputLinks.push({
+        projectId,
+        ownerUserId: aggregate.project.ownerUserId,
+        savedVideoId: outputVideoId,
+        videoVersionId: outputVersionId,
+        producingRevisionId: revision.id,
+        producingRevisionNumber: revision.revisionNumber,
+        createdAt: now,
+      });
+    };
+    // Presented media wins even when the Project has also produced something older.
+    recordOutput(presenting.current.project.id);
+    aggregateFor(presenting.current.project.id).revisions[0]!.snapshot.presentedMedia = {
+      kind: 'saved-video-version',
+      savedVideoId: presentedVideoId,
+      videoVersionId: presentedVersionId,
+    };
+    recordOutput(produced.current.project.id);
+    await writeFile(paths.primary, `${JSON.stringify(library)}\n`, 'utf8');
+    await writeFile(paths.backup, `${JSON.stringify(library)}\n`, 'utf8');
+
+    const page = await new ProjectService(new FileProjectRepository(directory)).list(ownerUserId, {
+      lifecycle: 'active',
+      pageSize: 20,
+    });
+
+    expect(page.projects).toHaveLength(3);
+    // Keyed by Project, never row-aligned: a Project with nothing to show contributes no entry.
+    expect(page.previews).toEqual(
+      expect.arrayContaining([
+        {
+          projectId: presenting.current.project.id,
+          savedVideoId: presentedVideoId,
+          videoVersionId: presentedVersionId,
+        },
+        {
+          projectId: produced.current.project.id,
+          savedVideoId: outputVideoId,
+          videoVersionId: outputVersionId,
+        },
+      ]),
+    );
+    expect(page.previews).toHaveLength(2);
+  });
+
   it('migrates v6 usage into distinct deterministic memberships without backfilling Recipe IDs', async () => {
     const service = new ProjectService(new FileProjectRepository(directory));
     const created = await service.create(ownerUserId, randomUUID(), 'Legacy asset usage');
