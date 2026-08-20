@@ -1,3 +1,4 @@
+import type { ListTotal } from '@studio/contracts';
 import type { Campaign, CampaignConflict } from '@studio/domain';
 
 export interface CampaignCreateReceipt {
@@ -26,6 +27,11 @@ export interface CampaignSummaryCursor {
 
 export interface CampaignSummaryPageInput {
   readonly lifecycle: 'active' | 'archived';
+  /**
+   * Matched case-insensitively against the Campaign name. Already trimmed and length-bounded by
+   * the contract, so an implementation applies it rather than re-validating it.
+   */
+  readonly search?: string;
   readonly cursor?: CampaignSummaryCursor;
   readonly pageSize: number;
 }
@@ -33,6 +39,11 @@ export interface CampaignSummaryPageInput {
 export interface CampaignSummaryPage {
   readonly campaigns: readonly Campaign[];
   readonly nextCursor: CampaignSummaryCursor | null;
+  /**
+   * How many Campaigns match the query as a whole, independent of where the cursor is. Bounded, so
+   * it never costs a full scan.
+   */
+  readonly total: ListTotal;
 }
 
 export interface CampaignWithAttachedProjectCount {

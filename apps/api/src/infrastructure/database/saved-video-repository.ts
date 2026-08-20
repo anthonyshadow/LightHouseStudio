@@ -20,6 +20,7 @@ import type {
 } from '../../features/saved-videos/saved-video-repository.js';
 import type { LightframeDatabase } from './client.js';
 import { savedVideoReceipts, savedVideos, videoVersions } from './schema.js';
+import { searchTermMatches } from './search-pattern.js';
 
 type DatabaseExecutor = Parameters<Parameters<LightframeDatabase['transaction']>[0]>[0];
 type VideoRow = typeof savedVideos.$inferSelect;
@@ -397,6 +398,7 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
         ? undefined
         : eq(videoVersions.characterName, query.characterName),
       query.format === undefined ? undefined : sql`${format} = ${query.format}`,
+      query.search === undefined ? undefined : searchTermMatches(savedVideos.title, query.search),
     );
     const order = videoOrder(query.sort);
 

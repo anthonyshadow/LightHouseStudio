@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_CHARACTER_MODEL_ID,
+  LIST_SEARCH_MAX_LENGTH,
+  LIST_SEARCH_MIN_LENGTH,
+  LIST_TOTAL_CEILING,
   PAGE_SIZE_LIMIT,
   VOICE_CONVERSION_MAX_BYTES,
   VOICE_CONVERSION_OUTPUT_MAX_BYTES,
@@ -8,6 +11,7 @@ import {
   VOICE_PROVIDER_INTENT_HEADER,
   VOICE_PROVIDER_INTENT_VALUE,
   apiErrorResponseSchema,
+  campaignsQuerySchema,
   capabilitiesResponseSchema,
   characterPromptOptimizationResultSchema,
   completeDirectSavedVideoUploadRequestSchema,
@@ -16,7 +20,10 @@ import {
   createReferenceImageRequestSchema,
   editReferenceImageRequestSchema,
   healthResponseSchema,
+  listTotalSchema,
   optimizeCharacterReferencePromptRequestSchema,
+  projectsQuerySchema,
+  savedVideosQuerySchema,
   optimizeCharacterReferencePromptResponseSchema,
   realtimeTokenRequestSchema,
   realtimeTokenResponseSchema,
@@ -809,6 +816,55 @@ describe('safe API errors', () => {
           upstreamBody: 'raw secret payload',
         },
       }).success,
+    ).toBe(false);
+  });
+});
+
+describe('List search and total contracts', () => {
+  const queries = [
+    ['Projects', projectsQuerySchema, { lifecycle: 'active' }],
+    ['Campaigns', campaignsQuerySchema, { lifecycle: 'active' }],
+    ['Saved Videos', savedVideosQuerySchema, {}],
+  ] as const;
+
+  it.each(queries)(
+    'treats an absent, empty and whitespace-only %s term alike',
+    (_name, schema, base) => {
+      const absent = schema.parse({ ...base });
+      expect(absent).not.toHaveProperty('search');
+      expect(schema.parse({ ...base, search: '' })).toEqual(absent);
+      expect(schema.parse({ ...base, search: '   ' })).toEqual(absent);
+    },
+  );
+
+  it.each(queries)(
+    'trims and bounds a %s term in the contract rather than in a repository',
+    (_name, schema, base) => {
+      expect(schema.parse({ ...base, search: '  launch  ' })).toMatchObject({ search: 'launch' });
+      // Too long is rejected outright. Truncating here would silently widen the match instead.
+      expect(
+        schema.safeParse({ ...base, search: 'x'.repeat(LIST_SEARCH_MAX_LENGTH + 1) }).success,
+      ).toBe(false);
+      expect(
+        schema.safeParse({ ...base, search: 'x'.repeat(LIST_SEARCH_MAX_LENGTH) }).success,
+      ).toBe(true);
+      expect(
+        schema.safeParse({ ...base, search: 'x'.repeat(LIST_SEARCH_MIN_LENGTH - 1) }).success,
+      ).toBe(false);
+    },
+  );
+
+  it('reports a total as a count and whether that count is a floor', () => {
+    expect(listTotalSchema.parse({ count: 3, exceedsCeiling: false })).toEqual({
+      count: 3,
+      exceedsCeiling: false,
+    });
+    expect(
+      listTotalSchema.parse({ count: LIST_TOTAL_CEILING, exceedsCeiling: true }),
+    ).toMatchObject({ exceedsCeiling: true });
+    // A count past the ceiling would be a census the list never took.
+    expect(
+      listTotalSchema.safeParse({ count: LIST_TOTAL_CEILING + 1, exceedsCeiling: true }).success,
     ).toBe(false);
   });
 });

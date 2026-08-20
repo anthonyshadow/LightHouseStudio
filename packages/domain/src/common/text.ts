@@ -38,3 +38,13 @@ export const normalizeTags = (values: readonly string[]): string[] => {
 };
 
 export const containsMeaningfulText = (value: string): boolean => /[\p{L}\p{N}]/u.test(value);
+
+/**
+ * How a typed list search term matches a title or name: case-insensitive containment.
+ *
+ * The locale is pinned rather than left to the host so the two implementations of this same rule —
+ * this one, used wherever records are already in memory, and the database `ILIKE` used where they
+ * are not — can be asserted to agree.
+ */
+export const matchesSearchTerm = (value: string, term: string): boolean =>
+  value.toLocaleLowerCase('en-US').includes(term.trim().toLocaleLowerCase('en-US'));

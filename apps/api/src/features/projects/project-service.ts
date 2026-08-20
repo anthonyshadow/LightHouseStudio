@@ -85,10 +85,15 @@ export const publicProjectCurrent = ({
     },
   });
 
+/**
+ * Everything a cursor is only valid within. The search term belongs here: a cursor names a position
+ * in one ordered result set, so replaying it against a different term would page the wrong list.
+ */
 const cursorCriteria = (query: ProjectsQuery): string =>
   JSON.stringify({
     lifecycle: query.lifecycle,
     campaignId: query.campaignId ?? null,
+    search: query.search ?? null,
     pageSize: query.pageSize,
   });
 
@@ -172,6 +177,7 @@ export class ProjectService {
     const page = await this.#repository.list(ownerUserId, {
       lifecycle: query.lifecycle,
       ...(query.campaignId === undefined ? {} : { campaignId: query.campaignId }),
+      ...(query.search === undefined ? {} : { search: query.search }),
       ...(cursor === undefined ? {} : { cursor }),
       pageSize: query.pageSize,
     });
@@ -183,6 +189,7 @@ export class ProjectService {
         videoVersionId: preview.videoVersionId,
       })),
       nextCursor: page.nextCursor === null ? null : encodeCursor(page.nextCursor, query),
+      total: page.total,
     });
   }
 

@@ -60,7 +60,11 @@ Rendered by `apps/web/src/features/video-gallery/VideoGallery.tsx` — the riche
 **Journey**
 
 1. `GET /api/videos` (infinite query) with `sort`, optional `characterName` and `format` filters
-   driven by server-provided facets.
+   driven by server-provided facets, and an optional `search` term matched against the video title.
+   Search joins the existing filter row rather than replacing it: the selects keep their position
+   and their own **Clear filters** control, and the term has its own **Clear search**. The facets
+   are computed across the whole library, not the filtered page, so a search that matches nothing
+   never makes the library look empty.
    Arriving with `?video=<uuid>` — how the Dashboard's Recent Work opens one specific video — the
    gallery resolves that id through `getSavedVideo` under the same query key the preview itself
    uses, opens its preview, and reports an unknown or removed id as a notice rather than an empty

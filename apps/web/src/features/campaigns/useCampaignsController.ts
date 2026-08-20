@@ -1,5 +1,11 @@
 import type { CampaignContract } from '@studio/contracts';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { useRef } from 'react';
 import {
   archiveCampaign,
@@ -20,18 +26,24 @@ export const campaignQueryKeys = {
   detail: (campaignId: string) => ['campaigns', 'detail', campaignId] as const,
 };
 
-export const useCampaignList = (lifecycle: 'active' | 'archived') =>
+/**
+ * `search` is part of the key, not just the request: a term identifies a different result set, so
+ * its pages — and the cursors that walk them — must never be mixed with another term's.
+ */
+export const useCampaignList = (lifecycle: 'active' | 'archived', search?: string) =>
   useInfiniteQuery({
-    queryKey: campaignQueryKeys.list(lifecycle),
+    queryKey: [...campaignQueryKeys.list(lifecycle), search ?? ''],
     queryFn: ({ pageParam, signal }) =>
       listCampaigns({
         lifecycle,
+        ...(search === undefined ? {} : { search }),
         pageSize: CAMPAIGN_PAGE_SIZE,
         ...(pageParam ? { cursor: pageParam } : {}),
         signal,
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
+    placeholderData: keepPreviousData,
   });
 
 export const useCampaignDetail = (campaignId: string | null) =>

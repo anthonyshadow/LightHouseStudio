@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { listSearchSchema } from './common';
 import { videoInputMimeTypeSchema, VIDEO_RESULT_MAX_BYTES } from './video-jobs';
 
 export const SAVED_VIDEO_ORIGINS = [
@@ -89,6 +90,7 @@ export const savedVideosQuerySchema = z
     pageSize: z.coerce.number().int().min(1).max(40).default(20),
     characterName: savedVideoCharacterNameSchema.optional(),
     format: savedVideoFormatSchema.optional(),
+    search: listSearchSchema,
     sort: savedVideoSortSchema.default('latest'),
   })
   .strict();

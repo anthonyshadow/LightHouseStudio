@@ -43,7 +43,13 @@ describe('Campaigns API adapter', () => {
       jsonScenario(
         'GET',
         '/api/campaigns',
-        { body: { campaigns: [campaign()], nextCursor: 'next-page' } },
+        {
+          body: {
+            campaigns: [campaign()],
+            nextCursor: 'next-page',
+            total: { count: 1, exceedsCeiling: false },
+          },
+        },
         observed.observe,
       ),
       jsonScenario('POST', '/api/campaigns', { body: campaign(), status: 201 }, observed.observe),
@@ -51,7 +57,11 @@ describe('Campaigns API adapter', () => {
 
     await expect(
       listCampaigns({ lifecycle: 'active', pageSize: 20, cursor: 'first-page' }),
-    ).resolves.toEqual({ campaigns: [campaign()], nextCursor: 'next-page' });
+    ).resolves.toEqual({
+      campaigns: [campaign()],
+      nextCursor: 'next-page',
+      total: { count: 1, exceedsCeiling: false },
+    });
     await expect(
       createCampaign({ name: 'Summer launch', brief: 'Keep the launch focused.' }, operationKey),
     ).resolves.toEqual(campaign());

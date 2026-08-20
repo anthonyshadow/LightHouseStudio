@@ -96,8 +96,10 @@ configured `DATABASE_MODE`; otherwise the routes are absent and the client sees 
 1. `ProjectRouteSurface` sees no project id in the pathname and renders `ProjectsListSurface`
    (`ProjectRouteSurface.tsx:39-43`).
 2. Header: `h1` "Projects", subtitle, and one create action — **New Project** (primary).
-3. A group filter with two options: **All Active** and **No Campaign**
-   (`ProjectsListSurface.tsx:258-275`).
+3. A search input — "Search Projects by name" — and a group filter with two options: **All Active**
+   and **No Campaign** (`ProjectsListSurface.tsx`). The term is debounced (300 ms), applies once it
+   reaches two characters, and searches **both** sections, exactly as the group filter does.
+   Clearing it restores the full list immediately rather than after the debounce.
 4. Two `ProjectListSection`s render — `lifecycle="active"` and `lifecycle="archived"` — and the
    group filter applies to **both**. Selecting "No Campaign" retitles them "No Campaign" and
    "Archived · No Campaign" and issues `campaignId=none` for each; the archived section used to
@@ -110,10 +112,19 @@ configured `DATABASE_MODE`; otherwise the routes are absent and the client sees 
    names the Project — and a Project with nothing to show says "No preview yet" rather than
    rendering a broken image.
 
-6. "N loaded" is shown, not a total; **Load more** appears while `hasNextPage`.
+6. Each section states a real count — "3 Projects", or "3 Projects matching “launch”" while a term
+   is active — through a polite live region, so a settled search announces its own result. Past
+   `LIST_TOTAL_CEILING` the count is stated as a floor ("More than 200 Projects"), never as an
+   exact number the list did not establish. **Load more** appears while `hasNextPage`. With a term
+   active and nothing matching, the empty state names the term and offers **Clear search**.
 
 **System behaviour** — `useProjectList` issues
-`GET /api/projects?lifecycle=…&pageSize=20[&campaignId=none]`. The response carries `previews`
+`GET /api/projects?lifecycle=…&pageSize=20[&campaignId=none][&search=…]`. `search` is bounded by the
+contract (`listSearchSchema`: trimmed, 2–80 characters; absent, empty and whitespace-only are the
+same request) and matched case-insensitively against the title. It is part of the query key and of
+the cursor's criteria, so a cursor issued for one term cannot page another. The response carries a
+bounded `total` counted before the cursor is applied — so it describes the query rather than what is
+left of it — and both repositories stop counting one row past the ceiling. The response carries `previews`
 beside `projects`: one `{ projectId, savedVideoId, videoVersionId }` for each listed Project whose
 current revision presents a Saved Video Version, or failing that names a last successful output
 (`projectPosterReferenceForSnapshot`). Only Projects that resolve to one appear, so the array is

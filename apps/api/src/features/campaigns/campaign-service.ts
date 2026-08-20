@@ -35,7 +35,11 @@ const publicCampaign = (campaign: Campaign): CampaignContract =>
   });
 
 const cursorCriteria = (query: CampaignsQuery): string =>
-  JSON.stringify({ lifecycle: query.lifecycle, pageSize: query.pageSize });
+  JSON.stringify({
+    lifecycle: query.lifecycle,
+    search: query.search ?? null,
+    pageSize: query.pageSize,
+  });
 
 const CAMPAIGN_CURSOR = {
   timestampKey: 'updatedAt',
@@ -102,12 +106,14 @@ export class CampaignService {
     const cursor = decodeCursor(query.cursor, query);
     const page = await this.#repository.listCampaigns(ownerUserId, {
       lifecycle: query.lifecycle,
+      ...(query.search === undefined ? {} : { search: query.search }),
       ...(cursor === undefined ? {} : { cursor }),
       pageSize: query.pageSize,
     });
     return campaignsResponseSchema.parse({
       campaigns: page.campaigns.map(publicCampaign),
       nextCursor: page.nextCursor === null ? null : encodeCursor(page.nextCursor, query),
+      total: page.total,
     });
   }
 

@@ -98,6 +98,8 @@ import {
 } from '../../features/projects/project-snapshot-relations.js';
 import type { LightframeDatabase } from './client.js';
 import { ProjectPersistenceError } from './project-persistence-errors.js';
+import { searchTermMatches } from './search-pattern.js';
+import { boundedListTotal, LIST_TOTAL_PROBE_LIMIT } from '../../application/list-total.js';
 import {
   assetLinkValues,
   parseSnapshot,
@@ -1004,48 +1006,64 @@ export class DrizzleProjectRepository
     }
     const cursorTimestamp =
       input.cursor === undefined ? undefined : toIsoTimestamp(input.cursor.updatedAt);
-    const rows = await this.db
-      .select({
-        project: projects,
-        // Two keys, not the whole snapshot: the poster is decoration and must not make a page read
-        // carry forty full revisions. Joined rather than asked for afterwards, so listing Projects
-        // stays one query no matter how many rows it returns.
-        presentedMedia: sql`${projectRevisions.snapshot} -> 'presentedMedia'`,
-        lastSuccessfulOutput: sql`${projectRevisions.snapshot} -> 'lastSuccessfulOutput'`,
-      })
-      .from(projects)
-      .leftJoin(
-        projectRevisions,
-        and(
-          eq(projectRevisions.id, projects.currentRevisionId),
-          eq(projectRevisions.ownerUserId, projects.ownerUserId),
-        ),
-      )
-      .where(
-        and(
-          eq(projects.ownerUserId, ownerUserId),
-          isNull(projects.deletedAt),
-          input.lifecycle === 'archived'
-            ? eq(projects.status, 'archived')
-            : sql`${projects.status} <> 'archived'`,
-          input.campaignId === undefined
-            ? undefined
-            : input.campaignId === 'none'
-              ? isNull(projects.campaignId)
-              : eq(projects.campaignId, input.campaignId),
-          input.cursor === undefined
-            ? undefined
-            : or(
-                lt(projects.updatedAt, cursorTimestamp!),
-                and(
-                  eq(projects.updatedAt, cursorTimestamp!),
-                  lt(projects.id, input.cursor.projectId),
+    // Shared by the page and the count, so the total can never describe a different question than
+    // the rows do. The cursor is deliberately not part of it: a total is of the query, not of what
+    // is left after paging.
+    const filters = and(
+      eq(projects.ownerUserId, ownerUserId),
+      isNull(projects.deletedAt),
+      input.lifecycle === 'archived'
+        ? eq(projects.status, 'archived')
+        : sql`${projects.status} <> 'archived'`,
+      input.campaignId === undefined
+        ? undefined
+        : input.campaignId === 'none'
+          ? isNull(projects.campaignId)
+          : eq(projects.campaignId, input.campaignId),
+      input.search === undefined ? undefined : searchTermMatches(projects.title, input.search),
+    );
+    const [rows, countRows] = await Promise.all([
+      this.db
+        .select({
+          project: projects,
+          // Two keys, not the whole snapshot: the poster is decoration and must not make a page
+          // read carry forty full revisions. Joined rather than asked for afterwards, so listing
+          // Projects stays one query no matter how many rows it returns.
+          presentedMedia: sql`${projectRevisions.snapshot} -> 'presentedMedia'`,
+          lastSuccessfulOutput: sql`${projectRevisions.snapshot} -> 'lastSuccessfulOutput'`,
+        })
+        .from(projects)
+        .leftJoin(
+          projectRevisions,
+          and(
+            eq(projectRevisions.id, projects.currentRevisionId),
+            eq(projectRevisions.ownerUserId, projects.ownerUserId),
+          ),
+        )
+        .where(
+          and(
+            filters,
+            input.cursor === undefined
+              ? undefined
+              : or(
+                  lt(projects.updatedAt, cursorTimestamp!),
+                  and(
+                    eq(projects.updatedAt, cursorTimestamp!),
+                    lt(projects.id, input.cursor.projectId),
+                  ),
                 ),
-              ),
-        ),
-      )
-      .orderBy(desc(projects.updatedAt), desc(projects.id))
-      .limit(input.pageSize + 1);
+          ),
+        )
+        .orderBy(desc(projects.updatedAt), desc(projects.id))
+        .limit(input.pageSize + 1),
+      // Stops one row past the ceiling: enough to know it was passed, never a full scan. The join
+      // is unnecessary here — `currentRevisionId` is unique, so it cannot change the count.
+      this.db
+        .select({ id: projects.id })
+        .from(projects)
+        .where(filters)
+        .limit(LIST_TOTAL_PROBE_LIMIT),
+    ]);
     const pageRows = rows.slice(0, input.pageSize);
     const page = pageRows.map((row) => toProject(row.project));
     const last = page.at(-1);
@@ -1061,6 +1079,7 @@ export class DrizzleProjectRepository
         rows.length > input.pageSize && last !== undefined
           ? { updatedAt: last.updatedAt, projectId: last.id }
           : null,
+      total: boundedListTotal(countRows.length),
     };
   }
 

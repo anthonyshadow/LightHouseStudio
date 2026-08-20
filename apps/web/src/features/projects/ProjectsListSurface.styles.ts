@@ -88,6 +88,10 @@ export const projectsHeaderActionsStyles = (theme: Theme): CSSObject => ({
   },
 });
 
+export const projectsSearchRowStyles = (theme: Theme): CSSObject => ({
+  paddingBlockStart: theme.space.lg,
+});
+
 export const projectsGroupFilterStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
   flexWrap: 'wrap',

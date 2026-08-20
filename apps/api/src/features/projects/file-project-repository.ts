@@ -21,6 +21,7 @@ import {
   type ProjectRevision,
   projectStatusAfterProcessingTrace,
   projectConflicts,
+  matchesSearchTerm,
 } from '@studio/domain';
 import type {
   ResumableVideoProcessingJob,
@@ -28,6 +29,7 @@ import type {
 } from '../processing-jobs/file-processing-job-repository.js';
 import type { StoredAssetManifest } from '../../storage/asset-byte-store.js';
 import { KeyedLock } from '../../application/keyed-lock.js';
+import { boundedListTotal } from '../../application/list-total.js';
 import type {
   CampaignCreatePersistenceResult,
   CampaignCreateReceipt,
@@ -1208,25 +1210,32 @@ export class FileProjectRepository
     if (!Number.isInteger(input.pageSize) || input.pageSize < 1 || input.pageSize > 40) {
       throw new Error('Use a bounded Project summary page.');
     }
-    const aggregates = (await this.#read(ownerUserId)).projects
-      .filter(({ project }) => {
-        const matchesLifecycle =
-          project.deletedAt === null &&
-          (input.lifecycle === 'archived'
-            ? project.status === 'archived'
-            : project.status !== 'archived');
-        const matchesCampaign =
-          input.campaignId === undefined
-            ? true
-            : input.campaignId === 'none'
-              ? project.campaignId === null
-              : project.campaignId === input.campaignId;
-        const followsCursor =
+    const matching = (await this.#read(ownerUserId)).projects.filter(({ project }) => {
+      const matchesLifecycle =
+        project.deletedAt === null &&
+        (input.lifecycle === 'archived'
+          ? project.status === 'archived'
+          : project.status !== 'archived');
+      const matchesCampaign =
+        input.campaignId === undefined
+          ? true
+          : input.campaignId === 'none'
+            ? project.campaignId === null
+            : project.campaignId === input.campaignId;
+      const matchesSearch =
+        input.search === undefined || matchesSearchTerm(project.title, input.search);
+      return matchesLifecycle && matchesCampaign && matchesSearch;
+    });
+    // Counted before the cursor narrows anything: a total that shrank on every page would describe
+    // the remainder rather than the query.
+    const total = boundedListTotal(matching.length);
+    const aggregates = matching
+      .filter(
+        ({ project }) =>
           input.cursor === undefined ||
           project.updatedAt < input.cursor.updatedAt ||
-          (project.updatedAt === input.cursor.updatedAt && project.id < input.cursor.projectId);
-        return matchesLifecycle && matchesCampaign && followsCursor;
-      })
+          (project.updatedAt === input.cursor.updatedAt && project.id < input.cursor.projectId),
+      )
       .sort(
         (left, right) =>
           right.project.updatedAt.localeCompare(left.project.updatedAt) ||
@@ -1248,6 +1257,7 @@ export class FileProjectRepository
         aggregates.length > input.pageSize && last !== undefined
           ? { updatedAt: last.updatedAt, projectId: last.id }
           : null,
+      total,
     };
   }
 
@@ -2030,19 +2040,24 @@ export class FileProjectRepository
     if (!Number.isInteger(input.pageSize) || input.pageSize < 1 || input.pageSize > 40) {
       throw new Error('Use a bounded Campaign summary page.');
     }
-    const campaigns = (await this.#read(ownerUserId)).campaigns
-      .filter((campaign) => {
-        const matchesLifecycle =
-          campaign.deletedAt === null &&
-          (input.lifecycle === 'archived'
-            ? campaign.status === 'archived'
-            : campaign.status === 'active');
-        const followsCursor =
+    const matching = (await this.#read(ownerUserId)).campaigns.filter((campaign) => {
+      const matchesLifecycle =
+        campaign.deletedAt === null &&
+        (input.lifecycle === 'archived'
+          ? campaign.status === 'archived'
+          : campaign.status === 'active');
+      const matchesSearch =
+        input.search === undefined || matchesSearchTerm(campaign.name, input.search);
+      return matchesLifecycle && matchesSearch;
+    });
+    const total = boundedListTotal(matching.length);
+    const campaigns = matching
+      .filter(
+        (campaign) =>
           input.cursor === undefined ||
           campaign.updatedAt < input.cursor.updatedAt ||
-          (campaign.updatedAt === input.cursor.updatedAt && campaign.id < input.cursor.campaignId);
-        return matchesLifecycle && followsCursor;
-      })
+          (campaign.updatedAt === input.cursor.updatedAt && campaign.id < input.cursor.campaignId),
+      )
       .sort(
         (left, right) =>
           right.updatedAt.localeCompare(left.updatedAt) || right.id.localeCompare(left.id),
@@ -2055,6 +2070,7 @@ export class FileProjectRepository
         campaigns.length > input.pageSize && last !== undefined
           ? { updatedAt: last.updatedAt, campaignId: last.id }
           : null,
+      total,
     };
   }
 

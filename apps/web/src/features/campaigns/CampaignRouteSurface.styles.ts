@@ -18,6 +18,10 @@ export const campaignCardMetaStyles = (theme: Theme): CSSObject => ({
   marginTop: theme.space.sm,
 });
 
+export const campaignSearchRowStyles = (theme: Theme): CSSObject => ({
+  paddingBlockStart: theme.space.lg,
+});
+
 export const campaignGridStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 19rem), 1fr))',

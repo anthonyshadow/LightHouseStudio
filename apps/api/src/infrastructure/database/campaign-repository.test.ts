@@ -21,12 +21,12 @@ const campaignRow = {
 };
 
 describe('Campaign persistence query boundaries', () => {
-  it('returns a bounded Campaign page with one SQL query regardless of row count', async () => {
+  it('returns a bounded Campaign page and its total in a fixed number of queries', async () => {
     const secondCampaignId = '41365ff4-5810-4ad4-b419-cb1a042cf30b';
-    const scripted = scriptedDatabase([
-      campaignRow,
-      { ...campaignRow, id: secondCampaignId, name: 'Second Campaign' },
-    ]);
+    const scripted = scriptedDatabase(
+      [campaignRow, { ...campaignRow, id: secondCampaignId, name: 'Second Campaign' }],
+      [{ id: campaignId }, { id: secondCampaignId }],
+    );
 
     await expect(
       new DrizzleCampaignRepository(scripted.db).listCampaigns(ownerUserId, {
@@ -36,8 +36,11 @@ describe('Campaign persistence query boundaries', () => {
     ).resolves.toMatchObject({
       campaigns: [{ id: campaignId }, { id: secondCampaignId }],
       nextCursor: null,
+      total: { count: 2, exceedsCeiling: false },
     });
-    expect(scripted.calls.filter(({ operation }) => operation === 'select')).toHaveLength(1);
+    // Two statements: the page, and the bounded count behind the total. A fixed number either way —
+    // what must never happen is a statement per row.
+    expect(scripted.calls.filter(({ operation }) => operation === 'select')).toHaveLength(2);
     expect(scripted.remaining()).toBe(0);
   });
 

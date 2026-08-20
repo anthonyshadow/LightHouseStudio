@@ -293,6 +293,7 @@ export type ListSavedVideosInput = Readonly<{
   cursor?: string;
   characterName?: string;
   format?: SavedVideoFormat;
+  search?: string;
   sort?: SavedVideoSort;
   /** Surfaces that render a short strip should ask for what they show, not a full gallery page. */
   pageSize?: number;
@@ -306,6 +307,7 @@ export const listSavedVideos = (input: ListSavedVideosInput = {}): Promise<Saved
   if (input.cursor) query.set('cursor', input.cursor);
   if (input.characterName) query.set('characterName', input.characterName);
   if (input.format) query.set('format', input.format);
+  if (input.search) query.set('search', input.search);
   if (input.sort) query.set('sort', input.sort);
   return requestJson(
     `/api/videos?${query.toString()}`,
