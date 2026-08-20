@@ -71,14 +71,20 @@ afterEach(() => {
 });
 
 describe('StudioHeader', () => {
-  it('exposes Dashboard, Projects, Campaigns, and Assets as primary navigation', async () => {
+  it('exposes Dashboard, Studio, Projects, Campaigns, and Assets as primary navigation', async () => {
     const user = userEvent.setup();
     const { container } = renderHeader();
     const navigation = screen.getByRole('navigation', { name: 'Primary' });
 
-    // The Studio destination shares the rail and the mobile navigation with every other surface.
+    // The Studio destination shares the rail and the mobile navigation with every other surface,
+    // and is the one the create surface marks: without it, Studio has no current location.
     expect(container.querySelector('nav[aria-label="Mobile primary"]')).not.toBeNull();
-    expect(within(navigation).queryByRole('button', { name: 'Studio' })).not.toBeInTheDocument();
+    expect(within(navigation).getByRole('button', { name: 'Studio' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await user.click(within(navigation).getByRole('button', { name: 'Studio' }));
+    expect(headerProps.onOpenStudio).toHaveBeenCalledOnce();
     await user.click(within(navigation).getByRole('button', { name: 'Dashboard' }));
     expect(headerProps.onOpenDashboard).toHaveBeenCalledOnce();
     await user.click(within(navigation).getByRole('button', { name: 'Projects' }));
@@ -102,13 +108,17 @@ describe('StudioHeader', () => {
       'page',
     );
     expect(mobileNavigation).not.toBeNull();
-    expect(within(mobileNavigation!).getAllByRole('button', { hidden: true })).toHaveLength(4);
+    expect(
+      within(mobileNavigation!)
+        .getAllByRole('button', { hidden: true })
+        .map((button) => button.textContent),
+    ).toEqual(['Dashboard', 'Studio', 'Projects', 'Campaigns', 'Assets']);
     expect(within(header).getByRole('button', { name: 'Quick Create' })).toBeVisible();
     expect(within(header).getByRole('button', { name: 'Core Studio ready' })).toBeVisible();
     expect(within(header).getByRole('button', { name: 'Demo Creator account menu' })).toBeVisible();
     expect(header).not.toHaveTextContent('Pro Plan');
 
-    within(mobileNavigation!).getAllByRole('button', { hidden: true })[1]?.click();
+    within(mobileNavigation!).getAllByRole('button', { hidden: true })[2]?.click();
     expect(headerProps.onOpenProjects).toHaveBeenCalledOnce();
   });
 

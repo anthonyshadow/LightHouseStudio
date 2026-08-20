@@ -62,6 +62,12 @@ export type CreativeWorkspaceState = {
   activeOutfitLabel?: string | undefined;
   recordingActive: boolean;
   hasPlaybackVideo: boolean;
+  /**
+   * What a disabled tool would need before it could act. Supplied by `useStudioActivityModel`, so a
+   * greyed control says its condition instead of leaving the operator to guess it.
+   */
+  editVideoBlockedReason?: string | undefined;
+  liveToolBlockedReason?: string | undefined;
 };
 
 export type CreativeWorkspaceActions = {
@@ -91,29 +97,40 @@ export const CreativeWorkspace = ({ state, actions, refs }: CreativeWorkspacePro
     activeOutfitLabel,
     recordingActive,
     hasPlaybackVideo,
+    editVideoBlockedReason,
+    liveToolBlockedReason,
   } = state;
   const { onOpenEditVideo, onOpenCharacter, onOpenOutfit } = actions;
   const { editVideoToggleRef, characterToggleRef, outfitToggleRef } = refs;
   const theme = useTheme();
   const playbackBlocksLiveTools = hasPlaybackVideo && !liveToolsAvailableDuringPlayback;
   const liveVideoToolBlocked = playbackBlocksLiveTools || recordingActive;
+  const editVideoBlocked = !hasPlaybackVideo || recordingActive;
+  const editVideoReason = editVideoBlocked ? editVideoBlockedReason : undefined;
+  const liveToolReason = liveVideoToolBlocked ? liveToolBlockedReason : undefined;
 
   return (
     <nav data-studio-tool-rail="" css={toolRailStyles(theme)} aria-label="Creative workspace tools">
       <Button
         ref={editVideoToggleRef}
         variant={activeTool === 'edit-video' ? 'primary' : 'secondary'}
-        disabled={!hasPlaybackVideo || recordingActive}
+        disabled={editVideoBlocked}
         aria-label="Edit Video"
         aria-describedby="edit-video-tool-description"
         aria-current={activeTool === 'edit-video' ? 'page' : undefined}
         aria-haspopup="dialog"
+        {...(editVideoReason ? { title: editVideoReason } : {})}
         onClick={onOpenEditVideo}
       >
         <ToolIcon name="editVideo" />
         <span data-tool-label>
           <strong>Edit Video</strong>
-          <small id="edit-video-tool-description">Open the video editor</small>
+          <small
+            id="edit-video-tool-description"
+            data-tool-blocked={editVideoReason ? '' : undefined}
+          >
+            {editVideoReason ?? 'Open the video editor'}
+          </small>
         </span>
       </Button>
       {showDesktopAiTools ? (
@@ -127,14 +144,21 @@ export const CreativeWorkspace = ({ state, actions, refs }: CreativeWorkspacePro
                 ? `Selected character: ${activeCharacterLabel}. Open character options`
                 : 'Select Character'
             }
+            aria-describedby="character-tool-description"
             aria-current={activeTool === 'character' ? 'page' : undefined}
             aria-haspopup="dialog"
+            {...(liveToolReason ? { title: liveToolReason } : {})}
             onClick={onOpenCharacter}
           >
             <ToolIcon name="character" />
             <span data-tool-label>
               <strong>{activeCharacterLabel ?? 'Select Character'}</strong>
-              <small>Choose or build an AI character</small>
+              <small
+                id="character-tool-description"
+                data-tool-blocked={liveToolReason ? '' : undefined}
+              >
+                {liveToolReason ?? 'Choose or build an AI character'}
+              </small>
             </span>
           </Button>
           <Button
@@ -146,14 +170,21 @@ export const CreativeWorkspace = ({ state, actions, refs }: CreativeWorkspacePro
                 ? `Selected outfit: ${activeOutfitLabel}. Open outfit options`
                 : 'Select Outfit'
             }
+            aria-describedby="outfit-tool-description"
             aria-current={activeTool === 'outfit' ? 'page' : undefined}
             aria-haspopup="dialog"
+            {...(liveToolReason ? { title: liveToolReason } : {})}
             onClick={onOpenOutfit}
           >
             <ToolIcon name="outfit" />
             <span data-tool-label>
               <strong>{activeOutfitLabel ?? 'Select Outfit'}</strong>
-              <small>Choose or build a try-on outfit</small>
+              <small
+                id="outfit-tool-description"
+                data-tool-blocked={liveToolReason ? '' : undefined}
+              >
+                {liveToolReason ?? 'Choose or build a try-on outfit'}
+              </small>
             </span>
           </Button>
         </>

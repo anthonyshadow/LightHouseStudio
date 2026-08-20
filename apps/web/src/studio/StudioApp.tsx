@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { hydrateReferenceImage } from '../adapters/api-client/apiClient';
 import { useAuth } from '../application/auth/AuthProvider';
@@ -111,6 +111,10 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   // Runtime-local: nothing outside the capture graph reads these.
   const uploadToggleRef = useRef<HTMLButtonElement>(null);
   const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
+  // The docked desktop panel rests collapsed so the stage and the two primary actions own the
+  // surface. Runtime-local: capture settings mean nothing on a route without live media.
+  const [captureSettingsExpanded, setCaptureSettingsExpanded] = useState(false);
+  const captureSettingsFocusRequestRef = useRef(false);
   const {
     creationIntent,
     queryCreationIntent,
@@ -269,6 +273,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     characterBuilderActivityBlockedReason,
     characterBuilderOpenBlockedReason,
     characterRemovalBlockedReason,
+    creativeToolBlockedReasons,
     captureBlockedReason,
     captureSettingsDisabledReason,
   } = useStudioActivityModel({
@@ -343,15 +348,35 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     closeOverlayIf(['capture-settings']);
   }, [closeOverlayIf, session.error]);
 
+  // Focus follows the panel becoming focusable, not the request: a collapsed panel is inside a
+  // `hidden` subtree, so recovery has to expand it first and focus it once React has committed.
+  useEffect(() => {
+    if (!captureSettingsExpanded || !captureSettingsFocusRequestRef.current) return;
+    captureSettingsFocusRequestRef.current = false;
+    focusDesktopCaptureSettings();
+  }, [captureSettingsExpanded]);
+  const openDesktopCaptureSettings = useCallback(() => {
+    if (captureSettingsExpanded) {
+      focusDesktopCaptureSettings();
+      return;
+    }
+    captureSettingsFocusRequestRef.current = true;
+    setCaptureSettingsExpanded(true);
+  }, [captureSettingsExpanded]);
+  const toggleCaptureSettings = useCallback(
+    () => setCaptureSettingsExpanded((expanded) => !expanded),
+    [],
+  );
+
   const clearSessionError = session.clearError;
   const openCaptureSettingsForRecovery = useCallback(() => {
     clearSessionError();
     if (desktopStudioLayout) {
-      focusDesktopCaptureSettings();
+      openDesktopCaptureSettings();
       return;
     }
     openOverlay('capture-settings');
-  }, [clearSessionError, desktopStudioLayout, openOverlay]);
+  }, [clearSessionError, desktopStudioLayout, openDesktopCaptureSettings, openOverlay]);
 
   const stage = useStudioStageModel({
     activeOverlay,
@@ -378,7 +403,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   const openCaptureSettings = () => {
     if (recordingActive) return;
     if (desktopStudioLayout) {
-      focusDesktopCaptureSettings();
+      openDesktopCaptureSettings();
       return;
     }
     openOverlay('capture-settings');
@@ -623,6 +648,8 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
               : undefined,
           recordingActive,
           hasPlaybackVideo: Boolean(recording.presented),
+          editVideoBlockedReason: creativeToolBlockedReasons.editVideo,
+          liveToolBlockedReason: creativeToolBlockedReasons.liveTools,
         }}
         refs={{
           editVideoToggleRef,
@@ -672,6 +699,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
         environment={{
           browser,
           desktopLayout: desktopStudioLayout,
+          captureSettingsExpanded,
           ownerUserId: auth.session!.user.id,
           creativeStore: repositoryStore,
           onCreateProjectCharacter: character.openNewForProject,
@@ -701,6 +729,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
           openAiExperience: liveExperience.openLiveAiExperience,
           openExistingVideo,
           openCaptureSettings,
+          toggleCaptureSettings,
           startProjectRecording,
         }}
       />

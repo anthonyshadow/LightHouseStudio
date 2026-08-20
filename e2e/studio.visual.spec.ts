@@ -362,6 +362,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
   'studio-initial-portrait': {
     id: 'studio-initial-portrait',
     setup: async (page) => {
+      await page.locator('[data-desktop-capture-settings-toggle]').click();
       const settings = page.locator('[data-desktop-capture-settings]');
       await settings.getByText('Portrait · 9:16', { exact: true }).click();
       const stage = page.getByLabel('Studio media stage');
@@ -392,8 +393,13 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
         defaultAspectRatio,
       );
       if (desktop) {
-        await expect(page.locator('[data-desktop-capture-settings]')).toBeVisible();
-        await expect(page.getByText('Landscape · 16:9', { exact: true })).toBeVisible();
+        // The docked panel rests collapsed: the stage keeps the column, and the control that
+        // reopens it sits under the tool rail with the current device summary.
+        await expect(page.locator('[data-desktop-capture-settings-toggle]')).toHaveAttribute(
+          'aria-expanded',
+          'false',
+        );
+        await expect(page.locator('[data-desktop-capture-settings]')).toBeHidden();
         await expect(page.getByRole('button', { name: 'Open capture settings' })).toHaveCount(0);
       } else {
         await expect(page.locator('[data-desktop-capture-settings]')).toHaveCount(0);
@@ -406,7 +412,9 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     setup: async (page) => {
       const desktop = (page.viewportSize()?.width ?? 1_024) >= 1_024;
       const switchedAspectRatio = desktop ? '9:16' : '16:9';
-      if (!desktop) await page.getByRole('button', { name: 'Open capture settings' }).click();
+      const desktopSettingsToggle = page.locator('[data-desktop-capture-settings-toggle]');
+      if (desktop) await desktopSettingsToggle.click();
+      else await page.getByRole('button', { name: 'Open capture settings' }).click();
       const captureSettings = desktop
         ? page.locator('[data-desktop-capture-settings]')
         : page.getByRole('dialog', { name: 'Capture Settings' });
@@ -419,10 +427,9 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
         'data-stage-aspect-ratio',
         switchedAspectRatio,
       );
-      if (!desktop) {
-        await page.keyboard.press('Escape');
-        await expect(captureSettings).toBeHidden();
-      }
+      if (desktop) await desktopSettingsToggle.click();
+      else await page.keyboard.press('Escape');
+      await expect(captureSettings).toBeHidden();
       await startLocalPreview(page);
       await page.getByRole('button', { name: 'Record' }).click();
       await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();

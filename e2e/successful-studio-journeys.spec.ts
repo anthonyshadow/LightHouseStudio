@@ -888,13 +888,12 @@ test('switches to a browser-exposed phone camera while Capture Settings stays op
   });
 
   const inlineSettings = page.locator('[data-desktop-capture-settings]');
-  if ((await inlineSettings.count()) === 0) {
-    await page.getByRole('button', { name: 'Open capture settings' }).click();
-  }
-  const settingsSurface =
-    (await inlineSettings.count()) > 0
-      ? inlineSettings
-      : page.getByRole('dialog', { name: 'Capture Settings' });
+  const desktopSettings = (await inlineSettings.count()) > 0;
+  if (desktopSettings) await page.locator('[data-desktop-capture-settings-toggle]').click();
+  else await page.getByRole('button', { name: 'Open capture settings' }).click();
+  const settingsSurface = desktopSettings
+    ? inlineSettings
+    : page.getByRole('dialog', { name: 'Capture Settings' });
   const cameraSelector = settingsSurface.getByLabel('Camera', { exact: true });
   await expect(settingsSurface).toBeVisible();
   await cameraSelector.click();

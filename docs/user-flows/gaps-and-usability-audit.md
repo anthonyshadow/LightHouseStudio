@@ -305,12 +305,12 @@ page-level `createError` and its "Retry quick project" notice had exactly one wr
 The idempotency-key retention that made the old quick path replay-safe is unchanged and still
 tested, now driven through the dialog.
 
-### N6 — No nav item is active while in Studio (Low)
+### N6 — No nav item is active while in Studio (Low) — **Resolved**
 
-`activeDestination` resolves to `'studio'` on `/studio/create`
-(`StudioApp.tsx`), but the primary nav renders only Dashboard, Projects, Campaigns and
-Assets (`StudioHeader.tsx:279-286`). In the product's main creation surface, the navigation shows
-no current location.
+`activeDestination` resolved to `'studio'` on `/studio/create`, but the primary nav rendered only
+Dashboard, Projects, Campaigns and Assets, so the product's main creation surface showed no current
+location. The rail and the mirrored mobile navigation now carry a **Studio** destination
+(`StudioHeader.tsx`), and the id `activeDestination` already produced marks it.
 
 ### N7 — Two different confirmation mechanisms (Medium) — **Resolved, before Tier 4**
 
@@ -715,13 +715,13 @@ Responsiveness is taken seriously — there is a dedicated `e2e/accessibility-re
 covering 200 %-text reflow at small-mobile, tablet and desktop, plus a visual matrix. Remaining
 concerns:
 
-| #   | Concern                                                                                                                                                                                                                       | Evidence                                           |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| P1  | ~~The mobile bottom nav only renders on organization routes. On `/studio/create` there is no bottom navigation at all.~~ — resolved: the shell renders one navigation chrome (rail plus bottom bar) on every protected route. | `StudioHeader.tsx`                                 |
-| P2  | The Project workspace tablist is four horizontal tabs; at small widths with large text they compete with the media stage in the same viewport.                                                                                | `ProjectWorkspaceSurface.tsx:244-261`              |
-| P3  | The account menu becomes a 2.75 rem icon with the label hidden below 48 rem (`AccountMenu.tsx:126-129`), leaving logout behind an unlabelled avatar.                                                                          | `AccountMenu.tsx:126-129`                          |
-| P4  | Asset library overlays are `placement="fullscreen"`, which is correct on mobile but means the hub's context is entirely lost with no breadcrumb (M5, M12).                                                                    | `StudioLibraryOverlays.tsx`                        |
-| P5  | Capture settings collapse from a desktop sidebar to a right-side overlay based on `useDesktopStudioLayout`; the transition point is not aligned with the nav breakpoints.                                                     | `useDesktopStudioLayout.ts`, `StudioApp.styles.ts` |
+| #   | Concern                                                                                                                                                                                                                                                                     | Evidence                                           |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| P1  | ~~The mobile bottom nav only renders on organization routes. On `/studio/create` there is no bottom navigation at all.~~ — resolved: the shell renders one navigation chrome (rail plus bottom bar) on every protected route.                                               | `StudioHeader.tsx`                                 |
+| P2  | The Project workspace tablist is four horizontal tabs; at small widths with large text they compete with the media stage in the same viewport.                                                                                                                              | `ProjectWorkspaceSurface.tsx:244-261`              |
+| P3  | The account menu becomes a 2.75 rem icon with the label hidden below 48 rem (`AccountMenu.tsx:126-129`), leaving logout behind an unlabelled avatar.                                                                                                                        | `AccountMenu.tsx:126-129`                          |
+| P4  | Asset library overlays are `placement="fullscreen"`, which is correct on mobile but means the hub's context is entirely lost with no breadcrumb (M5, M12).                                                                                                                  | `StudioLibraryOverlays.tsx`                        |
+| P5  | Capture settings collapse from a desktop sidebar to a right-side overlay based on `useDesktopStudioLayout`; the transition point is not aligned with the nav breakpoints. The desktop sidebar itself now rests collapsed behind a control, but the breakpoint is unchanged. | `useDesktopStudioLayout.ts`, `StudioApp.styles.ts` |
 
 ## 10. Technical risks affecting user flows
 
@@ -800,7 +800,7 @@ independent.
 21. ~~**R1/R4/R5** — remove the redundant surfaces once the flows above settle.~~ **Done**, all
     three. (**R3** already went with G6.) **R6** stays open on purpose — it needs **B4** first.
 
-**What is left.** Every tier is closed. The open findings are G5, the onboarding half of G8, N6,
+**What is left.** Every tier is closed. The open findings are G5, the onboarding half of G8,
 M3–M9 and M11–M12, B4, B5, B7, B9, B10, R2, R6, the §7 vocabulary consolidation, P2–P5, and
 T1/T2/T4/T5/T6. None is a broken flow; the largest of them (**G5**, account and settings) is a
 missing surface rather than a defect.

@@ -297,8 +297,11 @@ export const StudioHeader = ({
   const setMenuOpen = useCallback((menu: HeaderMenu, open: boolean) => {
     setOpenMenu(open ? menu : null);
   }, []);
+  // Studio is a destination like any other: without it the create surface — the product's main
+  // one — is the only place the rail can never mark, so the operator loses their location there.
   const destinations = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', open: onOpenDashboard },
+    { id: 'studio', label: 'Studio', icon: 'video', open: onOpenStudio },
     { id: 'projects', label: 'Projects', icon: 'projects', open: onOpenProjects },
     { id: 'campaigns', label: 'Campaigns', icon: 'campaigns', open: onOpenCampaigns },
     { id: 'assets', label: 'Assets', icon: 'assets', open: onOpenAssets },

@@ -5,6 +5,7 @@ import {
   captureSettingsDisabledReason as resolveCaptureSettingsDisabledReason,
   characterBuilderBlockedReasons,
   creativeConfigurationLocks,
+  creativeToolBlockedReasons,
   characterRemovalBlockedReason as resolveCharacterRemovalBlockedReason,
 } from './studioActivityPolicy';
 import type { useTakeReviewFlow } from './useTakeReviewFlow';
@@ -57,6 +58,12 @@ export const useStudioActivityModel = ({
     creativeConfigurationSessionModeLocked: creativeConfigurationLockState.sessionModeLocked,
     characterBuilderActivityBlockedReason: characterBuilderBlocked.activity,
     characterBuilderOpenBlockedReason: characterBuilderBlocked.open,
+    creativeToolBlockedReasons: creativeToolBlockedReasons({
+      recordingActive,
+      finalizing,
+      reviewLocked,
+      liveToolsAvailableDuringPlayback: creativeConfigurationIsDurable,
+    }),
     characterRemovalBlockedReason: resolveCharacterRemovalBlockedReason({
       recordingActive,
       finalizing,

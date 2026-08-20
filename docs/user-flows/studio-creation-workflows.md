@@ -37,8 +37,12 @@ experience**, mute microphone, camera on/off, stop model, stop recording, plus r
 (discard, voice treatments, **Save**, **Replace saved version**).
 
 To the side, `CreativeWorkspace` (`studio/CreativeWorkspace.tsx`) renders a tool rail:
-**Edit Video** · **Character** · **Outfit**. It also owns the "Reference image could not be
-restored" notice, with **Retry** and **Continue without reference**.
+**Edit Video** · **Character** · **Outfit**. A tool that cannot act is disabled and states the
+condition it is waiting on, in the same words the rest of the Studio uses
+(`studio/studioActivityPolicy.ts`): **Edit Video** needs a recorded or uploaded video, and the
+Character and Outfit tools are held by a take under review or an active recording. The rail also
+owns the "Reference image could not be restored" notice, with **Retry** and **Continue without
+reference**.
 
 ## Flow: Record a local video
 
@@ -47,7 +51,10 @@ restored" notice, with **Retry** and **Continue without reference**.
    existing-video intent, closes overlays, focuses the stage, and calls `session.startLocal()`.
    Camera and microphone are requested only here — the app never opens media on route entry.
 3. Capture preferences (source device, format, capture target) come from `CaptureSettingsPanel`,
-   shown as a desktop sidebar or a right-side overlay depending on `useDesktopStudioLayout`.
+   shown as a collapsed desktop sidebar or a right-side overlay depending on
+   `useDesktopStudioLayout`. On desktop the panel opens from the **Capture settings** control and
+   stays mounted while collapsed; the column keeps showing the active devices and any blocked
+   camera.
 4. `useRecording` (`orchestration/recording/useRecording.ts`) drives `MediaRecorder`, tracks
    elapsed seconds, and enforces a maximum duration; hitting it triggers `onAutomaticStop`, which
    opens a finalization window and then review (`useTakeReviewFlow.ts:113-125`).

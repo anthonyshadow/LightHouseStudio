@@ -23,14 +23,14 @@ Header regions:
 | Region       | Contents                                                                                                                                         |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Brand        | Logo + "Lightframe"; click → `/dashboard`                                                                                                        |
-| Primary nav  | Dashboard · Projects · Campaigns · Assets, with `aria-current="page"` from `activeDestination` (`StudioApp.tsx`)                                 |
+| Primary nav  | Dashboard · Studio · Projects · Campaigns · Assets, with `aria-current="page"` from `activeDestination` (`ShellChrome.tsx`)                      |
 | Quick Create | New video · New Project · New Campaign · Create Asset · Live AI · Beta (only when live is enabled)                                               |
 | Status menu  | "Core Studio ready" / "Studio limited" / "Checking integrations" with a breakdown of Local capture, Existing-video AI, Live AI Beta, Voice cloud |
 | Account menu | Display name, login, **Log out** only                                                                                                            |
 
 `isCampaignsPath` matches both `/campaigns` and `/campaigns/{id}`, so both highlight "Campaigns"
-correctly. The Studio routes fall through to `'studio'`, which is **not** one of the four rendered
-nav items, so no nav item is highlighted while in Studio.
+correctly. The Studio routes fall through to `'studio'`, which the rail and the mobile bottom nav
+both render, so the create surface marks its own destination like every other one.
 
 ## Dashboard anatomy
 

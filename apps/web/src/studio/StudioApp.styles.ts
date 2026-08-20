@@ -259,7 +259,7 @@ export const mobileNavigationStyles = (theme: Theme): CSSObject => ({
     insetBlockEnd: 0,
     minHeight: `calc(4.5rem + env(safe-area-inset-bottom))`,
     display: 'grid',
-    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+    gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
     gap: theme.space.xxs,
     padding: `${theme.space.xxs} max(${theme.space.xs}, env(safe-area-inset-right)) max(${theme.space.xxs}, env(safe-area-inset-bottom)) max(${theme.space.xs}, env(safe-area-inset-left))`,
     borderBlockStart: `1px solid ${theme.colors.borderStrong}`,
@@ -636,6 +636,15 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
     '& > [data-media-stage-layout]': { gridColumn: 2, gridRow: 1 },
     '& > [data-studio-tool-rail]': { gridColumn: 1, gridRow: 1 },
     '& > [data-capture-controls]': { gridColumn: 3, gridRow: 1 },
+    /*
+     * Collapsed capture settings hand most of their column to the stage, keeping only what has to
+     * stay readable: the current devices, any blocked camera, and the control that reopens the
+     * panel. The column stays put rather than moving, so opening the panel does not relocate what
+     * the operator just clicked.
+     */
+    '&[data-capture-settings="collapsed"]': {
+      gridTemplateColumns: 'minmax(12rem, 15rem) minmax(0, 1fr) minmax(10.5rem, 12rem)',
+    },
     '&[data-video-edit-active="true"]': {
       gridTemplateRows: 'minmax(0, 1fr)',
     },
@@ -724,6 +733,9 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     opacity: 0.74,
     textOverflow: 'ellipsis',
   },
+  // A blocked tool trades its description for the condition it is waiting on, which is a sentence
+  // rather than a label: two clamped lines fit the button, and `title` carries the rest.
+  '& [data-tool-label] small[data-tool-blocked]': { opacity: 0.9 },
   '& > span': {
     display: 'inline-flex',
     alignItems: 'center',
@@ -787,6 +799,13 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
       display: 'block',
       maxWidth: 'none',
       whiteSpace: 'nowrap',
+    },
+    '& [data-tool-label] small[data-tool-blocked]': {
+      display: '-webkit-box',
+      WebkitBoxOrient: 'vertical',
+      WebkitLineClamp: 2,
+      whiteSpace: 'normal',
+      lineHeight: 1.25,
     },
     '& > span': {
       alignItems: 'flex-start',

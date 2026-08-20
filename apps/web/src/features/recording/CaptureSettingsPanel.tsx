@@ -2,6 +2,8 @@ import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { useEffect, useRef } from 'react';
 import type { StudioMode } from '../../application/types';
 import { Button, SelectField, StatusNotice } from '../../ui';
+import { visuallyHiddenStyles } from '../../ui/primitives/VisuallyHidden';
+import { cameraAvailabilityNotices } from './cameraAvailability';
 import type {
   CaptureDeviceOption,
   CapturePreferencesController,
@@ -55,7 +57,7 @@ const bodyStyles = (theme: Theme, presentation: 'overlay' | 'sidebar'): CSSObjec
   '& > *': { minWidth: 0 },
 });
 
-const introductionStyles = (theme: Theme): CSSObject => ({
+const introductionStyles = (theme: Theme, presentation: 'overlay' | 'sidebar'): CSSObject => ({
   display: 'grid',
   gap: theme.space.xxs,
   '& h3': {
@@ -63,6 +65,9 @@ const introductionStyles = (theme: Theme): CSSObject => ({
     fontFamily: theme.type.display,
     fontSize: theme.fontSizes.label,
   },
+  // Docked, the disclosure control that opens this panel is already titled "Capture settings"; the
+  // heading stays for structure rather than repeating that title directly underneath it.
+  '& h2': presentation === 'sidebar' ? visuallyHiddenStyles() : { margin: 0 },
   '& p': {
     margin: 0,
     color: theme.colors.textMuted,
@@ -322,17 +327,19 @@ export const CaptureSettingsPanel = ({
   const phoneCameraVisible = controller.cameraDevices.some(({ label }) =>
     looksLikePhoneCamera(label),
   );
+  const cameraNotices = cameraAvailabilityNotices({
+    permissionState: controller.cameraPermissionState,
+    devicesState: controller.devicesState,
+    cameraCount: controller.cameraDevices.length,
+  });
   const showMacContinuityHelp = isMacDesktop();
 
   return (
     <form css={panelStyles(theme, presentation)} data-capture-settings-presentation={presentation}>
       <div data-scroll-region="capture-settings" css={bodyStyles(theme, presentation)}>
-        <header css={introductionStyles(theme)}>
+        <header css={introductionStyles(theme, presentation)}>
           {presentation === 'sidebar' ? <h2>Capture settings</h2> : <h3>Sources and quality</h3>}
-          <p>
-            Changes apply automatically. Nothing here starts your camera or microphone until you
-            press Start.
-          </p>
+          <p>Changes apply automatically and take effect on your next Start.</p>
         </header>
 
         {disabled && disabledReason ? (
@@ -396,29 +403,16 @@ export const CaptureSettingsPanel = ({
               hint={
                 controller.devicesState === 'loading'
                   ? 'Looking for available cameras…'
-                  : 'Every camera your browser can see. Names may be generic until you grant permission.'
+                  : 'Names fill in once you allow camera access.'
               }
               onValueChange={(value) => controller.updateVideoDeviceId(value || null)}
             />
 
-            {controller.cameraPermissionState === 'denied' ? (
-              <StatusNotice tone="warning" role="status" title="Camera permission blocked">
-                Allow camera access in your browser or system settings. Opening this panel never
-                asks for permission; the list updates after a successful Start.
+            {cameraNotices.map((notice) => (
+              <StatusNotice key={notice.id} tone={notice.tone} role="status" title={notice.title}>
+                {notice.body}
               </StatusNotice>
-            ) : controller.cameraPermissionState === 'prompt' ? (
-              <StatusNotice tone="neutral" role="status" title="Camera permission not granted">
-                Camera access is only requested when you press Start. Names may be generic until
-                then.
-              </StatusNotice>
-            ) : null}
-
-            {controller.devicesState === 'ready' && controller.cameraDevices.length === 0 ? (
-              <StatusNotice tone="warning" role="status" title="No camera available">
-                Your browser cannot see a camera. Connect or enable one and check permission — this
-                list updates on its own.
-              </StatusNotice>
-            ) : null}
+            ))}
 
             {!phoneCameraVisible ? (
               <details css={helpStyles(theme)}>
@@ -465,7 +459,7 @@ export const CaptureSettingsPanel = ({
             hint={
               controller.devicesState === 'loading'
                 ? 'Looking for available microphones…'
-                : 'The selected microphone is used for local capture and provider fallback audio.'
+                : 'Used for recording, and for AI takes with no model audio.'
             }
             onValueChange={(value) => controller.updateAudioDeviceId(value || null)}
           />
@@ -504,16 +498,13 @@ export const CaptureSettingsPanel = ({
                     ),
                   )}
                 </div>
-                <p>
-                  Sets the shape for local preview and recording. Unsupported formats leave the
-                  current preview unchanged.
-                </p>
+                <p>Sets the shape of your preview and recording.</p>
               </fieldset>
               <SelectField
                 label="Local preview quality"
                 value={controller.draft.profile}
                 disabled={controlsDisabled}
-                hint="The browser may negotiate a lower setting when the camera cannot meet the target."
+                hint="The browser picks the closest setting your camera supports."
                 options={controller.supportedProfiles.map((profile) => ({
                   value: profile,
                   label: profileLabels[profile],
