@@ -313,6 +313,48 @@ describe('DashboardRouteSurface', () => {
     expect(actions.onCreateCampaign).toHaveBeenCalledOnce();
   });
 
+  it('leads with the work and keeps an idle queue to one line without losing Refresh', async () => {
+    mockApiServer.use(
+      http.get('*/api/projects', () =>
+        HttpResponse.json({
+          projects: [project],
+          nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
+        }),
+      ),
+      http.get('*/api/campaigns', () =>
+        HttpResponse.json({
+          campaigns: [campaign],
+          nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
+        }),
+      ),
+      http.get('*/api/videos', () =>
+        HttpResponse.json({
+          videos: [video],
+          nextCursor: null,
+          total: 1,
+          facets: { characterNames: [], formats: ['landscape'] },
+        }),
+      ),
+    );
+    renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
+
+    // Idle: a status and Refresh, without the section description or a job list under them.
+    expect(await screen.findByText('No queued or active video jobs.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeVisible();
+    expect(
+      screen.queryByText('Queued and active provider video edits for this account.'),
+    ).not.toBeInTheDocument();
+
+    const queue = screen.getByRole('heading', { name: 'Processing Queue' });
+    const precedesQueue = (heading: HTMLElement) =>
+      Boolean(heading.compareDocumentPosition(queue) & Node.DOCUMENT_POSITION_FOLLOWING);
+    // What the operator has made comes before an engineering queue that is usually empty.
+    expect(precedesQueue(await screen.findByRole('heading', { name: 'Continue Work' }))).toBe(true);
+    expect(precedesQueue(screen.getByRole('heading', { name: 'Recent Work' }))).toBe(true);
+  });
+
   it('shows active processing and requires an upstream-cost warning before releasing its slot', async () => {
     const jobId = '9f5664cf-1d2f-4248-b809-b2369ad42dd5';
     let active = true;
@@ -369,6 +411,10 @@ describe('DashboardRouteSurface', () => {
 
     expect(await screen.findByRole('heading', { name: 'Processing Queue' })).toBeVisible();
     expect(await screen.findByText('Virtual Try-On')).toBeVisible();
+    // A job present expands the queue back into a full section, description and all.
+    expect(
+      screen.getByText('Queued and active provider video edits for this account.'),
+    ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Remove from queue' }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText(/provider has no verified cancellation API/i)).toBeVisible();
@@ -376,6 +422,9 @@ describe('DashboardRouteSurface', () => {
 
     await waitFor(() => expect(abandonBody).toEqual({ acknowledgeProviderMayContinue: true }));
     expect(await screen.findByText('No queued or active video jobs.')).toBeVisible();
+    expect(
+      screen.queryByText('Queued and active provider video edits for this account.'),
+    ).not.toBeInTheDocument();
     expect(screen.getByText(/processing slot is available/i)).toBeVisible();
   });
 });
