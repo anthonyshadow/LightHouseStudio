@@ -109,12 +109,22 @@ only resolves inside the authenticated shell.
 | `directSavedVideoUploadAvailable`                                                                     | R2 multipart direct upload configured                                                                        | Switches `useSaveVideo` to the direct-upload client (`StudioApp.tsx`)       |
 
 `useProviderAvailability` exposes `state: 'loading' | 'ready' | 'error'` plus a `retry`. The header
-status menu renders "checking" / "configuration unavailable" / "configured" per capability
-(`StudioHeader.tsx:44-52`).
+status menu renders "checking" / "configuration unavailable" / "configured" per capability, derived
+in `studio/studioAvailabilityPresentation.ts` so the account panel shows the same wording.
+
+## Account details
+
+Account menu → **Account details** opens a read-only `OverlayPanel` (`AccountPanel.tsx`) built from
+data already in memory: identity and plan from the authenticated session, the plan's entitlement
+snapshot, the configured-integration rows the status menu derives, and a bounded
+`GET /api/video-jobs` count of AI jobs running right now (fetched only while the panel is open,
+sharing the Dashboard's query cache — no polling). Completed runs are pointed at each Project's
+History; the panel states honestly that no lifetime total is tracked.
 
 ## Logout
 
-1. Account menu → **Log out** (`AccountMenu.tsx:245-247`). The menu contains no other item.
+1. Account menu → **Log out** (`AccountMenu.tsx`). Log out and its busy state are unchanged by the
+   account details panel.
 2. `useStudioLogoutController` (`studio/useStudioLogoutController.ts`) classifies current work:
    - `hasActiveWork` — recording, finalizing, provider job active, video render busy, project
      working-media busy (`StudioApp.tsx`)

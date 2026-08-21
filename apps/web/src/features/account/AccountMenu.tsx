@@ -1,8 +1,16 @@
 import { useTheme } from '@emotion/react';
-import type { AuthenticatedUser } from '@studio/contracts';
-import { useEffect, useRef } from 'react';
+import type { AuthenticatedSessionResponse, AuthenticatedUser } from '@studio/contracts';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '../../ui/primitives/Button';
 import { useDismissiblePopover } from '../../ui/primitives/useDismissiblePopover';
+import { AccountPanel, type AccountCapabilityRow } from './AccountPanel';
+
+/** Everything the read-only account panel shows; all of it already lives in memory. */
+export interface AccountDetailsSource {
+  readonly session: AuthenticatedSessionResponse;
+  readonly capabilityRows: readonly AccountCapabilityRow[];
+  readonly capabilityFootnote: string;
+}
 
 interface AccountMenuProps {
   readonly user: AuthenticatedUser;
@@ -10,6 +18,8 @@ interface AccountMenuProps {
   readonly onOpenChange: (open: boolean) => void;
   readonly busy?: boolean | undefined;
   readonly presentation?: 'header' | 'rail';
+  /** When provided, the menu offers a read-only "Account details" panel above Log out. */
+  readonly details?: AccountDetailsSource | undefined;
   readonly onLogout: () => void;
 }
 
@@ -19,12 +29,14 @@ export const AccountMenu = ({
   onOpenChange,
   busy = false,
   presentation = 'header',
+  details,
   onLogout,
 }: AccountMenuProps) => {
   const theme = useTheme();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   useDismissiblePopover({ open, onOpenChange, rootRef, triggerRef });
 
@@ -248,10 +260,25 @@ export const AccountMenu = ({
             <strong css={{ display: 'block', color: theme.colors.text }}>{user.displayName}</strong>
             {user.login}
           </p>
+          {details ? (
+            <Button role="menuitem" variant="quiet" onClick={() => run(() => setDetailsOpen(true))}>
+              Account details
+            </Button>
+          ) : null}
           <Button data-logout role="menuitem" variant="danger" onClick={() => run(onLogout)}>
             Log out
           </Button>
         </div>
+      ) : null}
+      {details ? (
+        <AccountPanel
+          open={detailsOpen}
+          onClose={() => setDetailsOpen(false)}
+          returnFocusRef={triggerRef}
+          session={details.session}
+          capabilityRows={details.capabilityRows}
+          capabilityFootnote={details.capabilityFootnote}
+        />
       ) : null}
     </div>
   );

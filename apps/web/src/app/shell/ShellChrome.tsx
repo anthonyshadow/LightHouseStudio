@@ -1,5 +1,5 @@
 import { useTheme } from '@emotion/react';
-import type { AuthenticatedUser } from '@studio/contracts';
+import type { AuthenticatedSessionResponse, AuthenticatedUser } from '@studio/contracts';
 import { useRef, useState } from 'react';
 import { CreativeLibrarySyncNotice } from '../../features/creative-assets/CreativeLibrarySyncNotice';
 import { AssetCreationLauncher } from '../../studio/AssetCreationLauncher';
@@ -14,6 +14,8 @@ import type { ShellServices } from './useShellServices';
 interface ShellChromeProps {
   readonly services: ShellServices;
   readonly user: AuthenticatedUser;
+  /** The full session in memory, for the read-only account details panel. */
+  readonly session?: AuthenticatedSessionResponse | undefined;
   readonly logout: ReturnType<typeof useStudioLogoutController>;
 }
 
@@ -25,7 +27,7 @@ interface ShellChromeProps {
  * builders in place on a Project. Rendering them here rather than inside the runtime is what lets
  * the runtime go away.
  */
-export const ShellChrome = ({ services, user, logout }: ShellChromeProps) => {
+export const ShellChrome = ({ services, user, session, logout }: ShellChromeProps) => {
   const theme = useTheme();
   const [assetCreationLauncherOpen, setAssetCreationLauncherOpen] = useState(false);
   // Written only from the trigger's own click handler, so focus returns to the control the operator
@@ -44,6 +46,7 @@ export const ShellChrome = ({ services, user, logout }: ShellChromeProps) => {
           browser={browser}
           capabilityState={capabilityState}
           user={user}
+          {...(session ? { session } : {})}
           accountBusy={logout.busy || logout.preparing}
           activeDestination={
             route.dashboardRouteActive
