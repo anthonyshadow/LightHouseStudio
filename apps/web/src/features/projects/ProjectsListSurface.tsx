@@ -4,7 +4,7 @@ import { formatDateTime } from '@studio/domain';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { projectPath, projectWorkspacePath } from '../../app/paths';
-import { Button, ListSearchField, StatusNotice, useListSearch } from '../../ui';
+import { Button, EmptyStatePreview, ListSearchField, StatusNotice, useListSearch } from '../../ui';
 import {
   NewProjectDialog,
   DeleteProjectDialog,
@@ -100,6 +100,7 @@ const ProjectListSection = ({
         <div css={projectsLedgerEmptyStyles(theme)}>
           {search === undefined ? (
             <>
+              {archived ? null : <EmptyStatePreview />}
               <strong>{archived ? 'No archived Projects' : 'No active Projects yet'}</strong>
               <p>
                 {archived
@@ -108,6 +109,12 @@ const ProjectListSection = ({
                     : 'Archived work appears here and can be restored.'
                   : 'Start a Project to keep one video and all the work you do on it together. Naming it is optional — you can rename it later.'}
               </p>
+              {archived ? null : (
+                <p data-empty-example>
+                  For example: a “Product demo” Project holding one original video, its Character
+                  Swap runs, and every saved cut.
+                </p>
+              )}
             </>
           ) : (
             <>

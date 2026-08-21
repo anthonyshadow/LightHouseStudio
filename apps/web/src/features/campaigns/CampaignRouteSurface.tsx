@@ -8,6 +8,7 @@ import { useRouteBack } from '../../app/useRouteBack';
 import {
   AppIcon,
   Button,
+  EmptyStatePreview,
   ListSearchField,
   listTotalLabel,
   StatusNotice,
@@ -103,12 +104,18 @@ const CampaignListSection = ({
         <div css={emptyListStyles(theme)}>
           {search === undefined ? (
             <>
+              {archived ? null : <EmptyStatePreview />}
               <strong>{archived ? 'No archived Campaigns' : 'No Campaigns yet'}</strong>
               <p>
                 {archived
                   ? 'Archived Campaigns remain available here until explicitly deleted.'
                   : 'Create a lightweight organizer, or keep using standalone Projects.'}
               </p>
+              {archived ? null : (
+                <p data-empty-example>
+                  For example: a “Spring launch” Campaign holding one Project per ad placement.
+                </p>
+              )}
             </>
           ) : (
             <>

@@ -12,6 +12,7 @@ export { SegmentedControl } from './primitives/SegmentedControl';
 export { VisuallyHidden } from './primitives/VisuallyHidden';
 export { IconButton } from './primitives/IconButton';
 export { ConfirmationDialog } from './primitives/ConfirmationDialog';
+export { EmptyStatePreview } from './primitives/EmptyStatePreview';
 export {
   ConfirmationRequestDialog,
   useConfirmationRequest,

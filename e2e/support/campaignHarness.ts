@@ -39,7 +39,11 @@ export const installCampaignHarness = async (page: Page, seed = false) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ campaigns, nextCursor: null }),
+        body: JSON.stringify({
+          campaigns,
+          nextCursor: null,
+          total: { count: campaigns.length, exceedsCeiling: false },
+        }),
       });
       return;
     }

@@ -84,6 +84,14 @@ describe('saved creative libraries', () => {
       </StudioDesignProvider>,
     );
     expect(screen.getByRole('heading', { name: 'No saved outfits yet' })).toBeVisible();
+    // The create action lives inside the empty state — one button, with a visual and an example.
+    const emptyCreate = screen.getByRole('button', { name: 'Create new saved outfit' });
+    expect(emptyCreate.closest('[data-empty-state-preview]')).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Create new saved outfit' })).toHaveLength(1);
+    expect(screen.getByText(/For example: a jacket you styled once/u)).toBeVisible();
+    fireEvent.click(emptyCreate);
+    expect(onCreate).toHaveBeenCalledOnce();
+    onCreate.mockClear();
 
     view.rerender(
       <StudioDesignProvider>

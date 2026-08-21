@@ -6,7 +6,7 @@ import type {
   SavedPrompt,
 } from '../creative-assets/types';
 import { useRef, useState } from 'react';
-import { Button, ConfirmationDialog } from '../../ui';
+import { Button, ConfirmationDialog, EmptyStatePreview } from '../../ui';
 
 const compactGrid = (theme: Theme): CSSObject => ({
   display: 'grid',
@@ -215,6 +215,13 @@ const emptyLibraryStyles = (theme: Theme): CSSObject => ({
     fontFamily: theme.type.display,
   },
   '& p': { margin: 0 },
+  '& [data-empty-state-preview]': { marginBlockEnd: theme.space.md },
+  '& [data-empty-example]': {
+    marginBlockStart: theme.space.xs,
+    color: theme.colors.textFaint,
+    fontSize: theme.fontSizes.metadata,
+  },
+  '& > div > button': { marginBlockStart: theme.space.md },
 });
 
 export const SavedCharacterLibrary = ({
@@ -261,8 +268,13 @@ export const SavedCharacterLibrary = ({
         {items.length === 0 ? (
           <div css={emptyLibraryStyles(theme)}>
             <div>
+              <EmptyStatePreview />
               <h2>No saved characters yet</h2>
               <p>Create a character in Studio and save it to see it here.</p>
+              <p data-empty-example>
+                For example: your brand presenter, saved once and applied to any video with
+                Character Swap.
+              </p>
             </div>
           </div>
         ) : (
@@ -388,15 +400,27 @@ export const SavedOutfitLibrary = ({
   return (
     <>
       <div css={{ display: 'grid', gap: theme.space.md }}>
-        <div>
-          <Button variant="primary" onClick={onCreate}>
-            Create new saved outfit
-          </Button>
-        </div>
-        {items.length === 0 ? (
+        {items.length > 0 ? (
           <div>
-            <h2>No saved outfits yet</h2>
-            <p>Create an outfit in Studio and save it to see it here.</p>
+            <Button variant="primary" onClick={onCreate}>
+              Create new saved outfit
+            </Button>
+          </div>
+        ) : null}
+        {items.length === 0 ? (
+          <div css={emptyLibraryStyles(theme)}>
+            <div>
+              <EmptyStatePreview />
+              <h2>No saved outfits yet</h2>
+              <p>Create an outfit in Studio and save it to see it here.</p>
+              <p data-empty-example>
+                For example: a jacket you styled once with Virtual Try-On, ready to try on in any
+                new video.
+              </p>
+              <Button variant="primary" onClick={onCreate}>
+                Create new saved outfit
+              </Button>
+            </div>
           </div>
         ) : (
           <div css={compactGrid(theme)}>

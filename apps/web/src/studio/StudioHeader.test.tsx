@@ -48,6 +48,7 @@ const headerProps = {
   onCreateCampaign: vi.fn(),
   onCreateAsset: vi.fn(),
   onOpenLive: vi.fn(),
+  onOpenHelp: vi.fn(),
   onLogout: vi.fn(),
 };
 
@@ -267,5 +268,18 @@ describe('StudioHeader', () => {
     );
 
     expect(headerProps.onCreateAsset).toHaveBeenCalledWith(trigger);
+  });
+
+  it('offers Help as a quiet utility action that never competes with Quick Create', async () => {
+    const user = userEvent.setup();
+    renderHeader();
+
+    const help = screen.getByRole('button', { name: 'How Lightframe works' });
+    // Quiet, and living with the other utility actions rather than beside the primary action.
+    expect(help.closest('[data-utility-actions]')).not.toBeNull();
+    expect(help.closest('[data-create-action]')).toBeNull();
+    await user.click(help);
+
+    expect(headerProps.onOpenHelp).toHaveBeenCalledWith(help);
   });
 });

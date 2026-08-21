@@ -309,6 +309,9 @@ describe('DashboardRouteSurface', () => {
       .getByText('No Campaigns yet. They are optional organizers for related Projects.')
       .closest('div');
     expect(emptyState).not.toBeNull();
+    // The empty state teaches: a ghost of the populated list plus one concrete worked example.
+    expect(emptyState!.querySelector('[data-empty-state-preview]')).not.toBeNull();
+    expect(within(emptyState!).getByText(/For example: a “Spring launch” Campaign/u)).toBeVisible();
     await user.click(within(emptyState!).getByRole('button', { name: 'New Campaign' }));
     expect(actions.onCreateCampaign).toHaveBeenCalledOnce();
   });
