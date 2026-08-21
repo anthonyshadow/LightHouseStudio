@@ -179,16 +179,18 @@ afterEach(() => {
 });
 
 describe('useProjectSourceController', () => {
-  it('hydrates durable media through the existing owner and creates a fresh File each mount', async () => {
+  it('hydrates by presenting the ranged content route without downloading the video', async () => {
+    let contentRequests = 0;
     mockApiServer.use(
       http.get(`*/api/projects/${firstProjectId}/source`, () =>
         HttpResponse.json(sourceResponse(firstProjectId)),
       ),
-      http.get(`*/api/projects/${firstProjectId}/source/content`, () =>
-        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+      http.get(`*/api/projects/${firstProjectId}/source/content`, () => {
+        contentRequests += 1;
+        return HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
           headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
-        }),
-      ),
+        });
+      }),
     );
     const mediaOwner = runtime();
     const first = renderHook(
@@ -204,8 +206,17 @@ describe('useProjectSourceController', () => {
     expect(mediaOwner.clear).toHaveBeenCalledWith(firstProjectId);
     expect(mediaOwner.present).toHaveBeenCalledOnce();
     const firstInput = mediaOwner.present.mock.calls[0]![1];
-    expect(firstInput.blob).toBeInstanceOf(File);
-    expect(firstInput.blob).not.toHaveProperty('objectUrl');
+    expect(firstInput).not.toHaveProperty('blob');
+    expect(firstInput).toMatchObject({
+      remoteMedia: {
+        kind: 'remote-presentation',
+        contentUrl: `/api/projects/${firstProjectId}/source/content`,
+        sizeBytes: 4,
+        mimeType: 'video/mp4',
+      },
+    });
+    expect(firstInput.artifactMetadata.filename).toBe(`${firstProjectId}.mp4`);
+    expect(contentRequests).toBe(0);
     first.unmount();
 
     const second = renderHook(
@@ -219,8 +230,10 @@ describe('useProjectSourceController', () => {
     );
     await waitFor(() => expect(second.result.current.phase).toBe('saved'));
     const secondInput = mediaOwner.present.mock.calls.at(-1)![1];
-    expect(secondInput.blob).toBeInstanceOf(File);
-    expect(secondInput.blob).not.toBe(firstInput.blob);
+    expect(secondInput).toMatchObject({
+      remoteMedia: { contentUrl: `/api/projects/${firstProjectId}/source/content` },
+    });
+    expect(contentRequests).toBe(0);
   });
 
   it('removes a source, clears the stage, and reopens the add-source controls', async () => {
@@ -453,25 +466,15 @@ describe('useProjectSourceController', () => {
   });
 
   it('aborts an old Project hydration so late completion cannot replace the new stage', async () => {
-    let firstContentStarted = false;
+    let firstSourceStarted = false;
     mockApiServer.use(
-      http.get(`*/api/projects/${firstProjectId}/source`, () =>
-        HttpResponse.json(sourceResponse(firstProjectId)),
-      ),
-      http.get(`*/api/projects/${firstProjectId}/source/content`, async () => {
-        firstContentStarted = true;
+      http.get(`*/api/projects/${firstProjectId}/source`, async () => {
+        firstSourceStarted = true;
         await delay(120);
-        return HttpResponse.arrayBuffer(new Uint8Array([1, 1, 1, 1]).buffer, {
-          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
-        });
+        return HttpResponse.json(sourceResponse(firstProjectId));
       }),
       http.get(`*/api/projects/${secondProjectId}/source`, () =>
         HttpResponse.json(sourceResponse(secondProjectId)),
-      ),
-      http.get(`*/api/projects/${secondProjectId}/source/content`, () =>
-        HttpResponse.arrayBuffer(new Uint8Array([2, 2, 2, 2]).buffer, {
-          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
-        }),
       ),
     );
     const mediaOwner = runtime();
@@ -480,13 +483,15 @@ describe('useProjectSourceController', () => {
         useProjectSourceController(projectId, currentProject(projectId, true), mediaOwner),
       { initialProps: { projectId: firstProjectId }, wrapper: RemoteStateTestProvider },
     );
-    await waitFor(() => expect(firstContentStarted).toBe(true));
+    await waitFor(() => expect(firstSourceStarted).toBe(true));
     hook.rerender({ projectId: secondProjectId });
 
     await waitFor(() => {
       const latest = mediaOwner.present.mock.calls.at(-1);
       expect(latest?.[0]).toBe(secondProjectId);
-      expect(latest?.[1].blob).toBeInstanceOf(File);
+      expect(latest?.[1]).toMatchObject({
+        remoteMedia: { contentUrl: `/api/projects/${secondProjectId}/source/content` },
+      });
     });
     await act(() => delay(150));
     expect(mediaOwner.present.mock.calls.map(([projectId]) => projectId)).toEqual([
@@ -596,7 +601,9 @@ describe('useProjectSourceController', () => {
     expect(JSON.stringify(requestBody)).not.toContain('saveTarget');
     const latestPresentation = mediaOwner.present.mock.calls.at(-1);
     expect(latestPresentation?.[0]).toBe(firstProjectId);
-    expect(latestPresentation?.[1].blob).toBeInstanceOf(File);
+    expect(latestPresentation?.[1]).toMatchObject({
+      remoteMedia: { contentUrl: `/api/projects/${firstProjectId}/source/content` },
+    });
   });
 
   it('reuses the same source operation key after response loss until the Project reconciles', async () => {

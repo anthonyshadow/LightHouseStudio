@@ -1420,7 +1420,9 @@ describe('Project route surface', () => {
     expect(await screen.findByText(/Loading this Project.s original video/u)).toBeVisible();
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
     expect(present.mock.calls[0]?.[0]).toBe(activeId);
-    expect(present.mock.calls[0]?.[1].blob).toBeInstanceOf(File);
+    expect(present.mock.calls[0]?.[1]).toMatchObject({
+      remoteMedia: { kind: 'remote-presentation' },
+    });
     const sourceHeading = screen.getByRole('heading', { name: 'Original video ready' });
     expect(sourceHeading.parentElement).toHaveTextContent(
       'accepted-source.mp4 · 640×360 · 1 seconds',
@@ -1742,7 +1744,9 @@ describe('Project route surface', () => {
 
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
     expect(present.mock.calls[0]?.[0]).toBe(activeId);
-    expect(present.mock.calls[0]?.[1].blob).toBeInstanceOf(File);
+    expect(present.mock.calls[0]?.[1]).toMatchObject({
+      remoteMedia: { kind: 'remote-presentation' },
+    });
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(
       screen.getByRole('heading', { name: 'Original video ready' }).parentElement,

@@ -13,7 +13,12 @@ import { convertRecordingVoice } from '../../adapters/api-client/voicesApi';
 import { decodeAudioBlob, renderLocalEffect } from '../../adapters/media-processing/audioEffects';
 import { replaceRecordingAudio } from '../../adapters/media-processing/replaceAudioTrack';
 import { transcodeRecordingToMp4 } from '../../adapters/media-processing/transcodeRecording';
-import type { RecordingArtifact, RecordingController } from '../../features/recording/types';
+import {
+  ownedRecordingArtifact,
+  type PresentedRecordingArtifact,
+  type RecordingArtifact,
+  type RecordingController,
+} from '../../features/recording/types';
 import type {
   LocalVoiceEffectId,
   VoiceEffectSelection,
@@ -30,7 +35,7 @@ const safeProcessingMessage = (error: unknown): string => {
 
 export const useVoiceProcessing = (recording: RecordingController): VoiceProcessingController => {
   const [selectionState, setSelectionState] = useState<{
-    original: RecordingArtifact | null;
+    original: PresentedRecordingArtifact | null;
     selection: VoiceEffectSelection;
   }>(() => ({ original: recording.original, selection: { kind: 'none' } }));
   if (selectionState.original !== recording.original) {
@@ -42,7 +47,9 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
       : ({ kind: 'none' } as const);
   const abortRef = useRef<AbortController | null>(null);
   const recordingRef = useRef(recording);
-  const domainStateRef = useRef<DomainVoiceProcessingState<RecordingArtifact> | null>(null);
+  const domainStateRef = useRef<DomainVoiceProcessingState<PresentedRecordingArtifact> | null>(
+    null,
+  );
   const operationCounterRef = useRef(0);
 
   const setSelection = useCallback((nextSelection: VoiceEffectSelection) => {
@@ -69,6 +76,14 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
       if (!current.original || !current.sidecar.blob) {
         throw new Error('A completed recording with audio is required.');
       }
+      // Declares owned bytes: voice work rewrites the audio track of the complete video. A
+      // URL-backed presentation has no sidecar either, so in practice the guard above refuses it.
+      const ownedVideo = ownedRecordingArtifact(
+        explicitVideo ?? current.visual ?? current.original,
+      );
+      if (!ownedVideo) {
+        throw new Error('A completed recording with audio is required.');
+      }
       const operationId = `voice-${++operationCounterRef.current}`;
       const domainState =
         domainStateRef.current?.original === current.original
@@ -83,12 +98,11 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
         title: voiceName ? `Applying ${voiceName}…` : 'Rendering voice treatment…',
         detail: 'Your original audio is being prepared for this video.',
       });
-      const videoArtifact = explicitVideo ?? current.visual ?? current.original;
       return {
         controller,
         operationId,
-        videoArtifact,
-        video: videoArtifact.media,
+        videoArtifact: ownedVideo,
+        video: ownedVideo.media,
         sidecar: current.sidecar.blob,
       };
     },
@@ -172,7 +186,7 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
   const applyLocal = useCallback(
     async (effect: LocalVoiceEffectId) => {
       const current = recordingRef.current;
-      const videoArtifact = current.visual ?? current.original;
+      const videoArtifact = ownedRecordingArtifact(current.visual ?? current.original);
       if (!videoArtifact) {
         current.failProcessing('A completed recording is required.');
         return;
@@ -247,7 +261,7 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
   const applyElevenLabs = useCallback(
     async (voiceId: string, voiceName: string) => {
       const current = recordingRef.current;
-      const videoArtifact = current.visual ?? current.original;
+      const videoArtifact = ownedRecordingArtifact(current.visual ?? current.original);
       if (!videoArtifact) {
         current.failProcessing('A completed recording is required.');
         return;

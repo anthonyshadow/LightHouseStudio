@@ -1,6 +1,6 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { useEffect, useRef } from 'react';
-import type { RecordingArtifact } from '../recording/types';
+import type { PresentedRecordingArtifact } from '../recording/types';
 
 const playerStyles = (theme: Theme): CSSObject => ({
   position: 'relative',
@@ -31,7 +31,7 @@ const playerStyles = (theme: Theme): CSSObject => ({
 });
 
 export interface ExistingVideoSourcePreviewProps {
-  readonly artifact: RecordingArtifact | null;
+  readonly artifact: PresentedRecordingArtifact | null;
   readonly displayName: string;
 }
 

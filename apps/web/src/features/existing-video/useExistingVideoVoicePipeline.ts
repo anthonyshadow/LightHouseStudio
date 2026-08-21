@@ -1,7 +1,7 @@
 import { useCallback, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { createProcessedRecordingArtifact } from '../../orchestration/recording/recordingArtifacts';
 import { revokeArtifactUrl } from '../recording/recordingHelpers';
-import type { RecordingController } from '../recording/types';
+import type { RecordingArtifact, RecordingController } from '../recording/types';
 import type { VoiceProcessingController, VoiceProcessingOutcome } from '../voice-effects/types';
 import type { ValidatedExistingVideo } from './videoValidation';
 import type {
@@ -33,7 +33,8 @@ export const useExistingVideoVoicePipeline = ({
 }: ExistingVideoVoicePipelineOptions) => {
   const applySelectedVoice = useCallback(
     async (
-      videoArtifact: NonNullable<RecordingController['original']>,
+      // Declares owned bytes: voice work rewrites the audio track of the complete video.
+      videoArtifact: RecordingArtifact,
       selectedVoice: ExistingVideoVoiceSelection,
       metadata: ValidatedExistingVideo['metadata'],
       hasServerApprovedVisual: boolean,

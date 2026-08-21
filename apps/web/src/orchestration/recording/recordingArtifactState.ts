@@ -1,4 +1,5 @@
 import type {
+  PresentedRecordingArtifact,
   RecordingArtifact,
   RecordingAudioSidecar,
   RecordingProcessingOperation,
@@ -7,7 +8,8 @@ import type {
 import { IDLE_AUDIO_SIDECAR } from './recordingArtifacts';
 
 export interface RecordingArtifactState {
-  readonly original: RecordingArtifact | null;
+  /** The only slot that may be URL-backed; results are always produced from owned bytes. */
+  readonly original: PresentedRecordingArtifact | null;
   readonly visual: RecordingArtifact | null;
   readonly processed: RecordingArtifact | null;
   readonly sidecar: RecordingAudioSidecar;
@@ -20,7 +22,7 @@ export interface RecordingArtifactState {
 export type RecordingArtifactAction =
   | Readonly<{
       type: 'publish-original';
-      artifact: RecordingArtifact;
+      artifact: PresentedRecordingArtifact;
       sidecar: RecordingAudioSidecar;
     }>
   | Readonly<{ type: 'discard' }>
@@ -40,6 +42,7 @@ export type RecordingArtifactAction =
   | Readonly<{
       type: 'repair-object-url';
       slot: 'original' | 'visual' | 'processed';
+      /** Repair recreates an object URL from owned bytes, so the artifact is always owned. */
       artifact: RecordingArtifact;
     }>;
 

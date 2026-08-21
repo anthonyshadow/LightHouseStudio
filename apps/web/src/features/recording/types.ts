@@ -26,6 +26,37 @@ export type RecordingLifecycle = RecordingLifecycleStatus;
 
 export type RecordingArtifact = DomainRecordingArtifact<Blob>;
 
+/**
+ * Stage media presented from an app-owned content URL without holding the bytes. Playback streams
+ * over HTTP ranges; any operation that needs the complete bytes must acquire them explicitly and
+ * republish an owned artifact first.
+ */
+export type RemotePresentationMedia = Readonly<{
+  kind: 'remote-presentation';
+  contentUrl: string;
+  sizeBytes: number;
+  mimeType: string;
+}>;
+
+/** What a stage artifact may carry: complete owned bytes, or a URL-backed presentation. */
+export type StageArtifactMedia = Blob | RemotePresentationMedia;
+
+/**
+ * An artifact the stage can present. Only the original/source slot may be URL-backed; every
+ * processed, edited or voiced artifact is produced from owned bytes and stays `RecordingArtifact`.
+ */
+export type PresentedRecordingArtifact = DomainRecordingArtifact<StageArtifactMedia>;
+
+/**
+ * The single declared narrowing from "presentable" to "owned bytes". A consumer that needs the
+ * complete media must go through this and handle `null` — never read `media` off a presented
+ * artifact directly.
+ */
+export const ownedRecordingArtifact = (
+  artifact: PresentedRecordingArtifact | null,
+): RecordingArtifact | null =>
+  artifact !== null && artifact.media instanceof Blob ? (artifact as RecordingArtifact) : null;
+
 export type VideoCharacterAttribution = Readonly<{
   characterName: string;
   characterVariantName: string | null;
@@ -126,6 +157,26 @@ export type RestorePersistedOriginalInput = Readonly<{
   audioSidecar?: PersistedRecordingAudioSidecar | null;
 }>;
 
+/**
+ * Presents durable media on the stage from its content URL without downloading it. There is no
+ * audio sidecar: URL-backed media never carries session-captured audio.
+ */
+export type RemotePresentationInput = Readonly<{
+  remoteMedia: RemotePresentationMedia;
+  artifactMetadata: PersistedRecordingArtifactMetadata;
+  takeMetadata?: TakeMetadata | null;
+}>;
+
+/**
+ * What a surface may hand the stage: complete owned bytes, or an explicit URL-backed
+ * presentation. The presentation layer accepts either; byte consumers must narrow to owned.
+ */
+export type PresentStageSourceInput = RestorePersistedOriginalInput | RemotePresentationInput;
+
+export const isRemotePresentationInput = (
+  input: PresentStageSourceInput,
+): input is RemotePresentationInput => 'remoteMedia' in input;
+
 export type CaptureDeviceState = 'idle' | 'loading' | 'ready' | 'error';
 
 export type CapturePreferencesController = {
@@ -159,10 +210,10 @@ export type RecordingController = {
   lifecycle: RecordingLifecycle;
   activeSource: RecordingSource | null;
   metadata: TakeMetadata | null;
-  original: RecordingArtifact | null;
+  original: PresentedRecordingArtifact | null;
   visual: RecordingArtifact | null;
   processed: RecordingArtifact | null;
-  presented: RecordingArtifact | null;
+  presented: PresentedRecordingArtifact | null;
   sidecar: RecordingAudioSidecar;
   recordingError: string | null;
   processingState: VoiceProcessingState;
@@ -174,8 +225,9 @@ export type RecordingController = {
     mode: StudioMode,
     character?: VideoCharacterAttribution | null,
   ) => Promise<void>;
-  stop: () => Promise<RecordingArtifact | null>;
+  stop: () => Promise<PresentedRecordingArtifact | null>;
   restorePersistedOriginal: (input: RestorePersistedOriginalInput) => RecordingArtifact;
+  presentRemoteOriginal: (input: RemotePresentationInput) => PresentedRecordingArtifact;
   replaceSource: (input: RestorePersistedOriginalInput) => RecordingArtifact;
   discard: () => void;
   beginProcessing: (operation?: RecordingProcessingOperation) => void;

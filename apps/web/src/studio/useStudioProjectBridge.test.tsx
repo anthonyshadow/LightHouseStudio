@@ -4,7 +4,11 @@ import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectSourceActivity } from '../features/projects/useProjectSourceController';
 import type { ProjectSessionPort } from '../features/projects/useProjectSession';
-import type { RecordingArtifact, RecordingLifecycle } from '../features/recording/types';
+import type {
+  PresentedRecordingArtifact,
+  RecordingArtifact,
+  RecordingLifecycle,
+} from '../features/recording/types';
 import { useStudioProjectBridge } from './useStudioProjectBridge';
 
 const firstProjectId = '18b120ac-1578-46e3-8c3d-42307772f391';
@@ -145,5 +149,35 @@ describe('useStudioProjectBridge', () => {
       lastModified: new Date(artifact.startedAt).valueOf(),
     });
     expect(hook.result.current.recordingCandidate?.file).not.toBe(media);
+  });
+
+  it('never offers a URL-backed presentation as a recording candidate', () => {
+    const remote: PresentedRecordingArtifact = {
+      id: 'streamed-1',
+      media: {
+        kind: 'remote-presentation',
+        contentUrl: '/api/projects/p/source/content',
+        sizeBytes: 4,
+        mimeType: 'video/mp4',
+      },
+      objectUrl: '/api/projects/p/source/content',
+      mimeType: 'video/mp4',
+      filename: 'streamed.mp4',
+      sourceModeId: 'local',
+      startedAt: '2026-08-12T16:00:00.000Z',
+      durationMs: 2_000,
+      sizeBytes: 4,
+    };
+    const hook = renderHook(() =>
+      useStudioProjectBridge({
+        projectId: firstProjectId,
+        recordingLifecycle: 'recorded',
+        recordingOriginal: remote,
+        presentSource: vi.fn(),
+        clearSource: vi.fn(),
+      }),
+    );
+
+    expect(hook.result.current.recordingCandidate).toBeNull();
   });
 });

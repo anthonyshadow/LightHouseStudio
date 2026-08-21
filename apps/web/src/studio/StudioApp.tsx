@@ -31,6 +31,10 @@ import { useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
 import { useTakeReviewFlow } from './useTakeReviewFlow';
 import type { ActiveOverlay } from './useStudioOverlayController';
 import { useStudioProjectBridge } from './useStudioProjectBridge';
+import {
+  deriveOwnedMediaAcquisitionNotices,
+  useOwnedMediaAcquisition,
+} from './useOwnedMediaAcquisition';
 import { useStudioSavedVideoController } from './useStudioSavedVideoController';
 import { StudioLifecycleDialogs } from './StudioLifecycleDialogs';
 import { StudioWorkspace } from './StudioWorkspace';
@@ -197,16 +201,17 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     reviewLocked,
     recordingMode,
     recordingSource,
-    publishUploadedVideo,
+    publishStageSource,
     publishValidatedVideo,
   } = takeReview;
   const project = useStudioProjectBridge({
     projectId: activeProjectId,
     recordingLifecycle: recording.lifecycle,
     recordingOriginal: recording.original,
-    presentSource: publishUploadedVideo,
+    presentSource: publishStageSource,
     clearSource: recording.discard,
   });
+  const mediaAcquisition = useOwnedMediaAcquisition({ recording });
   // Both consumers: the bridge scopes it to this Project for the runtime's own use, and the shell
   // keeps the one active slot that logout, expiry and Project processing read.
   const reportBridgeSession = project.handleSession;
@@ -260,6 +265,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     projectContextActive,
     activeProjectId,
     projectSourceActivity: activeProjectSourceActivity,
+    acquireOwnedMedia: mediaAcquisition.acquire,
     openOverlay,
     closeOverlay,
     focusMain: focusStudio,
@@ -564,9 +570,33 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
       routeOriginProjectId,
     ],
   );
+  const cancelMediaAcquisition = mediaAcquisition.cancel;
+  const dismissMediaAcquisitionError = mediaAcquisition.dismissError;
+  const acquireMedia = mediaAcquisition.acquire;
+  const mediaAcquisitionNotices = useMemo(
+    () =>
+      deriveOwnedMediaAcquisitionNotices(mediaAcquisition.state, {
+        onCancel: () => {
+          cancelMediaAcquisition();
+          clearExistingVideoIntent();
+        },
+        onRetry: () => void acquireMedia(),
+        onDismissError: () => {
+          dismissMediaAcquisitionError();
+          clearExistingVideoIntent();
+        },
+      }),
+    [
+      acquireMedia,
+      cancelMediaAcquisition,
+      clearExistingVideoIntent,
+      dismissMediaAcquisitionError,
+      mediaAcquisition.state,
+    ],
+  );
   const effectiveStageNotices = useMemo(
-    () => [...stageNotices, ...contextualStageNotices],
-    [contextualStageNotices, stageNotices],
+    () => [...stageNotices, ...contextualStageNotices, ...mediaAcquisitionNotices],
+    [contextualStageNotices, mediaAcquisitionNotices, stageNotices],
   );
   const creativeLocks = useMemo(
     () => ({

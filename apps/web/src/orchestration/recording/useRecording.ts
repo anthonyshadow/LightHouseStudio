@@ -15,11 +15,14 @@ import { transcodeRecordingToMp4 } from '../../adapters/media-processing/transco
 import type { StudioMode } from '../../features/media-session';
 import type {
   AutomaticRecordingStopReason,
+  PresentedRecordingArtifact,
   RecordingArtifact,
   RecordingController,
   RecordingLifecycle,
   RecordingSource,
+  RemotePresentationInput,
   RestorePersistedOriginalInput,
+  StageArtifactMedia,
   TakeMetadata,
   UseRecordingOptions,
   VideoCharacterAttribution,
@@ -62,8 +65,10 @@ export const useRecording = ({ onAutomaticStop }: UseRecordingOptions = {}): Rec
 
   const attemptRef = useRef<RecordingAttempt | null>(null);
   const pendingMetadataRef = useRef<TakeMetadata | null>(null);
-  const domainLifecycleRef = useRef<DomainRecordingLifecycle<Blob>>(
-    createRecordingLifecycle<Blob>(),
+  // Widened to StageArtifactMedia so a URL-backed presentation can occupy the recorded state; the
+  // domain never inspects the media value.
+  const domainLifecycleRef = useRef<DomainRecordingLifecycle<StageArtifactMedia>>(
+    createRecordingLifecycle<StageArtifactMedia>(),
   );
   const stopPromiseRef = useRef<Promise<RecordingArtifact | null> | null>(null);
   const stopResolverRef = useRef<((artifact: RecordingArtifact | null) => void) | null>(null);
@@ -285,7 +290,7 @@ export const useRecording = ({ onAutomaticStop }: UseRecordingOptions = {}): Rec
     }, SIDECAR_FINALIZATION_GRACE_MS);
   }, [finalizeAttempt]);
 
-  const stop = useCallback(async (): Promise<RecordingArtifact | null> => {
+  const stop = useCallback(async (): Promise<PresentedRecordingArtifact | null> => {
     if (stopPromiseRef.current) return stopPromiseRef.current;
     const attempt = attemptRef.current;
     if (!attempt) return artifacts.originalRef.current;
@@ -510,7 +515,7 @@ export const useRecording = ({ onAutomaticStop }: UseRecordingOptions = {}): Rec
     mainStoppedAtRef.current = null;
     setMetadata(null);
     setActiveSource(null);
-    domainLifecycleRef.current = createRecordingLifecycle<Blob>();
+    domainLifecycleRef.current = createRecordingLifecycle<StageArtifactMedia>();
     setLifecycle(domainLifecycleRef.current.status);
   }, [artifacts]);
 
@@ -556,6 +561,32 @@ export const useRecording = ({ onAutomaticStop }: UseRecordingOptions = {}): Rec
     (input: RestorePersistedOriginalInput): RecordingArtifact =>
       commitPersistedOriginal(input, 'source-validation'),
     [commitPersistedOriginal],
+  );
+  const presentRemoteOriginal = useCallback(
+    (input: RemotePresentationInput): PresentedRecordingArtifact => {
+      const status = domainLifecycleRef.current.status;
+      if (
+        attemptRef.current ||
+        transcodeControllerRef.current ||
+        status === 'recording' ||
+        status === 'stopping'
+      ) {
+        throw new Error('A persisted take cannot be restored while recording is active.');
+      }
+      if (artifacts.processingState === 'processing') {
+        throw new Error('A persisted take cannot be restored while voice processing is active.');
+      }
+      const artifact = artifacts.presentRemoteOriginal(input);
+      pendingMetadataRef.current = null;
+      mainStoppedAtRef.current = null;
+      setMetadata(input.takeMetadata ? Object.freeze({ ...input.takeMetadata }) : null);
+      setActiveSource(null);
+      setElapsedSeconds(Math.max(0, Math.floor(artifact.durationMs / 1_000)));
+      domainLifecycleRef.current = { status: 'recorded', artifact };
+      setLifecycle(domainLifecycleRef.current.status);
+      return artifact;
+    },
+    [artifacts],
   );
 
   useEffect(() => {
@@ -607,6 +638,7 @@ export const useRecording = ({ onAutomaticStop }: UseRecordingOptions = {}): Rec
       start,
       stop,
       restorePersistedOriginal,
+      presentRemoteOriginal,
       completeSourceValidation,
       replaceSource: restorePersistedOriginal,
       discard,
@@ -628,6 +660,7 @@ export const useRecording = ({ onAutomaticStop }: UseRecordingOptions = {}): Rec
       start,
       stop,
       restorePersistedOriginal,
+      presentRemoteOriginal,
       completeSourceValidation,
       discard,
     ],

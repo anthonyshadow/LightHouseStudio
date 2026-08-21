@@ -171,7 +171,7 @@ const harness = vi.hoisted(() => {
   const recording = {
     lifecycle: 'idle' as const,
     activeSource: null,
-    original: null as null | { id: string },
+    original: null as null | { id: string; media?: Blob },
     visual: null,
     processed: null,
     presented: null as null | Record<string, unknown>,
@@ -1140,7 +1140,7 @@ describe('StudioApp composition lifecycle', () => {
 
   it('adopts an explicitly recorded local take into the post-recording editor', async () => {
     harness.session.startLocal.mockImplementationOnce(() => {
-      harness.recording.original = { id: 'recorded-source' };
+      harness.recording.original = { id: 'recorded-source', media: new Blob(['take']) };
       harness.takeStagePresentation = { kind: 'playback', mode: 'local' };
       return Promise.resolve();
     });

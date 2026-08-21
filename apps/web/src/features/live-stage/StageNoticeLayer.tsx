@@ -5,6 +5,7 @@ import {
   noticeCopyStyles,
   noticeDismissStyles,
   noticeLayerStyles,
+  noticeProgressStyles,
   noticeStyles,
 } from './MediaStage.styles';
 import { deriveStageNotices, type StageNotice } from './stageNotices';
@@ -44,6 +45,17 @@ export const StageNoticeLayer = ({ notices }: StageNoticeLayerProps) => {
           <span css={noticeCopyStyles}>
             <strong id={`${labelId}-${index}`}>{notice.title}</strong>
             {notice.message ? <span>{notice.message}</span> : null}
+            {notice.progress ? (
+              // Hidden from the accessibility tree so per-chunk updates never re-announce the
+              // atomic live region; the stable title and message carry the announced state.
+              <span aria-hidden="true" css={noticeProgressStyles(theme)} data-notice-progress="">
+                <progress
+                  max={1}
+                  {...(notice.progress.value === null ? {} : { value: notice.progress.value })}
+                />
+                <span>{notice.progress.label}</span>
+              </span>
+            ) : null}
           </span>
 
           {notice.action ? (

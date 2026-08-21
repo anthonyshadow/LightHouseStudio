@@ -3,7 +3,11 @@
 import { act, renderHook } from '@testing-library/react';
 import { StrictMode, type PropsWithChildren } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { RecordingArtifact, RecordingSource } from '../../features/recording/types';
+import {
+  ownedRecordingArtifact,
+  type PresentedRecordingArtifact,
+  type RecordingSource,
+} from '../../features/recording/types';
 
 type RecordingTranscode = (
   blob: Blob,
@@ -600,7 +604,7 @@ describe('useRecording recorder construction failures', () => {
 
     expect(result.current.lifecycle).toBe('recording');
 
-    const stoppedRecording: { artifact: RecordingArtifact | null } = {
+    const stoppedRecording: { artifact: PresentedRecordingArtifact | null } = {
       artifact: null,
     };
     await act(async () => {
@@ -611,7 +615,7 @@ describe('useRecording recorder construction failures', () => {
     expect(stoppedRecording.artifact?.filename).toMatch(/\.mp4$/);
     expect(stoppedRecording.artifact?.sourceModeId).toBe('local');
     expect(result.current.lifecycle).toBe('recorded');
-    expect(result.current.original?.media.size).toBeGreaterThan(0);
+    expect(ownedRecordingArtifact(result.current.original)?.media.size).toBeGreaterThan(0);
     expect(result.current.sidecar).toMatchObject({
       state: 'error',
       blob: null,
@@ -698,7 +702,7 @@ describe('useRecording recorder construction failures', () => {
     });
 
     expect(result.current.lifecycle).toBe('recorded');
-    expect(result.current.original?.media.size).toBeGreaterThan(0);
+    expect(ownedRecordingArtifact(result.current.original)?.media.size).toBeGreaterThan(0);
     unmount();
   });
 
@@ -731,7 +735,7 @@ describe('useRecording recorder construction failures', () => {
     await stopping;
 
     expect(result.current.lifecycle).toBe('recorded');
-    expect(result.current.original?.media.size).toBeGreaterThan(0);
+    expect(ownedRecordingArtifact(result.current.original)?.media.size).toBeGreaterThan(0);
     expect(result.current.original?.durationMs).toBe(800);
     expect(result.current.sidecar).toMatchObject({
       state: 'error',
@@ -801,7 +805,7 @@ describe('useRecording recorder construction failures', () => {
 
     expect(result.current.original?.mimeType).toBe('video/mp4');
     expect(result.current.original?.filename).toMatch(/\.mp4$/);
-    expect(result.current.original?.media.type).toBe('video/mp4');
+    expect(ownedRecordingArtifact(result.current.original)?.media.type).toBe('video/mp4');
     unmount();
   });
 
@@ -820,7 +824,7 @@ describe('useRecording recorder construction failures', () => {
       await result.current.start(createSource(), 'local');
     });
 
-    let stopping!: Promise<RecordingArtifact | null>;
+    let stopping!: Promise<PresentedRecordingArtifact | null>;
     act(() => {
       stopping = result.current.stop();
     });
@@ -859,7 +863,7 @@ describe('useRecording recorder construction failures', () => {
     await act(async () => {
       await result.current.start(createSource(), 'local');
     });
-    let artifact: RecordingArtifact | null = null;
+    let artifact: PresentedRecordingArtifact | null = null;
     await act(async () => {
       artifact = await result.current.stop();
     });
@@ -1125,7 +1129,7 @@ describe('useRecording recorder construction failures', () => {
       await result.current.start(createSource(), 'local');
     });
 
-    let concurrentStop!: Promise<RecordingArtifact | null>;
+    let concurrentStop!: Promise<PresentedRecordingArtifact | null>;
     await act(async () => {
       vi.advanceTimersByTime(300_000);
       concurrentStop = result.current.stop();

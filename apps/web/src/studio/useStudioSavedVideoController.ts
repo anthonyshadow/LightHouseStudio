@@ -6,7 +6,11 @@ import { readSavedVideoContent } from '../adapters/api-client/savedVideosApi';
 import { useExportPlacementRender } from '../features/export-placements';
 import type { ExistingVideoSavedRecipe } from '../features/existing-video/ExistingVideoRecipeChooser';
 import type { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
-import type { RecordingArtifact } from '../features/recording/types';
+import {
+  ownedRecordingArtifact,
+  type PresentedRecordingArtifact,
+  type RecordingArtifact,
+} from '../features/recording/types';
 import type {
   SavedVideoCharacterAttribution,
   useSaveVideo,
@@ -52,7 +56,7 @@ interface UseStudioSavedVideoControllerOptions {
   readonly existingVideo: ExistingVideoController;
   readonly recording: RecordingController;
   readonly recordingActive: boolean;
-  readonly comparedExistingVideoArtifact: RecordingArtifact | null;
+  readonly comparedExistingVideoArtifact: PresentedRecordingArtifact | null;
   readonly videoEditor: VideoEditorController;
   readonly saveController: SavedVideoSaveController;
   readonly savedRecipes: readonly ExistingVideoSavedRecipe[];
@@ -109,7 +113,11 @@ export const useStudioSavedVideoController = ({
     recording.presented.id !== activeLoadedSource?.artifactId,
   );
   const openVideoAdjust = useCallback(() => {
-    const sourceArtifact = comparedExistingVideoArtifact ?? recording.presented;
+    // Declares owned bytes: the editor renders from the complete media. With an active
+    // existing-video selection the presented artifact is always owned.
+    const sourceArtifact = ownedRecordingArtifact(
+      comparedExistingVideoArtifact ?? recording.presented,
+    );
     const metadata = existingVideo.currentMetadata;
     if (!sourceArtifact || !metadata || recordingActive || existingVideo.providerActive) return;
     closeOverlay();
@@ -264,7 +272,8 @@ export const useStudioSavedVideoController = ({
   );
 
   const replaceLoadedSavedVideo = useCallback(async () => {
-    const artifact = recording.presented;
+    // Declares owned bytes: replacing a gallery version uploads the complete media.
+    const artifact = ownedRecordingArtifact(recording.presented);
     if (!artifact || !activeLoadedSource || artifact.id === activeLoadedSource.artifactId) return;
     if (
       !(await confirmation.ask({
@@ -294,7 +303,8 @@ export const useStudioSavedVideoController = ({
   }, [activeLoadedSource, confirmation, presentedCharacter, recording.presented, saveController]);
 
   const requestSavePresentedVideo = useCallback(() => {
-    const artifact = recording.presented;
+    // Declares owned bytes: saving retains the complete media.
+    const artifact = ownedRecordingArtifact(recording.presented);
     if (!artifact) return;
     const metadata = existingVideo.currentMetadata;
     placementRender.reset();

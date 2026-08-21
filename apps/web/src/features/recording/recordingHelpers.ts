@@ -6,7 +6,7 @@ import {
   shouldRevokeRecordingObjectUrl,
   type RecordingReleaseReason,
 } from '@studio/domain';
-import type { RecordingSource, RecordingArtifact } from './types';
+import type { RecordingSource, PresentedRecordingArtifact } from './types';
 import type { StudioMode } from '../media-session';
 
 const AUDIO_MIME_CANDIDATES = [
@@ -86,10 +86,14 @@ export const hasSameRecordingTracks = (
 };
 
 export const revokeArtifactUrl = (
-  artifact: RecordingArtifact | null,
+  artifact: PresentedRecordingArtifact | null,
   reason: RecordingReleaseReason,
 ): void => {
-  if (artifact && shouldRevokeRecordingObjectUrl(reason)) URL.revokeObjectURL(artifact.objectUrl);
+  // A URL-backed presentation streams from an app content URL; there is no browser resource to
+  // release, so only owned-blob object URLs are revoked.
+  if (artifact && artifact.media instanceof Blob && shouldRevokeRecordingObjectUrl(reason)) {
+    URL.revokeObjectURL(artifact.objectUrl);
+  }
 };
 
 export const formatBytes = (bytes: number): string => formatFileSize(bytes);

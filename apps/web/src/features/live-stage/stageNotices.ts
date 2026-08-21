@@ -6,6 +6,18 @@ export type StageNoticeAction = Readonly<{
 }>;
 
 /**
+ * Continuously updating progress for a long-running notice. It is rendered visually outside the
+ * notice's live region so per-chunk updates never re-announce the notice to assistive technology;
+ * the stable title and message carry the announced state.
+ */
+export type StageNoticeProgress = Readonly<{
+  /** Fraction complete in [0, 1], or null when the total is unknown. */
+  value: number | null;
+  /** Short human-readable progress, e.g. "84 MB of 213 MB". */
+  label: string;
+}>;
+
+/**
  * A notice that belongs to the media stage rather than to an individual form.
  * IDs must be stable for the lifetime of the condition so duplicate sources can
  * be collapsed without causing repeated assistive-technology announcements.
@@ -18,6 +30,7 @@ export type StageNotice = Readonly<{
   priority?: number;
   action?: StageNoticeAction;
   onDismiss?: () => void;
+  progress?: StageNoticeProgress;
 }>;
 
 const defaultPriority: Record<StageNoticeSeverity, number> = {

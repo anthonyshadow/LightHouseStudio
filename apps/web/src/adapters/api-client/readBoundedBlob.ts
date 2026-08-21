@@ -6,6 +6,8 @@ export type ReadBoundedBlobOptions = Readonly<{
   acceptsContentType: (contentType: string) => boolean;
   createError: (failure: BoundedBlobFailure) => Error;
   abortMessage: string;
+  /** Called after each chunk with cumulative bytes; total is null when the length is undeclared. */
+  onProgress?: (receivedBytes: number, totalBytes: number | null) => void;
 }>;
 
 const declaredContentLength = (response: Response): number | null | undefined => {
@@ -62,6 +64,7 @@ export const readBoundedBlob = async (
       const copy = new Uint8Array(chunk.value.byteLength);
       copy.set(chunk.value);
       chunks.push(copy.buffer);
+      options.onProgress?.(byteLength, contentLength ?? null);
     }
   } catch (error) {
     if (options.signal.aborted) throw new DOMException(options.abortMessage, 'AbortError');

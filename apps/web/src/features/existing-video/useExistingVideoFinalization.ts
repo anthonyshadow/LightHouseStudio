@@ -5,7 +5,11 @@ import {
   stripRecordingAudio,
 } from '../../adapters/media-processing/replaceAudioTrack';
 import { transcodeRecordingToMp4 } from '../../adapters/media-processing/transcodeRecording';
-import type { RecordingArtifact, RecordingController } from '../recording/types';
+import {
+  ownedRecordingArtifact,
+  type RecordingArtifact,
+  type RecordingController,
+} from '../recording/types';
 import { validateExistingVideo, type ValidatedExistingVideo } from './videoValidation';
 import { operationForModel } from './existingVideoWorkflowPolicy';
 import type {
@@ -147,7 +151,8 @@ export const useExistingVideoFinalization = ({
       setRetryJob(null);
       setCompletedStepCount(stepIndex + 1);
       updateSubmissionOperation(null);
-      const source = editBase ?? recording.original;
+      // A visual result only exists for a submitted (owned) source, so the narrow cannot fail here.
+      const source = editBase ?? ownedRecordingArtifact(recording.original);
       if (!source) throw new Error('The original video is unavailable.');
       return {
         blob: normalized.blob,
