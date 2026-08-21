@@ -1,9 +1,10 @@
 import { useTheme } from '@emotion/react';
-import type { AuthenticatedUser } from '@studio/contracts';
+import type { AuthenticatedSessionResponse, AuthenticatedUser } from '@studio/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccountMenu } from '../features/account/AccountMenu';
 import type { BrowserCapabilities, ProviderAvailability } from '../features/media-session';
 import { liveExperienceAvailability } from './studioLiveAvailability';
+import { deriveStudioAvailability, type CapabilityState } from './studioAvailabilityPresentation';
 import { AppIcon, Button, type AppIconName } from '../ui';
 import { useDismissiblePopover } from '../ui/primitives/useDismissiblePopover';
 import {
@@ -18,7 +19,7 @@ import {
   systemStatusDotStyles,
 } from './StudioApp.styles';
 
-export type CapabilityState = 'loading' | 'ready' | 'error';
+export type { CapabilityState } from './studioAvailabilityPresentation';
 
 type HeaderMenu = 'account' | 'create' | 'status';
 
@@ -29,6 +30,8 @@ type StudioHeaderProps = {
   browser: BrowserCapabilities;
   capabilityState: CapabilityState;
   user: AuthenticatedUser;
+  /** When provided, the account menu offers the read-only account details panel. */
+  session?: AuthenticatedSessionResponse;
   accountBusy?: boolean;
   activeDestination: StudioHeaderDestination;
   onOpenDashboard: () => void;
@@ -41,25 +44,6 @@ type StudioHeaderProps = {
   onCreateAsset: (trigger: HTMLButtonElement | null) => void;
   onOpenLive: () => void;
   onLogout: () => void;
-};
-
-const capabilityLabel = (
-  state: CapabilityState,
-  available: boolean,
-  unavailableLabel: string,
-): string => {
-  if (state === 'loading') return 'checking';
-  if (state === 'error') return 'configuration unavailable';
-  return available ? 'configured' : unavailableLabel;
-};
-
-const systemStatusLabel = (
-  capabilityState: CapabilityState,
-  localCaptureAvailable: boolean,
-): string => {
-  if (capabilityState === 'loading') return 'Checking integrations';
-  if (capabilityState === 'error') return 'Integration status unavailable';
-  return localCaptureAvailable ? 'Core Studio ready' : 'Studio limited';
 };
 
 type StatusMenuProps = {
@@ -244,6 +228,7 @@ export const StudioHeader = ({
   browser,
   capabilityState,
   user,
+  session,
   accountBusy,
   activeDestination,
   onOpenDashboard,
@@ -259,41 +244,20 @@ export const StudioHeader = ({
 }: StudioHeaderProps) => {
   const theme = useTheme();
   const [openMenu, setOpenMenu] = useState<HeaderMenu | null>(null);
-  const localCaptureAvailable = browser.mediaDevices && browser.secureContext;
-  const localCaptureState = localCaptureAvailable ? 'available' : 'unavailable';
+  const { enabled: liveEnabled } = liveExperienceAvailability(availability);
+  const studioAvailability = deriveStudioAvailability({
+    availability,
+    browser,
+    capabilityState,
+  });
   const {
-    betaEnabled: liveBetaEnabled,
-    providerConfigured: liveProviderConfigured,
-    enabled: liveEnabled,
-  } = liveExperienceAvailability(availability);
-  const liveAiState =
-    capabilityState === 'loading'
-      ? 'checking'
-      : !liveBetaEnabled
-        ? 'disabled'
-        : liveProviderConfigured
-          ? 'enabled'
-          : 'not configured';
-  const existingVideoAiState = capabilityLabel(
-    capabilityState,
-    Boolean(
-      availability.videoProcessing?.characterSwap.available ||
-      availability.videoProcessing?.virtualTryOn.available,
-    ),
-    'not configured',
-  );
-  const voiceCloudState = capabilityLabel(
-    capabilityState,
-    availability.elevenLabs,
-    'not configured (optional)',
-  );
-  const systemState =
-    capabilityState === 'loading'
-      ? 'loading'
-      : capabilityState === 'error' || !localCaptureAvailable
-        ? 'limited'
-        : 'ready';
-  const systemLabel = systemStatusLabel(capabilityState, localCaptureAvailable);
+    systemState,
+    systemLabel,
+    localCaptureState,
+    liveAiState,
+    existingVideoAiState,
+    voiceCloudState,
+  } = studioAvailability;
   const setMenuOpen = useCallback((menu: HeaderMenu, open: boolean) => {
     setOpenMenu(open ? menu : null);
   }, []);
@@ -371,6 +335,15 @@ export const StudioHeader = ({
               onOpenChange={(open) => setMenuOpen('account', open)}
               busy={accountBusy}
               presentation="rail"
+              details={
+                session
+                  ? {
+                      session,
+                      capabilityRows: studioAvailability.rows,
+                      capabilityFootnote: studioAvailability.footnote,
+                    }
+                  : undefined
+              }
               onLogout={onLogout}
             />
           </div>

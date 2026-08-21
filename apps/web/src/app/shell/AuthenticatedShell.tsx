@@ -68,7 +68,7 @@ const AuthenticatedShellSurfaces = ({ initialIntent }: AuthenticatedShellProps) 
         Skip to studio
       </a>
       <div css={shellStyles()}>
-        <ShellChrome services={services} user={user} logout={logout} />
+        <ShellChrome services={services} user={user} session={auth.session!} logout={logout} />
 
         <ShellMain
           services={services}
