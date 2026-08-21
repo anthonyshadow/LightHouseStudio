@@ -8,6 +8,7 @@ import { formatDateTime } from '@studio/domain';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
 import { Button, OverlayPanel, StatusNotice } from '../../ui';
+import { exportSpecificationSummary } from '../export-placements';
 import { getProjectProcessingHistory } from './projectProcessingApi';
 import { projectProcessingCapabilityLabel } from './projectProcessingPresentation';
 import { ProjectVideoPreviewPlayer } from './ProjectVideoPreviewPlayer';
@@ -392,6 +393,9 @@ export const ProjectHistorySection = ({
               </span>
               {revision.outputReference ? (
                 <span>This change points at one saved version.</span>
+              ) : null}
+              {revision.exportSpecification ? (
+                <span>Placement: {exportSpecificationSummary(revision.exportSpecification)}</span>
               ) : null}
             </li>
           ))}

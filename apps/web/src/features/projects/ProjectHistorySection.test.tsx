@@ -456,6 +456,7 @@ describe('ProjectHistorySection', () => {
         visualTreatment: snapshot.visualTreatment,
         creativeIntent: snapshot.creativeIntent,
         localEdit: snapshot.localEdit,
+        exportSpecification: snapshot.exportSpecification,
       },
       hasLocalProposal: true,
       message: null,

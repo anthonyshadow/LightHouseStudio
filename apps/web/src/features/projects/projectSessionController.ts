@@ -40,6 +40,7 @@ const proposalFromCurrent = (current: ProjectCurrentResponse): ProjectSessionPro
   visualTreatment: current.revision.snapshot.visualTreatment,
   creativeIntent: current.revision.snapshot.creativeIntent,
   localEdit: current.revision.snapshot.localEdit,
+  exportSpecification: current.revision.snapshot.exportSpecification,
 });
 
 const proposalsMatch = (

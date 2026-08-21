@@ -15,10 +15,15 @@ import {
   projectStatusAfterProcessingTrace,
   promoteProjectJobResult,
   ProjectRuleError,
+  projectExportFilename,
+  projectExportPreview,
+  projectExportSpecificationForAspect,
+  projectExportVideoEditSpec,
   removeProjectSource,
   renameProject,
   restoreProject,
   saveProjectOutput,
+  validateProjectExportSpecification,
   validateProjectSnapshot,
 } from './index';
 import { createDefaultVideoEditSpec } from '../video-editing';
@@ -218,6 +223,83 @@ describe('Project aggregate rules', () => {
         workflowPhase: 'complete',
       },
     });
+  });
+
+  it('carries a chosen placement onto the revision and through the output save', () => {
+    const accepted = acceptProjectSource(
+      emptyProject(),
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        assetId: sourceAssetId,
+        mediaReference: { kind: 'asset', assetId: sourceAssetId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    expect(accepted.ok).toBe(true);
+    if (!accepted.ok) return;
+    const placementRevisionId = '6e3d9c40-4e56-4d9e-9df6-5ad5f0f4b0c1';
+    const exportSpecification = projectExportSpecificationForAspect('9:16');
+
+    // A stale caller cannot slip a placement in: CAS is checked before anything is written.
+    expect(
+      appendProjectRevision(
+        accepted.value,
+        {
+          expectedProjectVersion: 1,
+          expectedRevisionNumber: 2,
+          snapshot: {
+            ...accepted.value.revisions.at(-1)!.snapshot,
+            exportSpecification,
+            updatedAt: latest,
+          },
+          author: { kind: 'user', authorId: ownerUserId },
+          source: 'user-edit',
+          facts: readyFacts,
+        },
+        { now: latest, createId: () => placementRevisionId },
+      ),
+    ).toMatchObject({ ok: false, conflict: { kind: 'project-version' } });
+
+    const placed = appendProjectRevision(
+      accepted.value,
+      {
+        expectedProjectVersion: 2,
+        expectedRevisionNumber: 2,
+        snapshot: {
+          ...accepted.value.revisions.at(-1)!.snapshot,
+          exportSpecification,
+          updatedAt: latest,
+        },
+        author: { kind: 'user', authorId: ownerUserId },
+        source: 'user-edit',
+        facts: readyFacts,
+      },
+      { now: latest, createId: () => placementRevisionId },
+    );
+    expect(placed.ok).toBe(true);
+    if (!placed.ok) return;
+    expect(placed.value.revisions.at(-1)!.snapshot.exportSpecification).toEqual(
+      exportSpecification,
+    );
+
+    const outputRevisionId = '5354b1d3-4022-4c85-a7b6-b230b58ba10b';
+    const saved = saveProjectOutput(
+      placed.value,
+      {
+        expectedProjectVersion: 3,
+        expectedRevisionNumber: 3,
+        savedVideoId: 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338',
+        videoVersionId: 'b276694b-58c4-40d3-8fb6-315e32b66fd0',
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => outputRevisionId },
+    );
+    expect(saved.ok).toBe(true);
+    if (!saved.ok) return;
+    // The post-save revision is what History reads, so the placement has to survive onto it.
+    expect(saved.value.revisions.at(-1)!.snapshot.exportSpecification).toEqual(exportSpecification);
   });
 
   it('keeps visual processing choices mutually exclusive and rejects browser URLs', () => {
@@ -795,5 +877,167 @@ describe('Project aggregate rules', () => {
     // A late trace can never resurrect a deleted Project.
     expect(projectStatusAfterProcessingTrace('deleted', 'failed')).toBeNull();
     expect(projectStatusAfterProcessingTrace('deleted', 'cancelled')).toBeNull();
+  });
+});
+
+describe('Project export specifications', () => {
+  const landscapeSource = { width: 1_920, height: 1_080, durationMs: 12_000 } as const;
+
+  it('treats the original shape as the absence of a specification', () => {
+    expect(projectExportSpecificationForAspect('source')).toBeNull();
+    expect(projectExportVideoEditSpec(null, landscapeSource)).toBeNull();
+    expect(projectExportPreview(null, landscapeSource)).toBeNull();
+    expect(projectExportFilename('launch-cut.mp4', null)).toBe('launch-cut.mp4');
+  });
+
+  it('offers one canonical size per placement and validates it', () => {
+    expect(projectExportSpecificationForAspect('9:16')).toEqual({
+      container: 'video/mp4',
+      aspect: '9:16',
+      resolution: { width: 1_080, height: 1_920 },
+      includeAudio: true,
+    });
+    for (const aspect of ['16:9', '9:16', '1:1', '4:5'] as const) {
+      const specification = projectExportSpecificationForAspect(aspect)!;
+      expect(validateProjectExportSpecification(specification)).toBe(specification);
+    }
+    expect(projectExportSpecificationForAspect('1:1', false)?.includeAudio).toBe(false);
+  });
+
+  it('rejects a size that does not match its placement, and a placement with no size', () => {
+    const wrongShape = {
+      container: 'video/mp4',
+      aspect: '9:16',
+      resolution: { width: 1_920, height: 1_080 },
+      includeAudio: true,
+    } as const;
+    expect(() => validateProjectExportSpecification(wrongShape)).toThrow(ProjectRuleError);
+    expect(() => validateProjectExportSpecification(wrongShape)).toThrow(/not a 9:16 shape/u);
+
+    expect(() =>
+      validateProjectExportSpecification({
+        container: 'video/mp4',
+        aspect: '1:1',
+        resolution: null,
+        includeAudio: true,
+      }),
+    ).toThrow(/needs a size in pixels/u);
+
+    // Keeping the original shape cannot also demand a size.
+    expect(() =>
+      validateProjectExportSpecification({
+        container: 'video/mp4',
+        aspect: 'source',
+        resolution: { width: 1_080, height: 1_080 },
+        includeAudio: true,
+      }),
+    ).toThrow(/cannot also ask for a size/u);
+  });
+
+  it('rejects odd and out-of-range dimensions the local encoder cannot produce', () => {
+    const withResolution = (width: number, height: number) =>
+      validateProjectExportSpecification({
+        container: 'video/mp4',
+        aspect: '1:1',
+        resolution: { width, height },
+        includeAudio: true,
+      });
+    expect(() => withResolution(1_081, 1_081)).toThrow(/whole even number/u);
+    expect(() => withResolution(64, 64)).toThrow(/between 128 and 4096/u);
+    expect(() => withResolution(8_192, 8_192)).toThrow(/between 128 and 4096/u);
+  });
+
+  it('reports the rule reason so a caller can distinguish it from a bad snapshot', () => {
+    try {
+      validateProjectExportSpecification({
+        container: 'video/mp4',
+        aspect: '4:5',
+        resolution: null,
+        includeAudio: true,
+      });
+      expect.unreachable('An invalid specification must throw.');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ProjectRuleError);
+      expect((error as ProjectRuleError).reason).toBe('invalid-export-specification');
+    }
+  });
+
+  it('expresses a placement as a centred crop the local renderer already understands', () => {
+    const portrait = projectExportVideoEditSpec(
+      projectExportSpecificationForAspect('9:16'),
+      landscapeSource,
+    )!;
+
+    expect(portrait.crop.preset).toBe('9:16');
+    // 1920x1080 cropped to 9:16 keeps the full height and a centred 0.31640625 of the width.
+    expect(portrait.crop.rectangle).toEqual({
+      x: (1 - 9 / 16 / (16 / 9)) / 2,
+      y: 0,
+      width: 9 / 16 / (16 / 9),
+      height: 1,
+    });
+    // Nothing else about the source is touched.
+    expect(portrait.rotation).toBe(0);
+    expect(portrait.filter).toBe('original');
+    expect(portrait.trim).toEqual({ startMs: 0, endMs: 12_000 });
+    expect(portrait.adjustments).toEqual(createDefaultVideoEditSpec(12_000).adjustments);
+  });
+
+  it('states the destination size and what the crop discards', () => {
+    expect(
+      projectExportPreview(projectExportSpecificationForAspect('1:1'), landscapeSource),
+    ).toMatchObject({
+      width: 1_080,
+      height: 1_080,
+      croppedHorizontalPercent: 44,
+      croppedVerticalPercent: 0,
+    });
+    // A portrait source loses height rather than width for a landscape placement.
+    expect(
+      projectExportPreview(projectExportSpecificationForAspect('16:9'), {
+        width: 1_080,
+        height: 1_920,
+        durationMs: 5_000,
+      }),
+    ).toMatchObject({ croppedHorizontalPercent: 0, croppedVerticalPercent: 68 });
+  });
+
+  it('names the file after the placement without inventing a second extension', () => {
+    expect(
+      projectExportFilename('launch-cut.mp4', projectExportSpecificationForAspect('9:16')),
+    ).toBe('launch-cut-9x16.mp4');
+    expect(
+      projectExportFilename('launch-cut.mov', projectExportSpecificationForAspect('4:5')),
+    ).toBe('launch-cut-4x5.mp4');
+    expect(projectExportFilename('launch-cut', projectExportSpecificationForAspect('16:9'))).toBe(
+      'launch-cut-16x9.mp4',
+    );
+  });
+
+  it('validates the specification as part of the snapshot it lives on', () => {
+    const snapshot = createEmptyProjectSnapshot(now);
+    expect(validateProjectSnapshot(snapshot).exportSpecification).toBeNull();
+    expect(
+      validateProjectSnapshot({
+        ...snapshot,
+        exportSpecification: projectExportSpecificationForAspect('4:5'),
+      }).exportSpecification,
+    ).toEqual({
+      container: 'video/mp4',
+      aspect: '4:5',
+      resolution: { width: 1_080, height: 1_350 },
+      includeAudio: true,
+    });
+    expect(() =>
+      validateProjectSnapshot({
+        ...snapshot,
+        exportSpecification: {
+          container: 'video/mp4',
+          aspect: '16:9',
+          resolution: { width: 1_080, height: 1_080 },
+          includeAudio: true,
+        },
+      }),
+    ).toThrow(ProjectRuleError);
   });
 });

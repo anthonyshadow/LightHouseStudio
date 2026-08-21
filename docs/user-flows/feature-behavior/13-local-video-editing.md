@@ -51,13 +51,23 @@ Refresh hydrates adopted working media while the first accepted original remains
 applied edit is shown as a historical baseline; new controls start neutral over already-rendered
 bytes so prior changes are not applied twice.
 
+### Placement exports
+
+Choosing a placement at a save step reuses this worker rather than adding a second render path. The
+placement is expressed as an ordinary `VideoEditSpec` — a centred crop to the destination shape, full
+duration, no rotation, filter or adjustment — plus one exact destination size that the worker scales
+the cropped frame to. Nothing else about the edit path changes: the same 300,000,000-byte ceiling
+applies before publication, the same cancel semantics apply, and a browser that cannot render here
+cannot re-frame there either. Placement exports are chosen at a save step, not in this editor.
+
 ## Validation and compatibility
 
 - Preview and export use the same WebGL color shader; the editor never depends on
   `CanvasRenderingContext2D.filter` and has no synchronous main-thread encoder fallback.
-- MediaBunny runs in the dedicated worker, trims and bakes rotation/crop, preserves the primary
-  audio track, and writes H.264/AAC MP4 through an offset-aware 4 MiB chunk accumulator capped at
-  300,000,000 bytes.
+- MediaBunny runs in the dedicated worker, trims and bakes rotation/crop, optionally scales the
+  cropped frame to one exact requested size, preserves the primary audio track unless a caller
+  explicitly excludes it, and writes H.264/AAC MP4 through an offset-aware 4 MiB chunk accumulator
+  capped at 300,000,000 bytes.
 - Publication requires a non-empty playable H.264 MP4, expected primary tracks, exact requested
   even dimensions, duration within 500 ms, and a matching immutable audio sidecar whenever the
   pinned source has audio. A silent source remains silent.

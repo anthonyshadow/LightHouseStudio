@@ -645,6 +645,7 @@ export const projectHistoryRevisionSchema = z
     authorKind: z.enum(['user', 'system', 'migration']),
     workflowPhase: projectWorkflowPhaseSchema,
     outputReference: projectOutputReferenceSchema.nullable(),
+    exportSpecification: projectExportSpecificationSchema,
     createdAt: z.iso.datetime(),
   })
   .strict();
@@ -746,6 +747,7 @@ export const projectSessionProposalSchema = z
     visualTreatment: projectVisualTreatmentSchema,
     creativeIntent: projectCreativeIntentSchema,
     localEdit: projectVideoEditSpecSchema.nullable(),
+    exportSpecification: projectExportSpecificationSchema,
   })
   .strict()
   .superRefine((value, context) => {

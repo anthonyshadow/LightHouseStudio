@@ -324,9 +324,15 @@ describe('Project snapshot contract', () => {
           visualTreatment: snapshot.visualTreatment,
           creativeIntent: snapshot.creativeIntent,
           localEdit: snapshot.localEdit,
+          exportSpecification: snapshot.exportSpecification,
         },
       }),
-    ).toMatchObject({ proposal: { workflowPhase: 'creative' } });
+    ).toMatchObject({
+      proposal: {
+        workflowPhase: 'creative',
+        exportSpecification: { aspect: '9:16', resolution: { width: 1_080, height: 1_920 } },
+      },
+    });
     expect(
       appendProjectRevisionRequestSchema.safeParse({
         expectedVersion: 2,
@@ -340,6 +346,7 @@ describe('Project snapshot contract', () => {
           visualTreatment: snapshot.visualTreatment,
           creativeIntent: snapshot.creativeIntent,
           localEdit: snapshot.localEdit,
+          exportSpecification: null,
           workingMedia: { kind: 'asset', assetId },
         },
       }).success,
@@ -604,6 +611,7 @@ describe('Project snapshot contract', () => {
             authorKind: 'user',
             workflowPhase: 'complete',
             outputReference: reference,
+            exportSpecification: snapshot.exportSpecification,
             createdAt: now,
           },
         ],

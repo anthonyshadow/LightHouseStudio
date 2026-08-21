@@ -135,9 +135,14 @@ export interface ProjectCreativeIntent {
   readonly resourceRevision: string | null;
 }
 
+/** Where a finished video is going. `source` keeps whatever shape the media already has. */
+export const PROJECT_EXPORT_ASPECTS = ['source', '16:9', '9:16', '1:1', '4:5'] as const;
+
+export type ProjectExportAspect = (typeof PROJECT_EXPORT_ASPECTS)[number];
+
 export interface ProjectExportSpecification {
   readonly container: 'video/mp4';
-  readonly aspect: 'source' | '16:9' | '9:16' | '1:1' | '4:5';
+  readonly aspect: ProjectExportAspect;
   readonly resolution: { readonly width: number; readonly height: number } | null;
   readonly includeAudio: boolean;
 }
