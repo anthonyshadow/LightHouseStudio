@@ -10,6 +10,9 @@ import {
   createProjectAssetMembership,
   deleteProject,
   deriveProjectStatus,
+  duplicateProject,
+  duplicateProjectSnapshot,
+  duplicateProjectTitle,
   isProjectResumable,
   moveProjectToCampaign,
   projectStatusAfterProcessingTrace,
@@ -1039,5 +1042,236 @@ describe('Project export specifications', () => {
         },
       }),
     ).toThrow(ProjectRuleError);
+  });
+});
+
+describe('Project duplication', () => {
+  const savedVideoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
+  const videoVersionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
+  const referenceAssetId = '0f0e4a30-6b98-4d1a-8bd6-32bd0a3b9b21';
+  const duplicateId = 'c1b7f4e5-9e51-4f1a-9c39-1f01d0a2e7ad';
+  const duplicateRevisionId = 'd2c8a5f6-0f62-4a2b-8d4a-2f12e1b3f8be';
+
+  /** A finished Project: source, full creative intent, a placement, and a saved output. */
+  const finishedSnapshot = () => ({
+    ...createEmptyProjectSnapshot(now),
+    sourceAssetId,
+    workingMedia: { kind: 'saved-video-version' as const, savedVideoId, videoVersionId },
+    presentedMedia: { kind: 'saved-video-version' as const, savedVideoId, videoVersionId },
+    selectedCharacter: {
+      characterId: 'character-one',
+      characterLabel: 'Avery',
+      characterRevision: now,
+      variantId: null,
+      variantLabel: null,
+      variantRevision: null,
+      referenceAssetId,
+    },
+    selectedOutfit: {
+      outfitId: 'outfit-one',
+      outfitLabel: 'Red jacket',
+      outfitRevision: now,
+      referenceAssetId: null,
+      inputKind: 'saved-outfit' as const,
+    },
+    selectedVoice: {
+      kind: 'local-effect' as const,
+      effectId: 'warm-studio' as const,
+      effectRevision: 'builtin-v1' as const,
+    },
+    visualTreatment: {
+      kind: 'character-swap' as const,
+      providerId: null,
+      outputResolution: '1080p' as const,
+    },
+    liveMode: {
+      modeId: 'local',
+      captureFormat: 'landscape' as const,
+      audioSource: 'local-microphone' as const,
+    },
+    creativeIntent: {
+      promptId: 'prompt-one',
+      promptLabel: 'Summer launch',
+      recipeId: null,
+      recipeLabel: null,
+      userIntent: 'A bright summer launch.',
+      appliedPrompt: 'A bright summer launch.',
+      referenceAssetId: null,
+      resourceRevision: now,
+    },
+    localEdit: createDefaultVideoEditSpec(12_000),
+    exportSpecification: projectExportSpecificationForAspect('9:16'),
+    lastSuccessfulOutput: { savedVideoId, videoVersionId },
+    workflowPhase: 'complete' as const,
+  });
+
+  const finishedProject = () =>
+    createProject(
+      {
+        id: projectId,
+        ownerUserId,
+        title: 'Launch cut',
+        snapshot: finishedSnapshot(),
+        author: { kind: 'user', authorId: ownerUserId },
+        facts: {
+          ...readyFacts,
+          validatedLastSuccessfulOutput: { savedVideoId, videoVersionId },
+        },
+      },
+      { now, createId: () => firstRevisionId },
+    ).project;
+
+  it('carries every creative field by reference and clears everything the original produced', () => {
+    const original = finishedSnapshot();
+    const copy = duplicateProjectSnapshot(original, later);
+
+    // Carried, unchanged — media is referenced, never copied.
+    expect(copy.sourceAssetId).toBe(original.sourceAssetId);
+    expect(copy.workingMedia).toEqual(original.workingMedia);
+    expect(copy.presentedMedia).toEqual(original.presentedMedia);
+    expect(copy.selectedCharacter).toEqual(original.selectedCharacter);
+    expect(copy.selectedOutfit).toEqual(original.selectedOutfit);
+    expect(copy.selectedVoice).toEqual(original.selectedVoice);
+    expect(copy.visualTreatment).toEqual(original.visualTreatment);
+    expect(copy.liveMode).toEqual(original.liveMode);
+    expect(copy.creativeIntent).toEqual(original.creativeIntent);
+    expect(copy.localEdit).toEqual(original.localEdit);
+    expect(copy.exportSpecification).toEqual(original.exportSpecification);
+
+    // Cleared — a duplicate has produced nothing.
+    expect(copy.lastSuccessfulOutput).toBeNull();
+    expect(copy.workflowPhase).toBe('review');
+    expect(copy.createdAt).toBe(later);
+    expect(copy.updatedAt).toBe(later);
+
+    // The schema version is carried, never bumped.
+    expect(copy.schemaVersion).toBe(original.schemaVersion);
+    // And the original is untouched.
+    expect(original.lastSuccessfulOutput).toEqual({ savedVideoId, videoVersionId });
+    expect(original.workflowPhase).toBe('complete');
+  });
+
+  it('never starts a duplicate mid-processing or without a source it does not have', () => {
+    const snapshot = finishedSnapshot();
+    expect(
+      duplicateProjectSnapshot({ ...snapshot, workflowPhase: 'processing' }, later).workflowPhase,
+    ).toBe('creative');
+    expect(
+      duplicateProjectSnapshot({ ...snapshot, workflowPhase: 'creative' }, later).workflowPhase,
+    ).toBe('creative');
+    // A sourceless Project duplicates to the step that is truthful for it.
+    expect(duplicateProjectSnapshot(createEmptyProjectSnapshot(now), later).workflowPhase).toBe(
+      'source',
+    );
+  });
+
+  it('creates one independent Project with a single create revision and no lineage', () => {
+    const duplicated = duplicateProject(
+      { project: finishedProject(), snapshot: finishedSnapshot() },
+      {
+        id: duplicateId,
+        title: 'Launch cut (copy)',
+        campaignId: null,
+        expectedVersion: 1,
+        author: { kind: 'user', authorId: ownerUserId },
+        facts: readyFacts,
+      },
+      { now: later, createId: () => duplicateRevisionId },
+    );
+
+    expect(duplicated.ok).toBe(true);
+    if (!duplicated.ok) return;
+    expect(duplicated.value.project).toMatchObject({
+      id: duplicateId,
+      ownerUserId,
+      title: 'Launch cut (copy)',
+      campaignId: null,
+      // Derived from its own snapshot and facts, never copied: it has no validated output.
+      status: 'ready',
+      version: 1,
+      currentRevisionId: duplicateRevisionId,
+      currentRevisionNumber: 1,
+      archivedAt: null,
+      deletedAt: null,
+    });
+    expect(duplicated.value.revisions).toHaveLength(1);
+    expect(duplicated.value.revisions[0]).toMatchObject({
+      id: duplicateRevisionId,
+      projectId: duplicateId,
+      revisionNumber: 1,
+      parentRevisionId: null,
+      parentRevisionNumber: null,
+      source: 'create',
+    });
+    // No outputs, no jobs, no carried history.
+    expect(duplicated.value.outputLinks).toEqual([]);
+    expect(duplicated.value.jobLinks).toEqual([]);
+    expect(duplicated.value.revisions[0]!.snapshot.lastSuccessfulOutput).toBeNull();
+    // The exact same source asset, not a copy of it.
+    expect(duplicated.value.revisions[0]!.snapshot.sourceAssetId).toBe(sourceAssetId);
+  });
+
+  it('refuses a stale expected version and a deleted original', () => {
+    const project = finishedProject();
+    expect(
+      duplicateProject(
+        { project, snapshot: finishedSnapshot() },
+        {
+          id: duplicateId,
+          title: 'Launch cut (copy)',
+          campaignId: null,
+          expectedVersion: 2,
+          author: { kind: 'user', authorId: ownerUserId },
+          facts: readyFacts,
+        },
+        { now: later, createId: () => duplicateRevisionId },
+      ),
+    ).toMatchObject({
+      ok: false,
+      conflict: { kind: 'project-version', expectedVersion: 2, actualVersion: 1 },
+    });
+
+    expect(() =>
+      duplicateProject(
+        { project: { ...project, deletedAt: later }, snapshot: finishedSnapshot() },
+        {
+          id: duplicateId,
+          title: 'Launch cut (copy)',
+          campaignId: null,
+          expectedVersion: 1,
+          author: { kind: 'user', authorId: ownerUserId },
+          facts: readyFacts,
+        },
+        { now: later, createId: () => duplicateRevisionId },
+      ),
+    ).toThrow(/deleted Project cannot be duplicated/u);
+  });
+
+  it('refuses a duplicate whose source asset is no longer ready', () => {
+    expect(() =>
+      duplicateProject(
+        { project: finishedProject(), snapshot: finishedSnapshot() },
+        {
+          id: duplicateId,
+          title: 'Launch cut (copy)',
+          campaignId: null,
+          expectedVersion: 1,
+          author: { kind: 'user', authorId: ownerUserId },
+          facts: { ...readyFacts, sourceStatus: 'unavailable' },
+        },
+        { now: later, createId: () => duplicateRevisionId },
+      ),
+    ).toThrow(ProjectRuleError);
+  });
+
+  it('names a duplicate recognisably without breaking the title limit', () => {
+    expect(duplicateProjectTitle('Launch cut')).toBe('Launch cut (copy)');
+    expect(duplicateProjectTitle('  Launch   cut  ')).toBe('Launch cut (copy)');
+    const long = 'x'.repeat(200);
+    const copied = duplicateProjectTitle(long);
+    expect(copied).toHaveLength(120);
+    expect(copied.endsWith(' (copy)')).toBe(true);
+    // The result is itself a valid Project title, so a copy of a copy still works.
+    expect(duplicateProjectTitle(copied)).toHaveLength(120);
   });
 });

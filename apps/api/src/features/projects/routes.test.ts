@@ -288,6 +288,160 @@ describe('Project lifecycle routes', () => {
     expect(recipe.statusCode).toBe(400);
   });
 
+  it('duplicates a Project into an independent one that copies intent but produces nothing', async () => {
+    const app = localApp();
+    const created = (await create(app, 'Launch cut')).response;
+    const projectId = json<{ project: { id: string } }>(created).project.id;
+    const exportSpecification = {
+      container: 'video/mp4',
+      aspect: '1:1',
+      resolution: { width: 1_080, height: 1_080 },
+      includeAudio: true,
+    };
+    // Give the original creative state worth carrying, so the duplicate has something to inherit.
+    const checkpointed = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/revisions`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: {
+        expectedVersion: 1,
+        expectedRevisionNumber: 1,
+        proposal: {
+          ...emptyCreativeProposal,
+          workflowPhase: 'creative',
+          liveMode: null,
+          creativeIntent: {
+            ...emptyCreativeProposal.creativeIntent,
+            userIntent: 'A bright summer launch.',
+            appliedPrompt: 'A bright summer launch.',
+          },
+          exportSpecification,
+        },
+      },
+    });
+    expect(checkpointed.statusCode).toBe(200);
+
+    const duplicate = (operationKey: string, payload: Record<string, unknown>) =>
+      app.inject({
+        method: 'POST',
+        url: `/api/projects/${projectId}/duplicate`,
+        headers: {
+          ...browserHeaders,
+          'content-type': 'application/json',
+          'idempotency-key': operationKey,
+        },
+        payload,
+      });
+
+    const operationKey = randomUUID();
+    const body = { title: 'Launch cut (copy)', campaignId: null, expectedVersion: 2 };
+    const copied = await duplicate(operationKey, body);
+    expect(copied.statusCode).toBe(201);
+    const copy = json<{
+      project: { id: string; version: number; title: string; status: string };
+      revision: {
+        revisionNumber: number;
+        source: string;
+        snapshot: Record<string, unknown>;
+      };
+    }>(copied);
+    expect(copy.project.id).not.toBe(projectId);
+    expect(copy.project).toMatchObject({ title: 'Launch cut (copy)', version: 1, status: 'draft' });
+    expect(copy.revision).toMatchObject({
+      revisionNumber: 1,
+      source: 'create',
+      snapshot: {
+        exportSpecification,
+        creativeIntent: { userIntent: 'A bright summer launch.' },
+        lastSuccessfulOutput: null,
+      },
+    });
+
+    // Same key, same intent: one duplicate, not two.
+    const replay = await duplicate(operationKey, body);
+    expect(replay.statusCode).toBe(201);
+    expect(json<{ project: { id: string } }>(replay).project.id).toBe(copy.project.id);
+    expect(
+      json<{ projects: { id: string }[] }>(
+        await app.inject({
+          method: 'GET',
+          url: '/api/projects?lifecycle=active',
+          headers: { host: browserHeaders.host },
+        }),
+      ).projects,
+    ).toHaveLength(2);
+
+    // Same key, different intent: refused rather than silently reused.
+    expect((await duplicate(operationKey, { ...body, title: 'Something else' })).statusCode).toBe(
+      409,
+    );
+
+    // A stale expected version is refused before anything is written.
+    const stale = await duplicate(randomUUID(), { ...body, expectedVersion: 1 });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json()).toMatchObject({
+      conflict: { kind: 'project-version', expectedVersion: 1, actualVersion: 2 },
+    });
+
+    // The duplicate is renameable and archivable on its own, and the original is untouched.
+    const renamed = await app.inject({
+      method: 'PATCH',
+      url: `/api/projects/${copy.project.id}`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { title: 'Second cut', expectedVersion: 1 },
+    });
+    expect(renamed.statusCode).toBe(200);
+    expect(
+      json<{ project: { title: string } }>(
+        await app.inject({
+          method: 'GET',
+          url: `/api/projects/${projectId}`,
+          headers: { host: browserHeaders.host },
+        }),
+      ).project.title,
+    ).toBe('Launch cut');
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: `/api/projects/${copy.project.id}/archive`,
+          headers: { ...browserHeaders, 'content-type': 'application/json' },
+          payload: { expectedVersion: 2 },
+        })
+      ).statusCode,
+    ).toBe(200);
+  });
+
+  it('refuses a duplicate placed in an unavailable Campaign, exactly as a move would', async () => {
+    const app = localApp();
+    const created = (await create(app, 'Launch cut')).response;
+    const projectId = json<{ project: { id: string } }>(created).project.id;
+
+    const refused = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/duplicate`,
+      headers: {
+        ...browserHeaders,
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: { title: 'Launch cut (copy)', campaignId: randomUUID(), expectedVersion: 1 },
+    });
+
+    expect(refused.statusCode).toBe(409);
+    expect(refused.json()).toMatchObject({ conflict: { kind: 'campaign-membership' } });
+    // Nothing was created by the refused attempt.
+    expect(
+      json<{ projects: unknown[] }>(
+        await app.inject({
+          method: 'GET',
+          url: '/api/projects?lifecycle=active',
+          headers: { host: browserHeaders.host },
+        }),
+      ).projects,
+    ).toHaveLength(1);
+  });
+
   it('records a chosen placement on the revision, replays it, and rejects an impossible one', async () => {
     const app = localApp();
     const created = (await create(app, 'Placement checkpoint')).response;

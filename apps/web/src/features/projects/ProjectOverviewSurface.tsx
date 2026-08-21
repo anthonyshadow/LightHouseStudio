@@ -10,6 +10,7 @@ import { useCampaignDetail } from '../campaigns/useCampaignsController';
 import { ProjectAssetsSection } from './ProjectAssetsSection';
 import {
   DeleteProjectDialog,
+  DuplicateProjectDialog,
   ProjectCampaignDialog,
   ProjectLifecycleDialog,
   RenameProjectDialog,
@@ -22,7 +23,7 @@ import {
 } from './ProjectOverviewSurface.styles';
 import { ProjectSourceSection, type ProjectRecordingCandidate } from './ProjectSourceSection';
 import { projectStatusLabel } from './projectStatusPresentation';
-import { ProjectWorkflowProgress } from './ProjectWorkflowProgress';
+import { ProjectWorkflowProgress, stepForSnapshot } from './ProjectWorkflowProgress';
 import type { useProjectSession } from './useProjectSession';
 import type { ProjectSourceActivity, ProjectSourceRuntime } from './useProjectSourceController';
 
@@ -73,6 +74,7 @@ export const ProjectOverviewSurface = ({
   const [lifecycleDialog, setLifecycleDialog] = useState<ProjectLifecycleDialogTarget | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ProjectContract | null>(null);
   const [campaignDialog, setCampaignDialog] = useState(false);
+  const [duplicateTarget, setDuplicateTarget] = useState<ProjectContract | null>(null);
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const archived = project.archivedAt !== null;
   const overviewHasSource = current.revision.snapshot.sourceAssetId !== null;
@@ -82,6 +84,7 @@ export const ProjectOverviewSurface = ({
     setLifecycleDialog(null);
     setDeleteTarget(null);
     setCampaignDialog(false);
+    setDuplicateTarget(null);
   };
   const acceptSession = session.acceptCurrent;
   // Accepting a source from the overview lands the operator in the workspace, where the media stage
@@ -159,6 +162,15 @@ export const ProjectOverviewSurface = ({
                 : overviewHasSource
                   ? 'Continue editing'
                   : 'Add original video'}
+            </Button>
+            <Button
+              data-detail-action="duplicate"
+              onClick={(event) => {
+                dialogReturnRef.current = event.currentTarget;
+                setDuplicateTarget(project);
+              }}
+            >
+              Make another version
             </Button>
             <Button
               data-detail-action="move"
@@ -255,6 +267,21 @@ export const ProjectOverviewSurface = ({
             session.acceptCurrent(updated);
             setAnnouncement(`Project renamed to ${updated.project.title}.`);
             closeDialog();
+          }}
+        />
+      ) : null}
+      {duplicateTarget ? (
+        <DuplicateProjectDialog
+          project={duplicateTarget}
+          returnFocusRef={dialogReturnRef}
+          onClose={closeDialog}
+          onDuplicated={(created) => {
+            closeDialog();
+            // Opened on the step the copy is actually ready for, using the same derivation the
+            // workspace itself uses to decide where a Project stands.
+            void navigate(
+              projectWorkspacePath(created.project.id, stepForSnapshot(created.revision.snapshot)),
+            );
           }}
         />
       ) : null}

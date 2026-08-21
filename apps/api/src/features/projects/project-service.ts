@@ -3,6 +3,7 @@ import {
   projectCurrentResponseSchema,
   projectsResponseSchema,
   type AppendProjectRevisionRequest,
+  type DuplicateProjectRequest,
   type ProjectContract,
   type ProjectCurrentResponse,
   type ProjectsQuery,
@@ -12,6 +13,7 @@ import {
   archiveProject,
   createProject,
   deleteProject,
+  duplicateProject,
   normalizeProjectTitle,
   ProjectRuleError,
   renameProject,
@@ -29,7 +31,10 @@ import {
   type ProjectSummaryCursor,
 } from './project-repository.js';
 import { projectRequestFingerprint } from './project-request-fingerprint.js';
-import { projectAssetLinksForRevision } from './project-snapshot-relations.js';
+import {
+  projectAssetLinksForRevision,
+  projectVersionReferenceLinksForRevision,
+} from './project-snapshot-relations.js';
 
 const emptyFacts = {
   sourceStatus: 'none' as const,
@@ -167,6 +172,83 @@ export class ProjectService {
     const result = await this.#repository.createIdempotent({
       aggregate,
       receipt: { operationKey, requestFingerprint, projectId, createdAt: now },
+    });
+    return result.kind === 'conflict'
+      ? { ok: false, conflict: result.conflict }
+      : { ok: true, current: publicProjectCurrent(result.current) };
+  }
+
+  /**
+   * A new Project derived from an existing one. It reuses the create path end to end — the same
+   * idempotency receipt, the same Campaign-membership check, the same status derivation — so the
+   * only thing that makes it a duplicate is the snapshot the domain rule derives.
+   *
+   * No bytes move. The duplicate's first revision names the original's `sourceAssetId` and media
+   * references exactly, and the asset links derived from it are what keeps those bytes retained
+   * once the original is archived or deleted.
+   */
+  async duplicate(
+    ownerUserId: string,
+    projectId: string,
+    operationKey: string,
+    input: DuplicateProjectRequest,
+  ): Promise<ProjectServiceMutationResult> {
+    const source = await this.#repository.getCurrent(ownerUserId, projectId);
+    if (source === null) throw new AppError(404, 'not_found', 'That Project is unavailable.');
+    const now = this.#now().toISOString();
+    const duplicateId = this.#createId();
+    let derived;
+    try {
+      derived = duplicateProject(
+        { project: source.project, snapshot: source.revision.snapshot },
+        {
+          id: duplicateId,
+          title: input.title,
+          campaignId: input.campaignId,
+          expectedVersion: input.expectedVersion,
+          author: { kind: 'user', authorId: ownerUserId },
+          facts: {
+            sourceStatus: source.revision.snapshot.sourceAssetId === null ? 'none' : 'ready',
+            currentAttempt: { status: 'none' },
+            validatedLastSuccessfulOutput: null,
+          },
+        },
+        { now, createId: this.#createId },
+      );
+    } catch (error) {
+      if (error instanceof ProjectRuleError) {
+        throw new AppError(
+          error.reason === 'invalid-title' ? 400 : 409,
+          error.reason === 'invalid-title' ? 'validation_error' : 'conflict',
+          error.message,
+        );
+      }
+      throw error;
+    }
+    if (!derived.ok) return { ok: false, conflict: derived.conflict };
+    const revision = derived.value.revisions[0]!;
+    const aggregate = {
+      ...derived.value,
+      // Derived here for the same reason every other revision derives them: one owner for the
+      // relation between a snapshot and the media it retains.
+      assetLinks: projectAssetLinksForRevision(revision),
+      versionReferenceLinks: projectVersionReferenceLinksForRevision(revision),
+    };
+    const result = await this.#repository.createIdempotent({
+      aggregate,
+      receipt: {
+        operationKey,
+        requestFingerprint: projectRequestFingerprint({
+          version: 1,
+          operation: 'duplicate',
+          sourceProjectId: projectId,
+          expectedVersion: input.expectedVersion,
+          title: aggregate.project.title,
+          campaignId: input.campaignId,
+        }),
+        projectId: duplicateId,
+        createdAt: now,
+      },
     });
     return result.kind === 'conflict'
       ? { ok: false, conflict: result.conflict }

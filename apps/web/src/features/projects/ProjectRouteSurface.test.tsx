@@ -1053,6 +1053,152 @@ describe('Project route surface', () => {
     );
   });
 
+  it('duplicates a Project from the list into a copy that has produced nothing yet', async () => {
+    const duplicateId = 'e7a1cb4f-2c2e-4a5f-b6dd-1f1b1a6a9d2e';
+    let requestBody: unknown;
+    let idempotencyKey: string | null = null;
+    let projects = [currentProject(activeId).project];
+    const copy = {
+      ...currentProject(duplicateId),
+      project: {
+        ...currentProject(duplicateId).project,
+        id: duplicateId,
+        title: 'Launch cut (copy)',
+        status: 'ready' as const,
+      },
+      revision: {
+        ...currentProject(duplicateId).revision,
+        projectId: duplicateId,
+        snapshot: {
+          ...currentProject(duplicateId).revision.snapshot,
+          sourceAssetId,
+          workflowPhase: 'review' as const,
+        },
+      },
+    };
+    mockApiServer.use(
+      http.get('*/api/projects', ({ request }) =>
+        HttpResponse.json(
+          listBody(
+            'projects',
+            new URL(request.url).searchParams.get('lifecycle') === 'archived' ? [] : projects,
+          ),
+        ),
+      ),
+      http.post(`*/api/projects/${activeId}/duplicate`, async ({ request }) => {
+        requestBody = await request.json();
+        idempotencyKey = request.headers.get('idempotency-key');
+        projects = [...projects, copy.project];
+        return HttpResponse.json(copy, { status: 201 });
+      }),
+      http.get(`*/api/projects/${duplicateId}`, () => HttpResponse.json(copy)),
+    );
+    const user = userEvent.setup();
+    const { router } = renderProjects();
+
+    const activeList = await screen.findByRole('list', { name: 'Active Projects' });
+    await user.click(within(activeList).getByRole('button', { name: 'Make another version' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Make another version' });
+
+    // Named recognisably, and editable before confirming.
+    expect(within(dialog).getByRole('textbox', { name: 'New Project name' })).toHaveValue(
+      'Launch cut (copy)',
+    );
+    // The cost question is answered before the operator has to ask it.
+    expect(within(dialog).getByText('Nothing is generated yet')).toBeVisible();
+    expect(within(dialog).getByText(/no video is duplicated/u)).toBeVisible();
+    expect(
+      within(dialog).getByText(/nothing is charged until you start it yourself/u),
+    ).toBeVisible();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Make another version' }));
+
+    await waitFor(() =>
+      expect(requestBody).toEqual({
+        title: 'Launch cut (copy)',
+        campaignId: null,
+        expectedVersion: 1,
+      }),
+    );
+    expect(idempotencyKey).toMatch(/^[0-9a-f-]{36}$/u);
+    // Opened on the step the copy is ready for, not on the first step.
+    await waitFor(() =>
+      expect(router.state.location.pathname + router.state.location.search).toBe(
+        `/projects/${duplicateId}/workspace?task=save`,
+      ),
+    );
+  });
+
+  it('duplicates from the Project overview and leaves the original untouched', async () => {
+    const duplicateId = 'e7a1cb4f-2c2e-4a5f-b6dd-1f1b1a6a9d2e';
+    const original = currentProject(activeId);
+    const copy = {
+      ...currentProject(duplicateId),
+      project: { ...currentProject(duplicateId).project, id: duplicateId, title: 'Second cut' },
+      revision: { ...currentProject(duplicateId).revision, projectId: duplicateId },
+    };
+    let duplicateRequests = 0;
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(original)),
+      http.get(`*/api/projects/${duplicateId}`, () => HttpResponse.json(copy)),
+      http.post(`*/api/projects/${activeId}/duplicate`, async ({ request }) => {
+        duplicateRequests += 1;
+        expect(await request.json()).toMatchObject({ title: 'Second cut', expectedVersion: 1 });
+        return HttpResponse.json(copy, { status: 201 });
+      }),
+    );
+    const user = userEvent.setup();
+    const { router } = renderProjects(`/projects/${activeId}`);
+
+    await user.click(await screen.findByRole('button', { name: 'Make another version' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Make another version' });
+    const field = within(dialog).getByRole('textbox', { name: 'New Project name' });
+    await user.clear(field);
+    await user.type(field, 'Second cut');
+    await user.click(within(dialog).getByRole('button', { name: 'Make another version' }));
+
+    await waitFor(() => expect(duplicateRequests).toBe(1));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/projects/${duplicateId}/workspace`),
+    );
+  });
+
+  it('refuses a duplicate of a Project that changed elsewhere, without creating one', async () => {
+    const user = userEvent.setup();
+    let duplicateRequests = 0;
+    mockApiServer.use(
+      http.get('*/api/projects', () =>
+        HttpResponse.json(listBody('projects', [currentProject(activeId).project])),
+      ),
+      http.post(`*/api/projects/${activeId}/duplicate`, () => {
+        duplicateRequests += 1;
+        return HttpResponse.json(
+          {
+            error: { code: 'conflict', message: 'The Project changed in another session.' },
+            conflict: {
+              kind: 'project-version',
+              projectId: activeId,
+              expectedVersion: 1,
+              actualVersion: 2,
+            },
+          },
+          { status: 409 },
+        );
+      }),
+    );
+    const { router } = renderProjects();
+
+    const activeList = await screen.findByRole('list', { name: 'Active Projects' });
+    await user.click(within(activeList).getByRole('button', { name: 'Make another version' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Make another version' });
+    await user.click(within(dialog).getByRole('button', { name: 'Make another version' }));
+
+    await waitFor(() => expect(duplicateRequests).toBe(1));
+    expect(await within(dialog).findByText('Project changed')).toBeVisible();
+    // The dialog stays open and nowhere was navigated to.
+    expect(router.state.location.pathname).toBe('/projects');
+  });
+
   it('deletes only the selected archived Project after explicit confirmation', async () => {
     let archived = [currentProject(archivedId).project];
     let requestBody: unknown;

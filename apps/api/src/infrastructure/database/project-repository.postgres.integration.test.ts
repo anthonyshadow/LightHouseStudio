@@ -10,6 +10,7 @@ import {
   createDefaultVideoEditSpec,
   createEmptyProjectSnapshot,
   createProject,
+  duplicateProject,
   promoteProjectJobResult,
   type ProjectAssetLink,
 } from '@studio/domain';
@@ -29,7 +30,10 @@ import type {
   ProjectSourceRecord,
   ProjectWorkingMediaRecord,
 } from '../../features/projects/project-repository.js';
-import { projectAssetLinksForRevision } from '../../features/projects/project-snapshot-relations.js';
+import {
+  projectAssetLinksForRevision,
+  projectVersionReferenceLinksForRevision,
+} from '../../features/projects/project-snapshot-relations.js';
 import {
   mediaAssets,
   processingJobs,
@@ -170,6 +174,196 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
       await connection.db
         .delete(projectOperationReceipts)
         .where(eq(projectOperationReceipts.ownerUserId, ownerUserId));
+      await connection.db.delete(users).where(eq(users.id, ownerUserId));
+    }
+  });
+
+  it('duplicates identically in both repositories and keeps the shared source retained', async () => {
+    const ownerUserId = randomUUID();
+    const projectId = randomUUID();
+    const duplicateId = randomUUID();
+    const originalRevisionId = randomUUID();
+    const duplicateRevisionId = randomUUID();
+    const sourceAssetId = randomUUID();
+    const now = '2026-08-11T12:00:00.000Z';
+    const later = '2026-08-11T12:05:00.000Z';
+    const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-duplicate-parity-'));
+    const drizzle = new DrizzleProjectRepository(connection.db);
+    const file = new FileProjectRepository(directory);
+    const retention = new DrizzleProjectRetentionPolicy(connection.db);
+    const lifecycle = new DrizzleAssetLifecycleRegistry(connection.db, retention);
+    const readyFacts = {
+      sourceStatus: 'ready' as const,
+      currentAttempt: { status: 'none' as const },
+      validatedLastSuccessfulOutput: null,
+    };
+
+    try {
+      await connection.db.insert(users).values({
+        id: ownerUserId,
+        login: `${ownerUserId}@duplicate.test`,
+        normalizedLogin: `${ownerUserId}@duplicate.test`,
+        username: `d-${ownerUserId}`,
+        email: `${ownerUserId}@duplicate.test`,
+        displayName: 'Duplicate Parity',
+      });
+      await connection.db.insert(mediaAssets).values({
+        id: sourceAssetId,
+        ownerUserId,
+        storageProvider: 'local',
+        storageKey: sourceAssetId,
+        status: 'ready',
+        mimeType: 'video/mp4',
+        filename: 'source.mp4',
+        sizeBytes: 100,
+        checksumSha256: 'c'.repeat(64),
+      });
+
+      const originalSnapshot = {
+        ...createEmptyProjectSnapshot(now),
+        sourceAssetId,
+        workingMedia: { kind: 'asset' as const, assetId: sourceAssetId },
+        presentedMedia: { kind: 'asset' as const, assetId: sourceAssetId },
+        localEdit: createDefaultVideoEditSpec(4_000),
+        workflowPhase: 'review' as const,
+      };
+      const original = createProject(
+        {
+          id: projectId,
+          ownerUserId,
+          title: 'Launch cut',
+          snapshot: originalSnapshot,
+          author: { kind: 'user', authorId: ownerUserId },
+          facts: readyFacts,
+        },
+        { now, createId: () => originalRevisionId },
+      );
+      const originalAggregate = {
+        ...original,
+        assetLinks: projectAssetLinksForRevision(original.revisions[0]!),
+        versionReferenceLinks: projectVersionReferenceLinksForRevision(original.revisions[0]!),
+      };
+      const originalReceipt = {
+        operationKey: randomUUID(),
+        requestFingerprint: createHash('sha256').update('duplicate-original').digest('hex'),
+        projectId,
+        createdAt: now,
+      };
+      await drizzle.createIdempotent({ aggregate: originalAggregate, receipt: originalReceipt });
+      await file.createIdempotent({ aggregate: originalAggregate, receipt: originalReceipt });
+
+      // Exactly what the service composes: the domain rule, then the shared link derivation.
+      const derived = duplicateProject(
+        { project: original.project, snapshot: originalSnapshot },
+        {
+          id: duplicateId,
+          title: 'Launch cut (copy)',
+          campaignId: null,
+          expectedVersion: 1,
+          author: { kind: 'user', authorId: ownerUserId },
+          facts: readyFacts,
+        },
+        { now: later, createId: () => duplicateRevisionId },
+      );
+      expect(derived.ok).toBe(true);
+      if (!derived.ok) return;
+      const duplicateAggregate = {
+        ...derived.value,
+        assetLinks: projectAssetLinksForRevision(derived.value.revisions[0]!),
+        versionReferenceLinks: projectVersionReferenceLinksForRevision(derived.value.revisions[0]!),
+      };
+      const duplicateReceipt = {
+        operationKey: randomUUID(),
+        requestFingerprint: createHash('sha256').update('duplicate-copy').digest('hex'),
+        projectId: duplicateId,
+        createdAt: later,
+      };
+      const fromDrizzle = await drizzle.createIdempotent({
+        aggregate: duplicateAggregate,
+        receipt: duplicateReceipt,
+      });
+      const fromFile = await file.createIdempotent({
+        aggregate: duplicateAggregate,
+        receipt: duplicateReceipt,
+      });
+
+      // Parity: the two implementations accept the same aggregate and read back the same Project.
+      expect(fromFile.kind).toBe(fromDrizzle.kind);
+      expect(await file.getCurrent(ownerUserId, duplicateId)).toEqual(
+        await drizzle.getCurrent(ownerUserId, duplicateId),
+      );
+      // And an exact replay converges to the one duplicate in both.
+      expect(
+        (
+          await file.createIdempotent({
+            aggregate: duplicateAggregate,
+            receipt: duplicateReceipt,
+          })
+        ).kind,
+      ).toBe(
+        (
+          await drizzle.createIdempotent({
+            aggregate: duplicateAggregate,
+            receipt: duplicateReceipt,
+          })
+        ).kind,
+      );
+
+      // The duplicate contributes its own retention row for the shared source; no bytes were copied.
+      const linkedProjectIds = (
+        await connection.db
+          .select({ projectId: projectAssets.projectId, assetId: projectAssets.assetId })
+          .from(projectAssets)
+          .where(eq(projectAssets.assetId, sourceAssetId))
+      ).map((row) => row.projectId);
+      expect(new Set(linkedProjectIds)).toEqual(new Set([projectId, duplicateId]));
+      expect(await file.retainedAssetIds(ownerUserId, [sourceAssetId])).toEqual(
+        await retention.retainedAssetIds(ownerUserId, [sourceAssetId]),
+      );
+
+      // Archiving the original changes nothing about what the duplicate still needs.
+      await connection.db
+        .update(projects)
+        .set({ status: 'archived', archivedAt: later, version: 2 })
+        .where(eq(projects.id, projectId));
+      expect(await retention.retainsAsset(ownerUserId, sourceAssetId)).toBe(true);
+      expect(await lifecycle.claimDeletion(ownerUserId, sourceAssetId, 'local')).toBeNull();
+
+      // Nor does deleting it.
+      await connection.db
+        .update(projects)
+        .set({ status: 'deleted', archivedAt: later, deletedAt: later, version: 3 })
+        .where(eq(projects.id, projectId));
+      expect(await retention.retainsAsset(ownerUserId, sourceAssetId)).toBe(true);
+      expect(await drizzle.getCurrent(ownerUserId, duplicateId)).not.toBeNull();
+
+      // And even if the original's rows were gone entirely, the duplicate alone keeps the bytes:
+      // this is what proves the retention comes from the duplicate rather than from the original.
+      await connection.db
+        .update(projects)
+        .set({ currentRevisionId: null, currentRevisionNumber: 0 })
+        .where(eq(projects.id, projectId));
+      await connection.db.delete(projectAssets).where(eq(projectAssets.projectId, projectId));
+      await connection.db.delete(projectRevisions).where(eq(projectRevisions.projectId, projectId));
+      await connection.db.delete(projects).where(eq(projects.id, projectId));
+
+      expect(await retention.retainsAsset(ownerUserId, sourceAssetId)).toBe(true);
+      expect(await lifecycle.claimDeletion(ownerUserId, sourceAssetId, 'local')).toBeNull();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+      for (const id of [projectId, duplicateId]) {
+        await connection.db
+          .update(projects)
+          .set({ currentRevisionId: null, currentRevisionNumber: 0 })
+          .where(eq(projects.id, id));
+        await connection.db.delete(projectAssets).where(eq(projectAssets.projectId, id));
+        await connection.db.delete(projectRevisions).where(eq(projectRevisions.projectId, id));
+        await connection.db.delete(projects).where(eq(projects.id, id));
+      }
+      await connection.db
+        .delete(projectOperationReceipts)
+        .where(eq(projectOperationReceipts.ownerUserId, ownerUserId));
+      await connection.db.delete(mediaAssets).where(eq(mediaAssets.id, sourceAssetId));
       await connection.db.delete(users).where(eq(users.id, ownerUserId));
     }
   });

@@ -70,6 +70,7 @@ response can be safely replayed. Conflicts return `409` with a typed `ProjectCon
 | POST     | `/api/projects`                                                                      | Create (Idempotency-Key required)                                            |
 | GET      | `/api/projects/:id`                                                                  | Current project + head revision                                              |
 | PATCH    | `/api/projects/:id`                                                                  | Rename (expectedVersion)                                                     |
+| POST     | `/api/projects/:id/duplicate`                                                        | Make another version (expectedVersion + Idempotency-Key)                     |
 | POST     | `/api/projects/:id/archive` · `/restore` · `/tombstone`                              | Lifecycle; tombstone requires archived + explicit confirmation               |
 | POST     | `/api/projects/:id/campaign`                                                         | Attach/detach campaign membership                                            |
 | POST     | `/api/projects/:id/revisions`                                                        | Semantic checkpoint (creative setup autosave)                                |
@@ -299,6 +300,39 @@ links to `/api/projects/{id}/outputs/{versionId}/content?download=true`
 (`ProjectHistorySection.tsx:311, 449`). The Save tab's post-save actions are the other download
 affordance inside a Project, reached through the Saved Video content route rather than this
 Project-scoped one.
+
+## Flow: Make another version
+
+`duplicateProject` (`packages/domain/src/projects/rules.ts`) derives a new Project from an existing
+revision, and `ProjectService.duplicate` composes it with the same create path everything else uses.
+
+1. The domain rule checks the **source** Project's `expectedVersion` and returns a `project-version`
+   conflict rather than throwing, so a Project that moved on is never silently copied from stale
+   state. A deleted Project cannot be duplicated; an archived one can, which is the only way to get
+   sourced work out of an archive.
+2. `duplicateProjectSnapshot` carries everything that describes intent — `sourceAssetId`,
+   `workingMedia`, `presentedMedia`, `selectedCharacter`, `selectedOutfit`, `selectedVoice`,
+   `visualTreatment`, `liveMode`, `creativeIntent`, `localEdit`, `exportSpecification` — **by
+   reference**. No bytes are copied and no storage is used again.
+3. It clears `lastSuccessfulOutput`, and derives a truthful `workflowPhase`: `complete` and `export`
+   become `review`, `processing` becomes `creative`, because a duplicate has produced nothing and no
+   provider job comes with it. The `status` is derived by `deriveProjectStatus`, never copied.
+4. The first revision is an ordinary `create` revision — no new `ProjectRevisionSource` value was
+   needed — with no output links, no job links and no carried history.
+5. The service derives the duplicate's asset and version-reference links with the same
+   `projectAssetLinksForRevision` / `projectVersionReferenceLinksForRevision` helpers every other
+   revision uses, then calls `createIdempotent`. **Those links are what keeps the shared source
+   retained**: `DrizzleProjectRetentionPolicy` and `FileProjectRepository.retainedAssetIds` both key
+   retention on `projectAssets` rows, so the duplicate's own row keeps the bytes alive after the
+   original is archived, deleted, or gone entirely.
+6. Campaign membership is checked by the same create path, so a duplicate aimed at an archived or
+   missing Campaign is refused with `campaign-membership` exactly as a move would be, and nothing is
+   created.
+7. The UI offers it as **Make another version** on the Projects list rows and the Project overview.
+   The dialog proposes `"<title> (copy)"` (bounded by `duplicateProjectTitle`), keeps the original's
+   Campaign as the default, and states plainly that no video is duplicated and nothing is charged
+   until work is started in the new Project. On success it opens the copy at
+   `stepForSnapshot(snapshot)` — the step it is actually ready for.
 
 ## Flow: Project-scoped provider processing
 

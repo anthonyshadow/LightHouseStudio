@@ -1,5 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectContract, ProjectCurrentResponse } from '@studio/contracts';
+import { duplicateProjectTitle } from '@studio/domain';
 import { useRef, useState, type FormEvent, type RefObject } from 'react';
 import { apiErrorMessage } from '../../adapters/api-client/apiClient';
 import { Button, ConfirmationDialog, OverlayPanel, StatusNotice, TextField } from '../../ui';
@@ -128,6 +129,117 @@ export const NewProjectDialog = ({
         {error?.scope === 'unnamed' ? (
           <StatusNotice role="alert" tone="danger" title="Project not created">
             {error.message}
+          </StatusNotice>
+        ) : null}
+      </form>
+    </OverlayPanel>
+  );
+};
+
+/**
+ * Making another version of an existing Project. The copy starts from the same original video and
+ * the same creative setup; it produces nothing until the operator asks it to, which is what the
+ * body states plainly rather than leaving the operator to wonder what it just cost them.
+ */
+export const DuplicateProjectDialog = ({
+  project,
+  returnFocusRef,
+  onClose,
+  onDuplicated,
+}: {
+  readonly project: ProjectContract;
+  readonly returnFocusRef: RefObject<HTMLElement | null>;
+  readonly onClose: () => void;
+  readonly onDuplicated: (current: ProjectCurrentResponse) => void;
+}) => {
+  const theme = useTheme();
+  const controller = useProjectsController();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [title, setTitle] = useState(() => duplicateProjectTitle(project.title));
+  // A copy stays beside its original unless the operator says otherwise.
+  const [campaignId, setCampaignId] = useState(project.campaignId ?? 'none');
+  const [error, setError] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
+  const busy = controller.duplicateMutation.isPending;
+
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
+    setError(null);
+    try {
+      onDuplicated(
+        await controller.duplicateMutation.mutateAsync({
+          projectId: project.id,
+          title: title.trim(),
+          campaignId: projectCampaignId(campaignId),
+          expectedVersion: project.version,
+        }),
+      );
+    } catch (caught) {
+      setStale(
+        caught instanceof ProjectApiConflictError && caught.conflict.kind === 'project-version',
+      );
+      setError(safeProjectError(caught));
+    }
+  };
+
+  return (
+    <OverlayPanel
+      open
+      onClose={onClose}
+      title="Make another version"
+      description="Creates a new Project that starts from the same original video and the same creative setup."
+      placement="bottom"
+      size="standard"
+      closeDisabled={busy}
+      closeOnBackdrop={false}
+      initialFocusRef={inputRef}
+      returnFocusRef={returnFocusRef}
+      footer={
+        <div css={dialogActionsStyles(theme)}>
+          <Button variant="quiet" disabled={busy} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            data-project-duplicate="confirm"
+            busy={busy}
+            disabled={busy || title.trim().length === 0 || title.trim().length > 120}
+            onClick={() => void submit()}
+          >
+            Make another version
+          </Button>
+        </div>
+      }
+    >
+      <form onSubmit={(event) => void submit(event)} css={{ display: 'grid', gap: theme.space.md }}>
+        <TextField
+          ref={inputRef}
+          label="New Project name"
+          value={title}
+          required
+          maxLength={120}
+          disabled={busy}
+          {...(error && !stale ? { error } : {})}
+          onChange={(event) => setTitle(event.target.value)}
+        />
+        <ProjectCampaignPicker
+          label="Campaign (optional)"
+          value={campaignId}
+          disabled={busy}
+          onValueChange={(value) => setCampaignId(value)}
+        />
+        <StatusNotice role="status" tone="neutral" title="Nothing is generated yet">
+          <p>
+            The copy points at the same original video — no video is duplicated and no storage is
+            used again. No AI work runs and nothing is charged until you start it yourself in the
+            new Project.
+          </p>
+          <p>“{project.title}” is left exactly as it is.</p>
+        </StatusNotice>
+        {stale ? (
+          <StatusNotice role="alert" tone="warning" title="Project changed">
+            “{project.title}” changed in another session. Reopen it and make the copy again, so the
+            copy starts from what is actually there now.
           </StatusNotice>
         ) : null}
       </form>

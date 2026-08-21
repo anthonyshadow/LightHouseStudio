@@ -16,6 +16,7 @@ import type {
   ProjectSnapshot,
   ProjectStatus,
   ProjectStatusFacts,
+  ProjectWorkflowPhase,
 } from './types';
 import { PROJECT_EXPORT_ASPECTS } from './types';
 import type { NormalizedVideoCrop, VideoEditSourceGeometry, VideoEditSpec } from '../video-editing';
@@ -612,6 +613,109 @@ export const createProject = (
     versionReferenceLinks: [],
     jobLinks: [],
     outputLinks: [],
+  };
+};
+
+const PROJECT_DUPLICATE_SUFFIX = ' (copy)';
+
+/**
+ * A recognisable default name for a duplicate, bounded by the same title limit as any other
+ * Project: the base is trimmed to leave room for the suffix rather than the whole name being
+ * rejected for length.
+ */
+export const duplicateProjectTitle = (title: string): string => {
+  const base = normalizeProjectTitle(title);
+  const room = PROJECT_TITLE_MAX_LENGTH - PROJECT_DUPLICATE_SUFFIX.length;
+  const trimmed = base.length > room ? base.slice(0, room).trimEnd() : base;
+  return `${trimmed}${PROJECT_DUPLICATE_SUFFIX}`;
+};
+
+/**
+ * A duplicate has produced nothing, so it cannot inherit a phase that claims otherwise. The phase
+ * is derived rather than copied for the same reason the status is: both describe what has happened
+ * to *this* Project, and nothing has happened to it yet beyond being created.
+ */
+const duplicatedWorkflowPhase = (snapshot: ProjectSnapshot): ProjectWorkflowPhase => {
+  if (snapshot.sourceAssetId === null) return 'source';
+  switch (snapshot.workflowPhase) {
+    // Completion belongs to the output the original saved, which the duplicate does not have. Its
+    // media is still ready to be saved again, which is what `review` means.
+    case 'complete':
+    case 'export':
+      return 'review';
+    // No provider job comes with a duplicate, so it is never mid-processing.
+    case 'processing':
+      return 'creative';
+    default:
+      return snapshot.workflowPhase;
+  }
+};
+
+/**
+ * The creative state a duplicate starts from: everything that describes *intent* is carried, and
+ * everything that records what the original *produced* is dropped.
+ *
+ * Carried: `sourceAssetId`, `workingMedia`, `presentedMedia`, `selectedCharacter`,
+ * `selectedOutfit`, `selectedVoice`, `visualTreatment`, `liveMode`, `creativeIntent`, `localEdit`
+ * and `exportSpecification` — all by reference, so no media is copied.
+ * Cleared: `lastSuccessfulOutput`, and a `workflowPhase` that claimed completion or processing.
+ */
+export const duplicateProjectSnapshot = (
+  snapshot: ProjectSnapshot,
+  nowValue: string,
+): ProjectSnapshot => {
+  const now = requireTimestamp(nowValue);
+  return validateProjectSnapshot({
+    ...snapshot,
+    lastSuccessfulOutput: null,
+    workflowPhase: duplicatedWorkflowPhase(snapshot),
+    createdAt: now,
+    updatedAt: now,
+  });
+};
+
+export interface DuplicateProjectInput {
+  readonly id: string;
+  readonly title: string;
+  readonly campaignId: string | null;
+  /** CAS on the *source* Project: a duplicate of a Project that has since moved on is refused. */
+  readonly expectedVersion: number;
+  readonly author: ProjectRevisionAuthor;
+  readonly facts: ProjectStatusFacts;
+}
+
+/**
+ * A new Project whose first revision is derived from an existing one.
+ *
+ * It is an ordinary create — same rule, same `create` revision source, same status derivation — so
+ * the duplicate owns nothing of the original beyond the media references its snapshot names. It
+ * produces no output link, no job link and no history, and it starts no provider work.
+ */
+export const duplicateProject = (
+  source: { readonly project: Project; readonly snapshot: ProjectSnapshot },
+  input: DuplicateProjectInput,
+  context: ProjectMutationContext,
+): ProjectMutationResult<ProjectAggregate> => {
+  if (source.project.version !== input.expectedVersion) {
+    return projectVersionConflict(source.project, input.expectedVersion);
+  }
+  if (source.project.deletedAt !== null) {
+    throw new ProjectRuleError('invalid-transition', 'A deleted Project cannot be duplicated.');
+  }
+  return {
+    ok: true,
+    value: createProject(
+      {
+        id: input.id,
+        ownerUserId: source.project.ownerUserId,
+        title: input.title,
+        campaignId: input.campaignId,
+        snapshot: duplicateProjectSnapshot(source.snapshot, context.now),
+        author: input.author,
+        facts: input.facts,
+      },
+      context,
+    ),
   };
 };
 

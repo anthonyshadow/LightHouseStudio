@@ -624,6 +624,17 @@ export const tombstoneProjectRequestSchema = z
 export const moveProjectCampaignRequestSchema = z
   .object({ campaignId: z.uuid().nullable(), expectedVersion: z.number().int().positive() })
   .strict();
+/**
+ * `campaignId` is required rather than defaulted: a duplicate lands where the operator says, and
+ * silently detaching a copy of a Campaign Project would be a surprising default.
+ */
+export const duplicateProjectRequestSchema = z
+  .object({
+    title: projectTitleSchema,
+    campaignId: z.uuid().nullable(),
+    expectedVersion: z.number().int().positive(),
+  })
+  .strict();
 export const projectParamsSchema = z.object({ projectId: projectIdSchema }).strict();
 export const projectOutputVersionParamsSchema = z
   .object({ projectId: projectIdSchema, videoVersionId: z.uuid() })
@@ -1070,6 +1081,7 @@ export type ProjectWorkingMediaUploadMetadata = z.infer<
 export type AdoptProjectWorkingMediaRequest = z.infer<typeof adoptProjectWorkingMediaRequestSchema>;
 export type ProjectWorkingMediaResponse = z.infer<typeof projectWorkingMediaResponseSchema>;
 export type ProjectOutputSaveTarget = z.infer<typeof projectOutputSaveTargetSchema>;
+export type DuplicateProjectRequest = z.infer<typeof duplicateProjectRequestSchema>;
 export type SaveProjectOutputRequest = z.infer<typeof saveProjectOutputRequestSchema>;
 export type ProjectOutputSaveResult = z.infer<typeof projectOutputSaveResultSchema>;
 export type SaveProjectOutputResponse = z.infer<typeof saveProjectOutputResponseSchema>;

@@ -3,11 +3,12 @@ import type { ProjectContract } from '@studio/contracts';
 import { formatDateTime } from '@studio/domain';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { projectPath } from '../../app/paths';
+import { projectPath, projectWorkspacePath } from '../../app/paths';
 import { Button, ListSearchField, StatusNotice, useListSearch } from '../../ui';
 import {
   NewProjectDialog,
   DeleteProjectDialog,
+  DuplicateProjectDialog,
   ProjectLifecycleDialog,
   RenameProjectDialog,
   safeProjectError,
@@ -26,6 +27,7 @@ import {
   projectsWorkspaceInnerStyles,
 } from './ProjectsListSurface.styles';
 import { projectPosterUrls } from './projectPosterPresentation';
+import { stepForSnapshot } from './ProjectWorkflowProgress';
 import { projectCountLabel, projectStatusLabel } from './projectStatusPresentation';
 import { useProjectList } from './useProjectsController';
 import { WorkPosterTile } from './WorkPosterTile';
@@ -39,6 +41,7 @@ interface ProjectListSectionProps {
   readonly heading?: string;
   readonly onOpen: (project: ProjectContract) => void;
   readonly onRename: (project: ProjectContract, trigger: HTMLButtonElement) => void;
+  readonly onDuplicate: (project: ProjectContract, trigger: HTMLButtonElement) => void;
   readonly onLifecycle: (
     action: LifecycleAction,
     project: ProjectContract,
@@ -55,6 +58,7 @@ const ProjectListSection = ({
   heading,
   onOpen,
   onRename,
+  onDuplicate,
   onLifecycle,
   onDelete,
 }: ProjectListSectionProps) => {
@@ -170,6 +174,13 @@ const ProjectListSection = ({
                   ) : null}
                   <Button
                     size="small"
+                    data-project-action="duplicate"
+                    onClick={(event) => onDuplicate(project, event.currentTarget)}
+                  >
+                    Make another version
+                  </Button>
+                  <Button
+                    size="small"
                     variant={archived ? 'secondary' : 'quiet'}
                     data-project-action={archived ? 'restore' : 'archive'}
                     onClick={(event) =>
@@ -219,6 +230,7 @@ export const ProjectsListSurface = () => {
     readonly project: ProjectContract;
   } | null>(null);
   const [deleteProject, setDeleteProject] = useState<ProjectContract | null>(null);
+  const [duplicateProject, setDuplicateProject] = useState<ProjectContract | null>(null);
   const [announcement, setAnnouncement] = useState<string | null>(null);
   const [activeGroup, setActiveGroup] = useState<'all' | 'none'>('all');
   const [creating, setCreating] = useState(false);
@@ -245,6 +257,7 @@ export const ProjectsListSurface = () => {
     setRenameProject(null);
     setLifecycleDialog(null);
     setDeleteProject(null);
+    setDuplicateProject(null);
   };
   const closeCreateDialog = () => {
     setCreating(false);
@@ -268,6 +281,10 @@ export const ProjectsListSurface = () => {
   const openDeleteDialog = (project: ProjectContract, trigger: HTMLButtonElement) => {
     dialogReturnRef.current = trigger;
     setDeleteProject(project);
+  };
+  const openDuplicateDialog = (project: ProjectContract, trigger: HTMLButtonElement) => {
+    dialogReturnRef.current = trigger;
+    setDuplicateProject(project);
   };
 
   return (
@@ -334,6 +351,7 @@ export const ProjectsListSurface = () => {
           onClearSearch={search.clear}
           onOpen={openProject}
           onRename={openRenameDialog}
+          onDuplicate={openDuplicateDialog}
           onLifecycle={openLifecycleDialog}
           onDelete={openDeleteDialog}
         />
@@ -347,6 +365,7 @@ export const ProjectsListSurface = () => {
           onClearSearch={search.clear}
           onOpen={openProject}
           onRename={openRenameDialog}
+          onDuplicate={openDuplicateDialog}
           onLifecycle={openLifecycleDialog}
           onDelete={openDeleteDialog}
         />
@@ -360,6 +379,22 @@ export const ProjectsListSurface = () => {
           onRenamed={(current) => {
             setAnnouncement(`Project renamed to ${current.project.title}.`);
             closeDialog();
+          }}
+        />
+      ) : null}
+      {duplicateProject ? (
+        <DuplicateProjectDialog
+          project={duplicateProject}
+          returnFocusRef={dialogReturnRef}
+          onClose={closeDialog}
+          onDuplicated={(current) => {
+            setAnnouncement(`${current.project.title} created. Nothing has been generated yet.`);
+            closeDialog();
+            // Opened on the step the copy is actually ready for, matching how the workspace itself
+            // decides where a Project stands.
+            void navigate(
+              projectWorkspacePath(current.project.id, stepForSnapshot(current.revision.snapshot)),
+            );
           }}
         />
       ) : null}
