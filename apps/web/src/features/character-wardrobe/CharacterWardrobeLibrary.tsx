@@ -1,3 +1,4 @@
+import { matchesSearchTerm } from '@studio/domain';
 import { useTheme } from '@emotion/react';
 import { useState, type Dispatch, type SetStateAction } from 'react';
 import { Button, ConfirmationDialog, StatusNotice, TextField } from '../../ui';
@@ -44,9 +45,7 @@ export const CharacterWardrobeLibrary = ({
   const theme = useTheme();
   const [query, setQuery] = useState('');
   const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
-  const visibleOptions = options.filter((option) =>
-    option.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
-  );
+  const visibleOptions = options.filter((option) => matchesSearchTerm(option.title, query));
   const deleteCandidate = deleteCandidateId
     ? (variants.find((variant) => variant.id === deleteCandidateId) ?? null)
     : null;

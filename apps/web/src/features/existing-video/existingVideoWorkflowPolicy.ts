@@ -5,6 +5,7 @@ import type {
 } from '@studio/contracts';
 import { ApiClientError } from '../../adapters/api-client/apiClient';
 import type { ExistingVideoStep } from './existingVideoWorkflowTypes';
+import { VIDEO_TRANSFORM_OPERATION_LABELS } from './videoTransformLabels';
 
 export const savedCharacterStepInput = (
   prompt: string,
@@ -34,7 +35,7 @@ export const capabilityForExistingVideoStep = (
 };
 
 export const stepLabel = (modelId: VideoTransformModelId): string =>
-  modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try-On';
+  VIDEO_TRANSFORM_OPERATION_LABELS[operationForModel(modelId)];
 
 export const defaultVideoProcessingCapabilities: CapabilitiesResponse['videoProcessing'] = {
   characterSwap: {

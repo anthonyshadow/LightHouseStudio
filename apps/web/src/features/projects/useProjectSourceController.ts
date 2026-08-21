@@ -65,6 +65,12 @@ const safeMessage = (error: unknown): string =>
 type PresentableProjectMedia =
   ProjectSourceResponse['source'] | ProjectWorkingMediaResponse['media'];
 
+const mediaCreatedAt = (source: PresentableProjectMedia): string =>
+  'acceptedAt' in source ? source.acceptedAt : source.adoptedAt;
+
+const mediaKind = (source: PresentableProjectMedia): 'recorded' | 'uploaded' =>
+  'acceptedAt' in source && source.kind === 'recorded' ? 'recorded' : 'uploaded';
+
 const mediaArtifactMetadata = (
   createdAt: string,
   kind: 'recorded' | 'uploaded',
@@ -103,19 +109,12 @@ const mediaTakeMetadata = (source: PresentableProjectMedia, createdAt: string): 
 });
 
 const artifactInput = (file: File, source?: PresentableProjectMedia): PresentStageSourceInput => {
-  const createdAt =
-    source === undefined
-      ? new Date().toISOString()
-      : 'acceptedAt' in source
-        ? source.acceptedAt
-        : source.adoptedAt;
+  const createdAt = source === undefined ? new Date().toISOString() : mediaCreatedAt(source);
   return {
     blob: file,
     artifactMetadata: mediaArtifactMetadata(
       createdAt,
-      source !== undefined && 'acceptedAt' in source && source.kind === 'recorded'
-        ? 'recorded'
-        : 'uploaded',
+      source === undefined ? 'uploaded' : mediaKind(source),
       source?.mimeType ?? file.type,
       source?.filename ?? file.name,
       source?.durationMs ?? 0,
@@ -129,7 +128,7 @@ const artifactInput = (file: File, source?: PresentableProjectMedia): PresentSta
  * streams playback; operations that need the complete bytes acquire them on demand.
  */
 const remoteArtifactInput = (source: PresentableProjectMedia): PresentStageSourceInput => {
-  const createdAt = 'acceptedAt' in source ? source.acceptedAt : source.adoptedAt;
+  const createdAt = mediaCreatedAt(source);
   return {
     remoteMedia: {
       kind: 'remote-presentation',
@@ -139,7 +138,7 @@ const remoteArtifactInput = (source: PresentableProjectMedia): PresentStageSourc
     },
     artifactMetadata: mediaArtifactMetadata(
       createdAt,
-      'acceptedAt' in source && source.kind === 'recorded' ? 'recorded' : 'uploaded',
+      mediaKind(source),
       source.mimeType,
       source.filename,
       source.durationMs,
@@ -156,9 +155,8 @@ export const useProjectSourceController = (
   onCurrentChange?: (current: ProjectCurrentResponse) => void,
 ) => {
   const queryClient = useQueryClient();
-  const [phase, setPhase] = useState<ProjectSourcePhase>(
-    current.revision.snapshot.sourceAssetId === null ? 'idle' : 'hydrating',
-  );
+  // 'idle' even with a source attached: `effectivePhase` below owns the idle→hydrating rule.
+  const [phase, setPhase] = useState<ProjectSourcePhase>('idle');
   const [source, setSource] = useState<ProjectSourceResponse['source'] | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);

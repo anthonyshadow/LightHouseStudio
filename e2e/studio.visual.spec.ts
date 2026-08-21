@@ -304,7 +304,7 @@ const addVisualStep = async (
 ) => {
   await dialog
     .getByRole('button', {
-      name: modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On',
+      name: modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try-On',
       exact: true,
     })
     .click();
@@ -522,7 +522,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
         dialog.getByRole('button', { name: 'Character Swap', exact: true }),
       ).toHaveAttribute('aria-pressed', 'true');
       await expect(
-        dialog.getByRole('button', { name: 'Virtual Try On', exact: true }),
+        dialog.getByRole('button', { name: 'Virtual Try-On', exact: true }),
       ).toBeEnabled();
     },
   },

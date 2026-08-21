@@ -57,7 +57,7 @@ const projectProcessingBlockedDetail = ({
     return 'Remove Voice before starting visual work in this Project. Local Voice can run separately, but its result cannot yet become the current cut.';
   }
   if (projectCapability === null) {
-    return 'Project provider Voice remains unavailable. Character Swap and Virtual Try On are the recoverable Project capabilities in this release.';
+    return 'Project provider Voice remains unavailable. Character Swap and Virtual Try-On are the recoverable Project capabilities in this release.';
   }
   if (visualUnavailable) {
     return 'This visual capability is unavailable in the current server configuration.';

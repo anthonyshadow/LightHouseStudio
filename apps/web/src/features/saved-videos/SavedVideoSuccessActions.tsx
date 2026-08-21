@@ -1,3 +1,4 @@
+import { downloadBlobFile } from '../../adapters/browser-media/downloadBlobFile';
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import type { SavedVideoDetail } from '@studio/contracts';
 import type { ProjectExportSpecification } from '@studio/domain';
@@ -116,12 +117,7 @@ export const SavedVideoSuccessActions = ({
     });
     if (rendered === null) return;
     // The Blob exists only for the length of the click that hands it over.
-    const url = URL.createObjectURL(rendered.blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = rendered.filename;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    downloadBlobFile(rendered.blob, rendered.filename);
   };
 
   return (

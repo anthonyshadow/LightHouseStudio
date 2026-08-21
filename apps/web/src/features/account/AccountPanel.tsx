@@ -3,15 +3,12 @@ import type { AuthenticatedSessionResponse } from '@studio/contracts';
 import { formatDateTime } from '@studio/domain';
 import { useQuery } from '@tanstack/react-query';
 import type { RefObject } from 'react';
-import { listActiveVideoJobs } from '../../adapters/api-client/videoJobsApi';
+import { activeVideoJobsQueryOptions } from '../../adapters/api-client/videoJobsApi';
+import type { StudioAvailabilityRow } from '../../studio/studioAvailabilityPresentation';
 import { OverlayPanel } from '../../ui/primitives/OverlayPanel';
 
 /** One integration row, using exactly the wording the header's status menu already shows. */
-export interface AccountCapabilityRow {
-  readonly id: string;
-  readonly label: string;
-  readonly state: string;
-}
+export type AccountCapabilityRow = StudioAvailabilityRow;
 
 const PLAN_LABELS = {
   free: 'Free plan',
@@ -59,19 +56,11 @@ export const AccountPanel = ({
   const theme = useTheme();
   const { user, entitlements } = session;
   const activeJobsQuery = useQuery({
-    queryKey: ['video-jobs', 'active', user.id],
-    queryFn: ({ signal }) => listActiveVideoJobs(signal),
+    ...activeVideoJobsQueryOptions(user.id),
     enabled: open,
     staleTime: 30_000,
   });
   const activeJobCount = activeJobsQuery.data?.jobs.length ?? null;
-  const enabledEntitlements = (
-    Object.keys(ENTITLEMENT_LABELS) as readonly (keyof typeof ENTITLEMENT_LABELS)[]
-  ).map((capability) => ({
-    capability,
-    label: ENTITLEMENT_LABELS[capability],
-    enabled: entitlements.capabilities[capability] === true,
-  }));
 
   return (
     <OverlayPanel
@@ -173,10 +162,14 @@ export const AccountPanel = ({
         <section aria-labelledby="account-panel-plan">
           <h3 id="account-panel-plan">Included with this plan</h3>
           <ul>
-            {enabledEntitlements.map((entry) => (
-              <li key={entry.capability}>
-                <span>{entry.label}</span>
-                <span>{entry.enabled ? 'Included' : 'Not included'}</span>
+            {Object.entries(ENTITLEMENT_LABELS).map(([capability, label]) => (
+              <li key={capability}>
+                <span>{label}</span>
+                <span>
+                  {entitlements.capabilities[capability as keyof typeof ENTITLEMENT_LABELS] === true
+                    ? 'Included'
+                    : 'Not included'}
+                </span>
               </li>
             ))}
           </ul>

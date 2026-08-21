@@ -54,7 +54,7 @@ future features current.
 - Camera access, provider contact, and billable work require an explicit action. Local Camera does
   not request provider credentials, load the Decart SDK, or send media externally.
 - The primary flow records or uploads a source, reviews it, and optionally applies Character Swap,
-  Virtual Try On, and/or Voice, then saves the result before exact Download from Videos in Assets.
+  Virtual Try-On, and/or Voice, then saves the result before exact Download from Videos in Assets.
   Live Character/VTO transformation is an advanced flow.
 - Campaign and Project lifecycle/source management is user-facing, including optional membership,
   move/detach, the virtual No Campaign group, durable source resume, and guarded bounded session

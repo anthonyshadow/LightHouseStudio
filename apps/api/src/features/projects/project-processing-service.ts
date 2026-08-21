@@ -29,6 +29,7 @@ import {
 } from '@studio/domain';
 import { KeyedLock } from '../../application/keyed-lock.js';
 import { AppError } from '../../http/app-error.js';
+import { decodePageCursor, encodePageCursor } from '../../http/page-cursor.js';
 import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
 import type { ReferenceImageAssetStore } from '../reference-images/asset-store.js';
 import { inspectStoredProjectMedia } from './project-media-inspection.js';
@@ -146,39 +147,14 @@ const safeErrorMessage = (
   }
 };
 
-const historyCursor = (value: {
-  readonly createdAt: string;
-  readonly operationId: string;
-}): string => Buffer.from(JSON.stringify({ version: 1, ...value }), 'utf8').toString('base64url');
+const HISTORY_CURSOR = {
+  timestampKey: 'createdAt',
+  idKey: 'operationId',
+  invalidMessage: 'Use a valid processing-history cursor.',
+} as const;
 
-const parseHistoryCursor = (
-  value: string | undefined,
-): { readonly createdAt: string; readonly operationId: string } | undefined => {
-  if (value === undefined) return undefined;
-  try {
-    const parsed = JSON.parse(Buffer.from(value, 'base64url').toString('utf8')) as Record<
-      string,
-      unknown
-    >;
-    if (
-      parsed.version === 1 &&
-      typeof parsed.createdAt === 'string' &&
-      Number.isFinite(Date.parse(parsed.createdAt)) &&
-      typeof parsed.operationId === 'string' &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
-        parsed.operationId,
-      )
-    ) {
-      return {
-        createdAt: new Date(parsed.createdAt).toISOString(),
-        operationId: parsed.operationId,
-      };
-    }
-  } catch {
-    // Opaque cursors fail through one finite public validation error.
-  }
-  throw new AppError(400, 'validation_error', 'Use a valid processing-history cursor.');
-};
+const historyCursorCriteria = (projectId: string, pageSize: number): string =>
+  JSON.stringify({ list: 'processing-history', projectId, pageSize });
 
 export class ProjectProcessingService {
   readonly #lock = new KeyedLock();
@@ -826,7 +802,11 @@ export class ProjectProcessingService {
     projectId: string,
     query: ProjectProcessingHistoryQuery,
   ): Promise<ProjectProcessingHistoryResponse> {
-    const cursor = parseHistoryCursor(query.cursor);
+    const cursor = decodePageCursor(
+      query.cursor,
+      historyCursorCriteria(projectId, query.pageSize),
+      HISTORY_CURSOR,
+    );
     const page = await this.processing.listProjectAttempts(ownerUserId, projectId, {
       ...(cursor === undefined ? {} : { cursor }),
       pageSize: query.pageSize,
@@ -842,7 +822,10 @@ export class ProjectProcessingService {
           supersededOperationIds.has(attempt.operationId),
         ),
       ),
-      nextCursor: page.nextCursor === null ? null : historyCursor(page.nextCursor),
+      nextCursor:
+        page.nextCursor === null
+          ? null
+          : encodePageCursor(page.nextCursor, historyCursorCriteria(projectId, query.pageSize)),
     });
   }
 

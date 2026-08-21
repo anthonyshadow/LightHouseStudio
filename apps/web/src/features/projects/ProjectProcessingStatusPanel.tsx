@@ -93,7 +93,7 @@ export const ProjectProcessingStatusPanel = ({
 
   return (
     <StatusNotice role="status" tone="neutral" title="Recoverable Project processing ready">
-      Character Swap and Virtual Try On start only from the explicit Project edit action. The exact
+      Character Swap and Virtual Try-On start only from the explicit Project edit action. The exact
       revision is linked before provider contact. Project provider Voice and live starts remain
       unavailable because they cannot reconnect through this authority.
     </StatusNotice>

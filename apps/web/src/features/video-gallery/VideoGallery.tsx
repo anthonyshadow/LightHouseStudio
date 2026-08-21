@@ -6,6 +6,7 @@ import type {
   SavedVideoVersion,
   SavedVideosResponse,
 } from '@studio/contracts';
+import { formatDateTime } from '@studio/domain';
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -26,6 +27,7 @@ import {
 } from '../../adapters/api-client/savedVideosApi';
 import {
   Button,
+  emptyExampleStyles,
   EmptyStatePreview,
   ListSearchField,
   OverlayPanel,
@@ -575,10 +577,7 @@ export const VideoGallery = ({
           Finish a Project with Save as New Video or Add Version, or save a video straight from
           Studio.
         </p>
-        <p
-          data-empty-example
-          css={{ margin: 0, color: theme.colors.textFaint, fontSize: theme.fontSizes.metadata }}
-        >
+        <p data-empty-example css={emptyExampleStyles(theme)}>
           For example: record a take in Studio, save it, and it appears here with a preview and
           every version you keep.
         </p>
@@ -933,7 +932,7 @@ export const VideoGallery = ({
                 <span>{FORMAT_LABELS[formatForDimensions(selectedVersion)]}</span>
                 <span>
                   <time dateTime={selectedVersion.createdAt}>
-                    {new Date(selectedVersion.createdAt).toLocaleString()}
+                    {formatDateTime(selectedVersion.createdAt)}
                   </time>
                 </span>
                 {selectedVersion.characterName ? (

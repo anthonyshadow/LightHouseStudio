@@ -45,7 +45,7 @@ source, then edit either base, save, start over, or discard.
    with parent lineage and an updated audio sidecar.
 6. The creator may use confirmed **Replace source video** or **Discard source video**, then choose
    zero or one visual transformation from status-bearing tool cards:
-   **Character Swap** or **Virtual Try On**, never both. Availability and input requirements are
+   **Character Swap** or **Virtual Try-On**, never both. Availability and input requirements are
    operation-specific; provider selection and model names are never shown. The currently viewed visual edit is selected; after any visual value is
    entered or selected, that card remains selected while Voice is viewed. Switching away from an
    empty visual edit is immediate. Switching away from a visual edit with settings requires a
@@ -76,7 +76,7 @@ source, then edit either base, save, start over, or discard.
    in the recorded-take controls reopens the same workflow. Whenever a playback is retained and
    **Edit Video** is available, the main Studio tool row/column disables its live-only **Select
    Character** and **Select Outfit** launchers. The editor's own Character Swap,
-   Virtual Try On, Voice, saved-resource, and builder controls remain governed only by the editor
+   Virtual Try-On, Voice, saved-resource, and builder controls remain governed only by the editor
    workflow and stay available when their existing step-specific requirements are met.
 7. VTO uses exactly one input mode. **Saved or recent outfit** selects a saved Outfit or tab-local
    recent import; **Reference image** prefers a local JPEG/PNG/WebP and reveals its HTTPS URL field
@@ -100,7 +100,7 @@ source, then edit either base, save, start over, or discard.
    original audio** or a broader explicit source/plan reset. Local effects identify their
    no-provider path. Voice is independent of the mutually exclusive visual choice: it appears
    selected while viewed, remains selected after configuration, and never clears or replaces
-   Character Swap or Virtual Try On. Review truthfully summarizes no provider work, one accepted
+   Character Swap or Virtual Try-On. Review truthfully summarizes no provider work, one accepted
    visual-processing job, one local voice render, one ElevenLabs conversion, or visual processing
    followed by voice.
 9. Studio executes one immutable captured plan: visual submit/poll/retrieve → validate → restore
@@ -258,7 +258,7 @@ rehydrates through the Project content route; this standalone workflow remains t
 
 For a source-bearing Project, the existing-video controls remain the feature-local configuration
 owner for one visual treatment followed by optional Voice. **Save progress** checkpoints the
-plan without provider contact. Project **Start Character Swap** and **Start Virtual Try On** first
+plan without provider contact. Project **Start Character Swap** and **Start Virtual Try-On** first
 save that exact setup, then use one app-owned operation command that commits the exact initiating
 revision before provider submission. Refresh/reopen reads current authority and resumes bounded
 status/retrieval for the same durable provider identity; a lost response replays only the same

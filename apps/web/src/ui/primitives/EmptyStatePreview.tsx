@@ -7,23 +7,20 @@ const previewStyles = (theme: Theme, variant: 'cards' | 'rows'): CSSObject => ({
   gap: theme.space.xs,
   marginInline: 'auto',
   opacity: 0.75,
-  '& [data-preview-tile]': {
+  '& [data-preview-item]': {
     display: 'grid',
     gap: '0.3rem',
-    padding: '0.4rem',
     border: `1px solid ${theme.colors.border}`,
     borderRadius: theme.radii.medium,
     background: theme.colors.surface,
-  },
-  '& [data-preview-row]': {
-    display: 'grid',
-    gridTemplateColumns: '2.4rem minmax(0, 1fr)',
-    gap: theme.space.xs,
-    alignItems: 'center',
-    padding: '0.35rem 0.4rem',
-    border: `1px solid ${theme.colors.border}`,
-    borderRadius: theme.radii.medium,
-    background: theme.colors.surface,
+    ...(variant === 'cards'
+      ? { padding: '0.4rem' }
+      : {
+          gridTemplateColumns: '2.4rem minmax(0, 1fr)',
+          gap: theme.space.xs,
+          alignItems: 'center',
+          padding: '0.35rem 0.4rem',
+        }),
   },
   '& [data-preview-poster]': {
     borderRadius: theme.radii.small,
@@ -40,6 +37,16 @@ const previewStyles = (theme: Theme, variant: 'cards' | 'rows'): CSSObject => ({
 });
 
 /**
+ * The one treatment for an empty state's "for example" line, exported beside the ghost preview so
+ * the surfaces that teach through their empty states cannot drift apart on it.
+ */
+export const emptyExampleStyles = (theme: Theme): CSSObject => ({
+  margin: 0,
+  color: theme.colors.textFaint,
+  fontSize: theme.fontSizes.metadata,
+});
+
+/**
  * A decorative ghost of the populated surface — poster tiles or list rows with placeholder text
  * lines — so an empty state shows what will appear here instead of only saying nothing has. It is
  * presentation only: inline-styled, request-free, and hidden from assistive technology, which
@@ -49,25 +56,15 @@ export const EmptyStatePreview = ({ variant = 'cards' }: { variant?: 'cards' | '
   const theme = useTheme();
   return (
     <div aria-hidden="true" data-empty-state-preview="" css={previewStyles(theme, variant)}>
-      {[0, 1, 2].map((index) =>
-        variant === 'cards' ? (
-          <span key={index} data-preview-tile="">
-            <span data-preview-poster="" />
-            <span data-preview-lines="">
-              <span data-preview-line="" />
-              <span data-preview-line="short" />
-            </span>
+      {[0, 1, 2].map((index) => (
+        <span key={index} data-preview-item="">
+          <span data-preview-poster="" />
+          <span data-preview-lines="">
+            <span data-preview-line="" />
+            <span data-preview-line="short" />
           </span>
-        ) : (
-          <span key={index} data-preview-row="">
-            <span data-preview-poster="" />
-            <span data-preview-lines="">
-              <span data-preview-line="" />
-              <span data-preview-line="short" />
-            </span>
-          </span>
-        ),
-      )}
+        </span>
+      ))}
     </div>
   );
 };

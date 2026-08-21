@@ -368,7 +368,7 @@ export const ExistingVideoPanel = ({
               <header css={sectionHeadingStyles(theme)}>
                 <h2>Choose your edits</h2>
                 <p>
-                  Choose one visual edit: Character Swap or Virtual Try On. Voice is independent, so
+                  Choose one visual edit: Character Swap or Virtual Try-On. Voice is independent, so
                   you can add it to either visual edit or use it on its own.
                 </p>
               </header>

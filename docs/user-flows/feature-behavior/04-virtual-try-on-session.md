@@ -1,7 +1,7 @@
 # Virtual try-on session
 
 **Outcome:** deliberately preview and optionally record an advanced live garment transformation.
-The current implementation pins `lucy-vton-latest`; post-recording Virtual Try On is also available
+The current implementation pins `lucy-vton-latest`; post-recording Virtual Try-On is also available
 in the primary editor.
 
 ## Journey
@@ -43,7 +43,7 @@ In a Project, the same Outfit/prompt/reference configuration can be checkpointed
 VTO. A saved-outfit checkpoint keeps the exact Outfit ID, label, revision, immutable reference,
 input kind, enhancement setting, applied prompt, provider binding, and resolution; a prompt-only or
 reference-image checkpoint does not fabricate an Outfit. Missing or changed owner-scoped resources
-retain historical labels and **Choose another**. Project **Start Virtual Try On** saves the exact
+retain historical labels and **Choose another**. Project **Start Virtual Try-On** saves the exact
 setup and then uses the Project-bound command. It reconnects a queued attempt after reopen and never
 falls back to this advanced live session. Configuration alone never invokes it. The standalone live
 and existing-video journeys retain their current explicit Start.

@@ -3,6 +3,7 @@ import type { CreativeAssetStore } from '@studio/domain';
 import { lazy, Suspense, type ReactNode, type RefObject } from 'react';
 import type { BrowserCapabilities } from '../application/types';
 import { CaptureSettingsPanel, RecordingAction, RecordingControls } from '../features/recording';
+import { ownedRecordingArtifact } from '../features/recording/types';
 import { cameraAvailabilityNotices } from '../features/recording/cameraAvailability';
 import type { RecordingSource } from '../features/recording';
 import type {
@@ -225,7 +226,7 @@ export const StudioWorkspace = ({
                       onChangeExperience={onOpenAiExperience}
                       onUploadVideo={onOpenExistingVideo}
                       uploadButtonRef={uploadToggleRef}
-                      {...(recording.presented
+                      {...(ownedRecordingArtifact(recording.presented)
                         ? { onSaveVideo: savedVideo.requestSavePresentedVideo }
                         : {})}
                       saveVideoState={saveVideoState}

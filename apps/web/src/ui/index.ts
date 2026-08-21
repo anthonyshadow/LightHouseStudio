@@ -4,6 +4,7 @@ export { Button } from './primitives/Button';
 export { Surface } from './primitives/Surface';
 export { TextAreaField, TextField } from './primitives/FormControls';
 export { ListSearchField } from './primitives/ListSearchField';
+export { SearchEmptyState } from './primitives/SearchEmptyState';
 export { useListSearch } from './primitives/useListSearch';
 export { listTotalLabel } from './primitives/listTotal';
 export { SelectField, type SelectOption } from './primitives/SelectField';
@@ -12,7 +13,7 @@ export { SegmentedControl } from './primitives/SegmentedControl';
 export { VisuallyHidden } from './primitives/VisuallyHidden';
 export { IconButton } from './primitives/IconButton';
 export { ConfirmationDialog } from './primitives/ConfirmationDialog';
-export { EmptyStatePreview } from './primitives/EmptyStatePreview';
+export { emptyExampleStyles, EmptyStatePreview } from './primitives/EmptyStatePreview';
 export {
   ConfirmationRequestDialog,
   useConfirmationRequest,

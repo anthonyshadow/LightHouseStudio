@@ -8,9 +8,11 @@ import { useRouteBack } from '../../app/useRouteBack';
 import {
   AppIcon,
   Button,
+  emptyExampleStyles,
   EmptyStatePreview,
   ListSearchField,
   listTotalLabel,
+  SearchEmptyState,
   StatusNotice,
   useListSearch,
 } from '../../ui';
@@ -112,21 +114,17 @@ const CampaignListSection = ({
                   : 'Create a lightweight organizer, or keep using standalone Projects.'}
               </p>
               {archived ? null : (
-                <p data-empty-example>
+                <p data-empty-example css={emptyExampleStyles(theme)}>
                   For example: a “Spring launch” Campaign holding one Project per ad placement.
                 </p>
               )}
             </>
           ) : (
-            <>
-              <strong>
-                No {archived ? 'archived ' : ''}Campaigns match “{search}”
-              </strong>
-              <p>Try a shorter term, or clear the search to see everything again.</p>
-              <Button size="small" onClick={onClearSearch}>
-                Clear search
-              </Button>
-            </>
+            <SearchEmptyState
+              noun={`${archived ? 'archived ' : ''}Campaigns`}
+              term={search}
+              onClear={onClearSearch}
+            />
           )}
         </div>
       ) : null}

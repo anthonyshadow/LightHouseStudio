@@ -24,7 +24,7 @@ to that capability.
 - Record a browser camera source or import a compatible video.
 - Review and locally adjust video through trim, crop, rotation, flip, lighting, filters, and
   validated H.264/AAC export.
-- Apply zero or one visual transformation—Character Swap or Virtual Try On—and optionally apply a
+- Apply zero or one visual transformation—Character Swap or Virtual Try-On—and optionally apply a
   local or configured provider-backed Voice treatment.
 - Prepare and record advanced live character or try-on work.
 - Create and reuse Characters, Character variants in Wardrobe, Outfits, Voices, prompts, recipes,

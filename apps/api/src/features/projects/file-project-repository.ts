@@ -303,6 +303,15 @@ export class FileProjectRepository
   readonly #afterJournalPrepared: (() => Promise<void> | void) | undefined;
   readonly #afterSavedVideoCommitted: (() => Promise<void> | void) | undefined;
   readonly #afterProjectCommitted: (() => Promise<void> | void) | undefined;
+  /**
+   * Same-process read cache, mirroring `FileSavedVideoRepository`: services stack several reads
+   * per request and the workspace polls, so re-parsing the whole per-owner library each time is
+   * the hot path's dominant cost. Libraries are built immutably, every mutation runs under the
+   * owner lock, and a failed or interrupted `#write` drops the entry so the next read performs
+   * the ordinary journal/backup recovery from disk.
+   */
+  readonly #cache = new Map<string, ProjectLibrary>();
+  readonly #loads = new Map<string, Promise<ProjectLibrary>>();
 
   constructor(dataDirectory: string, options: FileProjectRepositoryOptions = {}) {
     this.#root = path.resolve(dataDirectory, 'metadata', 'v1', 'projects');
@@ -351,7 +360,37 @@ export class FileProjectRepository
     }
   }
 
+  #cacheLibrary(library: ProjectLibrary): void {
+    this.#cache.delete(library.ownerUserId);
+    this.#cache.set(library.ownerUserId, library);
+    if (this.#cache.size > 16) {
+      const oldestOwner = this.#cache.keys().next().value;
+      if (oldestOwner !== undefined) this.#cache.delete(oldestOwner);
+    }
+  }
+
   async #read(ownerUserId: string): Promise<ProjectLibrary> {
+    const cached = this.#cache.get(ownerUserId);
+    if (cached !== undefined) {
+      this.#cacheLibrary(cached);
+      return cached;
+    }
+    const active = this.#loads.get(ownerUserId);
+    if (active !== undefined) return active;
+    const load = (async () => {
+      const library = await this.#readFromDisk(ownerUserId);
+      this.#cacheLibrary(library);
+      return library;
+    })();
+    this.#loads.set(ownerUserId, load);
+    try {
+      return await load;
+    } finally {
+      if (this.#loads.get(ownerUserId) === load) this.#loads.delete(ownerUserId);
+    }
+  }
+
+  async #readFromDisk(ownerUserId: string): Promise<ProjectLibrary> {
     const paths = this.#paths(ownerUserId);
     let rawJournal: unknown;
     try {
@@ -436,19 +475,26 @@ export class FileProjectRepository
   ): Promise<void> {
     const next = librarySchema.parse(nextValue);
     const paths = this.#paths(next.ownerUserId);
-    if (journal !== undefined) {
-      await this.#atomicWrite(paths.journal, journalSchema.parse(journal));
-      await this.#afterJournalPrepared?.();
-      if (journal.writes.savedVideos !== undefined) {
-        await this.#savedVideos.writeLibraryForProjectOutput(journal.writes.savedVideos);
-        await this.#afterSavedVideoCommitted?.();
+    try {
+      if (journal !== undefined) {
+        await this.#atomicWrite(paths.journal, journalSchema.parse(journal));
+        await this.#afterJournalPrepared?.();
+        if (journal.writes.savedVideos !== undefined) {
+          await this.#savedVideos.writeLibraryForProjectOutput(journal.writes.savedVideos);
+          await this.#afterSavedVideoCommitted?.();
+        }
       }
+      // `previous` is always a `#read` result, which is already `librarySchema`-validated.
+      await this.#atomicWrite(paths.backup, previous);
+      await this.#atomicWrite(paths.primary, next);
+      if (journal !== undefined) await this.#afterProjectCommitted?.();
+      if (journal !== undefined) await rm(paths.journal, { force: true });
+      this.#cacheLibrary(next);
+    } catch (error) {
+      // The next read must recover from disk state, not from what this write intended.
+      this.#cache.delete(next.ownerUserId);
+      throw error;
     }
-    // `previous` is always a `#read` result, which is already `librarySchema`-validated.
-    await this.#atomicWrite(paths.backup, previous);
-    await this.#atomicWrite(paths.primary, next);
-    if (journal !== undefined) await this.#afterProjectCommitted?.();
-    if (journal !== undefined) await rm(paths.journal, { force: true });
   }
 
   async #withOwnerLock<Result>(

@@ -1,4 +1,5 @@
 import type { ExistingVideoStep, ExistingVideoWorkflow } from './useExistingVideoWorkflow';
+import { VIDEO_TRANSFORM_OPERATION_LABELS } from './videoTransformLabels';
 
 export type ExistingVideoEditorPhase = 'source' | 'edit' | 'review';
 export type ExistingVideoToolId = 'character' | 'vton' | 'voice';
@@ -33,7 +34,7 @@ export const toolForStep = (
 };
 
 export const visualToolName = (tool: ExistingVideoVisualToolId): string =>
-  tool === 'character' ? 'Character Swap' : 'Virtual Try On';
+  VIDEO_TRANSFORM_OPERATION_LABELS[tool === 'character' ? 'character-swap' : 'virtual-try-on'];
 
 export const visualStepHasSettings = (step: ExistingVideoStep): boolean =>
   Boolean(
@@ -46,7 +47,7 @@ export const visualStepHasSettings = (step: ExistingVideoStep): boolean =>
   );
 
 export const visualToolLabel = (step: ExistingVideoStep): string =>
-  step.modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On';
+  step.modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try-On';
 
 export const toolStatus = (
   tool: ExistingVideoToolId,

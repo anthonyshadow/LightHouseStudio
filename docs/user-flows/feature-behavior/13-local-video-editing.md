@@ -71,7 +71,7 @@ cannot re-frame there either. Placement exports are chosen at a save step, not i
 - Publication requires a non-empty playable H.264 MP4, expected primary tracks, exact requested
   even dimensions, duration within 500 ms, and a matching immutable audio sidecar whenever the
   pinned source has audio. A silent source remains silent.
-- 16:9 and 9:16 uploads and edited outputs remain eligible for Character Swap and Virtual Try On
+- 16:9 and 9:16 uploads and edited outputs remain eligible for Character Swap and Virtual Try-On
   within the existing 1% tolerance. Other upload ratios and square, 4:5, or incompatible Freeform
   output disable those visual tools before provider intent or HTTP traffic; local adjustment,
   saving and Voice remain available.

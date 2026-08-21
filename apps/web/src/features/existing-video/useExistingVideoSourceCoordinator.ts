@@ -1,5 +1,9 @@
 import { useCallback, type Dispatch, type RefObject } from 'react';
-import type { RecordingArtifact, RecordingController } from '../recording/types';
+import {
+  ownedRecordingArtifact,
+  type RecordingArtifact,
+  type RecordingController,
+} from '../recording/types';
 import { validateExistingVideo, type ValidatedExistingVideo } from './videoValidation';
 import type { ExistingVideoWorkflowStateAction } from './existingVideoWorkflowState';
 import type { ExistingVideoWorkflowPhase } from './existingVideoWorkflowTypes';
@@ -100,12 +104,10 @@ export const useExistingVideoSourceCoordinator = ({
   );
 
   const adoptRecordedArtifact = useCallback(async () => {
-    const draft = recording.original;
-    if (!draft || recording.lifecycle !== 'recorded' || submissionLocked) return;
     // Declares owned bytes: adoption validates and re-publishes the complete media. A URL-backed
     // presentation must be acquired first; callers gate on that before adopting.
-    const draftMedia = draft.media;
-    if (!(draftMedia instanceof Blob)) return;
+    const draft = ownedRecordingArtifact(recording.original);
+    if (!draft || recording.lifecycle !== 'recorded' || submissionLocked) return;
     releaseRetainedJob();
     clearOperation();
     const generation = generationRef.current;
@@ -119,11 +121,11 @@ export const useExistingVideoSourceCoordinator = ({
       detail: 'Validating the finalized on-device recording before using it as the source.',
     });
     try {
-      const file = new File([draftMedia], draft.filename, { type: draft.mimeType });
+      const file = new File([draft.media], draft.filename, { type: draft.mimeType });
       const validated = await validateExistingVideo(file, false, controller.signal);
       if (controller.signal.aborted || generation !== generationRef.current) return;
       const sourceArtifact = publishUploadedVideo({
-        blob: draftMedia,
+        blob: draft.media,
         artifactMetadata: {
           id: draft.id,
           ...(draft.name ? { name: draft.name } : {}),

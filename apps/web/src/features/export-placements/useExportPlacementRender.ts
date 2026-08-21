@@ -1,5 +1,4 @@
 import {
-  ProjectRuleError,
   projectExportFilename,
   projectExportVideoEditSpec,
   type ProjectExportSpecification,
@@ -104,7 +103,7 @@ export const useExportPlacementRender = () => {
       } catch (renderError) {
         if (controller.signal.aborted) return null;
         setError(
-          renderError instanceof ProjectRuleError || renderError instanceof Error
+          renderError instanceof Error
             ? renderError.message
             : 'The browser could not re-frame this video. Your video is unchanged.',
         );

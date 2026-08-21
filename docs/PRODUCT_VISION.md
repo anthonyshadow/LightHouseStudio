@@ -81,7 +81,7 @@ The current Studio supports:
   configuration-gated PostgreSQL/Neon and private R2 adapters;
 - browser camera recording and compatible video upload;
 - local trim, crop, rotation, flip, lighting, filter, normalization, and export work;
-- optional Character Swap, Virtual Try On, live character transformation, and voice treatment that
+- optional Character Swap, Virtual Try-On, live character transformation, and voice treatment that
   runs locally or through a configured provider;
 - an Assets hub for reusable Saved Videos, Characters, Character variants in Wardrobe, Outfits,
   Voices, and recipes;
@@ -207,7 +207,7 @@ lifecycle is non-cascading.
 ## Creation and editing workflows
 
 Creative tools are capabilities within the workspace, not separate definitions of the product.
-Current examples include recording, upload, local video adjustment, Character Swap, Virtual Try On,
+Current examples include recording, upload, local video adjustment, Character Swap, Virtual Try-On,
 live character transformation, Character and Wardrobe creation, voice treatment, reference media,
 and prompt/recipe workflows.
 

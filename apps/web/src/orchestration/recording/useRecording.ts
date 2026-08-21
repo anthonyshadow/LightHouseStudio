@@ -519,11 +519,17 @@ export const useRecording = ({ onAutomaticStop }: UseRecordingOptions = {}): Rec
     setLifecycle(domainLifecycleRef.current.status);
   }, [artifacts]);
 
-  const commitPersistedOriginal = useCallback(
-    (
-      input: RestorePersistedOriginalInput,
-      completion: 'ordinary' | 'source-validation',
-    ): RecordingArtifact => {
+  /**
+   * The one commit path from a published take to the 'recorded' state. Every restore-like entry
+   * shares its guards and its state transition; only the publish step and whether an active voice
+   * processing operation forbids the commit differ per entry.
+   */
+  const commitPresentedTake = useCallback(
+    <T extends PresentedRecordingArtifact>(
+      publish: () => T,
+      takeMetadata: TakeMetadata | null | undefined,
+      guardVoiceProcessing: boolean,
+    ): T => {
       const status = domainLifecycleRef.current.status;
       if (
         attemptRef.current ||
@@ -533,17 +539,14 @@ export const useRecording = ({ onAutomaticStop }: UseRecordingOptions = {}): Rec
       ) {
         throw new Error('A persisted take cannot be restored while recording is active.');
       }
-      if (completion === 'ordinary' && artifacts.processingState === 'processing') {
+      if (guardVoiceProcessing && artifacts.processingState === 'processing') {
         throw new Error('A persisted take cannot be restored while voice processing is active.');
       }
 
-      const artifact =
-        completion === 'source-validation'
-          ? artifacts.completeSourceValidation(input)
-          : artifacts.restorePersistedOriginal(input);
+      const artifact = publish();
       pendingMetadataRef.current = null;
       mainStoppedAtRef.current = null;
-      setMetadata(input.takeMetadata ? Object.freeze({ ...input.takeMetadata }) : null);
+      setMetadata(takeMetadata ? Object.freeze({ ...takeMetadata }) : null);
       setActiveSource(null);
       setElapsedSeconds(Math.max(0, Math.floor(artifact.durationMs / 1_000)));
       domainLifecycleRef.current = { status: 'recorded', artifact };
@@ -554,39 +557,27 @@ export const useRecording = ({ onAutomaticStop }: UseRecordingOptions = {}): Rec
   );
   const restorePersistedOriginal = useCallback(
     (input: RestorePersistedOriginalInput): RecordingArtifact =>
-      commitPersistedOriginal(input, 'ordinary'),
-    [commitPersistedOriginal],
+      commitPresentedTake(
+        () => artifacts.restorePersistedOriginal(input),
+        input.takeMetadata,
+        true,
+      ),
+    [artifacts, commitPresentedTake],
   );
   const completeSourceValidation = useCallback(
     (input: RestorePersistedOriginalInput): RecordingArtifact =>
-      commitPersistedOriginal(input, 'source-validation'),
-    [commitPersistedOriginal],
+      // Source validation is itself a processing operation, so it must commit while one is active.
+      commitPresentedTake(
+        () => artifacts.completeSourceValidation(input),
+        input.takeMetadata,
+        false,
+      ),
+    [artifacts, commitPresentedTake],
   );
   const presentRemoteOriginal = useCallback(
-    (input: RemotePresentationInput): PresentedRecordingArtifact => {
-      const status = domainLifecycleRef.current.status;
-      if (
-        attemptRef.current ||
-        transcodeControllerRef.current ||
-        status === 'recording' ||
-        status === 'stopping'
-      ) {
-        throw new Error('A persisted take cannot be restored while recording is active.');
-      }
-      if (artifacts.processingState === 'processing') {
-        throw new Error('A persisted take cannot be restored while voice processing is active.');
-      }
-      const artifact = artifacts.presentRemoteOriginal(input);
-      pendingMetadataRef.current = null;
-      mainStoppedAtRef.current = null;
-      setMetadata(input.takeMetadata ? Object.freeze({ ...input.takeMetadata }) : null);
-      setActiveSource(null);
-      setElapsedSeconds(Math.max(0, Math.floor(artifact.durationMs / 1_000)));
-      domainLifecycleRef.current = { status: 'recorded', artifact };
-      setLifecycle(domainLifecycleRef.current.status);
-      return artifact;
-    },
-    [artifacts],
+    (input: RemotePresentationInput): PresentedRecordingArtifact =>
+      commitPresentedTake(() => artifacts.presentRemoteOriginal(input), input.takeMetadata, true),
+    [artifacts, commitPresentedTake],
   );
 
   useEffect(() => {

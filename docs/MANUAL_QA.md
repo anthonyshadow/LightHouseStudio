@@ -183,7 +183,7 @@ focus return, reduced motion, and overlay stacking at every canonical viewport a
   Source-file selection must continue rejecting non-9:16/16:9 input. Confirm a Pruna terminal
   failure issues no DELETE until explicit user discard/replacement, while Decart retains automatic
   terminal-failure release.
-- In **Choose your edits**, verify Character Swap and Virtual Try On behave as one-of-two visual
+- In **Choose your edits**, verify Character Swap and Virtual Try-On behave as one-of-two visual
   choices while Voice remains independently selectable. Empty visual setups switch immediately;
   configured setups require a topmost confirmation whose cancel path preserves every value and
   whose confirm path clears only the previous visual settings, never Voice. Select a saved Voice,
@@ -257,7 +257,7 @@ focus return, reduced motion, and overlay stacking at every canonical viewport a
 
 ## Project processing integration boundary
 
-Project Character Swap and Virtual Try On now expose recoverable Project Start/status controls. In
+Project Character Swap and Virtual Try-On now expose recoverable Project Start/status controls. In
 ordinary no-provider manual QA:
 
 - open a source-bearing Project, configure a visual treatment, save the setup, and confirm that

@@ -1,9 +1,9 @@
 import { formatFileSize, GENERAL_VIDEO_SIZE_LIMIT_BYTES } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ApiClientError, apiFetch } from '../adapters/api-client/apiClient';
+import { ApiClientError, apiErrorMessage, apiFetch } from '../adapters/api-client/apiClient';
 import { readBoundedBlob } from '../adapters/api-client/readBoundedBlob';
 import type { StageNotice } from '../features/live-stage/stageNotices';
-import type { RecordingController } from '../features/recording/types';
+import { ownedRecordingArtifact, type RecordingController } from '../features/recording/types';
 
 export type OwnedMediaAcquisitionState =
   | Readonly<{ status: 'idle' }>
@@ -16,11 +16,6 @@ export type OwnedMediaAcquisitionState =
   | Readonly<{ status: 'error'; artifactId: string; message: string }>;
 
 const IDLE: OwnedMediaAcquisitionState = { status: 'idle' };
-
-const safeAcquisitionMessage = (error: unknown): string =>
-  error instanceof ApiClientError
-    ? error.message
-    : 'The original video could not be fetched. Playback still streams; try again to edit.';
 
 interface UseOwnedMediaAcquisitionOptions {
   readonly recording: RecordingController;
@@ -138,7 +133,10 @@ export const useOwnedMediaAcquisition = ({ recording }: UseOwnedMediaAcquisition
         setState({
           status: 'error',
           artifactId: artifact.id,
-          message: safeAcquisitionMessage(error),
+          message: apiErrorMessage(
+            error,
+            'The original video could not be fetched. Playback still streams; try again to edit.',
+          ),
         });
         return false;
       } finally {
@@ -155,7 +153,7 @@ export const useOwnedMediaAcquisition = ({ recording }: UseOwnedMediaAcquisition
   // or already owned, an in-flight fetch is stale — abort it and drop stale error notices.
   const presentedArtifactId = recording.original?.id ?? null;
   const presentedIsRemote =
-    recording.original !== null && !(recording.original.media instanceof Blob);
+    recording.original !== null && ownedRecordingArtifact(recording.original) === null;
   useEffect(() => {
     const active = inFlightRef.current;
     if (active && (presentedArtifactId !== active.artifactId || !presentedIsRemote)) {

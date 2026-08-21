@@ -392,11 +392,6 @@ export const emptyRecentStyles = (theme: Theme): CSSObject => ({
   lineHeight: 1.55,
   '& button': { paddingInline: 0 },
   '& [data-empty-state-preview]': { marginInline: 0 },
-  '& [data-empty-example]': {
-    margin: 0,
-    color: theme.colors.textFaint,
-    fontSize: theme.fontSizes.metadata,
-  },
 });
 
 export const allDestinationsStyles = (theme: Theme): CSSObject => ({
