@@ -237,9 +237,11 @@ warning, `error` → danger. Once accepted, the three add-controls are disabled 
 appears beside them. Removal is refused — with the reason stated in the dialog — while a provider
 attempt is unresolved, while working media is being adopted, and while a recording is in flight.
 
-On reload, an accepted source is re-hydrated: `GET /api/projects/{id}/source`, then the bytes are
-fetched with a 300 MB bound and pushed onto the stage as a recording artifact
-(`useProjectSourceController.ts:98-119`).
+On reload, an accepted source is re-hydrated: `GET /api/projects/{id}/source`, then the stage
+presents a URL-backed artifact that streams from the ranged content route — no bytes are
+downloaded up front (`useProjectSourceController.ts`). Operations that need the complete media
+(local editing, provider submission, save) fetch it on demand through the bounded 300 MB reader,
+with a progress notice and a cancel on the stage (`useOwnedMediaAcquisition.ts`).
 
 ### Task 2 — Create
 

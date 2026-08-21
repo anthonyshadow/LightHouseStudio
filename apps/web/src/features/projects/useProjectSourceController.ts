@@ -6,9 +6,12 @@ import type {
 } from '@studio/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiClientError, apiFetch } from '../../adapters/api-client/apiClient';
-import { readBoundedBlob } from '../../adapters/api-client/readBoundedBlob';
-import type { RestorePersistedOriginalInput } from '../recording/types';
+import { ApiClientError } from '../../adapters/api-client/apiClient';
+import type {
+  PersistedRecordingArtifactMetadata,
+  PresentStageSourceInput,
+  TakeMetadata,
+} from '../recording/types';
 import { projectQueryKeys, reconcileProject } from './useProjectsController';
 import { useStableOperationKey } from './useStableOperationKey';
 import {
@@ -20,8 +23,6 @@ import {
   reuseSavedVideoAsProjectSource,
   uploadProjectSource,
 } from './projectsApi';
-
-const MAXIMUM_SOURCE_BYTES = 300_000_000;
 
 export type ProjectSourcePhase =
   'idle' | 'hydrating' | 'preparing' | 'saving' | 'removing' | 'saved' | 'conflict' | 'error';
@@ -43,7 +44,7 @@ export interface ProjectSourceRuntime {
    * test double around a real runtime is still a real runtime.
    */
   readonly available: boolean;
-  readonly present: (projectId: string, input: RestorePersistedOriginalInput) => void;
+  readonly present: (projectId: string, input: PresentStageSourceInput) => void;
   readonly clear: (projectId: string) => void;
 }
 
@@ -61,78 +62,90 @@ const safeMessage = (error: unknown): string =>
       ? 'Preparing the video was cancelled.'
       : 'This video could not be prepared safely.';
 
-const artifactInput = (
-  file: File,
-  source?: ProjectSourceResponse['source'] | ProjectWorkingMediaResponse['media'],
-): RestorePersistedOriginalInput => {
+type PresentableProjectMedia =
+  ProjectSourceResponse['source'] | ProjectWorkingMediaResponse['media'];
+
+const mediaArtifactMetadata = (
+  createdAt: string,
+  kind: 'recorded' | 'uploaded',
+  mimeType: string,
+  filename: string,
+  durationMs: number,
+): PersistedRecordingArtifactMetadata => {
+  const id = `project-media-${crypto.randomUUID()}`;
+  return {
+    id,
+    name: `Project media · ${createdAt} · ${id.slice(-8)}`,
+    createdAt,
+    kind,
+    parentArtifactId: null,
+    mimeType,
+    filename,
+    sourceModeId: 'local',
+    startedAt: createdAt,
+    durationMs,
+  };
+};
+
+const mediaTakeMetadata = (source: PresentableProjectMedia, createdAt: string): TakeMetadata => ({
+  kind: 'uploaded' as const,
+  mode: 'local' as const,
+  selectedAt: createdAt,
+  displayName: source.filename,
+  container: source.container,
+  videoCodec: source.videoCodec,
+  audioCodec: source.audioCodec,
+  durationMs: source.durationMs,
+  width: source.width,
+  height: source.height,
+  sizeBytes: source.sizeBytes,
+  hasAudio: source.hasAudio,
+});
+
+const artifactInput = (file: File, source?: PresentableProjectMedia): PresentStageSourceInput => {
   const createdAt =
     source === undefined
       ? new Date().toISOString()
       : 'acceptedAt' in source
         ? source.acceptedAt
         : source.adoptedAt;
-  const id = `project-media-${crypto.randomUUID()}`;
   return {
     blob: file,
-    artifactMetadata: {
-      id,
-      name: `Project media · ${createdAt} · ${id.slice(-8)}`,
+    artifactMetadata: mediaArtifactMetadata(
       createdAt,
-      kind:
-        source !== undefined && 'acceptedAt' in source && source.kind === 'recorded'
-          ? 'recorded'
-          : 'uploaded',
-      parentArtifactId: null,
-      mimeType: source?.mimeType ?? file.type,
-      filename: source?.filename ?? file.name,
-      sourceModeId: 'local',
-      startedAt: createdAt,
-      durationMs: source?.durationMs ?? 0,
-    },
-    ...(source
-      ? {
-          takeMetadata: {
-            kind: 'uploaded' as const,
-            mode: 'local' as const,
-            selectedAt: createdAt,
-            displayName: source.filename,
-            container: source.container,
-            videoCodec: source.videoCodec,
-            audioCodec: source.audioCodec,
-            durationMs: source.durationMs,
-            width: source.width,
-            height: source.height,
-            sizeBytes: source.sizeBytes,
-            hasAudio: source.hasAudio,
-          },
-        }
-      : {}),
+      source !== undefined && 'acceptedAt' in source && source.kind === 'recorded'
+        ? 'recorded'
+        : 'uploaded',
+      source?.mimeType ?? file.type,
+      source?.filename ?? file.name,
+      source?.durationMs ?? 0,
+    ),
+    ...(source ? { takeMetadata: mediaTakeMetadata(source, createdAt) } : {}),
   };
 };
 
-const mediaBlob = async (
-  source: ProjectSourceResponse['source'] | ProjectWorkingMediaResponse['media'],
-  signal: AbortSignal,
-) => {
-  const response = await apiFetch(source.contentUrl, {
-    cache: 'no-store',
-    headers: { Accept: source.mimeType },
-    signal,
-  });
-  return readBoundedBlob(response, {
-    maximumBytes: MAXIMUM_SOURCE_BYTES,
-    signal,
-    acceptsContentType: (contentType) => contentType === source.mimeType,
-    createError: (failure) =>
-      new ApiClientError(
-        failure === 'too-large'
-          ? 'The Project source exceeded the app-owned 300 MB safety limit.'
-          : 'The Project source response was empty or invalid.',
-        502,
-        failure === 'too-large' ? 'result_too_large' : 'result_invalid',
-      ),
-    abortMessage: 'Project source loading was cancelled.',
-  });
+/**
+ * Presents durable media from its ranged content route rather than downloading it. The stage
+ * streams playback; operations that need the complete bytes acquire them on demand.
+ */
+const remoteArtifactInput = (source: PresentableProjectMedia): PresentStageSourceInput => {
+  const createdAt = 'acceptedAt' in source ? source.acceptedAt : source.adoptedAt;
+  return {
+    remoteMedia: {
+      kind: 'remote-presentation',
+      contentUrl: source.contentUrl,
+      sizeBytes: source.sizeBytes,
+      mimeType: source.mimeType,
+    },
+    artifactMetadata: mediaArtifactMetadata(
+      createdAt,
+      'acceptedAt' in source && source.kind === 'recorded' ? 'recorded' : 'uploaded',
+      source.mimeType,
+      source.filename,
+      source.durationMs,
+    ),
+    takeMetadata: mediaTakeMetadata(source, createdAt),
+  };
 };
 
 export const useProjectSourceController = (
@@ -180,14 +193,9 @@ export const useProjectSourceController = (
   }, [abort, accepted, busy, effectivePhase, onActivityChange, projectId]);
 
   const presentAccepted = useCallback(
-    async (response: ProjectSourceResponse, signal: AbortSignal) => {
-      const blob = await mediaBlob(response.source, signal);
+    (response: ProjectSourceResponse, signal: AbortSignal) => {
       signal.throwIfAborted();
-      const file = new File([blob], response.source.filename, {
-        type: response.source.mimeType,
-        lastModified: new Date(response.source.acceptedAt).valueOf(),
-      });
-      runtime.present(projectId, artifactInput(file, response.source));
+      runtime.present(projectId, remoteArtifactInput(response.source));
     },
     [projectId, runtime],
   );
@@ -207,7 +215,7 @@ export const useProjectSourceController = (
             };
       const presented = current.revision.snapshot.presentedMedia;
       if (JSON.stringify(presented) === JSON.stringify(sourceReference)) {
-        await presentAccepted(sourceResponse, signal);
+        presentAccepted(sourceResponse, signal);
         return;
       }
       const working = await getProjectWorkingMedia(projectId, signal);
@@ -221,13 +229,8 @@ export const useProjectSourceController = (
           'conflict',
         );
       }
-      const blob = await mediaBlob(working.media, signal);
       signal.throwIfAborted();
-      const file = new File([blob], working.media.filename, {
-        type: working.media.mimeType,
-        lastModified: new Date(working.media.adoptedAt).valueOf(),
-      });
-      runtime.present(projectId, artifactInput(file, working.media));
+      runtime.present(projectId, remoteArtifactInput(working.media));
     },
     [current.revision.snapshot.presentedMedia, presentAccepted, projectId, runtime],
   );
@@ -299,7 +302,9 @@ export const useProjectSourceController = (
       });
       onCurrentChange?.({ project: response.project, revision: response.revision });
       await queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
-      if (previewFile === undefined) await presentAccepted(response, controller.signal);
+      // A file the operator just chose is already owned bytes; only re-presentation without a
+      // local file streams from the content route.
+      if (previewFile === undefined) presentAccepted(response, controller.signal);
       else runtime.present(projectId, artifactInput(previewFile, response.source));
       if (controller.signal.aborted || generation !== generationRef.current || !mountedRef.current)
         return;

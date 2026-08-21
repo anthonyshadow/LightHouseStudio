@@ -504,6 +504,27 @@ export const noticeCopyStyles: CSSObject = {
   },
 };
 
+export const noticeProgressStyles = (theme: Theme): CSSObject => ({
+  display: 'flex',
+  minWidth: 0,
+  alignItems: 'center',
+  gap: theme.space.xs,
+  '& progress': {
+    flex: '1 1 auto',
+    minWidth: 0,
+    height: '0.4rem',
+    accentColor: theme.colors.accent,
+  },
+  '& span': {
+    flex: 'none',
+    color: 'inherit',
+    opacity: 0.78,
+    fontSize: '0.72rem',
+    lineHeight: 1.35,
+    fontVariantNumeric: 'tabular-nums',
+  },
+});
+
 export const noticeActionStyles = (theme: Theme): CSSObject => ({
   minHeight: '2.75rem',
   paddingInline: theme.space.md,

@@ -1,4 +1,4 @@
-import type { RecordingArtifact, RecordingProcessingOperation } from '../recording/types';
+import type { PresentedRecordingArtifact, RecordingProcessingOperation } from '../recording/types';
 import type { StudioMode } from '../media-session';
 
 export type StagePresentation =
@@ -7,7 +7,8 @@ export type StagePresentation =
   | { kind: 'finalizing'; retainedStream: MediaStream | null; startedAt: number }
   | {
       kind: 'playback';
-      artifact: RecordingArtifact;
+      /** May be URL-backed: the stage only binds `objectUrl` and never reads the media bytes. */
+      artifact: PresentedRecordingArtifact;
       controlsLocked: boolean;
       processingOperation?: RecordingProcessingOperation | null;
     };

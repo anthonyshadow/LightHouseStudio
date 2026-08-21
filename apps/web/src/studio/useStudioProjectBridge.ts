@@ -1,5 +1,9 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { RecordingArtifact, RecordingLifecycle } from '../features/recording/types';
+import {
+  ownedRecordingArtifact,
+  type PresentedRecordingArtifact,
+  type RecordingLifecycle,
+} from '../features/recording/types';
 import type { ProjectRecordingCandidate } from '../features/projects/ProjectRouteSurface';
 import type { ProjectWorkingMediaActivity } from '../features/projects/ProjectWorkingMediaSection';
 import type {
@@ -11,7 +15,7 @@ import type { ProjectSessionPort } from '../features/projects/useProjectSession'
 interface UseStudioProjectBridgeOptions {
   readonly projectId: string | null;
   readonly recordingLifecycle: RecordingLifecycle;
-  readonly recordingOriginal: RecordingArtifact | null;
+  readonly recordingOriginal: PresentedRecordingArtifact | null;
   readonly presentSource: (input: Parameters<ProjectSourceRuntime['present']>[1]) => void;
   readonly clearSource: () => void;
 }
@@ -69,11 +73,15 @@ export const useStudioProjectBridge = ({
   const activeSession = session?.projectId === projectId ? session : null;
 
   const recordingCandidate = useMemo<ProjectRecordingCandidate | null>(() => {
-    if (recordingLifecycle !== 'recorded' || !recordingOriginal) return null;
+    // Declares owned bytes: only a finalized take the runtime holds can become a source upload.
+    // A URL-backed presentation is already the accepted source and is never a candidate.
+    const owned =
+      recordingLifecycle === 'recorded' ? ownedRecordingArtifact(recordingOriginal) : null;
+    if (!owned) return null;
     return {
-      file: new File([recordingOriginal.media], recordingOriginal.filename, {
-        type: recordingOriginal.mimeType,
-        lastModified: new Date(recordingOriginal.startedAt).valueOf(),
+      file: new File([owned.media], owned.filename, {
+        type: owned.mimeType,
+        lastModified: new Date(owned.startedAt).valueOf(),
       }),
       ready: true,
     };

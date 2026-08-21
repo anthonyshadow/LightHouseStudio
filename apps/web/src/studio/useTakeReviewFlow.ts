@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StagePresentation } from '../features/live-stage';
 import type { SessionDraft, StudioMode } from '../features/media-session';
 import { hasSameRecordingTracks, type AutomaticRecordingStopEvent } from '../features/recording';
-import type { RestorePersistedOriginalInput } from '../features/recording/types';
+import {
+  isRemotePresentationInput,
+  type PresentStageSourceInput,
+  type RestorePersistedOriginalInput,
+} from '../features/recording/types';
 import { useRecording, useRecordingSource } from '../orchestration/recording';
 import { type useStudioSession } from '../orchestration/session';
 import { useVoiceProcessing } from '../orchestration/voice-processing';
@@ -136,27 +140,41 @@ export const useTakeReviewFlow = ({ session, onReviewCleared }: UseTakeReviewFlo
     session.transformedVideoUsable ? session.remoteStream : null,
   );
 
+  const enterUploadedReview = useCallback(() => {
+    setAutomaticRecordingStopEvent(null);
+    setFinalizingStartedAt(null);
+    setFinalizingStream(null);
+    setReviewReady(true);
+  }, []);
   const publishUploadedVideo = useCallback(
     (input: RestorePersistedOriginalInput) => {
       const artifact = recording.restorePersistedOriginal(input);
-      setAutomaticRecordingStopEvent(null);
-      setFinalizingStartedAt(null);
-      setFinalizingStream(null);
-      setReviewReady(true);
+      enterUploadedReview();
       return artifact;
     },
-    [recording],
+    [enterUploadedReview, recording],
+  );
+  /**
+   * The stage-presentation entry: accepts owned bytes or a URL-backed presentation. Byte
+   * consumers keep using `publishUploadedVideo`, which stays owned-only.
+   */
+  const publishStageSource = useCallback(
+    (input: PresentStageSourceInput) => {
+      const artifact = isRemotePresentationInput(input)
+        ? recording.presentRemoteOriginal(input)
+        : recording.restorePersistedOriginal(input);
+      enterUploadedReview();
+      return artifact;
+    },
+    [enterUploadedReview, recording],
   );
   const publishValidatedVideo = useCallback(
     (input: RestorePersistedOriginalInput) => {
       const artifact = recording.completeSourceValidation(input);
-      setAutomaticRecordingStopEvent(null);
-      setFinalizingStartedAt(null);
-      setFinalizingStream(null);
-      setReviewReady(true);
+      enterUploadedReview();
       return artifact;
     },
-    [recording],
+    [enterUploadedReview, recording],
   );
 
   useEffect(() => {
@@ -260,6 +278,7 @@ export const useTakeReviewFlow = ({ session, onReviewCleared }: UseTakeReviewFlo
     automaticRecordingStopEvent,
     finishTake,
     publishUploadedVideo,
+    publishStageSource,
     publishValidatedVideo,
     stagePresentation,
   } as const;

@@ -41,6 +41,14 @@ offset-aware encoded blocks, the finalized candidate Blob, and validation/extrac
 A successful atomic replacement commits the candidate before revoking superseded artifact URLs;
 failure and cancellation keep the prior artifact and draft intact while releasing worker output.
 
+Reopening a Project with an accepted source does not download it. The stage presents a URL-backed
+artifact that streams from the app's ranged content route, holding no media bytes in
+application memory. Complete bytes are fetched only when an operation needs them — local editing,
+provider submission, or saving — through the same bounded incremental reader and caps as every
+other owned source, with visible progress and a cancel that leaves the streamed presentation
+intact. A freshly recorded or newly uploaded source is already owned bytes and stays that way;
+peak memory for byte-holding workflows is unchanged, only deferred.
+
 Uploaded source limits are decimal bytes: 300,000,000 for local/Lucy-only workflows and
 200,000,000 when VTO is planned. Downloaded provider output is capped at 300,000,000 bytes.
 Server-side upload and result files are streamed to the dedicated temporary video-job root rather

@@ -13,7 +13,11 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { submitVideoJob } from '../../adapters/api-client/videoJobsApi';
 import { transcodeRecordingToMp4 } from '../../adapters/media-processing/transcodeRecording';
-import type { RecordingArtifact, RecordingController } from '../recording/types';
+import {
+  ownedRecordingArtifact,
+  type RecordingArtifact,
+  type RecordingController,
+} from '../recording/types';
 import type { LocalVoiceEffectId, VoiceProcessingController } from '../voice-effects/types';
 import { validateExistingVideo } from './videoValidation';
 import {
@@ -347,7 +351,9 @@ export const useExistingVideoWorkflow = ({
 
   const submitStep = useCallback(
     async (stepIndex: number) => {
-      const baseArtifact = editBase ?? recording.original;
+      // Declares owned bytes: provider submission uploads the complete media. A URL-backed
+      // presentation cannot be submitted; adoption acquires and republishes it first.
+      const baseArtifact = editBase ?? ownedRecordingArtifact(recording.original);
       const source = baseArtifact?.media;
       const step = steps[stepIndex];
       if (!selection || !source || !step || submissionOperationRef.current !== null) return;
@@ -547,7 +553,7 @@ export const useExistingVideoWorkflow = ({
     const baseArtifact =
       completedStepCount > 0
         ? (recording.visual ?? recording.processed)
-        : (editBase ?? recording.original);
+        : (editBase ?? ownedRecordingArtifact(recording.original));
     const baseMetadata =
       completedStepCount > 0 ? resultMetadata : (editBaseMetadata ?? selection?.metadata ?? null);
     if (!baseArtifact || !baseMetadata || !voiceSelection) return;
@@ -694,12 +700,14 @@ export const useExistingVideoWorkflow = ({
   }, [acceptedSubmission, phase, processing, recording, selection, setMessage, setPhase]);
 
   const startOver = useCallback(() => {
-    if (!selection || phase !== 'complete' || !recording.original) return;
+    // The edit base must be owned bytes; with an active selection the original always is.
+    const ownedOriginal = ownedRecordingArtifact(recording.original);
+    if (!selection || phase !== 'complete' || !ownedOriginal) return;
     clearOperation();
     recording.clearVisualProcessing();
     dispatchWorkflowState({
       type: 'start-over',
-      editBase: recording.original,
+      editBase: ownedOriginal,
       metadata: selection.metadata,
       message: selection.audioUnavailableReason,
     });
@@ -733,7 +741,9 @@ export const useExistingVideoWorkflow = ({
 
   const editSelected = useCallback(() => {
     const base =
-      comparison === 'original' ? recording.original : (recording.processed ?? recording.visual);
+      comparison === 'original'
+        ? ownedRecordingArtifact(recording.original)
+        : (recording.processed ?? recording.visual);
     const metadata = comparison === 'original' ? selection?.metadata : resultMetadata;
     if (!base || !metadata) return;
     const provenance: ExistingVideoBaseProvenance =

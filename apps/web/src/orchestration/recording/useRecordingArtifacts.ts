@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { revokeArtifactUrl } from '../../features/recording/recordingHelpers';
 import type {
+  PresentedRecordingArtifact,
   RecordingArtifact,
   RecordingAudioSidecar,
   RecordingProcessingOperation,
+  RemotePresentationInput,
   RestorePersistedOriginalInput,
   VideoCharacterAttribution,
 } from '../../features/recording/types';
 import {
   createPersistedOriginalRecording,
   createProcessedRecordingArtifact,
+  createRemotePresentationRecording,
   IDLE_AUDIO_SIDECAR,
 } from './recordingArtifacts';
 import {
@@ -24,7 +27,7 @@ const artifactSlots = ['original', 'visual', 'processed'] as const;
 const removedArtifacts = (
   current: RecordingArtifactState,
   next: RecordingArtifactState,
-): RecordingArtifact[] => {
+): PresentedRecordingArtifact[] => {
   const retainedUrls = new Set(
     artifactSlots
       .map((slot) => next[slot]?.objectUrl)
@@ -33,7 +36,7 @@ const removedArtifacts = (
   return artifactSlots
     .map((slot) => current[slot])
     .filter(
-      (artifact): artifact is RecordingArtifact =>
+      (artifact): artifact is PresentedRecordingArtifact =>
         artifact !== null && !retainedUrls.has(artifact.objectUrl),
     );
 };
@@ -41,10 +44,10 @@ const removedArtifacts = (
 export const useRecordingArtifacts = () => {
   const [state, dispatch] = useReducer(recordingArtifactReducer, initialRecordingArtifactState);
   const stateRef = useRef(state);
-  const originalRef = useRef<RecordingArtifact | null>(null);
+  const originalRef = useRef<PresentedRecordingArtifact | null>(null);
   const visualRef = useRef<RecordingArtifact | null>(null);
   const processedRef = useRef<RecordingArtifact | null>(null);
-  const pendingRevocationsRef = useRef<RecordingArtifact[]>([]);
+  const pendingRevocationsRef = useRef<PresentedRecordingArtifact[]>([]);
   const repairedPlaybackArtifactIdRef = useRef<string | null>(null);
 
   const transition = useCallback((action: RecordingArtifactAction) => {
@@ -74,7 +77,7 @@ export const useRecordingArtifacts = () => {
   }, [state]);
 
   const publishOriginal = useCallback(
-    (artifact: RecordingArtifact, sidecar: RecordingAudioSidecar) => {
+    (artifact: PresentedRecordingArtifact, sidecar: RecordingAudioSidecar) => {
       repairedPlaybackArtifactIdRef.current = null;
       transition({ type: 'publish-original', artifact, sidecar });
     },
@@ -91,6 +94,15 @@ export const useRecordingArtifacts = () => {
         throw error;
       }
       return restored.artifact;
+    },
+    [publishOriginal],
+  );
+
+  const presentRemoteOriginal = useCallback(
+    (input: RemotePresentationInput): PresentedRecordingArtifact => {
+      const artifact = createRemotePresentationRecording(input);
+      publishOriginal(artifact, IDLE_AUDIO_SIDECAR);
+      return artifact;
     },
     [publishOriginal],
   );
@@ -224,17 +236,21 @@ export const useRecordingArtifacts = () => {
     const slot = current.processed ? 'processed' : current.visual ? 'visual' : 'original';
     const artifact = current[slot];
     if (!artifact || repairedPlaybackArtifactIdRef.current === artifact.id) return false;
+    // A URL-backed presentation has no owned bytes to mint a fresh object URL from; the stage's
+    // own retry re-requests the content URL instead.
+    const media = artifact.media;
+    if (!(media instanceof Blob)) return false;
 
     let objectUrl: string;
     try {
-      objectUrl = URL.createObjectURL(artifact.media);
+      objectUrl = URL.createObjectURL(media);
     } catch {
       return false;
     }
     if (!objectUrl) return false;
 
     repairedPlaybackArtifactIdRef.current = artifact.id;
-    transition({ type: 'repair-object-url', slot, artifact: { ...artifact, objectUrl } });
+    transition({ type: 'repair-object-url', slot, artifact: { ...artifact, media, objectUrl } });
     return true;
   }, [transition]);
 
@@ -271,6 +287,7 @@ export const useRecordingArtifacts = () => {
       originalRef,
       publishOriginal,
       restorePersistedOriginal,
+      presentRemoteOriginal,
       completeSourceValidation,
       discardArtifacts,
       markSidecarRecording,
@@ -290,6 +307,7 @@ export const useRecordingArtifacts = () => {
       state,
       publishOriginal,
       restorePersistedOriginal,
+      presentRemoteOriginal,
       completeSourceValidation,
       discardArtifacts,
       markSidecarRecording,

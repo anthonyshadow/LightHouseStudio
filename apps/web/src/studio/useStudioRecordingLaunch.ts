@@ -19,6 +19,8 @@ interface UseStudioRecordingLaunchOptions {
   readonly projectContextActive: boolean;
   readonly activeProjectId: string | null;
   readonly projectSourceActivity: ProjectSourceActivity | null;
+  /** Resolves true once the presented original is owned bytes; false on cancel or failure. */
+  readonly acquireOwnedMedia: () => Promise<boolean>;
   readonly openOverlay: ReturnType<typeof useStudioOverlayController>['open'];
   readonly closeOverlay: ReturnType<typeof useStudioOverlayController>['close'];
   readonly focusMain: () => void;
@@ -43,6 +45,7 @@ export const useStudioRecordingLaunch = ({
   projectContextActive,
   activeProjectId,
   projectSourceActivity,
+  acquireOwnedMedia,
   openOverlay,
   closeOverlay,
   focusMain,
@@ -60,6 +63,9 @@ export const useStudioRecordingLaunch = ({
     if (
       !recordingForExistingVideo ||
       !artifact ||
+      // Adoption validates complete media, so a URL-backed presentation waits here until the
+      // deferred acquisition republishes it as owned bytes.
+      !(artifact.media instanceof Blob) ||
       existingVideo.selection ||
       stagePresentationKind !== 'playback' ||
       adoptingRecordingRef.current === artifact.id
@@ -133,10 +139,14 @@ export const useStudioRecordingLaunch = ({
     if (!recording.presented || recordingActive) return;
     if (projectContextActive && !existingVideo.selection) {
       setRecordingForExistingVideo(true);
+      // A streamed Project source needs its complete bytes before adoption can validate it. The
+      // acquisition shows its own progress and cancel; adoption resumes when it lands.
+      if (!(recording.presented.media instanceof Blob)) void acquireOwnedMedia();
       return;
     }
     openExistingVideo();
   }, [
+    acquireOwnedMedia,
     existingVideo.selection,
     openExistingVideo,
     projectContextActive,

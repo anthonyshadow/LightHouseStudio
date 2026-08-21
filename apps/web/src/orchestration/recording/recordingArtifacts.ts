@@ -8,8 +8,10 @@ import {
 } from '@studio/domain';
 import { selectAudioMime, selectVideoMime } from '../../features/recording/recordingHelpers';
 import type {
+  PresentedRecordingArtifact,
   RecordingArtifact,
   RecordingAudioSidecar,
+  RemotePresentationInput,
   RestorePersistedOriginalInput,
 } from '../../features/recording/types';
 import type { RecordingAttempt } from './recordingAttempt';
@@ -132,6 +134,56 @@ export const createPersistedOriginalRecording = (
   return Object.freeze({ artifact, sidecar });
 };
 
+/**
+ * Builds a URL-backed stage artifact from durable media. No bytes are held and no object URL is
+ * created: the stage streams from the app-owned content URL, and the browser has nothing to
+ * revoke when the artifact is replaced or discarded.
+ */
+export const createRemotePresentationRecording = (
+  input: RemotePresentationInput,
+): PresentedRecordingArtifact => {
+  if (input.remoteMedia.kind !== 'remote-presentation' || !input.remoteMedia.contentUrl.trim()) {
+    throw new Error('Remote presentation media is missing its content URL.');
+  }
+  if (!Number.isFinite(input.remoteMedia.sizeBytes) || input.remoteMedia.sizeBytes <= 0) {
+    throw new Error('Remote presentation media size is invalid.');
+  }
+  const id = requireNonEmptyText(input.artifactMetadata.id, 'ID');
+  const mimeType = requireNonEmptyText(
+    input.artifactMetadata.mimeType || input.remoteMedia.mimeType,
+    'MIME type',
+  );
+  const filename = requireNonEmptyText(input.artifactMetadata.filename, 'filename');
+  if (!isSessionModeId(input.artifactMetadata.sourceModeId)) {
+    throw new Error('Persisted recording source mode is invalid.');
+  }
+  const startedAt = input.artifactMetadata.startedAt;
+  if (!Number.isFinite(new Date(startedAt).valueOf())) {
+    throw new Error('Persisted recording start time is invalid.');
+  }
+  const durationMs = input.artifactMetadata.durationMs;
+  if (!Number.isFinite(durationMs) || durationMs < 0) {
+    throw new Error('Persisted recording duration is invalid.');
+  }
+  return Object.freeze({
+    id,
+    name: input.artifactMetadata.name ?? `Streamed video · ${id.slice(-8)}`,
+    createdAt: input.artifactMetadata.createdAt ?? startedAt,
+    kind: input.artifactMetadata.kind ?? 'uploaded',
+    parentArtifactId: input.artifactMetadata.parentArtifactId ?? null,
+    characterName: input.artifactMetadata.characterName ?? null,
+    characterVariantName: input.artifactMetadata.characterVariantName ?? null,
+    media: input.remoteMedia,
+    objectUrl: input.remoteMedia.contentUrl,
+    mimeType,
+    filename,
+    sourceModeId: input.artifactMetadata.sourceModeId,
+    startedAt,
+    durationMs,
+    sizeBytes: input.remoteMedia.sizeBytes,
+  });
+};
+
 export const createOriginalRecordingArtifact = (
   attempt: RecordingAttempt,
   blob: Blob,
@@ -216,7 +268,7 @@ export const createRecordingSidecar = (attempt: RecordingAttempt): RecordingAudi
 };
 
 export const createProcessedRecordingArtifact = (
-  source: RecordingArtifact,
+  source: PresentedRecordingArtifact,
   blob: Blob,
   mimeType: string,
   label: string,

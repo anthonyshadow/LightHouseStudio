@@ -76,6 +76,7 @@ const createRecording = (
   start: vi.fn().mockResolvedValue(undefined),
   stop: vi.fn().mockResolvedValue(null),
   restorePersistedOriginal: vi.fn(),
+  presentRemoteOriginal: vi.fn(),
   replaceSource: vi.fn(),
   discard: vi.fn(),
   beginProcessing: vi.fn(),
