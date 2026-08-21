@@ -188,6 +188,8 @@ export const emptyListStyles = (theme: Theme): CSSObject => ({
   textAlign: 'center',
   '& strong': { color: theme.colors.text },
   '& p': { margin: 0, lineHeight: 1.5 },
+  '& [data-empty-state-preview]': { marginBlockEnd: theme.space.sm },
+  '& [data-empty-example]': { color: theme.colors.textFaint, fontSize: theme.fontSizes.metadata },
 });
 
 export const detailHeaderStyles = (theme: Theme): CSSObject => ({

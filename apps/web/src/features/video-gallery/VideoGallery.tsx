@@ -26,6 +26,7 @@ import {
 } from '../../adapters/api-client/savedVideosApi';
 import {
   Button,
+  EmptyStatePreview,
   ListSearchField,
   OverlayPanel,
   SelectField,
@@ -567,11 +568,19 @@ export const VideoGallery = ({
 
   if (!libraryHasVideos) {
     return (
-      <div>
-        <h2>No videos in Assets yet</h2>
-        <p>
+      <div css={{ display: 'grid', justifyItems: 'start', gap: theme.space.sm }}>
+        <EmptyStatePreview />
+        <h2 css={{ margin: 0 }}>No videos in Assets yet</h2>
+        <p css={{ margin: 0 }}>
           Finish a Project with Save as New Video or Add Version, or save a video straight from
           Studio.
+        </p>
+        <p
+          data-empty-example
+          css={{ margin: 0, color: theme.colors.textFaint, fontSize: theme.fontSizes.metadata }}
+        >
+          For example: record a take in Studio, save it, and it appears here with a preview and
+          every version you keep.
         </p>
       </div>
     );

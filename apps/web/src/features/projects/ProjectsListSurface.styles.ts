@@ -306,4 +306,6 @@ export const projectsLedgerEmptyStyles = (theme: Theme): CSSObject => ({
   color: theme.colors.textMuted,
   '& strong': { color: theme.colors.text },
   '& p': { maxWidth: '46rem', margin: 0, lineHeight: 1.55 },
+  '& [data-empty-state-preview]': { marginInline: 0, marginBlockEnd: theme.space.sm },
+  '& [data-empty-example]': { color: theme.colors.textFaint, fontSize: theme.fontSizes.metadata },
 });

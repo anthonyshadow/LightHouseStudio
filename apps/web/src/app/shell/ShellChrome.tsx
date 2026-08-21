@@ -3,6 +3,7 @@ import type { AuthenticatedSessionResponse, AuthenticatedUser } from '@studio/co
 import { useRef, useState } from 'react';
 import { CreativeLibrarySyncNotice } from '../../features/creative-assets/CreativeLibrarySyncNotice';
 import { AssetCreationLauncher } from '../../studio/AssetCreationLauncher';
+import { HowLightframeWorksPanel } from '../../studio/HowLightframeWorksPanel';
 import { headerRegionStyles } from '../../studio/StudioApp.styles';
 import { StudioHeader } from '../../studio/StudioHeader';
 import { StudioLibraryOverlays } from '../../studio/StudioLibraryOverlays';
@@ -30,9 +31,11 @@ interface ShellChromeProps {
 export const ShellChrome = ({ services, user, session, logout }: ShellChromeProps) => {
   const theme = useTheme();
   const [assetCreationLauncherOpen, setAssetCreationLauncherOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   // Written only from the trigger's own click handler, so focus returns to the control the operator
   // actually used rather than to whichever one rendered last.
   const quickCreateTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const helpTriggerRef = useRef<HTMLButtonElement | null>(null);
   const { route, nav, browser, provider, creative, character, outfit, libraryHandoff, mainRef } =
     services;
   const { availability, state: capabilityState } = provider;
@@ -71,6 +74,10 @@ export const ShellChrome = ({ services, user, session, logout }: ShellChromeProp
             setAssetCreationLauncherOpen(true);
           }}
           onOpenLive={nav.openLive}
+          onOpenHelp={(trigger) => {
+            helpTriggerRef.current = trigger;
+            setHelpOpen(true);
+          }}
           onLogout={() => void logout.request()}
         />
         {/*
@@ -81,6 +88,12 @@ export const ShellChrome = ({ services, user, session, logout }: ShellChromeProp
         */}
         <CreativeLibrarySyncNotice {...sync} />
       </div>
+
+      <HowLightframeWorksPanel
+        open={helpOpen}
+        onClose={() => setHelpOpen(false)}
+        returnFocusRef={helpTriggerRef}
+      />
 
       <AssetCreationLauncher
         open={assetCreationLauncherOpen}

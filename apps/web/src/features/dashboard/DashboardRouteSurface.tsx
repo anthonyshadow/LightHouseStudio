@@ -10,7 +10,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useMemo, useState } from 'react';
 import { listSavedVideos, savedVideoThumbnailUrl } from '../../adapters/api-client/savedVideosApi';
 import { abandonVideoJob, listActiveVideoJobs } from '../../adapters/api-client/videoJobsApi';
-import { AppIcon, Button, ConfirmationDialog, StatusNotice } from '../../ui';
+import { AppIcon, Button, ConfirmationDialog, EmptyStatePreview, StatusNotice } from '../../ui';
 import { useCampaignList } from '../campaigns/useCampaignsController';
 import { KIND_ICONS } from '../projects/ProjectAssetThumbnail';
 import { projectPosterUrls } from '../projects/projectPosterPresentation';
@@ -255,6 +255,14 @@ export const DashboardRouteSurface = ({
         : recentKind === 'campaigns'
           ? 'No Campaigns yet. They are optional organizers for related Projects.'
           : 'No recent work yet. Start with a standalone video and organize it later if needed.';
+  const emptyExample =
+    recentKind === 'projects'
+      ? 'For example: a “Product demo” Project holding one video, its AI runs, and every saved cut.'
+      : recentKind === 'videos'
+        ? 'For example: record a take in Studio and save it — it appears here with a preview.'
+        : recentKind === 'campaigns'
+          ? 'For example: a “Spring launch” Campaign holding one Project per ad placement.'
+          : 'Your latest Videos, Projects and Campaigns will line up here once you make something.';
   const emptyAction =
     recentKind === 'projects'
       ? { label: 'New Project', run: onCreateProject }
@@ -397,7 +405,9 @@ export const DashboardRouteSurface = ({
             </ul>
           ) : !visibleLoading && visibleErrors.length === 0 ? (
             <div css={emptyRecentStyles(theme)}>
+              <EmptyStatePreview variant="rows" />
               <p>{emptyMessage}</p>
+              <p data-empty-example>{emptyExample}</p>
               <Button size="small" variant="quiet" onClick={emptyAction.run}>
                 {emptyAction.label}
               </Button>

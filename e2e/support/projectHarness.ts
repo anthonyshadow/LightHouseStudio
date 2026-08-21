@@ -729,7 +729,11 @@ export const installProjectHarness = async (
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ projects, nextCursor: null }),
+        body: JSON.stringify({
+          projects,
+          nextCursor: null,
+          total: { count: projects.length, exceedsCeiling: false },
+        }),
       });
       return;
     }

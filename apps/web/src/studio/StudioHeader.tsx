@@ -43,6 +43,8 @@ type StudioHeaderProps = {
   onCreateCampaign: () => void;
   onCreateAsset: (trigger: HTMLButtonElement | null) => void;
   onOpenLive: () => void;
+  /** Opens the static "How Lightframe works" explainer; the trigger takes focus back on close. */
+  onOpenHelp: (trigger: HTMLButtonElement | null) => void;
   onLogout: () => void;
 };
 
@@ -240,6 +242,7 @@ export const StudioHeader = ({
   onCreateCampaign,
   onCreateAsset,
   onOpenLive,
+  onOpenHelp,
   onLogout,
 }: StudioHeaderProps) => {
   const theme = useTheme();
@@ -319,6 +322,24 @@ export const StudioHeader = ({
             />
           </div>
           <div data-utility-actions>
+            <Button
+              size="small"
+              variant="quiet"
+              aria-label="How Lightframe works"
+              css={{
+                gap: theme.space.xs,
+                '@media (min-width: 48rem)': { justifyContent: 'flex-start' },
+                '@media (max-width: 39.99rem)': {
+                  width: '2.75rem',
+                  padding: 0,
+                  '& [data-help-label]': { display: 'none' },
+                },
+              }}
+              onClick={(event) => onOpenHelp(event.currentTarget)}
+            >
+              <AppIcon name="info" width="1.05rem" height="1.05rem" />
+              <span data-help-label>Help</span>
+            </Button>
             <StatusMenu
               open={openMenu === 'status'}
               onOpenChange={(open) => setMenuOpen('status', open)}
