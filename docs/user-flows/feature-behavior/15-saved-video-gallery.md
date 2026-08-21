@@ -13,7 +13,14 @@ Studio stage.
    blank field keeps the existing generated artifact name. The preview source is one of an
    automatic early frame, the video's first frame, or an uploaded JPEG/PNG/WebP image; choosing
    Upload without attaching an image falls back to the automatic frame, so deciding nothing keeps
-   the long-standing behaviour. Once that exact artifact is retained, review acknowledges completion and
+   the long-standing behaviour. When the displayed frame has been measured, the same prompt also
+   asks **where is this going** — keep as it is, phone full screen (9:16), widescreen (16:9), square
+   (1:1), or tall feed post (4:5) — previewing the crop and stating what it trims. Keeping the shape
+   is the default and re-frames nothing. Choosing a placement re-frames the bytes locally before
+   they are retained, reporting progress and offering cancel while the dialog stays open; a
+   cancelled or failed re-frame saves nothing. The retained file, its poster and its filename are
+   the re-framed ones, and a re-framed save never inherits the receipt of the save it replaced.
+   Once that exact artifact is retained, review acknowledges completion and
    offers **Download**, **View in Assets** and **Create another** for that exact Version; a Project
    video context keeps its own attach-and-return behavior instead.
    Saving is explicit, reports progress/result, and repeated submission of the same artifact is

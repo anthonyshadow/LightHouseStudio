@@ -116,6 +116,7 @@ export class ProjectHistoryService {
         authorKind: revision.author.kind,
         workflowPhase: revision.snapshot.workflowPhase,
         outputReference: revision.snapshot.lastSuccessfulOutput,
+        exportSpecification: revision.snapshot.exportSpecification,
         createdAt: revision.createdAt,
       })),
       nextCursor:

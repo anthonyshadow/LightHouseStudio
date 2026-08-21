@@ -1,11 +1,42 @@
 // @vitest-environment jsdom
 
 import type { SavedVideoDetail } from '@studio/contracts';
-import { cleanup, render, screen } from '@testing-library/react';
+import { projectExportSpecificationForAspect } from '@studio/domain';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import { SavedVideoSuccessActions } from './SavedVideoSuccessActions';
+
+// jsdom has no WebGL, so the render capability is stated explicitly rather than inferred.
+const renderCapable = vi.fn(() => true);
+const renderVideoEdit =
+  vi.fn<
+    (input: {
+      targetResolution: unknown;
+      spec: { crop: { preset: string } };
+      sourceWidth: number;
+    }) => Promise<{ blob: Blob; mimeType: 'video/mp4' }>
+  >();
+const readSavedVideoContent = vi.fn<() => Promise<Blob>>();
+vi.mock('../video-editor/videoEditShader', () => ({
+  videoEditPreviewSupported: () => renderCapable(),
+}));
+vi.mock('../video-editor/renderVideoEdit', () => ({
+  renderVideoEdit: (input: Parameters<typeof renderVideoEdit>[0]) => renderVideoEdit(input),
+  videoEditRenderingSupported: () => renderCapable(),
+}));
+vi.mock('../../adapters/api-client/savedVideosApi', () => ({
+  downloadSavedVideoUrl: (videoId: string, versionId?: string) =>
+    `/api/videos/${videoId}/versions/${versionId}/content?download=true`,
+  readSavedVideoContent: () => readSavedVideoContent(),
+}));
+
+beforeEach(() => {
+  renderCapable.mockReturnValue(true);
+  renderVideoEdit.mockReset();
+  readSavedVideoContent.mockReset();
+});
 
 afterEach(cleanup);
 
@@ -79,5 +110,70 @@ describe('SavedVideoSuccessActions', () => {
 
     expect(screen.getByRole('link', { name: /Download/u })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Create another' })).not.toBeInTheDocument();
+  });
+});
+
+describe('SavedVideoSuccessActions placement download', () => {
+  const placement = projectExportSpecificationForAspect('9:16');
+
+  it('re-frames the retained bytes and hands over a file named for the placement', async () => {
+    const user = userEvent.setup();
+    const reframed = new Blob(['reframed'], { type: 'video/mp4' });
+    readSavedVideoContent.mockResolvedValue(new Blob(['source'], { type: 'video/mp4' }));
+    renderVideoEdit.mockResolvedValue({ blob: reframed, mimeType: 'video/mp4' });
+    const createObjectURL = vi.fn(() => 'blob:placement');
+    const revokeObjectURL = vi.fn();
+    vi.stubGlobal('URL', { ...URL, createObjectURL, revokeObjectURL });
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
+
+    render(
+      <StudioDesignProvider>
+        <SavedVideoSuccessActions
+          video={savedVideo()}
+          exportSpecification={placement}
+          onOpenInAssets={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Download Launch cut, Version 2, for/u }));
+
+    await waitFor(() => expect(renderVideoEdit).toHaveBeenCalledOnce());
+    const request = renderVideoEdit.mock.calls[0]![0];
+    expect(request.targetResolution).toEqual({ width: 1_080, height: 1_920 });
+    expect(request.spec.crop.preset).toBe('9:16');
+    expect(request.sourceWidth).toBe(1280);
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledWith(reframed));
+    expect(click).toHaveBeenCalledOnce();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:placement');
+
+    // The original shape stays one click away, since the Project keeps it either way.
+    expect(
+      screen.getByRole('link', { name: 'Download Launch cut, Version 2, in its original shape' }),
+    ).toBeVisible();
+    vi.unstubAllGlobals();
+    click.mockRestore();
+  });
+
+  it('falls back to the unchanged server download when the browser cannot re-frame', () => {
+    renderCapable.mockReturnValue(false);
+    render(
+      <StudioDesignProvider>
+        <SavedVideoSuccessActions
+          video={savedVideo()}
+          exportSpecification={placement}
+          onOpenInAssets={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByText('Local editor unavailable')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Download Launch cut, Version 2' })).toHaveAttribute(
+      'download',
+      'launch-cut.mp4',
+    );
+    expect(screen.queryByRole('button', { name: /for phone/u })).not.toBeInTheDocument();
   });
 });

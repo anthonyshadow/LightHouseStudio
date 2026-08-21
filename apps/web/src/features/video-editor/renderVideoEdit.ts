@@ -7,6 +7,14 @@ export type RenderVideoEditInput = Readonly<{
   sourceWidth: number;
   sourceHeight: number;
   requireAudio: boolean;
+  /**
+   * An exact destination size for the cropped frame. Omitted, the crop's own size is kept — the
+   * local editor's behaviour. A placement export supplies one, which is the only scaling this
+   * path performs.
+   */
+  targetResolution?: { readonly width: number; readonly height: number } | null;
+  /** Omitted or `true`, an existing audio track is transcoded; `false` drops it. */
+  includeAudio?: boolean;
   signal: AbortSignal;
   onProgress: (progress: number) => void;
 }>;
@@ -27,6 +35,8 @@ export const renderVideoEdit = ({
   sourceWidth,
   sourceHeight,
   requireAudio,
+  targetResolution = null,
+  includeAudio = true,
   signal,
   onProgress,
 }: RenderVideoEditInput): Promise<RenderVideoEditResult> => {
@@ -90,6 +100,8 @@ export const renderVideoEdit = ({
       sourceWidth,
       sourceHeight,
       requireAudio,
+      targetResolution,
+      includeAudio,
     };
     worker.postMessage(message);
   });

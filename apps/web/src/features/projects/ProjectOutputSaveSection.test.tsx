@@ -24,6 +24,17 @@ import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
 import { projectOutputOperationStorageKey } from './projectOutputOperationStorage';
 import type { ProjectSessionPort } from './useProjectSession';
 
+// jsdom has no WebGL, so the render capability is stated explicitly rather than left to the
+// environment: both the offered and the degraded path have to be exercised deliberately.
+const renderCapable = vi.fn(() => true);
+vi.mock('../video-editor/videoEditShader', () => ({
+  videoEditPreviewSupported: () => renderCapable(),
+}));
+vi.mock('../video-editor/renderVideoEdit', () => ({
+  renderVideoEdit: vi.fn(),
+  videoEditRenderingSupported: () => renderCapable(),
+}));
+
 const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
 const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
 const sourceAssetId = 'a1289672-bfb5-4214-94f7-4bd54f12ce06';
@@ -730,5 +741,106 @@ describe('Project output save UI', () => {
     expect(
       defaultProjectOutputTitle({ title: 'L'.repeat(400), currentRevisionNumber: 12 }).length,
     ).toBeLessThanOrEqual(SAVED_VIDEO_TITLE_MAX_LENGTH);
+  });
+});
+
+describe('ProjectOutputSaveSection placement', () => {
+  it('records a chosen placement through the session rather than the save request', async () => {
+    const user = userEvent.setup();
+    const propose = vi.fn(() => true);
+    renderSection({ ...session(), propose });
+
+    expect(screen.getByRole('group', { name: 'Where is this going?' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Keep as it is' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Phone, full screen' }));
+
+    // The revision-append path owns the write, so optimistic concurrency is never bypassed here.
+    expect(propose).toHaveBeenCalledExactlyOnceWith({
+      exportSpecification: {
+        container: 'video/mp4',
+        aspect: '9:16',
+        resolution: { width: 1_080, height: 1_920 },
+        includeAudio: true,
+      },
+    });
+  });
+
+  it('restates the recorded placement at the moment the save is confirmed', async () => {
+    const user = userEvent.setup();
+    const placed = current();
+    renderSection(session(), {
+      currentValue: {
+        ...placed,
+        revision: {
+          ...placed.revision,
+          snapshot: {
+            ...placed.revision.snapshot,
+            exportSpecification: {
+              container: 'video/mp4',
+              aspect: '4:5',
+              resolution: { width: 1_080, height: 1_350 },
+              includeAudio: true,
+            },
+          },
+        },
+      },
+    });
+
+    expect(screen.getByRole('button', { name: 'Tall feed post' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Save as New Video' });
+    expect(within(dialog).getByText('Tall feed post')).toBeVisible();
+  });
+
+  it('keeps the unchanged server download when no placement was recorded', async () => {
+    const user = userEvent.setup();
+    let saved = 0;
+    mockApiServer.use(
+      http.post(`*/api/projects/${projectId}/outputs`, () => {
+        saved += 1;
+        return HttpResponse.json(outputResponse(crypto.randomUUID()), { status: 201 });
+      }),
+    );
+    renderSection();
+
+    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Save as New Video' });
+    await user.click(within(dialog).getByRole('button', { name: 'Save as New Video' }));
+
+    await waitFor(() => expect(saved).toBe(1));
+    const download = await screen.findByRole('link', { name: /^Download Launch master/u });
+    expect(download).toHaveAttribute('href', downloadSavedVideoUrl(savedVideoId, versionId));
+    expect(screen.queryByRole('button', { name: /Download .* for /u })).not.toBeInTheDocument();
+  });
+  it('degrades to the original shape when the browser cannot re-frame, and still saves', async () => {
+    const user = userEvent.setup();
+    renderCapable.mockReturnValue(false);
+    const propose = vi.fn(() => true);
+    let saved = 0;
+    mockApiServer.use(
+      http.post(`*/api/projects/${projectId}/outputs`, () => {
+        saved += 1;
+        return HttpResponse.json(outputResponse(crypto.randomUUID()), { status: 201 });
+      }),
+    );
+    renderSection({ ...session(), propose });
+
+    expect(screen.getByText('Local editor unavailable')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Phone, full screen' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Save as New Video' });
+    await user.click(within(dialog).getByRole('button', { name: 'Save as New Video' }));
+
+    await waitFor(() => expect(saved).toBe(1));
+    expect(propose).not.toHaveBeenCalled();
+    expect(await screen.findByRole('link', { name: /^Download Launch master/u })).toBeVisible();
   });
 });

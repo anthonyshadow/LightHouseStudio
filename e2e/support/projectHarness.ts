@@ -282,6 +282,7 @@ export const installProjectHarness = async (
             authorKind: current.revision.authorKind,
             workflowPhase: current.revision.snapshot.workflowPhase,
             outputReference: current.revision.snapshot.lastSuccessfulOutput,
+            exportSpecification: current.revision.snapshot.exportSpecification,
             createdAt: current.revision.createdAt,
           },
         ],

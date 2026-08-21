@@ -19,10 +19,17 @@ Project (id, ownerUserId, campaignId?, title, status, version, currentRevisionId
  └── ProjectOutputLink[]         immutable producer provenance for saved Versions
 ```
 
-`ProjectSnapshot` (`types.ts:151-168`) is the entire creative state of a revision:
+`ProjectSnapshot` (`types.ts`) is the entire creative state of a revision:
 `sourceAssetId`, `workingMedia`, `presentedMedia`, `selectedCharacter`, `selectedOutfit`,
 `selectedVoice`, `visualTreatment`, `liveMode`, `creativeIntent`, `localEdit`,
 `exportSpecification`, `lastSuccessfulOutput`, `workflowPhase`.
+
+`exportSpecification` records where the finished video is going: `source` (stored as `null`,
+meaning unchanged), `16:9`, `9:16`, `1:1` or `4:5`, each with the exact size it is produced at.
+`validateProjectExportSpecification` rejects a size that is not its placement's shape, a placement
+with no size, an odd or out-of-range dimension, and a request to keep the original shape that also
+asks for a size. It is part of the material snapshot, so changing it clears a stale
+`lastSuccessfulOutput` like any other creative change.
 
 ### The three media pointers — this is the concept a new user must grasp
 
@@ -255,28 +262,39 @@ the app:
 
 1. Renders only when a source exists (`:243`).
 2. Describes the current review media (original / working media / retained Version).
-3. **Save as New Video** opens a title dialog whose field is proposed as the Project title plus
+3. `ExportPlacementChooser` asks where the video is going. Keeping the shape is the default and
+   is stored as `exportSpecification: null`, so a Project that never answers is unchanged. Choosing
+   a placement calls `session.propose({ exportSpecification })`, which the ordinary session
+   checkpoint writes onto a new revision under `expectedVersion`/`expectedRevisionNumber` — the
+   output-save request itself never carries it. `begin()` already flushes that checkpoint before it
+   reads authority, so no second concurrency path exists.
+4. **Save as New Video** opens a title dialog whose field is proposed as the Project title plus
    the change being saved (`defaultProjectOutputTitle`), so successive saves from one Project do
    not all reach the library under one name; **Add Version** opens a Saved Video picker then a
-   confirm dialog showing the target's current Version ordinal.
-4. `begin()` flushes any pending session checkpoint, re-fetches the authoritative project, re-checks
+   confirm dialog showing the target's current Version ordinal. Both restate the recorded
+   placement.
+5. `begin()` flushes any pending session checkpoint, re-fetches the authoritative project, re-checks
    that ready media still matches, mints an operation id, **persists the pending operation to
    `localStorage`**, and only then posts `/api/projects/{id}/outputs`.
-5. On reload, a stored pending operation is replayed in "reconciling" mode so a lost response can
+6. On reload, a stored pending operation is replayed in "reconciling" mode so a lost response can
    never produce a duplicate save (`:163-170`).
-6. Client failures (4xx/conflict) clear the pending record and refresh authoritative state;
+7. Client failures (4xx/conflict) clear the pending record and refresh authoritative state;
    transport failures keep it and offer **Reconcile saved operation**.
-7. A settled save renders `SavedVideoSuccessActions` inside the same polite notice that names the
+8. A settled save renders `SavedVideoSuccessActions` inside the same polite notice that names the
    Saved Video and Version — **Download** (`downloadSavedVideoUrl` and the retained filename) and
    **View in Assets** (`savedVideoLibraryPath`, the Videos library focused on that record). They
-   belong to the settled operation and clear when the next save starts.
+   belong to the settled operation and clear when the next save starts. When the settled revision
+   carries a placement, Download re-frames the retained Version locally through the video editor's
+   worker and hands over a file named for the placement, with the original shape still one link
+   away; a browser that cannot render says so and serves the original.
 
 Both actions are disabled when archived, busy, `readyMedia === null`, or the project is
 `processing`.
 
 ### Task 4 — History
 
-`ProjectHistorySection` lists retained revisions and outputs and exposes per-output **Download**
+`ProjectHistorySection` lists retained revisions and outputs, states the placement on any Project
+change that recorded one, and exposes per-output **Download**
 links to `/api/projects/{id}/outputs/{versionId}/content?download=true`
 (`ProjectHistorySection.tsx:311, 449`). The Save tab's post-save actions are the other download
 affordance inside a Project, reached through the Saved Video content route rather than this

@@ -1,6 +1,13 @@
 import { SAVED_VIDEO_TITLE_MAX_LENGTH } from '@studio/contracts';
-import { useId, useRef, useState, type FormEvent } from 'react';
+import type { ProjectExportSpecification, VideoEditSourceGeometry } from '@studio/domain';
+import { useId, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Button, OverlayPanel, TextField } from '../../ui';
+import {
+  ExportPlacementChooser,
+  ExportPlacementProgress,
+  exportPlacementRenderSupported,
+  type ExportPlacementRenderPhase,
+} from '../export-placements';
 import { ThumbnailSourceChooser } from './ThumbnailSourceChooser';
 import {
   DEFAULT_SAVED_VIDEO_THUMBNAIL_CHOICE,
@@ -9,22 +16,52 @@ import {
 
 export interface SaveVideoDialogProps {
   readonly fallbackName: string;
+  /**
+   * The measured frame of what is being saved. Present, a placement can be chosen and the crop is
+   * previewed exactly; absent, the video is saved in the shape it already has.
+   */
+  readonly source?: VideoEditSourceGeometry | null;
+  /** Live re-framing state, so the dialog stays open and answerable while the render runs. */
+  readonly placementRender?:
+    | {
+        readonly phase: ExportPlacementRenderPhase;
+        readonly progress: number;
+        readonly error: string | null;
+        readonly onCancel: () => void;
+      }
+    | undefined;
   readonly onCancel: () => void;
-  readonly onSave: (name?: string, thumbnail?: SavedVideoThumbnailChoice) => void;
+  readonly onSave: (
+    name?: string,
+    thumbnail?: SavedVideoThumbnailChoice,
+    placement?: ProjectExportSpecification | null,
+  ) => void;
 }
 
-export const SaveVideoDialog = ({ fallbackName, onCancel, onSave }: SaveVideoDialogProps) => {
+export const SaveVideoDialog = ({
+  fallbackName,
+  source = null,
+  placementRender,
+  onCancel,
+  onSave,
+}: SaveVideoDialogProps) => {
   const formId = useId();
   const fieldRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState('');
   const [thumbnail, setThumbnail] = useState<SavedVideoThumbnailChoice>(
     DEFAULT_SAVED_VIDEO_THUMBNAIL_CHOICE,
   );
+  const [placement, setPlacement] = useState<ProjectExportSpecification | null>(null);
+  const rendering = placementRender?.phase === 'rendering';
+  // Re-framing needs both a measured frame and a browser that can render one.
+  const placementOffered = source !== null;
+  const placementSupported = useMemo(() => exportPlacementRenderSupported(), []);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    if (rendering) return;
     const requestedName = name.trim();
-    onSave(requestedName || undefined, thumbnail);
+    onSave(requestedName || undefined, thumbnail, placementOffered ? placement : null);
   };
 
   return (
@@ -36,13 +73,14 @@ export const SaveVideoDialog = ({ fallbackName, onCancel, onSave }: SaveVideoDia
       placement="bottom"
       size="standard"
       closeOnBackdrop={false}
+      closeDisabled={rendering}
       initialFocusRef={fieldRef}
       footer={
         <div css={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '.75rem' }}>
-          <Button variant="quiet" onClick={onCancel}>
+          <Button variant="quiet" disabled={rendering} onClick={onCancel}>
             Cancel
           </Button>
-          <Button type="submit" form={formId} variant="primary">
+          <Button type="submit" form={formId} variant="primary" busy={rendering}>
             Save to Assets
           </Button>
         </div>
@@ -58,7 +96,24 @@ export const SaveVideoDialog = ({ fallbackName, onCancel, onSave }: SaveVideoDia
           autoComplete="off"
           onChange={(event) => setName(event.currentTarget.value)}
         />
-        <ThumbnailSourceChooser value={thumbnail} onChange={setThumbnail} />
+        {placementOffered ? (
+          <ExportPlacementChooser
+            value={placement}
+            source={source}
+            disabled={rendering}
+            unavailable={!placementSupported}
+            onChange={setPlacement}
+          />
+        ) : null}
+        {placementRender ? (
+          <ExportPlacementProgress
+            phase={placementRender.phase}
+            progress={placementRender.progress}
+            error={placementRender.error}
+            onCancel={placementRender.onCancel}
+          />
+        ) : null}
+        <ThumbnailSourceChooser value={thumbnail} disabled={rendering} onChange={setThumbnail} />
       </form>
     </OverlayPanel>
   );

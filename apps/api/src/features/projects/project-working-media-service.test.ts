@@ -171,6 +171,7 @@ describe('ProjectWorkingMediaService local authority', () => {
         visualTreatment: snapshot.visualTreatment,
         creativeIntent: { ...snapshot.creativeIntent, userIntent: 'A later creative checkpoint.' },
         localEdit: snapshot.localEdit,
+        exportSpecification: snapshot.exportSpecification,
       },
     });
     expect(checkpointed).toMatchObject({

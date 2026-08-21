@@ -54,8 +54,19 @@ export const StudioLifecycleDialogs = ({
     {savedVideo.pendingSave ? (
       <SaveVideoDialog
         fallbackName={defaultSavedVideoName(savedVideo.pendingSave.artifact)}
+        source={
+          savedVideo.pendingSave.intent === 'presented' ? savedVideo.pendingSave.geometry : null
+        }
+        placementRender={{
+          phase: savedVideo.placementRender.phase,
+          progress: savedVideo.placementRender.progress,
+          error: savedVideo.placementRender.error,
+          onCancel: savedVideo.placementRender.cancel,
+        }}
         onCancel={savedVideo.dismissPendingSave}
-        onSave={savedVideo.confirmPendingSave}
+        onSave={(name, thumbnail, placement) =>
+          void savedVideo.confirmPendingSave(name, thumbnail, placement)
+        }
       />
     ) : null}
 

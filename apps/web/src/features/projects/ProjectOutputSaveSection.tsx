@@ -6,13 +6,22 @@ import {
   type SavedVideoSummary,
   type SaveProjectOutputRequest,
 } from '@studio/contracts';
-import { defaultProjectOutputTitle, projectMediaReferencesEqual } from '@studio/domain';
+import {
+  defaultProjectOutputTitle,
+  projectMediaReferencesEqual,
+  type ProjectExportSpecification,
+} from '@studio/domain';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ApiClientError } from '../../adapters/api-client/apiClient';
 import { savedVideoLibraryPath } from '../../app/paths';
 import { Button, OverlayPanel, StatusNotice, TextField } from '../../ui';
+import {
+  ExportPlacementChooser,
+  exportPlacementLabel,
+  exportPlacementRenderSupported,
+} from '../export-placements';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { SavedVideoSuccessActions } from '../saved-videos/SavedVideoSuccessActions';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
@@ -88,8 +97,13 @@ export const ProjectOutputSaveSection = ({
   const [phase, setPhase] = useState<OutputPhase>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const [savedVideo, setSavedVideo] = useState<SavedVideoDetail | null>(null);
+  const [savedPlacement, setSavedPlacement] = useState<ProjectExportSpecification | null>(null);
   const [pendingAvailable, setPendingAvailable] = useState(false);
   const readyMedia = readyMediaFor(current);
+  // The chosen placement lives on the revision, so the snapshot is the value the control shows.
+  const placement = current.revision.snapshot.exportSpecification;
+  // A browser capability, measured once per mount rather than on every keystroke.
+  const placementSupported = useMemo(() => exportPlacementRenderSupported(), []);
   const busy = phase === 'saving' || phase === 'reconciling';
   const processing = current.project.status === 'processing';
   const notice = outputPhaseNotice[phase];
@@ -123,6 +137,7 @@ export const ProjectOutputSaveSection = ({
           queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.lists }),
         ]);
         setSavedVideo(response.savedVideo);
+        setSavedPlacement(response.revision.snapshot.exportSpecification);
         setPhase('saved');
         setMessage(
           pending.request.target.kind === 'new'
@@ -275,6 +290,7 @@ export const ProjectOutputSaveSection = ({
             {phase === 'saved' && savedVideo !== null ? (
               <SavedVideoSuccessActions
                 video={savedVideo}
+                exportSpecification={savedPlacement}
                 onOpenInAssets={() => void navigate(savedVideoLibraryPath(savedVideo.id))}
               />
             ) : null}
@@ -286,6 +302,18 @@ export const ProjectOutputSaveSection = ({
           </StatusNotice>
         ) : null}
         {processing ? <p>Wait for the current AI run to finish before saving its result.</p> : null}
+        {readyMedia === null ? null : (
+          <ExportPlacementChooser
+            value={placement}
+            disabled={archived || busy || processing}
+            unavailable={!placementSupported}
+            // The current cut's pixel size is not carried on the Project snapshot, so the crop is
+            // described rather than drawn here; the download after the save knows the exact frame.
+            onChange={(specification) => {
+              session.propose({ exportSpecification: specification });
+            }}
+          />
+        )}
         <div css={{ display: 'flex', flexWrap: 'wrap', gap: theme.space.sm }}>
           <Button
             ref={newTriggerRef}
@@ -343,16 +371,21 @@ export const ProjectOutputSaveSection = ({
           </div>
         }
       >
-        <div css={titleFieldStyles(theme)}>
-          <TextField
-            ref={titleInputRef}
-            label="Video title"
-            required
-            maxLength={SAVED_VIDEO_TITLE_MAX_LENGTH}
-            value={title}
-            onChange={(event) => setTitle(event.currentTarget.value)}
-            hint="The title names the video in your library. The proposal marks the change it came from, so saves from one Project stay apart."
-          />
+        <div css={{ display: 'grid', gap: theme.space.sm }}>
+          <p css={{ margin: 0 }}>
+            Placement: <strong>{exportPlacementLabel(placement?.aspect ?? 'source')}</strong>
+          </p>
+          <div css={titleFieldStyles(theme)}>
+            <TextField
+              ref={titleInputRef}
+              label="Video title"
+              required
+              maxLength={SAVED_VIDEO_TITLE_MAX_LENGTH}
+              value={title}
+              onChange={(event) => setTitle(event.currentTarget.value)}
+              hint="The title names the video in your library. The proposal marks the change it came from, so saves from one Project stay apart."
+            />
+          </div>
         </div>
       </OverlayPanel>
 
@@ -414,6 +447,9 @@ export const ProjectOutputSaveSection = ({
             <p>
               Current Version {appendTarget.currentVersion.ordinal} ·{' '}
               {appendTarget.currentVersion.width}×{appendTarget.currentVersion.height}
+            </p>
+            <p>
+              Placement: <strong>{exportPlacementLabel(placement?.aspect ?? 'source')}</strong>
             </p>
             <p>If that current version changes first, this save is refused.</p>
           </div>

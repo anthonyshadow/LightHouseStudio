@@ -143,6 +143,16 @@ provider work.
     Version in place — **Download** and **View in Assets** — belonging to the one settled operation.
     The new-Video title is proposed as the Project title plus the change the save is taken from, so
     successive saves from one Project stay distinguishable; the operator edits it before committing.
+    The Save task also asks **where is this going** — keep as it is, phone full screen (9:16),
+    widescreen (16:9), square (1:1), or tall feed post (4:5). Keeping the shape is the default and
+    is stored as no specification at all, so a Project that never answers behaves exactly as before.
+    A chosen placement is written onto the revision through the ordinary session checkpoint, under
+    the same CAS as every other creative change, never through the output-save request; the save
+    flushes it before it reads Project authority. Both confirmation dialogs restate the recorded
+    placement. Because the retained bytes are the ones the Project already holds, the placement is
+    produced at the settled save's **Download**, which re-frames locally to that shape and names the
+    file after it, and offers the original shape alongside. A browser that cannot render explains
+    that and gives the original shape; the placement stays recorded either way.
 24. One pending owner/environment/Project-scoped operation survives browser response loss. Reload
     resubmits only the exact stored request and reconciles the original result; a changed replay
     conflicts without another Version or partial aggregate advancement. Removing the Saved Video
@@ -151,7 +161,9 @@ provider work.
 25. Project history uses separate bounded cursor pages for Project changes, processing attempts and
     retained stale results, and immutable output Versions. Output rows distinguish the producing
     revision from the later revision that made the Version current. Lists contain metadata only;
-    preview and **Download** fetch one exact retained Version through Project-scoped content.
+    preview and **Download** fetch one exact retained Version through Project-scoped content. A
+    Project change that recorded a placement states it, so the operator can see what a change was
+    for.
 26. **Use in Project** can explicitly adopt one exact retained output Version or valid stale
     processing result as working media after current lifecycle and CAS validation. It never changes
     the immutable original, Saved Video current pointer, or Add Version target, and stale work is
@@ -176,8 +188,9 @@ provider work.
 ## Boundaries
 
 This story includes bounded semantic creative/edit checkpoints, working-media adoption, recoverable
-visual processing, atomic Saved Video output save, bounded history categories, and exact-Version
-preview/reuse/Download, but no Campaign expansion, restore/rollback, Variation, generic Export
+visual processing, atomic Saved Video output save, one recorded placement per revision, bounded
+history categories, and exact-Version preview/reuse/Download, but no Campaign expansion,
+restore/rollback, Variation, several placements from one save, server-side rendering, generic Export
 record, or IndexedDB Project data. Project source selection, session hydration, configuration,
 local adoption, history viewing, and output save start no provider.
 Standalone existing-video behavior retains its separate save/replace contract. Project

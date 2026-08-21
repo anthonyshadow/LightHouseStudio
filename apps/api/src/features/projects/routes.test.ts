@@ -27,6 +27,7 @@ const emptyCreativeProposal = {
     resourceRevision: null,
   },
   localEdit: null,
+  exportSpecification: null,
 };
 
 describe('Project lifecycle routes', () => {
@@ -285,6 +286,67 @@ describe('Project lifecycle routes', () => {
       payload: { kind: 'recipe', resourceId: randomUUID() },
     });
     expect(recipe.statusCode).toBe(400);
+  });
+
+  it('records a chosen placement on the revision, replays it, and rejects an impossible one', async () => {
+    const app = localApp();
+    const created = (await create(app, 'Placement checkpoint')).response;
+    const projectId = json<{ project: { id: string } }>(created).project.id;
+    const exportSpecification = {
+      container: 'video/mp4',
+      aspect: '9:16',
+      resolution: { width: 1_080, height: 1_920 },
+      includeAudio: true,
+    };
+    const choose = (specification: unknown, expectedVersion = 1, expectedRevisionNumber = 1) =>
+      app.inject({
+        method: 'POST',
+        url: `/api/projects/${projectId}/revisions`,
+        headers: { ...browserHeaders, 'content-type': 'application/json' },
+        payload: {
+          expectedVersion,
+          expectedRevisionNumber,
+          proposal: {
+            ...emptyCreativeProposal,
+            workflowPhase: 'review',
+            liveMode: null,
+            exportSpecification: specification,
+          },
+        },
+      });
+
+    const chosen = await choose(exportSpecification);
+    expect(chosen.statusCode).toBe(200);
+    expect(chosen.json()).toMatchObject({
+      project: { version: 2, currentRevisionNumber: 2 },
+      revision: { revisionNumber: 2, snapshot: { exportSpecification } },
+    });
+
+    // The same placement again is the same revision, not a second one.
+    expect((await choose(exportSpecification)).json()).toEqual(chosen.json());
+
+    // A size that is not the placement's shape is refused by the domain rule, not persisted.
+    const impossible = await choose(
+      { ...exportSpecification, resolution: { width: 1_920, height: 1_080 } },
+      2,
+      2,
+    );
+    expect(impossible.statusCode).toBe(409);
+    expect(impossible.json()).toMatchObject({ error: { code: 'conflict' } });
+
+    // History reports the placement so the operator can see what a change was for.
+    const history = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/history`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(history.statusCode).toBe(200);
+    expect(history.json()).toMatchObject({
+      revisions: [
+        { revisionNumber: 2, exportSpecification },
+        { revisionNumber: 1, exportSpecification: null },
+      ],
+    });
   });
 
   it('checkpoints bounded session metadata, converges exact replay, and preserves CAS conflicts', async () => {

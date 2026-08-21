@@ -4,6 +4,8 @@ import type {
   ProjectAssetKind,
   ProjectAssetMembership,
   ProjectConflict,
+  ProjectExportAspect,
+  ProjectExportSpecification,
   ProjectMutationContext,
   ProjectMutationResult,
   ProjectOutputLink,
@@ -15,6 +17,13 @@ import type {
   ProjectStatus,
   ProjectStatusFacts,
 } from './types';
+import { PROJECT_EXPORT_ASPECTS } from './types';
+import type { NormalizedVideoCrop, VideoEditSourceGeometry, VideoEditSpec } from '../video-editing';
+import {
+  FULL_VIDEO_CROP,
+  createDefaultVideoEditSpec,
+  normalizeVideoEditSpec,
+} from '../video-editing';
 import { requireIsoTimestamp, requireOpaqueId, stripControlCharacters } from '../common/identity';
 import { normalizeWhitespace } from '../common/text';
 import type { ProjectProcessingJobStatus } from '../video-processing/types';
@@ -26,6 +35,7 @@ export type ProjectRuleErrorReason =
   | 'invalid-title'
   | 'invalid-timestamp'
   | 'invalid-snapshot'
+  | 'invalid-export-specification'
   | 'invalid-transition'
   | 'not-archived'
   | 'confirmation-required';
@@ -96,6 +106,197 @@ const validateMediaReference = (reference: ProjectSnapshot['workingMedia']): voi
   }
   requireId(reference.savedVideoId, 'Saved video');
   requireId(reference.videoVersionId, 'Video version');
+};
+
+/**
+ * Placement exports.
+ *
+ * `source` is the absence of a decision, not a decision: it is stored as a null
+ * `exportSpecification`, keeps whatever shape the media already has, and never renders. Every other
+ * aspect names a destination shape and therefore must also name a size, because a placement that
+ * does not say how large it is cannot be produced.
+ */
+export type ProjectExportPlacementAspect = Exclude<ProjectExportAspect, 'source'>;
+
+/** Encoders reject odd dimensions, and the local renderer is the only producer of these files. */
+export const PROJECT_EXPORT_MIN_DIMENSION = 128;
+export const PROJECT_EXPORT_MAX_DIMENSION = 4_096;
+/** Even integer sizes cannot always hit a ratio exactly; 4:5 at 1080 wide is the tightest case. */
+export const PROJECT_EXPORT_ASPECT_TOLERANCE = 0.01;
+
+const PROJECT_EXPORT_ASPECT_RATIOS: Readonly<Record<ProjectExportPlacementAspect, number>> = {
+  '16:9': 16 / 9,
+  '9:16': 9 / 16,
+  '1:1': 1,
+  '4:5': 4 / 5,
+};
+
+const PROJECT_EXPORT_RESOLUTIONS: Readonly<
+  Record<ProjectExportPlacementAspect, { readonly width: number; readonly height: number }>
+> = {
+  '16:9': { width: 1_920, height: 1_080 },
+  '9:16': { width: 1_080, height: 1_920 },
+  '1:1': { width: 1_080, height: 1_080 },
+  '4:5': { width: 1_080, height: 1_350 },
+};
+
+const PROJECT_EXPORT_FILENAME_TAGS: Readonly<Record<ProjectExportPlacementAspect, string>> = {
+  '16:9': '16x9',
+  '9:16': '9x16',
+  '1:1': '1x1',
+  '4:5': '4x5',
+};
+
+export const isProjectExportPlacementAspect = (
+  aspect: ProjectExportAspect,
+): aspect is ProjectExportPlacementAspect => aspect !== 'source';
+
+export const defaultProjectExportResolution = (
+  aspect: ProjectExportAspect,
+): { readonly width: number; readonly height: number } | null =>
+  isProjectExportPlacementAspect(aspect) ? PROJECT_EXPORT_RESOLUTIONS[aspect] : null;
+
+/** The canonical specification for one placement. `source` has none, because it changes nothing. */
+export const projectExportSpecificationForAspect = (
+  aspect: ProjectExportAspect,
+  includeAudio = true,
+): ProjectExportSpecification | null =>
+  isProjectExportPlacementAspect(aspect)
+    ? {
+        container: 'video/mp4',
+        aspect,
+        resolution: PROJECT_EXPORT_RESOLUTIONS[aspect],
+        includeAudio,
+      }
+    : null;
+
+export const projectExportAspectOf = (
+  specification: ProjectExportSpecification | null,
+): ProjectExportAspect => specification?.aspect ?? 'source';
+
+const requireExportDimension = (value: number, label: string): void => {
+  if (!Number.isInteger(value) || value % 2 !== 0) {
+    throw new ProjectRuleError(
+      'invalid-export-specification',
+      `An export ${label} must be a whole even number of pixels.`,
+    );
+  }
+  if (value < PROJECT_EXPORT_MIN_DIMENSION || value > PROJECT_EXPORT_MAX_DIMENSION) {
+    throw new ProjectRuleError(
+      'invalid-export-specification',
+      `An export ${label} must be between ${PROJECT_EXPORT_MIN_DIMENSION} and ${PROJECT_EXPORT_MAX_DIMENSION} pixels.`,
+    );
+  }
+};
+
+export const validateProjectExportSpecification = (
+  specification: ProjectExportSpecification,
+): ProjectExportSpecification => {
+  if (specification.container !== 'video/mp4') {
+    throw new ProjectRuleError(
+      'invalid-export-specification',
+      'An export for a placement is always an MP4 file.',
+    );
+  }
+  if (!PROJECT_EXPORT_ASPECTS.includes(specification.aspect)) {
+    throw new ProjectRuleError(
+      'invalid-export-specification',
+      'That placement shape is not one this app can export.',
+    );
+  }
+  if (typeof specification.includeAudio !== 'boolean') {
+    throw new ProjectRuleError(
+      'invalid-export-specification',
+      'An export must state whether it keeps the audio.',
+    );
+  }
+  if (!isProjectExportPlacementAspect(specification.aspect)) {
+    if (specification.resolution !== null) {
+      throw new ProjectRuleError(
+        'invalid-export-specification',
+        'Keeping the original shape cannot also ask for a size. Choose a placement to set one.',
+      );
+    }
+    return specification;
+  }
+  const { resolution } = specification;
+  if (resolution === null) {
+    throw new ProjectRuleError(
+      'invalid-export-specification',
+      'An export for a placement needs a size in pixels.',
+    );
+  }
+  requireExportDimension(resolution.width, 'width');
+  requireExportDimension(resolution.height, 'height');
+  const expected = PROJECT_EXPORT_ASPECT_RATIOS[specification.aspect];
+  if (
+    Math.abs(resolution.width / resolution.height / expected - 1) > PROJECT_EXPORT_ASPECT_TOLERANCE
+  ) {
+    throw new ProjectRuleError(
+      'invalid-export-specification',
+      `${resolution.width}×${resolution.height} is not a ${specification.aspect} shape.`,
+    );
+  }
+  return specification;
+};
+
+/**
+ * The placement expressed in the vocabulary the local renderer already speaks: a centred crop to
+ * the destination shape, full duration, nothing else touched. `null` means there is nothing to
+ * render — the caller keeps the bytes it already has.
+ */
+export const projectExportVideoEditSpec = (
+  specification: ProjectExportSpecification | null,
+  source: VideoEditSourceGeometry,
+): VideoEditSpec | null => {
+  if (specification === null || !isProjectExportPlacementAspect(specification.aspect)) return null;
+  validateProjectExportSpecification(specification);
+  return normalizeVideoEditSpec(
+    {
+      ...createDefaultVideoEditSpec(source.durationMs),
+      crop: { preset: specification.aspect, rectangle: FULL_VIDEO_CROP },
+    },
+    source,
+  );
+};
+
+export interface ProjectExportPreview {
+  readonly crop: NormalizedVideoCrop;
+  readonly width: number;
+  readonly height: number;
+  /** How much of the source frame the placement discards, as whole percentages. */
+  readonly croppedHorizontalPercent: number;
+  readonly croppedVerticalPercent: number;
+}
+
+/** What the operator is about to get, and what it costs them from the original frame. */
+export const projectExportPreview = (
+  specification: ProjectExportSpecification | null,
+  source: VideoEditSourceGeometry,
+): ProjectExportPreview | null => {
+  const spec = projectExportVideoEditSpec(specification, source);
+  if (spec === null || specification?.resolution == null) return null;
+  const { rectangle } = spec.crop;
+  return {
+    crop: rectangle,
+    width: specification.resolution.width,
+    height: specification.resolution.height,
+    croppedHorizontalPercent: Math.round((1 - rectangle.width) * 100),
+    croppedVerticalPercent: Math.round((1 - rectangle.height) * 100),
+  };
+};
+
+/** Names the file after where it is going, so four placements do not land as four `video.mp4`. */
+export const projectExportFilename = (
+  filename: string,
+  specification: ProjectExportSpecification | null,
+): string => {
+  if (specification === null || !isProjectExportPlacementAspect(specification.aspect)) {
+    return filename;
+  }
+  const separator = filename.lastIndexOf('.');
+  const base = separator > 0 ? filename.slice(0, separator) : filename;
+  return `${base}-${PROJECT_EXPORT_FILENAME_TAGS[specification.aspect]}.mp4`;
 };
 
 export const validateProjectSnapshot = (snapshot: ProjectSnapshot): ProjectSnapshot => {
@@ -208,6 +409,9 @@ export const validateProjectSnapshot = (snapshot: ProjectSnapshot): ProjectSnaps
     snapshot.creativeIntent.appliedPrompt.length > PROJECT_INTENT_MAX_LENGTH
   ) {
     throw new ProjectRuleError('invalid-snapshot', 'The applied Project prompt is too long.');
+  }
+  if (snapshot.exportSpecification !== null) {
+    validateProjectExportSpecification(snapshot.exportSpecification);
   }
   if (snapshot.lastSuccessfulOutput !== null) {
     requireId(snapshot.lastSuccessfulOutput.savedVideoId, 'Saved video');

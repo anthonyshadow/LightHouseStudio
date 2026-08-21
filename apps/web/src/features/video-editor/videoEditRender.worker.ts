@@ -70,7 +70,9 @@ const render = async (
     if (!videoTrack) throw new Error('Missing video track.');
     if (request.requireAudio && !audioTrack) throw new Error('Missing audio track.');
     if (!(await canEncodeVideo('avc'))) throw new Error('H.264 encoding is unavailable.');
-    if (audioTrack) await ensureAacEncodingSupport(() => canEncodeAudio('aac'));
+    // A dropped track is never encoded, so its encoder support is not a precondition.
+    const keptAudioTrack = request.includeAudio ? audioTrack : null;
+    if (keptAudioTrack) await ensureAacEncodingSupport(() => canEncodeAudio('aac'));
 
     const geometry = getVideoEditOutputGeometry(
       {
@@ -92,7 +94,13 @@ const render = async (
       width: Math.max(2, Math.round(crop.width * rotated.width)),
       height: Math.max(2, Math.round(crop.height * rotated.height)),
     };
-    const frameCanvas = new OffscreenCanvas(geometry.width, geometry.height);
+    // The crop establishes the destination shape; a placement export additionally states the exact
+    // size it must arrive at, which is the only scaling this path performs.
+    const outputSize = request.targetResolution ?? {
+      width: geometry.width,
+      height: geometry.height,
+    };
+    const frameCanvas = new OffscreenCanvas(outputSize.width, outputSize.height);
     renderer = createVideoEditFrameRenderer(frameCanvas);
     const processedSpec: VideoEditSpec = {
       ...request.spec,
@@ -127,8 +135,8 @@ const render = async (
         rotate: request.spec.rotation,
         allowRotationMetadata: false,
         crop: cropPixels,
-        width: geometry.width,
-        height: geometry.height,
+        width: outputSize.width,
+        height: outputSize.height,
         fit: 'fill',
         process: (sample) => {
           const frame = sample.toVideoFrame();
@@ -139,10 +147,14 @@ const render = async (
           }
           return frameCanvas;
         },
-        processedWidth: geometry.width,
-        processedHeight: geometry.height,
+        processedWidth: outputSize.width,
+        processedHeight: outputSize.height,
       },
-      ...(audioTrack ? { audio: { codec: 'aac' as const, forceTranscode: true } } : undefined),
+      ...(keptAudioTrack
+        ? { audio: { codec: 'aac' as const, forceTranscode: true } }
+        : audioTrack
+          ? { audio: { discard: true } }
+          : undefined),
       tags: {},
       showWarnings: false,
     });
@@ -154,7 +166,7 @@ const render = async (
     if (
       !conversion.isValid ||
       !conversion.utilizedTracks.includes(videoTrack) ||
-      (audioTrack !== null && !conversion.utilizedTracks.includes(audioTrack))
+      (keptAudioTrack !== null && !conversion.utilizedTracks.includes(keptAudioTrack))
     ) {
       throw new Error('The edit would drop required media tracks.');
     }

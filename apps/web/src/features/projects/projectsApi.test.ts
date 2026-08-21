@@ -312,6 +312,7 @@ describe('Projects API adapter', () => {
       visualTreatment: { kind: 'none' },
       creativeIntent: base.revision.snapshot.creativeIntent,
       localEdit: null,
+      exportSpecification: null,
     } as const;
 
     await expect(

@@ -49,6 +49,13 @@ export type VideoEditWorkerRequest =
       sourceWidth: number;
       sourceHeight: number;
       requireAudio: boolean;
+      /**
+       * Scales the cropped frame to an exact destination size. `null` keeps the size the crop
+       * itself produces, which is what every local edit does.
+       */
+      targetResolution: { readonly width: number; readonly height: number } | null;
+      /** `false` drops the audio track instead of transcoding it. */
+      includeAudio: boolean;
     }>
   | Readonly<{ type: 'cancel'; operationId: number }>;
 

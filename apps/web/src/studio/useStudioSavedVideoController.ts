@@ -1,7 +1,9 @@
 import type { SavedVideoDetail, SavedVideoSummary } from '@studio/contracts';
+import type { ProjectExportSpecification, VideoEditSourceGeometry } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiClientError } from '../adapters/api-client/apiClient';
 import { readSavedVideoContent } from '../adapters/api-client/savedVideosApi';
+import { useExportPlacementRender } from '../features/export-placements';
 import type { ExistingVideoSavedRecipe } from '../features/existing-video/ExistingVideoRecipeChooser';
 import type { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import type { RecordingArtifact } from '../features/recording/types';
@@ -34,6 +36,12 @@ export type PendingVideoSave =
       artifact: RecordingArtifact;
       source: { readonly videoId: string; readonly versionId: string } | undefined;
       character: SavedVideoCharacterAttribution | null;
+      /**
+       * The frame as it was measured when this save was asked for, so a placement is previewed and
+       * rendered against exactly that, not against whatever the workflow moved on to.
+       */
+      geometry: VideoEditSourceGeometry | null;
+      hasAudio: boolean;
     }>
   | Readonly<{
       intent: 'video-edit-replacement';
@@ -76,6 +84,7 @@ export const useStudioSavedVideoController = ({
   confirmation,
 }: UseStudioSavedVideoControllerOptions) => {
   const [pendingSave, setPendingSave] = useState<PendingVideoSave | null>(null);
+  const placementRender = useExportPlacementRender();
   // Only an explicitly requested save records an outcome. The pre-edit save inside `commitVideoEdit`
   // also reaches `saved`, but it is a side effect of replacing the source, not a completed journey.
   const [saveOutcome, setSaveOutcome] = useState<SavedVideoDetail | null>(null);
@@ -287,6 +296,8 @@ export const useStudioSavedVideoController = ({
   const requestSavePresentedVideo = useCallback(() => {
     const artifact = recording.presented;
     if (!artifact) return;
+    const metadata = existingVideo.currentMetadata;
+    placementRender.reset();
     setPendingSave({
       intent: 'presented',
       artifact,
@@ -297,8 +308,18 @@ export const useStudioSavedVideoController = ({
           }
         : undefined,
       character: presentedCharacter,
+      geometry: metadata
+        ? { width: metadata.width, height: metadata.height, durationMs: metadata.durationMs }
+        : null,
+      hasAudio: metadata?.hasAudio ?? false,
     });
-  }, [activeLoadedSource, presentedCharacter, recording.presented]);
+  }, [
+    activeLoadedSource,
+    existingVideo.currentMetadata,
+    placementRender,
+    presentedCharacter,
+    recording.presented,
+  ]);
 
   const returnFromVideoEditor = useCallback(() => {
     videoEditor.close();
@@ -397,42 +418,61 @@ export const useStudioSavedVideoController = ({
   }, [videoEditor]);
 
   const confirmPendingSave = useCallback(
-    (name?: string, thumbnail?: SavedVideoThumbnailChoice) => {
+    async (
+      name?: string,
+      thumbnail?: SavedVideoThumbnailChoice,
+      placement?: ProjectExportSpecification | null,
+    ) => {
       const pending = pendingSave;
       if (!pending) return;
-      setPendingSave(null);
       if (pending.intent === 'video-edit-replacement') {
+        setPendingSave(null);
         void commitVideoEdit(true, name, thumbnail);
         return;
       }
-      void saveController
-        .save(pending.artifact, {
-          title: name,
-          source: pending.source,
-          character: pending.character,
-          thumbnail,
-        })
-        .then((saved) => {
-          if (saved) setSaveOutcome(saved);
+      // A placement re-frames the bytes before they are retained, so the dialog stays open and
+      // cancellable until the render settles. A failed or cancelled render saves nothing.
+      let reframed: { readonly blob: Blob; readonly filename: string } | null = null;
+      if (placement != null && pending.geometry !== null) {
+        const rendered = await placementRender.render({
+          media: pending.artifact.media,
+          specification: placement,
+          source: pending.geometry,
+          hasAudio: pending.hasAudio,
+          filename: pending.artifact.filename,
         });
+        if (rendered === null) return;
+        reframed = rendered;
+      }
+      setPendingSave(null);
+      const saved = await saveController.save(pending.artifact, {
+        title: name,
+        source: pending.source,
+        character: pending.character,
+        thumbnail,
+        ...(reframed ? { media: reframed, keyScope: placement?.aspect } : {}),
+      });
+      if (saved) setSaveOutcome(saved);
     },
-    [commitVideoEdit, pendingSave, saveController],
+    [commitVideoEdit, pendingSave, placementRender, saveController],
   );
 
   const discardWork = useCallback(() => {
     gallerySourceLoadControllerRef.current?.abort('discard');
     gallerySourceLoadControllerRef.current = null;
     galleryEditRequestedRef.current = false;
+    placementRender.cancel();
     setPendingSave(null);
     setSaveOutcome(null);
     videoEditor.close();
     saveController.reset();
-  }, [saveController, videoEditor]);
+  }, [placementRender, saveController, videoEditor]);
 
   return {
     activeLoadedSource,
     presentedHasUnsavedChanges,
     pendingSave,
+    placementRender,
     saveOutcome,
     discardPromptOpen,
     useSavedVideo,
@@ -440,7 +480,10 @@ export const useStudioSavedVideoController = ({
     openVideoAdjust,
     replaceLoadedSavedVideo,
     requestSavePresentedVideo,
-    dismissPendingSave: () => setPendingSave(null),
+    dismissPendingSave: () => {
+      placementRender.cancel();
+      setPendingSave(null);
+    },
     dismissSaveOutcome: () => setSaveOutcome(null),
     confirmPendingSave,
     requestVideoEditDiscard,

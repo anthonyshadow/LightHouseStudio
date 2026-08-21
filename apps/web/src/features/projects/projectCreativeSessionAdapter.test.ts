@@ -209,9 +209,13 @@ describe('Project creative session adapter', () => {
         resourceRevision: now,
       },
     });
-    expect(projectSessionProposalSchema.safeParse({ ...proposal, localEdit: null }).success).toBe(
-      true,
-    );
+    expect(
+      projectSessionProposalSchema.safeParse({
+        ...proposal,
+        localEdit: null,
+        exportSpecification: null,
+      }).success,
+    ).toBe(true);
   });
 
   it('supports prompt-only Virtual Try-On without fabricating an Outfit resource', () => {
@@ -237,9 +241,13 @@ describe('Project creative session adapter', () => {
       inputKind: 'prompt',
       enhancePrompt: true,
     });
-    expect(projectSessionProposalSchema.safeParse({ ...proposal, localEdit: null }).success).toBe(
-      true,
-    );
+    expect(
+      projectSessionProposalSchema.safeParse({
+        ...proposal,
+        localEdit: null,
+        exportSpecification: null,
+      }).success,
+    ).toBe(true);
   });
 
   it('hydrates only an exact owner-scoped resource revision and retains historical missing labels', () => {

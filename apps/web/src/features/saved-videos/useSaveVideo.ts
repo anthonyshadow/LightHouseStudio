@@ -78,6 +78,16 @@ export type SaveVideoOptions = Readonly<{
   source?: { readonly videoId: string; readonly versionId: string } | undefined;
   character?: SavedVideoCharacterAttribution | null | undefined;
   thumbnail?: SavedVideoThumbnailChoice | undefined;
+  /**
+   * Bytes to retain in place of the artifact's own, and the filename that names them. A placement
+   * export supplies these; the artifact it came from is never modified.
+   */
+  media?: { readonly blob: Blob; readonly filename: string } | undefined;
+  /**
+   * Distinguishes two different results produced from one artifact, so a re-framed save cannot
+   * inherit the receipt of the save that came before it.
+   */
+  keyScope?: string | undefined;
 }>;
 
 /** The same, for a replacement — whose target names the source, so it carries none. */
@@ -107,19 +117,23 @@ export const useSaveVideo = (directMultipartUpload = false) => {
         source,
         character,
         thumbnail = DEFAULT_SAVED_VIDEO_THUMBNAIL_CHOICE,
+        media,
+        keyScope,
       }: SaveVideoOptions = {},
     ) => {
       if (controller.current !== null) return null;
-      const idempotencyKey = keys.current.get(artifact.id) ?? crypto.randomUUID();
-      keys.current.set(artifact.id, idempotencyKey);
+      const keyId = keyScope === undefined ? artifact.id : `${artifact.id}:${keyScope}`;
+      const idempotencyKey = keys.current.get(keyId) ?? crypto.randomUUID();
+      keys.current.set(keyId, idempotencyKey);
+      const retained = media?.blob ?? artifact.media;
       const active = new AbortController();
       controller.current = active;
       setState({ status: 'saving', artifactId: artifact.id });
       try {
         const video = await (directMultipartUpload ? saveVideoDirect : saveVideo)({
-          blob: artifact.media,
+          blob: retained,
           title: savedVideoName(artifact, title),
-          filename: artifact.filename,
+          filename: media?.filename ?? artifact.filename,
           origin: originForArtifact(artifact),
           characterName: character?.characterName ?? null,
           characterVariantName: character?.characterVariantName ?? null,
@@ -128,12 +142,9 @@ export const useSaveVideo = (directMultipartUpload = false) => {
           sourceVersionId: source?.versionId ?? null,
           signal: active.signal,
         });
-        const saved = await saveThumbnailWhenAvailable(
-          video,
-          artifact.media,
-          active.signal,
-          thumbnail,
-        );
+        // The poster comes from the bytes that were actually retained, so a re-framed save is not
+        // previewed by the shape it replaced.
+        const saved = await saveThumbnailWhenAvailable(video, retained, active.signal, thumbnail);
         if (active.signal.aborted) return null;
         completeSave(artifact.id, saved);
         return saved;
