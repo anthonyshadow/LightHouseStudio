@@ -4,7 +4,15 @@ import { formatDateTime } from '@studio/domain';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { projectPath, projectWorkspacePath } from '../../app/paths';
-import { Button, EmptyStatePreview, ListSearchField, StatusNotice, useListSearch } from '../../ui';
+import {
+  Button,
+  emptyExampleStyles,
+  EmptyStatePreview,
+  ListSearchField,
+  SearchEmptyState,
+  StatusNotice,
+  useListSearch,
+} from '../../ui';
 import {
   NewProjectDialog,
   DeleteProjectDialog,
@@ -110,22 +118,18 @@ const ProjectListSection = ({
                   : 'Start a Project to keep one video and all the work you do on it together. Naming it is optional — you can rename it later.'}
               </p>
               {archived ? null : (
-                <p data-empty-example>
+                <p data-empty-example css={emptyExampleStyles(theme)}>
                   For example: a “Product demo” Project holding one original video, its Character
                   Swap runs, and every saved cut.
                 </p>
               )}
             </>
           ) : (
-            <>
-              <strong>
-                No {archived ? 'archived ' : ''}Projects match “{search}”
-              </strong>
-              <p>Try a shorter term, or clear the search to see everything again.</p>
-              <Button size="small" onClick={onClearSearch}>
-                Clear search
-              </Button>
-            </>
+            <SearchEmptyState
+              noun={`${archived ? 'archived ' : ''}Projects`}
+              term={search}
+              onClear={onClearSearch}
+            />
           )}
         </div>
       ) : null}

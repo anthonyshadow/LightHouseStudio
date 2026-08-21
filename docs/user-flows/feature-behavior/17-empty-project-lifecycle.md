@@ -121,7 +121,7 @@ provider work.
     returns status to current ready/attempt truth. Completing a local render or adoption alone does
     not make the Project `completed`. Saving setup, temporary rendering, and durable working-media
     readiness use distinct status copy.
-22. Project Character Swap and Virtual Try On now start visibly through the one pre-linked Project
+22. Project Character Swap and Virtual Try-On now start visibly through the one pre-linked Project
     processing command. Reopen reconnects durable visual-provider jobs without submission,
     unknown acceptance never auto-retries, and current/stale retained results are labeled
     separately. Configuration and local render/adoption still make no provider call. Provider-

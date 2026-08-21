@@ -1,4 +1,5 @@
 import { saveProjectOutputRequestSchema, type SaveProjectOutputRequest } from '@studio/contracts';
+import { isRecord, isTimestamp } from '@studio/domain';
 import { environmentScopedPersistenceName } from '../../persistence/environmentScope';
 
 const STORAGE_BASE = 'lightframe.project-output-operation.v1';
@@ -24,8 +25,8 @@ const parsePending = (
   ownerUserId: string,
   projectId: string,
 ): PendingProjectOutputOperation | null => {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
+  if (!isRecord(value)) return null;
+  const record = value;
   if (
     !exactKeys(record, [
       'schemaVersion',
@@ -40,8 +41,7 @@ const parsePending = (
     record.projectId !== projectId ||
     typeof record.operationId !== 'string' ||
     !uuidPattern.test(record.operationId) ||
-    typeof record.createdAt !== 'string' ||
-    !Number.isFinite(new Date(record.createdAt).valueOf())
+    !isTimestamp(record.createdAt)
   ) {
     return null;
   }

@@ -1,8 +1,14 @@
-import type { AccountCapabilityRow } from '../features/account/AccountPanel';
 import type { BrowserCapabilities, ProviderAvailability } from '../features/media-session';
 import { liveExperienceAvailability } from './studioLiveAvailability';
 
 export type CapabilityState = 'loading' | 'ready' | 'error';
+
+/** One integration row: the label and state wording every consumer must show identically. */
+export interface StudioAvailabilityRow {
+  readonly id: string;
+  readonly label: string;
+  readonly state: string;
+}
 
 const capabilityLabel = (
   state: CapabilityState,
@@ -26,18 +32,14 @@ const systemStatusLabel = (
 export interface StudioAvailabilityPresentation {
   readonly systemState: 'loading' | 'ready' | 'limited';
   readonly systemLabel: string;
-  readonly localCaptureState: string;
-  readonly liveAiState: string;
-  readonly existingVideoAiState: string;
-  readonly voiceCloudState: string;
-  /** The same rows and wording the header's status menu shows, for reuse elsewhere. */
-  readonly rows: readonly AccountCapabilityRow[];
+  readonly rows: readonly StudioAvailabilityRow[];
   readonly footnote: string;
 }
 
 /**
  * The one derivation of user-facing integration availability wording. The header's status menu
- * and the account panel both read from here so the same state never grows two vocabularies.
+ * and the account panel both render `rows` and `footnote` from here so the same state never grows
+ * two vocabularies.
  */
 export const deriveStudioAvailability = ({
   availability,
@@ -49,7 +51,6 @@ export const deriveStudioAvailability = ({
   readonly capabilityState: CapabilityState;
 }): StudioAvailabilityPresentation => {
   const localCaptureAvailable = browser.mediaDevices && browser.secureContext;
-  const localCaptureState = localCaptureAvailable ? 'available' : 'unavailable';
   const { betaEnabled: liveBetaEnabled, providerConfigured: liveProviderConfigured } =
     liveExperienceAvailability(availability);
   const liveAiState =
@@ -81,12 +82,12 @@ export const deriveStudioAvailability = ({
           ? 'limited'
           : 'ready',
     systemLabel: systemStatusLabel(capabilityState, localCaptureAvailable),
-    localCaptureState,
-    liveAiState,
-    existingVideoAiState,
-    voiceCloudState,
     rows: [
-      { id: 'local-capture', label: 'Local capture', state: localCaptureState },
+      {
+        id: 'local-capture',
+        label: 'Local capture',
+        state: localCaptureAvailable ? 'available' : 'unavailable',
+      },
       { id: 'existing-video-ai', label: 'Existing-video AI', state: existingVideoAiState },
       { id: 'live-ai', label: 'Live AI Beta', state: liveAiState },
       { id: 'voice-cloud', label: 'Voice cloud', state: voiceCloudState },

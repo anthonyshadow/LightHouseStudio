@@ -20,7 +20,7 @@ deliberately release or discard it.
    editor-backed upload reopens its retained editor state; a local/live-AI take opens
    the existing-video source chooser without automatically adopting the take. While playback is
    retained, the rail's live-only **Select Character** and **Select Outfit** actions
-   are disabled. This rail lock does not disable Character Swap, Virtual Try On, Voice, or other
+   are disabled. This rail lock does not disable Character Swap, Virtual Try-On, Voice, or other
    controls inside the open existing-video editor.
    From that editor, **Adjust video** enters the stage-owned local editing workspace without
    remounting the stage video. A confirmed validated export replaces the immutable source; discard

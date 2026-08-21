@@ -1,4 +1,4 @@
-import { sanitizeCreativeAssetStore, type CreativeAssetStore } from '@studio/domain';
+import { isRecord, sanitizeCreativeAssetStore, type CreativeAssetStore } from '@studio/domain';
 import { ApiClientError, apiFetchAllowingStatuses } from './transport';
 
 export type CreativeLibraryRemoteState = Readonly<{
@@ -13,9 +13,6 @@ const readPayload = async (response: Response, message: string): Promise<unknown
     throw new ApiClientError(message, 502, 'invalid-response');
   }
 };
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
 
 export const readCreativeLibrary = async (
   signal: AbortSignal,

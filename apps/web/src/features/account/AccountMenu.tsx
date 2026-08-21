@@ -1,8 +1,9 @@
 import { useTheme } from '@emotion/react';
 import type { AuthenticatedSessionResponse, AuthenticatedUser } from '@studio/contracts';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '../../ui/primitives/Button';
 import { useDismissiblePopover } from '../../ui/primitives/useDismissiblePopover';
+import { useMenuKeyboardNavigation } from '../../ui/primitives/useMenuKeyboardNavigation';
 import { AccountPanel, type AccountCapabilityRow } from './AccountPanel';
 
 /** Everything the read-only account panel shows; all of it already lives in memory. */
@@ -39,13 +40,7 @@ export const AccountMenu = ({
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   useDismissiblePopover({ open, onOpenChange, rootRef, triggerRef });
-
-  useEffect(() => {
-    if (!open) return;
-    window.requestAnimationFrame(() => {
-      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-    });
-  }, [open]);
+  const handleMenuKeyDown = useMenuKeyboardNavigation(menuRef, open);
 
   const initials = user.displayName
     .split(/\s+/u)
@@ -178,24 +173,7 @@ export const AccountMenu = ({
           role="menu"
           tabIndex={-1}
           aria-label="Account"
-          onKeyDown={(event) => {
-            if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
-            const items = [
-              ...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []),
-            ];
-            if (items.length === 0) return;
-            event.preventDefault();
-            const current = items.indexOf(document.activeElement as HTMLElement);
-            const next =
-              event.key === 'Home'
-                ? 0
-                : event.key === 'End'
-                  ? items.length - 1
-                  : event.key === 'ArrowDown'
-                    ? (current + 1 + items.length) % items.length
-                    : (current - 1 + items.length) % items.length;
-            items[next]?.focus();
-          }}
+          onKeyDown={handleMenuKeyDown}
           css={{
             position: 'absolute',
             zIndex: theme.layers.overlay,

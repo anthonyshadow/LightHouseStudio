@@ -6,7 +6,8 @@ import {
   useQueryClient,
   type QueryClient,
 } from '@tanstack/react-query';
-import { useCallback, useRef } from 'react';
+import { useCallback } from 'react';
+import { useStableOperationKey } from './useStableOperationKey';
 import {
   archiveProject,
   createProject,
@@ -71,9 +72,9 @@ export const useProjectList = (
 
 export const useProjectsController = () => {
   const queryClient = useQueryClient();
-  const pendingCreateKey = useRef<string | null>(null);
-  const pendingNamedCreateKey = useRef<string | null>(null);
-  const pendingDuplicateKey = useRef<string | null>(null);
+  const createOperation = useStableOperationKey();
+  const namedCreateOperation = useStableOperationKey();
+  const duplicateOperation = useStableOperationKey();
 
   const reconcile = useCallback(
     (current: ProjectCurrentResponse) => reconcileProject(queryClient, current),
@@ -89,25 +90,27 @@ export const useProjectsController = () => {
   );
 
   const createMutation = useMutation({
-    mutationFn: async (campaignId: string | null = null) => {
-      const operationKey = pendingCreateKey.current ?? crypto.randomUUID();
-      pendingCreateKey.current = operationKey;
-      return createProject('Untitled Project', operationKey, campaignId);
-    },
+    mutationFn: async (campaignId: string | null = null) =>
+      createProject(
+        'Untitled Project',
+        createOperation.keyFor(JSON.stringify({ kind: 'create', campaignId })),
+        campaignId,
+      ),
     onSuccess: async (current) => {
-      pendingCreateKey.current = null;
+      createOperation.reset();
       await reconcile(current);
     },
   });
 
   const createNamedMutation = useMutation({
-    mutationFn: async (input: { readonly title: string; readonly campaignId: string | null }) => {
-      const operationKey = pendingNamedCreateKey.current ?? crypto.randomUUID();
-      pendingNamedCreateKey.current = operationKey;
-      return createProject(input.title, operationKey, input.campaignId);
-    },
+    mutationFn: async (input: { readonly title: string; readonly campaignId: string | null }) =>
+      createProject(
+        input.title,
+        namedCreateOperation.keyFor(JSON.stringify({ kind: 'create-named', ...input })),
+        input.campaignId,
+      ),
     onSuccess: async (current) => {
-      pendingNamedCreateKey.current = null;
+      namedCreateOperation.reset();
       await reconcile(current);
     },
   });
@@ -122,21 +125,18 @@ export const useProjectsController = () => {
       readonly title: string;
       readonly campaignId: string | null;
       readonly expectedVersion: number;
-    }) => {
-      const operationKey = pendingDuplicateKey.current ?? crypto.randomUUID();
-      pendingDuplicateKey.current = operationKey;
-      return duplicateProject(
+    }) =>
+      duplicateProject(
         input.projectId,
         {
           title: input.title,
           campaignId: input.campaignId,
           expectedVersion: input.expectedVersion,
         },
-        operationKey,
-      );
-    },
+        duplicateOperation.keyFor(JSON.stringify({ kind: 'duplicate', ...input })),
+      ),
     onSuccess: async (current) => {
-      pendingDuplicateKey.current = null;
+      duplicateOperation.reset();
       await reconcile(current);
     },
   });

@@ -6,7 +6,6 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import { useRef } from 'react';
 import {
   archiveCampaign,
   createCampaign,
@@ -16,6 +15,7 @@ import {
   restoreCampaign,
   tombstoneCampaign,
 } from './campaignsApi';
+import { useStableOperationKey } from '../projects/useStableOperationKey';
 
 const CAMPAIGN_PAGE_SIZE = 20;
 
@@ -58,20 +58,17 @@ export const useCampaignDetail = (campaignId: string | null) =>
 
 export const useCampaignsController = () => {
   const queryClient = useQueryClient();
-  const pendingCreateKey = useRef<string | null>(null);
+  const createOperation = useStableOperationKey();
   const reconcile = async (campaign: CampaignContract) => {
     queryClient.setQueryData(campaignQueryKeys.detail(campaign.id), campaign);
     await queryClient.invalidateQueries({ queryKey: campaignQueryKeys.lists });
     return campaign;
   };
   const createMutation = useMutation({
-    mutationFn: (input: { readonly name: string; readonly brief: string | null }) => {
-      const operationKey = pendingCreateKey.current ?? crypto.randomUUID();
-      pendingCreateKey.current = operationKey;
-      return createCampaign(input, operationKey);
-    },
+    mutationFn: (input: { readonly name: string; readonly brief: string | null }) =>
+      createCampaign(input, createOperation.keyFor(JSON.stringify({ kind: 'create', ...input }))),
     onSuccess: async (campaign) => {
-      pendingCreateKey.current = null;
+      createOperation.reset();
       await reconcile(campaign);
     },
   });

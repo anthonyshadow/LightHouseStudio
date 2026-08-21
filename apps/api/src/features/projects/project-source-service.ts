@@ -25,6 +25,7 @@ import {
   type ProjectRetentionPolicy,
   type ProjectSourceRecord,
 } from './project-repository.js';
+import { acceptIdempotentUpload } from './project-byte-acceptance.js';
 import { projectRequestFingerprint } from './project-request-fingerprint.js';
 import { projectAssetLinksForRevision } from './project-snapshot-relations.js';
 import { publicProjectCurrent, type ProjectServiceMutationResult } from './project-service.js';
@@ -161,58 +162,35 @@ export class ProjectSourceService {
         checksumSha256: input.checksumSha256,
         inspected,
       });
-      const existing = await this.bytes.open(input.ownerUserId, input.operationKey);
-      let created = false;
-      let manifest = existing?.manifest;
-      if (manifest !== undefined) {
-        if (
-          manifest.checksumSha256 !== input.checksumSha256 ||
-          manifest.sizeBytes !== inspected.sizeBytes ||
-          manifest.mimeType !== inspected.mimeType ||
-          manifest.filename !== filename
-        ) {
-          throw new AppError(
-            409,
-            'conflict',
-            'That source operation was already used for different media.',
-          );
-        }
-      } else {
-        manifest = await this.bytes.storeFile({
-          assetId: input.operationKey,
-          ownerUserId: input.ownerUserId,
-          sourcePath: input.sourcePath,
-          checksumSha256: input.checksumSha256,
-          mimeType: inspected.mimeType,
-          filename,
-          createdAt: this.#now().toISOString(),
-        });
-        created = true;
-      }
-      try {
-        const result = await this.#accept({
-          ownerUserId: input.ownerUserId,
-          projectId: input.projectId,
-          operationKey: input.operationKey,
-          requestFingerprint,
-          expectedVersion: input.expectedVersion,
-          expectedRevisionNumber: input.expectedRevisionNumber,
-          kind: input.kind,
-          assetId: manifest.assetId,
-          savedVideoId: null,
-          videoVersionId: null,
-          mediaReference: { kind: 'asset', assetId: manifest.assetId },
-          inspected,
-          manifest,
-        });
-        if (!result.ok && created) {
-          await this.#deleteIfUnretained(input.ownerUserId, manifest.assetId);
-        }
-        return result;
-      } catch (error) {
-        if (created) await this.#deleteIfUnretained(input.ownerUserId, manifest.assetId);
-        throw error;
-      }
+      return acceptIdempotentUpload({
+        bytes: this.bytes,
+        ownerUserId: input.ownerUserId,
+        operationKey: input.operationKey,
+        sourcePath: input.sourcePath,
+        checksumSha256: input.checksumSha256,
+        mimeType: inspected.mimeType,
+        filename,
+        sizeBytes: inspected.sizeBytes,
+        now: this.#now().toISOString(),
+        conflictMessage: 'That source operation was already used for different media.',
+        commit: (manifest) =>
+          this.#accept({
+            ownerUserId: input.ownerUserId,
+            projectId: input.projectId,
+            operationKey: input.operationKey,
+            requestFingerprint,
+            expectedVersion: input.expectedVersion,
+            expectedRevisionNumber: input.expectedRevisionNumber,
+            kind: input.kind,
+            assetId: manifest.assetId,
+            savedVideoId: null,
+            videoVersionId: null,
+            mediaReference: { kind: 'asset', assetId: manifest.assetId },
+            inspected,
+            manifest,
+          }),
+        discard: (assetId) => this.#deleteIfUnretained(input.ownerUserId, assetId),
+      });
     });
   }
 

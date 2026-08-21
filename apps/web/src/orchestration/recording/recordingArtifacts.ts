@@ -70,6 +70,45 @@ const createRuntimeArtifactIdentity = (
 };
 
 /**
+ * Validates the persisted metadata both restore paths share and returns the artifact fields it
+ * yields, so the metadata rules cannot drift between the owned and URL-backed builders.
+ */
+const validatedPersistedArtifactFields = (
+  metadata: RestorePersistedOriginalInput['artifactMetadata'],
+  fallbackMimeType: string,
+  nameFallback: string,
+) => {
+  const id = requireNonEmptyText(metadata.id, 'ID');
+  const mimeType = requireNonEmptyText(metadata.mimeType || fallbackMimeType, 'MIME type');
+  const filename = requireNonEmptyText(metadata.filename, 'filename');
+  if (!isSessionModeId(metadata.sourceModeId)) {
+    throw new Error('Persisted recording source mode is invalid.');
+  }
+  const startedAt = metadata.startedAt;
+  if (!Number.isFinite(new Date(startedAt).valueOf())) {
+    throw new Error('Persisted recording start time is invalid.');
+  }
+  const durationMs = metadata.durationMs;
+  if (!Number.isFinite(durationMs) || durationMs < 0) {
+    throw new Error('Persisted recording duration is invalid.');
+  }
+  return {
+    id,
+    name: metadata.name ?? `${nameFallback} · ${id.slice(-8)}`,
+    createdAt: metadata.createdAt ?? startedAt,
+    kind: metadata.kind ?? ('uploaded' as const),
+    parentArtifactId: metadata.parentArtifactId ?? null,
+    characterName: metadata.characterName ?? null,
+    characterVariantName: metadata.characterVariantName ?? null,
+    mimeType,
+    filename,
+    sourceModeId: metadata.sourceModeId,
+    startedAt,
+    durationMs,
+  };
+};
+
+/**
  * Rebuilds runtime-owned recording objects from IndexedDB-safe data. Object
  * URLs are always created here so callers never persist or transfer their
  * ownership across application sessions.
@@ -80,23 +119,11 @@ export const createPersistedOriginalRecording = (
   if (!(input.blob instanceof Blob) || input.blob.size <= 0) {
     throw new Error('Persisted recording media is empty or invalid.');
   }
-  const id = requireNonEmptyText(input.artifactMetadata.id, 'ID');
-  const mimeType = requireNonEmptyText(
-    input.artifactMetadata.mimeType || input.blob.type,
-    'MIME type',
+  const fields = validatedPersistedArtifactFields(
+    input.artifactMetadata,
+    input.blob.type,
+    'Restored video',
   );
-  const filename = requireNonEmptyText(input.artifactMetadata.filename, 'filename');
-  if (!isSessionModeId(input.artifactMetadata.sourceModeId)) {
-    throw new Error('Persisted recording source mode is invalid.');
-  }
-  const startedAt = input.artifactMetadata.startedAt;
-  if (!Number.isFinite(new Date(startedAt).valueOf())) {
-    throw new Error('Persisted recording start time is invalid.');
-  }
-  const durationMs = input.artifactMetadata.durationMs;
-  if (!Number.isFinite(durationMs) || durationMs < 0) {
-    throw new Error('Persisted recording duration is invalid.');
-  }
 
   let sidecar: RecordingAudioSidecar = IDLE_AUDIO_SIDECAR;
   if (input.audioSidecar) {
@@ -115,20 +142,9 @@ export const createPersistedOriginalRecording = (
   }
 
   const artifact = Object.freeze({
-    id,
-    name: input.artifactMetadata.name ?? `Restored video · ${id.slice(-8)}`,
-    createdAt: input.artifactMetadata.createdAt ?? startedAt,
-    kind: input.artifactMetadata.kind ?? 'uploaded',
-    parentArtifactId: input.artifactMetadata.parentArtifactId ?? null,
-    characterName: input.artifactMetadata.characterName ?? null,
-    characterVariantName: input.artifactMetadata.characterVariantName ?? null,
+    ...fields,
     media: input.blob,
     objectUrl: createArtifactObjectUrl(input.blob),
-    mimeType,
-    filename,
-    sourceModeId: input.artifactMetadata.sourceModeId,
-    startedAt,
-    durationMs,
     sizeBytes: input.blob.size,
   });
   return Object.freeze({ artifact, sidecar });
@@ -148,38 +164,14 @@ export const createRemotePresentationRecording = (
   if (!Number.isFinite(input.remoteMedia.sizeBytes) || input.remoteMedia.sizeBytes <= 0) {
     throw new Error('Remote presentation media size is invalid.');
   }
-  const id = requireNonEmptyText(input.artifactMetadata.id, 'ID');
-  const mimeType = requireNonEmptyText(
-    input.artifactMetadata.mimeType || input.remoteMedia.mimeType,
-    'MIME type',
-  );
-  const filename = requireNonEmptyText(input.artifactMetadata.filename, 'filename');
-  if (!isSessionModeId(input.artifactMetadata.sourceModeId)) {
-    throw new Error('Persisted recording source mode is invalid.');
-  }
-  const startedAt = input.artifactMetadata.startedAt;
-  if (!Number.isFinite(new Date(startedAt).valueOf())) {
-    throw new Error('Persisted recording start time is invalid.');
-  }
-  const durationMs = input.artifactMetadata.durationMs;
-  if (!Number.isFinite(durationMs) || durationMs < 0) {
-    throw new Error('Persisted recording duration is invalid.');
-  }
   return Object.freeze({
-    id,
-    name: input.artifactMetadata.name ?? `Streamed video · ${id.slice(-8)}`,
-    createdAt: input.artifactMetadata.createdAt ?? startedAt,
-    kind: input.artifactMetadata.kind ?? 'uploaded',
-    parentArtifactId: input.artifactMetadata.parentArtifactId ?? null,
-    characterName: input.artifactMetadata.characterName ?? null,
-    characterVariantName: input.artifactMetadata.characterVariantName ?? null,
+    ...validatedPersistedArtifactFields(
+      input.artifactMetadata,
+      input.remoteMedia.mimeType,
+      'Streamed video',
+    ),
     media: input.remoteMedia,
     objectUrl: input.remoteMedia.contentUrl,
-    mimeType,
-    filename,
-    sourceModeId: input.artifactMetadata.sourceModeId,
-    startedAt,
-    durationMs,
     sizeBytes: input.remoteMedia.sizeBytes,
   });
 };

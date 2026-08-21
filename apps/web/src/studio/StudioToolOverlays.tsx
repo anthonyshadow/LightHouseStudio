@@ -5,6 +5,7 @@ import type {
   CreativeAssetStore,
   SavedCharacterPrompt,
 } from '../features/creative-assets/types';
+import { ownedRecordingArtifact } from '../features/recording/types';
 import type { ExistingVideoSavedRecipe } from '../features/existing-video/ExistingVideoRecipeChooser';
 import type { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import { hasDraftContent, SessionComposer } from '../features/media-session';
@@ -256,7 +257,9 @@ export const StudioToolOverlays = ({
         {...(existingVideo.selection ? { onEditVideo: onOpenExistingVideo } : {})}
         onOpenVoiceTreatments={() => onOpenOverlay('voice-treatments')}
         onBackToTakeReview={() => onOpenOverlay('take-review')}
-        {...(recording.presented ? { onSaveVideo: savedVideo.requestSavePresentedVideo } : {})}
+        {...(ownedRecordingArtifact(recording.presented)
+          ? { onSaveVideo: savedVideo.requestSavePresentedVideo }
+          : {})}
         saveVideoState={saveVideoState}
         onOpenSavedVideosLibrary={onOpenSavedVideosLibrary}
         hasUnsavedChanges={savedVideo.presentedHasUnsavedChanges}

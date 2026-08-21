@@ -56,10 +56,10 @@ export interface ExistingVideoVisualEditorProps {
 }
 
 const heading = (step: ExistingVideoStep): string =>
-  step.modelId === 'lucy-latest' ? 'Configure Character Swap' : 'Configure Virtual Try On';
+  step.modelId === 'lucy-latest' ? 'Configure Character Swap' : 'Configure Virtual Try-On';
 
 const shortLabel = (step: ExistingVideoStep): string =>
-  step.modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On';
+  step.modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try-On';
 
 export const ExistingVideoVisualEditor = ({
   step,

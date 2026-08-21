@@ -12,6 +12,7 @@ import {
   type ExistingVideoToolId,
 } from './existingVideoPresentation';
 import type { ExistingVideoWorkflow } from './useExistingVideoWorkflow';
+import { VIDEO_TRANSFORM_OPERATION_LABELS } from './videoTransformLabels';
 
 type ToolDefinition = Readonly<{
   id: ExistingVideoToolId;
@@ -22,12 +23,12 @@ type ToolDefinition = Readonly<{
 const tools: readonly ToolDefinition[] = [
   {
     id: 'character',
-    label: 'Character Swap',
+    label: VIDEO_TRANSFORM_OPERATION_LABELS['character-swap'],
     description: 'Replace the visible person or character.',
   },
   {
     id: 'vton',
-    label: 'Virtual Try On',
+    label: VIDEO_TRANSFORM_OPERATION_LABELS['virtual-try-on'],
     description: 'Change the subject’s clothing with one garment.',
   },
   {

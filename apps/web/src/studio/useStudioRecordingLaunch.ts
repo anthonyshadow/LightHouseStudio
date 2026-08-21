@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { APP_PATHS, projectWorkspacePath, type StudioCreationIntent } from '../app/paths';
 import type { BrowserCapabilities } from '../application/types';
+import { ownedRecordingArtifact } from '../features/recording/types';
 import type { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import type { ProjectSourceActivity } from '../features/projects/useProjectSourceController';
 import type { useStudioSession } from '../orchestration/session';
@@ -65,7 +66,7 @@ export const useStudioRecordingLaunch = ({
       !artifact ||
       // Adoption validates complete media, so a URL-backed presentation waits here until the
       // deferred acquisition republishes it as owned bytes.
-      !(artifact.media instanceof Blob) ||
+      ownedRecordingArtifact(artifact) === null ||
       existingVideo.selection ||
       stagePresentationKind !== 'playback' ||
       adoptingRecordingRef.current === artifact.id
@@ -141,7 +142,7 @@ export const useStudioRecordingLaunch = ({
       setRecordingForExistingVideo(true);
       // A streamed Project source needs its complete bytes before adoption can validate it. The
       // acquisition shows its own progress and cancel; adoption resumes when it lands.
-      if (!(recording.presented.media instanceof Blob)) void acquireOwnedMedia();
+      if (ownedRecordingArtifact(recording.presented) === null) void acquireOwnedMedia();
       return;
     }
     openExistingVideo();

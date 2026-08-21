@@ -1,3 +1,4 @@
+import { downloadBlobFile } from '../../adapters/browser-media/downloadBlobFile';
 import {
   CREATIVE_LIBRARY_EXPORT_MAX_BYTES,
   createCreativeLibraryExportFile,
@@ -40,24 +41,9 @@ export const downloadCreativeLibraryExport = (
   store: CreativeAssetStore,
   exportedAt: string,
 ): CreativeLibraryExportFile => {
-  if (typeof URL.createObjectURL !== 'function') {
-    throw new Error('This browser cannot save a file from the page.');
-  }
   const exported = createCreativeLibraryExportFile(store, exportedAt);
   const blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' });
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = objectUrl;
-  anchor.download = creativeLibraryExportFilename(exported.exportedAt);
-  anchor.rel = 'noopener';
-  document.body.append(anchor);
-  try {
-    anchor.click();
-  } finally {
-    anchor.remove();
-    // Revoked after the click has been dispatched; revoking synchronously cancels the download.
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
-  }
+  downloadBlobFile(blob, creativeLibraryExportFilename(exported.exportedAt));
   return exported;
 };
 

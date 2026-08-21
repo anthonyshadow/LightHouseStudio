@@ -19,6 +19,7 @@ import {
 } from '@studio/domain';
 import { AppError } from '../../http/app-error.js';
 import { decodePageCursor, encodePageCursor } from '../../http/page-cursor.js';
+import { projectRequestFingerprint } from '../projects/project-request-fingerprint.js';
 import type { CampaignRepository, CampaignSummaryCursor } from './campaign-repository.js';
 
 const publicCampaign = (campaign: Campaign): CampaignContract =>
@@ -90,9 +91,12 @@ export class CampaignService {
     const now = this.#now().toISOString();
     const campaignId = this.#createId();
     const campaign = createCampaign({ id: campaignId, ownerUserId, name, brief }, { now });
-    const requestFingerprint = createHash('sha256')
-      .update(JSON.stringify({ version: 1, operation: 'campaign-create', name, brief }))
-      .digest('hex');
+    const requestFingerprint = projectRequestFingerprint({
+      version: 1,
+      operation: 'campaign-create',
+      name,
+      brief,
+    });
     const result = await this.#repository.createCampaignIdempotent({
       campaign,
       receipt: { operationKey, requestFingerprint, campaignId, createdAt: now },

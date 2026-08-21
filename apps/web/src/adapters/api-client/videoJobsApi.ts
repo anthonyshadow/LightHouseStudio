@@ -113,6 +113,16 @@ export const listActiveVideoJobs = (signal?: AbortSignal): Promise<VideoJobQueue
       ),
   );
 
+/**
+ * The one query identity for this account's active provider jobs. Every surface that reads or
+ * invalidates the active queue must use this, so the caches stay shared by contract rather than
+ * by coincidental string equality.
+ */
+export const activeVideoJobsQueryOptions = (ownerUserId: string) => ({
+  queryKey: ['video-jobs', 'active', ownerUserId] as const,
+  queryFn: ({ signal }: { readonly signal?: AbortSignal }) => listActiveVideoJobs(signal),
+});
+
 export const abandonVideoJob = async (jobId: string, signal?: AbortSignal): Promise<void> => {
   await apiFetch(`${jobUrl(jobId)}/abandon`, {
     method: 'POST',

@@ -296,7 +296,7 @@ describe('ExistingVideoPanel', () => {
               compatible: false,
               aspect: 'unsupported',
               reason:
-                'Character Swap and Virtual Try On require a 16:9 or 9:16 source. Local saving and Voice remain available.',
+                'Character Swap and Virtual Try-On require a 16:9 or 9:16 source. Local saving and Voice remain available.',
             },
           })}
           videoProcessingAvailable
@@ -319,7 +319,7 @@ describe('ExistingVideoPanel', () => {
     fireEvent.click(adjustVideo);
     expect(onAdjustVideo).toHaveBeenCalledOnce();
     expect(screen.getByRole('button', { name: 'Character Swap' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Virtual Try On' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Virtual Try-On' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Voice' })).toBeEnabled();
     expect(screen.getByText('Square')).toBeInTheDocument();
     expect(screen.getAllByText(/require a 16:9 or 9:16 source/iu)).not.toHaveLength(0);
@@ -404,7 +404,7 @@ describe('ExistingVideoPanel', () => {
     fireEvent.click(screen.getByRole('option', { name: '1080p' }));
     expect(updateStep).toHaveBeenCalledWith('character', { outputResolution: '1080p' });
     expect(screen.getByRole('button', { name: 'Apply Character Swap' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Virtual Try On' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Virtual Try-On' })).toBeDisabled();
     expect(document.body.textContent).not.toMatch(/Decart|Pruna|Lucy|p-video/u);
   });
 
@@ -635,19 +635,19 @@ describe('ExistingVideoPanel', () => {
       'aria-pressed',
       'true',
     );
-    expect(screen.getByRole('button', { name: /^Virtual Try On/u })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /^Virtual Try On/u })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /^Virtual Try-On/u })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^Virtual Try-On/u })).toHaveAttribute(
       'aria-pressed',
       'false',
     );
     expect(screen.getByRole('button', { name: /^Voice/u })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Voice' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(screen.getByRole('button', { name: /^Virtual Try On/u }));
+    fireEvent.click(screen.getByRole('button', { name: /^Virtual Try-On/u }));
     expect(addStep).not.toHaveBeenCalled();
-    expect(screen.getByRole('dialog', { name: 'Switch to Virtual Try On?' })).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Switch to Virtual Try-On?' })).toBeVisible();
     expect(
       screen.getAllByText(
-        'Switching will clear your current Character Swap settings. Your Voice settings will not be affected, and Voice can still be combined with Virtual Try On.',
+        'Switching will clear your current Character Swap settings. Your Voice settings will not be affected, and Voice can still be combined with Virtual Try-On.',
       )[0],
     ).toBeVisible();
     expect(screen.getByDisplayValue('Change the scene')).toBeInTheDocument();
@@ -660,12 +660,12 @@ describe('ExistingVideoPanel', () => {
       'aria-pressed',
       'true',
     );
-    expect(screen.getByRole('button', { name: /^Virtual Try On/u })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /^Virtual Try-On/u })).toHaveAttribute(
       'aria-pressed',
       'false',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /^Virtual Try On/u }));
+    fireEvent.click(screen.getByRole('button', { name: /^Virtual Try-On/u }));
     fireEvent.click(screen.getByRole('button', { name: 'Clear and switch' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(addStep).toHaveBeenCalledWith('lucy-vton-latest');
@@ -673,7 +673,7 @@ describe('ExistingVideoPanel', () => {
       'aria-pressed',
       'false',
     );
-    expect(screen.getByRole('button', { name: /^Virtual Try On/u })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /^Virtual Try-On/u })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
@@ -732,7 +732,7 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /^Virtual Try On/u }));
+    fireEvent.click(screen.getByRole('button', { name: /^Virtual Try-On/u }));
 
     expect(addStep).toHaveBeenCalledWith('lucy-vton-latest');
     expect(screen.queryByRole('dialog', { name: /Switch to/u })).not.toBeInTheDocument();
@@ -740,13 +740,13 @@ describe('ExistingVideoPanel', () => {
       'aria-pressed',
       'false',
     );
-    expect(screen.getByRole('button', { name: /^Virtual Try On/u })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /^Virtual Try-On/u })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
   });
 
-  it('uses contextual confirmation copy when replacing Virtual Try On settings', () => {
+  it('uses contextual confirmation copy when replacing Virtual Try-On settings', () => {
     const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
     render(
       <StudioDesignProvider>
@@ -796,10 +796,10 @@ describe('ExistingVideoPanel', () => {
     expect(screen.getByRole('dialog', { name: 'Switch to Character Swap?' })).toBeVisible();
     expect(
       screen.getAllByText(
-        'Switching will clear your current Virtual Try On settings. Your Voice settings will not be affected, and Voice can still be combined with Character Swap.',
+        'Switching will clear your current Virtual Try-On settings. Your Voice settings will not be affected, and Voice can still be combined with Character Swap.',
       )[0],
     ).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Keep Virtual Try On' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Keep Virtual Try-On' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Clear and switch' })).toBeVisible();
   });
 
@@ -855,7 +855,7 @@ describe('ExistingVideoPanel', () => {
 
     expect(
       screen.getByText(
-        'Choose one visual edit: Character Swap or Virtual Try On. Voice is independent, so you can add it to either visual edit or use it on its own.',
+        'Choose one visual edit: Character Swap or Virtual Try-On. Voice is independent, so you can add it to either visual edit or use it on its own.',
       ),
     ).toBeVisible();
     expect(screen.getByText('Visual edit')).toBeVisible();
@@ -1734,7 +1734,7 @@ describe('ExistingVideoPanel', () => {
     // The local workflow is idle in Project context, so only the Project operation can say that
     // an edit is already committed to a provider.
     expect(screen.getByRole('button', { name: 'Character Swap' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Virtual Try On' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Virtual Try-On' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Voice' })).toBeDisabled();
   });
 

@@ -1,12 +1,17 @@
 import { useTheme } from '@emotion/react';
 import type { AuthenticatedSessionResponse, AuthenticatedUser } from '@studio/contracts';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { AccountMenu } from '../features/account/AccountMenu';
 import type { BrowserCapabilities, ProviderAvailability } from '../features/media-session';
 import { liveExperienceAvailability } from './studioLiveAvailability';
-import { deriveStudioAvailability, type CapabilityState } from './studioAvailabilityPresentation';
+import {
+  deriveStudioAvailability,
+  type CapabilityState,
+  type StudioAvailabilityPresentation,
+} from './studioAvailabilityPresentation';
 import { AppIcon, Button, type AppIconName } from '../ui';
 import { useDismissiblePopover } from '../ui/primitives/useDismissiblePopover';
+import { useMenuKeyboardNavigation } from '../ui/primitives/useMenuKeyboardNavigation';
 import {
   brandStyles,
   capabilityDetailStyles,
@@ -51,24 +56,10 @@ type StudioHeaderProps = {
 type StatusMenuProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  systemState: 'loading' | 'ready' | 'limited';
-  systemLabel: string;
-  localCaptureState: string;
-  liveAiState: string;
-  existingVideoAiState: string;
-  voiceCloudState: string;
+  availability: StudioAvailabilityPresentation;
 };
 
-const StatusMenu = ({
-  open,
-  onOpenChange,
-  systemState,
-  systemLabel,
-  localCaptureState,
-  liveAiState,
-  existingVideoAiState,
-  voiceCloudState,
-}: StatusMenuProps) => {
+const StatusMenu = ({ open, onOpenChange, availability }: StatusMenuProps) => {
   const theme = useTheme();
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -80,13 +71,13 @@ const StatusMenu = ({
       <button
         ref={triggerRef}
         type="button"
-        aria-label={systemLabel}
+        aria-label={availability.systemLabel}
         aria-expanded={open}
         aria-controls="studio-availability-details"
         onClick={() => onOpenChange(!open)}
       >
-        <span css={systemStatusDotStyles(theme, systemState)} aria-hidden="true" />
-        <span data-system-label>{systemLabel}</span>
+        <span css={systemStatusDotStyles(theme, availability.systemState)} aria-hidden="true" />
+        <span data-system-label>{availability.systemLabel}</span>
       </button>
       {open ? (
         <div
@@ -99,19 +90,12 @@ const StatusMenu = ({
             <strong>Studio availability</strong>
             <span>Local support and configured integrations</span>
           </div>
-          <span>
-            Local capture <strong>{localCaptureState}</strong>
-          </span>
-          <span>
-            Existing-video AI <strong>{existingVideoAiState}</strong>
-          </span>
-          <span>
-            Live AI Beta <strong>{liveAiState}</strong>
-          </span>
-          <span>
-            Voice cloud <strong>{voiceCloudState}</strong>
-          </span>
-          <small>Configuration does not verify live provider health.</small>
+          {availability.rows.map((row) => (
+            <span key={row.id}>
+              {row.label} <strong>{row.state}</strong>
+            </span>
+          ))}
+          <small>{availability.footnote}</small>
         </div>
       ) : null}
     </div>
@@ -144,13 +128,7 @@ const CreateMenu = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   useDismissiblePopover({ open, onOpenChange, rootRef, triggerRef });
-
-  useEffect(() => {
-    if (!open) return;
-    window.requestAnimationFrame(() => {
-      menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-    });
-  }, [open]);
+  const handleMenuKeyDown = useMenuKeyboardNavigation(menuRef, open);
 
   const run = (action: () => void) => {
     onOpenChange(false);
@@ -178,24 +156,7 @@ const CreateMenu = ({
           tabIndex={-1}
           aria-label="Quick Create"
           data-create-menu
-          onKeyDown={(event) => {
-            if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
-            const items = [
-              ...(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []),
-            ];
-            if (items.length === 0) return;
-            event.preventDefault();
-            const current = items.indexOf(document.activeElement as HTMLElement);
-            const next =
-              event.key === 'Home'
-                ? 0
-                : event.key === 'End'
-                  ? items.length - 1
-                  : event.key === 'ArrowDown'
-                    ? (current + 1 + items.length) % items.length
-                    : (current - 1 + items.length) % items.length;
-            items[next]?.focus();
-          }}
+          onKeyDown={handleMenuKeyDown}
         >
           <Button role="menuitem" variant="quiet" onClick={() => run(onCreateVideo)}>
             New video
@@ -253,14 +214,6 @@ export const StudioHeader = ({
     browser,
     capabilityState,
   });
-  const {
-    systemState,
-    systemLabel,
-    localCaptureState,
-    liveAiState,
-    existingVideoAiState,
-    voiceCloudState,
-  } = studioAvailability;
   const setMenuOpen = useCallback((menu: HeaderMenu, open: boolean) => {
     setOpenMenu(open ? menu : null);
   }, []);
@@ -343,12 +296,7 @@ export const StudioHeader = ({
             <StatusMenu
               open={openMenu === 'status'}
               onOpenChange={(open) => setMenuOpen('status', open)}
-              systemState={systemState}
-              systemLabel={systemLabel}
-              localCaptureState={localCaptureState}
-              liveAiState={liveAiState}
-              existingVideoAiState={existingVideoAiState}
-              voiceCloudState={voiceCloudState}
+              availability={studioAvailability}
             />
             <AccountMenu
               user={user}

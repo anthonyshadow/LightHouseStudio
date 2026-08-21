@@ -261,7 +261,7 @@ Record, upload, or reuse an exact Saved Video Version as source
   ↓
 Wait for durable source acceptance; local preview remains usable
   ↓
-Use local editing and/or one explicit Character Swap or Virtual Try On;
+Use local editing and/or one explicit Character Swap or Virtual Try-On;
 checkpoint Voice settings where useful, while unsupported Project Voice processing remains gated
   ↓
 Checkpoint semantic intent automatically and show saved/conflict state
@@ -374,7 +374,7 @@ persistence mode unless a mode is explicitly and canonically unsupported before 
    the original becomes durable before the Project claims resumability.
 6. Refresh, browser restart, and application restart restore Project identity, source, current
    semantic state, and a fresh playable content URL.
-7. Character Swap, Virtual Try On, reusable Character/Variant/Outfit/Voice/recipe choices, and local
+7. Character Swap, Virtual Try-On, reusable Character/Variant/Outfit/Voice/recipe choices, and local
    edit state operate in the Project without duplicating their lifecycle owners. Voice settings can
    be checkpointed; a Voice-processing adapter either retains a recoverable Project result before
    claiming success or remains truthfully gated.

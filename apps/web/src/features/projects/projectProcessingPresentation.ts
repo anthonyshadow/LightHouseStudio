@@ -1,12 +1,12 @@
 import type { ProjectProcessingAttempt } from '@studio/contracts';
+import { VIDEO_TRANSFORM_OPERATION_LABELS } from '../existing-video/videoTransformLabels';
 
 export const projectProcessingCapabilityLabel = (
   capability: ProjectProcessingAttempt['capability'],
-): string => {
-  if (capability === 'character-swap') return 'Character Swap';
-  if (capability === 'virtual-try-on') return 'Virtual Try On';
-  return 'Voice';
-};
+): string =>
+  capability === 'character-swap' || capability === 'virtual-try-on'
+    ? VIDEO_TRANSFORM_OPERATION_LABELS[capability]
+    : 'Voice';
 
 export const projectProcessingTitle = (attempt: ProjectProcessingAttempt): string => {
   const capability = projectProcessingCapabilityLabel(attempt.capability);

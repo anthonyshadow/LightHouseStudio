@@ -32,7 +32,7 @@
 - Encoder/remux failure never overwrites the original. Replacement commits before an old processed
   URL is revoked.
 - Square, 4:5, and incompatible Freeform edited sources keep Voice available when their sidecar is
-  valid even though Character Swap and Virtual Try On are disabled.
+  valid even though Character Swap and Virtual Try-On are disabled.
 - No local treatment contacts a provider.
 - A Project can checkpoint the selected local effect and built-in revision as optional Voice
   configuration through **Save progress**. Selection alone does not process audio, create a

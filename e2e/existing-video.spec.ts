@@ -139,7 +139,7 @@ test('Record a local video closes the panel and keeps capture on the persistent 
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('heading', { name: 'Current video' })).toBeVisible();
   await expect(dialog.getByRole('button', { name: 'Character Swap', exact: true })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Virtual Try On', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Virtual Try-On', exact: true })).toBeVisible();
   await expect(dialog.getByRole('button', { name: /^Voice/u })).toBeVisible();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
   expectNoExternalProviderTraffic(network);
@@ -284,7 +284,7 @@ test('provider-free Adjust video renders locally and atomically replaces the per
 
   await expect(upload).toBeVisible();
   await expect(upload.getByRole('button', { name: 'Character Swap', exact: true })).toBeDisabled();
-  await expect(upload.getByRole('button', { name: 'Virtual Try On', exact: true })).toBeDisabled();
+  await expect(upload.getByRole('button', { name: 'Virtual Try-On', exact: true })).toBeDisabled();
   await expect(upload).toContainText('require a 16:9 or 9:16 source');
   expect(await cameraCalls(page)).toBe(0);
   expect(new Set(network.apiRequests.map(({ path }) => path))).toEqual(
@@ -466,17 +466,17 @@ for (const operation of ['character-swap', 'virtual-try-on'] as const) {
     const dialog = page.getByRole('dialog', { name: 'Use existing video' });
     await dialog
       .getByRole('button', {
-        name: operation === 'character-swap' ? 'Character Swap' : 'Virtual Try On',
+        name: operation === 'character-swap' ? 'Character Swap' : 'Virtual Try-On',
         exact: true,
       })
       .click();
     const selectedButton = dialog.getByRole('button', {
-      name: operation === 'character-swap' ? 'Character Swap' : 'Virtual Try On',
+      name: operation === 'character-swap' ? 'Character Swap' : 'Virtual Try-On',
       exact: true,
     });
     const alternateOperation = operation === 'character-swap' ? 'virtual-try-on' : 'character-swap';
     const alternateButton = dialog.getByRole('button', {
-      name: alternateOperation === 'character-swap' ? 'Character Swap' : 'Virtual Try On',
+      name: alternateOperation === 'character-swap' ? 'Character Swap' : 'Virtual Try-On',
       exact: true,
     });
     await expect(selectedButton).toHaveAttribute('aria-pressed', 'true');
@@ -491,7 +491,7 @@ for (const operation of ['character-swap', 'virtual-try-on'] as const) {
     await steps.locator('textarea').fill(`Prompt for ${operation}`);
     await dialog
       .getByRole('button', {
-        name: operation === 'character-swap' ? 'Apply Character Swap' : 'Apply Virtual Try On',
+        name: operation === 'character-swap' ? 'Apply Character Swap' : 'Apply Virtual Try-On',
       })
       .click();
     await expect(dialog.getByRole('heading', { name: 'Your result is ready' })).toBeVisible({
@@ -551,15 +551,15 @@ for (const operation of ['character-swap', 'virtual-try-on'] as const) {
         dialog.getByRole('button', { name: 'Character Swap', exact: true }),
       ).toHaveAttribute('aria-pressed', 'false');
       await expect(
-        dialog.getByRole('button', { name: 'Virtual Try On', exact: true }),
+        dialog.getByRole('button', { name: 'Virtual Try-On', exact: true }),
       ).toHaveAttribute('aria-pressed', 'false');
 
-      await dialog.getByRole('button', { name: 'Virtual Try On', exact: true }).click();
+      await dialog.getByRole('button', { name: 'Virtual Try-On', exact: true }).click();
       await dialog
         .locator('article')
         .getByRole('textbox', { name: /^Prompt/u })
         .fill('Second submission from the retained original');
-      await dialog.getByRole('button', { name: 'Apply Virtual Try On' }).click();
+      await dialog.getByRole('button', { name: 'Apply Virtual Try-On' }).click();
       await expect(dialog.getByRole('heading', { name: 'Your result is ready' })).toBeVisible({
         timeout: 15_000,
       });

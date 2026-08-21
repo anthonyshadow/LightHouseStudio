@@ -9,9 +9,20 @@ import { formatDate, formatDateTime } from '@studio/domain';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { listSavedVideos, savedVideoThumbnailUrl } from '../../adapters/api-client/savedVideosApi';
-import { abandonVideoJob, listActiveVideoJobs } from '../../adapters/api-client/videoJobsApi';
-import { AppIcon, Button, ConfirmationDialog, EmptyStatePreview, StatusNotice } from '../../ui';
+import {
+  abandonVideoJob,
+  activeVideoJobsQueryOptions,
+} from '../../adapters/api-client/videoJobsApi';
+import {
+  AppIcon,
+  Button,
+  ConfirmationDialog,
+  emptyExampleStyles,
+  EmptyStatePreview,
+  StatusNotice,
+} from '../../ui';
 import { useCampaignList } from '../campaigns/useCampaignsController';
+import { VIDEO_TRANSFORM_OPERATION_LABELS } from '../existing-video/videoTransformLabels';
 import { KIND_ICONS } from '../projects/ProjectAssetThumbnail';
 import { projectPosterUrls } from '../projects/projectPosterPresentation';
 import { useProjectList } from '../projects/useProjectsController';
@@ -39,7 +50,7 @@ import {
 const RECENT_LIMIT = 4;
 
 const jobOperationLabel = (operation: VideoJobQueueItem['operation']): string =>
-  operation === 'virtual-try-on' ? 'Virtual Try-On' : 'Character Swap';
+  VIDEO_TRANSFORM_OPERATION_LABELS[operation];
 
 const jobStatusLabel = (status: VideoJobQueueItem['status']): string => {
   if (status === 'validating' || status === 'submitting' || status === 'queued') return 'Queued';
@@ -145,9 +156,9 @@ export const DashboardRouteSurface = ({
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
   });
+  const activeJobsQuery = activeVideoJobsQueryOptions(ownerUserId);
   const processingQueueQuery = useQuery({
-    queryKey: ['video-jobs', 'active', ownerUserId],
-    queryFn: ({ signal }) => listActiveVideoJobs(signal),
+    ...activeJobsQuery,
     refetchInterval: (query) => (query.state.data?.jobs.length ? 3_000 : false),
   });
   const abandonMutation = useMutation({
@@ -155,9 +166,7 @@ export const DashboardRouteSurface = ({
     onSuccess: async () => {
       setSelectedJob(null);
       setQueueNotice('The job was removed from Lightframe and the processing slot is available.');
-      await queryClient.invalidateQueries({
-        queryKey: ['video-jobs', 'active', ownerUserId],
-      });
+      await queryClient.invalidateQueries({ queryKey: activeJobsQuery.queryKey });
     },
   });
   const projects = useMemo(
@@ -247,28 +256,31 @@ export const DashboardRouteSurface = ({
     setOnboardingStorageWarning(!persisted);
   };
 
-  const emptyMessage =
-    recentKind === 'projects'
-      ? 'No active Projects yet. Create one when resumable context will help.'
-      : recentKind === 'videos'
-        ? 'No saved Videos yet. Create or upload one when you are ready.'
-        : recentKind === 'campaigns'
-          ? 'No Campaigns yet. They are optional organizers for related Projects.'
-          : 'No recent work yet. Start with a standalone video and organize it later if needed.';
-  const emptyExample =
-    recentKind === 'projects'
-      ? 'For example: a “Product demo” Project holding one video, its AI runs, and every saved cut.'
-      : recentKind === 'videos'
-        ? 'For example: record a take in Studio and save it — it appears here with a preview.'
-        : recentKind === 'campaigns'
-          ? 'For example: a “Spring launch” Campaign holding one Project per ad placement.'
-          : 'Your latest Videos, Projects and Campaigns will line up here once you make something.';
-  const emptyAction =
-    recentKind === 'projects'
-      ? { label: 'New Project', run: onCreateProject }
-      : recentKind === 'campaigns'
-        ? { label: 'New Campaign', run: onCreateCampaign }
-        : { label: 'Create video', run: onCreateVideo };
+  // One entry per filter so a new kind cannot update its message without its example and action.
+  const emptyRecent = {
+    all: {
+      message: 'No recent work yet. Start with a standalone video and organize it later if needed.',
+      example:
+        'Your latest Videos, Projects and Campaigns will line up here once you make something.',
+      action: { label: 'Create video', run: onCreateVideo },
+    },
+    videos: {
+      message: 'No saved Videos yet. Create or upload one when you are ready.',
+      example: 'For example: record a take in Studio and save it — it appears here with a preview.',
+      action: { label: 'Create video', run: onCreateVideo },
+    },
+    projects: {
+      message: 'No active Projects yet. Create one when resumable context will help.',
+      example:
+        'For example: a “Product demo” Project holding one video, its AI runs, and every saved cut.',
+      action: { label: 'New Project', run: onCreateProject },
+    },
+    campaigns: {
+      message: 'No Campaigns yet. They are optional organizers for related Projects.',
+      example: 'For example: a “Spring launch” Campaign holding one Project per ad placement.',
+      action: { label: 'New Campaign', run: onCreateCampaign },
+    },
+  }[recentKind];
 
   return (
     <section css={dashboardStyles(theme)} aria-labelledby="dashboard-heading">
@@ -406,10 +418,12 @@ export const DashboardRouteSurface = ({
           ) : !visibleLoading && visibleErrors.length === 0 ? (
             <div css={emptyRecentStyles(theme)}>
               <EmptyStatePreview variant="rows" />
-              <p>{emptyMessage}</p>
-              <p data-empty-example>{emptyExample}</p>
-              <Button size="small" variant="quiet" onClick={emptyAction.run}>
-                {emptyAction.label}
+              <p>{emptyRecent.message}</p>
+              <p data-empty-example css={emptyExampleStyles(theme)}>
+                {emptyRecent.example}
+              </p>
+              <Button size="small" variant="quiet" onClick={emptyRecent.action.run}>
+                {emptyRecent.action.label}
               </Button>
             </div>
           ) : null}

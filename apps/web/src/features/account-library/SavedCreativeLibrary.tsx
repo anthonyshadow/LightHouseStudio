@@ -6,7 +6,7 @@ import type {
   SavedPrompt,
 } from '../creative-assets/types';
 import { useRef, useState } from 'react';
-import { Button, ConfirmationDialog, EmptyStatePreview } from '../../ui';
+import { Button, ConfirmationDialog, emptyExampleStyles, EmptyStatePreview } from '../../ui';
 
 const compactGrid = (theme: Theme): CSSObject => ({
   display: 'grid',
@@ -216,11 +216,7 @@ const emptyLibraryStyles = (theme: Theme): CSSObject => ({
   },
   '& p': { margin: 0 },
   '& [data-empty-state-preview]': { marginBlockEnd: theme.space.md },
-  '& [data-empty-example]': {
-    marginBlockStart: theme.space.xs,
-    color: theme.colors.textFaint,
-    fontSize: theme.fontSizes.metadata,
-  },
+  '& [data-empty-example]': { marginBlockStart: theme.space.xs },
   '& > div > button': { marginBlockStart: theme.space.md },
 });
 
@@ -271,7 +267,7 @@ export const SavedCharacterLibrary = ({
               <EmptyStatePreview />
               <h2>No saved characters yet</h2>
               <p>Create a character in Studio and save it to see it here.</p>
-              <p data-empty-example>
+              <p data-empty-example css={emptyExampleStyles(theme)}>
                 For example: your brand presenter, saved once and applied to any video with
                 Character Swap.
               </p>
@@ -397,57 +393,58 @@ export const SavedOutfitLibrary = ({
       setDeleteBusy(false);
     }
   };
+  // One create action, defined once: inside the empty state when the library teaches, above the
+  // grid otherwise.
+  const createOutfitButton = (
+    <Button variant="primary" onClick={onCreate}>
+      Create new saved outfit
+    </Button>
+  );
   return (
     <>
       <div css={{ display: 'grid', gap: theme.space.md }}>
-        {items.length > 0 ? (
-          <div>
-            <Button variant="primary" onClick={onCreate}>
-              Create new saved outfit
-            </Button>
-          </div>
-        ) : null}
         {items.length === 0 ? (
           <div css={emptyLibraryStyles(theme)}>
             <div>
               <EmptyStatePreview />
               <h2>No saved outfits yet</h2>
               <p>Create an outfit in Studio and save it to see it here.</p>
-              <p data-empty-example>
+              <p data-empty-example css={emptyExampleStyles(theme)}>
                 For example: a jacket you styled once with Virtual Try-On, ready to try on in any
                 new video.
               </p>
-              <Button variant="primary" onClick={onCreate}>
-                Create new saved outfit
-              </Button>
+              {createOutfitButton}
             </div>
           </div>
         ) : (
-          <div css={compactGrid(theme)}>
-            {items.map((item) => (
-              <article key={item.id} css={compactCard(theme)}>
-                {item.referenceImageAssetId ? (
-                  <img src={referenceImageContentUrl(item.referenceImageAssetId)} alt="" />
-                ) : null}
-                <h3>{item.title}</h3>
-                <p>{item.prompt || 'Reference-image outfit'}</p>
-                <Button variant="primary" onClick={() => onUse(item)}>
-                  Use in Studio
-                </Button>
-                <Button
-                  variant="danger"
-                  aria-label={`Delete ${item.title}`}
-                  onClick={(event) => {
-                    deleteTriggerRef.current = event.currentTarget;
-                    setDeleteError(null);
-                    setDeleteTarget(item);
-                  }}
-                >
-                  Delete
-                </Button>
-              </article>
-            ))}
-          </div>
+          <>
+            <div>{createOutfitButton}</div>
+            <div css={compactGrid(theme)}>
+              {items.map((item) => (
+                <article key={item.id} css={compactCard(theme)}>
+                  {item.referenceImageAssetId ? (
+                    <img src={referenceImageContentUrl(item.referenceImageAssetId)} alt="" />
+                  ) : null}
+                  <h3>{item.title}</h3>
+                  <p>{item.prompt || 'Reference-image outfit'}</p>
+                  <Button variant="primary" onClick={() => onUse(item)}>
+                    Use in Studio
+                  </Button>
+                  <Button
+                    variant="danger"
+                    aria-label={`Delete ${item.title}`}
+                    onClick={(event) => {
+                      deleteTriggerRef.current = event.currentTarget;
+                      setDeleteError(null);
+                      setDeleteTarget(item);
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </article>
+              ))}
+            </div>
+          </>
         )}
       </div>
       <ConfirmationDialog
