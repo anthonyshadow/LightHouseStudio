@@ -4,6 +4,7 @@ import {
   adoptProjectWorkingMediaRequestSchema,
   createProjectRequestSchema,
   detachProjectAssetResponseSchema,
+  duplicateProjectRequestSchema,
   projectAssetMembershipParamsSchema,
   projectAssetsQuerySchema,
   projectConflictResponseSchema,
@@ -210,6 +211,31 @@ export const registerProjectRoutes = (
       throw new AppError(400, 'validation_error', 'Choose a valid Project.');
     }
     return requireService(service).get(ownerUserIdForRequest(request), params.data.projectId);
+  });
+
+  // Registered unconditionally alongside the other Project lifecycle commands: duplicating derives
+  // one revision from another and touches no source bytes, so it needs no storage-backed service.
+  app.post('/api/projects/:projectId/duplicate', async (request, reply) => {
+    const params = projectParamsSchema.safeParse(request.params);
+    const body = duplicateProjectRequestSchema.safeParse(request.body);
+    const operationKey = projectOperationKeySchema.safeParse(
+      requestHeader(request, 'idempotency-key'),
+    );
+    if (!params.success || !body.success || !operationKey.success) {
+      throw new AppError(
+        400,
+        'validation_error',
+        'Provide a Project title, Campaign, version and UUID Idempotency-Key.',
+      );
+    }
+    const result = await requireService(service).duplicate(
+      ownerUserIdForRequest(request),
+      params.data.projectId,
+      operationKey.data,
+      body.data,
+    );
+    if (result.ok) reply.status(201);
+    return sendMutation(reply, result);
   });
 
   app.get('/api/projects/:projectId/assets', async (request) => {

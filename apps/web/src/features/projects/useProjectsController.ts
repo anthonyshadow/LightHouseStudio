@@ -10,6 +10,7 @@ import { useCallback, useRef } from 'react';
 import {
   archiveProject,
   createProject,
+  duplicateProject,
   getProject,
   listProjects,
   moveProjectToCampaign,
@@ -72,6 +73,7 @@ export const useProjectsController = () => {
   const queryClient = useQueryClient();
   const pendingCreateKey = useRef<string | null>(null);
   const pendingNamedCreateKey = useRef<string | null>(null);
+  const pendingDuplicateKey = useRef<string | null>(null);
 
   const reconcile = useCallback(
     (current: ProjectCurrentResponse) => reconcileProject(queryClient, current),
@@ -106,6 +108,35 @@ export const useProjectsController = () => {
     },
     onSuccess: async (current) => {
       pendingNamedCreateKey.current = null;
+      await reconcile(current);
+    },
+  });
+
+  /**
+   * A duplicate is a create, so it carries a create's idempotency: one key per attempt, retained
+   * until the attempt settles, so a lost response cannot produce two Projects.
+   */
+  const duplicateMutation = useMutation({
+    mutationFn: async (input: {
+      readonly projectId: string;
+      readonly title: string;
+      readonly campaignId: string | null;
+      readonly expectedVersion: number;
+    }) => {
+      const operationKey = pendingDuplicateKey.current ?? crypto.randomUUID();
+      pendingDuplicateKey.current = operationKey;
+      return duplicateProject(
+        input.projectId,
+        {
+          title: input.title,
+          campaignId: input.campaignId,
+          expectedVersion: input.expectedVersion,
+        },
+        operationKey,
+      );
+    },
+    onSuccess: async (current) => {
+      pendingDuplicateKey.current = null;
       await reconcile(current);
     },
   });
@@ -198,6 +229,7 @@ export const useProjectsController = () => {
   return {
     createMutation,
     createNamedMutation,
+    duplicateMutation,
     renameMutation,
     archiveMutation,
     restoreMutation,

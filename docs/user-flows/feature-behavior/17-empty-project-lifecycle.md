@@ -169,7 +169,21 @@ provider work.
     the immutable original, Saved Video current pointer, or Add Version target, and stale work is
     never promoted automatically. A removed global Saved Video remains reachable only through an
     exact same-owner retaining Project relation with truthful retention copy.
-27. Project overview also exposes a separate non-owning Asset collection for Videos, Characters,
+27. **Make another version** duplicates a Project from its overview or from a Projects list row. The
+    copy starts from the same original video and the same creative setup — character, outfit, voice,
+    visual treatment, live-mode metadata, creative intent, local edit and placement — all carried by
+    reference, so no video is duplicated and no storage is used again. It carries no outputs, no
+    history beyond its own first `create` revision, no processing state and no retained-output
+    pointer, and its status is derived from its own snapshot rather than copied. Duplicating starts
+    no provider work and incurs no cost, which the dialog states before the operator confirms. The
+    name is proposed as `"<title> (copy)"` and is editable; the Campaign defaults to the original's
+    and can be changed, and a duplicate aimed at an unavailable Campaign is refused exactly as a move
+    is. The command carries the source Project's expected version and an Idempotency-Key, so a
+    Project that changed elsewhere is refused rather than copied from stale state, and a lost
+    response replays to the one copy. The copy opens on the step it is ready for and is renameable,
+    archivable and deletable on its own; the original is left exactly as it was. Archiving or
+    deleting the original never reclaims the source the copy still references.
+28. Project overview also exposes a separate non-owning Asset collection for Videos, Characters,
     Outfits, and Voices, stated in place as not being the Project source. Memberships are
     newest-first cursor pages and idempotent by Project/kind/resource. Membership alone does not
     create a source, working media, output, or retention claim. Archived Projects show the
@@ -179,7 +193,7 @@ provider work.
     **Use as working media** once a source exists. Either adopts the exact current Version before
     navigating to `/projects/:projectId/workspace`, and the working-media path never changes the
     immutable source.
-28. **Add Asset** can attach existing records or launch Project-aware creation. Record/Upload uses
+29. **Add Asset** can attach existing records or launch Project-aware creation. Record/Upload uses
     `/studio/create?intent=...&projectId=...`; only an explicit Save to Assets attempts attachment,
     then returns to Project detail. A successful save plus failed attachment preserves the Video
     and offers retry. Character/Outfit builders and Add Voice attach without leaving Project
@@ -188,10 +202,11 @@ provider work.
 ## Boundaries
 
 This story includes bounded semantic creative/edit checkpoints, working-media adoption, recoverable
-visual processing, atomic Saved Video output save, one recorded placement per revision, bounded
-history categories, and exact-Version preview/reuse/Download, but no Campaign expansion,
-restore/rollback, Variation, several placements from one save, server-side rendering, generic Export
-record, or IndexedDB Project data. Project source selection, session hydration, configuration,
+visual processing, atomic Saved Video output save, one recorded placement per revision, duplication
+into an independent Project, bounded history categories, and exact-Version preview/reuse/Download,
+but no Campaign expansion, restore/rollback, batch or multi-variant creation, templates or saved
+presets, several placements from one save, server-side rendering, generic Export record, or
+IndexedDB Project data. Project source selection, session hydration, configuration,
 local adoption, history viewing, and output save start no provider.
 Standalone existing-video behavior retains its separate save/replace contract. Project
 server/repository authority, retention, and cleanup remain as documented in Architecture.

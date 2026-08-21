@@ -114,6 +114,30 @@ export const createProject = (
     parseProjectConflict,
   );
 
+export const duplicateProject = (
+  projectId: string,
+  input: {
+    readonly title: string;
+    readonly campaignId: string | null;
+    readonly expectedVersion: number;
+  },
+  operationKey: string,
+  signal?: AbortSignal,
+): Promise<ProjectCurrentResponse> =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(projectId)}/duplicate`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { ...jsonHeaders, 'Idempotency-Key': operationKey },
+      body: JSON.stringify(input),
+      ...(signal ? { signal } : {}),
+    },
+    projectCurrentResponseSchema,
+    invalidProjectResponse,
+    parseProjectConflict,
+  );
+
 export const getProject = (
   projectId: string,
   signal?: AbortSignal,
