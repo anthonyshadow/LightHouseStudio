@@ -3,6 +3,7 @@
 import type { SavedVideoSummary } from '@studio/contracts';
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as SavedVideosApiModule from '../../adapters/api-client/savedVideosApi';
 
@@ -85,13 +86,16 @@ const renderGallery = (
 ) => {
   const queryClient = createRemoteStateQueryClient();
   queryClients.push(queryClient);
-  render(
+  const tree = (
     <QueryClientProvider client={queryClient}>
       <StudioDesignProvider>
         <VideoGallery onUse={onUse} {...(focus ?? {})} />
       </StudioDesignProvider>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  // A focused id always arrives on a fresh mount — the Dashboard opens this overlay for the first
+  // time — so those cases have to survive the effect replay React performs in development.
+  render(focus ? <StrictMode>{tree}</StrictMode> : tree);
   return onUse;
 };
 

@@ -424,6 +424,11 @@ export const VideoGallery = ({
   // Acted on once per requested id. The fetch uses the key `previewDetailQuery` already reads, so a
   // video on screen resolves from cache and one from a later page costs only the request the
   // preview itself would have made.
+  //
+  // The guard releases on teardown unless the work already settled, because the gallery mounts with
+  // the id already set — arriving from the Dashboard opens this overlay for the first time — and
+  // React replays a fresh mount's effects. Holding the guard across that replay would abandon the
+  // only attempt and leave the requested video unopened.
   useEffect(() => {
     if (focusVideoId === null) {
       consumedFocusVideoIdRef.current = null;
@@ -432,6 +437,7 @@ export const VideoGallery = ({
     if (consumedFocusVideoIdRef.current === focusVideoId) return;
     consumedFocusVideoIdRef.current = focusVideoId;
     let abandoned = false;
+    let settled = false;
     void queryClient
       .fetchQuery({
         queryKey: ['saved-videos', 'detail', focusVideoId],
@@ -454,10 +460,12 @@ export const VideoGallery = ({
         });
       })
       .finally(() => {
+        settled = true;
         if (!abandoned) onFocusVideoConsumed?.();
       });
     return () => {
       abandoned = true;
+      if (!settled) consumedFocusVideoIdRef.current = null;
     };
   }, [focusVideoId, onFocusVideoConsumed, queryClient]);
 
