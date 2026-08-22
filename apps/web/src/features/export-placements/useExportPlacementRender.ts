@@ -8,7 +8,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { renderVideoEdit, videoEditRenderingSupported } from '../video-editor/renderVideoEdit';
 import { videoEditPreviewSupported } from '../video-editor/videoEditShader';
 
-/** The same capability gate the local editor applies, because this is the same render path. */
+/**
+ * The same capability gate the local editor applies, because this is the same render path.
+ *
+ * Deliberately not memoised at module scope: probing costs a throwaway WebGL context, but caching
+ * it there would make the capability un-mockable per test. Callers mount this hook only on the
+ * surface that offers a placement, so the probe runs when that surface opens rather than with the
+ * library around it.
+ */
 export const exportPlacementRenderSupported = (): boolean =>
   videoEditPreviewSupported() && videoEditRenderingSupported();
 

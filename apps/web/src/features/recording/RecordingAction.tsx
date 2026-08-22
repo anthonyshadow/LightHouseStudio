@@ -52,18 +52,19 @@ const recordingUnavailableReason = ({
   return null;
 };
 
+const recordingActiveStyles = (theme: Theme): CSSObject => ({
+  color: theme.colors.text,
+  borderColor: theme.colors.recording,
+  background: `linear-gradient(135deg, ${theme.colors.recording}, ${theme.colors.danger})`,
+  boxShadow: theme.shadows.recording,
+});
+
 // Idle Record is the stage's primary action and takes the mint primary treatment from
-// `Button variant="primary"`; only the dot glyph is overridden, kept in the recording red
-// family but deepened so it still reads against mint. Active recording stays red.
-const recordActionStyles = (theme: Theme, active: boolean): CSSObject =>
-  active
-    ? {
-        color: theme.colors.text,
-        borderColor: theme.colors.recording,
-        background: `linear-gradient(135deg, ${theme.colors.recording}, ${theme.colors.danger})`,
-        boxShadow: theme.shadows.recording,
-      }
-    : { '& svg': { color: theme.colors.recordingSoft } };
+// `Button variant="primary"`, so only the dot glyph is overridden — kept in the recording red
+// family but deepened so it still reads against mint.
+const recordGlyphStyles = (theme: Theme): CSSObject => ({
+  '& svg': { color: theme.colors.recordingSoft },
+});
 
 const disabledReasonStyles = (): CSSObject => ({
   position: 'absolute',
@@ -189,7 +190,7 @@ export const RecordingAction = ({
           busy={recording.lifecycle === 'stopping'}
           aria-label="Stop recording"
           aria-keyshortcuts="Space"
-          css={recordActionStyles(theme, true)}
+          css={recordingActiveStyles(theme)}
           onClick={() => void onStop()}
         >
           <RecordIcon active />
@@ -205,7 +206,7 @@ export const RecordingAction = ({
           aria-describedby={unavailableReason ? 'recording-disabled-reason' : undefined}
           title={unavailableReason ?? undefined}
           aria-keyshortcuts="Space"
-          css={recordActionStyles(theme, false)}
+          css={recordGlyphStyles(theme)}
           onClick={() => void start()}
         >
           <RecordIcon active={false} />
