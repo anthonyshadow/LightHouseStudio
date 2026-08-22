@@ -1,5 +1,5 @@
 import { formatFileSize, GENERAL_VIDEO_SIZE_LIMIT_BYTES } from '@studio/domain';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ApiClientError, apiErrorMessage, apiFetch } from '../adapters/api-client/apiClient';
 import { readBoundedBlob } from '../adapters/api-client/readBoundedBlob';
 import type { StageNotice } from '../features/live-stage/stageNotices';
@@ -38,7 +38,9 @@ export const useOwnedMediaAcquisition = ({ recording }: UseOwnedMediaAcquisition
     null,
   );
   const recordingRef = useRef(recording);
-  recordingRef.current = recording;
+  useLayoutEffect(() => {
+    recordingRef.current = recording;
+  }, [recording]);
 
   const cancel = useCallback(() => {
     controllerRef.current?.abort('owned-media-acquisition-cancelled');
@@ -73,6 +75,7 @@ export const useOwnedMediaAcquisition = ({ recording }: UseOwnedMediaAcquisition
       totalBytes: remoteMedia.sizeBytes,
     });
 
+    let record: { readonly artifactId: string; readonly promise: Promise<boolean> } | null = null;
     const run = async (): Promise<boolean> => {
       try {
         const response = await apiFetch(remoteMedia.contentUrl, {
@@ -108,6 +111,9 @@ export const useOwnedMediaAcquisition = ({ recording }: UseOwnedMediaAcquisition
           },
         });
         controller.signal.throwIfAborted();
+        // The take may have been discarded or replaced while these bytes were arriving. Publishing
+        // then would resurrect media the operator already let go of, or clobber its replacement.
+        if (recordingRef.current.original?.id !== artifact.id) return false;
         recordingRef.current.restorePersistedOriginal({
           blob,
           artifactMetadata: {
@@ -141,11 +147,14 @@ export const useOwnedMediaAcquisition = ({ recording }: UseOwnedMediaAcquisition
         return false;
       } finally {
         if (controllerRef.current === controller) controllerRef.current = null;
-        if (inFlightRef.current?.artifactId === artifact.id) inFlightRef.current = null;
+        // Cleared by record identity, never by artifact id: a superseded run settling late must
+        // not drop the record a newer acquisition for the same artifact is already sharing.
+        if (record !== null && inFlightRef.current === record) inFlightRef.current = null;
       }
     };
     const promise = run();
-    inFlightRef.current = { artifactId: artifact.id, promise };
+    record = { artifactId: artifact.id, promise };
+    inFlightRef.current = record;
     return promise;
   }, []);
 

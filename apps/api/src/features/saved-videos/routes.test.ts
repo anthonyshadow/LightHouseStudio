@@ -203,8 +203,39 @@ describe('saved-video routes', () => {
     expect(head.headers['content-length']).toBe(String(videoBytes.byteLength));
   });
 
-  it('rejects unsupported ranges without opening a broader byte contract', async () => {
-    for (const range of ['bytes=-5', 'bytes=0-1,3-4', `bytes=${videoBytes.byteLength}-`]) {
+  it('serves suffix ranges and ignores ranges it does not support', async () => {
+    const rangeRequest = (range: string) =>
+      app.inject({
+        method: 'GET',
+        url: `/api/videos/${videoId}/content`,
+        headers: { host: browserHeaders.host, cookie, range },
+      });
+
+    // A suffix range is the last N bytes — the form a player uses to read a trailing moov atom.
+    const suffix = await rangeRequest('bytes=-5');
+    expect(suffix.statusCode).toBe(206);
+    expect(suffix.rawPayload).toEqual(videoBytes.subarray(videoBytes.byteLength - 5));
+    expect(suffix.headers).toMatchObject({
+      'content-range': `bytes ${videoBytes.byteLength - 5}-${videoBytes.byteLength - 1}/${videoBytes.byteLength}`,
+      'content-length': '5',
+    });
+
+    // A suffix longer than the representation is satisfied by the whole of it.
+    const oversizedSuffix = await rangeRequest(`bytes=-${videoBytes.byteLength + 10}`);
+    expect(oversizedSuffix.statusCode).toBe(206);
+    expect(oversizedSuffix.rawPayload).toEqual(videoBytes);
+
+    // A form this server does not support is ignored rather than refused: the client still gets
+    // the complete representation instead of a hard failure.
+    for (const ignored of ['bytes=0-1,3-4', 'items=0-1', 'nonsense']) {
+      const response = await rangeRequest(ignored);
+      expect(response.statusCode).toBe(200);
+      expect(response.rawPayload).toEqual(videoBytes);
+    }
+  });
+
+  it('refuses an unsatisfiable range and states the representation length', async () => {
+    for (const range of [`bytes=${videoBytes.byteLength}-`, 'bytes=-0']) {
       const response = await app.inject({
         method: 'GET',
         url: `/api/videos/${videoId}/content`,
@@ -212,6 +243,9 @@ describe('saved-video routes', () => {
       });
       expect(response.statusCode).toBe(416);
       expect(response.json()).toMatchObject({ error: { code: 'validation_error' } });
+      expect(response.headers).toMatchObject({
+        'content-range': `bytes */${videoBytes.byteLength}`,
+      });
     }
   });
 

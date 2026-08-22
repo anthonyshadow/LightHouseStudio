@@ -2,6 +2,7 @@ import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, rm } from 'node:fs/promises';
 import {
+  VIDEO_JOB_QUEUE_PAGE_SIZE,
   VIDEO_JOB_TTL_MS,
   videoJobQueueResponseSchema,
   videoJobStatusResponseSchema,
@@ -530,6 +531,9 @@ export class VideoJobService {
     const jobs = [...this.#jobs.values()]
       .filter((job) => job.ownerId === ownerId && !terminal(job.status))
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      // The configured active ceiling may exceed what one queue response may carry; report the
+      // newest page rather than throwing on the response contract when the queue is busiest.
+      .slice(0, VIDEO_JOB_QUEUE_PAGE_SIZE)
       .map((job) => ({
         jobId: job.jobId,
         operation: job.operation,

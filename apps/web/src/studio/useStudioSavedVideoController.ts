@@ -70,6 +70,11 @@ interface UseStudioSavedVideoControllerOptions {
   readonly confirmation: ConfirmationRequest;
 }
 
+const safeSavedVideoLoadMessage = (error: unknown): string =>
+  error instanceof ApiClientError && [403, 404, 410].includes(error.status)
+    ? 'That video is unavailable or has been removed. Your Assets are unchanged.'
+    : 'That video could not be opened in Studio. Your Assets are unchanged.';
+
 export const useStudioSavedVideoController = ({
   existingVideo,
   recording,
@@ -93,6 +98,7 @@ export const useStudioSavedVideoController = ({
   // also reaches `saved`, but it is a side effect of replacing the source, not a completed journey.
   const [saveOutcome, setSaveOutcome] = useState<SavedVideoDetail | null>(null);
   const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
+  const [loadFailure, setLoadFailure] = useState<string | null>(null);
   const [loadedSource, setLoadedSource] = useState<LoadedSavedVideoSource | null>(null);
   const galleryEditRequestedRef = useRef(false);
   const gallerySourceLoadControllerRef = useRef<AbortController | null>(null);
@@ -189,9 +195,20 @@ export const useStudioSavedVideoController = ({
     [existingVideo, navigateToStudio, openTakeReview, openVideoUpload, recordingActive],
   );
 
+  /**
+   * The entry the Assets gallery reaches, which always arrives here *after* the shell has already
+   * navigated to Studio — the gallery is unmounted by then and cannot report anything. A failure
+   * would otherwise leave the operator on an empty stage with no explanation, so it is caught and
+   * published as a stage notice instead.
+   */
   const useSavedVideo = useCallback(
     async (video: SavedVideoSummary, intent: 'play' | 'edit') => {
-      await loadSavedVideo(video, intent);
+      setLoadFailure(null);
+      try {
+        await loadSavedVideo(video, intent);
+      } catch (error) {
+        setLoadFailure(safeSavedVideoLoadMessage(error));
+      }
     },
     [loadSavedVideo],
   );
@@ -485,6 +502,8 @@ export const useStudioSavedVideoController = ({
     placementRender,
     saveOutcome,
     discardPromptOpen,
+    loadFailure,
+    dismissLoadFailure: () => setLoadFailure(null),
     useSavedVideo,
     loadSavedVideoRoute,
     openVideoAdjust,

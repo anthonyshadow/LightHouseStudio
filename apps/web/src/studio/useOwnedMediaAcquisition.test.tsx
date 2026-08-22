@@ -90,7 +90,7 @@ describe('useOwnedMediaAcquisition', () => {
 
   it('resolves immediately without a request when the original is already owned bytes', async () => {
     const owned = { ...remoteArtifact(), media: new Blob(['owned']) };
-    const recording = recordingWith(owned as PresentedRecordingArtifact);
+    const recording = recordingWith(owned);
     const hook = renderHook(() =>
       useOwnedMediaAcquisition({ recording: recording as RecordingController }),
     );
@@ -165,12 +165,15 @@ describe('useOwnedMediaAcquisition', () => {
     );
     const artifact = remoteArtifact();
     const recording = recordingWith(artifact);
-    const hook = renderHook(
-      ({ original }: { original: PresentedRecordingArtifact | null }) =>
+    const hook = renderHook<
+      ReturnType<typeof useOwnedMediaAcquisition>,
+      { original: PresentedRecordingArtifact | null }
+    >(
+      ({ original }) =>
         useOwnedMediaAcquisition({
           recording: { ...recording, original } as RecordingController,
         }),
-      { initialProps: { original: artifact as PresentedRecordingArtifact | null } },
+      { initialProps: { original: artifact } },
     );
 
     let outcome: Promise<boolean>;

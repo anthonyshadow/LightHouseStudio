@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, randomUUID } from 'node:crypto';
 import { chmod, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
@@ -312,6 +313,8 @@ export class FileProjectRepository
    */
   readonly #cache = new Map<string, ProjectLibrary>();
   readonly #loads = new Map<string, Promise<ProjectLibrary>>();
+  /** The owner whose lock the current async context already holds, so reads can avoid retaking it. */
+  readonly #lockedOwner = new AsyncLocalStorage<string>();
 
   constructor(dataDirectory: string, options: FileProjectRepositoryOptions = {}) {
     this.#root = path.resolve(dataDirectory, 'metadata', 'v1', 'projects');
@@ -377,17 +380,39 @@ export class FileProjectRepository
     }
     const active = this.#loads.get(ownerUserId);
     if (active !== undefined) return active;
-    const load = (async () => {
-      const library = await this.#readFromDisk(ownerUserId);
-      this.#cacheLibrary(library);
-      return library;
-    })();
+    const load = this.#loadUnderOwnerLock(ownerUserId);
     this.#loads.set(ownerUserId, load);
     try {
       return await load;
     } finally {
       if (this.#loads.get(ownerUserId) === load) this.#loads.delete(ownerUserId);
     }
+  }
+
+  /**
+   * Loads from disk while holding the owner lock, because `#readFromDisk` is not a pure read: a
+   * leftover journal is replayed there, rewriting this owner's project files *and*, through
+   * `writeLibraryForProjectOutput`, the saved-videos library that repository mutates under this
+   * same shared lock. Replaying unserialized would let a crash-recovery snapshot clobber
+   * saved-video writes that landed after the crash, or interleave with one in flight.
+   *
+   * `#read` is also called from inside a held lock and `KeyedLock` is not reentrant, so the
+   * async-context check is what keeps a locked caller from deadlocking against itself. Re-reading
+   * the cache after the wait also means queueing behind a writer cannot resurrect its pre-write
+   * state: either the writer already cached the newer library, or its failure dropped the entry
+   * and the disk (journal included) is the authority again.
+   */
+  async #loadUnderOwnerLock(ownerUserId: string): Promise<ProjectLibrary> {
+    const load = async (): Promise<ProjectLibrary> => {
+      const cached = this.#cache.get(ownerUserId);
+      if (cached !== undefined) return cached;
+      const library = await this.#readFromDisk(ownerUserId);
+      this.#cacheLibrary(library);
+      return library;
+    };
+    return this.#lockedOwner.getStore() === ownerUserId
+      ? load()
+      : this.#withOwnerLock(ownerUserId, load);
   }
 
   async #readFromDisk(ownerUserId: string): Promise<ProjectLibrary> {
@@ -502,7 +527,7 @@ export class FileProjectRepository
     operation: () => Promise<Result>,
   ): Promise<Result> {
     ownerIdSchema.parse(ownerUserId);
-    return this.#ownerLock.run(ownerUserId, operation);
+    return this.#ownerLock.run(ownerUserId, () => this.#lockedOwner.run(ownerUserId, operation));
   }
 
   async create(aggregateValue: ProjectAggregate): Promise<void> {
@@ -2076,8 +2101,10 @@ export class FileProjectRepository
     if (campaign === undefined) return null;
     return {
       campaign,
+      // Deleted Projects keep their `campaignId` but can never be moved off it again, so counting
+      // them would block the Campaign's deletion permanently against members nothing can detach.
       attachedProjectCount: library.projects.filter(
-        ({ project }) => project.campaignId === campaignId,
+        ({ project }) => project.campaignId === campaignId && project.deletedAt === null,
       ).length,
     };
   }
@@ -2152,8 +2179,10 @@ export class FileProjectRepository
         throw new Error('A Campaign update changed immutable identity.');
       }
       if (input.requireNoAttachedProjects) {
+        // Same rule as `getCampaignWithAttachedProjectCount`: a deleted Project keeps its
+        // `campaignId` and can never be detached again, so it must not hold the Campaign open.
         const attachedProjectCount = library.projects.filter(
-          ({ project }) => project.campaignId === current.id,
+          ({ project }) => project.campaignId === current.id && project.deletedAt === null,
         ).length;
         if (attachedProjectCount > 0) {
           return {

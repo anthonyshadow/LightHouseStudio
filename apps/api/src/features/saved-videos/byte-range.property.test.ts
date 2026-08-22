@@ -37,13 +37,39 @@ it.prop([validRange], { seed: 0x42595445, numRuns: 100 })(
 
 it.prop(
   [
-    fc.string({ maxLength: 80 }).filter((value) => !/^bytes=\d+-\d*$/u.test(value)),
+    fc.string({ maxLength: 80 }).filter((value) => !/^\s*bytes=(?:\d+-\d*|-\d+)\s*$/u.test(value)),
     fc.integer({ min: 1, max: 10_000_000 }),
   ],
   { seed: 0x52414e47, numRuns: 100 },
-)('rejects every generated header outside the supported single-range grammar', (value, size) => {
-  expect(() => parseByteRange(value, size)).toThrow();
-});
+)(
+  'ignores every generated header outside the supported single-range grammar, serving the whole representation',
+  (value, size) => {
+    expect(parseByteRange(value, size)).toBeNull();
+  },
+);
+
+const suffixRange = fc
+  .integer({ min: 1, max: 10_000_000 })
+  .chain((size) =>
+    fc.record({ size: fc.constant(size), length: fc.integer({ min: 1, max: size * 2 }) }),
+  );
+
+it.prop([suffixRange], { seed: 0x53554646, numRuns: 100 })(
+  'serves suffix ranges as the last bytes of the representation',
+  ({ size, length }) => {
+    expect(parseByteRange(`bytes=-${length}`, size)).toEqual({
+      start: length >= size ? 0 : size - length,
+      end: size - 1,
+    });
+  },
+);
+
+it.prop([fc.integer({ min: 1, max: 10_000_000 })], { seed: 0x5a45524f, numRuns: 25 })(
+  'rejects a zero-length suffix range as unsatisfiable',
+  (size) => {
+    expect(() => parseByteRange('bytes=-0', size)).toThrow();
+  },
+);
 
 const unavailableRange = fc.integer({ min: 1, max: 10_000_000 }).chain((size) =>
   fc.oneof(

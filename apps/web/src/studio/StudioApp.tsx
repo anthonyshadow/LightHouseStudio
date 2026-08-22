@@ -555,10 +555,12 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     () =>
       deriveStudioContextualNotices({
         directVideoLoad,
+        savedVideoLoadFailure: savedVideo.loadFailure,
         pendingVoiceName: existingVideoPendingVoiceName,
         projectVideoAttachment,
         routeOriginProjectId,
         onLeaveUnavailableVideo: nav.goBackTo,
+        onDismissSavedVideoLoadFailure: savedVideo.dismissLoadFailure,
         onRetryProjectVideoAttachment: retryProjectVideoAttachment,
       }),
     [
@@ -568,6 +570,8 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
       projectVideoAttachment,
       retryProjectVideoAttachment,
       routeOriginProjectId,
+      savedVideo.dismissLoadFailure,
+      savedVideo.loadFailure,
     ],
   );
   const cancelMediaAcquisition = mediaAcquisition.cancel;

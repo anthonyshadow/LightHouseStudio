@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { useBlocker, useLocation } from 'react-router';
 import { APP_PATHS, isProjectWorkspacePath, projectIdFromPath } from '../app/paths';
 import type { ProjectSessionPort } from '../features/projects/useProjectSession';
@@ -166,6 +166,23 @@ export const StudioExitGuard = ({
     ],
   );
 
+  /**
+   * The blocker as of the latest render. An awaited save resolves against a snapshot captured
+   * before it started, which cannot see an intervening "Stay here" — proceeding on that dead
+   * snapshot either throws an invalid state transition or navigates to a destination the operator
+   * already declined. Continuations therefore re-read the live blocker, and only proceed while it
+   * still blocks the same destination they saved for.
+   */
+  const blockerRef = useRef(blocker);
+  useLayoutEffect(() => {
+    blockerRef.current = blocker;
+  }, [blocker]);
+  const proceedIfStillBlocking = useCallback((destination: string) => {
+    const live = blockerRef.current;
+    if (live.state !== 'blocked' || live.location.pathname !== destination) return;
+    live.proceed();
+  }, []);
+
   const saveAttemptRef = useRef<string | null>(null);
   useEffect(() => {
     if (blocker.state !== 'blocked') {
@@ -186,9 +203,16 @@ export const StudioExitGuard = ({
     saveAttemptRef.current = destination;
     void projectSession.flush().then((saved) => {
       saveAttemptRef.current = null;
-      if (saved && !otherWorkBlocks(destination) && blocker.state === 'blocked') blocker.proceed();
+      if (saved && !otherWorkBlocks(destination)) proceedIfStillBlocking(destination);
     });
-  }, [blocker, location.pathname, otherWorkBlocks, projectSavePending, projectSession]);
+  }, [
+    blocker,
+    location.pathname,
+    otherWorkBlocks,
+    proceedIfStillBlocking,
+    projectSavePending,
+    projectSession,
+  ]);
 
   useEffect(() => {
     if (
@@ -234,9 +258,9 @@ export const StudioExitGuard = ({
     if (blocker.state !== 'blocked' || projectSession === null) return;
     const destination = blocker.location.pathname;
     void projectSession.retry().then((saved) => {
-      if (saved && !otherWorkBlocks(destination) && blocker.state === 'blocked') blocker.proceed();
+      if (saved && !otherWorkBlocks(destination)) proceedIfStillBlocking(destination);
     });
-  }, [blocker, otherWorkBlocks, projectSession]);
+  }, [blocker, otherWorkBlocks, proceedIfStillBlocking, projectSession]);
 
   const navigationBlocked = blocker.state === 'blocked';
   const projectContextChangeBlocked =

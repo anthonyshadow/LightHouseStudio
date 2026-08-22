@@ -179,7 +179,15 @@ export const RoutedApplication = () => {
   if (!hasVisitedProtectedApp && isProtectedAppPath(location.pathname)) {
     setHasVisitedProtectedApp(true);
   }
-  const legacyRedirect = canonicalizeLegacyAppPath(location.pathname);
+  // A bookmarked legacy URL keeps its query and fragment across the redirect: they carry the
+  // focused video, the workspace task, and every other piece of state the destination reads.
+  // Appended only when the canonical target states no query of its own, which would be the more
+  // specific instruction.
+  const legacyPath = canonicalizeLegacyAppPath(location.pathname);
+  const legacyRedirect =
+    legacyPath === null || legacyPath.includes('?')
+      ? legacyPath
+      : `${legacyPath}${location.search}${location.hash}`;
 
   return (
     <>

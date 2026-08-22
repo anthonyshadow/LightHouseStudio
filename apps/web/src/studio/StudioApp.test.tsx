@@ -243,7 +243,8 @@ const harness = vi.hoisted(() => {
       };
       return Promise.resolve(artifact);
     }),
-    adoptRecordedArtifact: vi.fn(() => Promise.resolve()),
+    // Resolves whether the take actually became the source, which is what spends the editor intent.
+    adoptRecordedArtifact: vi.fn(() => Promise.resolve(true)),
     cancelBeforeAcceptance: vi.fn(),
     cleanup: vi.fn(() => Promise.resolve()),
     reset: vi.fn(),
@@ -1154,6 +1155,22 @@ describe('StudioApp composition lifecycle', () => {
         'Post-recording editor',
       ),
     );
+  });
+
+  it('keeps the editor request armed when the take is refused rather than adopted', async () => {
+    harness.existingVideo.adoptRecordedArtifact.mockResolvedValueOnce(false);
+    harness.session.startLocal.mockImplementationOnce(() => {
+      harness.recording.original = { id: 'refused-source', media: new Blob(['take']) };
+      harness.takeStagePresentation = { kind: 'playback', mode: 'local' };
+      return Promise.resolve();
+    });
+    renderStudio('upload');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Record a local video' }));
+
+    await waitFor(() => expect(harness.existingVideo.adoptRecordedArtifact).toHaveBeenCalledOnce());
+    // A refusal must not spend the one-shot intent on an overlay that adopted nothing.
+    expect(screen.queryByRole('region', { name: 'Use existing video' })).not.toBeInTheDocument();
   });
 
   it('holds an expiring session open to say what an unsaved take loses', async () => {

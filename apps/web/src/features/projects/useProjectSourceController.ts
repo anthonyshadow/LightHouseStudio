@@ -6,7 +6,7 @@ import type {
 } from '@studio/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ApiClientError } from '../../adapters/api-client/apiClient';
+import { ApiClientError, apiFetch } from '../../adapters/api-client/apiClient';
 import type {
   PersistedRecordingArtifactMetadata,
   PresentStageSourceInput,
@@ -124,6 +124,34 @@ const artifactInput = (file: File, source?: PresentableProjectMedia): PresentSta
 };
 
 /**
+ * Confirms the content route actually serves this media before the stage commits to streaming it.
+ *
+ * Presenting a URL replaced a full download that used to prove reachability and content type as a
+ * side effect. One byte re-establishes that proof: without it a Project whose stored bytes are
+ * gone or misconfigured would hydrate as "ready", and its only symptom would be a playback error
+ * offering Take Review remedies that no Project source has.
+ */
+const assertMediaReachable = async (
+  source: PresentableProjectMedia,
+  signal: AbortSignal,
+): Promise<void> => {
+  const response = await apiFetch(source.contentUrl, {
+    cache: 'no-store',
+    headers: { Accept: source.mimeType, Range: 'bytes=0-0' },
+    signal,
+  });
+  void response.body?.cancel().catch(() => undefined);
+  const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();
+  if (contentType !== source.mimeType) {
+    throw new ApiClientError(
+      'This Project’s original video could not be opened.',
+      502,
+      'result_invalid',
+    );
+  }
+};
+
+/**
  * Presents durable media from its ranged content route rather than downloading it. The stage
  * streams playback; operations that need the complete bytes acquire them on demand.
  */
@@ -213,6 +241,9 @@ export const useProjectSourceController = (
             };
       const presented = current.revision.snapshot.presentedMedia;
       if (JSON.stringify(presented) === JSON.stringify(sourceReference)) {
+        // Reopening streams media this session has never read; prove it is actually there, so an
+        // unreachable source fails here as a Project problem rather than as a playback mystery.
+        await assertMediaReachable(sourceResponse.source, signal);
         presentAccepted(sourceResponse, signal);
         return;
       }
@@ -227,6 +258,7 @@ export const useProjectSourceController = (
           'conflict',
         );
       }
+      await assertMediaReachable(working.media, signal);
       signal.throwIfAborted();
       runtime.present(projectId, remoteArtifactInput(working.media));
     },
@@ -293,19 +325,30 @@ export const useProjectSourceController = (
     ) => {
       if (controller.signal.aborted || generation !== generationRef.current) return;
       setPhase('saving');
-      hydratedMediaRef.current = JSON.stringify(response.revision.snapshot.presentedMedia);
+      // Marked before the accepted revision is published, so the hydration effect does not race
+      // this acceptance and re-fetch media it is already about to present.
+      const mediaIdentity = JSON.stringify(response.revision.snapshot.presentedMedia);
+      hydratedMediaRef.current = mediaIdentity;
       queryClient.setQueryData(projectQueryKeys.detail(projectId), {
         project: response.project,
         revision: response.revision,
       });
       onCurrentChange?.({ project: response.project, revision: response.revision });
       await queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
+      if (
+        controller.signal.aborted ||
+        generation !== generationRef.current ||
+        !mountedRef.current
+      ) {
+        // Nothing reached the stage, so release the marker: otherwise the hydration effect would
+        // treat this media as already presented and leave an accepted source with an empty stage.
+        if (hydratedMediaRef.current === mediaIdentity) hydratedMediaRef.current = null;
+        return;
+      }
       // A file the operator just chose is already owned bytes; only re-presentation without a
       // local file streams from the content route.
       if (previewFile === undefined) presentAccepted(response, controller.signal);
       else runtime.present(projectId, artifactInput(previewFile, response.source));
-      if (controller.signal.aborted || generation !== generationRef.current || !mountedRef.current)
-        return;
       operation.reset();
       setSource(response.source);
       setMessage(null);

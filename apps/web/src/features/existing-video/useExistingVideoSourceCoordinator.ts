@@ -103,11 +103,12 @@ export const useExistingVideoSourceCoordinator = ({
     ],
   );
 
-  const adoptRecordedArtifact = useCallback(async () => {
+  /** Resolves whether the recorded take actually became the workflow's source. */
+  const adoptRecordedArtifact = useCallback(async (): Promise<boolean> => {
     // Declares owned bytes: adoption validates and re-publishes the complete media. A URL-backed
     // presentation must be acquired first; callers gate on that before adopting.
     const draft = ownedRecordingArtifact(recording.original);
-    if (!draft || recording.lifecycle !== 'recorded' || submissionLocked) return;
+    if (!draft || recording.lifecycle !== 'recorded' || submissionLocked) return false;
     releaseRetainedJob();
     clearOperation();
     const generation = generationRef.current;
@@ -123,7 +124,7 @@ export const useExistingVideoSourceCoordinator = ({
     try {
       const file = new File([draft.media], draft.filename, { type: draft.mimeType });
       const validated = await validateExistingVideo(file, false, controller.signal);
-      if (controller.signal.aborted || generation !== generationRef.current) return;
+      if (controller.signal.aborted || generation !== generationRef.current) return false;
       const sourceArtifact = publishUploadedVideo({
         blob: draft.media,
         artifactMetadata: {
@@ -149,13 +150,15 @@ export const useExistingVideoSourceCoordinator = ({
       });
       dispatch({ type: 'source-ready', selection: validated, editBase: sourceArtifact });
       recording.cancelProcessing();
+      return true;
     } catch (error) {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted) return false;
       const safeMessage =
         error instanceof Error ? error.message : 'The local recording could not be used.';
       recording.failProcessing(safeMessage);
       setPhase('error');
       setMessage(safeMessage);
+      return false;
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;
     }

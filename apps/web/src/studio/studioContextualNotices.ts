@@ -5,12 +5,15 @@ import type { ProjectVideoAttachmentState } from './useProjectVideoAttachment';
 
 export type StudioContextualNoticeInputs = Readonly<{
   directVideoLoad: DirectVideoLoadState;
+  /** A gallery hand-off that failed after the shell had already navigated into Studio. */
+  savedVideoLoadFailure: string | null;
   /** Name of a Voice chosen before a video existed, held until a source is ready. */
   pendingVoiceName: string | null;
   projectVideoAttachment: ProjectVideoAttachmentState;
   /** Project the operator arrived from, so an unavailable Video can return where it came from. */
   routeOriginProjectId: string | null;
   onLeaveUnavailableVideo: (fallbackPath: string) => void;
+  onDismissSavedVideoLoadFailure: () => void;
   onRetryProjectVideoAttachment: () => void;
 }>;
 
@@ -21,13 +24,30 @@ export type StudioContextualNoticeInputs = Readonly<{
  */
 export const deriveStudioContextualNotices = ({
   directVideoLoad,
+  savedVideoLoadFailure,
   pendingVoiceName,
   projectVideoAttachment,
   routeOriginProjectId,
   onLeaveUnavailableVideo,
+  onDismissSavedVideoLoadFailure,
   onRetryProjectVideoAttachment,
 }: StudioContextualNoticeInputs): readonly StageNotice[] => {
   const notices: StageNotice[] = [];
+
+  if (savedVideoLoadFailure !== null) {
+    notices.push({
+      id: 'saved-video-handoff-error',
+      severity: 'error',
+      title: 'Video not opened',
+      message: savedVideoLoadFailure,
+      priority: 500,
+      action: {
+        label: 'Back to Videos',
+        onAction: () => onLeaveUnavailableVideo(APP_PATHS.videos),
+      },
+      onDismiss: onDismissSavedVideoLoadFailure,
+    });
+  }
 
   if (directVideoLoad.status === 'loading') {
     notices.push({

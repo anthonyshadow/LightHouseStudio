@@ -75,8 +75,13 @@ export const useStudioRecordingLaunch = ({
     }
 
     adoptingRecordingRef.current = artifact.id;
-    void existingVideo.adoptRecordedArtifact().then(() => {
+    void existingVideo.adoptRecordedArtifact().then((adopted) => {
       if (adoptingRecordingRef.current !== artifact.id) return;
+      // Only a completed adoption spends the one-shot editor intent. A refusal (still locked, no
+      // longer a finished take) or a failure surfaces through the workflow's own error state and
+      // leaves the request armed; the marker stays set so this cannot retry in a loop, and
+      // asking for the editor again clears it.
+      if (!adopted) return;
       adoptingRecordingRef.current = null;
       setRecordingForExistingVideo(false);
       openOverlay('video-upload');
@@ -139,6 +144,9 @@ export const useStudioRecordingLaunch = ({
   const openPlaybackEditor = useCallback(() => {
     if (!recording.presented || recordingActive) return;
     if (projectContextActive && !existingVideo.selection) {
+      // Asking again is the retry: clear the attempt marker so a previously refused or failed
+      // adoption can run once more for the same take.
+      adoptingRecordingRef.current = null;
       setRecordingForExistingVideo(true);
       // A streamed Project source needs its complete bytes before adoption can validate it. The
       // acquisition shows its own progress and cancel; adoption resumes when it lands.

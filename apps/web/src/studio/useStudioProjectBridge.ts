@@ -28,6 +28,8 @@ export const useStudioProjectBridge = ({
   clearSource,
 }: UseStudioProjectBridgeOptions) => {
   const projectIdRef = useRef(projectId);
+  /** The Project whose media is on the stage right now, which outlives its route being left. */
+  const presentedProjectIdRef = useRef<string | null>(null);
   const presentSourceRef = useRef(presentSource);
   const clearSourceRef = useRef(clearSource);
   const [sourceActivity, setSourceActivity] = useState<ProjectSourceActivity | null>(null);
@@ -49,10 +51,23 @@ export const useStudioProjectBridge = ({
       available: true,
       present: (candidateProjectId, input) => {
         if (projectIdRef.current !== candidateProjectId) return;
+        presentedProjectIdRef.current = candidateProjectId;
         presentSourceRef.current(input);
       },
+      /**
+       * A Project may always relinquish media it put on the stage, even once the route has moved
+       * on. The unmounting source controller clears in a passive cleanup, by which point the
+       * layout effect above has already retargeted `projectIdRef` — so matching only that would
+       * drop the one clear that matters and strand the Project's source as a phantom take.
+       */
       clear: (candidateProjectId) => {
-        if (projectIdRef.current !== candidateProjectId) return;
+        if (
+          projectIdRef.current !== candidateProjectId &&
+          presentedProjectIdRef.current !== candidateProjectId
+        ) {
+          return;
+        }
+        presentedProjectIdRef.current = null;
         clearSourceRef.current();
       },
     }),
