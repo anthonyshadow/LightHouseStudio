@@ -292,6 +292,26 @@ Using synthetic compatible media and no live provider:
   preserved, and verify the Project-scoped current output still plays while the gallery record stays
   hidden.
 
+## Export placement and streamed source
+
+These two are the most device-dependent behaviours added since the last manual pass: both lean on
+codec paths that Chromium implements differently from Safari and iOS.
+
+Using synthetic compatible media and no live provider:
+
+- at save time — from Studio and from a Project — confirm **Where is this going?** offers keep as
+  it is, phone, widescreen, square post and tall feed post; that the crop preview matches the
+  saved result; and that the saved Version reports the placement it was saved for;
+- run one re-framing save to completion on each physical target and confirm the progress and
+  cancel controls behave, a cancelled render leaves the original untouched, and a failed render
+  explains itself without losing the pending save;
+- on a browser without the local editor path (WebGL preview plus worker WebCodecs/OffscreenCanvas
+  export), confirm the chooser says the editor is unavailable, stays on **Keep as it is**, and the
+  save still completes; and
+- open a Project with a large source on each target and confirm playback starts without
+  downloading the whole file, seeking works, and an operation that genuinely needs the complete
+  bytes acquires them explicitly rather than failing quietly.
+
 ## Project history and exact-Version boundary
 
 Using synthetic compatible media and no live provider:

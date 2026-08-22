@@ -3,8 +3,9 @@
 ## Product context
 
 Lightframe Studio is a local-first, single-operator browser video studio. The primary product model
-is Dashboard → Create, Assets, Projects, or Campaigns. `/studio` is the authenticated Dashboard and
-`/studio/create` is the standalone creation workspace. The workspace flow is Record or Upload →
+is Dashboard → Create, Assets, Projects, or Campaigns. `/dashboard` is the authenticated Dashboard
+and `/studio/create` is the standalone creation workspace; bare `/studio` only redirects to
+`/dashboard`. The workspace flow is Record or Upload →
 Review → optional Virtual Try On, Character Swap, and/or Voice → Save to Assets or Download. It is a
 fixed-viewport workspace with one media stage for as long as the operator is in Studio; tools are
 focus-managed overlays and must never remount the media while they are open. Leaving Studio releases
@@ -19,8 +20,9 @@ download.
 
 - Dashboard orients first-time users, exposes one strong Create video action, and helps returning
   users continue recent work.
-- Assets exposes retained Videos, Characters, Outfits, Voices, and Recipes. Account navigation is
-  reserved for identity, availability, and logout.
+- Assets exposes retained Videos, Characters, Outfits, and Voices. Recipe is not an Asset type and
+  is absent from the UI. Account navigation is reserved for identity, availability, a read-only
+  account panel, and logout; a quiet "How Lightframe works" control sits beside it.
 - A Campaign optionally groups Projects and never owns media-processing state.
 - A Project may intentionally be empty and acts as a collection around one focused, resumable
   primary video workflow today. Its retained outputs and reusable resources are visible from the
@@ -29,8 +31,9 @@ download.
 - Studio always declares its context, save destination, and return path. Standalone work returns to
   Dashboard or Assets; Project work returns to its Project and then its Campaign when applicable.
 - Live AI Beta is hidden from ordinary navigation unless `REALTIME_VIDEO_BETA_ENABLED=true`.
-- Export remains visible but disabled with a concise “Coming later” explanation until an actual
-  format/channel contract exists. Download continues to retrieve an exact retained Video Version.
+- Saving asks where the video is going — keep as it is, phone, widescreen, square post, tall feed
+  post — and re-frames it in the browser before upload. Publishing to a channel does not exist;
+  Download continues to retrieve an exact retained Video Version.
 
 ## Application shell
 

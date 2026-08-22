@@ -3,8 +3,12 @@
 Fifteen incremental steps, each with one primary objective, each independently reviewable, each
 preserving existing behaviour unless it explicitly changes it.
 
-**Nothing here has been implemented.** A standalone coding-agent prompt for every step is in
-[`prompts/`](prompts/README.md).
+**All fifteen steps have since been implemented on `develop`** — one commit per step, from
+`371b22e` (step 1) to `628fa22` (step 15), plus a bug-fix pass (`d19c0a7`), a simplification pass
+(`21ca458`) and the code-review findings (`80d0fd1`). The per-step sections below are the
+specification each step was built against, not a description of the code as it stands now. Where the
+two disagree, the code wins. The one-per-step implementation prompts that used to sit in
+`prompts/` were removed once every step landed; each step's commit is now its record.
 
 ## Why this order
 
@@ -577,23 +581,23 @@ dismissal boolean that already exists.
 
 ## Sequence at a glance
 
-| #   | Step                      | Priority      | Effort | Depends on |
-| --- | ------------------------- | ------------- | ------ | ---------- |
-| 1   | Provider safety switch    | P0            | XS     | —          |
-| 2   | Creative library export   | P0            | S      | —          |
-| 3   | Reliable previews         | P1            | S      | —          |
-| 4   | Ordinary language         | P1            | M      | —          |
-| 5   | Complete the save moment  | P2            | S      | 4          |
-| 6   | Separate Project surfaces | P3 (enabling) | M      | 4          |
-| 7   | Visual browsing           | P1            | M      | 3, 6       |
-| 8   | Search and totals         | P1            | M      | 6          |
-| 9   | Create surface            | P1            | M      | —          |
-| 10  | Dashboard                 | P2            | S      | 7          |
-| 11  | Export presets            | P1            | L      | 4, 5       |
-| 12  | Variants                  | P1            | M      | 6, 11      |
-| 13  | Streamed Project source   | P3            | M      | 6          |
-| 14  | Account and usage         | P2            | S      | —          |
-| 15  | Help that survives        | P2            | S      | 4          |
+| #   | Step                      | Priority      | Effort | Depends on | Landed in |
+| --- | ------------------------- | ------------- | ------ | ---------- | --------- |
+| 1   | Provider safety switch    | P0            | XS     | —          | `371b22e` |
+| 2   | Creative library export   | P0            | S      | —          | `e75c518` |
+| 3   | Reliable previews         | P1            | S      | —          | `d2ce0a5` |
+| 4   | Ordinary language         | P1            | M      | —          | `019f132` |
+| 5   | Complete the save moment  | P2            | S      | 4          | `8a4b419` |
+| 6   | Separate Project surfaces | P3 (enabling) | M      | 4          | `a743c1e` |
+| 7   | Visual browsing           | P1            | M      | 3, 6       | `67b11c4` |
+| 8   | Search and totals         | P1            | M      | 6          | `e59ee59` |
+| 9   | Create surface            | P1            | M      | —          | `eddffdc` |
+| 10  | Dashboard                 | P2            | S      | 7          | `066a195` |
+| 11  | Export presets            | P1            | L      | 4, 5       | `a086261` |
+| 12  | Variants                  | P1            | M      | 6, 11      | `3b7f5a8` |
+| 13  | Streamed Project source   | P3            | M      | 6          | `788885d` |
+| 14  | Account and usage         | P2            | S      | —          | `9f34956` |
+| 15  | Help that survives        | P2            | S      | 4          | `628fa22` |
 
 Steps 1–5 are roughly one week and change how the product feels. Steps 6–10 are roughly two weeks
 and change how it works. Steps 11–12 are the product's next real capability. Steps 13–15 close out

@@ -9,13 +9,20 @@ Entry: `apps/web/src/app/EntryPage.tsx`
   - `apps/web/src/ui/StudioDesignProvider.tsx`
   - `apps/web/src/ui/theme.ts`
 
-## `/studio/*` — the Studio runtime
+## Every protected route — the authenticated shell
 
-Entry: `apps/web/src/studio/StudioApp.tsx`
+Entry: `apps/web/src/app/shell/AuthenticatedShell.tsx`. It stays mounted across `/dashboard`,
+`/projects/*`, `/campaigns/*`, `/assets/*` and the Studio routes, and owns the chrome
+(`studio/StudioHeader.tsx` — nav, Quick Create, status/account/help panels), the library overlays
+(`studio/StudioLibraryOverlays.tsx`) and the session lifecycle.
+
+## `/studio/create`, `/studio/:videoId`, `/projects/:id/workspace` — the capture runtime
+
+Entry: `apps/web/src/studio/StudioApp.tsx`. Only these three destinations mount live media
+(`isStudioRuntimePath` in `app/paths.ts`); every other protected route mounts no stage at all.
 
 - `apps/web/src/studio/StudioApp.tsx`
   - `apps/web/src/studio/CreativeWorkspace.tsx`
-  - `apps/web/src/studio/StudioHeader.tsx`
   - `apps/web/src/features/live-stage/MediaStage.tsx`
   - `apps/web/src/features/character-builder/CharacterBuilderCoordinator.tsx`
     - `apps/web/src/features/character-builder/CharacterBuilderPanel.tsx`

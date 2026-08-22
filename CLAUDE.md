@@ -19,23 +19,25 @@ Imports point inward. `apps/web` must never import `apps/api` implementation.
 
 ## Where things live
 
-| Task touches                                                          | Look in                                                                                                 |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| A route, redirect, or "where does this link go"                       | `apps/web/src/app/paths.ts`, `AppRouter.tsx`, `docs/user-flows/navigation-map.md`                       |
-| Any authenticated screen                                              | `apps/web/src/app/shell/AuthenticatedShell.tsx` (persistent) → `studio/StudioApp.tsx` (live media only) |
-| Dashboard / Assets / Projects / Campaigns surfaces                    | `apps/web/src/features/{dashboard,assets,projects,campaigns}`                                           |
-| Recording, take review, stage                                         | `apps/web/src/orchestration/{recording,session}`, `features/live-stage`, `studio/useTakeReviewFlow.ts`  |
-| Upload / Character Swap / Virtual Try-On / voice on an existing video | `apps/web/src/features/existing-video`                                                                  |
-| Local video editing                                                   | `apps/web/src/features/video-editor`                                                                    |
-| Characters, outfits, prompts (browser-local)                          | `apps/web/src/features/{creative-assets,character-builder,character-wardrobe}`                          |
-| Saved Videos and Versions                                             | `apps/web/src/features/{saved-videos,video-gallery}`, `apps/api/src/features/saved-videos`              |
-| An HTTP endpoint                                                      | `apps/api/src/features/<area>/routes.ts`; the canonical list is `apps/api/src/route-inventory.test.ts`  |
-| Business rules / invariants                                           | `packages/domain/src/<area>/rules.ts`                                                                   |
-| Request/response shape                                                | `packages/contracts/src/<area>.ts`                                                                      |
-| Database                                                              | `apps/api/src/infrastructure/database/schema.ts`, `apps/api/drizzle/*.sql`                              |
-| Byte storage (local or R2)                                            | `apps/api/src/storage`                                                                                  |
-| Provider integrations                                                 | `apps/api/src/providers/{decart,openai,bfl,wiro,pruna,elevenlabs}`                                      |
-| Feature flags / environment                                           | `apps/api/src/config/environment.ts`, `.env.example`                                                    |
+| Task touches                                                          | Look in                                                                                                                                                |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A route, redirect, or "where does this link go"                       | `apps/web/src/app/paths.ts`, `AppRouter.tsx`, `docs/user-flows/navigation-map.md`                                                                      |
+| Any authenticated screen                                              | `apps/web/src/app/shell/AuthenticatedShell.tsx` (persistent) → `studio/StudioApp.tsx` (live media only)                                                |
+| Dashboard / Assets / Projects / Campaigns surfaces                    | `apps/web/src/features/{dashboard,assets,projects,campaigns}`                                                                                          |
+| Recording, take review, stage                                         | `apps/web/src/orchestration/{recording,session}`, `features/live-stage`, `studio/useTakeReviewFlow.ts`                                                 |
+| Upload / Character Swap / Virtual Try-On / voice on an existing video | `apps/web/src/features/existing-video`                                                                                                                 |
+| Local video editing                                                   | `apps/web/src/features/video-editor`                                                                                                                   |
+| Characters, outfits, prompts (browser-local)                          | `apps/web/src/features/{creative-assets,character-builder,character-wardrobe}`; the Characters/Outfits overlays render from `features/account-library` |
+| Saved Videos and Versions                                             | `apps/web/src/features/{saved-videos,video-gallery}`, `apps/api/src/features/saved-videos`                                                             |
+| Export placement (where the video is going) at save time              | `apps/web/src/features/export-placements`; aspects, resolutions and crop live in `packages/domain/src/projects`                                        |
+| Account details, capabilities and usage; the help explainer           | `apps/web/src/features/account`, `apps/web/src/studio/HowLightframeWorksPanel.tsx`                                                                     |
+| An HTTP endpoint                                                      | `apps/api/src/features/<area>/routes.ts`; the canonical list is `apps/api/src/route-inventory.test.ts`                                                 |
+| Business rules / invariants                                           | `packages/domain/src/<area>/rules.ts`                                                                                                                  |
+| Request/response shape                                                | `packages/contracts/src/<area>.ts`                                                                                                                     |
+| Database                                                              | `apps/api/src/infrastructure/database/schema.ts`, `apps/api/drizzle/*.sql`                                                                             |
+| Byte storage (local or R2)                                            | `apps/api/src/storage`                                                                                                                                 |
+| Provider integrations                                                 | `apps/api/src/providers/{decart,openai,bfl,wiro,pruna,elevenlabs}`                                                                                     |
+| Feature flags / environment                                           | `apps/api/src/config/environment.ts`, `.env.example`                                                                                                   |
 
 ## Deeper documentation — consult only when relevant
 
@@ -141,6 +143,10 @@ check as passing.
   updated.
 - **Idempotency keys and CAS versions are load-bearing** on Project and Campaign mutations. Do not
   drop `expectedVersion`, `expectedRevisionNumber` or `Idempotency-Key` to "simplify" a call.
+- **A stage artifact may not hold its bytes.** `PresentedRecordingArtifact.media` is either an owned
+  `Blob` or a URL-backed `remote-presentation` (a Project source streamed over HTTP ranges). Never
+  read `media` directly when you need the complete file — narrow through `ownedRecordingArtifact`
+  and handle `null`.
 - **`scripts/check-retired-program-references.mjs` fails on certain retired words** in any tracked
   text file. If a doc or test suddenly fails that check, that is why.
 - **`bun run check:docs`** validates every relative link and heading anchor in `README.md`,

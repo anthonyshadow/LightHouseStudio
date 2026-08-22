@@ -8,6 +8,13 @@ Severities are **Critical / High / Medium / Low / Observation**.
 B2, N10, N1, G6) and **Tier 4** (N7/T7, N5, G8, N8, N9, B6, B8/T6, R1, R4, R5). **R3** closed as a
 consequence of G6. Each entry below records what shipped. Everything else remains an open finding.
 
+**The fifteen-step roadmap in [`../product-audit/10-implementation-roadmap.md`](../product-audit/10-implementation-roadmap.md)
+has since landed as well**, closing four findings this document had left open: **G5** and **M9**
+(step 14, the account panel), **G8** and **M7** (step 15, the persistent explainer) and **M3**
+(step 15, the Outfits empty state). **M10** was closed separately — `isChunkLoadError` now tells a
+stale lazy chunk apart from a crash. Still open: **M5**, **M8**, **M12**, **R2**, **R6**, **B4**,
+**B5**, **B7**, **B9** and **B10**.
+
 **Two Tier 4 findings were already closed before the tier ran** — N7/T7 and G8's dead guide — by
 refactors that landed for other reasons. Their entries below record that correction rather than new
 work; verifying a finding still holds before acting on it is part of the job.
@@ -109,11 +116,20 @@ it has one, replacing the single ambiguous "Open in Workspace". The source branc
 place, "Project source" and "Project Assets" sit as adjacent, differently-named sections on the
 overview.
 
-### G5 — No account or settings surface (Medium)
+### G5 — No account or settings surface (Medium) — **Resolved**
 
-`AccountMenu` contains only **Log out** (`AccountMenu.tsx:245-247`). There is no profile, no
-preferences, no storage usage, no provider configuration view, no way to see the plan or
-entitlements that the API already returns in the session payload.
+`AccountMenu` contained only **Log out**. There was no profile, no preferences, no storage usage, no
+provider configuration view, no way to see the plan or entitlements the API already returns in the
+session payload.
+
+**Shipped (step 14).** The account menu now offers **Account details**, opening a read-only
+`AccountPanel` (`features/account/AccountPanel.tsx`) built entirely from data the product already
+holds: identity, plan and session expiry from the in-memory session; the plan's included
+capabilities and its Saved Video/Character/Outfit and monthly-credit limits from `entitlements`;
+the configured integrations in the same wording the header status menu uses; and one bounded
+active-jobs read for what is running right now. It adds no polling and no new endpoint, and it says
+plainly that Lightframe keeps no lifetime total across Projects — a Project's own History is the
+record. This is not preferences or billing; neither exists to configure.
 
 ### G6 — Campaigns cannot be managed from the list (Medium) — **Resolved**
 
@@ -180,11 +196,17 @@ outranks it. A query parameter rather than a path segment because the anchored
 with unsaved changes. Task changes `replace` rather than push, or `useRouteBack` would walk back
 through tasks instead of leaving. This also closes **M6**.
 
-### G8 — First-time-user guidance is one dismissible card (Medium) — **partly resolved**
+### G8 — First-time-user guidance is one dismissible card (Medium) — **Resolved**
 
-`dashboardOnboarding.ts` stores a single boolean. Once dismissed, no product surface ever explains
-Projects vs Campaigns vs Assets again. **That half of the finding is still open**, and is tracked
-alongside **M7**.
+`dashboardOnboarding.ts` stores a single boolean. Once dismissed, no product surface ever explained
+Projects vs Campaigns vs Assets again.
+
+**Shipped (step 15).** A quiet **How Lightframe works** control sits in the header on every
+protected route and opens a static explainer (`studio/HowLightframeWorksPanel.tsx`) covering when a
+Project helps, when a Campaign helps, and what each Asset library holds — reachable long after the
+getting-started card is dismissed, and storing nothing beyond the boolean that already existed.
+Each list empty state also gained a visual and one worked example, so a surface teaches when it has
+nothing to show. This closes **M7** with it.
 
 _Correction:_ the second half — the unreachable Studio "first take guide" gated on
 `firstSuccessGuideVisible` — **no longer exists**. The symbol and the guide markup were both removed
@@ -387,20 +409,20 @@ repositories and both Campaign repositories stop counting one row past `LIST_TOT
 
 ## 4. Missing UI
 
-| #       | Missing                                                                                                                                                                                       | Where                              | Severity |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------- |
-| ~~M1~~  | ~~Success state after saving a video~~ — **resolved with G2**                                                                                                                                 | Studio take review / action bar    | High     |
-| ~~M2~~  | ~~Download affordance anywhere except the Videos gallery and Project History~~ — **resolved with G2** for Studio review and by the Project workspace Save tab's post-save actions             | Studio review, Project Save        | High     |
-| M3      | Empty-state call to action on the Outfits library (the create button is above the empty state, not in it)                                                                                     | `SavedCreativeLibrary.tsx:394-398` | Low      |
-| ~~M4~~  | ~~Loading/error state for the Assets hub counts (they silently read 0 before the local repository hydrates)~~ — **resolved**: all four cards count, and say they are counting until they know | `AssetsRouteSurface.tsx`           | Low      |
-| M5      | Breadcrumbs anywhere except Project detail, Project workspace and Campaign detail                                                                                                             | Assets libraries, Studio           | Medium   |
-| ~~M6~~  | ~~Progress indication for the Project workflow phase~~ — **resolved with G7**                                                                                                                 | Project workspace masthead         | Medium   |
-| M7      | A "what is a Project / Campaign / Asset" explanation reachable after onboarding is dismissed                                                                                                  | Global                             | Medium   |
-| M8      | Confirmation before a project-source upload replaces a previously _failed_ staging attempt                                                                                                    | `ProjectSourceSection.tsx:130-166` | Low      |
-| M9      | Any surfacing of `entitlements` returned by `/api/auth/me`                                                                                                                                    | Account menu                       | Low      |
-| M10     | An error boundary message that distinguishes a chunk-load failure from an application crash                                                                                                   | `AppRouter.tsx`                    | Low      |
-| ~~M11~~ | ~~Retry affordance for the Assets hub when the creative repository fails to open~~ — **resolved**: an unopenable library offers a retry that reopens the repository                           | `useStudioCreativeRepository.ts`   | Low      |
-| M12     | Visible indication that `/assets/*` libraries are overlays over the hub (Escape closes to `/assets`, which is not signposted)                                                                 | `StudioLibraryOverlays.tsx`        | Low      |
+| #       | Missing                                                                                                                                                                                                                                                  | Where                                      | Severity |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ | -------- |
+| ~~M1~~  | ~~Success state after saving a video~~ — **resolved with G2**                                                                                                                                                                                            | Studio take review / action bar            | High     |
+| ~~M2~~  | ~~Download affordance anywhere except the Videos gallery and Project History~~ — **resolved with G2** for Studio review and by the Project workspace Save tab's post-save actions                                                                        | Studio review, Project Save                | High     |
+| ~~M3~~  | ~~Empty-state call to action on the Outfits library (the create button is above the empty state, not in it)~~ — **resolved (step 15)**: one create action, defined once, rendered inside the empty state when the library teaches and above it otherwise | `account-library/SavedCreativeLibrary.tsx` | Low      |
+| ~~M4~~  | ~~Loading/error state for the Assets hub counts (they silently read 0 before the local repository hydrates)~~ — **resolved**: all four cards count, and say they are counting until they know                                                            | `AssetsRouteSurface.tsx`                   | Low      |
+| M5      | Breadcrumbs anywhere except Project detail, Project workspace and Campaign detail                                                                                                                                                                        | Assets libraries, Studio                   | Medium   |
+| ~~M6~~  | ~~Progress indication for the Project workflow phase~~ — **resolved with G7**                                                                                                                                                                            | Project workspace masthead                 | Medium   |
+| ~~M7~~  | ~~A "what is a Project / Campaign / Asset" explanation reachable after onboarding is dismissed~~ — **resolved (step 15)** with G8                                                                                                                        | `studio/HowLightframeWorksPanel.tsx`       | Medium   |
+| M8      | Confirmation before a project-source upload replaces a previously _failed_ staging attempt                                                                                                                                                               | `ProjectSourceSection.tsx:130-166`         | Low      |
+| ~~M9~~  | ~~Any surfacing of `entitlements` returned by `/api/auth/me`~~ — **resolved (step 14)** with G5: the account panel lists each capability as Included / Not included, plus every limit                                                                    | `account/AccountPanel.tsx`                 | Low      |
+| ~~M10~~ | ~~An error boundary message that distinguishes a chunk-load failure from an application crash~~ — **resolved**: `isChunkLoadError` splits a stale lazy chunk from a crash, and each states its own recovery                                              | `AppRouter.tsx`, `clientDiagnostics.ts`    | Low      |
+| ~~M11~~ | ~~Retry affordance for the Assets hub when the creative repository fails to open~~ — **resolved**: an unopenable library offers a retry that reopens the repository                                                                                      | `useStudioCreativeRepository.ts`           | Low      |
+| M12     | Visible indication that `/assets/*` libraries are overlays over the hub (Escape closes to `/assets`, which is not signposted)                                                                                                                            | `StudioLibraryOverlays.tsx`                | Low      |
 
 ## 5. Unnecessary or redundant UI
 

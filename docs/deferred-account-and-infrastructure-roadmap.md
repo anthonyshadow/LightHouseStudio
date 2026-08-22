@@ -15,6 +15,12 @@ sessions, creative sync, accepted-job recovery, and admission limits are now con
 current behavior. Signup, billing, public deployment, cloud ownership policy, a worker fleet, and
 multi-tenant authorization remain deferred.
 
+The product now displays the account data it already holds — identity, plan, entitlement matrix,
+configured integrations and currently running jobs — in a read-only account panel. That is
+presentation of the existing session payload and changes nothing here: no signup, recovery,
+preferences, plan change, billing, metering or multi-tenant authorization exists, and every phase
+below remains deferred.
+
 This is the service-readiness roadmap, not the product capability roadmap. Campaigns, user-facing
 Projects, multi-format content, distribution, and collaboration direction are maintained in the
 [Product Roadmap](PRODUCT_ROADMAP.md).

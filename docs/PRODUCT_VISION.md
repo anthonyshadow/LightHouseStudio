@@ -83,8 +83,8 @@ The current Studio supports:
 - local trim, crop, rotation, flip, lighting, filter, normalization, and export work;
 - optional Character Swap, Virtual Try-On, live character transformation, and voice treatment that
   runs locally or through a configured provider;
-- an Assets hub for reusable Saved Videos, Characters, Character variants in Wardrobe, Outfits,
-  Voices, and recipes;
+- an Assets hub for reusable Saved Videos, Characters, Character variants in Wardrobe, Outfits, and
+  Voices — searchable by name, with a real total on each list;
 - immutable reference media, explicit source/result handling, and non-destructive saved-video
   versions;
 - a Videos gallery in Assets with metadata, filtering, preview, rename, removal, reuse, and download;
@@ -217,20 +217,21 @@ exact behavior matters. A provider change should not require redefining what Lig
 
 ## Asset organization and distribution
 
-Saved outputs are reusable records with Project provenance where known and truthful **Unassigned
-Content** when it is not. Project history exposes exact producing revisions and Versions; Campaigns
+Saved outputs are reusable records with Project provenance where known and a truthful **No
+Project** label when it is not. Project history exposes exact producing revisions and Versions; Campaigns
 provide lightweight organization without taking output ownership. Future search or richer context
 must preserve those ownership and lineage boundaries.
 
 Download is the current delivery mechanism and is available from Videos in Assets and exact retained
-Project output Versions. Future distribution may include channel-specific export presets,
-aspect-ratio and format adaptation, scheduling, direct publishing, and marketing-platform
+Project output Versions. Aspect adaptation is implemented at the moment of saving: the operator is
+asked where the video is going — keep as it is, phone, widescreen, square post, tall feed post —
+and the browser re-frames it before upload, recording that placement on the Version. Future
+distribution may add other formats, scheduling, direct publishing, and marketing-platform
 integrations. No particular integration is committed until its product, authentication, permission,
 failure, privacy, and support boundaries are approved.
 
-**Export** is therefore reserved in the current UI as a disabled, explained action. It must not be
-used as a synonym for the existing local render or Download behavior until at least one supported
-format/channel specification and its validation, failure, and delivery contract are approved.
+**Publishing** remains the reserved word. Placement is a shape a saved video was produced for; it is
+not delivery to a channel, and no UI may imply that saving sends a video anywhere.
 
 ## Product principles
 

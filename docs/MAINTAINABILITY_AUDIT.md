@@ -5,6 +5,14 @@
 and the sections titled _Current deferred and approval-required findings_ and _Deferred findings_
 remain **open** and are why this document was not archived in the 2026-08-16 restructure.
 
+**Since 2026-08-12**, two behaviour-preserving passes landed on `develop` without a record here,
+deliberately: the branch-wide simplify pass (`21ca458`) and the code-review findings applied on top
+of it (`80d0fd1`). Their scope is the commits themselves, not a new dated section — this document
+records repository-wide audits, not every cleanup. Two of the deferred findings below have since
+been taken at proven boundaries and are no longer open: `StudioApp` was split into the persistent
+`AuthenticatedShell` and the live-media runtime inside it, and the Project surface was separated
+into overview, workspace and history. The rest of the list still stands.
+
 This document records the repository-wide behavior-preserving cleanup and the placement rules that
 follow from it. Product behavior remains defined by the [project README](../README.md),
 [Architecture](ARCHITECTURE.md), and the [user flows](user-flows/README.md). Product- and
@@ -354,8 +362,9 @@ rendered UI, CSS selector, media node, or cleanup owner changed.
 - The full audit still has one low-severity Windows development-server advisory through
   `tsup`'s declared `esbuild@0.27.x` range. Forcing `0.28.1` underneath that incompatible range is
   not an acceptable cleanup.
-- Nine Linux visual baselines are missing and none are removable. Live/paid provider, physical
-  device, real-codec, memory, and assistive-technology validation remain open.
+- The Linux baseline gap recorded here is closed: both `screenshots/chromium-darwin` and
+  `screenshots/chromium-linux` now hold all 35 curated cases. Live/paid provider, physical device,
+  real-codec, memory, and assistive-technology validation remain open.
 
 ### 2026-08-02 validation
 
@@ -476,7 +485,8 @@ complete proof required for removal, so package manifests and the lockfile were 
 These changes may be valuable, but their lifecycle or regression surface is too large for a
 repository-wide cleanup:
 
-- split `StudioApp` only at proven composition-ownership boundaries;
+- ~~split `StudioApp` only at proven composition-ownership boundaries~~ — **taken**: the shell/runtime
+  split and the three separate Project surfaces were exactly those boundaries;
 - extract `MediaStage` media binding or control-visibility lifecycles only with dedicated
   characterization coverage;
 - split legacy project persistence types from storage mechanics only as an atomic migration-safe

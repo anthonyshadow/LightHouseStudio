@@ -59,7 +59,10 @@ under the browser workspace.
 ## Parallel enabling track — Account and service readiness
 
 **Status: seeded authentication and configuration-gated persistence exist; public-service work is
-deferred.**
+deferred.** The product now _shows_ the account it already has — plan, entitlements, configured
+integrations and running work, read-only — but that is presentation of existing session data, not
+account management: no signup, recovery, preferences, plan change, billing or usage metering
+exists.
 
 Real signup and recovery, multi-device sessions, tenancy, plans and usage, production operations,
 retention and portability, abuse controls, and public deployment are enabling capabilities rather
@@ -107,14 +110,20 @@ runbook records every required automated gate.
 
 ## Phase 3 — Post-MVP organization and creative variations
 
-**Status: future direction after the Campaign/Project MVP is validated.**
+**Status: partially delivered ahead of the phase; the rest remains future direction.** The
+fifteen-step product-audit roadmap took the two cheapest items below — search, and variation by
+placement and by Project copy — because they were blocking everyday use, not because the phase
+opened. See [`product-audit/10-implementation-roadmap.md`](product-audit/10-implementation-roadmap.md).
 
 - Enrich Campaign briefs only with demonstrated needs such as goals, audiences, channels,
   placements, timing, or shared context.
-- Add Project/Campaign search, filters, tags, favorites, folders, bulk organization, or review states
-  only after their semantics and persistence authority are defined.
-- Represent deliberate variations for audience, message, platform, aspect ratio, placement, or
-  experiment separately from immutable Project revisions and Video Versions.
+- **Search is implemented** for Projects, Campaigns and Videos — bounded, name-matched, with real
+  totals. Filters, tags, favorites, folders, bulk organization and review states are still gated on
+  their semantics and persistence authority being defined.
+- **Variation is partly implemented**: a save states the placement it is for (Keep as it is, phone,
+  widescreen, square, tall feed) and records it on the Version, and **Make another version**
+  derives a new Project from an existing one by reference. Variation for audience, message,
+  platform or experiment — carried as first-class metadata rather than a copy — is still future.
 - Evaluate independently resumable Project Deliverables only if one focused workflow per Project
   proves insufficient.
 - Add campaign-level approved-asset views without transferring asset, output, or reusable-resource

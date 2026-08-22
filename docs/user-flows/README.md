@@ -71,8 +71,9 @@ left rail from `48rem` up, and a compact top bar plus a fixed four-destination b
 Both carry Dashboard, Projects, Campaigns and Assets; the rail also holds the Quick Create menu, a
 quiet "How Lightframe works" help panel, the integration-status menu, and the account menu.
 
-`organizationRouteActive` in `StudioApp.tsx` no longer selects a chrome. It only decides which
-surface renders inside the shell. Whether a media stage exists at all is `isStudioRuntimePath`.
+No flag selects a chrome any more. `useStudioRouteContext` derives one boolean per destination
+(`dashboardRouteActive`, `projectWorkspaceActive`, and so on) and `ShellMain` picks the surface from
+them. Whether a media stage exists at all is `isStudioRuntimePath`.
 
 ```text
 /  (Entry)

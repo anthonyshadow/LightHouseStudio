@@ -12,7 +12,10 @@ resources, and browse reusable Assets without activating media or a provider.
    Assets in its header, reaches New Project and New Campaign through Quick Create and its own
    empty states, and runs independent bounded recent queries. Every recent row
    opens the exact record it names — a video row opens that Saved Video's preview in the Videos
-   library, not the unfiltered library.
+   library, not the unfiltered library. The work comes first: what to continue, then recent work,
+   then the footer links, and only then the processing queue, which collapses to a single line
+   while nothing is queued or running. Each recent row leads with a poster resolved from the list
+   response it already has, and says "No preview yet" when there is nothing to show.
 2. Canonical organization routes are `/dashboard`, `/campaigns`, `/projects`, and `/assets`.
    Project and Campaign detail/workspace children remain deep-linkable. Former `/studio/...`
    organization and library URLs replace-redirect to the corresponding canonical path, and the
@@ -33,19 +36,26 @@ resources, and browse reusable Assets without activating media or a provider.
    from a Project.
 6. `/assets` launches the current Videos, Characters, Outfits, and Voices libraries. It does not
    invent a new cross-type gallery, and Recipe is absent from routes, cards, menus, counts,
-   dialogs, filters, accessibility labels, and Quick Create.
-7. The four-item mobile navigation mirrors Dashboard, Projects, Campaigns, and
+   dialogs, filters, accessibility labels, and Quick Create. The Projects, Campaigns and Videos
+   lists can each be searched by name, and state a real total — a floor once past the counting
+   ceiling — rather than the number currently loaded.
+7. The header carries a quiet **How Lightframe works** control on every protected route. It opens a
+   static explainer covering when a Project helps, when a Campaign helps and what each Asset
+   library holds, and it remains reachable after the Dashboard getting-started card is dismissed.
+   It starts no request and stores nothing. The account menu's **Account details** panel is its
+   sibling: the status, account and help panels are mutually exclusive.
+8. The four-item mobile navigation mirrors Dashboard, Projects, Campaigns, and
    Assets with safe-area padding. Quick Create stays in the header. Project workspaces and focused
    Create retain this shared mobile shell, and each surface reserves bottom padding so the fixed bar
    never covers its content.
-8. Dashboard, library listing, Project membership listing, pickers, and preview metadata start no
+9. Dashboard, library listing, Project membership listing, pickers, and preview metadata start no
    paid provider work. Camera, microphone, byte fetching, and provider submissions remain explicit.
-9. Dashboard lists the signed-in owner's queued and active Character Swap and Virtual Try-On jobs.
-   Its bounded refresh can reconcile an already accepted provider identity without resubmitting it.
-   **Remove from queue** or **Stop tracking** requires confirmation that the current providers have
-   no verified cancellation API: Lightframe durably marks the attempt cancelled, abandons result
-   recovery, removes temporary files, and releases the owner processing slot, while upstream work
-   and cost may continue.
+10. Dashboard lists the signed-in owner's queued and active Character Swap and Virtual Try-On jobs.
+    Its bounded refresh can reconcile an already accepted provider identity without resubmitting it.
+    **Remove from queue** or **Stop tracking** requires confirmation that the current providers have
+    no verified cancellation API: Lightframe durably marks the attempt cancelled, abandons result
+    recovery, removes temporary files, and releases the owner processing slot, while upstream work
+    and cost may continue.
 
 ## Acceptance checks
 

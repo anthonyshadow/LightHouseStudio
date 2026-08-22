@@ -40,22 +40,23 @@ areas, the software keyboard, browser chrome changes, or physical 200% text/refl
 
 ## Capability and degradation
 
-| Capability        | Requirement                                                                            | Safe degradation                                                                       |
-| ----------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Local preparation | React; browser storage for durable Shelf/Builder data                                  | Session-only work with warning where storage fails                                     |
-| Camera preview    | `navigator.mediaDevices.getUserMedia` and permission                                   | Actionable blocked state; no provider contact                                          |
-| Device selection  | `enumerateDevices`; labels may need prior permission                                   | Browser default remains available                                                      |
-| Front/rear switch | Active `facingMode` plus exposed opposite capability                                   | Control omitted; current camera remains                                                |
-| Camera zoom       | Numeric track zoom capability and `applyConstraints`                                   | Control omitted; no CSS crop substitute                                                |
-| Recording         | Live video, `MediaRecorder`, decodable capture, H.264 WebCodecs encode                 | No raw download fallback; conversion fails safely and the session remains controllable |
-| Existing video    | File input/drop, Blob playback, supported H.264/VP8 file                               | Local validation explains export needs; camera stays optional                          |
-| Durable Project   | Authenticated API plus supported video decode and local storage/relational authority   | Safe loading/error state; no false resumability, provider start, or stale media reuse  |
-| Local video edit  | WebGL, dedicated workers, OffscreenCanvas, H.264 WebCodecs encode, AAC when needed     | Playback, Download, Voice, and existing workflows remain usable; no main-thread export |
-| Decart output     | Local capture, WebRTC, provider reachability/entitlement                               | Local preview remains the fallback                                                     |
-| Batch visual      | Supported source, broker, operation capability; WebCodecs for required MP4 preparation | Local preview/download remains available without a configured operation                |
-| Local Voice       | Web Audio, offline render, AAC encoder, MP4 remux                                      | Original take remains usable                                                           |
-| ElevenLabs Voice  | Sidecar, broker, saved voice/model/account support                                     | Original/local effects remain usable                                                   |
-| Download          | Blob URL plus browser download handling                                                | Mobile may open/share rather than save directly                                        |
+| Capability        | Requirement                                                                            | Safe degradation                                                                              |
+| ----------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Local preparation | React; browser storage for durable Shelf/Builder data                                  | Session-only work with warning where storage fails                                            |
+| Camera preview    | `navigator.mediaDevices.getUserMedia` and permission                                   | Actionable blocked state; no provider contact                                                 |
+| Device selection  | `enumerateDevices`; labels may need prior permission                                   | Browser default remains available                                                             |
+| Front/rear switch | Active `facingMode` plus exposed opposite capability                                   | Control omitted; current camera remains                                                       |
+| Camera zoom       | Numeric track zoom capability and `applyConstraints`                                   | Control omitted; no CSS crop substitute                                                       |
+| Recording         | Live video, `MediaRecorder`, decodable capture, H.264 WebCodecs encode                 | No raw download fallback; conversion fails safely and the session remains controllable        |
+| Existing video    | File input/drop, Blob playback, supported H.264/VP8 file                               | Local validation explains export needs; camera stays optional                                 |
+| Durable Project   | Authenticated API plus supported video decode and local storage/relational authority   | Safe loading/error state; no false resumability, provider start, or stale media reuse         |
+| Local video edit  | WebGL, dedicated workers, OffscreenCanvas, H.264 WebCodecs encode, AAC when needed     | Playback, Download, Voice, and existing workflows remain usable; no main-thread export        |
+| Export placement  | The same local-editor path: WebGL preview plus worker WebCodecs/OffscreenCanvas export | The chooser states the editor is unavailable and stays on "Keep as it is"; saving still works |
+| Decart output     | Local capture, WebRTC, provider reachability/entitlement                               | Local preview remains the fallback                                                            |
+| Batch visual      | Supported source, broker, operation capability; WebCodecs for required MP4 preparation | Local preview/download remains available without a configured operation                       |
+| Local Voice       | Web Audio, offline render, AAC encoder, MP4 remux                                      | Original take remains usable                                                                  |
+| ElevenLabs Voice  | Sidecar, broker, saved voice/model/account support                                     | Original/local effects remain usable                                                          |
+| Download          | Blob URL plus browser download handling                                                | Mobile may open/share rather than save directly                                               |
 
 A retained recording gets one owner-controlled object-URL repair attempt after a playback error.
 This covers a stale Blob URL without turning a genuinely undecodable file into a retry loop.
@@ -145,7 +146,9 @@ authenticated content loading, Download, and Delete do not depend on thumbnail s
 ## Local video editor
 
 The editor checks WebGL preview and dedicated-worker WebCodecs/OffscreenCanvas export support only
-when **Adjust video** opens. It does not use the limited-availability 2D canvas `filter` property.
+when **Adjust video** opens. Choosing an export placement at save time re-uses exactly that check
+(`exportPlacementRenderSupported`), so a browser that cannot run the editor cannot re-frame a video
+either; the save dialog says so and keeps the video's original shape. It does not use the limited-availability 2D canvas `filter` property.
 Preview and export share a WebGL shader for flips, curated filters, and manual lighting controls;
 MediaBunny performs trim, baked 90° rotation, crop, H.264 encode, and AAC audio preservation in the
 worker. There is no synchronous main-thread processing fallback.

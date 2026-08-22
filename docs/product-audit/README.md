@@ -9,7 +9,9 @@ Existing documentation was read for intent only; where a document and the code d
 won. Findings are separated into **confirmed** (reproduced or read in the code) and
 **suspected** (reasoned, not reproduced).
 
-**This is an assessment, not a decision.** Nothing here has been implemented.
+**This is an assessment, not a decision.** Documents 00–09 record what was found, not what was
+agreed to. The roadmap in [10](10-implementation-roadmap.md) is the exception: all fifteen of its
+steps have since been implemented on `develop`.
 
 ## Read in this order
 
@@ -26,7 +28,6 @@ won. Findings are separated into **confirmed** (reproduced or read in the code) 
 | [08](08-prioritized-findings.md)         | Prioritized findings    | The full register: P0–P4, effort, risk, dependencies, quick wins |
 | [09](09-future-opportunities.md)         | Future opportunities    | Deliberately deferred ideas and why                              |
 | [10](10-implementation-roadmap.md)       | Implementation roadmap  | Ordered incremental steps, each independently reviewable         |
-| [prompts](prompts/README.md)             | Implementation prompts  | One standalone coding-agent prompt per roadmap step              |
 
 ## Relationship to existing documentation
 

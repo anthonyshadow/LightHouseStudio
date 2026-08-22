@@ -1,7 +1,36 @@
 # Prioritized findings
 
+> **Status (2026-08-21).** This audit is a point-in-time assessment; the fifteen-step roadmap it
+> produced has since been implemented in full — see
+> [`10-implementation-roadmap.md`](10-implementation-roadmap.md) for the step-to-commit table. The
+> findings below describe the product **as audited**, not as it now stands. Where the two disagree,
+> the code wins.
+
 The combined register. Effort is XS (< 2 h) · S (½–1 day) · M (2–4 days) · L (1–2 weeks) ·
 XL (> 2 weeks). Risk is the chance of regressing existing behaviour.
+
+## What the roadmap closed
+
+The roadmap took every P0 and P1 finding plus five P2s and two P3s:
+
+| Finding                | Closed by                                     |
+| ---------------------- | --------------------------------------------- |
+| P0-1, P0-2             | steps 1–2                                     |
+| P1-1, P1-2, P1-3, P1-4 | steps 3, 8, 7, 4                              |
+| P1-5, P1-6, P1-7       | steps 11, 12, 9                               |
+| P2-1, P2-2, P2-3       | steps 10, 5, 5                                |
+| P2-4, P2-5, P2-10      | steps 14, 15, 15                              |
+| P2-7                   | step 2 (durability) and the Assets-hub counts |
+| P3-1, P3-2             | steps 13, 6                                   |
+
+**P2-6**, **P3-9** and the M10 half of the error-boundary work were closed separately by the Tier
+work recorded in
+[`../user-flows/gaps-and-usability-audit.md`](../user-flows/gaps-and-usability-audit.md) (N6, M4,
+M11, B8/M10). Everything else in this register — **P2-8**, **P2-9**, **P2-11**, **P2-12**, **P3-3** through
+**P3-8**, **P3-10**, **P3-11** and all of **P4** — remains open, and P3-3 remains a deliberate
+do-not-act.
+
+---
 
 ## Priority definitions
 

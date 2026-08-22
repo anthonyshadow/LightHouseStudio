@@ -15,38 +15,75 @@ Download an exact Version**
 The standalone Studio remains available for a fast record/upload workflow that does not
 automatically create or assign a Project.
 
-Live character transformation remains an advanced tool. The app binds to loopback. Phase
-1 provides one seeded local demo account, authenticated ownership, and durable local saved-media
-records; it does not provide signup, billing, collaboration, or public multi-user deployment. A
-durable, video-oriented Project authority and lightweight optional Campaigns now support bounded
-lists, named/quick Project creation, open, edit/rename, move/detach, archive, restore, and guarded
-Campaign deletion in every persistence mode. An open Project can now durably accept one inspected
-upload, finalized local recording, or exact active Saved Video Version as its source, remove that
-source to choose a different one, and restore it from the same URL. Project creative configuration is now available through explicit
-semantic checkpoints: reusable Character/Variant, Outfit, Voice, prompt,
-treatment, capture metadata, and validated local-edit state save through the one Project session.
-A validated local Render preview or exact same-owner retained Media Asset/Saved Video Version can
-be explicitly adopted as durable working media without replacing the original or creating output
-provenance. Project Character Swap and Virtual Try On now start through one exact-revision,
-pre-linked processing command, reconnect accepted work after refresh, require an explicit
-cost-bearing retry, and present only a durably retained current result as working media. Project
-provider Voice remains gated because its synchronous adapter has no durable reconnect identity;
-the current exact ready Project media can now be saved explicitly as a new Saved Video or, after
-choosing and confirming one active target, appended as an immutable Video Version. The composite
-save records producing-revision provenance, advances one completed post-save Project revision, and
-reconciles the same durable operation after response loss or reload. Bounded Project history now
-separates revisions, processing attempts/stale results, and output Versions; one exact retained
-Version can be previewed, explicitly reused, or downloaded without changing either current
-pointer. Rich Campaign planning and multi-format content creation remain future product directions.
-The app is not approved for LAN, tunnel, proxy, or public exposure.
+Live character transformation remains an advanced tool. The app binds to loopback and is not
+approved for LAN, tunnel, proxy, or public exposure.
+
+## What the product does today
+
+- **The Dashboard leads with the work** — what to continue, then the newest Projects, videos and
+  Campaigns with a poster on every row that has one. The processing queue collapses to a single
+  line when nothing is running.
+- **A Project holds one immutable source.** An empty Project offers Record, Upload, or Use Saved
+  Video. It becomes resumable only after the API stores or verifies the bytes, inspects the media,
+  commits the owner-bound source record and revision, and reports **All changes saved**. The first
+  accepted original cannot be replaced; another original requires another Project. The source can be
+  removed to choose a different one, and it restores from the same URL. Reopening a Project streams
+  that source over HTTP ranges instead of downloading the whole file.
+- **Three separate Project surfaces**: an overview that states where the work stands, a workspace
+  that does the work beside one media stage, and history that pages Project changes, processing
+  attempts and immutable output Versions separately.
+- **Creative work runs on an explicit action** — Character Swap, Virtual Try-On, local editing
+  (trim, crop, rotate, flip, relight, filter), local voice treatments, and provider Voice on the
+  standalone path. Choosing, recording, or reopening a source never starts paid AI work, and
+  nothing contacts a provider on load, resume, or refresh.
+- **Saving asks where the video is going**, not what aspect ratio it wants: Keep as it is, Phone,
+  Widescreen, Square post, or Tall feed post. The placement is rendered in the browser before
+  upload and recorded on the Version that was saved.
+- **Make another version** derives a new Project from an existing one by reference — same source,
+  same creative setup, no bytes copied, nothing charged until work starts in the copy.
+- **Assets** holds Videos, Characters, Outfits, and Voices. Each list can be searched by name and
+  states a real total, stated as a floor past its counting ceiling rather than as a number the list
+  did not establish.
+- **Every saved video can have a preview.** One missing a thumbnail can generate it on demand, from
+  a frame or a chosen image, without touching its saved Versions.
+- **The creative library is browser-local and says so**, and can be exported to a file and imported
+  back. The file carries records, not reference-image bytes.
+- **The account menu shows the account**: plan, what this configured install can and cannot do, and
+  how much work is currently running. A **How Lightframe works** panel explains Projects, Campaigns
+  and each Asset library, and stays reachable after the getting-started card is dismissed.
+- **Campaigns are optional grouping**: bounded lists, move/detach, archive/restore, and deletion
+  guarded by archive plus zero attached Projects. **No Campaign** is a virtual group, never a
+  database row. Named and quick Project creation, open, rename and the whole Campaign/Project
+  lifecycle behave the same in every persistence mode.
+
+Project creative configuration saves through explicit semantic checkpoints — Character/Variant,
+Outfit, Voice, prompt, treatment, capture metadata, and validated local-edit state. Project
+Character Swap and Virtual Try-On start through one exact-revision, pre-linked processing command,
+reconnect accepted work after refresh, require an explicit cost-bearing retry, and present only a
+durably retained result as working media. The current ready Project media can be saved as a new
+Saved Video or, after choosing and confirming one active target, appended as an immutable Version;
+that save records producing-revision provenance and reconciles the same durable operation after
+response loss or reload.
+
+Phase 1 provides one seeded local demo account, authenticated ownership, and durable local
+saved-media records. It does not provide signup, billing, collaboration, or public multi-user
+deployment. Project provider Voice remains gated because its synchronous adapter has no durable
+reconnect identity. Rich Campaign planning and multi-format content creation remain future product
+directions.
 
 ## Status
 
 The core Campaign/Project workflow is implemented and has passed the local automated MVP boundary.
 The [MVP acceptance runbook](docs/MVP_ACCEPTANCE.md) records all 17 objective criteria and required
-automated gates as passing. This local-only GO does not include physical-device,
-assistive-technology, live Neon/R2, or paid-provider checks and does not imply public-service
-readiness.
+automated gates as passing for its 2026-08-14 candidate. This local-only GO does not include
+physical-device, assistive-technology, live Neon/R2, or paid-provider checks and does not imply
+public-service readiness.
+
+The fifteen-step product-audit roadmap has landed since that candidate — separate Project surfaces,
+name search with real totals, export placement at save, Project duplication, a streamed Project
+source, the account panel and the persistent explainer. Those changes are covered by the ordinary
+automated gates, but the acceptance record itself has not been rerun; treat its GO as candidate-
+specific.
 
 ## Product direction
 
@@ -129,8 +166,10 @@ adopted only through explicit **Use in Project**; preview, use, and **Download**
 Saved Video current pointer or infer an Add Version target. The full-screen library surfaces
 likewise never create another media session. The gallery
 loads metadata and lazy thumbnails first, then fetches video bytes only for an explicit Preview,
-Studio, Edit, or Download action. Videos in Assets can be filtered by attributed parent character and
-Landscape, Portrait, or Square format, then ordered by Latest, Oldest, Shortest, or Longest. When
+Studio, Edit, or Download action. Videos in Assets can be searched by title and filtered by attributed parent character and
+Landscape, Portrait, or Square format, then ordered by Latest, Oldest, Shortest, or Longest. Its
+filter facets are computed across the whole library rather than the filtered page, so a search
+that matches nothing never makes the library look empty. When
 a Wardrobe variant was used, the card and preview also show that exact variant without splitting
 the parent character's filter group. Preview can select an exact immutable Version and marks the
 current one. Legacy or independently saved records without a trustworthy Project output relation
@@ -223,7 +262,8 @@ resumable Project working media. Local editing and configuration do not contact 
 - Pruna Character Swap requires one identity reference and H.264 MP4 input. H.264 MOV and VP8
   WebM are converted locally at explicit Start into an ephemeral submission Blob; the immutable
   source is unchanged. MP4 input passes through. Every prediction explicitly pins seed `0`, turbo
-  off, original frame rate, source-audio conditioning/output, and the enabled safety checker.
+  off, original frame rate, and source-audio conditioning/output. Provider content filtering stays
+  on unless `PRUNA_VIDEO_REPLACE_DISABLE_SAFETY_CHECKER` is explicitly set to `true`.
   Prompt entry and enhancement are unavailable in this configuration. The browser always submits
   an empty recipe prompt, the broker rejects tampered non-empty prompt text, and the adapter always
   uses a server-owned Pruna instruction that makes reference image 1 authoritative for facial
@@ -277,8 +317,8 @@ applies pending development migrations, builds the shared packages, and then sta
 watchers. The database remains running when the watchers stop; use `bun run db:development:down`
 when you want to stop it without deleting its named volume.
 
-Open <http://127.0.0.1:4173> for the entry or <http://127.0.0.1:4173/studio> for a direct Studio
-load. Vite proxies `/api` to `127.0.0.1:4100`; keep `PORT=4100` for the normal development and
+Open <http://127.0.0.1:4173> for the entry, or <http://127.0.0.1:4173/studio/create> to load the
+create surface directly. `/studio` itself redirects to `/dashboard`. Vite proxies `/api` to `127.0.0.1:4100`; keep `PORT=4100` for the normal development and
 functional Playwright paths. The checked development defaults prefill
 `demo@lightframe.local` / `lightframe-demo`; change the plaintext prefill and its independently
 generated hash together when rotating the demo credential. Paid-provider keys remain empty until
@@ -323,6 +363,7 @@ automatic dotenv loading so startup reads only the file selected by `LIGHTFRAME_
 | `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER`                                                  | Default Character Swap choice shown in the editor: `decart` (default) or `pruna`                                                                                  |
 | `PRUNA_VIDEO_REPLACE_ENABLED`, `PRUNA_API_KEY`                                            | Enables the Pruna Character Swap option and supplies its shared server credential                                                                                 |
 | `PRUNA_VIDEO_REPLACE_MODEL`                                                               | Exact pinned `p-video-replace` literal; required when Pruna Character Swap is enabled                                                                             |
+| `PRUNA_VIDEO_REPLACE_DISABLE_SAFETY_CHECKER`                                              | Turns Pruna's content filtering off when explicitly `true`; defaults to `false`, meaning filtering stays on                                                       |
 | `PRUNA_IMAGE_TRY_ON_ENABLED`                                                              | Enables Wardrobe Add Outfit; defaults to `false` and does not hide saved versions                                                                                 |
 | `PRUNA_IMAGE_TRY_ON_MODEL`                                                                | Exact pinned `p-image-try-on` literal; required with try-on enablement                                                                                            |
 | `OPENAI_API_KEY`                                                                          | Character prompt optimization and OpenAI image work                                                                                                               |

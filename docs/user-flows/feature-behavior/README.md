@@ -40,12 +40,13 @@ future features current.
 ## Shared runtime rules
 
 - `/` is the provider-free entry and Login surface. Dashboard (`/dashboard`), Create
-  (`/studio/create`), Project overview/workspace, Campaign, and `/assets/*` routes are
-  authenticated views of one active Studio runtime; every other path returns to `/`.
-- Dashboard and other organization routes hide the persistent media stage and start no media or
-  provider work. Create and Project workspaces begin in neutral Local Camera mode with camera and
-  microphone off. Only an explicit control-bar or upload-panel action acquires media; only
-  an explicit AI Start contacts a provider.
+  (`/studio/create`), Project overview/workspace, Campaign, and `/assets/*` routes are authenticated
+  views inside one persistent shell; every other path returns to `/`.
+- Organization routes do not hide the capture runtime — they never mount it. Only the three
+  destinations that own live media do: `/studio/create`, `/studio/:videoId` and a Project
+  workspace. Those begin in neutral Local Camera mode with camera and microphone off. Only an
+  explicit control-bar or upload-panel action acquires media; only an explicit AI Start contacts a
+  provider.
 - Retired Guided repositories and presentation code are removed. Their records are not imported
   into Saved Videos and cannot revive the retired Guided experience.
 - Browser navigation cannot abandon recording/finalization or an active video render. Leaving with
@@ -56,6 +57,11 @@ future features current.
 - The primary flow records or uploads a source, reviews it, and optionally applies Character Swap,
   Virtual Try-On, and/or Voice, then saves the result before exact Download from Videos in Assets.
   Live Character/VTO transformation is an advanced flow.
+- Saving asks where the video is going — keep as it is, phone, widescreen, square post, or tall
+  feed post — and re-frames it in the browser before upload, recording that placement on the saved
+  Version. A browser without the local editor keeps the save path and only "Keep as it is".
+- Projects, Campaigns and Videos can each be searched by name and state a real bounded total rather
+  than the number currently loaded.
 - Campaign and Project lifecycle/source management is user-facing, including optional membership,
   move/detach, the virtual No Campaign group, durable source resume, and guarded bounded session
   autosave. Creative/edit checkpoints, recoverable visual processing, and exact output save are

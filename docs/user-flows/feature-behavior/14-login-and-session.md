@@ -23,7 +23,12 @@ browser for up to 24 hours, and log out with temporary work safely cleaned up.
    screen behind one notice naming exactly what will be lost and offering one way out; the work is
    discarded only when the operator acknowledges. Nothing is saved on this path — the session is
    already gone — and `/` then says the session ended rather than that login is required.
-7. **Log out** is blocked while recording/finalization cannot be abandoned. Discardable work asks
+7. The account menu offers **Account details** beside **Log out**: a read-only panel stating the
+   signed-in identity, the plan, when the session expires, what the plan includes and its limits,
+   which integrations this install has configured, and how many AI jobs are running right now. It
+   reads the session already in memory plus one bounded active-jobs request while open, stores
+   nothing, and offers no setting to change — there is no preferences or billing surface to reach.
+8. **Log out** is blocked while recording/finalization cannot be abandoned. Discardable work asks
    for confirmation, then cleanup cancels temporary work, releases media, clears user caches,
    revokes the session, and returns to `/`.
 

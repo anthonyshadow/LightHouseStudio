@@ -1,5 +1,11 @@
 # Executive summary
 
+> **Status (2026-08-21).** This audit is a point-in-time assessment; the fifteen-step roadmap it
+> produced has since been implemented in full — see
+> [`10-implementation-roadmap.md`](10-implementation-roadmap.md) for the step-to-commit table. The
+> findings below describe the product **as audited**, not as it now stands. Where the two disagree,
+> the code wins.
+
 ## 1. What is the product currently?
 
 Lightframe Studio is a **single-operator, loopback-only browser video studio for AI-assisted

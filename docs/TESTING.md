@@ -192,6 +192,23 @@ The retained suite protects:
 - a route crash recorded as one bounded local diagnostic behind a generic fallback, a stale
   lazy-chunk failure told apart from a crash, and cloud creative-library recovery through retry,
   keep-local and keep-cloud;
+- bounded name search and honest totals: contract bounds on the search term, repositories counting
+  one row past the ceiling, cursors bound to the criteria that issued them, and list surfaces
+  debouncing, clearing, announcing the settled result and naming an empty term;
+- export placement: the domain aspect list and the resolution each produces, the browser
+  support gate, the chooser's copy/crop preview, and render progress, cancellation and failure
+  leaving the save path intact;
+- **Make another version**: the domain rule's stale-version conflict, by-reference snapshot,
+  cleared last output and derived phase; route replay under `Idempotency-Key`; retention through
+  the duplicate's own asset links; and the browser dialog's Campaign default and post-create step;
+- URL-backed Project source presentation: the single narrowing from presentable media to owned
+  bytes, ranged content delivery, and acquisition of complete bytes only when an operation needs
+  them;
+- the read-only account panel and the static "How Lightframe works" explainer, including their
+  mutual exclusion with the status menu, and Saved Video preview generation from a frame or an
+  uploaded image without touching saved Versions;
+- creative-library export to a file and import back, including the replace confirmation and the
+  file carrying records rather than reference bytes;
 - one media stage per Studio visit, shared overlay focus/inert/Escape behavior, dominant recording Stop,
   200% text, and constrained mobile scrolling; and
 - unexpected external HTTP and WebSocket denial in ordinary automated tests.

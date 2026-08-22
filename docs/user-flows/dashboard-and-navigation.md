@@ -3,7 +3,7 @@
 ## Entry point
 
 - Route `/dashboard`, rendered by `apps/web/src/features/dashboard/DashboardRouteSurface.tsx`
-  (lazy-loaded from `StudioWorkspace.tsx`).
+  (lazy-loaded by `app/shell/ShellMain.tsx`).
 - Reached from: login success, the brand button, the "Dashboard" nav item, and the Live-beta
   "Back to Dashboard" action.
 
@@ -14,9 +14,10 @@
 
 ## The shell around it
 
-`StudioHeader` (`apps/web/src/studio/StudioHeader.tsx`) is rendered for every protected route. On
-organization routes (`organizationRouteActive`, `StudioApp.tsx`) it switches to a rail
-presentation and additionally renders a mobile bottom nav (`StudioHeader.tsx:381-397`).
+`StudioHeader` (`apps/web/src/studio/StudioHeader.tsx`) is rendered by the shell for every
+protected route: one rail presentation from `48rem` up, plus a mobile bottom nav below it. It no
+longer switches chrome by route — `useStudioRouteContext` only decides which surface renders inside
+the shell.
 
 Header regions:
 
