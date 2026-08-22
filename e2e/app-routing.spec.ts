@@ -448,7 +448,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   const gallery = page.getByRole('dialog', { name: 'Videos' });
   await expect(gallery.getByText('No Project').first()).toBeVisible();
   await expect(gallery.getByRole('heading', { name: 'Legacy unassigned' })).toBeVisible();
-  await expect(gallery.getByRole('button', { name: 'Open in Studio' }).first()).toBeEnabled();
+  await expect(gallery.getByRole('link', { name: /^Download / }).first()).toBeVisible();
 
   await gallery.getByLabel('More actions for Launch master').click();
   await gallery.getByRole('button', { name: 'Remove from Assets' }).click();
