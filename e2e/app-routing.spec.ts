@@ -291,8 +291,8 @@ test('Project overview gives the title the full tablet content width', async ({ 
   await page.goto(`/projects/${TEST_PROJECT_ID}`);
 
   const title = page.getByRole('heading', { name: 'Untitled Project' });
-  const identity = page.locator('[data-detail-identity]');
-  const actions = page.locator('[data-detail-actions]');
+  const identity = page.locator('[data-page-identity]');
+  const actions = page.locator('[data-page-actions]');
   await expect(title).toBeVisible();
   await expect(actions.getByRole('button', { name: 'Add original video' })).toBeVisible();
 
@@ -815,7 +815,8 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
 
   await page.getByRole('button', { name: '← Project overview' }).click();
   await page.getByRole('button', { name: '← Summer launch' }).click();
-  await page.getByRole('button', { name: 'Archive' }).click();
+  await page.getByLabel('More actions for Summer launch').click();
+  await page.getByRole('menuitem', { name: 'Archive' }).click();
   await page
     .getByRole('dialog', { name: 'Archive Campaign' })
     .getByRole('button', { name: 'Archive Campaign' })

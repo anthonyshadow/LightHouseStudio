@@ -10,6 +10,8 @@ import {
   emptyExampleStyles,
   EmptyStatePreview,
   ListSearchField,
+  PageHeader,
+  PageShell,
   SearchEmptyState,
   StatusNotice,
   useListSearch,
@@ -26,14 +28,11 @@ import {
 import {
   projectsGroupFilterStyles,
   projectsSearchRowStyles,
-  projectsHeaderActionsStyles,
   projectsLedgerEmptyStyles,
   projectsLedgerLayoutStyles,
   projectsLedgerListStyles,
   projectsLedgerRowStyles,
   projectsLedgerSectionStyles,
-  projectsWorkspaceHeaderStyles,
-  projectsWorkspaceInnerStyles,
 } from './ProjectsListSurface.styles';
 import { projectPosterUrls } from './projectPosterPresentation';
 import { stepForSnapshot } from './ProjectWorkflowProgress';
@@ -302,15 +301,12 @@ export const ProjectsListSurface = () => {
   };
 
   return (
-    <div css={projectsWorkspaceInnerStyles(theme)} data-project-index="">
-      <header css={projectsWorkspaceHeaderStyles(theme)}>
-        <div>
-          <h1 ref={setHeadingRef} tabIndex={-1}>
-            Projects
-          </h1>
-          <p>Keep focused video work together. Start as a collection, become a workspace.</p>
-        </div>
-        <div css={projectsHeaderActionsStyles(theme)} data-project-header-actions="">
+    <PageShell data-project-index="">
+      <PageHeader
+        title="Projects"
+        headingRef={setHeadingRef}
+        description="Keep focused video work together. Start as a collection, become a workspace."
+        actions={
           <Button
             variant="primary"
             data-project-create="named"
@@ -321,8 +317,8 @@ export const ProjectsListSurface = () => {
           >
             New Project
           </Button>
-        </div>
-      </header>
+        }
+      />
 
       <div role="status" aria-live="polite" aria-atomic="true">
         {announcement}
@@ -450,6 +446,6 @@ export const ProjectsListSurface = () => {
           }}
         />
       ) : null}
-    </div>
+    </PageShell>
   );
 };

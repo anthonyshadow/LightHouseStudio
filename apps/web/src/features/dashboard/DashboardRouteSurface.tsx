@@ -19,6 +19,8 @@ import {
   ConfirmationDialog,
   emptyExampleStyles,
   EmptyStatePreview,
+  PageHeader,
+  PageShell,
   StatusNotice,
 } from '../../ui';
 import { useCampaignList } from '../campaigns/useCampaignsController';
@@ -284,251 +286,254 @@ export const DashboardRouteSurface = ({
 
   return (
     <section css={dashboardStyles(theme)} aria-labelledby="dashboard-heading">
-      <header css={dashboardHeaderStyles(theme)}>
-        <div>
-          <span data-dashboard-eyebrow>Welcome back, {displayName}</span>
-          <h1 id="dashboard-heading" tabIndex={-1}>
-            Dashboard
-          </h1>
-          <p>Resume focused Project work or start a standalone video.</p>
-        </div>
-        <div data-dashboard-actions>
-          <Button variant="primary" onClick={onCreateVideo}>
-            Create video
-          </Button>
-          <Button variant="quiet" onClick={onOpenAssets}>
-            Browse Assets
-          </Button>
-        </div>
-      </header>
+      <PageShell css={dashboardHeaderStyles(theme)}>
+        <PageHeader
+          eyebrow={`Welcome back, ${displayName}`}
+          title="Dashboard"
+          headingId="dashboard-heading"
+          description="Resume focused Project work or start a standalone video."
+          actions={
+            <div data-dashboard-actions>
+              <Button variant="primary" onClick={onCreateVideo}>
+                Create video
+              </Button>
+              <Button variant="quiet" onClick={onOpenAssets}>
+                Browse Assets
+              </Button>
+            </div>
+          }
+        />
 
-      {onboardingVisible ? (
-        <aside css={onboardingStyles(theme)} aria-labelledby="dashboard-getting-started-heading">
-          <h2 id="dashboard-getting-started-heading" data-onboarding-heading>
-            Start with the outcome you need
-          </h2>
-          <AppIcon name="info" data-onboarding-icon />
-          <p>
-            Organization is optional. Use <strong>Projects</strong> for focused workflows and{' '}
-            <strong>Campaigns</strong> to group initiatives.
-          </p>
-          <Button size="small" variant="quiet" onClick={dismissOnboarding}>
-            Got it
-          </Button>
-        </aside>
-      ) : null}
-      {onboardingStorageWarning ? (
-        <StatusNotice role="status" tone="warning" title="Preference not retained">
-          Lightframe could not save this account-scoped onboarding preference in this browser.
-        </StatusNotice>
-      ) : null}
-
-      <div css={dashboardBodyStyles(theme)}>
-        <div data-dashboard-primary-column>
-          <section aria-labelledby="continue-heading">
-            <h2 id="continue-heading" css={sectionEyebrowStyles(theme)}>
-              Continue Work
+        {onboardingVisible ? (
+          <aside css={onboardingStyles(theme)} aria-labelledby="dashboard-getting-started-heading">
+            <h2 id="dashboard-getting-started-heading" data-onboarding-heading>
+              Start with the outcome you need
             </h2>
-            {projectsQuery.isLoading ? <p role="status">Finding recent work…</p> : null}
-            {projectsQuery.isError ? (
-              <StatusNotice role="alert" tone="danger" title="Projects unavailable">
-                <Button size="small" variant="quiet" onClick={() => void projectsQuery.refetch()}>
+            <AppIcon name="info" data-onboarding-icon />
+            <p>
+              Organization is optional. Use <strong>Projects</strong> for focused workflows and{' '}
+              <strong>Campaigns</strong> to group initiatives.
+            </p>
+            <Button size="small" variant="quiet" onClick={dismissOnboarding}>
+              Got it
+            </Button>
+          </aside>
+        ) : null}
+        {onboardingStorageWarning ? (
+          <StatusNotice role="status" tone="warning" title="Preference not retained">
+            Lightframe could not save this account-scoped onboarding preference in this browser.
+          </StatusNotice>
+        ) : null}
+
+        <div css={dashboardBodyStyles(theme)}>
+          <div data-dashboard-primary-column>
+            <section aria-labelledby="continue-heading">
+              <h2 id="continue-heading" css={sectionEyebrowStyles(theme)}>
+                Continue Work
+              </h2>
+              {projectsQuery.isLoading ? <p role="status">Finding recent work…</p> : null}
+              {projectsQuery.isError ? (
+                <StatusNotice role="alert" tone="danger" title="Projects unavailable">
+                  <Button size="small" variant="quiet" onClick={() => void projectsQuery.refetch()}>
+                    Retry
+                  </Button>
+                </StatusNotice>
+              ) : null}
+              {continueProject ? (
+                <article css={continuePanelStyles(theme)}>
+                  <span data-project-context>
+                    {continueProject.campaignId === null ? 'No Campaign' : 'Campaign Project'}
+                  </span>
+                  <h3>{continueProject.title}</h3>
+                  <time dateTime={continueProject.updatedAt}>
+                    Updated {formatDate(continueProject.updatedAt)}
+                  </time>
+                  <Button
+                    variant="primary"
+                    aria-label={`Continue ${continueProject.title}`}
+                    onClick={() => onOpenProject(continueProject.id)}
+                  >
+                    Continue Project
+                    <AppIcon name="chevronRight" width="1rem" height="1rem" />
+                  </Button>
+                </article>
+              ) : !projectsQuery.isLoading && !projectsQuery.isError ? (
+                <div css={continuePanelStyles(theme)} data-empty="true">
+                  <h3>No active Project yet</h3>
+                  <p>Create one only when resumable context will help.</p>
+                  <Button variant="secondary" onClick={onCreateProject}>
+                    New Project
+                  </Button>
+                </div>
+              ) : null}
+            </section>
+          </div>
+
+          <section css={recentWorkStyles(theme)} aria-labelledby="recent-work-heading">
+            <header>
+              <h2 id="recent-work-heading" css={sectionEyebrowStyles(theme)}>
+                Recent Work
+              </h2>
+              <div role="group" aria-label="Filter recent work" css={recentFilterStyles(theme)}>
+                {(['all', 'videos', 'projects', 'campaigns'] as const).map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    aria-pressed={recentKind === kind}
+                    onClick={() => setRecentKind(kind)}
+                  >
+                    {kind === 'all' ? 'All' : `${kind[0]?.toUpperCase()}${kind.slice(1)}`}
+                  </button>
+                ))}
+              </div>
+            </header>
+
+            {visibleLoading ? <p role="status">Loading recent work…</p> : null}
+            {visibleErrors.map((kind) => (
+              <StatusNotice
+                key={kind}
+                role="alert"
+                tone="danger"
+                title={`${recentKindLabel[kind]}s unavailable`}
+              >
+                <Button size="small" variant="quiet" onClick={queryState[kind].retry}>
                   Retry
                 </Button>
               </StatusNotice>
-            ) : null}
-            {continueProject ? (
-              <article css={continuePanelStyles(theme)}>
-                <span data-project-context>
-                  {continueProject.campaignId === null ? 'No Campaign' : 'Campaign Project'}
-                </span>
-                <h3>{continueProject.title}</h3>
-                <time dateTime={continueProject.updatedAt}>
-                  Updated {formatDate(continueProject.updatedAt)}
-                </time>
-                <Button
-                  variant="primary"
-                  aria-label={`Continue ${continueProject.title}`}
-                  onClick={() => onOpenProject(continueProject.id)}
-                >
-                  Continue Project
-                  <AppIcon name="chevronRight" width="1rem" height="1rem" />
-                </Button>
-              </article>
-            ) : !projectsQuery.isLoading && !projectsQuery.isError ? (
-              <div css={continuePanelStyles(theme)} data-empty="true">
-                <h3>No active Project yet</h3>
-                <p>Create one only when resumable context will help.</p>
-                <Button variant="secondary" onClick={onCreateProject}>
-                  New Project
+            ))}
+
+            {visibleItems.length > 0 ? (
+              <ul css={recentListStyles(theme)}>
+                {visibleItems.map((item) => (
+                  <li key={`${item.kind}-${item.id}`}>
+                    <button type="button" onClick={item.open}>
+                      <span data-recent-poster="">
+                        {/* Decorative: the button's own text already names the work. */}
+                        <WorkPosterTile
+                          decorative
+                          playBadge={item.kind !== 'campaigns'}
+                          icon={
+                            item.kind === 'campaigns' ? (
+                              <AppIcon name={recentKindIcon(item.kind)} />
+                            ) : (
+                              KIND_ICONS.video
+                            )
+                          }
+                          thumbnailUrl={item.posterUrl}
+                          emptyCaption={recentEmptyCaption(item.kind)}
+                          failedCaption="Preview didn’t load"
+                          label={item.title}
+                          kindNoun={recentKindLabel[item.kind]}
+                          unavailable={false}
+                        />
+                      </span>
+                      <span data-recent-title>
+                        <strong>{item.title}</strong>
+                        <span>
+                          {recentKindLabel[item.kind]} · {item.meta}
+                        </span>
+                      </span>
+                      <time dateTime={item.updatedAt}>{formatDate(item.updatedAt)}</time>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : !visibleLoading && visibleErrors.length === 0 ? (
+              <div css={emptyRecentStyles(theme)}>
+                <EmptyStatePreview variant="rows" />
+                <p>{emptyRecent.message}</p>
+                <p data-empty-example css={emptyExampleStyles(theme)}>
+                  {emptyRecent.example}
+                </p>
+                <Button size="small" variant="quiet" onClick={emptyRecent.action.run}>
+                  {emptyRecent.action.label}
                 </Button>
               </div>
             ) : null}
+
+            <footer css={allDestinationsStyles(theme)}>
+              <Button size="small" variant="quiet" onClick={onOpenProjects}>
+                All Projects
+              </Button>
+              <Button size="small" variant="quiet" onClick={onOpenVideos}>
+                All Videos
+              </Button>
+              <Button size="small" variant="quiet" onClick={onOpenCampaigns}>
+                All Campaigns
+              </Button>
+            </footer>
           </section>
         </div>
 
-        <section css={recentWorkStyles(theme)} aria-labelledby="recent-work-heading">
+        <section
+          css={processingQueueStyles(theme)}
+          data-queue-state={queueActive ? 'active' : 'idle'}
+          aria-labelledby="processing-queue-heading"
+        >
           <header>
-            <h2 id="recent-work-heading" css={sectionEyebrowStyles(theme)}>
-              Recent Work
-            </h2>
-            <div role="group" aria-label="Filter recent work" css={recentFilterStyles(theme)}>
-              {(['all', 'videos', 'projects', 'campaigns'] as const).map((kind) => (
-                <button
-                  key={kind}
-                  type="button"
-                  aria-pressed={recentKind === kind}
-                  onClick={() => setRecentKind(kind)}
-                >
-                  {kind === 'all' ? 'All' : `${kind[0]?.toUpperCase()}${kind.slice(1)}`}
-                </button>
-              ))}
+            <div data-queue-summary>
+              <h2 id="processing-queue-heading">Processing Queue</h2>
+              {queueActive ? <p>Queued and active provider video edits for this account.</p> : null}
+              {processingQueueQuery.isLoading ? (
+                <p role="status">Checking processing jobs…</p>
+              ) : null}
+              {!queueActive && !processingQueueQuery.isLoading && !processingQueueQuery.isError ? (
+                <p data-empty-queue>No queued or active video jobs.</p>
+              ) : null}
             </div>
-          </header>
-
-          {visibleLoading ? <p role="status">Loading recent work…</p> : null}
-          {visibleErrors.map((kind) => (
-            <StatusNotice
-              key={kind}
-              role="alert"
-              tone="danger"
-              title={`${recentKindLabel[kind]}s unavailable`}
-            >
-              <Button size="small" variant="quiet" onClick={queryState[kind].retry}>
-                Retry
-              </Button>
-            </StatusNotice>
-          ))}
-
-          {visibleItems.length > 0 ? (
-            <ul css={recentListStyles(theme)}>
-              {visibleItems.map((item) => (
-                <li key={`${item.kind}-${item.id}`}>
-                  <button type="button" onClick={item.open}>
-                    <span data-recent-poster="">
-                      {/* Decorative: the button's own text already names the work. */}
-                      <WorkPosterTile
-                        decorative
-                        playBadge={item.kind !== 'campaigns'}
-                        icon={
-                          item.kind === 'campaigns' ? (
-                            <AppIcon name={recentKindIcon(item.kind)} />
-                          ) : (
-                            KIND_ICONS.video
-                          )
-                        }
-                        thumbnailUrl={item.posterUrl}
-                        emptyCaption={recentEmptyCaption(item.kind)}
-                        failedCaption="Preview didn’t load"
-                        label={item.title}
-                        kindNoun={recentKindLabel[item.kind]}
-                        unavailable={false}
-                      />
-                    </span>
-                    <span data-recent-title>
-                      <strong>{item.title}</strong>
-                      <span>
-                        {recentKindLabel[item.kind]} · {item.meta}
-                      </span>
-                    </span>
-                    <time dateTime={item.updatedAt}>{formatDate(item.updatedAt)}</time>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : !visibleLoading && visibleErrors.length === 0 ? (
-            <div css={emptyRecentStyles(theme)}>
-              <EmptyStatePreview variant="rows" />
-              <p>{emptyRecent.message}</p>
-              <p data-empty-example css={emptyExampleStyles(theme)}>
-                {emptyRecent.example}
-              </p>
-              <Button size="small" variant="quiet" onClick={emptyRecent.action.run}>
-                {emptyRecent.action.label}
-              </Button>
-            </div>
-          ) : null}
-
-          <footer css={allDestinationsStyles(theme)}>
-            <Button size="small" variant="quiet" onClick={onOpenProjects}>
-              All Projects
-            </Button>
-            <Button size="small" variant="quiet" onClick={onOpenVideos}>
-              All Videos
-            </Button>
-            <Button size="small" variant="quiet" onClick={onOpenCampaigns}>
-              All Campaigns
-            </Button>
-          </footer>
-        </section>
-      </div>
-
-      <section
-        css={processingQueueStyles(theme)}
-        data-queue-state={queueActive ? 'active' : 'idle'}
-        aria-labelledby="processing-queue-heading"
-      >
-        <header>
-          <div data-queue-summary>
-            <h2 id="processing-queue-heading">Processing Queue</h2>
-            {queueActive ? <p>Queued and active provider video edits for this account.</p> : null}
-            {processingQueueQuery.isLoading ? <p role="status">Checking processing jobs…</p> : null}
-            {!queueActive && !processingQueueQuery.isLoading && !processingQueueQuery.isError ? (
-              <p data-empty-queue>No queued or active video jobs.</p>
-            ) : null}
-          </div>
-          <Button
-            size="small"
-            variant="quiet"
-            disabled={processingQueueQuery.isFetching}
-            onClick={() => void processingQueueQuery.refetch()}
-          >
-            Refresh
-          </Button>
-        </header>
-        {processingQueueQuery.isError ? (
-          <StatusNotice role="alert" tone="danger" title="Processing queue unavailable">
             <Button
               size="small"
               variant="quiet"
+              disabled={processingQueueQuery.isFetching}
               onClick={() => void processingQueueQuery.refetch()}
             >
-              Retry
+              Refresh
             </Button>
-          </StatusNotice>
-        ) : null}
-        {queueNotice ? (
-          <StatusNotice role="status" tone="success" title="Processing slot released">
-            {queueNotice}
-          </StatusNotice>
-        ) : null}
-        {queueActive ? (
-          <ul>
-            {queueJobs.map((job) => (
-              <li key={job.jobId}>
-                <span data-job-status>{jobStatusLabel(job.status)}</span>
-                <span data-job-details>
-                  <strong>{jobOperationLabel(job.operation)}</strong>
-                  <span>
-                    {job.provider} · Started {formatDateTime(job.createdAt)}
+          </header>
+          {processingQueueQuery.isError ? (
+            <StatusNotice role="alert" tone="danger" title="Processing queue unavailable">
+              <Button
+                size="small"
+                variant="quiet"
+                onClick={() => void processingQueueQuery.refetch()}
+              >
+                Retry
+              </Button>
+            </StatusNotice>
+          ) : null}
+          {queueNotice ? (
+            <StatusNotice role="status" tone="success" title="Processing slot released">
+              {queueNotice}
+            </StatusNotice>
+          ) : null}
+          {queueActive ? (
+            <ul>
+              {queueJobs.map((job) => (
+                <li key={job.jobId}>
+                  <span data-job-status>{jobStatusLabel(job.status)}</span>
+                  <span data-job-details>
+                    <strong>{jobOperationLabel(job.operation)}</strong>
+                    <span>
+                      {job.provider} · Started {formatDateTime(job.createdAt)}
+                    </span>
                   </span>
-                </span>
-                <Button
-                  size="small"
-                  variant="danger"
-                  onClick={() => {
-                    abandonMutation.reset();
-                    setQueueNotice(null);
-                    setSelectedJob(job);
-                  }}
-                >
-                  {jobActionLabel(job.status)}
-                </Button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </section>
+                  <Button
+                    size="small"
+                    variant="danger"
+                    onClick={() => {
+                      abandonMutation.reset();
+                      setQueueNotice(null);
+                      setSelectedJob(job);
+                    }}
+                  >
+                    {jobActionLabel(job.status)}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      </PageShell>
 
       <ConfirmationDialog
         open={selectedJob !== null}

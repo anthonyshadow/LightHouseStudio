@@ -6,17 +6,20 @@ import { useLocation, useNavigate } from 'react-router';
 import { APP_PATHS, campaignIdFromPath, campaignPath, projectPath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
 import {
+  ActionMenu,
   AppIcon,
   Button,
   emptyExampleStyles,
   EmptyStatePreview,
   ListSearchField,
   listTotalLabel,
+  PageHeader,
+  PageShell,
   SearchEmptyState,
   StatusNotice,
   useListSearch,
 } from '../../ui';
-import { workspaceInnerStyles, workspaceStyles } from '../projects/ProjectRouteSurface.styles';
+import { workspaceStyles } from '../projects/ProjectRouteSurface.styles';
 import { NewProjectDialog } from '../projects/ProjectDialogs';
 import { KIND_ICONS } from '../projects/ProjectAssetThumbnail';
 import { projectPosterUrls } from '../projects/projectPosterPresentation';
@@ -34,7 +37,6 @@ import {
   listSectionStyles,
   projectGroupStyles,
   statusPillStyles,
-  workspaceHeaderStyles,
 } from './CampaignRouteSurface.styles';
 import {
   CampaignFormDialog,
@@ -281,27 +283,23 @@ const CampaignsWorkspace = () => {
   };
 
   return (
-    <div css={workspaceInnerStyles(theme)}>
-      <header css={workspaceHeaderStyles(theme)}>
-        <div>
-          <h1 ref={setHeadingRef} tabIndex={-1}>
-            Campaigns
-          </h1>
-          <p>
-            Group related Projects under one initiative — just a name and an optional brief.
-            Campaigns are optional; you can create a Project without one.
-          </p>
-        </div>
-        <Button
-          variant="primary"
-          onClick={(event) => {
-            returnFocusRef.current = event.currentTarget;
-            setCreating(true);
-          }}
-        >
-          Create Campaign
-        </Button>
-      </header>
+    <PageShell>
+      <PageHeader
+        title="Campaigns"
+        headingRef={setHeadingRef}
+        description="Group related Projects under one initiative — just a name and an optional brief. Campaigns are optional; you can create a Project without one."
+        actions={
+          <Button
+            variant="primary"
+            onClick={(event) => {
+              returnFocusRef.current = event.currentTarget;
+              setCreating(true);
+            }}
+          >
+            Create Campaign
+          </Button>
+        }
+      />
       <div role="status" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
@@ -371,7 +369,7 @@ const CampaignsWorkspace = () => {
           onDeleted={(name) => finishDialog(`${name} deleted.`)}
         />
       ) : null}
-    </div>
+    </PageShell>
   );
 };
 
@@ -495,20 +493,20 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
   };
   if (query.isPending)
     return (
-      <div css={workspaceInnerStyles(theme)}>
+      <PageShell>
         <p role="status">Loading Campaign…</p>
-      </div>
+      </PageShell>
     );
   if (query.isError) {
     return (
-      <div css={workspaceInnerStyles(theme)}>
+      <PageShell>
         <StatusNotice role="alert" tone="danger" title="Campaign unavailable">
           <p>{safeError(query.error)}</p>
           <Button variant="quiet" onClick={() => goBack(APP_PATHS.campaigns)}>
             Back to Campaigns
           </Button>
         </StatusNotice>
-      </div>
+      </PageShell>
     );
   }
   const campaign = query.data;
@@ -522,57 +520,81 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
     setAnnouncement(message);
     window.requestAnimationFrame(() => headingRef.current?.focus());
   };
+  const openMenuDialog = (next: CampaignDialog, trigger: HTMLButtonElement | null) => {
+    returnFocusRef.current = trigger;
+    setDialog(next);
+  };
   return (
-    <div css={workspaceInnerStyles(theme)}>
-      <header css={detailHeaderStyles(theme)}>
-        <Button data-detail-breadcrumb variant="quiet" onClick={() => goBack(APP_PATHS.campaigns)}>
-          ← All Campaigns
-        </Button>
-        <div data-detail-identity>
-          <div>
-            <h1 ref={headingRef} tabIndex={-1}>
-              {campaign.name}
-            </h1>
-            <div data-detail-meta>
-              <span css={statusPillStyles(theme, archived)}>
-                {archived ? 'Archived' : 'Active'}
-              </span>
-              <span>
-                Updated <time dateTime={campaign.updatedAt}>{formatDate(campaign.updatedAt)}</time>
-              </span>
-            </div>
-            <p css={campaignBriefStyles(theme)}>{campaign.brief ?? 'No brief yet.'}</p>
-          </div>
-          <div data-detail-actions>
-            {!archived ? (
-              <Button
-                variant="primary"
-                onClick={(event) => {
-                  returnFocusRef.current = event.currentTarget;
-                  setCreatingProject(true);
-                }}
-              >
-                New Project
-              </Button>
-            ) : null}
-            <Button onClick={(event) => openDialog('edit', event.currentTarget)}>Edit</Button>
+    <PageShell>
+      <PageHeader
+        css={detailHeaderStyles(theme)}
+        title={campaign.name}
+        headingRef={headingRef}
+        breadcrumb={
+          <Button
+            data-detail-breadcrumb
+            variant="quiet"
+            onClick={() => goBack(APP_PATHS.campaigns)}
+          >
+            ← All Campaigns
+          </Button>
+        }
+        actions={
+          <>
             <Button
-              variant={archived ? 'primary' : 'danger'}
-              onClick={(event) => openDialog(archived ? 'restore' : 'archive', event.currentTarget)}
+              variant="primary"
+              onClick={(event) => {
+                if (archived) {
+                  openDialog('restore', event.currentTarget);
+                  return;
+                }
+                returnFocusRef.current = event.currentTarget;
+                setCreatingProject(true);
+              }}
             >
-              {archived ? 'Restore' : 'Archive'}
+              {archived ? 'Restore' : 'New Project'}
             </Button>
-            {archived ? (
-              <Button
-                variant="danger"
-                onClick={(event) => openDialog('tombstone', event.currentTarget)}
-              >
-                Delete Campaign
-              </Button>
-            ) : null}
-          </div>
+            <ActionMenu
+              label={`More actions for ${campaign.name}`}
+              size="regular"
+              items={[
+                {
+                  id: 'edit',
+                  label: 'Edit',
+                  onSelect: (trigger) => openMenuDialog('edit', trigger),
+                },
+                ...(archived
+                  ? [
+                      {
+                        id: 'tombstone',
+                        label: 'Delete Campaign',
+                        danger: true,
+                        onSelect: (trigger: HTMLButtonElement | null) =>
+                          openMenuDialog('tombstone', trigger),
+                      },
+                    ]
+                  : [
+                      {
+                        id: 'archive',
+                        label: 'Archive',
+                        danger: true,
+                        onSelect: (trigger: HTMLButtonElement | null) =>
+                          openMenuDialog('archive', trigger),
+                      },
+                    ]),
+              ]}
+            />
+          </>
+        }
+      >
+        <div data-detail-meta>
+          <span css={statusPillStyles(theme, archived)}>{archived ? 'Archived' : 'Active'}</span>
+          <span>
+            Updated <time dateTime={campaign.updatedAt}>{formatDate(campaign.updatedAt)}</time>
+          </span>
         </div>
-      </header>
+        <p css={campaignBriefStyles(theme)}>{campaign.brief ?? 'No brief yet.'}</p>
+      </PageHeader>
       <div role="status" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
@@ -669,7 +691,7 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
           onCreated={(current) => void navigate(projectPath(current.project.id))}
         />
       ) : null}
-    </div>
+    </PageShell>
   );
 };
 

@@ -3,10 +3,9 @@ import type { CreativeAssetStore } from '@studio/domain';
 import { useEffect, type ReactNode } from 'react';
 import { APP_PATHS } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
-import { Button, StatusNotice } from '../../ui';
+import { Button, pageShellStyles, StatusNotice } from '../../ui';
 import { projectProcessingBlockedReason } from './projectProcessingPresentation';
 import { ProjectOverviewSurface } from './ProjectOverviewSurface';
-import { projectOverviewInnerStyles } from './ProjectOverviewSurface.styles';
 import { dialogActionsStyles, workspaceInnerStyles } from './ProjectRouteSurface.styles';
 import { unavailableSourceRuntime, type ProjectRecordingCandidate } from './ProjectSourceSection';
 import type { ProjectWorkingMediaActivity } from './ProjectWorkingMediaSection';
@@ -56,7 +55,7 @@ export const ProjectDetailSurface = ({
   const theme = useTheme();
   const goBack = useRouteBack();
   const session = useProjectSession(projectId);
-  const detailContentStyles = workspaceMode ? workspaceInnerStyles : projectOverviewInnerStyles;
+  const detailContentStyles = workspaceMode ? workspaceInnerStyles : pageShellStyles;
 
   useEffect(() => {
     onSessionChange?.(session.port);

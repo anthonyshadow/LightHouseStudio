@@ -1,55 +1,27 @@
 import type { CSSObject, Theme } from '@emotion/react';
 import { media } from '../../ui/media';
 
+/** The scroll region and query container; `PageShell` inside it owns width and padding. */
 export const dashboardStyles = (theme: Theme): CSSObject => ({
   width: '100%',
   height: '100%',
   minWidth: 0,
   minHeight: 0,
-  marginInline: 'auto',
-  padding: `4.5rem ${theme.space.xxl} 4rem`,
   overflowY: 'auto',
   background: theme.colors.canvas,
-  '& h1, & h2, & h3': { fontFamily: theme.type.display },
+  containerType: 'inline-size',
+  '& h2, & h3': { fontFamily: theme.type.display },
   '& p': { margin: 0 },
-  [media.down('compact')]: {
-    padding: `${theme.space.xl} ${theme.space.lg} max(5rem, calc(env(safe-area-inset-bottom) + 4.5rem))`,
-  },
-  '@media (max-width: 22rem)': {
-    paddingInline: theme.space.lg,
-  },
 });
 
+/**
+ * Layered onto `PageShell`. The eyebrow, the title scale and the identity grid come from the shared
+ * header now; what stays here is the Dashboard's own action pair and its mobile bottom clearance.
+ */
 export const dashboardHeaderStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) auto',
-  alignItems: 'end',
-  gap: theme.space.lg,
-  paddingBlockEnd: theme.space.xl,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
-  // A greeting, not a category label: the old uppercase 0.2em-tracked 0.625rem treatment made
-  // "Welcome back, …" read as an eyebrow rather than as a sentence addressed to the operator.
-  '& [data-dashboard-eyebrow]': {
-    display: 'block',
-    marginBlockEnd: theme.space.xs,
-    color: theme.colors.textMuted,
-    fontSize: '0.9375rem',
-    fontWeight: 600,
-    letterSpacing: '-0.01em',
-  },
-  '& h1': {
-    margin: 0,
-    color: theme.colors.text,
-    fontSize: 'clamp(1.5rem, 3vw, 1.875rem)',
-    letterSpacing: '-0.035em',
-    lineHeight: 1.05,
-  },
-  '& p': {
-    maxWidth: '34rem',
-    marginBlockStart: theme.space.xs,
-    color: theme.colors.textMuted,
-    fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
-    lineHeight: 1.55,
+  // The fixed bottom navigation sits over the last rows of a scrolled Dashboard without this.
+  [media.down('compact')]: {
+    paddingBlockEnd: `max(5rem, calc(env(safe-area-inset-bottom) + 4.5rem))`,
   },
   '& [data-dashboard-actions]': {
     display: 'flex',
@@ -62,14 +34,10 @@ export const dashboardHeaderStyles = (theme: Theme): CSSObject => ({
     boxShadow: 'none',
   },
   '& [data-dashboard-actions] > button:last-of-type': { paddingInline: 0 },
-  '@media (max-width: 57rem)': {
-    gridTemplateColumns: 'minmax(0, 1fr)',
-    alignItems: 'start',
-  },
-  '@media (max-width: 30rem)': {
-    '& [data-dashboard-actions]': {
-      flexWrap: 'wrap',
-    },
+  '@container (max-width: 30rem)': {
+    '& [data-dashboard-actions]': { flexWrap: 'wrap' },
+    // The Dashboard's slot holds two controls, so it opts out of the shared one-primary grid.
+    '& [data-page-actions]': { display: 'flex' },
   },
 });
 

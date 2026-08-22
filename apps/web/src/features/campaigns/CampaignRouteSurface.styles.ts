@@ -75,10 +75,7 @@ export const campaignCardStyles = (theme: Theme): CSSObject => ({
 export const projectGroupStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gap: theme.space.md,
-  padding: `clamp(${theme.space.md}, 2vw, ${theme.space.lg})`,
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: theme.radii.large,
-  background: theme.colors.surfaceSoft,
+  paddingBlockStart: theme.space.lg,
   '& > header': {
     display: 'flex',
     alignItems: 'baseline',
@@ -121,40 +118,11 @@ export const projectGroupStyles = (theme: Theme): CSSObject => ({
  * last place a Campaigns layout change would be looked for.
  */
 
-export const workspaceHeaderStyles = (theme: Theme): CSSObject => ({
-  display: 'flex',
-  alignItems: 'end',
-  justifyContent: 'space-between',
-  gap: theme.space.lg,
-  '& > div': { minWidth: 0 },
-  '& h2': {
-    margin: 0,
-    fontFamily: theme.type.display,
-    fontSize: 'clamp(1.7rem, 4vw, 2.6rem)',
-    letterSpacing: '-0.04em',
-  },
-  '& p': {
-    maxWidth: '48rem',
-    margin: `${theme.space.xs} 0 0`,
-    color: theme.colors.textMuted,
-    lineHeight: 1.6,
-  },
-  [media.down('tablet')]: {
-    alignItems: 'stretch',
-    flexDirection: 'column',
-    '& > button': { width: '100%' },
-  },
-});
-
 export const listSectionStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   display: 'grid',
   gap: theme.space.md,
-  padding: `clamp(${theme.space.md}, 2vw, ${theme.space.lg})`,
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: theme.radii.large,
-  background: theme.colors.surfaceSoft,
-  boxShadow: theme.shadows.soft,
+  paddingBlockStart: theme.space.lg,
   '& > header': {
     display: 'flex',
     alignItems: 'baseline',
@@ -192,44 +160,20 @@ export const emptyListStyles = (theme: Theme): CSSObject => ({
   '& [data-empty-state-preview]': { marginBlockEnd: theme.space.sm },
 });
 
+/** Only what `PageHeader` does not own: the breadcrumb and the status/updated line under the name. */
 export const detailHeaderStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gap: theme.space.md,
   '& [data-detail-breadcrumb]': {
     justifySelf: 'start',
     minHeight: '2.75rem',
-  },
-  '& [data-detail-identity]': {
-    display: 'flex',
-    alignItems: 'end',
-    justifyContent: 'space-between',
-    gap: theme.space.lg,
-  },
-  '& h2': {
-    margin: 0,
-    overflowWrap: 'anywhere',
-    fontFamily: theme.type.display,
-    fontSize: 'clamp(1.7rem, 4vw, 2.6rem)',
-    letterSpacing: '-0.04em',
+    marginBlockEnd: theme.space.lg,
   },
   '& [data-detail-meta]': {
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: theme.space.sm,
-    marginBlockStart: theme.space.sm,
+    marginBlockStart: theme.space.md,
     color: theme.colors.textMuted,
     fontSize: theme.fontSizes.metadata,
-  },
-  '& [data-detail-actions]': {
-    display: 'flex',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    gap: theme.space.sm,
-  },
-  '@media (max-width: 45rem)': {
-    '& [data-detail-identity]': { alignItems: 'stretch', flexDirection: 'column' },
-    '& [data-detail-actions]': { justifyContent: 'stretch' },
-    '& [data-detail-actions] > button': { flex: '1 1 auto' },
   },
 });

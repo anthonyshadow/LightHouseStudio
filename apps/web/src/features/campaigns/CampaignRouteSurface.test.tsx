@@ -139,6 +139,21 @@ afterEach(() => {
   window.history.replaceState({ idx: 0 }, '');
 });
 
+/**
+ * On the Campaign detail page management actions live behind the header's `ActionMenu`. Returns the
+ * trigger, which is where focus comes back to once the dialog it opened closes.
+ */
+const chooseCampaignAction = async (
+  user: ReturnType<typeof userEvent.setup>,
+  name: string,
+  action: string,
+): Promise<HTMLElement> => {
+  const trigger = await screen.findByLabelText(`More actions for ${name}`);
+  await user.click(trigger);
+  await user.click(await screen.findByRole('menuitem', { name: action }));
+  return trigger;
+};
+
 describe('Campaign route surface', () => {
   it('covers Campaign cards deliberately and shows their Projects\u2019 own work', async () => {
     const preview = {
@@ -589,8 +604,7 @@ describe('Campaign route surface', () => {
     const user = userEvent.setup();
     renderCampaigns(`/campaigns/${campaignId}`);
 
-    const edit = await screen.findByRole('button', { name: 'Edit' });
-    await user.click(edit);
+    const edit = await chooseCampaignAction(user, 'Summer launch', 'Edit');
     await user.click(
       within(screen.getByRole('dialog', { name: 'Edit Campaign' })).getByRole('button', {
         name: 'Cancel',
@@ -598,7 +612,7 @@ describe('Campaign route surface', () => {
     );
     expect(edit).toHaveFocus();
 
-    await user.click(edit);
+    await chooseCampaignAction(user, 'Summer launch', 'Edit');
     const dialog = screen.getByRole('dialog', { name: 'Edit Campaign' });
     const name = within(dialog).getByRole('textbox', { name: /Campaign name/u });
     const brief = within(dialog).getByRole('textbox', { name: /Brief/u });
@@ -835,7 +849,7 @@ describe('Campaign route surface', () => {
     await waitFor(() => expect(movedBody).toEqual({ campaignId: null, expectedVersion: 1 }));
     expect(await screen.findByText('Launch cut moved to No Campaign.')).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: 'Archive' }));
+    await chooseCampaignAction(user, 'Summer launch', 'Archive');
     const archiveDialog = screen.getByRole('dialog', { name: 'Archive Campaign' });
     expect(archiveDialog).toHaveTextContent('It does not archive or move Projects.');
     await user.click(within(archiveDialog).getByRole('button', { name: 'Archive Campaign' }));
@@ -872,7 +886,7 @@ describe('Campaign route surface', () => {
     const user = userEvent.setup();
     renderCampaigns(`/campaigns/${campaignId}`);
 
-    await user.click(await screen.findByRole('button', { name: 'Delete Campaign' }));
+    await chooseCampaignAction(user, 'Summer launch', 'Delete Campaign');
     const dialog = screen.getByRole('dialog', { name: 'Delete Campaign' });
     await user.click(within(dialog).getByRole('button', { name: 'Confirm Delete Campaign' }));
 
@@ -944,8 +958,7 @@ describe('Campaign route surface', () => {
     expect(screen.getByRole('button', { name: 'New Project' })).toBeVisible();
     expect(restoreAttempts).toBe(2);
 
-    const archive = screen.getByRole('button', { name: 'Archive' });
-    await user.click(archive);
+    const archive = await chooseCampaignAction(user, 'Summer launch', 'Archive');
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog', { name: 'Archive Campaign' })).not.toBeInTheDocument();
     expect(archive).toHaveFocus();
@@ -985,13 +998,12 @@ describe('Campaign route surface', () => {
     const user = userEvent.setup();
     const { router } = renderCampaigns(`/campaigns/${campaignId}`);
 
-    const deleteCampaign = await screen.findByRole('button', { name: 'Delete Campaign' });
-    await user.click(deleteCampaign);
+    const deleteCampaign = await chooseCampaignAction(user, 'Summer launch', 'Delete Campaign');
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog', { name: 'Delete Campaign' })).not.toBeInTheDocument();
     expect(deleteCampaign).toHaveFocus();
 
-    await user.click(deleteCampaign);
+    await chooseCampaignAction(user, 'Summer launch', 'Delete Campaign');
     await user.click(
       within(screen.getByRole('dialog', { name: 'Delete Campaign' })).getByRole('button', {
         name: 'Confirm Delete Campaign',

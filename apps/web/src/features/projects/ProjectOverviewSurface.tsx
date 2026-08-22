@@ -5,7 +5,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { APP_PATHS, campaignPath, projectWorkspacePath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
-import { ActionMenu, AppIcon, Button } from '../../ui';
+import { ActionMenu, AppIcon, Button, PageHeader, PageShell } from '../../ui';
 import { useCampaignDetail } from '../campaigns/useCampaignsController';
 import { ProjectAssetsSection } from './ProjectAssetsSection';
 import {
@@ -18,7 +18,6 @@ import {
 } from './ProjectDialogs';
 import {
   projectOverviewHeaderStyles,
-  projectOverviewInnerStyles,
   projectOverviewSourceStyles,
 } from './ProjectOverviewSurface.styles';
 import { ProjectSourceSection, type ProjectRecordingCandidate } from './ProjectSourceSection';
@@ -101,57 +100,30 @@ export const ProjectOverviewSurface = ({
   );
 
   return (
-    <div css={projectOverviewInnerStyles(theme)} data-project-overview="">
-      <header css={projectOverviewHeaderStyles(theme)}>
-        <Button
-          data-detail-breadcrumb
-          variant="quiet"
-          onClick={() =>
-            goBack(
-              project.campaignId === null ? APP_PATHS.projects : campaignPath(project.campaignId),
-            )
-          }
-        >
-          {project.campaignId === null
-            ? '← All Projects'
-            : campaignName === null
-              ? '← Campaign'
-              : `← ${campaignName}`}
-        </Button>
-        <div data-detail-identity>
-          <div>
-            <h1 ref={headingRef} tabIndex={-1}>
-              {project.title}
-            </h1>
-            <div data-detail-meta>
-              <span data-project-overview-status>{projectStatusLabel(project.status)}</span>
-              <span>
-                Updated{' '}
-                <time dateTime={project.updatedAt}>{formatDateTime(project.updatedAt)}</time>
-              </span>
-              {project.campaignId === null ? (
-                <span>No Campaign</span>
-              ) : (
-                <span aria-live="polite">
-                  {campaign.isPending
-                    ? 'Campaign: loading…'
-                    : campaign.isError || campaignName === null
-                      ? 'Campaign unavailable'
-                      : `Campaign: ${campaignName}`}
-                </span>
-              )}
-            </div>
-            <div data-project-workspace-status>
-              <AppIcon name="info" />
-              <span>
-                {overviewHasSource
-                  ? `Original video ready • ${projectWorkflowLabel(current.revision.snapshot.workflowPhase)} workflow active.`
-                  : 'No original video yet • Choose one below to begin.'}
-              </span>
-            </div>
-            <ProjectWorkflowProgress snapshot={current.revision.snapshot} />
-          </div>
-          <div data-detail-actions>
+    <PageShell data-project-overview="">
+      <PageHeader
+        css={projectOverviewHeaderStyles(theme)}
+        title={project.title}
+        headingRef={headingRef}
+        breadcrumb={
+          <Button
+            data-detail-breadcrumb
+            variant="quiet"
+            onClick={() =>
+              goBack(
+                project.campaignId === null ? APP_PATHS.projects : campaignPath(project.campaignId),
+              )
+            }
+          >
+            {project.campaignId === null
+              ? '← All Projects'
+              : campaignName === null
+                ? '← Campaign'
+                : `← ${campaignName}`}
+          </Button>
+        }
+        actions={
+          <>
             <Button
               variant="primary"
               data-detail-action="continue"
@@ -219,9 +191,36 @@ export const ProjectOverviewSurface = ({
                   : []),
               ]}
             />
-          </div>
+          </>
+        }
+      >
+        <div data-detail-meta>
+          <span data-project-overview-status>{projectStatusLabel(project.status)}</span>
+          <span>
+            Updated <time dateTime={project.updatedAt}>{formatDateTime(project.updatedAt)}</time>
+          </span>
+          {project.campaignId === null ? (
+            <span>No Campaign</span>
+          ) : (
+            <span aria-live="polite">
+              {campaign.isPending
+                ? 'Campaign: loading…'
+                : campaign.isError || campaignName === null
+                  ? 'Campaign unavailable'
+                  : `Campaign: ${campaignName}`}
+            </span>
+          )}
         </div>
-      </header>
+        <div data-project-workspace-status>
+          <AppIcon name="info" />
+          <span>
+            {overviewHasSource
+              ? `Original video ready • ${projectWorkflowLabel(current.revision.snapshot.workflowPhase)} workflow active.`
+              : 'No original video yet • Choose one below to begin.'}
+          </span>
+        </div>
+        <ProjectWorkflowProgress snapshot={current.revision.snapshot} />
+      </PageHeader>
 
       <div role="status" aria-live="polite" aria-atomic="true">
         {announcement}
@@ -334,6 +333,6 @@ export const ProjectOverviewSurface = ({
           }
         />
       ) : null}
-    </div>
+    </PageShell>
   );
 };
