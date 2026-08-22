@@ -23,6 +23,7 @@ import {
   primaryNavigationStyles,
   systemStatusDotStyles,
 } from './StudioApp.styles';
+import { media } from '../ui/media';
 
 export type { CapabilityState } from './studioAvailabilityPresentation';
 
@@ -281,8 +282,8 @@ export const StudioHeader = ({
               aria-label="How Lightframe works"
               css={{
                 gap: theme.space.xs,
-                '@media (min-width: 48rem)': { justifyContent: 'flex-start' },
-                '@media (max-width: 39.99rem)': {
+                [media.up('compact')]: { justifyContent: 'flex-start' },
+                [media.down('tablet')]: {
                   width: '2.75rem',
                   padding: 0,
                   '& [data-help-label]': { display: 'none' },

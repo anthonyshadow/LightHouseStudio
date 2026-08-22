@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const workspaceMastheadStyles = (theme: Theme): CSSObject => ({
   gridColumn: '1 / -1',
@@ -113,7 +114,7 @@ export const taskInspectorStyles = (theme: Theme): CSSObject => ({
   overflow: 'hidden',
   borderInlineStart: `1px solid ${theme.colors.border}`,
   background: theme.colors.canvas,
-  '@media (max-width: 63.99rem)': {
+  [media.down('laptop')]: {
     gridColumn: 1,
     gridRow: 3,
     minHeight: '34rem',
@@ -193,7 +194,7 @@ export const taskBodyStyles = (theme: Theme): CSSObject => ({
     borderRadius: theme.radii.round,
     background: theme.colors.border,
   },
-  '@media (max-width: 63.99rem)': { overflow: 'visible' },
+  [media.down('laptop')]: { overflow: 'visible' },
 });
 
 export const taskPanelStyles = (theme: Theme): CSSObject => ({
@@ -220,7 +221,7 @@ export const taskPanelStyles = (theme: Theme): CSSObject => ({
   '& > section, & > [role="status"], & > [role="alert"]': {
     boxShadow: 'none',
   },
-  '@media (max-width: 39.99rem)': {
+  [media.down('tablet')]: {
     padding: `${theme.space.lg} ${theme.space.md} 5.5rem`,
   },
 });

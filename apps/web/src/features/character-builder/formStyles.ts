@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const builderLayoutStyles = (_theme: Theme): CSSObject => ({
   width: '100%',
@@ -8,7 +9,7 @@ export const builderLayoutStyles = (_theme: Theme): CSSObject => ({
   display: 'grid',
   gridTemplateColumns: '16.25rem minmax(0, 1fr)',
   overflow: 'hidden',
-  '@media (max-width: 64rem)': {
+  [media.down('laptop')]: {
     gridTemplateColumns: '1fr',
     gridTemplateRows: 'auto minmax(0, 1fr)',
   },
@@ -24,7 +25,7 @@ export const stepNavigationStyles = (theme: Theme): CSSObject => ({
   overflowY: 'auto',
   borderInlineEnd: `1px solid ${theme.colors.border}`,
   background: theme.colors.canvasRaised,
-  '@media (max-width: 64rem)': {
+  [media.down('laptop')]: {
     flexDirection: 'row',
     gap: theme.space.lg,
     padding: theme.space.md,
@@ -76,7 +77,7 @@ export const stepButtonStyles = (theme: Theme, active: boolean): CSSObject => ({
     fontSize: theme.fontSizes.caption,
     lineHeight: 1.3,
   },
-  '@media (max-width: 64rem)': {
+  [media.down('laptop')]: {
     flex: '0 0 auto',
     padding: 0,
     borderInlineStart: 0,
@@ -112,12 +113,12 @@ export const workflowCanvasStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.xxl,
   marginInline: 'auto',
   padding: `${theme.space.xxl} ${theme.space.xl}`,
-  '@media (max-width: 79.99rem)': {
+  [media.down('desktop')]: {
     gridTemplateColumns: '1fr',
     maxWidth: '52rem',
     padding: theme.space.xl,
   },
-  '@media (max-width: 40rem)': {
+  [media.down('tablet')]: {
     padding: theme.space.md,
   },
 });
@@ -138,7 +139,7 @@ export const stepContentStyles = (theme: Theme): CSSObject => ({
     fontSize: theme.fontSizes.section,
     fontWeight: 650,
   },
-  '@media (max-width: 40rem)': { gap: theme.space.xl },
+  [media.down('tablet')]: { gap: theme.space.xl },
 });
 
 export const stepEyebrowStyles = (theme: Theme): CSSObject => ({
@@ -333,7 +334,7 @@ export const previewPanelStyles = (theme: Theme): CSSObject => ({
   borderRadius: theme.radii.large,
   background: theme.colors.canvasRaised,
   '& h3': { margin: 0 },
-  '@media (max-width: 64rem)': { position: 'static' },
+  [media.down('laptop')]: { position: 'static' },
 });
 
 export const heroPreviewStyles = (theme: Theme): CSSObject => ({

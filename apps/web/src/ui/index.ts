@@ -1,5 +1,6 @@
 export { StudioDesignProvider } from './StudioDesignProvider';
 export { studioTheme } from './theme';
+export { media, type BreakpointName } from './media';
 export { Button } from './primitives/Button';
 export { Surface } from './primitives/Surface';
 export { TextAreaField, TextField } from './primitives/FormControls';

@@ -8,6 +8,7 @@ import { creativeLibraryStorageSummary } from '../creative-assets/creativeLibrar
 import type { CreativeLibraryMirror } from '../creative-assets/useCreativeLibraryCloudSync';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { Button, VisuallyHidden } from '../../ui';
+import { media } from '../../ui/media';
 
 /**
  * What a card knows about its own size.
@@ -73,7 +74,7 @@ const gridStyles = (theme: Theme): CSSObject => ({
   gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   gap: theme.space.md,
   marginBlockStart: theme.space.lg,
-  '@media (max-width: 64rem)': { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
+  [media.down('laptop')]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
   '@media (max-width: 38rem)': { gridTemplateColumns: 'minmax(0, 1fr)' },
 });
 

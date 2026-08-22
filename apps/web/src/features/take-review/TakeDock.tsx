@@ -8,6 +8,7 @@ import { VoiceEffectsPanel } from '../voice-effects/VoiceEffectsPanel';
 import { SavedVideoSuccessActions } from '../saved-videos/SavedVideoSuccessActions';
 import { TakeReviewActions } from './TakeReviewActions';
 import type { SaveVideoState } from '../saved-videos/useSaveVideo';
+import { media } from '../../ui/media';
 
 export type TakeDockProps = {
   recording: RecordingController;
@@ -35,7 +36,7 @@ const gridStyles = (theme: Theme, view: NonNullable<TakeDockProps['view']>): CSS
   minWidth: 0,
   minHeight: 0,
   minBlockSize: '100%',
-  '@media (max-width: 64rem)': { gridTemplateColumns: '1fr' },
+  [media.down('laptop')]: { gridTemplateColumns: '1fr' },
 });
 const metadataStyles = (theme: Theme): CSSObject => ({
   display: 'flex',

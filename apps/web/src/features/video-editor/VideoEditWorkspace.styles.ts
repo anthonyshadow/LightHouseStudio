@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const editToolRailStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
@@ -36,7 +37,7 @@ export const editToolRailStyles = (theme: Theme): CSSObject => ({
     outline: `2px solid ${theme.colors.focus}`,
     outlineOffset: '2px',
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     flexDirection: 'column',
     alignItems: 'stretch',
     padding: theme.space.sm,
@@ -91,7 +92,7 @@ export const editSettingsBodyStyles = (theme: Theme): CSSObject => ({
   scrollbarWidth: 'thin',
   '& h3': { margin: 0, fontSize: theme.fontSizes.body },
   '& p': { margin: 0, color: theme.colors.textMuted, fontSize: theme.fontSizes.metadata },
-  '@media (max-width: 63.99rem)': {
+  [media.down('laptop')]: {
     padding: theme.space.sm,
     gap: theme.space.sm,
   },

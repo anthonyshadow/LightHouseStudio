@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const campaignBriefStyles = (theme: Theme): CSSObject => ({
   margin: `${theme.space.sm} 0 0`,
@@ -65,7 +66,7 @@ export const campaignCardStyles = (theme: Theme): CSSObject => ({
     flexWrap: 'wrap',
     gap: theme.space.sm,
   },
-  '@media (max-width: 39.99rem)': {
+  [media.down('tablet')]: {
     minHeight: 0,
     '& [data-campaign-actions] > button': { flex: '1 1 auto' },
   },
@@ -106,7 +107,7 @@ export const projectGroupStyles = (theme: Theme): CSSObject => ({
   },
   '& [data-project-poster]': { width: 'min(5rem, 22vw)' },
   '& [data-project-actions]': { display: 'flex', flexWrap: 'wrap', gap: theme.space.sm },
-  '@media (max-width: 39.99rem)': {
+  [media.down('tablet')]: {
     '& article': { gridTemplateColumns: 'minmax(0, 1fr)' },
     '& [data-project-actions] > button': { flex: '1 1 auto' },
   },
@@ -138,7 +139,7 @@ export const workspaceHeaderStyles = (theme: Theme): CSSObject => ({
     color: theme.colors.textMuted,
     lineHeight: 1.6,
   },
-  '@media (max-width: 39.99rem)': {
+  [media.down('tablet')]: {
     alignItems: 'stretch',
     flexDirection: 'column',
     '& > button': { width: '100%' },

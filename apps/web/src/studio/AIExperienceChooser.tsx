@@ -2,6 +2,7 @@ import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { DecartStartDisclosure } from '../features/media-session';
 import { Button, OverlayPanel, StatusNotice } from '../ui';
 import type { CapabilityState } from './StudioHeader';
+import { media } from '../ui/media';
 
 type AIExperienceChooserProps = {
   open: boolean;
@@ -27,7 +28,7 @@ const chooserStyles = (theme: Theme): CSSObject => ({
   width: 'min(52rem, 100%)',
   marginInline: 'auto',
   padding: theme.space.xs,
-  '@media (max-width: 47.99rem)': {
+  [media.down('compact')]: {
     gridTemplateColumns: 'minmax(0, 1fr)',
     gap: theme.space.sm,
   },
@@ -62,7 +63,7 @@ const experienceCardStyles = (theme: Theme, primary: boolean): CSSObject => ({
     gap: theme.space.xs,
     marginBlockStart: 'auto',
   },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     padding: theme.space.md,
     '& p': { minHeight: 0 },
   },

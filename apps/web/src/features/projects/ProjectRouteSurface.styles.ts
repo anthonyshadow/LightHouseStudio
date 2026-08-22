@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const projectWorkspaceRouteStyles = (): CSSObject => ({
   display: 'contents',
@@ -51,7 +52,7 @@ export const workspaceInnerStyles = (theme: Theme): CSSObject => ({
   overflowY: 'auto',
   borderInlineStart: `1px solid ${theme.colors.border}`,
   background: theme.colors.canvas,
-  '@media (max-width: 63.99rem)': {
+  [media.down('laptop')]: {
     gridColumn: 1,
     gridRow: 3,
     minHeight: '20rem',
@@ -133,7 +134,7 @@ export const projectWorkflowProgressStyles = (theme: Theme): CSSObject => ({
       padding: `0.15rem ${theme.space.xs}`,
       fontSize: theme.fontSizes.metadata,
     },
-    '@media (max-width: 63.99rem)': {
+    [media.down('laptop')]: {
       '& li span[data-step-label]': { display: 'none' },
     },
   },

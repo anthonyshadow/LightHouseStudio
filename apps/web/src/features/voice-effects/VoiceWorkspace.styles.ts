@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const workspaceStyles = (theme: Theme, embedded: boolean): CSSObject => ({
   width: embedded ? '100%' : `calc(100% + (${theme.space.md} * 2))`,
@@ -47,7 +48,7 @@ export const workspaceBodyStyles = (theme: Theme, embedded: boolean): CSSObject 
   display: 'grid',
   gridTemplateColumns: '20rem minmax(0, 1fr)',
   overflow: embedded ? 'visible' : 'hidden',
-  '@media (max-width: 48rem)': {
+  [media.down('compact')]: {
     gridTemplateColumns: 'minmax(0, 1fr)',
     gridTemplateRows: 'auto minmax(0, 1fr)',
     overflow: embedded ? 'visible' : 'hidden',
@@ -70,7 +71,7 @@ export const treatmentRailStyles = (theme: Theme): CSSObject => ({
   borderInlineEnd: `1px solid ${theme.colors.border}`,
   background: `color-mix(in srgb, ${theme.colors.canvasRaised} 70%, transparent)`,
   '& > h3': { fontSize: theme.fontSizes.body, fontWeight: 700 },
-  '@media (max-width: 48rem)': {
+  [media.down('compact')]: {
     gridTemplateRows: 'auto auto',
     gap: theme.space.sm,
     padding: theme.space.md,
@@ -86,7 +87,7 @@ export const treatmentRailStyles = (theme: Theme): CSSObject => ({
     borderBlockEnd: `1px solid ${theme.colors.border}`,
     '& details': { display: 'none' },
   },
-  '@media (max-width: 40rem)': { paddingInline: theme.space.sm },
+  [media.down('tablet')]: { paddingInline: theme.space.sm },
 });
 
 export const treatmentListStyles = (theme: Theme): CSSObject => ({
@@ -101,7 +102,7 @@ export const treatmentListStyles = (theme: Theme): CSSObject => ({
   overflowY: 'auto',
   overscrollBehaviorBlock: 'contain',
   scrollbarWidth: 'thin',
-  '@media (max-width: 48rem)': {
+  [media.down('compact')]: {
     gridAutoFlow: 'column',
     gridAutoColumns: 'minmax(12rem, 15rem)',
     gridTemplateColumns: 'none',
@@ -197,9 +198,9 @@ export const workspaceContentStyles = (theme: Theme, embedded: boolean): CSSObje
   overscrollBehavior: 'contain',
   scrollbarGutter: embedded ? undefined : 'stable',
   background: theme.colors.canvas,
-  '@media (max-width: 48rem)': { padding: theme.space.md },
+  [media.down('compact')]: { padding: theme.space.md },
   '@container (max-width: 48rem)': { padding: theme.space.md },
-  '@media (max-width: 40rem)': {
+  [media.down('tablet')]: {
     padding: theme.space.sm,
     scrollbarGutter: 'auto',
   },
@@ -342,7 +343,7 @@ export const workspaceFooterStyles = (theme: Theme, embedded: boolean): CSSObjec
     '& [data-footer-actions]': { justifyContent: 'stretch' },
     '& [data-footer-disclosure]': { flex: '1 1 auto', textAlign: 'start' },
   },
-  '@media (max-width: 40rem)': {
+  [media.down('tablet')]: {
     padding: `${theme.space.sm} max(${theme.space.sm}, env(safe-area-inset-right)) max(${theme.space.sm}, env(safe-area-inset-bottom)) max(${theme.space.sm}, env(safe-area-inset-left))`,
     '& [data-footer-selection]': {
       gridTemplateColumns: '2.5rem minmax(0, 1fr)',

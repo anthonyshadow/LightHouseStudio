@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const dashboardStyles = (theme: Theme): CSSObject => ({
   width: '100%',
@@ -11,7 +12,7 @@ export const dashboardStyles = (theme: Theme): CSSObject => ({
   background: theme.colors.canvas,
   '& h1, & h2, & h3': { fontFamily: theme.type.display },
   '& p': { margin: 0 },
-  '@media (max-width: 47.99rem)': {
+  [media.down('compact')]: {
     padding: `${theme.space.xl} ${theme.space.lg} max(5rem, calc(env(safe-area-inset-bottom) + 4.5rem))`,
   },
   '@media (max-width: 22rem)': {
@@ -233,7 +234,7 @@ export const dashboardBodyStyles = (theme: Theme): CSSObject => ({
     gridTemplateColumns: 'minmax(0, 1fr)',
     gap: theme.space.xxl,
   },
-  '@media (max-width: 47.99rem)': {
+  [media.down('compact')]: {
     paddingBlock: theme.space.xl,
     gap: theme.space.xxl,
   },
@@ -299,7 +300,7 @@ export const recentWorkStyles = (theme: Theme): CSSObject => ({
     color: theme.colors.textMuted,
     fontSize: theme.fontSizes.metadata,
   },
-  '@media (max-width: 80rem)': { '& > header': { gap: theme.space.sm } },
+  [media.down('desktop')]: { '& > header': { gap: theme.space.sm } },
   '@media (max-width: 34rem)': {
     '& > header': {
       alignItems: 'flex-start',
@@ -333,7 +334,7 @@ export const recentFilterStyles = (theme: Theme): CSSObject => ({
     outline: `2px solid ${theme.colors.focus}`,
     outlineOffset: '3px',
   },
-  '@media (max-width: 80rem)': { gap: theme.space.xs },
+  [media.down('desktop')]: { gap: theme.space.xs },
   '@media (max-width: 34rem)': { justifyContent: 'flex-start' },
 });
 

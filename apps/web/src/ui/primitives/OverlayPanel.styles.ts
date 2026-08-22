@@ -7,6 +7,7 @@ import type {
   OverlayPanelSize,
   OverlayPhase,
 } from './OverlayPanel.types';
+import { media } from '../media';
 
 export const backdropStyles = (
   theme: Theme,
@@ -27,11 +28,11 @@ export const backdropStyles = (
   overflow: 'hidden',
   background: theme.colors.scrim,
   ...overlayBackdropAnimationStyles(theme, phase === 'exiting'),
-  '@media (min-width: 40rem) and (max-width: 63.99rem)':
+  [media.between('tablet', 'laptop')]:
     !centered && placement === 'right' && size !== 'standard'
       ? { alignItems: 'flex-end', justifyContent: 'stretch' }
       : undefined,
-  '@media (max-width: 40rem)': centered
+  [media.down('tablet')]: centered
     ? { alignItems: 'flex-end', justifyContent: 'stretch', padding: 0 }
     : undefined,
 });
@@ -88,7 +89,7 @@ export const panelStyles = (
   background: theme.colors.overlaySurface,
   boxShadow: theme.shadows.lifted,
   ...overlayPanelAnimationStyles(theme, placement, phase === 'exiting'),
-  '@media (max-width: 80rem), (max-height: 48rem)': {
+  [media.downOrShort('desktop', '48rem')]: {
     width:
       !centered && placement === 'right'
         ? size === 'workspace'
@@ -114,7 +115,7 @@ export const panelStyles = (
           : theme.layout.overlays.bottomCompact
         : undefined,
   },
-  '@media (min-width: 40rem) and (max-width: 63.99rem)': {
+  [media.between('tablet', 'laptop')]: {
     width:
       !centered && placement === 'right'
         ? size !== 'standard'
@@ -142,7 +143,7 @@ export const panelStyles = (
         ? `${theme.radii.large} ${theme.radii.large} 0 0`
         : undefined,
   },
-  '@media (max-width: 40rem)': {
+  [media.down('tablet')]: {
     width: '100%',
     height: centered ? '88dvh' : '100%',
     maxHeight: centered ? '88dvh' : '100dvh',

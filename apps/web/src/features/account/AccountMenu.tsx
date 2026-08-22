@@ -5,6 +5,7 @@ import { Button } from '../../ui/primitives/Button';
 import { useDismissiblePopover } from '../../ui/primitives/useDismissiblePopover';
 import { useMenuKeyboardNavigation } from '../../ui/primitives/useMenuKeyboardNavigation';
 import { AccountPanel, type AccountCapabilityRow } from './AccountPanel';
+import { media } from '../../ui/media';
 
 /** Everything the read-only account panel shows; all of it already lives in memory. */
 export interface AccountDetailsSource {
@@ -78,13 +79,13 @@ export const AccountMenu = ({
           fontSize: theme.fontSizes.metadata,
           whiteSpace: 'nowrap',
         },
-        '@media (max-width: 39.99rem)': {
+        [media.down('tablet')]: {
           '& > button': { width: '2.75rem', padding: 0 },
           '& [data-account-label]': { display: 'none' },
         },
         ...(railPresentation
           ? {
-              '@media (min-width: 48rem)': {
+              [media.up('compact')]: {
                 width: '100%',
                 '& > button': {
                   width: '100%',
@@ -130,7 +131,7 @@ export const AccountMenu = ({
                   fontWeight: 650,
                 },
               },
-              '@media (max-width: 47.99rem)': {
+              [media.down('compact')]: {
                 '& > button': { width: '2.75rem', padding: 0 },
                 '& [data-account-label]': { display: 'none' },
               },
@@ -206,7 +207,7 @@ export const AccountMenu = ({
               borderTop: `1px solid ${theme.colors.border}`,
               borderRadius: theme.radii.small,
             },
-            '@media (max-width: 39.99rem)': {
+            [media.down('tablet')]: {
               position: 'fixed',
               insetBlockStart: '4rem',
               insetInline: theme.space.xs,
@@ -216,13 +217,13 @@ export const AccountMenu = ({
             },
             ...(railPresentation
               ? {
-                  '@media (min-width: 48rem)': {
+                  [media.up('compact')]: {
                     insetBlockStart: 'auto',
                     insetBlockEnd: 0,
                     insetInlineStart: `calc(100% + ${theme.space.sm})`,
                     insetInlineEnd: 'auto',
                   },
-                  '@media (max-width: 47.99rem)': {
+                  [media.down('compact')]: {
                     position: 'fixed',
                     insetBlockStart: '4rem',
                     insetInline: theme.space.xs,

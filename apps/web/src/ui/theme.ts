@@ -117,6 +117,7 @@ export interface StudioTheme {
   };
   breakpoints: {
     tablet: string;
+    compact: string;
     laptop: string;
     desktop: string;
     wide: string;
@@ -255,6 +256,8 @@ export const studioTheme: StudioTheme = {
   },
   breakpoints: {
     tablet: '40rem',
+    // The shell's rail/bottom-navigation switch. Load-bearing, and not derivable from the others.
+    compact: '48rem',
     laptop: '64rem',
     desktop: '80rem',
     wide: '100rem',

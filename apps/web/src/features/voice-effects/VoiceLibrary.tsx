@@ -15,6 +15,7 @@ import {
 import { useVoiceLibrary } from '../../orchestration/voice-library/useVoiceLibrary';
 import { VoiceList } from './VoiceList';
 import { VoicePreview, useVoicePreviewController } from './VoicePreview';
+import { media } from '../../ui/media';
 
 export type VoiceLibraryProps = {
   disabled: boolean;
@@ -50,12 +51,12 @@ const libraryHeaderStyles = (theme: Theme): CSSObject => ({
     fontFamily: theme.type.display,
     fontSize: theme.fontSizes.section,
   },
-  '@media (max-width: 48rem)': {
+  [media.down('compact')]: {
     top: `calc(-1 * ${theme.space.md})`,
     marginBlockStart: `calc(-1 * ${theme.space.md})`,
     paddingBlock: theme.space.md,
   },
-  '@media (max-width: 40rem)': {
+  [media.down('tablet')]: {
     position: 'static',
     gridTemplateColumns: 'minmax(0, 1fr)',
     marginBlockStart: 0,

@@ -8,6 +8,7 @@ import {
   summaryChipStyles,
   thumbnailStripStyles,
 } from './formStyles';
+import { media } from '../../ui/media';
 
 const previewMontageStyles: CSSObject = {
   width: '100%',
@@ -86,7 +87,7 @@ export const CharacterDirectionPreview = ({
         {
           gridColumn: '2',
           gridRow: '1 / span 30',
-          '@media (max-width: 79.99rem)': {
+          [media.down('desktop')]: {
             display: showOnNarrow ? 'grid' : 'none',
             gridColumn: '1',
             gridRow: 'auto',

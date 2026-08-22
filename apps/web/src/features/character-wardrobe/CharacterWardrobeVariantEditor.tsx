@@ -13,6 +13,7 @@ import type { SavedCharacterPrompt } from '../creative-assets/types';
 import { ReferenceImageInputField } from '../reference-images/ReferenceImageInputField';
 import { CharacterVersionSelector, type CharacterVersionOption } from './CharacterVersionSelector';
 import type { CharacterWardrobeVariantDraft } from './useCharacterWardrobeVariantDraft';
+import { media } from '../../ui/media';
 
 export const CharacterWardrobeVariantEditor = ({
   character,
@@ -89,7 +90,7 @@ export const CharacterWardrobeVariantEditor = ({
             gridTemplateColumns: 'minmax(0, 1.15fr) minmax(16rem, 0.85fr)',
             alignItems: 'start',
             gap: theme.space.lg,
-            '@media (max-width: 48rem)': {
+            [media.down('compact')]: {
               gridTemplateColumns: 'minmax(0, 1fr)',
               gap: theme.space.md,
             },
@@ -240,7 +241,7 @@ export const CharacterWardrobeVariantEditor = ({
               border: `1px solid ${theme.colors.border}`,
               borderRadius: theme.radii.large,
               background: theme.colors.surfaceSoft,
-              '@media (max-width: 48rem)': { position: 'static' },
+              [media.down('compact')]: { position: 'static' },
             }}
           >
             <div>

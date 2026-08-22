@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const projectsWorkspaceInnerStyles = (theme: Theme): CSSObject => ({
   minHeight: '100%',
@@ -14,7 +15,7 @@ export const projectsWorkspaceInnerStyles = (theme: Theme): CSSObject => ({
     borderRadius: 0,
   },
   '& > [role="status"]:empty': { display: 'none' },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     paddingInline: theme.space.md,
   },
 });

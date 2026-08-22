@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const panelStackStyles = (theme: Theme): CSSObject => ({
   height: '100%',
@@ -11,7 +12,7 @@ export const panelStackStyles = (theme: Theme): CSSObject => ({
   overflow: 'auto',
   overscrollBehavior: 'contain',
   '& h2, & h3, & p': { margin: 0 },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     overflow: 'hidden',
   },
 });
@@ -80,7 +81,7 @@ export const phaseNavStyles = (theme: Theme): CSSObject => ({
     position: 'static',
     paddingBlockStart: 0,
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     position: 'static',
     top: 'auto',
     paddingBlockStart: 0,
@@ -143,7 +144,7 @@ export const workspaceStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   alignItems: 'start',
   gap: theme.space.lg,
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     height: '100%',
     gridTemplateColumns: 'minmax(18rem, 0.85fr) minmax(22rem, 1.15fr)',
     overflow: 'hidden',
@@ -155,7 +156,7 @@ export const sourceColumnStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   alignContent: 'start',
   gap: theme.space.sm,
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     height: '100%',
     overflow: 'hidden',
   },
@@ -170,7 +171,7 @@ export const sourceCardStyles = (theme: Theme): CSSObject => ({
   borderRadius: theme.radii.large,
   background: theme.colors.surfaceSoft,
   boxShadow: theme.shadows.soft,
-  '@media (min-width: 64rem) and (max-height: 48rem)': {
+  [`${media.up('laptop')} and (max-height: 48rem)`]: {
     gap: theme.space.xs,
     padding: theme.space.xs,
   },
@@ -252,7 +253,7 @@ export const sourceAdjustStyles = (theme: Theme): CSSObject => ({
     fontSize: theme.fontSizes.caption,
     lineHeight: 1.35,
   },
-  '@media (min-width: 64rem) and (max-height: 48rem)': {
+  [`${media.up('laptop')} and (max-height: 48rem)`]: {
     minHeight: '3.75rem',
     padding: theme.space.xs,
   },
@@ -335,7 +336,7 @@ export const editorColumnStyles = (theme: Theme): CSSObject => ({
     borderRadius: theme.radii.small,
     boxShadow: theme.shadows.focus,
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     height: '100%',
     overflowY: 'auto',
     overscrollBehavior: 'contain',
@@ -355,7 +356,7 @@ export const sectionHeadingStyles = (theme: Theme): CSSObject => ({
     textTransform: 'uppercase',
   },
   '& p': { color: theme.colors.textMuted, lineHeight: 1.5 },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     '& p': {
       position: 'absolute',
       width: '1px',
@@ -395,7 +396,7 @@ export const toolGroupStyles = (theme: Theme, columns: number): CSSObject => ({
   '@media (max-width: 34rem)': {
     '& > div': { gridTemplateColumns: 'minmax(0, 1fr)' },
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     '& > p': {
       position: 'absolute',
       width: '1px',
@@ -606,7 +607,7 @@ export const actionBarStyles = (theme: Theme): CSSObject => ({
     marginBlockEnd: `calc(-1 * ${theme.space.md})`,
     boxShadow: 'none',
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     position: 'static',
     bottom: 'auto',
     gridTemplateColumns: 'minmax(0, 1fr) auto',
@@ -636,7 +637,7 @@ export const actionButtonsStyles = (theme: Theme): CSSObject => ({
     gridTemplateColumns: 'minmax(0, 1fr)',
     '& > *': { width: '100%' },
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     minWidth: '15rem',
     '& > *': { width: '100%', flex: 'none' },
   },

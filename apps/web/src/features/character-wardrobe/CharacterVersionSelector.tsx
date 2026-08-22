@@ -1,6 +1,7 @@
 import { useTheme } from '@emotion/react';
 import { Button } from '../../ui';
 import { referenceImageContentUrl } from '../../adapters/api-client/referenceImageRoutes';
+import { media } from '../../ui/media';
 
 export type CharacterVersionOption = Readonly<{
   value: string;
@@ -39,7 +40,7 @@ export const CharacterVersionSelector = ({
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 11rem), 1fr))',
         gap: theme.space.sm,
-        '@media (min-width: 22.01rem) and (max-width: 40rem)': {
+        [`${media.down('tablet')} and (min-width: 22.01rem)`]: {
           gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
         },
         '@media (max-width: 22rem)': {

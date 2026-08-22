@@ -2,6 +2,7 @@ import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { Button, ConfirmationRequestDialog, useConfirmationRequest } from '../../ui';
 import type { RecordingController } from '../recording/types';
 import type { SaveVideoState } from '../saved-videos/useSaveVideo';
+import { media } from '../../ui/media';
 
 export type TakeReviewActionsProps = {
   recording: RecordingController;
@@ -32,7 +33,7 @@ const actionStyles = (
     minHeight: presentation === 'control-bar' ? '2.8rem' : undefined,
     whiteSpace: 'nowrap',
   },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     gap: '0.3rem',
     '& > *': {
       minHeight: presentation === 'control-bar' ? '2.75rem' : undefined,

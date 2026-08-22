@@ -5,6 +5,7 @@ import type { CameraAvailabilityNotice } from './cameraAvailability';
 import { formatDuration } from './recordingHelpers';
 import type { RecordingController, RecordingSource } from './types';
 import type { StudioMode } from '../media-session';
+import { media } from '../../ui/media';
 
 export const DESKTOP_CAPTURE_SETTINGS_PANEL_ID = 'desktop-capture-settings-panel';
 
@@ -38,12 +39,12 @@ const captureSurfaceStyles = (theme: Theme, dockedSettings: boolean): CSSObject 
   background: `color-mix(in srgb, ${theme.colors.canvas} 58%, transparent)`,
   boxShadow: 'none',
   overflow: 'hidden',
-  '@media (max-width: 79.99rem), (max-height: 48rem)': {
+  [media.downOrShort('desktop', '48rem')]: {
     gap: theme.space.xs,
     padding: theme.space.xs,
   },
-  '@media (max-width: 39.99rem)': { paddingInline: theme.space.xs },
-  '@media (min-width: 64rem)': {
+  [media.down('tablet')]: { paddingInline: theme.space.xs },
+  [media.up('laptop')]: {
     display: 'grid',
     alignContent: 'start',
     ...(dockedSettings ? { gridTemplateRows: 'minmax(0, 1fr)' } : {}),
@@ -52,7 +53,7 @@ const captureSurfaceStyles = (theme: Theme, dockedSettings: boolean): CSSObject 
     borderRadius: theme.radii.large,
     background: theme.colors.canvasRaised,
   },
-  '@media (min-width: 64rem) and (max-height: 48rem)': {
+  [`${media.up('laptop')} and (max-height: 48rem)`]: {
     gap: theme.space.sm,
     padding: theme.space.sm,
   },
@@ -63,7 +64,7 @@ const compactCaptureContentStyles = (dockedSettings: boolean): CSSObject => ({
   display: 'contents',
   ...(dockedSettings
     ? {
-        '@media (min-width: 64rem)': { display: 'none' },
+        [media.up('laptop')]: { display: 'none' },
       }
     : {}),
 });
@@ -74,7 +75,7 @@ const desktopSettingsStyles = (theme: Theme, expanded: boolean): CSSObject => ({
   minHeight: 0,
   height: '100%',
   overflow: 'hidden',
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     display: 'grid',
     alignContent: 'start',
     gap: theme.space.xs,
@@ -116,7 +117,7 @@ const detailsStyles = (theme: Theme): CSSObject => ({
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
   '& strong': { color: theme.colors.text, fontWeight: 760 },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     padding: theme.space.sm,
     overflow: 'visible',
     border: `1px solid ${theme.colors.surfaceStrong}`,
@@ -134,7 +135,7 @@ const headingStyles = (theme: Theme): CSSObject => ({
   margin: '-1px',
   overflow: 'hidden',
   clip: 'rect(0 0 0 0)',
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     position: 'static',
     width: 'auto',
     height: 'auto',
@@ -151,7 +152,7 @@ const headingStyles = (theme: Theme): CSSObject => ({
 
 const desktopDeviceListStyles = (theme: Theme): CSSObject => ({
   display: 'none',
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     display: 'grid',
     gap: theme.space.sm,
     padding: theme.space.sm,
@@ -193,7 +194,7 @@ const desktopDeviceRowStyles = (theme: Theme): CSSObject => ({
 
 const compactDeviceSummaryStyles = (theme: Theme): CSSObject => ({
   ...detailsStyles(theme),
-  '@media (min-width: 64rem)': { display: 'none' },
+  [media.up('laptop')]: { display: 'none' },
 });
 const settingsActionStyles = (theme: Theme): CSSObject => ({
   minHeight: '2.75rem',
@@ -209,14 +210,14 @@ const settingsActionStyles = (theme: Theme): CSSObject => ({
     borderColor: theme.colors.border,
     background: theme.colors.surface,
   },
-  '@media (max-width: 39.99rem)': {
+  [media.down('tablet')]: {
     width: '2.75rem',
     minWidth: '2.75rem',
     padding: 0,
     fontSize: 0,
     '&::before': { content: '"⚙"', fontSize: '1rem' },
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     width: '100%',
     minHeight: '2.75rem',
     justifyContent: 'center',

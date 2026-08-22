@@ -1,5 +1,6 @@
 import type { CSSObject, Theme } from '@emotion/react';
 import { buttonVariantStyles } from '../../ui/primitives/Button';
+import { media } from '../../ui/media';
 
 export const galleryStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
@@ -20,7 +21,7 @@ export const gallerySummaryStyles = (theme: Theme): CSSObject => ({
 export const gallerySearchRowStyles = (): CSSObject => ({
   display: 'grid',
   gridTemplateColumns: 'minmax(0, 1fr)',
-  '@media (min-width: 64rem)': { maxWidth: '32rem' },
+  [media.up('laptop')]: { maxWidth: '32rem' },
 });
 
 export const filterControlsStyles = (theme: Theme): CSSObject => ({
@@ -33,10 +34,10 @@ export const filterControlsStyles = (theme: Theme): CSSObject => ({
   borderRadius: theme.radii.large,
   background: theme.colors.surfaceSoft,
   '& > button': { minHeight: '2.75rem' },
-  '@media (min-width: 40rem)': {
+  [media.up('tablet')]: {
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr)) auto',
   },
 });
@@ -46,10 +47,10 @@ export const gridStyles = (theme: Theme): CSSObject => ({
   gridTemplateColumns: 'minmax(0, 1fr)',
   gap: theme.space.lg,
   paddingBlockEnd: theme.space.lg,
-  '@media (min-width: 40rem)': {
+  [media.up('tablet')]: {
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   },
   '@media (max-height: 36rem)': { gap: theme.space.md },
@@ -296,7 +297,7 @@ export const previewPlayerStyles = (theme: Theme): CSSObject => ({
     objectFit: 'contain',
     background: '#000',
   },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     maxHeight: '46dvh',
     borderRadius: theme.radii.medium,
     '& video': { maxHeight: '46dvh' },
@@ -318,7 +319,7 @@ export const previewFooterStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.xs,
   '& > *': { minWidth: '8.5rem' },
   '& > a': downloadLinkStyles(theme),
-  '@media (max-width: 39.99rem)': {
+  [media.down('tablet')]: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
     '& > *': { minWidth: 0 },
