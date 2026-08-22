@@ -302,6 +302,27 @@ export const DashboardRouteSurface = ({
         </div>
       </header>
 
+      {onboardingVisible ? (
+        <aside css={onboardingStyles(theme)} aria-labelledby="dashboard-getting-started-heading">
+          <h2 id="dashboard-getting-started-heading" data-onboarding-heading>
+            Start with the outcome you need
+          </h2>
+          <AppIcon name="info" data-onboarding-icon />
+          <p>
+            Organization is optional. Use <strong>Projects</strong> for focused workflows and{' '}
+            <strong>Campaigns</strong> to group initiatives.
+          </p>
+          <Button size="small" variant="quiet" onClick={dismissOnboarding}>
+            Got it
+          </Button>
+        </aside>
+      ) : null}
+      {onboardingStorageWarning ? (
+        <StatusNotice role="status" tone="warning" title="Preference not retained">
+          Lightframe could not save this account-scoped onboarding preference in this browser.
+        </StatusNotice>
+      ) : null}
+
       <div css={dashboardBodyStyles(theme)}>
         <div data-dashboard-primary-column>
           <section aria-labelledby="continue-heading">
@@ -441,27 +462,6 @@ export const DashboardRouteSurface = ({
           </footer>
         </section>
       </div>
-
-      {onboardingVisible ? (
-        <aside css={onboardingStyles(theme)} aria-labelledby="dashboard-getting-started-heading">
-          <h2 id="dashboard-getting-started-heading" data-onboarding-heading>
-            Start with the outcome you need
-          </h2>
-          <AppIcon name="info" data-onboarding-icon />
-          <p>
-            Organization is optional. Use <strong>Projects</strong> for focused workflows and{' '}
-            <strong>Campaigns</strong> to group initiatives.
-          </p>
-          <Button size="small" variant="quiet" onClick={dismissOnboarding}>
-            Got it
-          </Button>
-        </aside>
-      ) : null}
-      {onboardingStorageWarning ? (
-        <StatusNotice role="status" tone="warning" title="Preference not retained">
-          Lightframe could not save this account-scoped onboarding preference in this browser.
-        </StatusNotice>
-      ) : null}
 
       <section
         css={processingQueueStyles(theme)}
