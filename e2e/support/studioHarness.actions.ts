@@ -76,7 +76,7 @@ export const closeAiSettings = async (page: Page): Promise<void> => {
 };
 
 export const startLocalPreview = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: 'Record New Video' }).click();
+  await page.getByRole('button', { name: 'Start camera' }).click();
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
 };
 

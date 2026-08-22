@@ -473,7 +473,7 @@ export const StudioSessionControlBar = ({
                 }}
               >
                 <CameraIcon off={false} />
-                {transition ?? 'Record New Video'}
+                {transition ?? 'Start camera'}
               </Button>
               <Button
                 ref={uploadButtonRef}

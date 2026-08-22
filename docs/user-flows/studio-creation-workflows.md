@@ -32,7 +32,7 @@ belongs to the runtime, which leaves when the operator does — and shows one of
 | `playback`   | A presented take exists and review is ready                                                                  |
 
 Overlaid controls come from `StudioSessionControlBar` (`studio/StudioSessionControlBar.tsx`):
-Switch camera, zoom out/in, **Record New Video**, **Upload Video**, **Start AI** / **Change
+Switch camera, zoom out/in, **Start camera**, **Upload Video**, **Start AI** / **Change
 experience**, mute microphone, camera on/off, stop model, stop recording, plus review-mode actions
 (discard, voice treatments, **Save**, **Replace saved version**).
 
@@ -47,7 +47,7 @@ reference**.
 ## Flow: Record a local video
 
 1. Enter `/studio/create`.
-2. Press **Record New Video** → `startLocalRecording` (`StudioApp.tsx`): clears the
+2. Press **Start camera** → `startLocalRecording` (`StudioApp.tsx`): clears the
    existing-video intent, closes overlays, focuses the stage, and calls `session.startLocal()`.
    Camera and microphone are requested only here — the app never opens media on route entry.
 3. Capture preferences (source device, format, capture target) come from `CaptureSettingsPanel`,

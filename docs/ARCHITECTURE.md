@@ -118,7 +118,7 @@ existing dashboard dismissal flag.
 Studio initializes the session draft in Local Camera mode and the media lifecycle at `idle`.
 Dashboard and organization routes mount no stage and no capture graph, and retain the same shell. Entry
 intent on `/studio/create` may open the upload panel or start the explicit local-recording flow,
-but it never starts AI or provider work. The control-bar **Record New Video** action starts a normal
+but it never starts AI or provider work. The control-bar **Start camera** action starts a normal
 local take and enters Latest Take review after finalization. The upload panel's **Record a local
 video** action separately marks the finalized artifact for adoption by the existing-video editor.
 Character and Virtual Try-On starts retain the advanced live-session and Latest Take paths;

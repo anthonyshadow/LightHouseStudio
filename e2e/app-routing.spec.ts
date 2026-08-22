@@ -158,7 +158,7 @@ test('direct and refreshed Studio entries preserve one stage', async ({ page }) 
   await page.reload();
   await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
   await expect(page.getByLabel('Studio media stage')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Record New Video' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start camera' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Upload Video' })).toBeVisible();
   await expect
     .poll(async () => readBrowserState(page))
