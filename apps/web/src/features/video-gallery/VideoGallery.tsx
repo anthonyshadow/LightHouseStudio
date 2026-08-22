@@ -235,19 +235,25 @@ const VideoGalleryGrid = ({
                 </div>
               )}
               <div css={actionsStyles(theme)}>
-                <Button
-                  variant="primary"
-                  disabled={busy || video.status !== 'ready'}
-                  busy={busy}
-                  onClick={() => void onUse(video, 'play')}
+                <a
+                  href={downloadSavedVideoUrl(video.id, version.id)}
+                  download={version.filename}
+                  aria-label={`Download ${video.title}`}
                 >
-                  Open in Studio
-                </Button>
+                  Download
+                </a>
                 <details css={actionMenuStyles(theme)}>
                   <summary aria-label={`More actions for ${video.title}`}>
                     <MoreIcon />
                   </summary>
                   <div css={actionMenuPopoverStyles(theme)}>
+                    <button
+                      type="button"
+                      disabled={busy || video.status !== 'ready'}
+                      onClick={() => void onUse(video, 'play')}
+                    >
+                      Open in Studio
+                    </button>
                     <button
                       type="button"
                       disabled={busy || video.status !== 'ready'}
@@ -267,12 +273,6 @@ const VideoGalleryGrid = ({
                     >
                       Use as Project source
                     </button>
-                    <a
-                      href={downloadSavedVideoUrl(video.id, version.id)}
-                      download={version.filename}
-                    >
-                      Download
-                    </a>
                     <button
                       type="button"
                       disabled={busy}
@@ -911,15 +911,15 @@ export const VideoGallery = ({
         footer={
           previewVideo && selectedVersion ? (
             <div css={previewFooterStyles(theme)}>
-              <Button variant="secondary" onClick={(event) => openExport(event.currentTarget)}>
-                Export
-              </Button>
               <a
                 href={downloadSavedVideoUrl(previewVideo.id, selectedVersion.id)}
                 download={selectedVersion.filename}
               >
                 Download
               </a>
+              <Button variant="secondary" onClick={(event) => openExport(event.currentTarget)}>
+                Export
+              </Button>
               {selectedIsCurrent ? (
                 <>
                   <Button
@@ -930,7 +930,7 @@ export const VideoGallery = ({
                     Edit video
                   </Button>
                   <Button
-                    variant="primary"
+                    variant="secondary"
                     busy={busyId === previewVideo.id}
                     onClick={() => void handleUseVideo(previewVideo, 'play')}
                   >

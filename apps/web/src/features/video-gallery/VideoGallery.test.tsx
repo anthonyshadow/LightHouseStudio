@@ -149,6 +149,12 @@ describe('VideoGallery', () => {
     expect(screen.getByText('0:12')).toBeInTheDocument();
     expect(screen.getAllByText('Landscape').length).toBeGreaterThan(0);
     expect(screen.getByText('Mara')).toBeInTheDocument();
+    // Retrieval leads the card; everything else lives behind the overflow.
+    expect(screen.getByRole('link', { name: 'Download Morning take' })).toHaveAttribute(
+      'href',
+      `/api/videos/${item.id}/versions/${item.currentVersion.id}/content?download=true`,
+    );
+    fireEvent.click(screen.getByLabelText('More actions for Morning take'));
     fireEvent.click(screen.getByRole('button', { name: 'Open in Studio' }));
     await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, 'play'));
   });
