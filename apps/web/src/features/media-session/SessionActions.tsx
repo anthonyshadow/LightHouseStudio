@@ -65,7 +65,7 @@ export const SessionActions = ({
             aria-describedby={recording ? reasonId : undefined}
             onClick={() => void session.startLocal()}
           >
-            Start local preview
+            Start camera
           </Button>
         )}
         {recording ? (

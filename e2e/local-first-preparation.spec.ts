@@ -120,7 +120,7 @@ test('prepares a visual configuration accessibly without camera or provider work
 
   await expect(page.getByRole('main')).toBeVisible();
   await expect(page.getByLabel('Studio media stage')).toContainText(
-    'Camera and microphone remain off until you start local preview.',
+    'Camera and microphone remain off until you select Start camera.',
   );
   await page.getByLabel('Integration availability').getByRole('button').click();
   await expect(page.getByRole('region', { name: 'Studio availability details' })).toContainText(

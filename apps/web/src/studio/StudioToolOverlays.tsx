@@ -145,13 +145,11 @@ export const StudioToolOverlays = ({
 
       <StudioOutfitOverlays
         activeOverlay={activeOverlay}
-        desktopStudioLayout={desktopStudioLayout}
         repository={repository}
         session={session}
         handoff={handoff}
         outfit={outfit}
         characterOpenBlockedReason={characterOpenBlockedReason}
-        mainRef={mainRef}
         outfitToggleRef={outfitToggleRef}
         onClose={onCloseOverlay}
         onUnselectAi={onUnselectAi}
@@ -169,7 +167,6 @@ export const StudioToolOverlays = ({
         characterOpenBlockedReason={characterOpenBlockedReason}
         characterRemovalBlockedReason={characterRemovalBlockedReason}
         recordingActive={recordingActive}
-        mainRef={mainRef}
         characterSelectorRef={characterSelectorRef}
         onClose={onCloseOverlay}
         onOpenSavedCharacters={onOpenSavedCharacters}

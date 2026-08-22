@@ -35,7 +35,6 @@ export const StudioCharacterOverlays = ({
   characterOpenBlockedReason,
   characterRemovalBlockedReason,
   recordingActive,
-  mainRef,
   characterSelectorRef,
   onClose,
   onOpenSavedCharacters,
@@ -52,7 +51,6 @@ export const StudioCharacterOverlays = ({
   readonly characterOpenBlockedReason: string | undefined;
   readonly characterRemovalBlockedReason: string | undefined;
   readonly recordingActive: boolean;
-  readonly mainRef: RefObject<HTMLElement | null>;
   readonly characterSelectorRef: RefObject<HTMLButtonElement | null>;
   readonly onClose: () => void;
   readonly onOpenSavedCharacters: () => void;
@@ -65,7 +63,7 @@ export const StudioCharacterOverlays = ({
     <>
       <StudioCharacterSelectorOverlay
         open={activeOverlay === 'character-selector'}
-        returnFocusRef={desktopStudioLayout ? characterSelectorRef : mainRef}
+        returnFocusRef={characterSelectorRef}
         activeCharacterName={activeCharacterName}
         activeCharacter={activeCharacterRecord}
         editBlockedReason={characterOpenBlockedReason}
@@ -87,7 +85,7 @@ export const StudioCharacterOverlays = ({
         placement={desktopStudioLayout ? 'right' : 'fullscreen'}
         size="wide"
         bodyMode="scroll"
-        returnFocusRef={desktopStudioLayout ? characterSelectorRef : mainRef}
+        returnFocusRef={characterSelectorRef}
       >
         {activeOverlay === 'saved-characters' ? (
           <Suspense fallback={<p role="status">Loading saved characters…</p>}>
@@ -127,7 +125,7 @@ export const StudioCharacterOverlays = ({
         size="wide"
         bodyMode="contained"
         closeOnBackdrop={!character.wardrobeDirty}
-        returnFocusRef={desktopStudioLayout ? characterSelectorRef : mainRef}
+        returnFocusRef={characterSelectorRef}
       >
         {character.wardrobeCharacter ? (
           <Suspense fallback={<p role="status">Loading studio tool…</p>}>

@@ -167,7 +167,7 @@ const emptyCopy = (mode: StudioMode): { title: string; description: string } => 
   return {
     title: 'Your private creative stage.',
     description:
-      'Camera and microphone remain off until you start local preview. Nothing leaves this browser in Local mode.',
+      'Camera and microphone remain off until you select Start camera. Nothing leaves this browser in Local mode.',
   };
 };
 

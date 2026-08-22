@@ -54,10 +54,9 @@ Thirteen visual baselines were re-captured and reviewed image by image. Four of 
 `--update-snapshots=all`: a label change alone falls under the 0.5% `maxDiffPixelRatio`, so the
 suite passed while the committed baseline still showed a control that no longer exists.
 
-**One pre-existing visual failure remains and is not from this work**: `small-mobile /
-character-builder-combined-ready` cannot reach `Select Character`, because
-`showDesktopAiTools` removes the AI tools below 64rem. Verified by running that test on the base
-commit `2399167` in a clean worktree, where it fails identically. **Tier 3 item 21 owns it.**
+A pre-existing visual failure surfaced during this work — `small-mobile /
+character-builder-combined-ready` could not reach `Select Character` — and was traced to LF-S04
+rather than to Tier 1. **Item 21 was brought forward and is now complete**; the suite is green.
 
 The prompts below are kept verbatim as the record of what was asked.
 
@@ -790,7 +789,7 @@ Brief: [Superdesign prompts → Dashboard & First-Run](LightFrameSuperdesignProm
 **Risk** Low. Keep the merged Recent Work model and the per-kind empty states — they are among the
 product's best work.
 
-## 21. Keep AI tools available below 64rem
+## ~~21. Keep AI tools available below 64rem~~ · DONE
 
 **Audit IDs** LF-S04, LF-A11Y3 · **P2** · **M**
 
@@ -829,9 +828,29 @@ a larger display to use them.` A capability that silently vanishes is worse than
 >
 > Validate with `vitest run apps/web/src/studio apps/web/src/features/character-builder`.
 
-**Validation** as above, then `bun run test:visual` at tablet and mobile.
-**Risk** Character and outfit builders may genuinely need width; the disabled-with-reason fallback
-is the safe outcome.
+**Finding, as the prompt required, before changing anything: the constraint was incidental.** The
+overlays were already written for narrow layouts — `StudioCharacterOverlays` chooses
+`placement={desktopStudioLayout ? 'right' : 'fullscreen'}` and both overlays already branched their
+`returnFocusRef`. Only `showDesktopAiTools` withheld the entry points. So branch (a) applied: the
+tools render at every width, keeping the fullscreen placement the overlays already implement
+rather than the bottom sheet this prompt guessed at — a multi-step character builder needs the
+room, and `fullscreen` was the considered choice already in the code.
+
+**Outcome (a)** `showDesktopAiTools` is deleted rather than defaulted, since it now has one value.
+Because the trigger exists at every width, the six `desktopStudioLayout ? toggleRef : mainRef`
+focus branches are stale and now return focus to the trigger, which is what `returnFocusRef` is
+for; `mainRef` and one `desktopStudioLayout` prop drop out. At the narrowest widths the labels
+trade the verb for the noun — `Edit` / `Character` / `Outfit` — using the `data-*-label-long` /
+`-short` pattern `StudioSessionControlBar` already owns, so three tools fit 320px without
+truncation. Each control's `aria-label` still states the full name.
+
+**Outcome (b)** `[data-tool-label] small` still hides a tool's _description_ on a compact rail, but
+no longer its _blocked reason_: `small[data-tool-blocked]` stays visible, clamped to two lines. At
+390px the whole reason reads; at 320px it clips, with `title` and the intact `aria-describedby`
+carrying the rest.
+
+**Validated** `vitest run apps/web/src/studio apps/web/src/features/character-builder`, the full
+`apps/web/src` suite, and `bun run test:visual` — including the case that used to fail.
 
 ## 22. Skeleton loading
 
@@ -958,11 +977,18 @@ Run the scoped command in each item. In addition:
 - **After token, primitive, shell or breakpoint work** (items 13, 14, 16, 23–25) — `bun run quality`
 - **After any item marked "touches baselines"** — `bun run test:visual`, then
   `bun run test:visual:update` and review every re-captured image before committing.
-  **Beware:** `test:visual:update` only rewrites a baseline the suite _failed_ on, and a
-  label-sized change falls under the 0.5% `maxDiffPixelRatio`. A copy change therefore leaves a
-  stale baseline behind and the suite still passes. Use
-  `playwright test --config playwright.visual.config.ts --update-snapshots=all -g "<scenario>"`
-  for the affected scenarios — Tier 1 needed this for four of its thirteen baselines.
+
+  `test:visual:update` now passes `--update-snapshots=all`, and that matters. Playwright's plain
+  `--update-snapshots` only rewrites a baseline the suite _failed_ on, and the 0.5%
+  `maxDiffPixelRatio` swallows a label-sized change — so a copy fix left a stale image behind while
+  the suite stayed green. That is not hypothetical: `06-voice/voice-browser-loaded.png` and three
+  `07-existing-video/*` baselines were still showing the retired `Dock / Workshop / Shelf` shell,
+  and the Campaigns baseline still carried the "Quick Start" sentence item 4 removed. The audit's
+  "stale-artifact traps" note describes this exact mechanism.
+
+  The cost is that an update run rewrites every baseline, so **review is not optional** — compare
+  the images, not just the file list.
+
 - **After route changes** (item 19) — `apps/web/src/app/route-inventory.test.ts` and
   `paths.test.ts` will fail until their expected lists are updated. That is the oracle working.
 

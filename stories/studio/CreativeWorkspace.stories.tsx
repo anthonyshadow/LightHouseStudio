@@ -31,7 +31,6 @@ const WorkspaceHarness = () => {
 
   const state: CreativeWorkspaceState = {
     activeTool: null,
-    showDesktopAiTools: true,
     recordingActive: false,
     hasPlaybackVideo: true,
   };
