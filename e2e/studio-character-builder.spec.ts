@@ -171,7 +171,7 @@ test('saved-character selection survives reload and completes Use through Start'
       name: 'Selected character: Saved Field Host. Open character options',
     }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Record New Video' }).click();
+  await page.getByRole('button', { name: 'Start camera' }).click();
   await expect(page.getByLabel('Live local camera preview', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Start AI', exact: true }).click();
   let chooser = page.getByRole('dialog', { name: 'Choose live AI experience' });
@@ -192,7 +192,7 @@ test('saved-character selection survives reload and completes Use through Start'
   ]);
 
   await page.reload();
-  await page.getByRole('button', { name: 'Record New Video' }).click();
+  await page.getByRole('button', { name: 'Start camera' }).click();
   await expect(page.getByLabel('Live local camera preview', { exact: true })).toBeVisible();
   await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Choose saved character' }).click();
@@ -257,7 +257,7 @@ test('image-only upload saves and preloads without starting AI, then appears in 
     },
   });
 
-  await page.getByRole('button', { name: 'Record New Video' }).click();
+  await page.getByRole('button', { name: 'Start camera' }).click();
   await page.getByRole('button', { name: 'Start AI', exact: true }).click();
   await page
     .getByRole('dialog', { name: 'Choose live AI experience' })
@@ -477,7 +477,7 @@ test('image-backed save preserves the exact generated asset and optimized Lucy p
     }),
   ).toBeVisible();
 
-  await page.getByRole('button', { name: 'Record New Video' }).click();
+  await page.getByRole('button', { name: 'Start camera' }).click();
   await page.getByRole('button', { name: 'Start AI', exact: true }).click();
   await page
     .getByRole('dialog', { name: 'Choose live AI experience' })

@@ -216,7 +216,7 @@ for (const viewport of representativeViewports) {
 
     await expect(page.getByRole('main')).toBeVisible();
     await expect(page.getByLabel('Studio media stage')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Record New Video' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start camera' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Upload Video' })).toBeVisible();
     const stageFrameBox = await page.locator('[data-stage-frame]').boundingBox();
     expect(stageFrameBox).not.toBeNull();
@@ -686,7 +686,7 @@ test('explicit local Start surfaces a sanitized camera denial without provider w
   const network = await installProviderFreeStudio(page);
   await page.goto('/studio/create');
 
-  const start = page.getByRole('button', { name: 'Record New Video' });
+  const start = page.getByRole('button', { name: 'Start camera' });
   await start.focus();
   await page.keyboard.press('Enter');
 
@@ -708,7 +708,7 @@ test('explicit local Start surfaces a sanitized camera denial without provider w
     await expect(page.getByRole('dialog', { name: 'Capture Settings' })).toBeVisible();
     await page.getByRole('button', { name: 'Close panel' }).click();
   }
-  await page.getByRole('button', { name: 'Record New Video' }).click();
+  await page.getByRole('button', { name: 'Start camera' }).click();
   await expect(page.getByRole('alert')).toContainText(
     'Camera or microphone access was not allowed.',
   );

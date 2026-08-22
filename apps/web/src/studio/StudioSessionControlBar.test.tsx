@@ -173,7 +173,7 @@ describe('StudioSessionControlBar', () => {
     const view = renderBar(session);
 
     expect(screen.getByRole('button', { name: 'Upload Video' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Record New Video' }));
+    await user.click(screen.getByRole('button', { name: 'Start camera' }));
     expect(session.startLocal).toHaveBeenCalledOnce();
 
     view.rerender(
@@ -204,7 +204,7 @@ describe('StudioSessionControlBar', () => {
       onStartLocalRecording,
     });
 
-    await user.click(screen.getByRole('button', { name: 'Record New Video' }));
+    await user.click(screen.getByRole('button', { name: 'Start camera' }));
 
     expect(onStartLocalRecording).toHaveBeenCalledOnce();
     expect(session.startLocal).not.toHaveBeenCalled();
@@ -401,7 +401,7 @@ describe('StudioSessionControlBar', () => {
     expect(screen.queryByRole('button', { name: 'Edit video' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Voice' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Release' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Record New Video' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start camera' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Voice' }));
     expect(onOpenVoiceTreatments).toHaveBeenCalledOnce();

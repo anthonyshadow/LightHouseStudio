@@ -144,7 +144,7 @@ CampaignDetail
   └─ project ▸ Move or detach ──────────► MoveProjectDialog
 
 Studio (create)
-  ├─ Record New Video / Stop ───────────► take review on the stage
+  ├─ Start camera / Stop ───────────────► take review on the stage
   ├─ Upload Video ──────────────────────► video-upload overlay
   ├─ Change experience ─────────────────► AI experience chooser
   ├─ Voice ─────────────────────────────► voice-treatments overlay

@@ -13,7 +13,7 @@ pinned `lucy-latest` model.
    starts AI. The Character panel exposes **Unselect character** when opened from the desktop rail.
    Unselecting returns the session draft to **Local Camera**, removes **Start AI** from the stage
    controls, and restores local **Record**.
-2. Explicitly start local media from **Record New Video**, then select **Start AI** and the
+2. Explicitly start local media from **Start camera**, then select **Start AI** and the
    **Character Transformation** experience.
 3. Review the Decart disclosure and select **Start with [character]**. If no Character is ready,
    use Character Builder or **Choose Saved Character**.

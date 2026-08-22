@@ -64,7 +64,7 @@ test('optimized reference hydrates its stored Lucy prompt atomically and survive
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
   expect(network.referenceImageContentReads).toContain(generated.assetId);
 
-  await page.getByRole('button', { name: 'Record New Video' }).click();
+  await page.getByRole('button', { name: 'Start camera' }).click();
   await page.getByRole('button', { name: 'Start AI', exact: true }).click();
   await page
     .getByRole('dialog', { name: 'Choose live AI experience' })
@@ -98,7 +98,7 @@ test('optimized reference hydrates its stored Lucy prompt atomically and survive
     .filter({ hasText: 'Field correspondent' })
     .getByRole('button', { name: 'Use in Studio' })
     .click();
-  await page.getByRole('button', { name: 'Record New Video' }).click();
+  await page.getByRole('button', { name: 'Start camera' }).click();
   await page.getByRole('button', { name: 'Start AI', exact: true }).click();
   await page
     .getByRole('dialog', { name: 'Choose live AI experience' })
