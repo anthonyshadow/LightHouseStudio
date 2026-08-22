@@ -64,6 +64,7 @@ const meta = {
     onCreateCampaign: fn(),
     onCreateAsset: fn(),
     onOpenLive: fn(),
+    onOpenHelp: fn(),
     onLogout: fn(),
   },
   parameters: {
@@ -97,6 +98,7 @@ const HeaderHarness = () => {
         onCreateCampaign={fn()}
         onCreateAsset={fn()}
         onOpenLive={fn()}
+        onOpenHelp={fn()}
         onLogout={fn()}
       />
     </StoryColumn>

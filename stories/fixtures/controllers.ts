@@ -96,6 +96,16 @@ const restorePersistedOriginal: RecordingController['restorePersistedOriginal'] 
     input.artifactMetadata,
   );
 
+const presentRemoteOriginal: RecordingController['presentRemoteOriginal'] = (input) =>
+  Object.assign(
+    createTakeArtifact({
+      objectUrl: input.remoteMedia.contentUrl,
+      sizeBytes: input.remoteMedia.sizeBytes,
+    }),
+    input.artifactMetadata,
+    { media: input.remoteMedia },
+  );
+
 const completeProcessing: RecordingController['completeProcessing'] = (blob, mimeType, label) =>
   createTakeArtifact({
     id: 'processed-storybook',
@@ -140,6 +150,7 @@ export const createRecordingController = (
     start: fn(() => Promise.resolve()),
     stop: fn(() => Promise.resolve(null)),
     restorePersistedOriginal: fn(restorePersistedOriginal),
+    presentRemoteOriginal: fn(presentRemoteOriginal),
     replaceSource: fn(restorePersistedOriginal),
     discard: fn(),
     beginProcessing: fn(),
