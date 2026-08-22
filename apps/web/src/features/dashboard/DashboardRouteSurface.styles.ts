@@ -114,7 +114,6 @@ export const onboardingStyles = (theme: Theme): CSSObject => ({
     gridTemplateColumns: '1rem minmax(0, 1fr)',
     alignItems: 'start',
     rowGap: 0,
-    paddingBlock: theme.space.sm,
     '& > button': { gridColumn: 2, justifySelf: 'start', paddingInline: 0 },
   },
 });

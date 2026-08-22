@@ -6,7 +6,7 @@ import type {
   SavedVideoVersion,
   SavedVideosResponse,
 } from '@studio/contracts';
-import { formatDateTime, type ProjectExportSpecification } from '@studio/domain';
+import { formatDateTime } from '@studio/domain';
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -21,12 +21,10 @@ import {
   downloadSavedVideoUrl,
   getSavedVideo,
   listSavedVideos,
-  readSavedVideoContent,
   renameSavedVideo,
   savedVideoContentUrl,
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
-import { downloadBlobFile } from '../../adapters/browser-media/downloadBlobFile';
 import {
   Button,
   emptyExampleStyles,
@@ -38,15 +36,10 @@ import {
   TextField,
   useListSearch,
 } from '../../ui';
-import {
-  ExportPlacementChooser,
-  ExportPlacementProgress,
-  exportPlacementLabel,
-  useExportPlacementRender,
-} from '../export-placements';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { AddVideoToProjectDialog } from '../projects/AddVideoToProjectDialog';
 import { GeneratePreviewDialog } from './GeneratePreviewDialog';
+import { VideoExportPanel } from './VideoExportPanel';
 import {
   actionMenuPopoverStyles,
   actionMenuStyles,
@@ -342,8 +335,6 @@ export const VideoGallery = ({
   const [projectTarget, setProjectTarget] = useState<SavedVideoSummary | null>(null);
   const [previewRepairTarget, setPreviewRepairTarget] = useState<SavedVideoSummary | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportPlacement, setExportPlacement] = useState<ProjectExportSpecification | null>(null);
-  const [exportFailure, setExportFailure] = useState<string | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [brokenThumbnails, setBrokenThumbnails] = useState<ReadonlySet<string>>(() => new Set());
@@ -356,10 +347,6 @@ export const VideoGallery = ({
   const projectTriggerRef = useRef<HTMLElement | null>(null);
   const previewRepairTriggerRef = useRef<HTMLElement | null>(null);
   const exportTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const exportFetchRef = useRef<AbortController | null>(null);
-  // The same local render the Project save step and the standalone save use, applied to a version
-  // that is already retained. It owns no bytes: the source is read for the click and handed back.
-  const placementRender = useExportPlacementRender();
 
   const videosQuery = useInfiniteQuery({
     queryKey: [
@@ -436,8 +423,6 @@ export const VideoGallery = ({
       player?.removeAttribute('src');
     };
   }, [previewVideo]);
-
-  useEffect(() => () => exportFetchRef.current?.abort('unmount'), []);
 
   // Acted on once per requested id. The fetch uses the key `previewDetailQuery` already reads, so a
   // video on screen resolves from cache and one from a later page costs only the request the
@@ -557,19 +542,9 @@ export const VideoGallery = ({
     setPreviewVideo(video);
   };
 
-  const closeExport = () => {
-    exportFetchRef.current?.abort('cancelled');
-    exportFetchRef.current = null;
-    placementRender.cancel();
-    setExportFailure(null);
-    setExportOpen(false);
-  };
-
+  // The panel is mounted only while it is open, so it starts clean and needs no reset here.
   const openExport = (trigger: HTMLButtonElement) => {
     exportTriggerRef.current = trigger;
-    setExportPlacement(null);
-    setExportFailure(null);
-    placementRender.reset();
     setExportOpen(true);
   };
 
@@ -582,7 +557,7 @@ export const VideoGallery = ({
     } catch {
       // Some test environments do not implement media loading.
     }
-    closeExport();
+    setExportOpen(false);
     setPreviewVideo(null);
     setSelectedVersionId(null);
     setPreviewError(false);
@@ -610,54 +585,6 @@ export const VideoGallery = ({
     null;
   const selectedIsCurrent =
     selectedVersion?.id === (previewDetail?.currentVersion.id ?? previewVideo?.currentVersion.id);
-  const exportRendering = placementRender.phase === 'rendering';
-  // A placement can only be produced where the browser can render one; elsewhere the chooser says
-  // so and the original shape is what the operator gets.
-  const exportReframing = exportPlacement !== null && placementRender.supported;
-  const exportPlacementName =
-    exportPlacement === null ? null : exportPlacementLabel(exportPlacement.aspect);
-
-  const downloadPlacement = async () => {
-    if (!previewVideo || !selectedVersion || exportPlacement === null || exportRendering) return;
-    setExportFailure(null);
-    const controller = new AbortController();
-    exportFetchRef.current = controller;
-    let media: Blob;
-    try {
-      media = await readSavedVideoContent({
-        videoId: previewVideo.id,
-        versionId: selectedVersion.id,
-        mimeType: selectedVersion.mimeType,
-        signal: controller.signal,
-        abortMessage: 'Preparing this export was cancelled.',
-      });
-    } catch {
-      if (!controller.signal.aborted) {
-        setExportFailure(
-          'This video could not be read to re-frame it. Download it as it is instead.',
-        );
-      }
-      return;
-    } finally {
-      if (exportFetchRef.current === controller) exportFetchRef.current = null;
-    }
-    const rendered = await placementRender.render({
-      media,
-      specification: exportPlacement,
-      source: {
-        width: selectedVersion.width,
-        height: selectedVersion.height,
-        durationMs: selectedVersion.durationMs,
-      },
-      // The retained record does not state whether it carries audio, so an existing track is kept
-      // rather than required.
-      hasAudio: false,
-      filename: selectedVersion.filename,
-    });
-    if (rendered === null) return;
-    // The Blob exists only for the length of the click that hands it over.
-    downloadBlobFile(rendered.blob, rendered.filename);
-  };
 
   if (!libraryHasVideos) {
     return (
@@ -1045,71 +972,14 @@ export const VideoGallery = ({
         ) : null}
       </OverlayPanel>
 
-      <OverlayPanel
-        open={exportOpen && previewVideo !== null && selectedVersion !== null}
-        onClose={closeExport}
-        title="Export video"
-        description="Choose where this video is going. Re-framing happens in this browser; the saved version is not changed."
-        placement="bottom"
-        size="standard"
-        closeOnBackdrop={false}
-        closeDisabled={exportRendering}
-        returnFocusRef={exportTriggerRef}
-        footer={
-          previewVideo && selectedVersion ? (
-            <div css={previewFooterStyles(theme)}>
-              <Button variant="quiet" disabled={exportRendering} onClick={closeExport}>
-                Cancel
-              </Button>
-              {exportReframing ? (
-                <Button
-                  variant="primary"
-                  busy={exportRendering}
-                  aria-label={`Download ${previewVideo.title}, Version ${selectedVersion.ordinal}, for ${exportPlacementName}`}
-                  onClick={() => void downloadPlacement()}
-                >
-                  Download for {exportPlacementName?.toLowerCase()}
-                </Button>
-              ) : (
-                <a
-                  href={downloadSavedVideoUrl(previewVideo.id, selectedVersion.id)}
-                  download={selectedVersion.filename}
-                  aria-label={`Download ${previewVideo.title}, Version ${selectedVersion.ordinal}`}
-                >
-                  Download
-                </a>
-              )}
-            </div>
-          ) : null
-        }
-      >
-        {previewVideo && selectedVersion ? (
-          <div css={{ display: 'grid', gap: theme.space.sm }}>
-            <ExportPlacementChooser
-              value={exportPlacement}
-              source={{
-                width: selectedVersion.width,
-                height: selectedVersion.height,
-                durationMs: selectedVersion.durationMs,
-              }}
-              disabled={exportRendering}
-              unavailable={!placementRender.supported}
-              onChange={setExportPlacement}
-            />
-            <ExportPlacementProgress
-              phase={placementRender.phase}
-              progress={placementRender.progress}
-              error={placementRender.error}
-              onCancel={placementRender.cancel}
-            />
-            {exportFailure ? (
-              <StatusNotice role="alert" tone="warning" title="Not exported">
-                {exportFailure}
-              </StatusNotice>
-            ) : null}
-          </div>
-        ) : null}
-      </OverlayPanel>
+      {exportOpen && previewVideo && selectedVersion ? (
+        <VideoExportPanel
+          video={previewVideo}
+          version={selectedVersion}
+          returnFocusRef={exportTriggerRef}
+          onClose={() => setExportOpen(false)}
+        />
+      ) : null}
     </div>
   );
 };

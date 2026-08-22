@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { buttonVariantStyles } from '../../ui/primitives/Button';
 
 export const galleryStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
@@ -231,20 +232,16 @@ export const noPreviewActionStyles = (theme: Theme): CSSObject => ({
  * and the version-preview footer. `Button` has no anchor form yet, so a download link cannot be a
  * `Button`; when one is added (design-system consolidation) both call sites collapse onto it.
  */
-export const downloadLinkStyles = (theme: Theme, tone: 'primary' | 'secondary'): CSSObject => ({
+export const downloadLinkStyles = (theme: Theme): CSSObject => ({
   minHeight: '2.85rem',
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
   padding: '0.7rem 1rem',
-  border: `1px solid ${tone === 'primary' ? 'transparent' : theme.colors.borderStrong}`,
+  border: '1px solid transparent',
   borderRadius: theme.radii.medium,
-  color: tone === 'primary' ? theme.colors.onAccent : theme.colors.text,
-  background:
-    tone === 'primary'
-      ? `linear-gradient(135deg, ${theme.colors.accentStrong}, ${theme.colors.accent})`
-      : theme.colors.surfaceStrong,
-  ...(tone === 'primary' ? { boxShadow: theme.shadows.soft } : {}),
+  // The primary fill comes from the primitive, so the accent treatment keeps one owner.
+  ...buttonVariantStyles(theme, 'primary'),
   fontWeight: 720,
   lineHeight: 1.1,
   textDecoration: 'none',
@@ -262,7 +259,7 @@ export const actionsStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.xs,
   marginBlockStart: 'auto',
   // Retrieval leads: the download link takes the row, the rest live behind the overflow.
-  '& > a:first-of-type': { ...downloadLinkStyles(theme, 'primary'), flex: 1 },
+  '& > a:first-of-type': { ...downloadLinkStyles(theme), flex: 1 },
 });
 
 export const actionMenuStyles = (theme: Theme): CSSObject => ({
@@ -378,18 +375,11 @@ export const previewFooterStyles = (theme: Theme): CSSObject => ({
   justifyContent: 'flex-end',
   gap: theme.space.xs,
   '& > *': { minWidth: '8.5rem' },
-  '& > small': {
-    flexBasis: '100%',
-    color: theme.colors.textMuted,
-    fontSize: theme.fontSizes.caption,
-    textAlign: 'end',
-  },
-  '& > a': downloadLinkStyles(theme, 'primary'),
+  '& > a': downloadLinkStyles(theme),
   '@media (max-width: 39.99rem)': {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
     '& > *': { minWidth: 0 },
-    '& > small': { gridColumn: '1 / -1', textAlign: 'start' },
   },
   '@media (max-width: 20rem)': { gridTemplateColumns: 'minmax(0, 1fr)' },
 });

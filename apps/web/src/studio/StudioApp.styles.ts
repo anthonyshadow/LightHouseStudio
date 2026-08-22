@@ -194,6 +194,9 @@ export const primaryNavigationStyles = (theme: Theme): CSSObject => ({
   '@media (max-width: 47.99rem)': { display: 'none' },
 });
 
+/** The header brand with the wordmark column removed, leaving the logo mark on its own. */
+const brandMarkOnly: CSSObject = { gridTemplateColumns: '2rem', '& > div': { display: 'none' } };
+
 export const brandStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   display: 'inline-grid',
@@ -242,10 +245,7 @@ export const brandStyles = (theme: Theme): CSSObject => ({
     '& strong': { fontSize: theme.fontSizes.section },
     '& span': { fontSize: '0.62rem' },
   },
-  '@media (min-width: 48rem) and (max-width: 63.99rem)': {
-    gridTemplateColumns: '2rem',
-    '& > div': { display: 'none' },
-  },
+  '@media (min-width: 48rem) and (max-width: 63.99rem)': brandMarkOnly,
   '@media (max-width: 47.99rem)': {
     gridTemplateColumns: '2rem minmax(0, 1fr)',
     padding: 0,
@@ -253,13 +253,9 @@ export const brandStyles = (theme: Theme): CSSObject => ({
     '& span': { display: 'none' },
     '& strong': { fontSize: theme.fontSizes.label },
   },
-  // Below this the header row cannot hold the wordmark and the action cluster, so the mark stands
-  // alone — the same treatment the 48–64rem rail already uses. The button keeps its `aria-label`,
-  // so the destination is still announced.
-  '@media (max-width: 22rem)': {
-    gridTemplateColumns: '2rem',
-    '& > div': { display: 'none' },
-  },
+  // Below this the header row cannot hold the wordmark and the action cluster. The button keeps
+  // its `aria-label`, so the destination is still announced.
+  '@media (max-width: 22rem)': brandMarkOnly,
 });
 
 export const mobileNavigationStyles = (theme: Theme): CSSObject => ({
