@@ -14,6 +14,21 @@ const api = vi.hoisted(() => ({
   createSavedVideoThumbnailFromImage: vi.fn(),
 }));
 
+// jsdom has no WebGL or WebCodecs, so the re-framing capability is stated explicitly rather than
+// inferred. The gallery itself touches neither module except through the placement render.
+const editor = vi.hoisted(() => ({
+  renderCapable: vi.fn(() => true),
+  renderVideoEdit: vi.fn<() => Promise<{ blob: Blob; mimeType: 'video/mp4' }>>(),
+}));
+
+vi.mock('../video-editor/videoEditShader', () => ({
+  videoEditPreviewSupported: () => editor.renderCapable(),
+}));
+vi.mock('../video-editor/renderVideoEdit', () => ({
+  renderVideoEdit: () => editor.renderVideoEdit(),
+  videoEditRenderingSupported: () => editor.renderCapable(),
+}));
+
 vi.mock('../../adapters/api-client/savedVideosApi', async (importOriginal) => ({
   ...(await importOriginal<typeof SavedVideosApiModule>()),
   deleteSavedVideo: api.deleteSavedVideo,
@@ -109,6 +124,8 @@ describe('VideoGallery', () => {
     api.createSavedVideoThumbnailFromImage
       .mockReset()
       .mockResolvedValue(new Blob(['poster'], { type: 'image/webp' }));
+    editor.renderCapable.mockReturnValue(true);
+    editor.renderVideoEdit.mockReset();
     vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
     vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);
   });
@@ -190,12 +207,68 @@ describe('VideoGallery', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Edit video' }));
     await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, 'edit'));
-    expect(within(dialog).getByRole('button', { name: 'Export' })).toBeDisabled();
-    expect(
-      within(dialog).getByText(/Export formats and channels are not specified/u),
-    ).toBeVisible();
+    expect(within(dialog).getByRole('button', { name: 'Export' })).toBeEnabled();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Open in Studio' }));
     await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, 'play'));
+  });
+
+  it('exports a saved Version by re-framing it for a chosen placement', async () => {
+    const item = video();
+    const bytes = new Uint8Array([1, 2, 3, 4]);
+    mockGalleryPages({ '': page([item]) });
+    mockApiServer.use(
+      jsonScenario('GET', `/api/videos/${item.id}`, [{ body: detail(item) }]),
+      http.get(
+        `*/api/videos/${item.id}/versions/${item.currentVersion.id}/content`,
+        () =>
+          new HttpResponse(bytes, {
+            headers: {
+              'content-type': 'video/mp4',
+              'content-length': String(bytes.byteLength),
+            },
+          }),
+      ),
+    );
+    const reframed = new Blob(['reframed'], { type: 'video/mp4' });
+    editor.renderVideoEdit.mockResolvedValue({ blob: reframed, mimeType: 'video/mp4' });
+    // Only the two object-URL statics are swapped, so `new URL(...)` keeps working for the client.
+    const urlStatics = URL as unknown as Record<string, unknown>;
+    const restoreUrl = {
+      createObjectURL: urlStatics.createObjectURL,
+      revokeObjectURL: urlStatics.revokeObjectURL,
+    };
+    const createObjectURL = vi.fn(() => 'blob:placement');
+    urlStatics.createObjectURL = createObjectURL;
+    urlStatics.revokeObjectURL = vi.fn();
+    const anchorClick = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(() => undefined);
+    renderGallery();
+
+    try {
+      fireEvent.click(await screen.findByRole('button', { name: 'Preview Morning take' }));
+      const preview = await screen.findByRole('dialog', { name: 'Morning take' });
+      fireEvent.click(within(preview).getByRole('button', { name: 'Export' }));
+
+      const exportPanel = await screen.findByRole('dialog', { name: 'Export video' });
+      // Until a placement is chosen the unchanged server-served download is what is offered.
+      expect(
+        within(exportPanel).getByRole('link', { name: 'Download Morning take, Version 1' }),
+      ).toBeVisible();
+
+      fireEvent.click(within(exportPanel).getByRole('button', { name: 'Phone, full screen' }));
+      const download = await within(exportPanel).findByRole('button', {
+        name: 'Download Morning take, Version 1, for Phone, full screen',
+      });
+      fireEvent.click(download);
+
+      await waitFor(() => expect(editor.renderVideoEdit).toHaveBeenCalledOnce());
+      await waitFor(() => expect(createObjectURL).toHaveBeenCalledWith(reframed));
+      expect(anchorClick).toHaveBeenCalledOnce();
+    } finally {
+      Object.assign(urlStatics, restoreUrl);
+      anchorClick.mockRestore();
+    }
   });
 
   it('selects, previews, and downloads an exact older Version without using or changing current', async () => {
