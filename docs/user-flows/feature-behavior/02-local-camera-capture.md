@@ -7,7 +7,7 @@
 1. Optionally stage sources in **Capture settings** on desktop or **Device settings** on tablet
    and mobile, including **Landscape · 16:9** or **Portrait · 9:16** for both local preview and
    recording.
-2. Entering Studio leaves camera and microphone off. Select **Record New Video** in the control
+2. Entering Studio leaves camera and microphone off. Select **Start camera** in the control
    bar and grant browser permission.
 3. Confirm **Live local camera preview**. Use the mic/camera toggles and any capability-gated
    front/rear or zoom controls.

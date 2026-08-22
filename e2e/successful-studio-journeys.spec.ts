@@ -129,7 +129,7 @@ for (const viewport of exactViewports) {
     await page.goto('/studio/create');
     await expectNoDocumentOverflow(page);
     await expect(page.getByLabel('Studio session controls')).toBeVisible();
-    await expectActionInsideViewport(page, 'Record New Video');
+    await expectActionInsideViewport(page, 'Start camera');
     const stableStageRect = await readStageRect(page);
 
     await page.getByRole('button', { name: 'Open capture settings' }).click();
@@ -378,7 +378,7 @@ test('persistent controls preserve local media across VTON choice, AI stop, trac
   await closeAiSettings(page);
 
   const controls = page.getByLabel('Studio session controls');
-  await controls.getByRole('button', { name: 'Record New Video' }).click();
+  await controls.getByRole('button', { name: 'Start camera' }).click();
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
   await expect(controls.getByRole('button', { name: 'Start AI' })).toBeVisible();
   expect((await readBrowserState(page)).cameraCalls).toBe(1);

@@ -65,7 +65,7 @@ const CaptureFlowHarness = () => {
           idleAction={
             step === 'idle' ? (
               <Button variant="primary" onClick={() => setStep('ready')}>
-                Record New Video
+                Start camera
               </Button>
             ) : undefined
           }

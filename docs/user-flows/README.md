@@ -139,7 +139,7 @@ them. Whether a media stage exists at all is `isStudioRuntimePath`.
 1. Land on `/`, press **Log in**, authenticate with the seeded demo credentials.
 2. Arrive at `/dashboard`, which shows a dismissible "Start with the outcome you need" card
    explaining that organization is optional.
-3. Press **Create video** → `/studio/create` → **Record New Video** or **Upload Video**.
+3. Press **Create video** → `/studio/create` → **Start camera** or **Upload Video**.
 4. Review the take on the Studio stage; optionally apply one visual edit plus voice.
 5. Press **Save to Assets** → the video becomes Version 1 of a Saved Video, and a completion panel
    offers **Download**, **View in Assets** and **Create another**.
