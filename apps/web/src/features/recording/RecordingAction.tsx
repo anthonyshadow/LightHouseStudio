@@ -38,7 +38,7 @@ const recordingUnavailableReason = ({
   if (!source) {
     switch (mode) {
       case 'local':
-        return 'Start local preview to enable Record.';
+        return 'Start camera to enable Record.';
       case 'lucy-latest':
         return 'Start Character AI and wait for live output to enable Record.';
       case 'lucy-vton-latest':
@@ -52,13 +52,18 @@ const recordingUnavailableReason = ({
   return null;
 };
 
-const recordActionStyles = (theme: Theme, active: boolean): CSSObject => ({
-  color: active ? theme.colors.text : theme.colors.recording,
-  borderColor: active ? theme.colors.recording : theme.colors.accent,
-  background: active
-    ? `linear-gradient(135deg, ${theme.colors.recording}, ${theme.colors.danger})`
-    : theme.colors.recordingSoft,
-  boxShadow: active ? theme.shadows.recording : 'none',
+const recordingActiveStyles = (theme: Theme): CSSObject => ({
+  color: theme.colors.text,
+  borderColor: theme.colors.recording,
+  background: `linear-gradient(135deg, ${theme.colors.recording}, ${theme.colors.danger})`,
+  boxShadow: theme.shadows.recording,
+});
+
+// Idle Record is the stage's primary action and takes the mint primary treatment from
+// `Button variant="primary"`, so only the dot glyph is overridden — kept in the recording red
+// family but deepened so it still reads against mint.
+const recordGlyphStyles = (theme: Theme): CSSObject => ({
+  '& svg': { color: theme.colors.recordingSoft },
 });
 
 const disabledReasonStyles = (): CSSObject => ({
@@ -185,7 +190,7 @@ export const RecordingAction = ({
           busy={recording.lifecycle === 'stopping'}
           aria-label="Stop recording"
           aria-keyshortcuts="Space"
-          css={recordActionStyles(theme, true)}
+          css={recordingActiveStyles(theme)}
           onClick={() => void onStop()}
         >
           <RecordIcon active />
@@ -195,13 +200,13 @@ export const RecordingAction = ({
         <Button
           ref={actionRef}
           id="record-take-action"
-          variant="secondary"
+          variant="primary"
           disabled={unavailable}
           aria-label="Record"
           aria-describedby={unavailableReason ? 'recording-disabled-reason' : undefined}
           title={unavailableReason ?? undefined}
           aria-keyshortcuts="Space"
-          css={recordActionStyles(theme, false)}
+          css={recordGlyphStyles(theme)}
           onClick={() => void start()}
         >
           <RecordIcon active={false} />

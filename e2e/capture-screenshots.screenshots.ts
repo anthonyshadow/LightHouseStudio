@@ -247,7 +247,7 @@ const SCENARIOS: readonly Scenario[] = [
     filename: 'local-idle.png',
     preparationOnly: true,
     setup: async (page) => {
-      await expect(page.getByRole('button', { name: 'Record New Video' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Start camera' })).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toContainText('Studio idle');
     },
   },
@@ -301,7 +301,7 @@ const SCENARIOS: readonly Scenario[] = [
             ),
         });
       });
-      await page.getByRole('button', { name: 'Record New Video' }).click({ force: true });
+      await page.getByRole('button', { name: 'Start camera' }).click({ force: true });
       await expect(page.getByRole('dialog', { name: 'AI Settings' })).toBeHidden();
       await expect(
         page.getByRole('alert').filter({ hasText: 'Camera or microphone access was not allowed.' }),

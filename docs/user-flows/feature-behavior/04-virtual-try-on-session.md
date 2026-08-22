@@ -22,7 +22,7 @@ in the primary editor.
    returns to the library after Save or Cancel.
 4. Until an Outfit configuration has content, the stage control bar keeps local **Record** as its primary
    action and does not present **Start AI**. Once prepared, explicitly start local media from
-   **Record New Video**, then select **Start AI** and **Virtual
+   **Start camera**, then select **Start AI** and **Virtual
    Try-On**.
 5. **AI Settings** accepts garment direction, a temporary
    JPEG/PNG/WebP image up to 10 MiB, or both. Prompt enhancement is optional and off by default.

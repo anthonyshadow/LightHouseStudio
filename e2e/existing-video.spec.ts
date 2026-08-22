@@ -145,7 +145,7 @@ test('Record a local video closes the panel and keeps capture on the persistent 
   expectNoExternalProviderTraffic(network);
 });
 
-test('Record New Video starts only from the control bar and keeps the local take in review', async ({
+test('Local capture starts only from the control bar and keeps the local take in review', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -153,11 +153,11 @@ test('Record New Video starts only from the control bar and keeps the local take
 
   const controls = page.getByLabel('Studio session controls');
   await expect(page.getByLabel('Studio media stage')).toContainText(
-    'Camera and microphone remain off until you start local preview.',
+    'Camera and microphone remain off until you select Start camera.',
   );
   expect((await readBrowserState(page)).cameraCalls).toBe(0);
 
-  await controls.getByRole('button', { name: 'Record New Video' }).click();
+  await controls.getByRole('button', { name: 'Start camera' }).click();
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
   await controls.getByRole('button', { name: 'Record' }).click();
   await controls.getByRole('button', { name: 'Stop recording' }).click();

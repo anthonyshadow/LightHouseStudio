@@ -4,7 +4,7 @@ import type { useProjectCreativeSessionAdapter } from './useProjectCreativeSessi
 import type { useProjectWorkingMediaController } from './useProjectWorkingMediaController';
 
 export const PROJECT_PROVIDER_START_BLOCKED_REASON =
-  'Project live provider starts remain unavailable because they do not use the recoverable Project processing command.';
+  "Live AI isn't available inside a Project yet. You can still run Character Swap and Virtual Try-On on this Project's video.";
 
 export const ProjectCreativeCheckpointPanel = ({
   controller,

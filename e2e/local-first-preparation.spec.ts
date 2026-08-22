@@ -16,7 +16,17 @@ test.beforeEach(async ({ page, request, baseURL }) => {
       headers: { Origin: origin },
       data: { login: 'demo@lightframe.local', password: 'lightframe-demo' },
     });
-    expect(login.ok()).toBe(true);
+    // These are the only specs that authenticate against the real API rather than a route
+    // harness, so they are also the only ones that fail when the API is not up. A bare
+    // `expect(ok).toBe(true)` reports "expected true, received false" and sends the reader
+    // hunting through auth; the status and body say which it actually is — 502 for an
+    // unreachable API behind the Vite proxy, 403 for a genuine Origin/Host mismatch.
+    expect(
+      login.ok(),
+      `Login failed with ${login.status()}: ${await login.text()}\n` +
+        'A 502 means the API is not running: start the full stack with `bun run dev`, or let ' +
+        '`bun run test:e2e` start it for you. Serving only the web app is not enough.',
+    ).toBe(true);
   }
 
   await page.addInitScript(() => {
@@ -120,7 +130,7 @@ test('prepares a visual configuration accessibly without camera or provider work
 
   await expect(page.getByRole('main')).toBeVisible();
   await expect(page.getByLabel('Studio media stage')).toContainText(
-    'Camera and microphone remain off until you start local preview.',
+    'Camera and microphone remain off until you select Start camera.',
   );
   await page.getByLabel('Integration availability').getByRole('button').click();
   await expect(page.getByRole('region', { name: 'Studio availability details' })).toContainText(

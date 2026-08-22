@@ -4,6 +4,12 @@ import { OverlayPanel } from '../ui/primitives/OverlayPanel';
 
 const CONCEPTS = [
   {
+    id: 'studio',
+    name: 'Studio',
+    when: 'Where every video starts. Record with your camera or bring in a video you already have, then edit it or transform it with AI.',
+    example: 'Record a 30-second product take, trim it, and save it.',
+  },
+  {
     id: 'videos',
     name: 'Videos',
     when: 'Every video you save lands here, with every saved version kept.',

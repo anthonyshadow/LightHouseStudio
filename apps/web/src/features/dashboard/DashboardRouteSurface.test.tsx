@@ -261,7 +261,12 @@ describe('DashboardRouteSurface', () => {
     );
     const user = userEvent.setup();
     const first = renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
-    expect(screen.getByRole('heading', { name: 'Start with the outcome you need' })).toBeVisible();
+    const explainer = screen.getByRole('heading', { name: 'Start with the outcome you need' });
+    expect(explainer).toBeVisible();
+    // The vocabulary is defined before the sections that use it: Recent Work shows "No Campaign"
+    // and a Campaigns filter, so the explainer must not follow them.
+    const recentWork = screen.getByRole('heading', { name: 'Recent Work' });
+    expect(explainer.compareDocumentPosition(recentWork)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     await user.click(screen.getByRole('button', { name: 'Got it' }));
     expect(screen.queryByRole('heading', { name: 'Start with the outcome you need' })).toBeNull();
     first.unmount();

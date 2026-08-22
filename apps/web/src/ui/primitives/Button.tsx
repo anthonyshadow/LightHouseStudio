@@ -40,7 +40,12 @@ const buttonStyles = (theme: Theme, size: ButtonSize): CSSObject => ({
   },
 });
 
-const variantStyles = (theme: Theme, variant: ButtonVariant): CSSObject => {
+/**
+ * The colour recipe for a button variant, exported so a control that cannot be a `Button` — an
+ * `<a download>`, which has no anchor form yet — states the accent treatment once rather than
+ * copying it. Metrics and focus ring stay with the caller; only the fill is shared.
+ */
+export const buttonVariantStyles = (theme: Theme, variant: ButtonVariant): CSSObject => {
   const variants: Record<ButtonVariant, CSSObject> = {
     primary: {
       color: theme.colors.onAccent,
@@ -91,7 +96,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       type={type}
-      css={[buttonStyles(theme, size), variantStyles(theme, variant)]}
+      css={[buttonStyles(theme, size), buttonVariantStyles(theme, variant)]}
       disabled={disabled || busy}
       aria-busy={busy || undefined}
       {...props}

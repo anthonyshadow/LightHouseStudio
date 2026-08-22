@@ -11,7 +11,7 @@ source, then edit either base, save, start over, or discard.
 1. From `/`, the creator logs in or enters Studio. The entry route does not mount Studio, request
    media, or offer the creation actions. Direct `/studio/create` visits keep neutral Local Camera mode with
    camera, microphone, and AI off.
-2. The idle Studio control bar exposes **Record New Video** and **Upload Video** actions.
+2. The idle Studio control bar exposes **Start camera** and **Upload Video** actions.
    Upload needs no camera permission, provider credentials, Decart SDK, or external traffic.
 3. Studio accepts a file picker or drop, validates browser metadata and decode, and publishes a
    playable temporary source on the Studio stage and the upload panel's accessible inline
@@ -29,7 +29,7 @@ source, then edit either base, save, start over, or discard.
    immutable base rather than adding a visual or Voice treatment.
    Once a video is selected, backdrop clicks cannot dismiss the panel; the creator must use an
    explicit close action or complete the workflow.
-4. Instead of selecting a file, the creator may choose control-bar **Record New Video** or panel
+4. Instead of selecting a file, the creator may choose control-bar **Start camera** or panel
    **Record a local video**. Camera and microphone start only after that action. The one
    stage owns live preview, Record, Stop, the independent 270/300-second warning/limit, and
    finalization. After a healthy finalization, Studio validates and adopts the normalized

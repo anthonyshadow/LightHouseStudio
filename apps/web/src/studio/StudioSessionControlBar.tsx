@@ -473,7 +473,7 @@ export const StudioSessionControlBar = ({
                 }}
               >
                 <CameraIcon off={false} />
-                {transition ?? 'Record New Video'}
+                {transition ?? 'Start camera'}
               </Button>
               <Button
                 ref={uploadButtonRef}
@@ -562,7 +562,7 @@ export const StudioSessionControlBar = ({
                 </Button>
               ) : (
                 <Button
-                  variant="danger"
+                  variant="secondary"
                   disabled={endDisabled}
                   title={recordingActive ? 'Stop recording before closing the session.' : undefined}
                   onClick={() => void session.stopCamera()}

@@ -194,6 +194,9 @@ export const primaryNavigationStyles = (theme: Theme): CSSObject => ({
   '@media (max-width: 47.99rem)': { display: 'none' },
 });
 
+/** The header brand with the wordmark column removed, leaving the logo mark on its own. */
+const brandMarkOnly: CSSObject = { gridTemplateColumns: '2rem', '& > div': { display: 'none' } };
+
 export const brandStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   display: 'inline-grid',
@@ -221,9 +224,14 @@ export const brandStyles = (theme: Theme): CSSObject => ({
   '& strong': {
     display: 'block',
     margin: 0,
+    overflow: 'hidden',
     fontFamily: theme.type.display,
     fontSize: 'clamp(1.05rem, 2vw, 1.35rem)',
     letterSpacing: '-0.025em',
+    // The product's name is never broken mid-word. The column is `minmax(0, 1fr)`, so without
+    // this it wrapped to `Ligh / tfra / me` on the first authenticated screen at 320px.
+    whiteSpace: 'nowrap',
+    textOverflow: 'ellipsis',
   },
   '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '2px' },
   '&:hover': { background: theme.colors.surfaceSoft },
@@ -237,10 +245,7 @@ export const brandStyles = (theme: Theme): CSSObject => ({
     '& strong': { fontSize: theme.fontSizes.section },
     '& span': { fontSize: '0.62rem' },
   },
-  '@media (min-width: 48rem) and (max-width: 63.99rem)': {
-    gridTemplateColumns: '2rem',
-    '& > div': { display: 'none' },
-  },
+  '@media (min-width: 48rem) and (max-width: 63.99rem)': brandMarkOnly,
   '@media (max-width: 47.99rem)': {
     gridTemplateColumns: '2rem minmax(0, 1fr)',
     padding: 0,
@@ -248,6 +253,9 @@ export const brandStyles = (theme: Theme): CSSObject => ({
     '& span': { display: 'none' },
     '& strong': { fontSize: theme.fontSizes.label },
   },
+  // Below this the header row cannot hold the wordmark and the action cluster. The button keeps
+  // its `aria-label`, so the destination is still announced.
+  '@media (max-width: 22rem)': brandMarkOnly,
 });
 
 export const mobileNavigationStyles = (theme: Theme): CSSObject => ({
@@ -724,6 +732,10 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     fontSize: 'inherit',
     fontWeight: 'inherit',
   },
+  // The rail carries three tools at every width now, so the narrowest layouts trade the verb for
+  // the noun rather than truncating it. Each control states its full name in `aria-label`, so
+  // only the visible text changes.
+  '& [data-tool-label-short]': { display: 'none' },
   '& [data-tool-label] small': {
     maxWidth: '8rem',
     overflow: 'hidden',
@@ -769,7 +781,22 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     },
     '& [data-tool-label]': { justifyItems: 'center' },
     '& [data-tool-label] strong': { fontSize: '0.72rem' },
+    '& [data-tool-label-long]': { display: 'none' },
+    '& [data-tool-label-short]': { display: 'inline' },
+    // The description is a label a compact rail can do without. The blocked reason is not: it is
+    // the only thing that explains a dead control, and `title` never reaches a touch user. It
+    // stays, clamped to two lines, so the `aria-describedby` target is visible rather than hidden.
     '& [data-tool-label] small': { display: 'none' },
+    '& [data-tool-label] small[data-tool-blocked]': {
+      display: '-webkit-box',
+      maxWidth: '100%',
+      WebkitBoxOrient: 'vertical',
+      WebkitLineClamp: 2,
+      fontSize: '0.6rem',
+      lineHeight: 1.25,
+      whiteSpace: 'normal',
+      textAlign: 'center',
+    },
     '& [data-tool-icon]': { width: '0.95rem', height: '0.95rem' },
   },
   '@media (max-width: 20rem), (max-height: 36rem)': {

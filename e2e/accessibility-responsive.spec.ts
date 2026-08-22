@@ -216,7 +216,7 @@ for (const viewport of representativeViewports) {
 
     await expect(page.getByRole('main')).toBeVisible();
     await expect(page.getByLabel('Studio media stage')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Record New Video' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start camera' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Upload Video' })).toBeVisible();
     const stageFrameBox = await page.locator('[data-stage-frame]').boundingBox();
     expect(stageFrameBox).not.toBeNull();
@@ -596,13 +596,22 @@ test('phone and tablet expose supported creative tools without Recipe UI', async
     await page.setViewportSize(viewport);
     await page.goto('/studio/create');
     const rail = page.getByRole('navigation', { name: 'Creative workspace tools' });
-    // Edit Video alone below the desktop breakpoint: Character and Outfit are desktop-only, and
-    // the Workshop that used to keep it company is retired.
-    await expect(rail.getByRole('button')).toHaveCount(1);
-    await expect(rail.getByRole('button', { name: 'Edit Video' })).toHaveCount(1);
-    await expect(rail.getByRole('button', { name: 'Select Character' })).toHaveCount(0);
-    await expect(rail.getByRole('button', { name: 'Select Outfit' })).toHaveCount(0);
+    // The same three tools at every width. They used to vanish below 64rem with no entry point
+    // and no explanation, so a phone or tablet operator concluded the AI tools did not exist.
+    // The visible labels shorten on a compact rail; the accessible names do not.
+    await expect
+      .poll(() =>
+        rail
+          .locator('button')
+          .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
+      )
+      .toEqual(['Edit Video', 'Select Character', 'Select Outfit']);
     await expect(page.getByRole('button', { name: /Select AI/u })).toHaveCount(0);
+
+    // A blocked tool still states its condition here, rather than hiding it in `title` where a
+    // touch user can never reach it.
+    await expect(rail.getByRole('button', { name: 'Edit Video' })).toBeDisabled();
+    await expect(rail.locator('[data-tool-blocked]').first()).toBeVisible();
 
     await expect(rail.getByRole('button', { name: /Recipe|Shelf|Dock/u })).toHaveCount(0);
     const quickCreate = page.getByRole('button', { name: 'Quick Create' });
@@ -686,7 +695,7 @@ test('explicit local Start surfaces a sanitized camera denial without provider w
   const network = await installProviderFreeStudio(page);
   await page.goto('/studio/create');
 
-  const start = page.getByRole('button', { name: 'Record New Video' });
+  const start = page.getByRole('button', { name: 'Start camera' });
   await start.focus();
   await page.keyboard.press('Enter');
 
@@ -708,7 +717,7 @@ test('explicit local Start surfaces a sanitized camera denial without provider w
     await expect(page.getByRole('dialog', { name: 'Capture Settings' })).toBeVisible();
     await page.getByRole('button', { name: 'Close panel' }).click();
   }
-  await page.getByRole('button', { name: 'Record New Video' }).click();
+  await page.getByRole('button', { name: 'Start camera' }).click();
   await expect(page.getByRole('alert')).toContainText(
     'Camera or microphone access was not allowed.',
   );

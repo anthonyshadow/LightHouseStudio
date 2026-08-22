@@ -39,6 +39,7 @@ import {
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { AddVideoToProjectDialog } from '../projects/AddVideoToProjectDialog';
 import { GeneratePreviewDialog } from './GeneratePreviewDialog';
+import { VideoExportPanel } from './VideoExportPanel';
 import {
   actionMenuPopoverStyles,
   actionMenuStyles,
@@ -227,19 +228,25 @@ const VideoGalleryGrid = ({
                 </div>
               )}
               <div css={actionsStyles(theme)}>
-                <Button
-                  variant="primary"
-                  disabled={busy || video.status !== 'ready'}
-                  busy={busy}
-                  onClick={() => void onUse(video, 'play')}
+                <a
+                  href={downloadSavedVideoUrl(video.id, version.id)}
+                  download={version.filename}
+                  aria-label={`Download ${video.title}`}
                 >
-                  Open in Studio
-                </Button>
+                  Download
+                </a>
                 <details css={actionMenuStyles(theme)}>
                   <summary aria-label={`More actions for ${video.title}`}>
                     <MoreIcon />
                   </summary>
                   <div css={actionMenuPopoverStyles(theme)}>
+                    <button
+                      type="button"
+                      disabled={busy || video.status !== 'ready'}
+                      onClick={() => void onUse(video, 'play')}
+                    >
+                      Open in Studio
+                    </button>
                     <button
                       type="button"
                       disabled={busy || video.status !== 'ready'}
@@ -259,12 +266,6 @@ const VideoGalleryGrid = ({
                     >
                       Use as Project source
                     </button>
-                    <a
-                      href={downloadSavedVideoUrl(video.id, version.id)}
-                      download={version.filename}
-                    >
-                      Download
-                    </a>
                     <button
                       type="button"
                       disabled={busy}
@@ -333,6 +334,7 @@ export const VideoGallery = ({
   } | null>(null);
   const [projectTarget, setProjectTarget] = useState<SavedVideoSummary | null>(null);
   const [previewRepairTarget, setPreviewRepairTarget] = useState<SavedVideoSummary | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
   const [renameTitle, setRenameTitle] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [brokenThumbnails, setBrokenThumbnails] = useState<ReadonlySet<string>>(() => new Set());
@@ -344,6 +346,7 @@ export const VideoGallery = ({
   const actionCancelRef = useRef<HTMLButtonElement | null>(null);
   const projectTriggerRef = useRef<HTMLElement | null>(null);
   const previewRepairTriggerRef = useRef<HTMLElement | null>(null);
+  const exportTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const videosQuery = useInfiniteQuery({
     queryKey: [
@@ -424,6 +427,11 @@ export const VideoGallery = ({
   // Acted on once per requested id. The fetch uses the key `previewDetailQuery` already reads, so a
   // video on screen resolves from cache and one from a later page costs only the request the
   // preview itself would have made.
+  //
+  // The guard releases on teardown unless the work already settled, because the gallery mounts with
+  // the id already set — arriving from the Dashboard opens this overlay for the first time — and
+  // React replays a fresh mount's effects. Holding the guard across that replay would abandon the
+  // only attempt and leave the requested video unopened.
   useEffect(() => {
     if (focusVideoId === null) {
       consumedFocusVideoIdRef.current = null;
@@ -432,6 +440,7 @@ export const VideoGallery = ({
     if (consumedFocusVideoIdRef.current === focusVideoId) return;
     consumedFocusVideoIdRef.current = focusVideoId;
     let abandoned = false;
+    let settled = false;
     void queryClient
       .fetchQuery({
         queryKey: ['saved-videos', 'detail', focusVideoId],
@@ -454,10 +463,12 @@ export const VideoGallery = ({
         });
       })
       .finally(() => {
+        settled = true;
         if (!abandoned) onFocusVideoConsumed?.();
       });
     return () => {
       abandoned = true;
+      if (!settled) consumedFocusVideoIdRef.current = null;
     };
   }, [focusVideoId, onFocusVideoConsumed, queryClient]);
 
@@ -531,6 +542,12 @@ export const VideoGallery = ({
     setPreviewVideo(video);
   };
 
+  // The panel is mounted only while it is open, so it starts clean and needs no reset here.
+  const openExport = (trigger: HTMLButtonElement) => {
+    exportTriggerRef.current = trigger;
+    setExportOpen(true);
+  };
+
   const closePreview = () => {
     const player = previewPlayerRef.current;
     player?.pause();
@@ -540,6 +557,7 @@ export const VideoGallery = ({
     } catch {
       // Some test environments do not implement media loading.
     }
+    setExportOpen(false);
     setPreviewVideo(null);
     setSelectedVersionId(null);
     setPreviewError(false);
@@ -820,15 +838,15 @@ export const VideoGallery = ({
         footer={
           previewVideo && selectedVersion ? (
             <div css={previewFooterStyles(theme)}>
-              <Button disabled aria-describedby="video-export-unavailable">
-                Export
-              </Button>
               <a
                 href={downloadSavedVideoUrl(previewVideo.id, selectedVersion.id)}
                 download={selectedVersion.filename}
               >
                 Download
               </a>
+              <Button variant="secondary" onClick={(event) => openExport(event.currentTarget)}>
+                Export
+              </Button>
               {selectedIsCurrent ? (
                 <>
                   <Button
@@ -839,7 +857,7 @@ export const VideoGallery = ({
                     Edit video
                   </Button>
                   <Button
-                    variant="primary"
+                    variant="secondary"
                     busy={busyId === previewVideo.id}
                     onClick={() => void handleUseVideo(previewVideo, 'play')}
                   >
@@ -847,9 +865,6 @@ export const VideoGallery = ({
                   </Button>
                 </>
               ) : null}
-              <small id="video-export-unavailable">
-                Export formats and channels are not specified yet. Download remains available.
-              </small>
             </div>
           ) : null
         }
@@ -956,6 +971,15 @@ export const VideoGallery = ({
           </div>
         ) : null}
       </OverlayPanel>
+
+      {exportOpen && previewVideo && selectedVersion ? (
+        <VideoExportPanel
+          video={previewVideo}
+          version={selectedVersion}
+          returnFocusRef={exportTriggerRef}
+          onClose={() => setExportOpen(false)}
+        />
+      ) : null}
     </div>
   );
 };

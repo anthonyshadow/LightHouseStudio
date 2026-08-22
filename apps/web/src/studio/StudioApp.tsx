@@ -445,17 +445,13 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   const unselectCharacter = useCallback(() => {
     if (!clearActiveCharacter()) return;
     closeOverlayIf(['character-selector']);
-    window.requestAnimationFrame(() =>
-      (desktopStudioLayout ? characterSelectorRef.current : mainRef.current)?.focus(),
-    );
-  }, [characterSelectorRef, clearActiveCharacter, closeOverlayIf, desktopStudioLayout, mainRef]);
+    window.requestAnimationFrame(() => characterSelectorRef.current?.focus());
+  }, [characterSelectorRef, clearActiveCharacter, closeOverlayIf]);
   const unselectAi = useCallback(() => {
     if (!clearActiveRecipe()) return;
     closeOverlayIf(['character-selector', 'outfit-selector']);
-    window.requestAnimationFrame(() =>
-      (desktopStudioLayout ? characterSelectorRef.current : mainRef.current)?.focus(),
-    );
-  }, [characterSelectorRef, clearActiveRecipe, closeOverlayIf, desktopStudioLayout, mainRef]);
+    window.requestAnimationFrame(() => characterSelectorRef.current?.focus());
+  }, [characterSelectorRef, clearActiveRecipe, closeOverlayIf]);
   const openTakeReview = useCallback(() => openOverlay('take-review'), [openOverlay]);
   const focusEditVideo = useCallback(() => {
     window.requestAnimationFrame(() => editVideoToggleRef.current?.focus());
@@ -673,7 +669,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
       <CreativeWorkspace
         state={{
           activeTool: activeCreativeTool,
-          showDesktopAiTools: desktopStudioLayout,
           liveToolsAvailableDuringPlayback: projectContextActive,
           activeCharacterLabel: activeCharacterName,
           activeOutfitLabel:

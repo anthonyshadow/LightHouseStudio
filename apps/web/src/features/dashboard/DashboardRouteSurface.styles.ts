@@ -78,8 +78,11 @@ export const onboardingStyles = (theme: Theme): CSSObject => ({
   gridTemplateColumns: '1rem minmax(0, 1fr) auto',
   alignItems: 'center',
   gap: theme.space.sm,
-  paddingBlock: theme.space.xxs,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  // It now sits directly under the page header, so the vocabulary is defined before Recent Work
+  // uses it. Quiet by construction — muted, metadata-sized, one rule below it — so it introduces
+  // the words without competing with the `Create video` primary above it.
+  paddingBlock: theme.space.sm,
+  borderBlockEnd: `1px solid ${theme.colors.border}`,
   color: theme.colors.textMuted,
   fontSize: theme.fontSizes.metadata,
   lineHeight: 1.5,
@@ -111,7 +114,6 @@ export const onboardingStyles = (theme: Theme): CSSObject => ({
     gridTemplateColumns: '1rem minmax(0, 1fr)',
     alignItems: 'start',
     rowGap: 0,
-    paddingBlock: theme.space.xs,
     '& > button': { gridColumn: 2, justifySelf: 'start', paddingInline: 0 },
   },
 });

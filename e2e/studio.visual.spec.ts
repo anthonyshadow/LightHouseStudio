@@ -353,9 +353,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'studio-initial-closed',
     setup: async (page) => {
       await expect(page.getByRole('dialog')).toHaveCount(0);
-      await expect(
-        page.getByRole('button', { name: 'Record New Video', exact: true }),
-      ).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Start camera', exact: true })).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toContainText('Studio idle');
     },
   },
@@ -372,7 +370,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       });
       await expect(stage.getByText('Your private creative stage.')).toBeVisible();
       await expect(
-        stage.getByText('Camera and microphone remain off until you start local preview.'),
+        stage.getByText('Camera and microphone remain off until you select Start camera.'),
       ).toBeVisible();
       await expect(stage.locator('[data-first-success-guide]')).toHaveCount(0);
     },
@@ -444,9 +442,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'selected-character-ai-live',
     setup: async (page) => {
       await selectSeededCharacter(page);
-      await page
-        .getByRole('button', { name: 'Record New Video', exact: true })
-        .click({ force: true });
+      await page.getByRole('button', { name: 'Start camera', exact: true }).click({ force: true });
       await expect(page.getByLabel('Live local camera preview')).toBeVisible();
       await closeAiSettings(page);
       const controls = page.getByLabel('Studio session controls');
@@ -661,7 +657,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
             ),
         });
       });
-      await page.getByRole('button', { name: 'Record New Video' }).click({ force: true });
+      await page.getByRole('button', { name: 'Start camera' }).click({ force: true });
       await expect(
         page.getByRole('alert').filter({ hasText: 'Camera or microphone access was not allowed.' }),
       ).toBeVisible();

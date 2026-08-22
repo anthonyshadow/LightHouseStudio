@@ -2,6 +2,7 @@ import type { SavedVideoSummary, VoiceSummary } from '@studio/contracts';
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { lazy, Suspense, type RefObject } from 'react';
 import { APP_PATHS } from '../app/paths';
+import { ASSET_LIBRARY_DESCRIPTIONS } from '../features/assets/assetLibraryDescriptions';
 import type {
   CreativeAssetRepository,
   CreativeAssetStore,
@@ -93,7 +94,7 @@ export const StudioLibraryOverlays = ({
         open={pathname === APP_PATHS.videos}
         onClose={onClose}
         title="Videos"
-        description="Preview, edit, download, rename or remove your videos, and open any saved version."
+        description={ASSET_LIBRARY_DESCRIPTIONS.videos}
         placement="fullscreen"
         size="wide"
         bodyMode="scroll"
@@ -114,7 +115,7 @@ export const StudioLibraryOverlays = ({
         open={pathname === APP_PATHS.characters}
         onClose={onClose}
         title="Characters"
-        description="Manage your Lucy 2.5 cast and their wardrobe."
+        description={ASSET_LIBRARY_DESCRIPTIONS.characters}
         headerActions={
           <div css={{ display: 'flex', justifyContent: 'flex-end' }}>
             <Button variant="primary" onClick={onCreateCharacter}>
@@ -162,7 +163,7 @@ export const StudioLibraryOverlays = ({
         open={pathname === APP_PATHS.outfits}
         onClose={onClose}
         title="Outfits"
-        description="Choose a saved Virtual Try-On outfit for Studio or remove it from your library."
+        description={ASSET_LIBRARY_DESCRIPTIONS.outfits}
         placement="fullscreen"
         size="wide"
         bodyMode="scroll"
@@ -191,7 +192,7 @@ export const StudioLibraryOverlays = ({
         open={pathname === APP_PATHS.voices}
         onClose={onClose}
         title="Voices"
-        description="Preview the provider catalog, keep the voices you want for this account, and send a saved voice to Studio."
+        description={ASSET_LIBRARY_DESCRIPTIONS.voices}
         placement="fullscreen"
         size="wide"
         bodyMode="scroll"

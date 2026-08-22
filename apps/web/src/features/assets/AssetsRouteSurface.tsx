@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { listSavedVideos } from '../../adapters/api-client/savedVideosApi';
 import { fetchSavedVoiceCount } from '../../adapters/api-client/voicesApi';
 import { type AssetDestination } from '../../app/paths';
+import { ASSET_LIBRARY_DESCRIPTIONS } from './assetLibraryDescriptions';
 import { creativeLibraryStorageSummary } from '../creative-assets/creativeLibraryStorage';
 import type { CreativeLibraryMirror } from '../creative-assets/useCreativeLibraryCloudSync';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
@@ -123,35 +124,13 @@ const cardStyles = (theme: Theme): CSSObject => ({
 const assetCards: ReadonlyArray<{
   destination: AssetDestination;
   title: string;
-  description: string;
   /** The word after the number. Kept per card so "3 saved" never becomes "3 videos saved". */
   noun: string;
 }> = [
-  {
-    destination: 'videos',
-    title: 'Videos',
-    description:
-      'Preview, edit, download, rename or remove your videos, and open any saved version.',
-    noun: 'saved',
-  },
-  {
-    destination: 'characters',
-    title: 'Characters',
-    description: 'Manage reusable characters, copies, and Wardrobe variants.',
-    noun: 'saved',
-  },
-  {
-    destination: 'outfits',
-    title: 'Outfits',
-    description: 'Reuse saved Virtual Try-On outfits in new or existing video work.',
-    noun: 'saved',
-  },
-  {
-    destination: 'voices',
-    title: 'Voices',
-    description: 'Preview the catalog, keep the voices you want, and send one to Studio.',
-    noun: 'kept',
-  },
+  { destination: 'videos', title: 'Videos', noun: 'saved' },
+  { destination: 'characters', title: 'Characters', noun: 'saved' },
+  { destination: 'outfits', title: 'Outfits', noun: 'saved' },
+  { destination: 'voices', title: 'Voices', noun: 'kept' },
 ];
 
 const AssetCount = ({
@@ -264,7 +243,7 @@ export const AssetsRouteSurface = ({
                 <h2>{card.title}</h2>
               </div>
               <div>
-                <p>{card.description}</p>
+                <p>{ASSET_LIBRARY_DESCRIPTIONS[card.destination]}</p>
                 {storage ? <p data-asset-storage>{storage}</p> : null}
               </div>
               <Button variant="secondary" onClick={() => onOpen(card.destination)}>

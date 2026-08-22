@@ -158,7 +158,7 @@ test('direct and refreshed Studio entries preserve one stage', async ({ page }) 
   await page.reload();
   await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
   await expect(page.getByLabel('Studio media stage')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: 'Record New Video' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start camera' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Upload Video' })).toBeVisible();
   await expect
     .poll(async () => readBrowserState(page))
@@ -448,7 +448,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   const gallery = page.getByRole('dialog', { name: 'Videos' });
   await expect(gallery.getByText('No Project').first()).toBeVisible();
   await expect(gallery.getByRole('heading', { name: 'Legacy unassigned' })).toBeVisible();
-  await expect(gallery.getByRole('button', { name: 'Open in Studio' }).first()).toBeEnabled();
+  await expect(gallery.getByRole('link', { name: /^Download / }).first()).toBeVisible();
 
   await gallery.getByLabel('More actions for Launch master').click();
   await gallery.getByRole('button', { name: 'Remove from Assets' }).click();
