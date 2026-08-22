@@ -265,7 +265,10 @@ not assertions or baselines.
 ### Safe baseline updates
 
 1. Make the intentional UI or matrix change.
-2. Run `bun run test:visual` and inspect the failure against the product contract.
+2. Run `bun run test:visual` and inspect the failure against the product contract. **Confirm that
+   only the cases you meant to change are failing** — step 3 rewrites every baseline, so a suite
+   that is already broadly red (wrong platform, missing fonts, a renderer difference) must be
+   understood before you continue.
 3. Run `bun run test:visual:update` only when the new rendering is approved.
 4. Inspect every changed Darwin/Linux image at every affected viewport.
 5. Run `node scripts/prune-visual-baselines.mjs --check`.
@@ -273,6 +276,17 @@ not assertions or baselines.
 
 Never regenerate a baseline merely to make a failure pass. Do not run `screenshots:prune` until
 every required platform baseline exists.
+
+`test:visual:update` passes `--update-snapshots=all`, so it rewrites every curated baseline rather
+than only the ones that failed. That is deliberate. Playwright's default update mode rewrites only
+failing baselines, and the suite's `maxDiffPixelRatio` of 0.005 is wide enough to absorb a label or
+a sentence — so a copy change would leave a stale image committed while the suite stayed green.
+That had already happened: `06-voice/voice-browser-loaded.png` and three `07-existing-video/*`
+baselines were still showing a retired shell design long after it was replaced.
+
+The trade is that step 4 is not optional. Compare the images themselves, not the list of changed
+files: an update run touches baselines you did not intend to change, and re-encoding noise looks
+identical to real drift in `git status`.
 
 ## CI behavior
 
