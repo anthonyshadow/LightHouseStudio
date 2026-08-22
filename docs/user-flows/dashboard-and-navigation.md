@@ -21,14 +21,14 @@ the shell.
 
 Header regions:
 
-| Region       | Contents                                                                                                                                         |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Brand        | Logo + "Lightframe"; click → `/dashboard`                                                                                                        |
-| Primary nav  | Dashboard · Studio · Projects · Campaigns · Assets, with `aria-current="page"` from `activeDestination` (`ShellChrome.tsx`)                      |
-| Quick Create | New video · New Project · New Campaign · Create Asset · Live AI · Beta (only when live is enabled)                                               |
-| Help         | A quiet "How Lightframe works" button opening a static explainer panel — when to use Projects, Campaigns and each Asset library, with an example |
-| Status menu  | "Core Studio ready" / "Studio limited" / "Checking integrations" with a breakdown of Local capture, Existing-video AI, Live AI Beta, Voice cloud |
-| Account menu | Display name, login, **Account details**, **Log out**                                                                                            |
+| Region       | Contents                                                                                                                                                 |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Brand        | Logo + "Lightframe"; click → `/dashboard`                                                                                                                |
+| Primary nav  | Dashboard · Studio · Projects · Campaigns · Assets, with `aria-current="page"` from `activeDestination` (`ShellChrome.tsx`)                              |
+| Quick Create | New video · New Project · New Campaign · Create Asset · Live AI · Beta (only when live is enabled)                                                       |
+| Help         | A quiet "How Lightframe works" button opening a static explainer panel — when to use Studio, Projects, Campaigns and each Asset library, with an example |
+| Status menu  | "Core Studio ready" / "Studio limited" / "Checking integrations" with a breakdown of Local capture, Existing-video AI, Live AI Beta, Voice cloud         |
+| Account menu | Display name, login, **Account details**, **Log out**                                                                                                    |
 
 `isCampaignsPath` matches both `/campaigns` and `/campaigns/{id}`, so both highlight "Campaigns"
 correctly. The Studio routes fall through to `'studio'`, which the rail and the mobile bottom nav
@@ -42,9 +42,14 @@ Sections in DOM order:
    actions: **Create video** (primary) and **Browse Assets**. The heading's visible text is also its
    accessible name; the greeting used to exist only as a `title` tooltip, and the heading used to
    read "Momentum Workspace" while announcing "Dashboard".
-2. **Continue Work** — the first project from the active project list, or an empty panel offering
+2. **Getting-started strip** — "Start with the outcome you need": one quiet line stating that
+   organization is optional and what Projects and Campaigns are for. It sits directly under the
+   header, ahead of the body, so the vocabulary is defined before Recent Work uses it — that list
+   shows `No Campaign`, `Campaign Project` and a Campaigns filter. Dismissed per account via
+   `localStorage` (`dashboardOnboarding.ts`); if the write fails a warning notice appears.
+3. **Continue Work** — the first project from the active project list, or an empty panel offering
    **New Project**.
-3. **Recent Work** — merged list of the newest 4 projects, 4 videos and 4 campaigns, sorted by
+4. **Recent Work** — merged list of the newest 4 projects, 4 videos and 4 campaigns, sorted by
    `updatedAt` descending, filtered by an All / Videos / Projects / Campaigns toggle, then sliced to
    4 items. Every row opens the specific record it names: projects go to `/projects/{id}`, campaigns
    to `/campaigns/{id}`, and videos to `/assets/videos?video={id}`, which opens that video's preview
@@ -55,10 +60,7 @@ Sections in DOM order:
    costs a request of its own. A row with nothing to show says "No preview yet"; a campaign says
    "Campaign", because it organizes work rather than producing it and no poster is coming.
 
-4. **Footer links** — All Projects · All Videos · All Campaigns.
-5. **Getting-started card** — "Start with the outcome you need". Dismissed per account via
-   `localStorage` (`dashboardOnboarding.ts`); if the write fails a warning notice appears
-   (`DashboardRouteSurface.tsx:436-440`).
+5. **Footer links** — All Projects · All Videos · All Campaigns.
 6. **Processing Queue** — `GET /api/video-jobs` via `listActiveVideoJobs`, polled every 3 s **only
    while at least one job exists** (`DashboardRouteSurface.tsx:151`).
 
@@ -69,8 +71,10 @@ Sections in DOM order:
    `ConfirmationDialog` that explicitly warns the provider may still bill.
 
 The work comes first deliberately. The queue is an engineering view of provider jobs, and on most
-visits it has nothing to report; leading with it, and with an explanation of Projects versus
-Campaigns, put two blocks the operator did not ask for above everything they had made.
+visits it has nothing to report; leading with it put a block the operator did not ask for above
+everything they had made. The getting-started strip is the one exception, and it earns its place by
+being one dismissible line that defines the words the sections below it use — it used to render
+_after_ Recent Work, so a first-time user met the vocabulary before the definition.
 
 There is no separate "Start New" section. It offered **New Project** and **New Campaign**, both
 already reachable from Quick Create, from the Recent Work empty state, and — for New Project —

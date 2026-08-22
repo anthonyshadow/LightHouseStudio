@@ -13,6 +13,28 @@ that is fixed should be struck here **and** in the plan.
 
 **Date:** 2026-08-22 · **Branch:** `develop` @ `af55754` · **Method:** implementation-first
 
+## Status
+
+**Tier 1 of the plan is complete** (2026-08-22, branch `LightFrameUxImprovements`). These ten
+findings are fixed in the product and struck through below and in the plan:
+
+| ID     | Finding                                        | Fixed by                                                    |
+| ------ | ---------------------------------------------- | ----------------------------------------------------------- |
+| LF-S01 | "Record New Video" does not record             | Idle action relabelled **Start camera**                     |
+| LF-S02 | Primary and destructive actions share red      | Idle Record is mint primary; Close demoted to secondary     |
+| LF-X04 | Internal language in a blocked reason          | `PROJECT_PROVIDER_START_BLOCKED_REASON` rewritten           |
+| LF-C01 | Campaigns promises a non-existent Quick Start  | Description rewritten to name only controls that exist      |
+| LF-A02 | A permanently disabled `Export` button         | Wired to the existing `ExportPlacementChooser`              |
+| LF-R01 | Brand wordmark breaks to three lines at 320px  | `white-space: nowrap`; mark-only below 22rem                |
+| LF-A01 | Download is the hidden action                  | `Download` leads the card; the rest move to the overflow    |
+| LF-A04 | Provider model name in UI copy                 | One shared `ASSET_LIBRARY_DESCRIPTIONS`, naming no provider |
+| LF-A05 | Two descriptions of the same library           | Same — hub and overlay read from one owner                  |
+| LF-D04 | The Dashboard explainer sits below its subject | Moved above the body, restyled as a quiet strip             |
+| LF-E03 | The concept explainer omits Studio             | Studio added as the first concept                           |
+
+The findings that follow LF-S01's dependency — the colour rule it establishes — are unchanged:
+Tiers 2–5 are open. Everything else in this document still describes the product as audited.
+
 ---
 
 ## How this audit was produced
@@ -644,7 +666,9 @@ capability is removed rather than reorganised.
 
 ## P1 — Major
 
-### LF-S01 · "Record New Video" does not record
+### ~~LF-S01 · "Record New Video" does not record~~ — FIXED
+
+**Resolved.** The idle action is now `Start camera`; capture stays the separate `Record` control.
 
 - **Where:** `studio/useStudioRecordingLaunch.ts:100` (`startLocalRecording` → `session.startLocal`), label in `StudioSessionControlBar.tsx:476`
 - **Category:** Labelling / expectation · **Improve** · **P1** · **XS**
@@ -659,7 +683,9 @@ capability is removed rather than reorganised.
 - **Redesign needed:** No.
 - **Dependencies:** LF-S02 (colour). **Risks:** copy-asserting tests in `StudioSessionControlBar.test.tsx`.
 
-### LF-S02 · Primary and destructive actions share red
+### ~~LF-S02 · Primary and destructive actions share red~~ — FIXED
+
+**Resolved.** Idle Record is the mint primary with a deepened red dot; active recording stays red; `Close` is secondary.
 
 - **Where:** `features/recording/RecordingAction.tsx:55` (`recordActionStyles`), `StudioSessionControlBar.tsx:565`
 - **Category:** CTA hierarchy · **Improve** · **P1** · **XS**
@@ -711,7 +737,9 @@ capability is removed rather than reorganised.
 - **Change:** Project duplicate → `Duplicate Project`. Saved Video version keeps `Version`. Project revision → `Autosaved`. Never use "version" for a Project.
 - **Redesign needed:** No. **Risks:** wide test surface; no behaviour change.
 
-### LF-A01 · Download is the hidden action on a finished video
+### ~~LF-A01 · Download is the hidden action on a finished video~~ — FIXED
+
+**Resolved.** `Download` leads every card and the version-preview footer; `Open in Studio` moved into the overflow.
 
 - **Where:** `VideoGallery.tsx:236` (`Open in Studio` primary) vs `:262` (Download inside `<details>`)
 - **Category:** CTA hierarchy · **Improve** · **P1** · **S**
@@ -722,7 +750,9 @@ capability is removed rather than reorganised.
 - **Change:** Make Download the card's primary (or a split button `Download ▾` with Open in Studio / Edit inside). Keep Download visible in the preview footer.
 - **Redesign needed:** No.
 
-### LF-A02 · A permanently disabled Export button
+### ~~LF-A02 · A permanently disabled Export button~~ — FIXED
+
+**Resolved** via option (b): `Export` opens the existing `ExportPlacementChooser` and re-frames the selected version locally.
 
 - **Where:** `VideoGallery.tsx:831` — `<Button disabled aria-describedby="video-export-unavailable">Export</Button>` + _"Export formats and channels are not specified yet."_
 - **Category:** Dead control · **Remove / Consolidate** · **P1** · **XS**
@@ -731,7 +761,9 @@ capability is removed rather than reorganised.
 - **Change (pick one):** (a) Remove the button and its note — Download is the export; or (b) wire it to `ExportPlacementChooser` so any saved video can be re-framed for a placement. **(b) is the higher-value option** and is close to free given the chooser exists.
 - **Redesign needed:** No. **Dependencies:** `useExportPlacementRender`, browser WebCodecs capability (already degrades gracefully).
 
-### LF-X04 · Internal language shipped as a user-facing blocked reason
+### ~~LF-X04 · Internal language shipped as a user-facing blocked reason~~ — FIXED
+
+**Resolved.** The string now states a user-visible condition and what still works.
 
 - **Where:** `ProjectCreativeCheckpointPanel.tsx:6` → rendered in `AIExperienceChooser.tsx:109` and `ExistingVideoActionBar.tsx:161`
 - **Text:** _"Project live provider starts remain unavailable because they do not use the recoverable Project processing command."_
@@ -749,7 +781,9 @@ capability is removed rather than reorganised.
 - **Change:** On mobile use a bottom sheet at ~45dvh with the stage visible above, or embed a compact player in the panel.
 - **Redesign needed:** No, but it is the mobile half of LF-S09.
 
-### LF-R01 · Brand wordmark breaks to three lines at 320px
+### ~~LF-R01 · Brand wordmark breaks to three lines at 320px~~ — FIXED
+
+**Resolved.** `white-space: nowrap` on the wordmark, and the text column is hidden below 22rem.
 
 - **Where:** `StudioApp.styles.ts:197` `brandStyles` — `gridTemplateColumns: '2rem minmax(0, 1fr)'`, no `white-space` control
 - **Category:** Responsive defect · **Polish** · **P1** · **XS**
@@ -778,41 +812,41 @@ capability is removed rather than reorganised.
 
 ## P2 — Important
 
-| ID       | Where                                          | Finding                                                                                 | Class       | Scope       |
-| -------- | ---------------------------------------------- | --------------------------------------------------------------------------------------- | ----------- | ----------- |
-| LF-E01   | `EntryPage.tsx:82`                             | First sentence uses "Project" and "Campaigns" as proper nouns before either is defined. | Improve     | XS          |
-| LF-E03   | `HowLightframeWorksPanel.tsx`                  | The concept explainer omits **Studio**.                                                 | Improve     | XS          |
-| LF-D02   | `DashboardRouteSurface.styles.ts:236`          | `1.5fr / 1fr` gives the wide column to one card and the narrow one to the list.         | Improve     | S           |
-| LF-D04   | `DashboardRouteSurface.tsx`                    | The Projects/Campaigns explainer renders _below_ Recent Work.                           | Improve     | XS          |
-| LF-N02   | `AssetsRouteSurface.tsx`                       | `/assets` is a menu page; every library is 2 clicks from the rail.                      | Simplify    | M           |
-| LF-N03   | `StudioLibraryOverlays.tsx`                    | Libraries are fullscreen overlays with no breadcrumb or "Esc returns" hint.             | Polish      | S           |
-| LF-N05   | —                                              | **No Settings destination exists.** Account is read-only.                               | Investigate | M           |
-| LF-S03   | `stageColumnStyles`                            | Stage does not fill its column; large dead space around it.                             | Improve     | M           |
-| LF-S04   | `CreativeWorkspace.tsx` (`showDesktopAiTools`) | Character/Outfit tools disappear below 64rem, unexplained.                              | Improve     | M           |
-| LF-S07   | `StudioTakeOverlays.tsx`                       | 8 technical chips (fps, KiB, mime) above the decision.                                  | Simplify    | S           |
-| LF-S08   | `TakeReviewActions.tsx`                        | "Close and release" / "release the temporary in-memory take".                           | Polish      | XS          |
-| LF-S09   | `TakeReviewActions.tsx`                        | Up to six peer actions at the moment of highest decision pressure.                      | Simplify    | S           |
-| LF-V02   | `VideoEditWorkspace.tsx`                       | No timeline; trim has no visual reference.                                              | Redesign    | L           |
-| LF-V03   | editor settings header                         | Unlabelled low-contrast undo/redo glyphs.                                               | Polish      | XS          |
-| LF-V05   | mobile editor                                  | Tool row truncates (`Lig`) with no scroll affordance.                                   | Polish      | S           |
-| LF-X01   | `ExistingVideoSourcePreview`, `VideoGallery`   | Native `<video controls>` vs custom player elsewhere.                                   | Consolidate | M           |
-| LF-X02   | `ExistingVideoActionBar.tsx`                   | Four identical full-width result buttons.                                               | Improve     | S           |
-| LF-X03   | multiple                                       | `Save to Assets` / `Saved Videos` / `Videos` — three names, one place.                  | Polish      | S           |
-| LF-P01   | `ProjectOverviewSurface.tsx:153`               | Five peer actions with a red `Archive` in the default row.                              | Simplify    | S           |
-| LF-P02   | `ProjectsListSurface.tsx:167`                  | 4–5 inline actions per row.                                                             | Simplify    | S           |
-| LF-P06   | `ProjectsListSurface.styles.ts`                | `h1` to 4rem and `borderRadius: 0` on all buttons — a second design language.           | Improve     | S           |
-| LF-C01   | `CampaignRouteSurface.tsx:292`                 | Copy promises **"Quick Start"**, which does not exist.                                  | Polish      | XS          |
-| LF-C02   | `CampaignRouteSurface.styles.ts`               | Three levels of nested bordered/rounded surfaces.                                       | Simplify    | S           |
-| LF-A03   | `VideoGallery.tsx:239`                         | `<details>` overflow menu: no Escape, no outside-click, no menu semantics.              | Improve     | S           |
-| LF-A04   | `StudioLibraryOverlays.tsx:113`                | _"Manage your **Lucy 2.5** cast"_ — provider model name in the UI.                      | Polish      | XS          |
-| LF-A07   | `VideoGallery.tsx:583`                         | Empty state uses internal flow names.                                                   | Polish      | XS          |
-| LF-DS03  | 6 locations                                    | Six visual answers to "choose one of N".                                                | Consolidate | M           |
-| LF-DS04  | 13 files                                       | Icon sets with three stroke weights.                                                    | Consolidate | S           |
-| LF-DS06  | 37 sites                                       | Bare-text loading everywhere; one skeleton total.                                       | Improve     | M           |
-| LF-A11Y1 | `theme.ts`                                     | `border` 1.58:1, `borderStrong` 2.44:1 — WCAG 1.4.11 needs 3:1.                         | Improve     | S           |
-| LF-A11Y3 | `toolRailStyles` mobile                        | Blocked reason survives only in `title=`.                                               | Improve     | XS          |
-| LF-R04   | mobile editor                                  | Media/chrome ratio inverted.                                                            | Redesign    | (in LF-V01) |
-| LF-R05   | `/assets` at 320px                             | ~5 screens of scroll for four navigation cards.                                         | Simplify    | (in LF-N02) |
+| ID         | Where                                          | Finding                                                                                                                              | Class       | Scope       |
+| ---------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------- | ----------- |
+| LF-E01     | `EntryPage.tsx:82`                             | First sentence uses "Project" and "Campaigns" as proper nouns before either is defined.                                              | Improve     | XS          |
+| ~~LF-E03~~ | `HowLightframeWorksPanel.tsx`                  | ~~The concept explainer omits **Studio**.~~ **Fixed** — Studio is the first concept.                                                 | Improve     | XS          |
+| LF-D02     | `DashboardRouteSurface.styles.ts:236`          | `1.5fr / 1fr` gives the wide column to one card and the narrow one to the list.                                                      | Improve     | S           |
+| ~~LF-D04~~ | `DashboardRouteSurface.tsx`                    | ~~The Projects/Campaigns explainer renders _below_ Recent Work.~~ **Fixed** — it now sits under the page header.                     | Improve     | XS          |
+| LF-N02     | `AssetsRouteSurface.tsx`                       | `/assets` is a menu page; every library is 2 clicks from the rail.                                                                   | Simplify    | M           |
+| LF-N03     | `StudioLibraryOverlays.tsx`                    | Libraries are fullscreen overlays with no breadcrumb or "Esc returns" hint.                                                          | Polish      | S           |
+| LF-N05     | —                                              | **No Settings destination exists.** Account is read-only.                                                                            | Investigate | M           |
+| LF-S03     | `stageColumnStyles`                            | Stage does not fill its column; large dead space around it.                                                                          | Improve     | M           |
+| LF-S04     | `CreativeWorkspace.tsx` (`showDesktopAiTools`) | Character/Outfit tools disappear below 64rem, unexplained.                                                                           | Improve     | M           |
+| LF-S07     | `StudioTakeOverlays.tsx`                       | 8 technical chips (fps, KiB, mime) above the decision.                                                                               | Simplify    | S           |
+| LF-S08     | `TakeReviewActions.tsx`                        | "Close and release" / "release the temporary in-memory take".                                                                        | Polish      | XS          |
+| LF-S09     | `TakeReviewActions.tsx`                        | Up to six peer actions at the moment of highest decision pressure.                                                                   | Simplify    | S           |
+| LF-V02     | `VideoEditWorkspace.tsx`                       | No timeline; trim has no visual reference.                                                                                           | Redesign    | L           |
+| LF-V03     | editor settings header                         | Unlabelled low-contrast undo/redo glyphs.                                                                                            | Polish      | XS          |
+| LF-V05     | mobile editor                                  | Tool row truncates (`Lig`) with no scroll affordance.                                                                                | Polish      | S           |
+| LF-X01     | `ExistingVideoSourcePreview`, `VideoGallery`   | Native `<video controls>` vs custom player elsewhere.                                                                                | Consolidate | M           |
+| LF-X02     | `ExistingVideoActionBar.tsx`                   | Four identical full-width result buttons.                                                                                            | Improve     | S           |
+| LF-X03     | multiple                                       | `Save to Assets` / `Saved Videos` / `Videos` — three names, one place.                                                               | Polish      | S           |
+| LF-P01     | `ProjectOverviewSurface.tsx:153`               | Five peer actions with a red `Archive` in the default row.                                                                           | Simplify    | S           |
+| LF-P02     | `ProjectsListSurface.tsx:167`                  | 4–5 inline actions per row.                                                                                                          | Simplify    | S           |
+| LF-P06     | `ProjectsListSurface.styles.ts`                | `h1` to 4rem and `borderRadius: 0` on all buttons — a second design language.                                                        | Improve     | S           |
+| ~~LF-C01~~ | `CampaignRouteSurface.tsx:292`                 | ~~Copy promises **"Quick Start"**, which does not exist.~~ **Fixed** — rewritten to name only real controls.                         | Polish      | XS          |
+| LF-C02     | `CampaignRouteSurface.styles.ts`               | Three levels of nested bordered/rounded surfaces.                                                                                    | Simplify    | S           |
+| LF-A03     | `VideoGallery.tsx:239`                         | `<details>` overflow menu: no Escape, no outside-click, no menu semantics. **Still open** — item 7 deliberately left it for item 12. | Improve     | S           |
+| ~~LF-A04~~ | `StudioLibraryOverlays.tsx:113`                | ~~_"Manage your **Lucy 2.5** cast"_ — provider model name in the UI.~~ **Fixed** — see `assetLibraryDescriptions.ts`.                | Polish      | XS          |
+| LF-A07     | `VideoGallery.tsx:583`                         | Empty state uses internal flow names.                                                                                                | Polish      | XS          |
+| LF-DS03    | 6 locations                                    | Six visual answers to "choose one of N".                                                                                             | Consolidate | M           |
+| LF-DS04    | 13 files                                       | Icon sets with three stroke weights.                                                                                                 | Consolidate | S           |
+| LF-DS06    | 37 sites                                       | Bare-text loading everywhere; one skeleton total.                                                                                    | Improve     | M           |
+| LF-A11Y1   | `theme.ts`                                     | `border` 1.58:1, `borderStrong` 2.44:1 — WCAG 1.4.11 needs 3:1.                                                                      | Improve     | S           |
+| LF-A11Y3   | `toolRailStyles` mobile                        | Blocked reason survives only in `title=`.                                                                                            | Improve     | XS          |
+| LF-R04     | mobile editor                                  | Media/chrome ratio inverted.                                                                                                         | Redesign    | (in LF-V01) |
+| LF-R05     | `/assets` at 320px                             | ~5 screens of scroll for four navigation cards.                                                                                      | Simplify    | (in LF-N02) |
 
 ## P3 — Polish
 
@@ -828,7 +862,7 @@ capability is removed rather than reorganised.
 | LF-P05     | `ProjectWorkflowProgress.tsx`    | `History` shown as step 4 of 4.                                            | Improve     |
 | LF-C03     | campaigns                        | Empty `Archived` box always rendered.                                      | Polish      |
 | LF-C04     | campaigns                        | `Clear search` misaligned with its field.                                  | Polish      |
-| LF-A05     | assets vs overlay                | Two descriptions of the same library.                                      | Polish      |
+| ~~LF-A05~~ | assets vs overlay                | ~~Two descriptions of the same library.~~ **Fixed** — one shared owner.    | Polish      |
 | LF-A06     | characters/outfits overlays      | Export/import block above the library.                                     | Polish      |
 | LF-A08     | `VideoGallery.tsx`               | Raw `version.origin` / `video.status` as chips.                            | Polish      |
 | LF-N04     | nav                              | Campaigns holds a permanent slot on mobile.                                | Investigate |
@@ -1004,23 +1038,30 @@ responsive requirements, visual direction, and the expected deliverable.
 
 # Phase 16 — Prioritised recommendations
 
-## 1 — Fix immediately (days; highest value per hour)
+## 1 — ~~Fix immediately~~ · **DONE** (2026-08-22)
 
-| #   | Fix                                                                     | ID     | Scope |
-| --- | ----------------------------------------------------------------------- | ------ | ----- |
-| 1   | Relabel `Record New Video` → `Start camera`; promote `Record` once live | LF-S01 | XS    |
-| 2   | Split the red: mint `Record`, red `Stop`, quiet `Close`                 | LF-S02 | XS    |
-| 3   | Replace the internal blocked-reason string                              | LF-X04 | XS    |
-| 4   | Delete the "Quick Start" sentence from Campaigns                        | LF-C01 | XS    |
-| 5   | Remove or wire up the disabled `Export` button                          | LF-A02 | XS–S  |
-| 6   | Fix the 320px brand wordmark                                            | LF-R01 | XS    |
-| 7   | Make `Download` the primary on Videos cards                             | LF-A01 | S     |
-| 8   | Remove "Lucy 2.5" and other provider names from UI copy                 | LF-A04 | XS    |
-| 9   | Move the Dashboard explainer above Recent Work                          | LF-D04 | XS    |
-| 10  | Add Studio to the "How Lightframe works" panel                          | LF-E03 | XS    |
+| #   | Fix                                                           | ID     | Scope | Status |
+| --- | ------------------------------------------------------------- | ------ | ----- | ------ |
+| 1   | ~~Relabel `Record New Video` → `Start camera`~~               | LF-S01 | XS    | done   |
+| 2   | ~~Split the red: mint `Record`, red `Stop`, quiet `Close`~~   | LF-S02 | XS    | done   |
+| 3   | ~~Replace the internal blocked-reason string~~                | LF-X04 | XS    | done   |
+| 4   | ~~Delete the "Quick Start" sentence from Campaigns~~          | LF-C01 | XS    | done   |
+| 5   | ~~Wire up the disabled `Export` button~~ (option b)           | LF-A02 | XS–S  | done   |
+| 6   | ~~Fix the 320px brand wordmark~~                              | LF-R01 | XS    | done   |
+| 7   | ~~Make `Download` the primary on Videos cards~~               | LF-A01 | S     | done   |
+| 8   | ~~Remove "Lucy 2.5" from the Characters library description~~ | LF-A04 | XS    | done   |
+| 9   | ~~Move the Dashboard explainer above Recent Work~~            | LF-D04 | XS    | done   |
+| 10  | ~~Add Studio to the "How Lightframe works" panel~~            | LF-E03 | XS    | done   |
 
-Every one is a copy or token change with no architectural risk. Together they fix the two worst
+Every one was a copy or token change with no architectural risk, apart from item 5, which reused
+the existing placement render rather than deleting the control. Together they fixed the two worst
 first-run misunderstandings and the worst retrieval flow.
+
+Item 8 also reported, without fixing, the other provider and model names still reaching product
+surfaces — chiefly `useReferenceRecipeAttribution.ts:97`, `CharacterNameDialog.tsx:56`,
+`AIExperienceChooser.tsx:86`, `CharacterWardrobeLibrary.tsx:95` and
+`ExistingVideoVisualEditor.tsx:176`. Cost and contact disclosures that name a provider at the point
+of spend are deliberate and stay.
 
 ## 2 — Work on next (1–2 weeks)
 

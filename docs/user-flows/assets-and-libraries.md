@@ -77,11 +77,11 @@ Rendered by `apps/web/src/features/video-gallery/VideoGallery.tsx` — the riche
    carries an inline **Generate preview** action; one whose stored thumbnail fails to load states
    `Preview didn't load`.
 3. Card actions:
-   - **Preview** (the poster button) — opens a preview overlay with a version selector and a
-     download link for the selected version
-   - **Open in Studio** — primary
-   - ⋯ menu: **Edit video** · **Use as Project source** · **Download** · **Rename** · **Remove
-     from Assets**
+   - **Preview** (the poster button) — opens a preview overlay with a version selector, a
+     download link for the selected version, and **Export**
+   - **Download** — primary; a plain anchor to the current version
+   - ⋯ menu: **Open in Studio** · **Edit video** · **Use as Project source** · **Rename** ·
+     **Remove from Assets**
 4. **Open in Studio** / **Edit video** run `useStudioSavedVideoController.loadSavedVideo`
    (`useStudioSavedVideoController.ts:114-180`): abort any prior load → `GET /api/videos/{id}/content`
    with a 300 MB bound and a strict content-type check → build a `File` →
@@ -94,8 +94,15 @@ Rendered by `apps/web/src/features/video-gallery/VideoGallery.tsx` — the riche
    membership, and it refuses any Project that already has a source. Attaching a Video as a
    membership is a different action, available from the Project overview as **Import Saved Video**.
 6. **Download** is a plain anchor to `/api/videos/{id}/content?download=true`.
-7. **Rename** and **Remove** are dialog-confirmed mutations with in-place cache updates.
-8. **Generate preview** opens a repair dialog offering the same three poster sources as the save
+7. **Export** (preview footer only) opens a bottom panel holding the shared
+   `ExportPlacementChooser` — the same destinations, schematic crop preview and
+   unsupported-browser degradation the Project save step and the standalone save use. Choosing a
+   placement replaces the plain anchor with a **Download for &lt;placement&gt;** action that reads
+   the selected version's bytes, re-frames them locally through `useExportPlacementRender`, and
+   hands over the file. With no placement, or where the browser cannot render, the unchanged
+   server-served download is what is offered. The saved version is never modified.
+8. **Rename** and **Remove** are dialog-confirmed mutations with in-place cache updates.
+9. **Generate preview** opens a repair dialog offering the same three poster sources as the save
    dialog — an automatic early frame, the first frame, or an uploaded image. A frame source reads
    the current Version through the shared 300 MB bounded reader; an uploaded image reads no video
    bytes at all. Generation stays in the browser, the result is `PUT` to the existing thumbnail
