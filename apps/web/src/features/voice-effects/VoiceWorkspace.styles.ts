@@ -22,7 +22,7 @@ export const workspaceHeaderStyles = (theme: Theme): CSSObject => ({
   justifyContent: 'space-between',
   gap: theme.space.md,
   padding: theme.space.md,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   '& > div': { minWidth: 0 },
   '& h3': { fontFamily: theme.type.display, fontSize: theme.fontSizes.section },
   '& p': {
@@ -68,7 +68,7 @@ export const treatmentRailStyles = (theme: Theme): CSSObject => ({
   alignContent: 'start',
   gap: theme.space.md,
   padding: theme.space.lg,
-  borderInlineEnd: `1px solid ${theme.colors.border}`,
+  borderInlineEnd: `1px solid ${theme.colors.divider}`,
   background: `color-mix(in srgb, ${theme.colors.canvasRaised} 70%, transparent)`,
   '& > h3': { fontSize: theme.fontSizes.body, fontWeight: 700 },
   [media.down('compact')]: {
@@ -76,7 +76,7 @@ export const treatmentRailStyles = (theme: Theme): CSSObject => ({
     gap: theme.space.sm,
     padding: theme.space.md,
     borderInlineEnd: 0,
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
     '& details': { display: 'none' },
   },
   '@container (max-width: 48rem)': {
@@ -84,7 +84,7 @@ export const treatmentRailStyles = (theme: Theme): CSSObject => ({
     gap: theme.space.sm,
     padding: theme.space.md,
     borderInlineEnd: 0,
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
     '& details': { display: 'none' },
   },
   [media.down('tablet')]: { paddingInline: theme.space.sm },
@@ -171,7 +171,7 @@ export const treatmentChoiceStyles = (theme: Theme, selected: boolean): CSSObjec
 
 export const compatibilityStyles = (theme: Theme): CSSObject => ({
   paddingBlockStart: theme.space.md,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   color: theme.colors.textMuted,
   fontSize: theme.fontSizes.metadata,
   '& summary': {
@@ -219,7 +219,7 @@ export const selectionHeadingStyles = (theme: Theme): CSSObject => ({
   justifyContent: 'space-between',
   gap: theme.space.sm,
   paddingBlockEnd: theme.space.md,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   '& > div': { minWidth: 0 },
   '& h4': { fontFamily: theme.type.display, fontSize: theme.fontSizes.section },
   '& p': { marginBlockStart: theme.space.xs, color: theme.colors.textMuted, lineHeight: 1.5 },
@@ -273,7 +273,7 @@ export const workspaceFooterStyles = (theme: Theme, embedded: boolean): CSSObjec
   alignItems: 'center',
   gap: theme.space.lg,
   padding: embedded ? theme.space.md : `${theme.space.md} ${theme.space.lg}`,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   background: theme.colors.canvasRaised,
   boxShadow: '0 -12px 40px rgba(0, 0, 0, 0.5)',
   '& [data-footer-selection]': {

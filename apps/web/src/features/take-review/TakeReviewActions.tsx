@@ -1,14 +1,9 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import {
-  ActionMenu,
-  Button,
-  ConfirmationRequestDialog,
-  useConfirmationRequest,
-  type ActionMenuItem,
-} from '../../ui';
+import { Button, ConfirmationRequestDialog, useConfirmationRequest } from '../../ui';
 import type { RecordingController } from '../recording/types';
 import type { SaveVideoState } from '../saved-videos/useSaveVideo';
 import { media } from '../../ui/media';
+import { ActionMenu, type ActionMenuItem } from '../../ui/primitives/ActionMenu';
 
 export type TakeReviewActionsProps = {
   recording: RecordingController;

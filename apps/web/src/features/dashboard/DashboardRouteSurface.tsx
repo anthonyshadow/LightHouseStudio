@@ -19,8 +19,6 @@ import {
   ConfirmationDialog,
   emptyExampleStyles,
   EmptyStatePreview,
-  PageHeader,
-  PageShell,
   StatusNotice,
 } from '../../ui';
 import { useCampaignList } from '../campaigns/useCampaignsController';
@@ -48,6 +46,7 @@ import {
   recentWorkStyles,
   sectionEyebrowStyles,
 } from './DashboardRouteSurface.styles';
+import { PageHeader, PageShell } from '../../ui/primitives/PageShell';
 
 const RECENT_LIMIT = 4;
 

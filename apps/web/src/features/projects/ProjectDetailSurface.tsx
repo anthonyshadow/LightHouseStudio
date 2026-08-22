@@ -3,7 +3,7 @@ import type { CreativeAssetStore } from '@studio/domain';
 import { useEffect, type ReactNode } from 'react';
 import { APP_PATHS } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
-import { Button, pageShellStyles, StatusNotice } from '../../ui';
+import { Button, StatusNotice } from '../../ui';
 import { projectProcessingBlockedReason } from './projectProcessingPresentation';
 import { ProjectOverviewSurface } from './ProjectOverviewSurface';
 import { dialogActionsStyles, workspaceInnerStyles } from './ProjectRouteSurface.styles';
@@ -13,6 +13,7 @@ import { ProjectWorkspaceSurface } from './ProjectWorkspaceSurface';
 import type { ProjectProcessingController } from './useProjectProcessingController';
 import { useProjectSession, type ProjectSessionPort } from './useProjectSession';
 import type { ProjectSourceActivity, ProjectSourceRuntime } from './useProjectSourceController';
+import { pageShellStyles } from '../../ui/primitives/PageShell.styles';
 
 export interface ProjectRouteSurfaceProps {
   readonly workspaceMode?: boolean;

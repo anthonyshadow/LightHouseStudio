@@ -5,13 +5,10 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { projectPath, projectWorkspacePath } from '../../app/paths';
 import {
-  ActionMenu,
   Button,
   emptyExampleStyles,
   EmptyStatePreview,
   ListSearchField,
-  PageHeader,
-  PageShell,
   SearchEmptyState,
   StatusNotice,
   useListSearch,
@@ -40,6 +37,8 @@ import { projectCountLabel, projectStatusLabel } from './projectStatusPresentati
 import { useProjectList } from './useProjectsController';
 import { WorkPosterTile } from './WorkPosterTile';
 import { KIND_ICONS } from './ProjectAssetThumbnail';
+import { ActionMenu } from '../../ui/primitives/ActionMenu';
+import { PageHeader, PageShell } from '../../ui/primitives/PageShell';
 
 interface ProjectListSectionProps {
   readonly lifecycle: 'active' | 'archived';

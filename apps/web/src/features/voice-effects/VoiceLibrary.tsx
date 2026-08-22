@@ -44,7 +44,7 @@ const libraryHeaderStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.md,
   marginBlockStart: `calc(-1 * ${theme.space.lg})`,
   paddingBlock: theme.space.lg,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   background: theme.colors.canvas,
   '& h4': {
     marginBlockEnd: theme.space.sm,
@@ -122,7 +122,7 @@ const pageStyles = (theme: Theme): CSSObject => ({
   justifyContent: 'space-between',
   gap: theme.space.sm,
   paddingBlockStart: theme.space.xs,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   '& p': { color: theme.colors.textMuted, fontSize: theme.fontSizes.caption },
 });
 

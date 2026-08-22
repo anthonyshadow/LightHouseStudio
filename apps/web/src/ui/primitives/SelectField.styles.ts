@@ -128,7 +128,7 @@ export const mobileHeaderStyles = (theme: Theme): CSSObject => ({
     alignItems: 'center',
     gap: theme.space.sm,
     padding: `${theme.space.sm} max(${theme.space.md}, env(safe-area-inset-right)) ${theme.space.sm} max(${theme.space.md}, env(safe-area-inset-left))`,
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
   },
 });
 

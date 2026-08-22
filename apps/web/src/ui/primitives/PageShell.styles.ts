@@ -44,7 +44,7 @@ export const pageHeaderStyles = (theme: Theme): CSSObject => ({
     alignItems: 'end',
     gap: theme.space.xl,
     paddingBlockEnd: '2.5rem',
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
   },
   '& [data-page-identity] > div:first-of-type': { minWidth: 0, width: '100%' },
   '& [data-page-eyebrow]': {

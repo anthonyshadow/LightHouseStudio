@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { pageHeaderStyles, pageShellStyles, studioTheme } from '../../ui';
+import { studioTheme } from '../../ui';
 import { projectOverviewHeaderStyles } from './ProjectOverviewSurface.styles';
 import { projectOverviewRouteStyles, projectsIndexRouteStyles } from './ProjectRouteSurface.styles';
 import { projectsLedgerRowStyles } from './ProjectsListSurface.styles';
+import { pageHeaderStyles, pageShellStyles } from '../../ui/primitives/PageShell.styles';
 
 describe('Project index responsive ledger styles', () => {
   it('keeps the index flat and establishes a content-width query boundary', () => {

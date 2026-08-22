@@ -48,10 +48,10 @@ export const headerRegionStyles = (theme: Theme): CSSObject => ({
   overflow: 'visible',
   background: theme.colors.canvas,
   [media.up('compact')]: {
-    borderInlineEnd: `1px solid ${theme.colors.border}`,
+    borderInlineEnd: `1px solid ${theme.colors.divider}`,
   },
   [media.down('compact')]: {
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
   },
 });
 
@@ -116,7 +116,7 @@ export const headerActionsStyles = (theme: Theme): CSSObject => ({
       alignItems: 'stretch',
       gap: theme.space.sm,
       paddingBlockStart: theme.space.md,
-      borderBlockStart: `1px solid ${theme.colors.border}`,
+      borderBlockStart: `1px solid ${theme.colors.divider}`,
     },
   },
   [media.down('compact')]: {
@@ -448,7 +448,7 @@ export const capabilityDetailStyles = (theme: Theme): CSSObject => ({
     display: 'grid',
     gap: theme.space.xxs,
     paddingBlockEnd: theme.space.sm,
-    borderBottom: `1px solid ${theme.colors.border}`,
+    borderBottom: `1px solid ${theme.colors.divider}`,
     '& > strong': { color: theme.colors.text, fontSize: theme.fontSizes.body },
     '& > span': { color: theme.colors.textMuted, fontSize: theme.fontSizes.caption },
   },
@@ -462,7 +462,7 @@ export const capabilityDetailStyles = (theme: Theme): CSSObject => ({
   '& strong': { color: theme.colors.text, fontWeight: 760 },
   '& small': {
     paddingBlockStart: theme.space.sm,
-    borderTop: `1px solid ${theme.colors.border}`,
+    borderTop: `1px solid ${theme.colors.divider}`,
     color: theme.colors.textFaint,
     fontSize: theme.fontSizes.caption,
     lineHeight: 1.45,

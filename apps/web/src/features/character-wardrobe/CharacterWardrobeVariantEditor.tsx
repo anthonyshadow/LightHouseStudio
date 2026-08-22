@@ -49,7 +49,7 @@ export const CharacterWardrobeVariantEditor = ({
           display: 'grid',
           gap: theme.space.sm,
           paddingBlockEnd: theme.space.sm,
-          borderBlockEnd: `1px solid ${theme.colors.border}`,
+          borderBlockEnd: `1px solid ${theme.colors.divider}`,
         }}
       >
         <Button
@@ -296,7 +296,7 @@ export const CharacterWardrobeVariantEditor = ({
           alignItems: 'center',
           gap: theme.space.sm,
           paddingBlockStart: theme.space.sm,
-          borderBlockStart: `1px solid ${theme.colors.border}`,
+          borderBlockStart: `1px solid ${theme.colors.divider}`,
           background: theme.colors.overlaySurface,
           '@media (max-width: 30rem)': {
             gridTemplateColumns: 'minmax(0, 1fr)',

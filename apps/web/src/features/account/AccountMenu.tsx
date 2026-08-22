@@ -191,7 +191,7 @@ export const AccountMenu = ({
             '& [data-account-identity]': {
               margin: 0,
               padding: `${theme.space.xs} ${theme.space.sm} ${theme.space.sm}`,
-              borderBottom: `1px solid ${theme.colors.border}`,
+              borderBottom: `1px solid ${theme.colors.divider}`,
               color: theme.colors.textMuted,
               fontSize: theme.fontSizes.metadata,
               lineHeight: 1.45,
@@ -204,7 +204,7 @@ export const AccountMenu = ({
             },
             '& > button[data-logout]': {
               marginBlockStart: theme.space.xs,
-              borderTop: `1px solid ${theme.colors.border}`,
+              borderTop: `1px solid ${theme.colors.divider}`,
               borderRadius: theme.radii.small,
             },
             [media.down('tablet')]: {

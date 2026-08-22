@@ -6,15 +6,12 @@ import { useLocation, useNavigate } from 'react-router';
 import { APP_PATHS, campaignIdFromPath, campaignPath, projectPath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
 import {
-  ActionMenu,
   AppIcon,
   Button,
   emptyExampleStyles,
   EmptyStatePreview,
   ListSearchField,
   listTotalLabel,
-  PageHeader,
-  PageShell,
   SearchEmptyState,
   StatusNotice,
   useListSearch,
@@ -47,6 +44,8 @@ import {
   type CampaignLifecycleAction,
 } from './CampaignDialogs';
 import { useCampaignDetail, useCampaignList } from './useCampaignsController';
+import { ActionMenu } from '../../ui/primitives/ActionMenu';
+import { PageHeader, PageShell } from '../../ui/primitives/PageShell';
 
 interface CampaignListSectionProps {
   readonly lifecycle: 'active' | 'archived';

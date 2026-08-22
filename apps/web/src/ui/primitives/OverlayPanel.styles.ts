@@ -81,7 +81,7 @@ export const panelStyles = (
     gridTemplateRows: 'auto minmax(0, 1fr) auto',
     overflow: 'hidden',
     border: placement === 'right' ? 0 : `1px solid ${theme.colors.border}`,
-    borderInlineStart: placement === 'right' ? `1px solid ${theme.colors.border}` : undefined,
+    borderInlineStart: placement === 'right' ? `1px solid ${theme.colors.divider}` : undefined,
     borderRadius: centered
       ? theme.radii.large
       : placement === 'right' || placement === 'fullscreen'
@@ -171,7 +171,7 @@ export const headerStyles = (theme: Theme, hasActions = false): CSSObject => ({
   alignItems: 'start',
   gap: theme.space.md,
   padding: `max(${theme.space.md}, env(safe-area-inset-top)) max(${theme.space.md}, env(safe-area-inset-right)) ${theme.space.md} max(${theme.space.md}, env(safe-area-inset-left))`,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   background: theme.colors.overlaySurface,
   '@media (max-width: 56rem)': hasActions
     ? {
@@ -226,6 +226,6 @@ export const bodyStyles = (theme: Theme, bodyMode: OverlayPanelBodyMode): CSSObj
 export const footerStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   padding: `${theme.space.md} max(${theme.space.md}, env(safe-area-inset-right)) max(${theme.space.md}, env(safe-area-inset-bottom)) max(${theme.space.md}, env(safe-area-inset-left))`,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   background: theme.colors.overlaySurface,
 });

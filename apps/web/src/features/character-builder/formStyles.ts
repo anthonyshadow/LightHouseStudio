@@ -23,7 +23,7 @@ export const stepNavigationStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.xl,
   padding: theme.space.lg,
   overflowY: 'auto',
-  borderInlineEnd: `1px solid ${theme.colors.border}`,
+  borderInlineEnd: `1px solid ${theme.colors.divider}`,
   background: theme.colors.canvasRaised,
   [media.down('laptop')]: {
     flexDirection: 'row',
@@ -32,7 +32,7 @@ export const stepNavigationStyles = (theme: Theme): CSSObject => ({
     overflowX: 'auto',
     overflowY: 'hidden',
     borderInlineEnd: 0,
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
   },
   '@media (max-width: 31rem)': {
     display: 'grid',

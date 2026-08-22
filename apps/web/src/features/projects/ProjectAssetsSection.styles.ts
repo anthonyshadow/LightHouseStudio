@@ -13,7 +13,7 @@ export const projectAssetsSectionStyles = (theme: Theme): CSSObject => ({
   '& > p[role="status"]': {
     margin: 0,
     paddingBlock: theme.space.xl,
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
     color: theme.colors.textMuted,
   },
   '& > button': {
@@ -73,7 +73,7 @@ export const projectAssetFiltersStyles = (theme: Theme): CSSObject => ({
   marginBlockEnd: `clamp(${theme.space.xl}, 4cqi, 2.5rem)`,
   overflowX: 'auto',
   overscrollBehaviorInline: 'contain',
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   scrollbarWidth: 'thin',
   '& > button': {
     position: 'relative',
@@ -249,7 +249,7 @@ export const projectAssetsEmptyStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gap: theme.space.xs,
   paddingBlock: theme.space.xxl,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   color: theme.colors.textMuted,
   '& strong': { color: theme.colors.text, fontSize: theme.fontSizes.label },
   '& p': { maxWidth: '42rem', margin: 0, lineHeight: 1.55 },
@@ -258,7 +258,7 @@ export const projectAssetsEmptyStyles = (theme: Theme): CSSObject => ({
 export const projectAssetsOwnershipStyles = (theme: Theme): CSSObject => ({
   margin: `${theme.space.xxl} 0 0`,
   paddingBlockStart: theme.space.md,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   color: theme.colors.textFaint,
   fontSize: theme.fontSizes.caption,
   lineHeight: 1.5,

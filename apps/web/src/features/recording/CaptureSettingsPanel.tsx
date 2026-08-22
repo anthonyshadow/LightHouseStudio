@@ -185,7 +185,7 @@ const noticeActionStyles = (theme: Theme): CSSObject => ({
 
 const helpStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   paddingBlockStart: theme.space.sm,
   color: theme.colors.textMuted,
   fontSize: theme.fontSizes.metadata,

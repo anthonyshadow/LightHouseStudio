@@ -9,6 +9,7 @@ export interface StudioTheme {
     surfaceSoft: string;
     border: string;
     borderStrong: string;
+    divider: string;
     text: string;
     textMuted: string;
     textFaint: string;
@@ -138,8 +139,23 @@ export const studioTheme: StudioTheme = {
     surface: '#111922',
     surfaceStrong: '#17232f',
     surfaceSoft: '#0f171f',
-    border: '#293642',
-    borderStrong: '#405363',
+    /*
+     * WCAG 2.1 SC 1.4.11 wants 3:1 for the visual boundary of a UI component, measured against
+     * every surface the boundary can sit on. Ratios against canvas / canvasRaised / surface /
+     * surfaceStrong / surfaceSoft, computed rather than estimated:
+     *   border       3.77 / 3.61 / 3.43 / 3.08 / 3.50   (was 1.58 / 1.51 / 1.43 / 1.29 / 1.46)
+     *   borderStrong 4.39 / 4.21 / 3.99 / 3.59 / 4.07   (was 2.44 / 2.34 / 2.22 / 2.00 / 2.27)
+     * `borderStrong` stays below textFaint's 4.84 on canvas so a control's edge cannot read as
+     * louder than the faintest text beside it.
+     */
+    border: '#557089',
+    borderStrong: '#5f7b92',
+    /*
+     * The old `border`. A rule between stacked blocks on one surface bounds nothing interactive,
+     * so 1.4.11 does not apply to it, and raising it with the rest would have drawn a hard line
+     * under every heading and between every list row in the product.
+     */
+    divider: '#293642',
     text: '#f4f7f8',
     textMuted: '#b4c0c8',
     textFaint: '#7f909d',

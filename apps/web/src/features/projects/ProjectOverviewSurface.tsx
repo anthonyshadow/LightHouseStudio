@@ -5,7 +5,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { APP_PATHS, campaignPath, projectWorkspacePath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
-import { ActionMenu, AppIcon, Button, PageHeader, PageShell } from '../../ui';
+import { AppIcon, Button } from '../../ui';
 import { useCampaignDetail } from '../campaigns/useCampaignsController';
 import { ProjectAssetsSection } from './ProjectAssetsSection';
 import {
@@ -25,6 +25,8 @@ import { projectStatusLabel } from './projectStatusPresentation';
 import { ProjectWorkflowProgress, stepForSnapshot } from './ProjectWorkflowProgress';
 import type { useProjectSession } from './useProjectSession';
 import type { ProjectSourceActivity, ProjectSourceRuntime } from './useProjectSourceController';
+import { ActionMenu } from '../../ui/primitives/ActionMenu';
+import { PageHeader, PageShell } from '../../ui/primitives/PageShell';
 
 const projectWorkflowLabel = (
   phase: ProjectCurrentResponse['revision']['snapshot']['workflowPhase'],

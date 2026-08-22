@@ -45,7 +45,7 @@ export const workspaceInnerStyles = (theme: Theme): CSSObject => ({
   padding: theme.space.lg,
   alignContent: 'start',
   overflowY: 'auto',
-  borderInlineStart: `1px solid ${theme.colors.border}`,
+  borderInlineStart: `1px solid ${theme.colors.divider}`,
   background: theme.colors.canvas,
   [media.down('laptop')]: {
     gridColumn: 1,
@@ -53,7 +53,7 @@ export const workspaceInnerStyles = (theme: Theme): CSSObject => ({
     minHeight: '20rem',
     height: 'auto',
     borderInlineStart: 0,
-    borderBlockStart: `1px solid ${theme.colors.border}`,
+    borderBlockStart: `1px solid ${theme.colors.divider}`,
   },
 });
 

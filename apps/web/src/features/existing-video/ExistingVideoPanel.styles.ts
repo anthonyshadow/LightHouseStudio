@@ -270,7 +270,7 @@ export const sourceAdjustStatusStyles = (theme: Theme): CSSObject => ({
 });
 
 export const sourceDetailsStyles = (theme: Theme): CSSObject => ({
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   '& summary': {
     minHeight: '2.75rem',
     display: 'flex',
@@ -587,7 +587,7 @@ export const actionBarStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.sm,
   marginInline: `calc(-1 * ${theme.space.md})`,
   padding: `${theme.space.sm} max(${theme.space.md}, env(safe-area-inset-right)) max(${theme.space.md}, env(safe-area-inset-bottom)) max(${theme.space.md}, env(safe-area-inset-left))`,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   background: theme.colors.overlaySurface,
   boxShadow: '0 -18px 34px rgba(2, 4, 5, 0.22)',
   '&[aria-label="Result actions"]': {

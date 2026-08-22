@@ -26,7 +26,6 @@ import {
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
 import {
-  ActionMenu,
   Button,
   emptyExampleStyles,
   EmptyStatePreview,
@@ -66,6 +65,7 @@ import {
   thumbnailPlaceholderStyles,
   thumbnailStyles,
 } from './VideoGallery.styles';
+import { ActionMenu } from '../../ui/primitives/ActionMenu';
 
 const PlayIcon = () => (
   <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor">

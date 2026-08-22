@@ -10,7 +10,7 @@ export const projectsGroupFilterStyles = (theme: Theme): CSSObject => ({
   alignItems: 'end',
   gap: theme.space.lg,
   paddingBlock: theme.space.lg,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   '& > button': {
     position: 'relative',
     minWidth: 0,
@@ -87,7 +87,7 @@ export const projectsLedgerSectionStyles = (theme: Theme): CSSObject => ({
   '& > [role="status"]': {
     margin: 0,
     paddingBlock: theme.space.lg,
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
     color: theme.colors.textMuted,
   },
   '&[data-project-ledger-section="archived"] [data-project-status]': {
@@ -117,7 +117,7 @@ export const projectsLedgerRowStyles = (theme: Theme): CSSObject => ({
   columnGap: theme.space.lg,
   rowGap: theme.space.sm,
   paddingBlock: theme.space.md,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   '& [data-project-identity]': {
     minWidth: 0,
     display: 'grid',
@@ -211,7 +211,7 @@ export const projectsLedgerEmptyStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gap: theme.space.xs,
   paddingBlock: theme.space.xl,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   color: theme.colors.textMuted,
   '& strong': { color: theme.colors.text },
   '& p': { maxWidth: '46rem', margin: 0, lineHeight: 1.55 },

@@ -7,8 +7,9 @@ import { ASSET_LIBRARY_DESCRIPTIONS } from './assetLibraryDescriptions';
 import { creativeLibraryStorageSummary } from '../creative-assets/creativeLibraryStorage';
 import type { CreativeLibraryMirror } from '../creative-assets/useCreativeLibraryCloudSync';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
-import { Button, PageHeader, PageShell, VisuallyHidden } from '../../ui';
+import { Button, VisuallyHidden } from '../../ui';
 import { media } from '../../ui/media';
+import { PageHeader, PageShell } from '../../ui/primitives/PageShell';
 
 /**
  * What a card knows about its own size.

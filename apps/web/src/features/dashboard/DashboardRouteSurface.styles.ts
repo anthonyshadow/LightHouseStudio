@@ -51,7 +51,7 @@ export const onboardingStyles = (theme: Theme): CSSObject => ({
   // uses it. Quiet by construction — muted, metadata-sized, one rule below it — so it introduces
   // the words without competing with the `Create video` primary above it.
   paddingBlock: theme.space.sm,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   color: theme.colors.textMuted,
   fontSize: theme.fontSizes.metadata,
   lineHeight: 1.5,
@@ -91,7 +91,7 @@ export const processingQueueStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gap: theme.space.md,
   paddingBlock: theme.space.xl,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   '& > header': {
     display: 'flex',
     alignItems: 'start',
@@ -114,7 +114,7 @@ export const processingQueueStyles = (theme: Theme): CSSObject => ({
     display: 'grid',
     margin: 0,
     padding: 0,
-    borderBlockStart: `1px solid ${theme.colors.border}`,
+    borderBlockStart: `1px solid ${theme.colors.divider}`,
     listStyle: 'none',
   },
   '& > ul > li': {
@@ -125,7 +125,7 @@ export const processingQueueStyles = (theme: Theme): CSSObject => ({
     alignItems: 'center',
     gap: theme.space.md,
     padding: `${theme.space.md} ${theme.space.xs}`,
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
   },
   '& [data-job-status]': {
     padding: `${theme.space.xxs} ${theme.space.sm}`,
@@ -309,9 +309,9 @@ export const recentFilterStyles = (theme: Theme): CSSObject => ({
 export const recentListStyles = (theme: Theme): CSSObject => ({
   margin: 0,
   padding: 0,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   listStyle: 'none',
-  '& li': { minWidth: 0, borderBlockEnd: `1px solid ${theme.colors.border}` },
+  '& li': { minWidth: 0, borderBlockEnd: `1px solid ${theme.colors.divider}` },
   '& li > button': {
     width: '100%',
     minHeight: '4.5rem',

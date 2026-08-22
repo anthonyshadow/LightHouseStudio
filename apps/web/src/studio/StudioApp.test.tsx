@@ -603,9 +603,6 @@ vi.mock('../ui', async () => {
   const { StudioDesignProvider } = await import('../ui/StudioDesignProvider');
   const { Button } = await import('../ui/primitives/Button');
   const { VisuallyHidden } = await import('../ui/primitives/VisuallyHidden');
-  // The page frame is layout only, so the real one renders here rather than a stub that would let
-  // a heading id or a focus target disappear without a spec noticing.
-  const { PageHeader, PageShell } = await import('../ui/primitives/PageShell');
   // The confirmation mechanism is plain state with no styling, so the real one is used here: a
   // stub would let a shell change that stops asking pass unnoticed.
   const { useConfirmationRequest, ConfirmationRequestDialog } =
@@ -642,8 +639,6 @@ vi.mock('../ui', async () => {
     StudioDesignProvider,
     Button,
     VisuallyHidden,
-    PageHeader,
-    PageShell,
     useConfirmationRequest,
     ConfirmationRequestDialog,
     useAwaitableQuestion,

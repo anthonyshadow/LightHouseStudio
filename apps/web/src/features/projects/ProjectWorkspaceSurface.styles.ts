@@ -112,7 +112,7 @@ export const taskInspectorStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
-  borderInlineStart: `1px solid ${theme.colors.border}`,
+  borderInlineStart: `1px solid ${theme.colors.divider}`,
   background: theme.colors.canvas,
   [media.down('laptop')]: {
     gridColumn: 1,
@@ -120,7 +120,7 @@ export const taskInspectorStyles = (theme: Theme): CSSObject => ({
     minHeight: '34rem',
     overflow: 'visible',
     borderInlineStart: 0,
-    borderBlockStart: `1px solid ${theme.colors.border}`,
+    borderBlockStart: `1px solid ${theme.colors.divider}`,
   },
 });
 
@@ -133,7 +133,7 @@ export const taskNavigationStyles = (theme: Theme): CSSObject => ({
   gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
   gap: theme.space.xxs,
   padding: theme.space.xs,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   background: theme.colors.canvas,
   '& > button': {
     position: 'relative',

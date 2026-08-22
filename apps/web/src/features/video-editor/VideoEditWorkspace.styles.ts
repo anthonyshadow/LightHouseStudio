@@ -68,7 +68,7 @@ export const editSettingsStyles = (theme: Theme): CSSObject => ({
     alignItems: 'center',
     gap: theme.space.xs,
     padding: theme.space.sm,
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
     background: theme.colors.surfaceStrong,
   },
   '& > header h2': { margin: 0, fontSize: theme.fontSizes.body },
@@ -141,7 +141,7 @@ export const editorFooterStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.xs,
   padding: theme.space.sm,
   paddingBlockEnd: `max(${theme.space.sm}, env(safe-area-inset-bottom))`,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   background: theme.colors.surfaceStrong,
   '& [data-editor-primary-actions]': {
     display: 'grid',
