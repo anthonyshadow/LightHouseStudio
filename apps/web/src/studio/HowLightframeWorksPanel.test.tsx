@@ -34,7 +34,16 @@ describe('HowLightframeWorksPanel', () => {
     await user.click(screen.getByRole('button', { name: 'Help' }));
     const panel = await screen.findByRole('dialog', { name: 'How Lightframe works' });
 
-    for (const concept of ['Videos', 'Projects', 'Campaigns', 'Characters', 'Outfits', 'Voices']) {
+    // Studio leads: it is the only destination a video can be made in.
+    for (const concept of [
+      'Studio',
+      'Videos',
+      'Projects',
+      'Campaigns',
+      'Characters',
+      'Outfits',
+      'Voices',
+    ]) {
       expect(within(panel).getByText(concept)).toBeVisible();
     }
     // "When would I use this", not a definition — spot-check the phrasing carries a condition.
@@ -44,7 +53,7 @@ describe('HowLightframeWorksPanel', () => {
     expect(
       within(panel).getByText(/Use a Campaign when several Projects belong to one effort/u),
     ).toBeVisible();
-    expect(within(panel).getAllByText(/^For example: /u)).toHaveLength(6);
+    expect(within(panel).getAllByText(/^For example: /u)).toHaveLength(7);
   });
 
   it('closes back to its trigger', async () => {
