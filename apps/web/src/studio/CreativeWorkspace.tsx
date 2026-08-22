@@ -51,7 +51,6 @@ const ToolIcon = ({ name }: { name: ToolIconName }) => {
 
 export type CreativeWorkspaceState = {
   activeTool: 'edit-video' | 'character' | 'outfit' | null;
-  showDesktopAiTools: boolean;
   /**
    * Whether a loaded playback video still leaves the live tools usable. Surfaces that own their
    * own media lifecycle set this; standalone capture, where the playback video *is* the work in
@@ -91,7 +90,6 @@ export type CreativeWorkspaceProps = {
 export const CreativeWorkspace = ({ state, actions, refs }: CreativeWorkspaceProps) => {
   const {
     activeTool,
-    showDesktopAiTools,
     liveToolsAvailableDuringPlayback = false,
     activeCharacterLabel,
     activeOutfitLabel,
@@ -124,7 +122,12 @@ export const CreativeWorkspace = ({ state, actions, refs }: CreativeWorkspacePro
       >
         <ToolIcon name="editVideo" />
         <span data-tool-label>
-          <strong>Edit Video</strong>
+          <strong>
+            <span data-tool-label-long>Edit Video</span>
+            <span data-tool-label-short aria-hidden="true">
+              Edit
+            </span>
+          </strong>
           <small
             id="edit-video-tool-description"
             data-tool-blocked={editVideoReason ? '' : undefined}
@@ -133,62 +136,73 @@ export const CreativeWorkspace = ({ state, actions, refs }: CreativeWorkspacePro
           </small>
         </span>
       </Button>
-      {showDesktopAiTools ? (
-        <>
-          <Button
-            ref={characterToggleRef}
-            variant={activeTool === 'character' ? 'primary' : 'secondary'}
-            disabled={liveVideoToolBlocked}
-            aria-label={
-              activeCharacterLabel
-                ? `Selected character: ${activeCharacterLabel}. Open character options`
-                : 'Select Character'
-            }
-            aria-describedby="character-tool-description"
-            aria-current={activeTool === 'character' ? 'page' : undefined}
-            aria-haspopup="dialog"
-            {...(liveToolReason ? { title: liveToolReason } : {})}
-            onClick={onOpenCharacter}
+      <Button
+        ref={characterToggleRef}
+        variant={activeTool === 'character' ? 'primary' : 'secondary'}
+        disabled={liveVideoToolBlocked}
+        aria-label={
+          activeCharacterLabel
+            ? `Selected character: ${activeCharacterLabel}. Open character options`
+            : 'Select Character'
+        }
+        aria-describedby="character-tool-description"
+        aria-current={activeTool === 'character' ? 'page' : undefined}
+        aria-haspopup="dialog"
+        {...(liveToolReason ? { title: liveToolReason } : {})}
+        onClick={onOpenCharacter}
+      >
+        <ToolIcon name="character" />
+        <span data-tool-label>
+          <strong>
+            {activeCharacterLabel ?? (
+              <>
+                <span data-tool-label-long>Select Character</span>
+                <span data-tool-label-short aria-hidden="true">
+                  Character
+                </span>
+              </>
+            )}
+          </strong>
+          <small
+            id="character-tool-description"
+            data-tool-blocked={liveToolReason ? '' : undefined}
           >
-            <ToolIcon name="character" />
-            <span data-tool-label>
-              <strong>{activeCharacterLabel ?? 'Select Character'}</strong>
-              <small
-                id="character-tool-description"
-                data-tool-blocked={liveToolReason ? '' : undefined}
-              >
-                {liveToolReason ?? 'Choose or build an AI character'}
-              </small>
-            </span>
-          </Button>
-          <Button
-            ref={outfitToggleRef}
-            variant={activeTool === 'outfit' ? 'primary' : 'secondary'}
-            disabled={liveVideoToolBlocked}
-            aria-label={
-              activeOutfitLabel
-                ? `Selected outfit: ${activeOutfitLabel}. Open outfit options`
-                : 'Select Outfit'
-            }
-            aria-describedby="outfit-tool-description"
-            aria-current={activeTool === 'outfit' ? 'page' : undefined}
-            aria-haspopup="dialog"
-            {...(liveToolReason ? { title: liveToolReason } : {})}
-            onClick={onOpenOutfit}
-          >
-            <ToolIcon name="outfit" />
-            <span data-tool-label>
-              <strong>{activeOutfitLabel ?? 'Select Outfit'}</strong>
-              <small
-                id="outfit-tool-description"
-                data-tool-blocked={liveToolReason ? '' : undefined}
-              >
-                {liveToolReason ?? 'Choose or build a try-on outfit'}
-              </small>
-            </span>
-          </Button>
-        </>
-      ) : null}
+            {liveToolReason ?? 'Choose or build an AI character'}
+          </small>
+        </span>
+      </Button>
+      <Button
+        ref={outfitToggleRef}
+        variant={activeTool === 'outfit' ? 'primary' : 'secondary'}
+        disabled={liveVideoToolBlocked}
+        aria-label={
+          activeOutfitLabel
+            ? `Selected outfit: ${activeOutfitLabel}. Open outfit options`
+            : 'Select Outfit'
+        }
+        aria-describedby="outfit-tool-description"
+        aria-current={activeTool === 'outfit' ? 'page' : undefined}
+        aria-haspopup="dialog"
+        {...(liveToolReason ? { title: liveToolReason } : {})}
+        onClick={onOpenOutfit}
+      >
+        <ToolIcon name="outfit" />
+        <span data-tool-label>
+          <strong>
+            {activeOutfitLabel ?? (
+              <>
+                <span data-tool-label-long>Select Outfit</span>
+                <span data-tool-label-short aria-hidden="true">
+                  Outfit
+                </span>
+              </>
+            )}
+          </strong>
+          <small id="outfit-tool-description" data-tool-blocked={liveToolReason ? '' : undefined}>
+            {liveToolReason ?? 'Choose or build a try-on outfit'}
+          </small>
+        </span>
+      </Button>
       <span title="Prompts and generated references persist locally; manual uploads and takes stay temporary.">
         <ToolIcon name="privacy" />
         Local-first workspace · generated references persist locally

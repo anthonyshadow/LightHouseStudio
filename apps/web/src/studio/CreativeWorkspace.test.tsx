@@ -6,14 +6,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../ui';
 import { CreativeWorkspace, type CreativeWorkspaceProps } from './CreativeWorkspace';
 
-const createProps = (
-  showDesktopAiTools: boolean,
-  stateOverrides: Partial<CreativeWorkspaceProps['state']> = {},
-) =>
+const createProps = (stateOverrides: Partial<CreativeWorkspaceProps['state']> = {}) =>
   ({
     state: {
       activeTool: null,
-      showDesktopAiTools,
       recordingActive: false,
       hasPlaybackVideo: true,
       ...stateOverrides,
@@ -33,10 +29,13 @@ const createProps = (
 afterEach(cleanup);
 
 describe('CreativeWorkspace responsive tools', () => {
-  it('places Character and Outfit after Edit Video in the desktop rail', () => {
+  // The rail offers the same capability at every width. It used to drop Character and Outfit
+  // below 64rem with no entry point and no explanation, which is how a mobile operator concluded
+  // the product had no AI tools at all.
+  it('places Character and Outfit after Edit Video, at every width', () => {
     render(
       <StudioDesignProvider>
-        <CreativeWorkspace {...createProps(true)} />
+        <CreativeWorkspace {...createProps()} />
       </StudioDesignProvider>,
     );
     const rail = screen.getByRole('navigation', { name: 'Creative workspace tools' });
@@ -47,22 +46,8 @@ describe('CreativeWorkspace responsive tools', () => {
     ).toEqual(['Edit Video', 'Select Character', 'Select Outfit']);
   });
 
-  it('keeps the compact row focused on editing', () => {
-    render(
-      <StudioDesignProvider>
-        <CreativeWorkspace {...createProps(false)} />
-      </StudioDesignProvider>,
-    );
-    const rail = screen.getByRole('navigation', { name: 'Creative workspace tools' });
-    expect(
-      within(rail)
-        .getAllByRole('button')
-        .map((button) => button.getAttribute('aria-label')),
-    ).toEqual(['Edit Video']);
-  });
-
   it('enables Edit Video only for inactive playback and invokes the editor action', () => {
-    const props = createProps(true);
+    const props = createProps();
     const view = render(
       <StudioDesignProvider>
         <CreativeWorkspace {...props} />
@@ -76,14 +61,14 @@ describe('CreativeWorkspace responsive tools', () => {
 
     view.rerender(
       <StudioDesignProvider>
-        <CreativeWorkspace {...createProps(true, { hasPlaybackVideo: false })} />
+        <CreativeWorkspace {...createProps({ hasPlaybackVideo: false })} />
       </StudioDesignProvider>,
     );
     expect(screen.getByRole('button', { name: 'Edit Video' })).toBeDisabled();
 
     view.rerender(
       <StudioDesignProvider>
-        <CreativeWorkspace {...createProps(true, { recordingActive: true })} />
+        <CreativeWorkspace {...createProps({ recordingActive: true })} />
       </StudioDesignProvider>,
     );
     expect(screen.getByRole('button', { name: 'Edit Video' })).toBeDisabled();
@@ -92,7 +77,7 @@ describe('CreativeWorkspace responsive tools', () => {
   it('marks Edit Video as the active dialog launcher while the editor is open', () => {
     render(
       <StudioDesignProvider>
-        <CreativeWorkspace {...createProps(true, { activeTool: 'edit-video' })} />
+        <CreativeWorkspace {...createProps({ activeTool: 'edit-video' })} />
       </StudioDesignProvider>,
     );
 
@@ -105,7 +90,7 @@ describe('CreativeWorkspace responsive tools', () => {
   it('disables live-video tools while playback is available for editing', () => {
     const view = render(
       <StudioDesignProvider>
-        <CreativeWorkspace {...createProps(true)} />
+        <CreativeWorkspace {...createProps()} />
       </StudioDesignProvider>,
     );
 
@@ -116,7 +101,7 @@ describe('CreativeWorkspace responsive tools', () => {
 
     view.rerender(
       <StudioDesignProvider>
-        <CreativeWorkspace {...createProps(true, { hasPlaybackVideo: false })} />
+        <CreativeWorkspace {...createProps({ hasPlaybackVideo: false })} />
       </StudioDesignProvider>,
     );
 
@@ -128,7 +113,7 @@ describe('CreativeWorkspace responsive tools', () => {
     render(
       <StudioDesignProvider>
         <CreativeWorkspace
-          {...createProps(true, {
+          {...createProps({
             hasPlaybackVideo: false,
             editVideoBlockedReason: 'Record or upload a video to edit it.',
             liveToolBlockedReason: 'Finish recording and finalization before building a character.',
@@ -153,7 +138,7 @@ describe('CreativeWorkspace responsive tools', () => {
     render(
       <StudioDesignProvider>
         <CreativeWorkspace
-          {...createProps(true, {
+          {...createProps({
             editVideoBlockedReason: 'Record or upload a video to edit it.',
             liveToolBlockedReason:
               'Save and release or discard the current take before building a character.',
@@ -173,7 +158,7 @@ describe('CreativeWorkspace responsive tools', () => {
   it('keeps reusable creative setup available beside Project working-media playback', () => {
     render(
       <StudioDesignProvider>
-        <CreativeWorkspace {...createProps(true, { liveToolsAvailableDuringPlayback: true })} />
+        <CreativeWorkspace {...createProps({ liveToolsAvailableDuringPlayback: true })} />
       </StudioDesignProvider>,
     );
 

@@ -153,7 +153,7 @@ test('Local capture starts only from the control bar and keeps the local take in
 
   const controls = page.getByLabel('Studio session controls');
   await expect(page.getByLabel('Studio media stage')).toContainText(
-    'Camera and microphone remain off until you start local preview.',
+    'Camera and microphone remain off until you select Start camera.',
   );
   expect((await readBrowserState(page)).cameraCalls).toBe(0);
 

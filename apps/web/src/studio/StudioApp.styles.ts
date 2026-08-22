@@ -732,6 +732,10 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     fontSize: 'inherit',
     fontWeight: 'inherit',
   },
+  // The rail carries three tools at every width now, so the narrowest layouts trade the verb for
+  // the noun rather than truncating it. Each control states its full name in `aria-label`, so
+  // only the visible text changes.
+  '& [data-tool-label-short]': { display: 'none' },
   '& [data-tool-label] small': {
     maxWidth: '8rem',
     overflow: 'hidden',
@@ -777,7 +781,22 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     },
     '& [data-tool-label]': { justifyItems: 'center' },
     '& [data-tool-label] strong': { fontSize: '0.72rem' },
+    '& [data-tool-label-long]': { display: 'none' },
+    '& [data-tool-label-short]': { display: 'inline' },
+    // The description is a label a compact rail can do without. The blocked reason is not: it is
+    // the only thing that explains a dead control, and `title` never reaches a touch user. It
+    // stays, clamped to two lines, so the `aria-describedby` target is visible rather than hidden.
     '& [data-tool-label] small': { display: 'none' },
+    '& [data-tool-label] small[data-tool-blocked]': {
+      display: '-webkit-box',
+      maxWidth: '100%',
+      WebkitBoxOrient: 'vertical',
+      WebkitLineClamp: 2,
+      fontSize: '0.6rem',
+      lineHeight: 1.25,
+      whiteSpace: 'normal',
+      textAlign: 'center',
+    },
     '& [data-tool-icon]': { width: '0.95rem', height: '0.95rem' },
   },
   '@media (max-width: 20rem), (max-height: 36rem)': {
