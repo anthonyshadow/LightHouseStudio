@@ -5,7 +5,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { APP_PATHS, campaignPath, projectWorkspacePath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
-import { AppIcon, Button } from '../../ui';
+import { ActionMenu, AppIcon, Button } from '../../ui';
 import { useCampaignDetail } from '../campaigns/useCampaignsController';
 import { ProjectAssetsSection } from './ProjectAssetsSection';
 import {
@@ -163,57 +163,62 @@ export const ProjectOverviewSurface = ({
                   ? 'Continue editing'
                   : 'Add original video'}
             </Button>
-            <Button
-              data-detail-action="duplicate"
-              onClick={(event) => {
-                dialogReturnRef.current = event.currentTarget;
-                setDuplicateTarget(project);
-              }}
-            >
-              Duplicate Project
-            </Button>
-            <Button
-              data-detail-action="move"
-              onClick={(event) => {
-                dialogReturnRef.current = event.currentTarget;
-                setCampaignDialog(true);
-              }}
-            >
-              Move Project
-            </Button>
-            {!archived ? (
-              <Button
-                data-detail-action="rename"
-                onClick={(event) => {
-                  dialogReturnRef.current = event.currentTarget;
-                  setRenameTarget(project);
-                }}
-              >
-                Rename
-              </Button>
-            ) : null}
-            <Button
-              variant={archived ? 'secondary' : 'danger'}
-              data-detail-action="archive"
-              onClick={(event) => {
-                dialogReturnRef.current = event.currentTarget;
-                setLifecycleDialog({ action: archived ? 'restore' : 'archive', project });
-              }}
-            >
-              {archived ? 'Restore' : 'Archive'}
-            </Button>
-            {archived ? (
-              <Button
-                variant="danger"
-                data-detail-action="delete"
-                onClick={(event) => {
-                  dialogReturnRef.current = event.currentTarget;
-                  setDeleteTarget(project);
-                }}
-              >
-                Delete Project
-              </Button>
-            ) : null}
+            <ActionMenu
+              label={`More actions for ${project.title}`}
+              size="regular"
+              items={[
+                {
+                  id: 'duplicate',
+                  label: 'Duplicate Project',
+                  onSelect: (trigger) => {
+                    dialogReturnRef.current = trigger;
+                    setDuplicateTarget(project);
+                  },
+                },
+                {
+                  id: 'move',
+                  label: 'Move Project',
+                  onSelect: (trigger) => {
+                    dialogReturnRef.current = trigger;
+                    setCampaignDialog(true);
+                  },
+                },
+                ...(archived
+                  ? []
+                  : [
+                      {
+                        id: 'rename',
+                        label: 'Rename',
+                        onSelect: (trigger: HTMLButtonElement | null) => {
+                          dialogReturnRef.current = trigger;
+                          setRenameTarget(project);
+                        },
+                      },
+                    ]),
+                {
+                  id: 'archive',
+                  label: archived ? 'Restore' : 'Archive',
+                  danger: !archived,
+                  onSelect: (trigger) => {
+                    dialogReturnRef.current = trigger;
+                    setLifecycleDialog({ action: archived ? 'restore' : 'archive', project });
+                  },
+                },
+                ...(archived
+                  ? [
+                      {
+                        id: 'delete',
+                        label: 'Delete Project',
+                        danger: true,
+                        onSelect: (trigger: HTMLButtonElement | null) => {
+                          dialogReturnRef.current = trigger;
+                          setDeleteTarget(project);
+                        },
+                      },
+                    ]
+                  : []),
+              ]}
+            />
           </div>
         </div>
       </header>

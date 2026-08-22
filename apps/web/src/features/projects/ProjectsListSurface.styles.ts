@@ -273,9 +273,6 @@ export const projectsLedgerRowStyles = (theme: Theme): CSSObject => ({
   '& [data-project-actions] > button[data-project-action="open"]': {
     color: theme.colors.accent,
   },
-  '& [data-project-actions] > button[data-project-action="delete"]': {
-    color: theme.colors.danger,
-  },
   '@container (min-width: 32rem)': {
     gridTemplateColumns: 'minmax(0, 1fr) auto',
     '& [data-project-meta]': { gridColumn: 1 },

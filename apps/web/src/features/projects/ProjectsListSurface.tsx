@@ -5,6 +5,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { projectPath, projectWorkspacePath } from '../../app/paths';
 import {
+  ActionMenu,
   Button,
   emptyExampleStyles,
   EmptyStatePreview,
@@ -48,14 +49,14 @@ interface ProjectListSectionProps {
   readonly onClearSearch: () => void;
   readonly heading?: string;
   readonly onOpen: (project: ProjectContract) => void;
-  readonly onRename: (project: ProjectContract, trigger: HTMLButtonElement) => void;
-  readonly onDuplicate: (project: ProjectContract, trigger: HTMLButtonElement) => void;
+  readonly onRename: (project: ProjectContract, trigger: HTMLButtonElement | null) => void;
+  readonly onDuplicate: (project: ProjectContract, trigger: HTMLButtonElement | null) => void;
   readonly onLifecycle: (
     action: LifecycleAction,
     project: ProjectContract,
-    trigger: HTMLButtonElement,
+    trigger: HTMLButtonElement | null,
   ) => void;
-  readonly onDelete: (project: ProjectContract, trigger: HTMLButtonElement) => void;
+  readonly onDelete: (project: ProjectContract, trigger: HTMLButtonElement | null) => void;
 }
 
 const ProjectListSection = ({
@@ -174,42 +175,44 @@ const ProjectListSection = ({
                   >
                     Open
                   </Button>
-                  {!archived ? (
-                    <Button
-                      size="small"
-                      data-project-action="rename"
-                      onClick={(event) => onRename(project, event.currentTarget)}
-                    >
-                      Rename
-                    </Button>
-                  ) : null}
-                  <Button
-                    size="small"
-                    data-project-action="duplicate"
-                    onClick={(event) => onDuplicate(project, event.currentTarget)}
-                  >
-                    Duplicate Project
-                  </Button>
-                  <Button
-                    size="small"
-                    variant={archived ? 'secondary' : 'quiet'}
-                    data-project-action={archived ? 'restore' : 'archive'}
-                    onClick={(event) =>
-                      onLifecycle(archived ? 'restore' : 'archive', project, event.currentTarget)
-                    }
-                  >
-                    {archived ? 'Restore' : 'Archive'}
-                  </Button>
-                  {archived ? (
-                    <Button
-                      size="small"
-                      variant="danger"
-                      data-project-action="delete"
-                      onClick={(event) => onDelete(project, event.currentTarget)}
-                    >
-                      Delete
-                    </Button>
-                  ) : null}
+                  <ActionMenu
+                    label={`More actions for ${project.title}`}
+                    items={[
+                      ...(archived
+                        ? []
+                        : [
+                            {
+                              id: 'rename',
+                              label: 'Rename',
+                              onSelect: (trigger: HTMLButtonElement | null) =>
+                                onRename(project, trigger),
+                            },
+                          ]),
+                      {
+                        id: 'duplicate',
+                        label: 'Duplicate Project',
+                        onSelect: (trigger) => onDuplicate(project, trigger),
+                      },
+                      {
+                        id: archived ? 'restore' : 'archive',
+                        label: archived ? 'Restore' : 'Archive',
+                        danger: !archived,
+                        onSelect: (trigger) =>
+                          onLifecycle(archived ? 'restore' : 'archive', project, trigger),
+                      },
+                      ...(archived
+                        ? [
+                            {
+                              id: 'delete',
+                              label: 'Delete',
+                              danger: true,
+                              onSelect: (trigger: HTMLButtonElement | null) =>
+                                onDelete(project, trigger),
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
                 </div>
               </article>
             </li>
@@ -277,23 +280,23 @@ export const ProjectsListSurface = () => {
   const openProject = (project: ProjectContract) => {
     void navigate(projectPath(project.id));
   };
-  const openRenameDialog = (project: ProjectContract, trigger: HTMLButtonElement) => {
+  const openRenameDialog = (project: ProjectContract, trigger: HTMLButtonElement | null) => {
     dialogReturnRef.current = trigger;
     setRenameProject(project);
   };
   const openLifecycleDialog = (
     action: LifecycleAction,
     project: ProjectContract,
-    trigger: HTMLButtonElement,
+    trigger: HTMLButtonElement | null,
   ) => {
     dialogReturnRef.current = trigger;
     setLifecycleDialog({ action, project });
   };
-  const openDeleteDialog = (project: ProjectContract, trigger: HTMLButtonElement) => {
+  const openDeleteDialog = (project: ProjectContract, trigger: HTMLButtonElement | null) => {
     dialogReturnRef.current = trigger;
     setDeleteProject(project);
   };
-  const openDuplicateDialog = (project: ProjectContract, trigger: HTMLButtonElement) => {
+  const openDuplicateDialog = (project: ProjectContract, trigger: HTMLButtonElement | null) => {
     dialogReturnRef.current = trigger;
     setDuplicateProject(project);
   };

@@ -133,10 +133,6 @@ export const projectOverviewHeaderStyles = (theme: Theme): CSSObject => ({
       background: theme.colors.accentStrong,
     },
   },
-  '& [data-detail-actions] > button[data-detail-action="archive"], & [data-detail-actions] > button[data-detail-action="delete"]':
-    {
-      color: theme.colors.danger,
-    },
   '@container (max-width: 64rem)': {
     '& [data-detail-identity]': {
       gridTemplateColumns: 'minmax(0, 1fr)',
@@ -151,18 +147,14 @@ export const projectOverviewHeaderStyles = (theme: Theme): CSSObject => ({
     '& [data-detail-identity]': { gap: theme.space.lg, paddingBlockEnd: theme.space.xl },
     '& h1': { fontSize: 'clamp(2rem, 11cqi, 2.6rem)' },
     '& [data-detail-meta]': { columnGap: theme.space.md, fontSize: theme.fontSizes.metadata },
+    // One primary and one overflow: the primary takes the width it needs, the menu stays square.
     '& [data-detail-actions]': {
       display: 'grid',
-      gridTemplateColumns: 'repeat(3, minmax(0, auto))',
-      justifyContent: 'start',
+      gridTemplateColumns: 'minmax(0, 1fr) auto',
+      justifyContent: 'stretch',
+      columnGap: theme.space.sm,
     },
-    '& [data-detail-actions] > button[data-detail-action="continue"]': {
-      width: '100%',
-      gridColumn: '1 / -1',
-    },
-  },
-  '@container (max-width: 21rem)': {
-    '& [data-detail-actions]': { gridTemplateColumns: 'repeat(2, minmax(0, auto))' },
+    '& [data-detail-actions] > button[data-detail-action="continue"]': { width: '100%' },
   },
 });
 

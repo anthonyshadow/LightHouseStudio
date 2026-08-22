@@ -26,6 +26,7 @@ import {
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
 import {
+  ActionMenu,
   Button,
   emptyExampleStyles,
   EmptyStatePreview,
@@ -41,8 +42,6 @@ import { AddVideoToProjectDialog } from '../projects/AddVideoToProjectDialog';
 import { GeneratePreviewDialog } from './GeneratePreviewDialog';
 import { VideoExportPanel } from './VideoExportPanel';
 import {
-  actionMenuPopoverStyles,
-  actionMenuStyles,
   actionsStyles,
   cardBodyStyles,
   cardCopyStyles,
@@ -78,14 +77,6 @@ const VideoPlaceholderIcon = () => (
   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
     <rect x="3" y="5" width="18" height="14" rx="3" />
     <path d="m10 9 5 3-5 3Z" />
-  </svg>
-);
-
-const MoreIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor">
-    <circle cx="5" cy="12" r="1.8" />
-    <circle cx="12" cy="12" r="1.8" />
-    <circle cx="19" cy="12" r="1.8" />
   </svg>
 );
 
@@ -134,9 +125,9 @@ const VideoGalleryGrid = ({
   onOpenPreview: (video: SavedVideoSummary, trigger: HTMLButtonElement) => void;
   onGeneratePreview: (video: SavedVideoSummary, trigger: HTMLElement) => void;
   onUse: (video: SavedVideoSummary, intent: 'play' | 'edit') => Promise<void>;
-  onAddToProject: (video: SavedVideoSummary, trigger: HTMLElement) => void;
-  onRename: (video: SavedVideoSummary, trigger: HTMLElement) => void;
-  onRemove: (video: SavedVideoSummary, trigger: HTMLElement) => void;
+  onAddToProject: (video: SavedVideoSummary, trigger: HTMLElement | null) => void;
+  onRename: (video: SavedVideoSummary, trigger: HTMLElement | null) => void;
+  onRemove: (video: SavedVideoSummary, trigger: HTMLElement | null) => void;
 }) => {
   'use memo';
 
@@ -235,64 +226,43 @@ const VideoGalleryGrid = ({
                 >
                   Download
                 </a>
-                <details css={actionMenuStyles(theme)}>
-                  <summary aria-label={`More actions for ${video.title}`}>
-                    <MoreIcon />
-                  </summary>
-                  <div css={actionMenuPopoverStyles(theme)}>
-                    <button
-                      type="button"
-                      disabled={busy || video.status !== 'ready'}
-                      onClick={() => void onUse(video, 'play')}
-                    >
-                      Open in Studio
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy || video.status !== 'ready'}
-                      onClick={() => void onUse(video, 'edit')}
-                    >
-                      Edit video
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy || video.status !== 'ready'}
-                      onClick={(event) => {
-                        const details = event.currentTarget.closest('details');
-                        const trigger = details?.querySelector<HTMLElement>('summary');
-                        details?.removeAttribute('open');
-                        onAddToProject(video, trigger ?? event.currentTarget);
-                      }}
-                    >
-                      Use as Project source
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={(event) => {
-                        const details = event.currentTarget.closest('details');
-                        const trigger = details?.querySelector<HTMLElement>('summary');
-                        details?.removeAttribute('open');
-                        onRename(video, trigger ?? event.currentTarget);
-                      }}
-                    >
-                      Rename
-                    </button>
-                    <button
-                      type="button"
-                      data-danger=""
-                      disabled={busy}
-                      onClick={(event) => {
-                        const details = event.currentTarget.closest('details');
-                        const trigger = details?.querySelector<HTMLElement>('summary');
-                        details?.removeAttribute('open');
-                        onRemove(video, trigger ?? event.currentTarget);
-                      }}
-                    >
-                      Remove from Assets
-                    </button>
-                  </div>
-                </details>
+                <ActionMenu
+                  label={`More actions for ${video.title}`}
+                  placement="above"
+                  items={[
+                    {
+                      id: 'play',
+                      label: 'Open in Studio',
+                      disabled: busy || video.status !== 'ready',
+                      onSelect: () => void onUse(video, 'play'),
+                    },
+                    {
+                      id: 'edit',
+                      label: 'Edit video',
+                      disabled: busy || video.status !== 'ready',
+                      onSelect: () => void onUse(video, 'edit'),
+                    },
+                    {
+                      id: 'project-source',
+                      label: 'Use as Project source',
+                      disabled: busy || video.status !== 'ready',
+                      onSelect: (trigger) => onAddToProject(video, trigger),
+                    },
+                    {
+                      id: 'rename',
+                      label: 'Rename',
+                      disabled: busy,
+                      onSelect: (trigger) => onRename(video, trigger),
+                    },
+                    {
+                      id: 'remove',
+                      label: 'Remove from Assets',
+                      danger: true,
+                      disabled: busy,
+                      onSelect: (trigger) => onRemove(video, trigger),
+                    },
+                  ]}
+                />
               </div>
             </div>
           </article>
@@ -481,7 +451,7 @@ export const VideoGallery = ({
   const openAction = (
     kind: 'rename' | 'remove',
     video: SavedVideoSummary,
-    trigger: HTMLElement,
+    trigger: HTMLElement | null,
   ) => {
     actionTriggerRef.current = trigger;
     setRenameTitle(video.title);
@@ -844,27 +814,35 @@ export const VideoGallery = ({
               >
                 Download
               </a>
-              <Button variant="secondary" onClick={(event) => openExport(event.currentTarget)}>
-                Export
-              </Button>
-              {selectedIsCurrent ? (
-                <>
-                  <Button
-                    variant="secondary"
-                    disabled={busyId === previewVideo.id}
-                    onClick={() => void handleUseVideo(previewVideo, 'edit')}
-                  >
-                    Edit video
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    busy={busyId === previewVideo.id}
-                    onClick={() => void handleUseVideo(previewVideo, 'play')}
-                  >
-                    Open in Studio
-                  </Button>
-                </>
-              ) : null}
+              <ActionMenu
+                label={`More actions for ${previewVideo.title}`}
+                placement="above"
+                items={[
+                  {
+                    id: 'export',
+                    label: 'Export',
+                    onSelect: (trigger) => {
+                      if (trigger) openExport(trigger);
+                    },
+                  },
+                  ...(selectedIsCurrent
+                    ? [
+                        {
+                          id: 'edit',
+                          label: 'Edit video',
+                          disabled: busyId === previewVideo.id,
+                          onSelect: () => void handleUseVideo(previewVideo, 'edit'),
+                        },
+                        {
+                          id: 'play',
+                          label: 'Open in Studio',
+                          disabled: busyId === previewVideo.id,
+                          onSelect: () => void handleUseVideo(previewVideo, 'play'),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             </div>
           ) : null
         }

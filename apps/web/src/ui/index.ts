@@ -25,3 +25,4 @@ export { OverlayPanel } from './primitives/OverlayPanel';
 export { ReferenceImagePreview } from './primitives/ReferenceImagePreview';
 export { ImagePickerDropField } from './primitives/ImagePickerDropField';
 export { AppIcon, type AppIconName } from './primitives/AppIcon';
+export { ActionMenu, type ActionMenuItem } from './primitives/ActionMenu';

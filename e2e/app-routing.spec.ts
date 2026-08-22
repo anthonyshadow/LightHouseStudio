@@ -251,13 +251,15 @@ test('Projects quick creation, lifecycle, refresh, and explicit Assets exit keep
     .poll(async () => readBrowserState(page))
     .toMatchObject({ cameraCalls: 0, requirementModels: [], connections: [], recorderStarts: 0 });
 
-  await page.getByRole('button', { name: 'Rename' }).click();
+  await page.getByLabel('More actions for Untitled Project').click();
+  await page.getByRole('menuitem', { name: 'Rename' }).click();
   const rename = page.getByRole('dialog', { name: 'Rename Project' });
   await rename.getByRole('textbox', { name: /Project name/u }).fill('Launch edit');
   await rename.getByRole('button', { name: 'Rename Project' }).click();
   await expect(page.getByRole('heading', { name: 'Launch edit' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Archive' }).click();
+  await page.getByLabel('More actions for Launch edit').click();
+  await page.getByRole('menuitem', { name: 'Archive' }).click();
   await page
     .getByRole('dialog', { name: 'Archive Project' })
     .getByRole('button', { name: 'Archive Project' })
@@ -265,7 +267,8 @@ test('Projects quick creation, lifecycle, refresh, and explicit Assets exit keep
   await expect(page.getByText('Archived', { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Launch edit' })).toBeVisible();
-  await page.getByRole('button', { name: 'Restore' }).click();
+  await page.getByLabel('More actions for Launch edit').click();
+  await page.getByRole('menuitem', { name: 'Restore' }).click();
   await page
     .getByRole('dialog', { name: 'Restore Project' })
     .getByRole('button', { name: 'Restore Project' })
@@ -451,7 +454,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   await expect(gallery.getByRole('link', { name: /^Download / }).first()).toBeVisible();
 
   await gallery.getByLabel('More actions for Launch master').click();
-  await gallery.getByRole('button', { name: 'Remove from Assets' }).click();
+  await gallery.getByRole('menuitem', { name: 'Remove from Assets' }).click();
   await page
     .getByRole('dialog', { name: 'Remove video from Assets' })
     .getByRole('button', { name: 'Remove from Assets' })
@@ -521,7 +524,8 @@ test('an accepted Project operation reconnects after refresh and presents its re
   expect(projects.processingProviderIntents).toEqual(['video']);
   await expect(existingVideo).toBeHidden();
   await page.getByRole('button', { name: '← Project overview' }).click();
-  await page.getByRole('button', { name: 'Archive' }).click();
+  await page.getByLabel('More actions for Untitled Project').click();
+  await page.getByRole('menuitem', { name: 'Archive' }).click();
   const archive = page.getByRole('dialog', { name: 'Archive Project' });
   await expect(archive.getByRole('button', { name: 'Archive Project' })).toBeDisabled();
   await expect(archive).toContainText('accepted provider work is running');

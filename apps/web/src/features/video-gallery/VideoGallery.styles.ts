@@ -262,64 +262,6 @@ export const actionsStyles = (theme: Theme): CSSObject => ({
   '& > a:first-of-type': { ...downloadLinkStyles(theme), flex: 1 },
 });
 
-export const actionMenuStyles = (theme: Theme): CSSObject => ({
-  position: 'relative',
-  flex: '0 0 auto',
-  '& summary': {
-    width: '2.75rem',
-    height: '2.75rem',
-    display: 'grid',
-    placeItems: 'center',
-    border: `1px solid ${theme.colors.borderStrong}`,
-    borderRadius: theme.radii.medium,
-    color: theme.colors.textMuted,
-    background: theme.colors.surfaceStrong,
-    cursor: 'pointer',
-    listStyle: 'none',
-    '&::-webkit-details-marker': { display: 'none' },
-    '&:hover': { color: theme.colors.text, borderColor: theme.colors.accent },
-    '&:focus-visible': {
-      outline: `2px solid ${theme.colors.focus}`,
-      outlineOffset: '2px',
-    },
-    '& svg': { width: '1.2rem', height: '1.2rem' },
-  },
-  '&[open] summary': { color: theme.colors.text, borderColor: theme.colors.accent },
-});
-
-export const actionMenuPopoverStyles = (theme: Theme): CSSObject => ({
-  position: 'absolute',
-  zIndex: 3,
-  insetInlineEnd: 0,
-  insetBlockEnd: `calc(100% + ${theme.space.xs})`,
-  width: '12rem',
-  display: 'grid',
-  gap: theme.space.xxs,
-  padding: theme.space.xs,
-  border: `1px solid ${theme.colors.borderStrong}`,
-  borderRadius: theme.radii.medium,
-  background: theme.colors.overlaySurface,
-  boxShadow: theme.shadows.lifted,
-  '& a, & button': {
-    width: '100%',
-    minHeight: '2.75rem',
-    display: 'flex',
-    alignItems: 'center',
-    padding: `${theme.space.xs} ${theme.space.sm}`,
-    border: 0,
-    borderRadius: theme.radii.small,
-    color: theme.colors.text,
-    background: 'transparent',
-    fontWeight: 700,
-    textAlign: 'start',
-    textDecoration: 'none',
-    cursor: 'pointer',
-    '&:hover': { background: theme.colors.surfaceStrong },
-    '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '-2px' },
-  },
-  '& [data-danger]': { color: theme.colors.danger },
-});
-
 export const paginationStyles = (theme: Theme): CSSObject => ({
   position: 'sticky',
   insetBlockEnd: 0,
