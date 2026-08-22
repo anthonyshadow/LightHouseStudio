@@ -338,7 +338,8 @@ checks exercise local authenticated routes only and must not be converted into p
 Using keyboard and a screen reader:
 
 - traverse skip link, Quick Create, Start/AI choices, Character and Outfit selectors,
-  fields/files, Apply, settings, Record/Stop, Latest Take, Voice, Save, Release/Discard;
+  fields/files, Apply, settings, Record/Stop, Latest take, its action menu, Voice, Save,
+  Close/Discard;
 - verify names, roles, states, validation, live/status announcements, logical focus, visible focus,
   reduced motion, and approximately 44 px touch actions;
 - ensure topmost overlays alone are active, Tab wraps inside, Escape closes one layer, background

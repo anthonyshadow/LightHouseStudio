@@ -244,7 +244,10 @@ presentations share one overlay controller, creative-selection handoff, activity
 return-focus behavior. They never mount duplicate stateful selectors or start media/provider work.
 
 All tools use the shared `OverlayPanel` portal. It owns focus trap, inert background, Escape,
-topmost dismissal, scroll lock, transition-safe backdrop behavior, and return focus. The portal
+topmost dismissal, scroll lock, transition-safe backdrop behavior, and return focus. A popover
+opened _inside_ a panel — an `ActionMenu` — takes Escape first: `useDismissiblePopover` listens in
+the capture phase and marks the event handled, so the innermost layer closes and the panel still
+owns Escape once nothing is open inside it. The portal
 follows the active browser fullscreen element. In stage fullscreen, the existing media stage fills
 the viewport and the creative-tool and session/device regions are hidden; the stage control bar
 remains beneath the video frame. A panel triggered from the stage still renders above the

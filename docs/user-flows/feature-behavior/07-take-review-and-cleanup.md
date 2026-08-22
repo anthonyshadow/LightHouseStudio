@@ -14,7 +14,7 @@ deliberately release or discard it.
    recorder container is never downloadable.
 4. After the converted MP4 becomes authoritative and live/provider resources release, confirm
    **Recorded take playback** on the Studio stage. Local and live AI recordings retain compact
-   Save, Discard, Voice, and Release actions directly beneath the video. They never overlay the take or
+   Save, Discard, Voice, and Close actions directly beneath the video. They never overlay the take or
    its native playback controls, and the narrowest supported viewport wraps them into a second row.
 5. Confirm **Edit Video** is enabled in the creative tool rail for any finalized playback. An
    editor-backed upload reopens its retained editor state; a local/live-AI take opens
@@ -25,9 +25,13 @@ deliberately release or discard it.
    From that editor, **Adjust video** enters the stage-owned local editing workspace without
    remounting the stage video. A confirmed validated export replaces the immutable source; discard
    or failure preserves the take shown when editing began.
-6. When the detailed **Latest Take** surface opens after finishing an editor flow or returning from
-   Voice, inspect mode, sources, start time, dimensions/frame rate when known, duration, size, and
-   MIME type. The panel does not create another player and has no dedicated tool-rail launcher.
+6. When the detailed **Latest take** surface opens after finishing an editor flow or returning from
+   Voice, duration and dimensions are inline; mode, sources, start time, frame rate, size and MIME
+   type are behind a collapsed **Details** disclosure. `Save to Assets` is the only primary and
+   `Discard` the only destructive control; `Replace Saved Version`, `Edit video`, `Voice treatments`
+   and `Close without saving` are in the panel's action menu. Below 40rem the panel is a bottom
+   sheet at `min(45dvh, 24rem)`, so the stage it refers to stays visible above it. The panel does
+   not create another player and has no dedicated tool-rail launcher.
 7. Optionally apply a voice treatment. Playback and saving remain locked until processing
    settles or is cancelled.
 8. Select **Save Video**, optionally name it, and confirm. A blank name keeps the existing generated
@@ -38,12 +42,13 @@ deliberately release or discard it.
    and **View in Assets** for that exact retained Version, plus **Create another**, which releases
    the take and clears save state so the next recording starts from a clean stage. A Project video
    context keeps its own attach-and-return behavior and shows no completion surface.
-10. Select **Release**. The durable gallery copy remains available for preview, reuse, and download.
-    Or select **Discard** and confirm irreversible removal of the temporary take without saving it.
+10. Select **Close without saving** (**Close** on the compact control bar). The durable gallery copy
+    remains available for preview, reuse, and download. Or select **Discard** and confirm
+    irreversible removal of the take without saving it.
 
 ## Guards and recovery
 
-- Release stays disabled until the current artifact is saved to the gallery.
+- Close stays unavailable until the current artifact is saved to the gallery.
 - Playback, Voice, and Save Video remain unavailable while device-local transcoding is
   active.
 - Main video remains available if the optional sidecar fails, provided the required H.264 MP4
