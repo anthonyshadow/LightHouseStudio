@@ -38,7 +38,7 @@ const recordingUnavailableReason = ({
   if (!source) {
     switch (mode) {
       case 'local':
-        return 'Start local preview to enable Record.';
+        return 'Start camera to enable Record.';
       case 'lucy-latest':
         return 'Start Character AI and wait for live output to enable Record.';
       case 'lucy-vton-latest':

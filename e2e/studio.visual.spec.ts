@@ -370,7 +370,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       });
       await expect(stage.getByText('Your private creative stage.')).toBeVisible();
       await expect(
-        stage.getByText('Camera and microphone remain off until you start local preview.'),
+        stage.getByText('Camera and microphone remain off until you select Start camera.'),
       ).toBeVisible();
       await expect(stage.locator('[data-first-success-guide]')).toHaveCount(0);
     },

@@ -15,25 +15,21 @@ const OutfitSelector = lazy(() =>
 
 export const StudioOutfitOverlays = ({
   activeOverlay,
-  desktopStudioLayout,
   repository,
   session,
   handoff,
   outfit,
   characterOpenBlockedReason,
-  mainRef,
   outfitToggleRef,
   onClose,
   onUnselectAi,
 }: {
   readonly activeOverlay: ActiveOverlay;
-  readonly desktopStudioLayout: boolean;
   readonly repository: CreativeAssetRepository;
   readonly session: ReturnType<typeof useStudioSession>;
   readonly handoff: ReturnType<typeof useReferenceRecipeHandoff>;
   readonly outfit: ReturnType<typeof useStudioOutfitWorkflow>;
   readonly characterOpenBlockedReason: string | undefined;
-  readonly mainRef: RefObject<HTMLElement | null>;
   readonly outfitToggleRef: RefObject<HTMLButtonElement | null>;
   readonly onClose: () => void;
   readonly onUnselectAi: () => void;
@@ -48,7 +44,7 @@ export const StudioOutfitOverlays = ({
       description="Create an outfit, or select a saved or recently used Virtual Try-On configuration."
       placement="right"
       bodyMode="scroll"
-      returnFocusRef={desktopStudioLayout ? outfitToggleRef : mainRef}
+      returnFocusRef={outfitToggleRef}
     >
       {activeOverlay === 'outfit-selector' ? (
         <Suspense fallback={<p role="status">Loading studio tool…</p>}>

@@ -49,7 +49,7 @@
     "test:e2e": "playwright test",
     "test:production": "playwright test --config playwright.production.config.ts",
     "test:visual": "playwright test --config playwright.visual.config.ts",
-    "test:visual:update": "playwright test --config playwright.visual.config.ts --update-snapshots",
+    "test:visual:update": "playwright test --config playwright.visual.config.ts --update-snapshots=all",
     "test:all": "bun run test && bun run build && bun run test:production && bun run test:e2e && bun run test:visual",
     "audit:all": "bun audit --ignore GHSA-67mh-4wv8-2f99",
     "audit:prod": "bun audit --prod --audit-level high",
