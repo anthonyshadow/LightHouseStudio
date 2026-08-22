@@ -102,11 +102,21 @@ export const useProjectsController = () => {
     },
   });
 
+  /**
+   * The key is keyed on where the Project is being created, never on its title.
+   *
+   * A create has no version to compare against, so its idempotency key is the only thing standing
+   * between a lost response and a duplicate. The dialog stays open on failure with the title still
+   * editable, and an operator who tweaks it and retries means "the same creation, said better" —
+   * folding the title into the key would mint a fresh one and commit a second Project.
+   */
   const createNamedMutation = useMutation({
     mutationFn: async (input: { readonly title: string; readonly campaignId: string | null }) =>
       createProject(
         input.title,
-        namedCreateOperation.keyFor(JSON.stringify({ kind: 'create-named', ...input })),
+        namedCreateOperation.keyFor(
+          JSON.stringify({ kind: 'create-named', campaignId: input.campaignId }),
+        ),
         input.campaignId,
       ),
     onSuccess: async (current) => {
@@ -116,8 +126,9 @@ export const useProjectsController = () => {
   });
 
   /**
-   * A duplicate is a create, so it carries a create's idempotency: one key per attempt, retained
-   * until the attempt settles, so a lost response cannot produce two Projects.
+   * A duplicate is a create, so it carries a create's idempotency: the key identifies which
+   * Project is being copied and where, and is retained across retries until the attempt settles,
+   * so a lost response — or a retry with an edited title — cannot produce two copies.
    */
   const duplicateMutation = useMutation({
     mutationFn: async (input: {
@@ -133,7 +144,13 @@ export const useProjectsController = () => {
           campaignId: input.campaignId,
           expectedVersion: input.expectedVersion,
         },
-        duplicateOperation.keyFor(JSON.stringify({ kind: 'duplicate', ...input })),
+        duplicateOperation.keyFor(
+          JSON.stringify({
+            kind: 'duplicate',
+            projectId: input.projectId,
+            campaignId: input.campaignId,
+          }),
+        ),
       ),
     onSuccess: async (current) => {
       duplicateOperation.reset();

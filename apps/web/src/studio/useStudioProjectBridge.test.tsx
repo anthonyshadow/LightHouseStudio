@@ -93,14 +93,37 @@ describe('useStudioProjectBridge', () => {
     expect(hook.result.current.session).toBeNull();
 
     act(() => {
+      // The left-behind Project can no longer present onto the stage it no longer owns …
       runtime.present(firstProjectId, sourceInput);
+      // … but it must still be able to take back the media it put there, which is what its
+      // unmounting source controller does after the route has already moved on.
       runtime.clear(firstProjectId);
       runtime.present(secondProjectId, sourceInput);
       runtime.clear(secondProjectId);
     });
 
     expect(presentSource).toHaveBeenCalledTimes(2);
-    expect(clearSource).toHaveBeenCalledOnce();
+    expect(clearSource).toHaveBeenCalledTimes(2);
+  });
+
+  it('refuses a clear from a Project that never presented onto the stage', () => {
+    const presentSource = vi.fn();
+    const clearSource = vi.fn();
+    const hook = renderHook(() =>
+      useStudioProjectBridge({
+        projectId: firstProjectId,
+        recordingLifecycle: 'idle',
+        recordingOriginal: null,
+        presentSource,
+        clearSource,
+      }),
+    );
+
+    act(() => hook.result.current.sourceRuntime.present(firstProjectId, sourceInput));
+    act(() => hook.result.current.sourceRuntime.clear(secondProjectId));
+
+    expect(presentSource).toHaveBeenCalledOnce();
+    expect(clearSource).not.toHaveBeenCalled();
   });
 
   it('publishes a fresh project recording candidate only for a finalized artifact', () => {

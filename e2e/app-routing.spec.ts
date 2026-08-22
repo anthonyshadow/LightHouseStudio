@@ -336,7 +336,9 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   await openProjectTask(page, 'Original');
   await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
   await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();
-  await expect(stageVideo).toHaveAttribute('src', /^blob:/u);
+  // Reopening streams the accepted source from its ranged content route rather than downloading
+  // it into a Blob, so the stage binds the app-owned URL instead of a fresh object URL.
+  await expect(stageVideo).toHaveAttribute('src', /\/source\/content$/u);
   expect(await stageVideo.getAttribute('src')).not.toBe(firstObjectUrl);
   await expect(page.getByRole('button', { name: 'Upload' })).toBeDisabled();
   expect(projects.sourceOperationKeys).toHaveLength(1);
@@ -531,9 +533,10 @@ test('an accepted Project operation reconnects after refresh and presents its re
   await openProjectTask(page, 'Create');
   await expect(page.getByText('Character Swap accepted / queued', { exact: true })).toBeVisible();
   await expect(page.getByText('Result ready', { exact: true })).toBeVisible({ timeout: 15_000 });
+  // After a refresh the retained result is streamed from its content route, not re-downloaded.
   await expect(page.getByLabel('Studio media stage').locator('video')).toHaveAttribute(
     'src',
-    /^blob:/u,
+    /\/content$/u,
   );
   await openProjectTask(page, 'History');
   await expect(
@@ -628,9 +631,10 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
   ).toBeVisible();
   await openProjectTask(page, 'Original');
   await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
+  // The adopted cut is streamed from its content route after the refresh, never buffered first.
   await expect(page.getByLabel('Studio media stage').locator('video')).toHaveAttribute(
     'src',
-    /^blob:/u,
+    /\/content$/u,
   );
   expect(projects.checkpointRequests).toHaveLength(2);
   expect(projects.workingMediaOperationKeys).toHaveLength(1);

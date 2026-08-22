@@ -205,9 +205,16 @@ export const videoJobQueueItemSchema = z
   })
   .strict();
 
+/**
+ * How many active jobs one queue response may carry. The configured active-job ceiling can exceed
+ * this, so the server reports the most recent page rather than letting a busy queue overflow its
+ * own response contract.
+ */
+export const VIDEO_JOB_QUEUE_PAGE_SIZE = 25;
+
 export const videoJobQueueResponseSchema = z
   .object({
-    jobs: z.array(videoJobQueueItemSchema).max(25),
+    jobs: z.array(videoJobQueueItemSchema).max(VIDEO_JOB_QUEUE_PAGE_SIZE),
   })
   .strict();
 

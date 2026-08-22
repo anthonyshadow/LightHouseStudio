@@ -52,6 +52,45 @@ describe('Campaign organization routes', () => {
       payload: { title: 'Launch cut', campaignId },
     });
 
+  it('deletes a Campaign whose only Projects were permanently deleted', async () => {
+    const app = localApp();
+    const created = await createCampaign(app, 'Retired launch', randomUUID());
+    const campaignId = campaignSchema.parse(created.json()).id;
+    const project = await createProject(app, campaignId);
+    const projectId = projectCurrentResponseSchema.parse(project.json()).project.id;
+
+    await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/archive`,
+      headers: jsonHeaders,
+      payload: { expectedVersion: 1 },
+    });
+    const deletedProject = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/tombstone`,
+      headers: jsonHeaders,
+      payload: { expectedVersion: 2, confirmation: 'permanent-delete' },
+    });
+    expect(deletedProject.statusCode).toBe(200);
+
+    await app.inject({
+      method: 'POST',
+      url: `/api/campaigns/${campaignId}/archive`,
+      headers: jsonHeaders,
+      payload: { expectedVersion: 1 },
+    });
+    // A deleted Project keeps its campaignId and can never be detached again, so counting it
+    // would leave this Campaign permanently undeletable against a member nothing can move.
+    const deletedCampaign = await app.inject({
+      method: 'POST',
+      url: `/api/campaigns/${campaignId}/tombstone`,
+      headers: jsonHeaders,
+      payload: { expectedVersion: 2, confirmation: 'tombstone' },
+    });
+    expect(deletedCampaign.statusCode).toBe(200);
+    await app.close();
+  });
+
   it('creates, replays, lists, edits, archives, restores, and tombstones an empty Campaign', async () => {
     const app = localApp();
     const key = randomUUID();

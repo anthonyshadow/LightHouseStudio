@@ -180,15 +180,16 @@ afterEach(() => {
 
 describe('useProjectSourceController', () => {
   it('hydrates by presenting the ranged content route without downloading the video', async () => {
-    let contentRequests = 0;
+    const contentRanges: (string | null)[] = [];
     mockApiServer.use(
       http.get(`*/api/projects/${firstProjectId}/source`, () =>
         HttpResponse.json(sourceResponse(firstProjectId)),
       ),
-      http.get(`*/api/projects/${firstProjectId}/source/content`, () => {
-        contentRequests += 1;
-        return HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
-          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+      http.get(`*/api/projects/${firstProjectId}/source/content`, ({ request }) => {
+        contentRanges.push(request.headers.get('range'));
+        return HttpResponse.arrayBuffer(new Uint8Array([1]).buffer, {
+          status: 206,
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '1' },
         });
       }),
     );
@@ -216,7 +217,8 @@ describe('useProjectSourceController', () => {
       },
     });
     expect(firstInput.artifactMetadata.filename).toBe(`${firstProjectId}.mp4`);
-    expect(contentRequests).toBe(0);
+    // Reachability is proven with one byte; the video itself is never downloaded to hydrate.
+    expect(contentRanges).toEqual(['bytes=0-0']);
     first.unmount();
 
     const second = renderHook(
@@ -233,7 +235,7 @@ describe('useProjectSourceController', () => {
     expect(secondInput).toMatchObject({
       remoteMedia: { contentUrl: `/api/projects/${firstProjectId}/source/content` },
     });
-    expect(contentRequests).toBe(0);
+    expect(contentRanges).toEqual(['bytes=0-0', 'bytes=0-0']);
   });
 
   it('removes a source, clears the stage, and reopens the add-source controls', async () => {
@@ -475,6 +477,12 @@ describe('useProjectSourceController', () => {
       }),
       http.get(`*/api/projects/${secondProjectId}/source`, () =>
         HttpResponse.json(sourceResponse(secondProjectId)),
+      ),
+      http.get('*/api/projects/:projectId/source/content', () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1]).buffer, {
+          status: 206,
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '1' },
+        }),
       ),
     );
     const mediaOwner = runtime();

@@ -66,7 +66,10 @@ export const useCampaignsController = () => {
   };
   const createMutation = useMutation({
     mutationFn: (input: { readonly name: string; readonly brief: string | null }) =>
-      createCampaign(input, createOperation.keyFor(JSON.stringify({ kind: 'create', ...input }))),
+      // Keyed on the operation, never on the name or brief: a create has no version to compare
+      // against, so retrying an edited draft after a lost response must reuse the key rather than
+      // mint one and commit a second Campaign.
+      createCampaign(input, createOperation.keyFor('create')),
     onSuccess: async (campaign) => {
       createOperation.reset();
       await reconcile(campaign);

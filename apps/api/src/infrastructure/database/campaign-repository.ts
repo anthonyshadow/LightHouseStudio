@@ -132,7 +132,13 @@ export class DrizzleCampaignRepository implements CampaignRepository {
       .from(campaigns)
       .leftJoin(
         projects,
-        and(eq(projects.campaignId, campaigns.id), eq(projects.ownerUserId, campaigns.ownerUserId)),
+        // Deleted Projects keep their `campaignId` but can never be moved off it again, so
+        // counting them would block the Campaign's deletion against members nothing can detach.
+        and(
+          eq(projects.campaignId, campaigns.id),
+          eq(projects.ownerUserId, campaigns.ownerUserId),
+          isNull(projects.deletedAt),
+        ),
       )
       .where(
         and(
@@ -246,8 +252,14 @@ export class DrizzleCampaignRepository implements CampaignRepository {
         const [attached] = await tx
           .select({ count: sql<number>`count(*)::integer` })
           .from(projects)
+          // A deleted Project keeps its `campaignId` and can never be detached again, so it must
+          // not hold the Campaign open against a member nothing can move.
           .where(
-            and(eq(projects.ownerUserId, current.ownerUserId), eq(projects.campaignId, current.id)),
+            and(
+              eq(projects.ownerUserId, current.ownerUserId),
+              eq(projects.campaignId, current.id),
+              isNull(projects.deletedAt),
+            ),
           );
         const attachedProjectCount = attached?.count ?? 0;
         if (attachedProjectCount > 0) {

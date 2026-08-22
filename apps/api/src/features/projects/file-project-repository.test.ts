@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { KeyedLock } from '../../application/keyed-lock.js';
 import { FileProjectRepository } from './file-project-repository.js';
 import { ProjectService } from './project-service.js';
 import { CampaignService } from '../campaigns/campaign-service.js';
@@ -151,6 +152,44 @@ describe('FileProjectRepository', () => {
     expect(
       (await restarted.list(ownerUserId, { lifecycle: 'active', pageSize: 20 })).projects,
     ).toHaveLength(1);
+  });
+
+  it('replays a recovery journal under the owner lock, not around it', async () => {
+    const operationKey = randomUUID();
+    const ownerLock = new KeyedLock();
+    const interrupted = new ProjectService(
+      new FileProjectRepository(directory, {
+        ownerLock,
+        afterJournalPrepared: () => {
+          throw new Error('simulated interruption');
+        },
+      }),
+    );
+    await expect(
+      interrupted.create(ownerUserId, operationKey, 'Recovered Project'),
+    ).rejects.toThrow('simulated interruption');
+
+    // Recovery rewrites this owner's files — and the saved-videos library the sibling repository
+    // mutates under this same lock — so it has to be serialized against them like any other write.
+    const restarted = new ProjectService(new FileProjectRepository(directory, { ownerLock }));
+    const observed: string[] = [];
+    // Taken first and held across real asynchronous work: an unlocked replay would finish its
+    // handful of file writes long before this releases, which is exactly the interleaving that
+    // let a recovery snapshot clobber writes made after the crash.
+    const competing = ownerLock.run(ownerUserId, async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      observed.push('competing-owner-write');
+    });
+    const recovering = restarted
+      .list(ownerUserId, { lifecycle: 'active', pageSize: 20 })
+      .then((page) => {
+        observed.push('journal-replayed');
+        return page;
+      });
+    const [, page] = await Promise.all([competing, recovering]);
+
+    expect(observed).toEqual(['competing-owner-write', 'journal-replayed']);
+    expect(page.projects).toHaveLength(1);
   });
 
   it('enforces CAS across rename, archive, restore, paging, and restart', async () => {

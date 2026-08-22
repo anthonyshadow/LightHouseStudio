@@ -203,6 +203,15 @@ export const ProjectOutputSaveSection = ({
       setMessage('Your account could not be confirmed for this save.');
       return;
     }
+    // A save whose reply never arrived is still out there, and this browser holds its only
+    // receipt. Settling that one is what the operator is asking for by pressing Save again —
+    // minting a second operation would overwrite the receipt and create a duplicate Version.
+    const unresolved = loadPendingProjectOutput(ownerUserId, current.project.id);
+    if (unresolved !== null) {
+      recoveredRef.current = unresolved.operationId;
+      await runOperation(unresolved, true);
+      return;
+    }
     if (!(await session.flush())) {
       setPhase('conflict');
       setMessage('Save or discard your pending Project changes before saving.');

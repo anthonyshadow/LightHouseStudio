@@ -22,7 +22,12 @@ export const useDismissiblePopover = <
       }
     };
     const closeWithEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      // A modal layered above this popover owns Escape. Its `stopPropagation` cannot reach a
+      // listener on the same node, so the popover reads the isolation the modal applies instead:
+      // everything behind it is marked inert. Without this one Escape would dismiss both layers,
+      // and the restore below would silently fail against the inert trigger anyway.
+      if (rootRef.current?.closest('[inert]') != null) return;
       onOpenChange(false);
       triggerRef.current?.focus();
     };
