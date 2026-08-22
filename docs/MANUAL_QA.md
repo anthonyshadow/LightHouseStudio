@@ -281,7 +281,7 @@ each Start or retry requires separate approval.
 Using synthetic compatible media and no live provider:
 
 - open a ready source-bearing Project and confirm the review surface distinguishes current media
-  from the immutable original, and that **All changes saved**, **Render preview**, **Save as New
+  from the immutable original, and that **Autosaved**, **Render preview**, **Save as New
   Video**, and **Add Version** describe separate states/actions;
 - save as a new titled video, then separately select an active Saved Video for **Add Version** and
   verify the confirmation names its title, current version ordinal, and current-media dimensions;

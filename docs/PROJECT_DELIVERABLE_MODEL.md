@@ -27,7 +27,7 @@ decision does not authorize implementation or a schema migration.
 This document preserves that future direction. It does not authorize schema, API, UI, migration,
 provider, or background-work changes today.
 
-**What shipped instead (2026-08-21).** **Make another version** derives a _new Project_ from an
+**What shipped instead (2026-08-21).** **Duplicate Project** derives a _new Project_ from an
 existing one by reference — same source, same creative setup, no bytes copied — so a second cut of
 the same material is an ordinary Project with its own revisions, jobs and outputs. That covers the
 "independently editable and resumable at the same time" need without a child aggregate, at the cost

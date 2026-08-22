@@ -198,7 +198,7 @@ The retained suite protects:
 - export placement: the domain aspect list and the resolution each produces, the browser
   support gate, the chooser's copy/crop preview, and render progress, cancellation and failure
   leaving the save path intact;
-- **Make another version**: the domain rule's stale-version conflict, by-reference snapshot,
+- **Duplicate Project**: the domain rule's stale-version conflict, by-reference snapshot,
   cleared last output and derived phase; route replay under `Idempotency-Key`; retention through
   the duplicate's own asset links; and the browser dialog's Campaign default and post-create step;
 - URL-backed Project source presentation: the single narrowing from presentable media to owned

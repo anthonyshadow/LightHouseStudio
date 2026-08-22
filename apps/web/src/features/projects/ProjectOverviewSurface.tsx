@@ -170,7 +170,7 @@ export const ProjectOverviewSurface = ({
                 setDuplicateTarget(project);
               }}
             >
-              Make another version
+              Duplicate Project
             </Button>
             <Button
               data-detail-action="move"

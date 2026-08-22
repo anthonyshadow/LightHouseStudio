@@ -249,7 +249,7 @@ export const CharacterBuilderPanel = ({
             >
               {saveBlockedReason ??
                 (state.preview?.stale
-                  ? 'The visible preview is from an earlier character version and will not be attached.'
+                  ? 'The visible preview is from an earlier character and will not be attached.'
                   : (autosaveMessage ?? 'Draft changes autosave on this browser.'))}
             </span>
             <Button
@@ -392,7 +392,7 @@ export const CharacterBuilderPanel = ({
                   <span role="status">
                     {uploadedReference
                       ? 'Regenerate to attach a combined image, or save with the uploaded reference.'
-                      : 'Regenerate to attach an image, or save this version as prompt-only.'}
+                      : 'Regenerate to attach an image, or save this character as prompt-only.'}
                   </span>
                 ) : previewIsUsable ? (
                   <span role="status">This preview matches the current character.</span>

@@ -34,7 +34,7 @@ export const CharacterVersionSelector = ({
   return (
     <div
       role="list"
-      aria-label="Character versions"
+      aria-label="Character and wardrobe variants"
       css={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 11rem), 1fr))',
@@ -75,7 +75,7 @@ export const CharacterVersionSelector = ({
               {version.referenceImageAssetId ? (
                 <img
                   src={referenceImageContentUrl(version.referenceImageAssetId)}
-                  alt={`${version.title} character version`}
+                  alt={`${version.title} character reference`}
                   css={{ width: '100%', height: '100%', display: 'block', objectFit: 'contain' }}
                 />
               ) : (

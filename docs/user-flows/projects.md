@@ -70,7 +70,7 @@ response can be safely replayed. Conflicts return `409` with a typed `ProjectCon
 | POST     | `/api/projects`                                                                      | Create (Idempotency-Key required)                                            |
 | GET      | `/api/projects/:id`                                                                  | Current project + head revision                                              |
 | PATCH    | `/api/projects/:id`                                                                  | Rename (expectedVersion)                                                     |
-| POST     | `/api/projects/:id/duplicate`                                                        | Make another version (expectedVersion + Idempotency-Key)                     |
+| POST     | `/api/projects/:id/duplicate`                                                        | Duplicate Project (expectedVersion + Idempotency-Key)                        |
 | POST     | `/api/projects/:id/archive` · `/restore` · `/tombstone`                              | Lifecycle; tombstone requires archived + explicit confirmation               |
 | POST     | `/api/projects/:id/campaign`                                                         | Attach/detach campaign membership                                            |
 | POST     | `/api/projects/:id/revisions`                                                        | Semantic checkpoint (creative setup autosave)                                |
@@ -195,7 +195,7 @@ This is the only organization route that mounts the Studio runtime (`isStudioRun
 recording and preview happen in place.
 
 **Layout** — a masthead (Overview breadcrumb, title, status, a compact `ProjectWorkflowProgress`
-strip, and a live "All changes saved / Saving changes / Resolve conflict / Changes not saved"
+strip, and a live "Autosaved / Autosaving… / Resolve conflict / Not autosaved"
 indicator) plus a four-tab inspector: **Source · Create · Save · History**. The tabs are a proper
 ARIA tablist with arrow/Home/End keyboard support.
 
@@ -303,7 +303,7 @@ links to `/api/projects/{id}/outputs/{versionId}/content?download=true`
 affordance inside a Project, reached through the Saved Video content route rather than this
 Project-scoped one.
 
-## Flow: Make another version
+## Flow: Duplicate Project
 
 `duplicateProject` (`packages/domain/src/projects/rules.ts`) derives a new Project from an existing
 revision, and `ProjectService.duplicate` composes it with the same create path everything else uses.
@@ -330,7 +330,7 @@ revision, and `ProjectService.duplicate` composes it with the same create path e
 6. Campaign membership is checked by the same create path, so a duplicate aimed at an archived or
    missing Campaign is refused with `campaign-membership` exactly as a move would be, and nothing is
    created.
-7. The UI offers it as **Make another version** on the Projects list rows and the Project overview.
+7. The UI offers it as **Duplicate Project** on the Projects list rows and the Project overview.
    The dialog proposes `"<title> (copy)"` (bounded by `duplicateProjectTitle`), keeps the original's
    Campaign as the default, and states plainly that no video is duplicated and nothing is charged
    until work is started in the new Project. On success it opens the copy at

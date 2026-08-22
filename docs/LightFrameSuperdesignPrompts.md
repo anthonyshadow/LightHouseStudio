@@ -448,13 +448,14 @@ correct and must not be weakened. Dark studio palette and tokens as listed in th
 ### Existing Experience
 
 The workspace masthead shows a back control, the Project title, a workflow progress strip, and a
-live save status that reads `All changes saved` / `Saving changes` / `Changes not saved`. The
+live save status that reads `Autosaved` / `Autosaving…` / `Not autosaved` (item 11 renamed these
+from `All changes saved` / `Saving changes` / `Changes not saved`). The
 `Create` tab contains a "Creative setup" panel with its own `Save progress` button. The `Save` tab
 offers a placement chooser ("Where is this going?" — keep as-is / phone / widescreen / square post /
 tall feed), then `Save as New Video` and `Add Version`, followed by this literal disclaimer:
 
-> "All changes saved" refers to your saved progress. Render preview, Save as New Video and Add
-> Version are separate actions you take yourself.
+> "Autosaved" refers to your Project setup. Render preview, Save as New Video and Add Version are
+> separate actions you take yourself.
 
 ### Problems Identified
 
@@ -462,12 +463,13 @@ tall feed), then `Save as New Video` and `Add Version`, followed by this literal
    `Save as New Video`, and `Add Version`.
 2. **The product ships an explanation of its own status message.** A disclaimer that a status
    message does not mean what it says is the clearest evidence the model needs restructuring.
-3. **`All changes saved` is actively misleading** — a user reasonably concludes they have a video.
-   They do not; nothing has been produced.
+3. **The autosave status is still read as “my video is saved.”** Item 11 renamed it to `Autosaved`,
+   which no longer says “saved” outright, but a passive indicator beside a Save tab still competes
+   with the one action that actually produces a video.
 4. **`Save as New Video` and `Add Version` are presented as peers**, forcing a taxonomy decision
    before the user has decided to save at all.
-5. **"Version" collides with itself.** Elsewhere the product offers "Make another version" to
-   duplicate a Project, and Saved Videos have "Version 3 · Current".
+5. **"Version" used to collide with itself.** Item 11 resolved this: duplicating a Project is now
+   `Duplicate Project`, and `Version` belongs to Saved Videos alone ("Version 3 · Current").
 6. **Confirmation copy is defensive**: "The current cut is now that version. Nothing was copied,
    your original video was not replaced, and no new version was saved." Three negations.
 7. **The placement chooser is the best part of this step and is buried below the save buttons.**

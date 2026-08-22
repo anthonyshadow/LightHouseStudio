@@ -339,7 +339,7 @@ describe('Project route surface', () => {
       expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`),
     );
     expect(await screen.findByRole('heading', { name: 'No original video yet' })).toBeVisible();
-    expect(screen.getByText('All changes saved').closest('[role="status"]')).toBeInTheDocument();
+    expect(screen.getByText('Autosaved').closest('[role="status"]')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Record' })).toBeDisabled();
     expect(screen.queryByRole('video')).not.toBeInTheDocument();
   });
@@ -1097,8 +1097,8 @@ describe('Project route surface', () => {
     const { router } = renderProjects();
 
     const activeList = await screen.findByRole('list', { name: 'Active Projects' });
-    await user.click(within(activeList).getByRole('button', { name: 'Make another version' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Make another version' });
+    await user.click(within(activeList).getByRole('button', { name: 'Duplicate Project' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Duplicate Project' });
 
     // Named recognisably, and editable before confirming.
     expect(within(dialog).getByRole('textbox', { name: 'New Project name' })).toHaveValue(
@@ -1111,7 +1111,7 @@ describe('Project route surface', () => {
       within(dialog).getByText(/nothing is charged until you start it yourself/u),
     ).toBeVisible();
 
-    await user.click(within(dialog).getByRole('button', { name: 'Make another version' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Duplicate Project' }));
 
     await waitFor(() =>
       expect(requestBody).toEqual({
@@ -1150,12 +1150,12 @@ describe('Project route surface', () => {
     const user = userEvent.setup();
     const { router } = renderProjects(`/projects/${activeId}`);
 
-    await user.click(await screen.findByRole('button', { name: 'Make another version' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Make another version' });
+    await user.click(await screen.findByRole('button', { name: 'Duplicate Project' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Duplicate Project' });
     const field = within(dialog).getByRole('textbox', { name: 'New Project name' });
     await user.clear(field);
     await user.type(field, 'Second cut');
-    await user.click(within(dialog).getByRole('button', { name: 'Make another version' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Duplicate Project' }));
 
     await waitFor(() => expect(duplicateRequests).toBe(1));
     await waitFor(() =>
@@ -1189,9 +1189,9 @@ describe('Project route surface', () => {
     const { router } = renderProjects();
 
     const activeList = await screen.findByRole('list', { name: 'Active Projects' });
-    await user.click(within(activeList).getByRole('button', { name: 'Make another version' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Make another version' });
-    await user.click(within(dialog).getByRole('button', { name: 'Make another version' }));
+    await user.click(within(activeList).getByRole('button', { name: 'Duplicate Project' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Duplicate Project' });
+    await user.click(within(dialog).getByRole('button', { name: 'Duplicate Project' }));
 
     await waitFor(() => expect(duplicateRequests).toBe(1));
     expect(await within(dialog).findByText('Project changed')).toBeVisible();
@@ -1577,7 +1577,7 @@ describe('Project route surface', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Use finalized recording' }));
     expect(await screen.findByText(/Uploading and checking your video/u)).toBeVisible();
-    expect(screen.queryByText('All changes saved')).not.toBeInTheDocument();
+    expect(screen.queryByText('Autosaved')).not.toBeInTheDocument();
 
     expect(await screen.findByRole('heading', { name: 'Original video ready' })).toBeVisible();
     expect(present).toHaveBeenCalledWith(activeId, expect.objectContaining({ blob: file }));
@@ -1943,7 +1943,7 @@ describe('Project route surface', () => {
     expect(
       await screen.findByText(/Saving your recent changes together as one change/u),
     ).toBeVisible();
-    expect(await screen.findByText('All changes saved')).toBeVisible();
+    expect(await screen.findByText('Autosaved')).toBeVisible();
     expect(revisionWrites).toBe(2);
   });
 
@@ -1978,6 +1978,6 @@ describe('Project route surface', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Project saving unavailable.');
     await user.click(within(alert).getByRole('button', { name: 'Discard local changes' }));
-    expect(await screen.findByText('All changes saved')).toBeVisible();
+    expect(await screen.findByText('Autosaved')).toBeVisible();
   });
 });

@@ -137,7 +137,7 @@ export const NewProjectDialog = ({
 };
 
 /**
- * Making another version of an existing Project. The copy starts from the same original video and
+ * Duplicating an existing Project. The copy starts from the same original video and
  * the same creative setup; it produces nothing until the operator asks it to, which is what the
  * body states plainly rather than leaving the operator to wonder what it just cost them.
  */
@@ -186,7 +186,7 @@ export const DuplicateProjectDialog = ({
     <OverlayPanel
       open
       onClose={onClose}
-      title="Make another version"
+      title="Duplicate Project"
       description="Creates a new Project that starts from the same original video and the same creative setup."
       placement="bottom"
       size="standard"
@@ -206,7 +206,7 @@ export const DuplicateProjectDialog = ({
             disabled={busy || title.trim().length === 0 || title.trim().length > 120}
             onClick={() => void submit()}
           >
-            Make another version
+            Duplicate Project
           </Button>
         </div>
       }

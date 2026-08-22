@@ -298,7 +298,7 @@ describe('Project output save UI', () => {
     const user = userEvent.setup();
     renderSection(session(acceptCurrent));
 
-    expect(screen.getByText('All changes saved', { exact: false })).toBeVisible();
+    expect(screen.getByText('Autosaved', { exact: false })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
     await user.click(screen.getByRole('button', { name: 'Close panel' }));
     await waitFor(() =>

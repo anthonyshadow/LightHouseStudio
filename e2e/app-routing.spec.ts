@@ -324,7 +324,7 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   });
 
   await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
-  await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();
+  await expect(page.getByText('Autosaved', { exact: true })).toBeVisible();
   await expect(stageVideo).toHaveAttribute('src', /^blob:/u);
   const firstObjectUrl = await stageVideo.getAttribute('src');
   expect(projects.sourceOperationKeys).toHaveLength(1);
@@ -335,7 +335,7 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   // Source task explicitly to check what the refresh restored.
   await openProjectTask(page, 'Original');
   await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
-  await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();
+  await expect(page.getByText('Autosaved', { exact: true })).toBeVisible();
   // Reopening streams the accepted source from its ranged content route rather than downloading
   // it into a Blob, so the stage binds the app-owned URL instead of a fresh object URL.
   await expect(stageVideo).toHaveAttribute('src', /\/source\/content$/u);

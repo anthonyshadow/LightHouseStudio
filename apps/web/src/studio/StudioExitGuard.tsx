@@ -296,13 +296,13 @@ export const StudioExitGuard = ({
         ? {
             title: 'Discard temporary Project work and leave this Project?',
             description:
-              'Leaving this Project now cancels active source staging and discards finalized in-memory recordings, active Voice work, unsaved edits, and unsaved creative configuration. Server-accepted source and saved revisions remain attached to this Project.',
+              'Leaving this Project now cancels active source staging and discards finalized in-memory recordings, active Voice work, unsaved edits, and unsaved creative configuration. Server-accepted source and autosaved Project changes remain attached to this Project.',
             confirmLabel: 'Discard and leave Project',
           }
         : {
             title: 'Discard temporary Project work and switch Projects?',
             description:
-              'Switching Projects now cancels active source staging and discards finalized in-memory recordings, active Voice work, unsaved edits, and unsaved creative configuration. Server-accepted source and saved revisions remain attached to the original Project.',
+              'Switching Projects now cancels active source staging and discards finalized in-memory recordings, active Voice work, unsaved edits, and unsaved creative configuration. Server-accepted source and autosaved Project changes remain attached to the original Project.',
             confirmLabel: 'Discard and switch',
           };
   const activeWorkCopy = videoRenderingActive

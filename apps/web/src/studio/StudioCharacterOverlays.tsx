@@ -120,7 +120,7 @@ export const StudioCharacterOverlays = ({
             ? `${character.wardrobeCharacter.name} wardrobe`
             : 'Character wardrobe'
         }
-        description="Browse the original and saved variants, or create a new version without changing the parent character."
+        description="Browse the original and saved variants, or create a new variant without changing the parent character."
         placement={desktopStudioLayout ? 'right' : 'fullscreen'}
         size="wide"
         bodyMode="contained"

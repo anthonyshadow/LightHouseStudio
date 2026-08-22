@@ -188,7 +188,7 @@ const ProjectListSection = ({
                     data-project-action="duplicate"
                     onClick={(event) => onDuplicate(project, event.currentTarget)}
                   >
-                    Make another version
+                    Duplicate Project
                   </Button>
                   <Button
                     size="small"
