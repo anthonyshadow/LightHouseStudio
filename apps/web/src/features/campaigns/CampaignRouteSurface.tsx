@@ -288,8 +288,8 @@ const CampaignsWorkspace = () => {
             Campaigns
           </h1>
           <p>
-            Group related Projects around an initiative with only a name and optional brief.
-            Campaigns stay optional, so standalone Quick Start remains available in Projects.
+            Group related Projects under one initiative — just a name and an optional brief.
+            Campaigns are optional; you can create a Project without one.
           </p>
         </div>
         <Button
