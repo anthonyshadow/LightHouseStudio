@@ -221,9 +221,14 @@ export const brandStyles = (theme: Theme): CSSObject => ({
   '& strong': {
     display: 'block',
     margin: 0,
+    overflow: 'hidden',
     fontFamily: theme.type.display,
     fontSize: 'clamp(1.05rem, 2vw, 1.35rem)',
     letterSpacing: '-0.025em',
+    // The product's name is never broken mid-word. The column is `minmax(0, 1fr)`, so without
+    // this it wrapped to `Ligh / tfra / me` on the first authenticated screen at 320px.
+    whiteSpace: 'nowrap',
+    textOverflow: 'ellipsis',
   },
   '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '2px' },
   '&:hover': { background: theme.colors.surfaceSoft },
@@ -247,6 +252,13 @@ export const brandStyles = (theme: Theme): CSSObject => ({
     '& img': { width: '2rem', height: '2rem' },
     '& span': { display: 'none' },
     '& strong': { fontSize: theme.fontSizes.label },
+  },
+  // Below this the header row cannot hold the wordmark and the action cluster, so the mark stands
+  // alone — the same treatment the 48–64rem rail already uses. The button keeps its `aria-label`,
+  // so the destination is still announced.
+  '@media (max-width: 22rem)': {
+    gridTemplateColumns: '2rem',
+    '& > div': { display: 'none' },
   },
 });
 
