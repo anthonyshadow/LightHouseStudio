@@ -103,6 +103,7 @@ export interface StudioTheme {
       bottom: string;
       bottomCompact: string;
       bottomTablet: string;
+      bottomSheet: string;
     };
   };
   layers: {
@@ -240,6 +241,8 @@ export const studioTheme: StudioTheme = {
       drawerWorkspace: 'min(64rem, calc(100vw - 1rem))',
       drawerWorkspaceCompact: 'min(64rem, calc(100vw - 1rem))',
       bottom: 'min(52dvh, 32rem)',
+      // A sheet keeps the stage above it visible; it is not a small version of a full panel.
+      bottomSheet: 'min(45dvh, 24rem)',
       bottomCompact: 'min(68dvh, 30rem)',
       bottomTablet: '88dvh',
     },

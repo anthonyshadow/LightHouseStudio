@@ -1,5 +1,6 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { StatusNotice, Surface } from '../../ui';
+import { visuallyHiddenStyles } from '../../ui/primitives/VisuallyHidden';
 import { formatBytes, formatDuration } from '../recording';
 import type { RecordedTakeMetadata, RecordingController, TakeMetadata } from '../recording/types';
 import type { VoiceProcessingController } from '../voice-effects/types';
@@ -57,11 +58,6 @@ const metadataStyles = (theme: Theme): CSSObject => ({
     background: theme.colors.surfaceStrong,
   },
 });
-const headingStyles = (theme: Theme): CSSObject => ({
-  margin: 0,
-  fontFamily: theme.type.display,
-});
-
 const introStyles = (theme: Theme): CSSObject => ({
   marginBlockEnd: theme.space.sm,
   color: theme.colors.textMuted,
@@ -94,6 +90,21 @@ const reviewBodyStyles = (theme: Theme): CSSObject => ({
 
 const reviewDetailsStyles = (): CSSObject => ({
   minWidth: 0,
+});
+
+const detailsDisclosureStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  '& > summary': {
+    display: 'inline-flex',
+    alignItems: 'center',
+    minHeight: '2.25rem',
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSizes.caption,
+    fontWeight: 700,
+    cursor: 'pointer',
+    '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '2px' },
+  },
+  '&[open] > summary': { color: theme.colors.text },
 });
 
 type MetadataChip = {
@@ -215,6 +226,14 @@ export const TakeDock = ({
   const theme = useTheme();
   const artifact = recording.presented;
   const captureChips = captureMetadataChips(recording.metadata);
+  const resolutionChip = captureChips.find((chip) => chip.key === 'resolution') ?? null;
+  const detailChips: MetadataChip[] = [
+    ...captureChips.filter((chip) => chip.key !== 'resolution'),
+    { key: 'size', label: formatBytes(artifact?.sizeBytes ?? 0) },
+    ...(artifact?.mimeType
+      ? [{ key: 'mime', label: artifact.mimeType, title: artifact.mimeType }]
+      : []),
+  ];
 
   if (!artifact) return null;
   if (view === 'voice') {
@@ -242,46 +261,49 @@ export const TakeDock = ({
       <div css={gridStyles(theme, view)}>
         <div css={latestPanelStyles()}>
           <header>
-            <h2 id="take-heading" tabIndex={-1} css={headingStyles(theme)}>
+            {/* The panel chrome already shows this title; the heading stays for the region label
+                and as the focus target, so it is hidden rather than repeated on screen. */}
+            <h2 id="take-heading" tabIndex={-1} css={visuallyHiddenStyles()}>
               Latest take
             </h2>
             <p role="status" aria-live="polite" aria-atomic="true" css={introStyles(theme)}>
               {hasUnsavedChanges === false
-                ? 'Playback remains on the main stage. This video has no unsaved changes.'
-                : 'Playback remains on the main stage. Save this temporary take before releasing it.'}
+                ? 'This video has no unsaved changes.'
+                : 'Save this take before you close it.'}
             </p>
           </header>
           <div css={reviewBodyStyles(theme)}>
             <div css={reviewDetailsStyles()}>
-              {captureChips.length > 0 ? (
-                <div css={metadataStyles(theme)} role="list" aria-label="Capture metadata">
-                  {captureChips.map((chip) =>
-                    chip.dateTime ? (
-                      <time
-                        key={chip.key}
-                        role="listitem"
-                        dateTime={chip.dateTime}
-                        title={chip.title}
-                      >
-                        {chip.label}
-                      </time>
-                    ) : (
-                      <span key={chip.key} role="listitem" title={chip.title}>
-                        {chip.label}
-                      </span>
-                    ),
-                  )}
-                </div>
-              ) : null}
-              <div css={metadataStyles(theme)} role="list" aria-label="Take file details">
+              {/* Duration and resolution are review criteria. Codec, file size, frame rate and
+                  device names are not, so they are one disclosure away rather than eight chips
+                  ahead of the decision. Nothing is dropped. */}
+              <div css={metadataStyles(theme)} role="list" aria-label="Take summary">
                 <span role="listitem">{formatDuration(artifact.durationMs / 1000)}</span>
-                <span role="listitem">{formatBytes(artifact.sizeBytes)}</span>
-                {artifact.mimeType ? (
-                  <span role="listitem" title={artifact.mimeType}>
-                    {artifact.mimeType}
-                  </span>
-                ) : null}
+                {resolutionChip ? <span role="listitem">{resolutionChip.label}</span> : null}
               </div>
+              {detailChips.length > 0 ? (
+                <details css={detailsDisclosureStyles(theme)}>
+                  <summary>Details</summary>
+                  <div css={metadataStyles(theme)} role="list" aria-label="Take details">
+                    {detailChips.map((chip) =>
+                      chip.dateTime ? (
+                        <time
+                          key={chip.key}
+                          role="listitem"
+                          dateTime={chip.dateTime}
+                          title={chip.title}
+                        >
+                          {chip.label}
+                        </time>
+                      ) : (
+                        <span key={chip.key} role="listitem" title={chip.title}>
+                          {chip.label}
+                        </span>
+                      ),
+                    )}
+                  </div>
+                </details>
+              ) : null}
               <TakeReviewActions
                 recording={recording}
                 {...(onCloseTake ? { onCloseTake } : {})}
@@ -304,8 +326,8 @@ export const TakeDock = ({
               title={`“${saveVideoState.video.title}” is in Assets`}
             >
               <p>
-                Saved as Version {saveVideoState.video.currentVersion.ordinal}. This tab still owns
-                the temporary take until you release it.
+                Saved as Version {saveVideoState.video.currentVersion.ordinal}. This take stays in
+                this browser tab until you close it.
               </p>
               {onOpenSavedVideosLibrary ? (
                 <SavedVideoSuccessActions

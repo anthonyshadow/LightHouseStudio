@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../StudioDesignProvider';
 import { ActionMenu, type ActionMenuItem } from './ActionMenu';
+import { OverlayPanel } from './OverlayPanel';
 
 afterEach(() => {
   cleanup();
@@ -80,7 +81,7 @@ describe('ActionMenu', () => {
     expect(screen.getByRole('menuitem', { name: 'Archive' })).toHaveFocus();
   });
 
-  it('keeps a disabled item focusable, states its reason, and refuses to run it', async () => {
+  it('keeps a disabled item focusable, states its description, and refuses to run it', async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
     renderMenu([
@@ -88,7 +89,7 @@ describe('ActionMenu', () => {
         id: 'edit',
         label: 'Edit video',
         disabled: true,
-        disabledReason: 'Still processing.',
+        description: 'Still processing.',
         onSelect,
       },
     ]);
@@ -101,6 +102,30 @@ describe('ActionMenu', () => {
     await user.click(item);
     expect(onSelect).not.toHaveBeenCalled();
     expect(menu).toBeInTheDocument();
+  });
+
+  it('takes Escape from the panel it is inside, closing only itself', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <StudioDesignProvider>
+        <OverlayPanel open title="Latest take" placement="bottom" onClose={onClose}>
+          <ActionMenu
+            label="More actions for this take"
+            items={[{ id: 'edit', label: 'Edit video', onSelect: vi.fn() }]}
+          />
+        </OverlayPanel>
+      </StudioDesignProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'More actions for this take' }));
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+
+    // The panel still owns Escape once nothing is open inside it.
+    await user.keyboard('{Escape}');
+    expect(onClose).toHaveBeenCalledOnce();
   });
 
   it('renders nothing when it would hold no items', () => {

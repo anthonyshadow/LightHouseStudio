@@ -124,7 +124,7 @@ export const createLocalTake = async (page: Page): Promise<void> => {
 export const discardTake = async (page: Page, scope?: Locator): Promise<void> => {
   await (scope ?? page).getByRole('button', { name: 'Discard' }).click();
   await page
-    .getByRole('dialog', { name: 'Discard this in-memory take?' })
+    .getByRole('dialog', { name: 'Discard this take?' })
     .getByRole('button', { name: 'Discard take' })
     .click();
 };

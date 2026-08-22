@@ -951,7 +951,7 @@ describe('StudioApp composition lifecycle', () => {
     const { router } = renderStudio(undefined, `/studio/${directVideoId}`);
     const stage = await screen.findByTestId('media-stage');
 
-    expect(await screen.findByRole('region', { name: 'Latest Take' })).toBeVisible();
+    expect(await screen.findByRole('region', { name: 'Latest take' })).toBeVisible();
     expect(harness.getSavedVideo).toHaveBeenCalledWith(directVideoId, expect.any(AbortSignal));
     expect(harness.existingVideo.selectFile).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'launch-review.mp4', type: 'video/mp4' }),

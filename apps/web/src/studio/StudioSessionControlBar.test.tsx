@@ -400,7 +400,7 @@ describe('StudioSessionControlBar', () => {
     expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit video' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Voice' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Release' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Start camera' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Voice' }));
@@ -433,7 +433,7 @@ describe('StudioSessionControlBar', () => {
     );
 
     expect(screen.queryByRole('button', { name: 'Discard' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Release' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
     expect(savedRecording.discard).toHaveBeenCalledOnce();
     expect(onCloseTakeReview).toHaveBeenCalledOnce();
 
@@ -461,7 +461,7 @@ describe('StudioSessionControlBar', () => {
     expect(screen.queryByRole('group', { name: 'Recorded take controls' })).not.toBeInTheDocument();
   });
 
-  it('shows Release instead of Discard for an unchanged video already loaded from Assets', () => {
+  it('shows Close instead of Discard for an unchanged video already loaded from Assets', () => {
     const artifact = takeArtifact();
     renderBar(
       createSession(),
@@ -474,7 +474,7 @@ describe('StudioSessionControlBar', () => {
       { hasUnsavedChanges: false },
     );
 
-    expect(screen.getByRole('button', { name: 'Release' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Discard' })).not.toBeInTheDocument();
   });
 

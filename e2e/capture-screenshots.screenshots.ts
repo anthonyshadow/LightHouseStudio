@@ -233,7 +233,8 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
 
 const showVoiceTreatment = async (page: Page): Promise<void> => {
   await createLocalTake(page);
-  await page.getByRole('button', { name: 'Voice treatments' }).click();
+  await page.getByRole('button', { name: 'More actions for this take' }).click();
+  await page.getByRole('menuitem', { name: 'Voice treatments' }).click();
   await expect(page.getByRole('dialog', { name: 'Voice Treatments' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Back to take review' })).toBeVisible();
   const heading = page.getByRole('heading', { name: 'Select Treatment', exact: true });

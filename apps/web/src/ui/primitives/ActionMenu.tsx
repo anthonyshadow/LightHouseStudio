@@ -18,8 +18,11 @@ export type ActionMenuItem = Readonly<{
   /** Destructive actions are marked here rather than promoted into a page's default action row. */
   danger?: boolean;
   disabled?: boolean;
-  /** Shown under a disabled item's label and announced as its description. */
-  disabledReason?: string;
+  /**
+   * A second line under the label, announced as the item's description: why a disabled item is
+   * unavailable, or what an enabled one will do. The accessible name stays the label alone.
+   */
+  description?: string;
 }>;
 
 /**
@@ -89,8 +92,9 @@ export const ActionMenu = ({
         >
           {items.map((item) => {
             const disabled = item.disabled ?? false;
-            const reason = disabled ? item.disabledReason : undefined;
-            const reasonId = reason === undefined ? undefined : `${menuId}-${item.id}-reason`;
+            const description = item.description;
+            const descriptionId =
+              description === undefined ? undefined : `${menuId}-${item.id}-description`;
             return (
               <Button
                 key={item.id}
@@ -100,9 +104,9 @@ export const ActionMenu = ({
                 data-action-menu-item={item.id}
                 {...(item.danger ? { 'data-danger': '' } : {})}
                 aria-disabled={disabled}
-                {...(reasonId === undefined
+                {...(descriptionId === undefined
                   ? {}
-                  : { 'aria-label': item.label, 'aria-describedby': reasonId })}
+                  : { 'aria-label': item.label, 'aria-describedby': descriptionId })}
                 onClick={() => {
                   if (disabled) return;
                   const trigger = triggerRef.current;
@@ -111,9 +115,9 @@ export const ActionMenu = ({
                 }}
               >
                 <span>{item.label}</span>
-                {reasonId === undefined ? null : (
-                  <span data-action-menu-reason id={reasonId}>
-                    {reason}
+                {descriptionId === undefined ? null : (
+                  <span data-action-menu-description id={descriptionId}>
+                    {description}
                   </span>
                 )}
               </Button>

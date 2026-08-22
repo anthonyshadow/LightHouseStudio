@@ -55,7 +55,7 @@ export const actionMenuPopoverStyles = (theme: Theme, placement: 'above' | 'belo
   },
   '& > button[data-danger]': { color: theme.colors.danger },
   '& > button[aria-disabled="true"]': { cursor: 'not-allowed', opacity: 0.48 },
-  '& [data-action-menu-reason]': {
+  '& [data-action-menu-description]': {
     color: theme.colors.textMuted,
     fontSize: theme.fontSizes.metadata,
     fontWeight: 500,

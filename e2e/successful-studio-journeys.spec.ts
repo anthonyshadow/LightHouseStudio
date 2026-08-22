@@ -172,7 +172,7 @@ for (const viewport of exactViewports) {
       'data-stage-presentation',
       'playback',
     );
-    await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
+    await expect(page.getByRole('dialog', { name: 'Latest take' })).toBeHidden();
     await expectStableStageRect(page, stableStageRect);
     await expectNoDocumentOverflow(page);
 
@@ -190,7 +190,7 @@ for (const viewport of exactViewports) {
     await expectStableStageRect(page, stableStageRect);
     await page.getByRole('button', { name: 'Back to take review' }).click();
 
-    await discardTake(page, page.getByRole('dialog', { name: 'Latest Take' }));
+    await discardTake(page, page.getByRole('dialog', { name: 'Latest take' }));
     await openAiSettings(page);
     await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
     await page.getByLabel('Character direction').fill('An adult cinematic field presenter');
@@ -257,7 +257,7 @@ test('@cross-browser focused media smoke reaches record, Voice, and review recov
     ),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Back to take review' }).click();
-  await discardTake(page, page.getByRole('dialog', { name: 'Latest Take' }));
+  await discardTake(page, page.getByRole('dialog', { name: 'Latest take' }));
   await expect(page.getByLabel('Recorded take playback')).toHaveCount(0);
 
   const browser = await readBrowserState(page);
@@ -345,7 +345,7 @@ test('the independent recording maximum warns and safely opens take review', asy
   await expect(takeControls.getByRole('button', { name: 'Save' })).toBeVisible();
   await expect(takeControls.getByRole('button', { name: 'Discard' })).toBeVisible();
   await expect(takeControls.getByRole('button', { name: 'Voice' })).toBeVisible();
-  await expect(takeControls.getByRole('button', { name: 'Release' })).toHaveCount(0);
+  await expect(takeControls.getByRole('button', { name: 'Close' })).toHaveCount(0);
 
   const browser = await readBrowserState(page);
   expect(browser.recorderStarts).toBe(2);
@@ -448,7 +448,7 @@ test('no-key Local Camera records and finalizes without provider HTTP, WebSocket
   await page.getByRole('button', { name: 'Stop recording' }).click();
 
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
-  await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: 'Latest take' })).toBeHidden();
   const takeControls = page.getByRole('group', { name: 'Recorded take controls' });
   await expect(takeControls.getByRole('button', { name: 'Save' })).toBeVisible();
   await expectNoAxeViolations(page);
@@ -478,12 +478,13 @@ test('saved voice preview, Apply, remux, Save, and Restore Original stay explici
   await page.goto('/studio/create');
 
   await createLocalTake(page);
-  const takeDialog = page.getByRole('dialog', { name: 'Latest Take' });
+  const takeDialog = page.getByRole('dialog', { name: 'Latest take' });
   const playback = page.getByLabel('Recorded take playback');
   const originalUrl = await playback.getAttribute('src');
   expect(originalUrl).toMatch(/^blob:/u);
 
-  await takeDialog.getByRole('button', { name: 'Voice treatments' }).click();
+  await takeDialog.getByRole('button', { name: 'More actions for this take' }).click();
+  await takeDialog.getByRole('menuitem', { name: 'Voice treatments' }).click();
   const voiceTreatments = page.getByRole('dialog', { name: 'Voice Treatments' });
   await expect(voiceTreatments).toBeVisible();
   await voiceTreatments.getByRole('button', { name: /Saved AI Voice/u }).click();
@@ -525,7 +526,7 @@ test('saved voice preview, Apply, remux, Save, and Restore Original stay explici
   await voiceTreatments.getByRole('button', { name: 'Apply treatment' }).click();
   await expect(voiceTreatments.getByRole('button', { name: 'Treatment applied' })).toBeDisabled();
   await voiceTreatments.getByRole('button', { name: 'Back to take review' }).click();
-  const processedTakeDialog = page.getByRole('dialog', { name: 'Latest Take' });
+  const processedTakeDialog = page.getByRole('dialog', { name: 'Latest take' });
   await expect(playback).toHaveAttribute('src', /^blob:/u);
   const processedUrl = await playback.getAttribute('src');
   expect(processedUrl).not.toBe(originalUrl);
@@ -543,11 +544,12 @@ test('saved voice preview, Apply, remux, Save, and Restore Original stay explici
   await processedTakeDialog.getByRole('button', { name: 'Save to Assets' }).click();
   await confirmSaveVideo(page, 'Northstar narration');
   await expect(processedTakeDialog.getByRole('button', { name: 'Saved' })).toBeVisible();
+  await processedTakeDialog.getByRole('button', { name: 'More actions for this take' }).click();
   await expect(
-    processedTakeDialog.getByRole('button', { name: 'Close and release' }),
-  ).toBeEnabled();
+    processedTakeDialog.getByRole('menuitem', { name: 'Close without saving' }),
+  ).toBeVisible();
 
-  await processedTakeDialog.getByRole('button', { name: 'Voice treatments' }).click();
+  await processedTakeDialog.getByRole('menuitem', { name: 'Voice treatments' }).click();
   const restoredVoiceTreatments = page.getByRole('dialog', { name: 'Voice Treatments' });
   await restoredVoiceTreatments.getByRole('button', { name: 'Original', exact: true }).click();
   await restoredVoiceTreatments.getByRole('button', { name: 'Restore original audio' }).click();
@@ -567,8 +569,9 @@ test('Browse Voices adds once and confirmed Saved removal reconciles both librar
   await page.goto('/studio/create');
   await createLocalTake(page);
 
-  const takeDialog = page.getByRole('dialog', { name: 'Latest Take' });
-  await takeDialog.getByRole('button', { name: 'Voice treatments' }).click();
+  const takeDialog = page.getByRole('dialog', { name: 'Latest take' });
+  await takeDialog.getByRole('button', { name: 'More actions for this take' }).click();
+  await takeDialog.getByRole('menuitem', { name: 'Voice treatments' }).click();
   const treatments = page.getByRole('dialog', { name: 'Voice Treatments' });
   await treatments.getByRole('button', { name: /Saved AI Voice/u }).click();
   await treatments.getByRole('button', { name: 'Browse Voices' }).click();
@@ -607,7 +610,7 @@ test('Browse Voices adds once and confirmed Saved removal reconciles both librar
   expectNoExternalProviderTraffic(network);
 });
 
-test('Save reveals Release and clears the reviewed take without reacquiring media', async ({
+test('Save reveals Close and clears the reviewed take without reacquiring media', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -619,9 +622,9 @@ test('Save reveals Release and clears the reviewed take without reacquiring medi
 
   const playback = page.getByLabel('Recorded take playback');
   await expect(playback).toBeVisible();
-  await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: 'Latest take' })).toBeHidden();
   const takeControls = page.getByRole('group', { name: 'Recorded take controls' });
-  const releaseTake = takeControls.getByRole('button', { name: 'Release' });
+  const releaseTake = takeControls.getByRole('button', { name: 'Close' });
   await expect(releaseTake).toHaveCount(0);
 
   await takeControls.getByRole('button', { name: 'Save' }).click();
@@ -630,7 +633,7 @@ test('Save reveals Release and clears the reviewed take without reacquiring medi
   await expect(releaseTake).toBeEnabled();
   await releaseTake.click();
 
-  await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: 'Latest take' })).toBeHidden();
   await expect(playback).toHaveCount(0);
   await expect(page.getByLabel('Studio media stage')).toHaveAttribute(
     'data-stage-presentation',
@@ -745,7 +748,7 @@ test('a Lucy model take finalizes before the provider session is released', asyn
   await page.getByRole('button', { name: 'Stop recording' }).click();
 
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
-  await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: 'Latest take' })).toBeHidden();
   await expect(page.getByLabel('Live local camera preview')).toHaveCount(0);
   await expect(page.getByLabel('Studio media stage')).toHaveAttribute(
     'data-stage-presentation',

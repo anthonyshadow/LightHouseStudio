@@ -1,5 +1,11 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { Button, ConfirmationRequestDialog, useConfirmationRequest } from '../../ui';
+import {
+  ActionMenu,
+  Button,
+  ConfirmationRequestDialog,
+  useConfirmationRequest,
+  type ActionMenuItem,
+} from '../../ui';
 import type { RecordingController } from '../recording/types';
 import type { SaveVideoState } from '../saved-videos/useSaveVideo';
 import { media } from '../../ui/media';
@@ -91,8 +97,9 @@ export const TakeReviewActions = ({
   const discard = async () => {
     if (
       !(await confirmation.ask({
-        title: 'Discard this in-memory take?',
-        description: 'It cannot be recovered after the tab releases it.',
+        title: 'Discard this take?',
+        description:
+          'It only exists in this browser tab, so it cannot be recovered once you discard it.',
         confirmLabel: 'Discard take',
         danger: true,
       }))
@@ -103,6 +110,52 @@ export const TakeReviewActions = ({
     onDiscardTake?.();
     onCloseTake?.();
   };
+
+  const closeLabel = compact ? 'Close' : 'Close without saving';
+  const closeDescription = saved
+    ? 'Closes review and clears this take from memory. Anything you already saved stays in Assets.'
+    : 'Closes review and clears this take from memory. Nothing was changed since you saved it.';
+
+  /*
+   * One primary, one destructive, and everything else behind the overflow. This is the moment of
+   * highest decision pressure in the product; six peer buttons made every option look equal.
+   */
+  const overflowItems: ActionMenuItem[] = [
+    ...(onReplaceSavedVideo
+      ? [
+          {
+            id: 'replace',
+            label: 'Replace Saved Version',
+            disabled: locked || saving,
+            onSelect: () => onReplaceSavedVideo(),
+          },
+        ]
+      : []),
+    ...(onEditVideo
+      ? [{ id: 'edit', label: 'Edit video', disabled: locked, onSelect: () => onEditVideo() }]
+      : []),
+    ...(onOpenVoiceTreatments
+      ? [
+          {
+            id: 'voice',
+            label: 'Voice treatments',
+            disabled: locked,
+            onSelect: () => onOpenVoiceTreatments(),
+          },
+        ]
+      : []),
+    ...(!unsaved
+      ? [
+          {
+            id: 'close',
+            label: closeLabel,
+            description: closeDescription,
+            disabled: locked || saving,
+            onSelect: () => closeTake(),
+          },
+        ]
+      : []),
+  ];
 
   return (
     <div
@@ -120,40 +173,37 @@ export const TakeReviewActions = ({
           {saving ? 'Saving…' : saved ? 'Saved to Assets' : compact ? 'Save' : 'Save to Assets'}
         </Button>
       ) : null}
-      {onReplaceSavedVideo ? (
-        <Button variant="secondary" disabled={locked || saving} onClick={onReplaceSavedVideo}>
-          Replace Saved Version
-        </Button>
-      ) : null}
-      {onEditVideo ? (
-        <Button variant="secondary" disabled={locked} onClick={onEditVideo}>
-          Edit video
-        </Button>
-      ) : null}
       {unsaved ? (
         <Button variant="danger" disabled={locked || saving} onClick={() => void discard()}>
           Discard
         </Button>
       ) : null}
-      {onOpenVoiceTreatments ? (
-        <Button variant="secondary" disabled={locked} onClick={onOpenVoiceTreatments}>
-          {compact ? 'Voice' : 'Voice treatments'}
-        </Button>
-      ) : null}
-      {!unsaved ? (
-        <Button
-          variant="secondary"
-          disabled={locked || saving}
-          title={
-            saved
-              ? 'Close review and release the temporary in-memory take. The saved gallery copy remains available.'
-              : 'Close review and release this unchanged temporary in-memory copy.'
-          }
-          onClick={closeTake}
-        >
-          {compact ? 'Release' : 'Close and release'}
-        </Button>
-      ) : null}
+      {compact ? (
+        <>
+          {onOpenVoiceTreatments ? (
+            <Button variant="secondary" disabled={locked} onClick={onOpenVoiceTreatments}>
+              Voice
+            </Button>
+          ) : null}
+          {onReplaceSavedVideo ? (
+            <Button variant="secondary" disabled={locked || saving} onClick={onReplaceSavedVideo}>
+              Replace Saved Version
+            </Button>
+          ) : null}
+          {!unsaved ? (
+            <Button
+              variant="secondary"
+              disabled={locked || saving}
+              title={closeDescription}
+              onClick={closeTake}
+            >
+              Close
+            </Button>
+          ) : null}
+        </>
+      ) : (
+        <ActionMenu label="More actions for this take" size="regular" items={overflowItems} />
+      )}
       {saveVideoState.status === 'error' && saveVideoState.artifactId === artifact.id ? (
         <span role="alert">{saveVideoState.message}</span>
       ) : null}
