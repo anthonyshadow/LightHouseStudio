@@ -864,6 +864,13 @@ suite. Recorded honestly:
 - **Three `e2e/local-first-preparation.spec.ts` cases fail on the unmodified baseline too**, all at
   the same `expect(login.ok()).toBe(true)` before reaching any assertion this work touched.
   Environmental, and confirmed by the same stash-and-re-run.
+
+  _Diagnosed later:_ these are the only specs that authenticate against the real API instead of a
+  route harness, so they are the only ones that fail when the API is not up — serving just the web
+  app leaves the Vite proxy returning 502 for `/api`. They pass under `bun run test:e2e`, which
+  starts the whole stack. The assertion now reports the status and body so the next reader does not
+  have to infer this.
+
 - **One genuine accessibility defect surfaced and was fixed.** Removing the Workshop step from the
   full-desktop axe scan exposed a `color-contrast` violation on the _selected_ capture-format
   option's caption: `textFaint` on the `accentSoft` background. It had been hidden because the scan
