@@ -24,6 +24,9 @@ implemented behaviour and constraints.
 | The complete route table and redirects                                      | [`user-flows/navigation-map.md`](user-flows/navigation-map.md)                     |
 | Known usability problems, gaps and likely bugs                              | [`user-flows/gaps-and-usability-audit.md`](user-flows/gaps-and-usability-audit.md) |
 | A cross-functional product assessment, and which of its findings are closed | [`product-audit/README.md`](product-audit/README.md)                               |
+| A UI/UX assessment of the interface as implemented                          | [`LightFrameUXAudit.md`](LightFrameUXAudit.md)                                     |
+| The order UX work should be done in, and a prompt for each item             | [`LightFrameUXImplementationPlan.md`](LightFrameUXImplementationPlan.md)           |
+| A design brief for an area that needs a new layout                          | [`LightFrameSuperdesignPrompts.md`](LightFrameSuperdesignPrompts.md)               |
 | The observable contract for one capability                                  | [`user-flows/feature-behavior/README.md`](user-flows/feature-behavior/README.md)   |
 | Module boundaries, ownership, lifecycle, API and deployment                 | [`ARCHITECTURE.md`](ARCHITECTURE.md)                                               |
 | Setup, scripts, configuration and release posture                           | [`../README.md`](../README.md)                                                     |
@@ -57,6 +60,9 @@ implemented behaviour and constraints.
 | [Gaps and usability audit](user-flows/gaps-and-usability-audit.md) | Product/engineering | Known flow gaps, missing/redundant UI, likely bugs, prioritised remediation                                                                                         |
 | [Product audit (Aug 2026)](product-audit/README.md)                | Product/engineering | Cross-functional assessment and prioritised findings. Its fifteen-step roadmap is fully implemented; the findings describe the product as audited, not as it stands |
 | [Feature behaviour](user-flows/feature-behavior/README.md)         | Product/QA          | Per-capability observable behaviour and manual validation limits                                                                                                    |
+| [UI/UX audit](LightFrameUXAudit.md)                                | Product/design      | The interface as implemented on 2026-08-22: classified findings, cross-page consistency, first-run experience. An assessment, not implementation authority          |
+| [UX implementation plan](LightFrameUXImplementationPlan.md)        | Product/engineering | Execution order for the UI/UX audit, with one ready-to-run prompt and its scoped validation per item                                                                |
+| [Superdesign prompts](LightFrameSuperdesignPrompts.md)             | Product/design      | The four areas the UI/UX audit judged to need a new layout rather than a fix, and the brief for each                                                                |
 | [Product Vision](PRODUCT_VISION.md)                                | Product             | Positioning, audiences, hierarchy, principles, terminology                                                                                                          |
 | [Campaign and Project MVP definition](MVP_DEFINITION.md)           | Product/engineering | Bounded Campaign/Project/video MVP model and completion criteria                                                                                                    |
 
