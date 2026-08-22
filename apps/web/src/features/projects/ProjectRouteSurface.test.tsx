@@ -16,6 +16,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
+import { chooseMenuAction } from '../../test/actionMenu';
 import { mockApiServer } from '../../test/msw/server';
 import { ProjectRouteSurface, type ProjectRouteSurfaceProps } from './ProjectRouteSurface';
 import type { ProjectSourceRuntime } from './useProjectSourceController';
@@ -191,23 +192,6 @@ const acceptedSourceResponse = (): ProjectSourceResponse => ({
     contentUrl: `/api/projects/${activeId}/source/content`,
   },
 });
-
-/**
- * Management actions live behind the row's `ActionMenu`, so a spec opens the overflow and picks the
- * item. Returns the trigger, which is the element focus must come back to once a dialog closes.
- */
-const chooseProjectAction = async (
-  user: ReturnType<typeof userEvent.setup>,
-  container: HTMLElement,
-  title: string,
-  action: string,
-): Promise<HTMLElement> => {
-  const queries = within(container);
-  const trigger = await queries.findByLabelText(`More actions for ${title}`);
-  await user.click(trigger);
-  await user.click(await queries.findByRole('menuitem', { name: action }));
-  return trigger;
-};
 
 const renderProjects = (
   path = '/projects',
@@ -1055,13 +1039,13 @@ describe('Project route surface', () => {
     renderProjects();
 
     const activeList = await screen.findByRole('list', { name: 'Active Projects' });
-    await chooseProjectAction(user, activeList, 'Launch cut', 'Archive');
+    await chooseMenuAction(user, 'Launch cut', 'Archive', activeList);
     const archiveDialog = screen.getByRole('dialog', { name: 'Archive Project' });
     await user.click(within(archiveDialog).getByRole('button', { name: 'Archive Project' }));
     expect(await screen.findByText('Launch cut archived.')).toBeVisible();
     const archivedList = await screen.findByRole('list', { name: 'Archived Projects' });
 
-    await chooseProjectAction(user, archivedList, 'Launch cut', 'Restore');
+    await chooseMenuAction(user, 'Launch cut', 'Restore', archivedList);
     const restoreDialog = screen.getByRole('dialog', { name: 'Restore Project' });
     await user.click(within(restoreDialog).getByRole('button', { name: 'Restore Project' }));
     expect(await screen.findByText('Launch cut restored.')).toBeVisible();
@@ -1114,7 +1098,7 @@ describe('Project route surface', () => {
     const { router } = renderProjects();
 
     const activeList = await screen.findByRole('list', { name: 'Active Projects' });
-    await chooseProjectAction(user, activeList, 'Launch cut', 'Duplicate Project');
+    await chooseMenuAction(user, 'Launch cut', 'Duplicate Project', activeList);
     const dialog = await screen.findByRole('dialog', { name: 'Duplicate Project' });
 
     // Named recognisably, and editable before confirming.
@@ -1167,7 +1151,7 @@ describe('Project route surface', () => {
     const user = userEvent.setup();
     const { router } = renderProjects(`/projects/${activeId}`);
 
-    await chooseProjectAction(user, document.body, 'Launch cut', 'Duplicate Project');
+    await chooseMenuAction(user, 'Launch cut', 'Duplicate Project');
     const dialog = await screen.findByRole('dialog', { name: 'Duplicate Project' });
     const field = within(dialog).getByRole('textbox', { name: 'New Project name' });
     await user.clear(field);
@@ -1206,7 +1190,7 @@ describe('Project route surface', () => {
     const { router } = renderProjects();
 
     const activeList = await screen.findByRole('list', { name: 'Active Projects' });
-    await chooseProjectAction(user, activeList, 'Launch cut', 'Duplicate Project');
+    await chooseMenuAction(user, 'Launch cut', 'Duplicate Project', activeList);
     const dialog = await screen.findByRole('dialog', { name: 'Duplicate Project' });
     await user.click(within(dialog).getByRole('button', { name: 'Duplicate Project' }));
 
@@ -1244,7 +1228,7 @@ describe('Project route surface', () => {
     renderProjects();
 
     const archivedList = await screen.findByRole('list', { name: 'Archived Projects' });
-    await chooseProjectAction(user, archivedList, 'Archived concept', 'Delete');
+    await chooseMenuAction(user, 'Archived concept', 'Delete', archivedList);
     const dialog = screen.getByRole('dialog', { name: 'Delete Project' });
     expect(dialog).toHaveTextContent('It does not claim physical erasure');
     await user.click(within(dialog).getByRole('button', { name: 'Confirm Delete Project' }));
@@ -1290,7 +1274,7 @@ describe('Project route surface', () => {
     renderProjects(`/projects/${activeId}`);
     const user = userEvent.setup();
 
-    const renameTrigger = await chooseProjectAction(user, document.body, 'Launch cut', 'Rename');
+    const renameTrigger = await chooseMenuAction(user, 'Launch cut', 'Rename');
     const dialog = screen.getByRole('dialog', { name: 'Rename Project' });
     const input = within(dialog).getByRole('textbox', { name: /Project name/u });
     await user.clear(input);
@@ -1355,7 +1339,7 @@ describe('Project route surface', () => {
     await user.click(screen.getByRole('button', { name: 'All Active' }));
     expect(await screen.findByRole('heading', { name: 'Archived' })).toBeVisible();
     const activeList = await screen.findByRole('list', { name: 'Active Projects' });
-    await chooseProjectAction(user, activeList, 'Launch cut', 'Rename');
+    await chooseMenuAction(user, 'Launch cut', 'Rename', activeList);
     const dialog = screen.getByRole('dialog', { name: 'Rename Project' });
     const input = within(dialog).getByRole('textbox', { name: /Project name/u });
     await user.clear(input);
@@ -1797,7 +1781,7 @@ describe('Project route surface', () => {
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}`);
 
-    await chooseProjectAction(user, document.body, 'Launch cut', 'Move Project');
+    await chooseMenuAction(user, 'Launch cut', 'Move Project');
     const dialog = screen.getByRole('dialog', { name: 'Project Campaign' });
     await user.click(within(dialog).getByRole('combobox', { name: 'Campaign' }));
     await user.click(screen.getByRole('option', { name: 'Summer launch' }));
@@ -1851,7 +1835,7 @@ describe('Project route surface', () => {
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}`);
 
-    await chooseProjectAction(user, document.body, 'Launch cut', 'Archive');
+    await chooseMenuAction(user, 'Launch cut', 'Archive');
     const dialog = screen.getByRole('dialog', { name: 'Archive Project' });
     await user.click(within(dialog).getByRole('button', { name: 'Archive Project' }));
     expect(await within(dialog).findByText('The Project changed. Refresh it.')).toBeVisible();

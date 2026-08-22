@@ -8,6 +8,7 @@ import {
 import {
   CREATIVE_ASSET_STORAGE_KEY,
   closeAiSettings,
+  chooseTakeAction,
   createLocalTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
@@ -621,8 +622,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'voice-browser-loaded',
     setup: async (page) => {
       await createLocalTake(page);
-      await page.getByRole('button', { name: 'More actions for this take' }).click();
-      await page.getByRole('menuitem', { name: 'Voice treatments' }).click();
+      await chooseTakeAction(page, 'Voice treatments');
       const treatments = page.getByRole('dialog', { name: 'Voice Treatments' });
       await expect(
         treatments.getByRole('heading', { name: 'Select Treatment', exact: true }),

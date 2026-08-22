@@ -1,13 +1,13 @@
 import { useTheme } from '@emotion/react';
 import { useId, useRef, useState } from 'react';
 import { AppIcon } from './AppIcon';
-import { Button, type ButtonSize } from './Button';
+import { Button } from './Button';
 import { actionMenuPopoverStyles, actionMenuStyles } from './ActionMenu.styles';
 import { useDismissiblePopover } from './useDismissiblePopover';
 import { useMenuKeyboardNavigation } from './useMenuKeyboardNavigation';
 
 export type ActionMenuItem = Readonly<{
-  /** Stable key, also emitted as `data-action-menu-item` so styles and specs can address one row. */
+  /** Stable key for the rendered row. */
   id: string;
   label: string;
   /**
@@ -36,18 +36,12 @@ export type ActionMenuItem = Readonly<{
 export const ActionMenu = ({
   label,
   items,
-  size = 'small',
   placement = 'below',
-  className,
-  'data-testid': dataTestId,
 }: {
   /** Accessible name for both the trigger and the menu, e.g. `More actions for Morning take`. */
   readonly label: string;
   readonly items: readonly ActionMenuItem[];
-  readonly size?: ButtonSize;
   readonly placement?: 'above' | 'below';
-  readonly className?: string;
-  readonly 'data-testid'?: string;
 }) => {
   const theme = useTheme();
   const menuId = useId();
@@ -61,16 +55,10 @@ export const ActionMenu = ({
   if (items.length === 0) return null;
 
   return (
-    <div
-      ref={rootRef}
-      css={actionMenuStyles(theme)}
-      {...(className === undefined ? {} : { className })}
-      {...(dataTestId === undefined ? {} : { 'data-testid': dataTestId })}
-    >
+    <div ref={rootRef} css={actionMenuStyles(theme)}>
       <Button
         ref={triggerRef}
         type="button"
-        size={size}
         variant="secondary"
         aria-label={label}
         aria-haspopup="menu"
@@ -101,7 +89,6 @@ export const ActionMenu = ({
                 type="button"
                 role="menuitem"
                 variant="quiet"
-                data-action-menu-item={item.id}
                 {...(item.danger ? { 'data-danger': '' } : {})}
                 aria-disabled={disabled}
                 {...(descriptionId === undefined

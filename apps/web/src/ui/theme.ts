@@ -151,9 +151,14 @@ export const studioTheme: StudioTheme = {
     border: '#557089',
     borderStrong: '#5f7b92',
     /*
-     * The old `border`. A rule between stacked blocks on one surface bounds nothing interactive,
-     * so 1.4.11 does not apply to it, and raising it with the rest would have drawn a hard line
-     * under every heading and between every list row in the product.
+     * The old `border`, for lines that separate *content* — a rule under a section heading, the
+     * edges bracketing an empty state, the row separators in a list. They bound nothing
+     * interactive, so 1.4.11 does not apply, and raising them with the rest would have drawn a
+     * hard line under every heading in the product.
+     *
+     * The test is what the edge bounds, not its shape: a single edge that bounds a *control bar*
+     * — the mobile navigation, a player's control strip, a workspace masthead — is that bar's
+     * visual boundary and keeps `border` / `borderStrong`.
      */
     divider: '#293642',
     text: '#f4f7f8',

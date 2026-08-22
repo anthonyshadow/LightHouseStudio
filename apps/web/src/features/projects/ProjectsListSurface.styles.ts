@@ -65,7 +65,7 @@ export const projectsLedgerSectionStyles = (theme: Theme): CSSObject => ({
     justifyContent: 'space-between',
     gap: theme.space.md,
     paddingBlockEnd: theme.space.md,
-    borderBlockEnd: `1px solid ${theme.colors.borderStrong}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
   },
   '& h3': {
     margin: 0,

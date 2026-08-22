@@ -8,6 +8,7 @@ import { creativeLibraryStorageSummary } from '../creative-assets/creativeLibrar
 import type { CreativeLibraryMirror } from '../creative-assets/useCreativeLibraryCloudSync';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { Button, VisuallyHidden } from '../../ui';
+import { pageScrollRegionStyles } from '../../ui/primitives/PageShell.styles';
 import { media } from '../../ui/media';
 import { PageHeader, PageShell } from '../../ui/primitives/PageShell';
 
@@ -34,13 +35,7 @@ type AssetsRouteSurfaceProps = Readonly<{
 
 /** The page is not a card: scrolling and the query container live here, the frame in `PageShell`. */
 const surfaceStyles = (theme: Theme): CSSObject => ({
-  height: '100%',
-  minWidth: 0,
-  minHeight: 0,
-  overflowY: 'auto',
-  scrollbarGutter: 'stable',
-  background: theme.colors.canvas,
-  containerType: 'inline-size',
+  ...pageScrollRegionStyles(theme),
   '& h2': { fontFamily: theme.type.display },
   '& p': { margin: 0 },
 });

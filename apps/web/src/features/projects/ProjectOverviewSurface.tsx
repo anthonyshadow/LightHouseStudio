@@ -128,7 +128,6 @@ export const ProjectOverviewSurface = ({
           <>
             <Button
               variant="primary"
-              data-detail-action="continue"
               onClick={() => void navigate(projectWorkspacePath(project.id))}
             >
               {archived
@@ -139,7 +138,6 @@ export const ProjectOverviewSurface = ({
             </Button>
             <ActionMenu
               label={`More actions for ${project.title}`}
-              size="regular"
               items={[
                 {
                   id: 'duplicate',

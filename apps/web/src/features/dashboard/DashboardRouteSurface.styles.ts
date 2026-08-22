@@ -1,28 +1,32 @@
 import type { CSSObject, Theme } from '@emotion/react';
 import { media } from '../../ui/media';
+import { pageScrollRegionStyles } from '../../ui/primitives/PageShell.styles';
 
 /** The scroll region and query container; `PageShell` inside it owns width and padding. */
 export const dashboardStyles = (theme: Theme): CSSObject => ({
+  ...pageScrollRegionStyles(theme),
   width: '100%',
-  height: '100%',
-  minWidth: 0,
-  minHeight: 0,
-  overflowY: 'auto',
-  background: theme.colors.canvas,
-  containerType: 'inline-size',
   '& h2, & h3': { fontFamily: theme.type.display },
   '& p': { margin: 0 },
 });
 
-/**
- * Layered onto `PageShell`. The eyebrow, the title scale and the identity grid come from the shared
- * header now; what stays here is the Dashboard's own action pair and its mobile bottom clearance.
- */
-export const dashboardHeaderStyles = (theme: Theme): CSSObject => ({
+/** Layered onto `PageShell`: the one thing the Dashboard's scroll region needs that no page does. */
+export const dashboardShellStyles = (): CSSObject => ({
   // The fixed bottom navigation sits over the last rows of a scrolled Dashboard without this.
   [media.down('compact')]: {
     paddingBlockEnd: `max(5rem, calc(env(safe-area-inset-bottom) + 4.5rem))`,
   },
+});
+
+/**
+ * Layered onto `PageHeader` — not onto the shell above it. The eyebrow, title scale and identity
+ * grid come from the shared header; only the Dashboard's own action pair stays here.
+ *
+ * These rules have to sit on the same element the shared ones do. Declared from an ancestor they
+ * tie on specificity and are settled by stylesheet insertion order, which is decided by whichever
+ * surface happened to mount a `PageHeader` first in the session.
+ */
+export const dashboardHeaderStyles = (theme: Theme): CSSObject => ({
   '& [data-dashboard-actions]': {
     display: 'flex',
     alignItems: 'center',
@@ -36,7 +40,7 @@ export const dashboardHeaderStyles = (theme: Theme): CSSObject => ({
   '& [data-dashboard-actions] > button:last-of-type': { paddingInline: 0 },
   '@container (max-width: 30rem)': {
     '& [data-dashboard-actions]': { flexWrap: 'wrap' },
-    // The Dashboard's slot holds two controls, so it opts out of the shared one-primary grid.
+    // The Dashboard's slot holds two peer controls, so it opts out of the one-primary grid.
     '& [data-page-actions]': { display: 'flex' },
   },
 });
@@ -357,7 +361,7 @@ export const emptyRecentStyles = (theme: Theme): CSSObject => ({
   justifyItems: 'start',
   gap: theme.space.sm,
   paddingBlock: theme.space.xl,
-  borderBlock: `1px solid ${theme.colors.border}`,
+  borderBlock: `1px solid ${theme.colors.divider}`,
   color: theme.colors.textMuted,
   fontSize: theme.fontSizes.body,
   lineHeight: 1.55,

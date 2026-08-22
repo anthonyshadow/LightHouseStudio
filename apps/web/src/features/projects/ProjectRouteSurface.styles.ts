@@ -5,31 +5,11 @@ export const projectWorkspaceRouteStyles = (): CSSObject => ({
   display: 'contents',
 });
 
-/**
- * A top-level route's scroll region. It owns scrolling and the query container; the page frame is
- * `PageShell`, inside it. Not a card — a bordered, raised page nested inside the shell's own
- * chrome is what made these surfaces read as boxes within boxes.
- */
-export const workspaceStyles = (theme: Theme): CSSObject => ({
-  minWidth: 0,
-  minHeight: 0,
-  height: '100%',
-  overflowY: 'auto',
-  overscrollBehavior: 'contain',
-  background: theme.colors.canvas,
-  scrollbarGutter: 'stable',
-  containerType: 'inline-size',
-});
-
-export const projectsIndexRouteStyles = (theme: Theme): CSSObject => workspaceStyles(theme);
-
 export const projectOverviewRouteStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   minHeight: 0,
   height: '100%',
   overscrollBehavior: 'contain',
-  border: 0,
-  borderRadius: 0,
   background: theme.colors.canvas,
   scrollbarGutter: 'stable',
   containerType: 'inline-size',

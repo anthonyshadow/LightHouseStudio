@@ -24,6 +24,7 @@ export {
   closeAiSettings,
   confirmSaveVideo,
   createLocalTake,
+  chooseTakeAction,
   discardTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,

@@ -16,7 +16,7 @@ import {
   StatusNotice,
   useListSearch,
 } from '../../ui';
-import { workspaceStyles } from '../projects/ProjectRouteSurface.styles';
+import { pageScrollRegionStyles } from '../../ui/primitives/PageShell.styles';
 import { NewProjectDialog } from '../projects/ProjectDialogs';
 import { KIND_ICONS } from '../projects/ProjectAssetThumbnail';
 import { projectPosterUrls } from '../projects/projectPosterPresentation';
@@ -510,7 +510,7 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
   }
   const campaign = query.data;
   const archived = campaign.status === 'archived';
-  const openDialog = (next: CampaignDialog, trigger: HTMLButtonElement) => {
+  const openDialog = (next: CampaignDialog, trigger: HTMLButtonElement | null) => {
     returnFocusRef.current = trigger;
     setDialog(next);
   };
@@ -518,10 +518,6 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
     setDialog(null);
     setAnnouncement(message);
     window.requestAnimationFrame(() => headingRef.current?.focus());
-  };
-  const openMenuDialog = (next: CampaignDialog, trigger: HTMLButtonElement | null) => {
-    returnFocusRef.current = trigger;
-    setDialog(next);
   };
   return (
     <PageShell>
@@ -555,12 +551,11 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
             </Button>
             <ActionMenu
               label={`More actions for ${campaign.name}`}
-              size="regular"
               items={[
                 {
                   id: 'edit',
                   label: 'Edit',
-                  onSelect: (trigger) => openMenuDialog('edit', trigger),
+                  onSelect: (trigger) => openDialog('edit', trigger),
                 },
                 ...(archived
                   ? [
@@ -569,7 +564,7 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
                         label: 'Delete Campaign',
                         danger: true,
                         onSelect: (trigger: HTMLButtonElement | null) =>
-                          openMenuDialog('tombstone', trigger),
+                          openDialog('tombstone', trigger),
                       },
                     ]
                   : [
@@ -578,7 +573,7 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
                         label: 'Archive',
                         danger: true,
                         onSelect: (trigger: HTMLButtonElement | null) =>
-                          openMenuDialog('archive', trigger),
+                          openDialog('archive', trigger),
                       },
                     ]),
               ]}
@@ -703,7 +698,7 @@ export const CampaignRouteSurface = () => {
     if (routeRef.current) routeRef.current.scrollTop = 0;
   }, [location.pathname]);
   return (
-    <div ref={routeRef} css={workspaceStyles(theme)} data-campaign-route="">
+    <div ref={routeRef} css={pageScrollRegionStyles(theme)} data-campaign-route="">
       {campaignId === null ? <CampaignsWorkspace /> : <CampaignDetail campaignId={campaignId} />}
     </div>
   );

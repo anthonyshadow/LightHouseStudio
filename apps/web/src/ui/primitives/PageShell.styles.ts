@@ -12,6 +12,23 @@ import { media } from '../media';
  * Padding is viewport-relative rather than container-relative because this element *is* the query
  * container for everything inside it; `cqi` here would be asking about the width it is deciding.
  */
+/**
+ * The element a route scrolls in, and the query container everything inside it measures against.
+ * Separate from `pageShellStyles` because scrolling belongs to the route while the frame belongs
+ * to the page — but shared, because otherwise every surface re-derives the same seven properties
+ * and they drift, which is what happened to `scrollbarGutter` and `overscrollBehavior`.
+ */
+export const pageScrollRegionStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  minHeight: 0,
+  height: '100%',
+  overflowY: 'auto',
+  overscrollBehavior: 'contain',
+  scrollbarGutter: 'stable',
+  background: theme.colors.canvas,
+  containerType: 'inline-size',
+});
+
 export const pageShellStyles = (theme: Theme): CSSObject => ({
   width: 'min(100%, 88rem)',
   minWidth: 0,

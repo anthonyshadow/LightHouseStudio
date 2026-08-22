@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   closeAiSettings,
   confirmSaveVideo,
+  chooseTakeAction,
   createLocalTake,
   discardTake,
   expectNoDocumentOverflow,
@@ -483,8 +484,7 @@ test('saved voice preview, Apply, remux, Save, and Restore Original stay explici
   const originalUrl = await playback.getAttribute('src');
   expect(originalUrl).toMatch(/^blob:/u);
 
-  await takeDialog.getByRole('button', { name: 'More actions for this take' }).click();
-  await takeDialog.getByRole('menuitem', { name: 'Voice treatments' }).click();
+  await chooseTakeAction(page, 'Voice treatments', takeDialog);
   const voiceTreatments = page.getByRole('dialog', { name: 'Voice Treatments' });
   await expect(voiceTreatments).toBeVisible();
   await voiceTreatments.getByRole('button', { name: /Saved AI Voice/u }).click();
@@ -548,7 +548,6 @@ test('saved voice preview, Apply, remux, Save, and Restore Original stay explici
   await expect(
     processedTakeDialog.getByRole('menuitem', { name: 'Close without saving' }),
   ).toBeVisible();
-
   await processedTakeDialog.getByRole('menuitem', { name: 'Voice treatments' }).click();
   const restoredVoiceTreatments = page.getByRole('dialog', { name: 'Voice Treatments' });
   await restoredVoiceTreatments.getByRole('button', { name: 'Original', exact: true }).click();
@@ -570,8 +569,7 @@ test('Browse Voices adds once and confirmed Saved removal reconciles both librar
   await createLocalTake(page);
 
   const takeDialog = page.getByRole('dialog', { name: 'Latest take' });
-  await takeDialog.getByRole('button', { name: 'More actions for this take' }).click();
-  await takeDialog.getByRole('menuitem', { name: 'Voice treatments' }).click();
+  await chooseTakeAction(page, 'Voice treatments', takeDialog);
   const treatments = page.getByRole('dialog', { name: 'Voice Treatments' });
   await treatments.getByRole('button', { name: /Saved AI Voice/u }).click();
   await treatments.getByRole('button', { name: 'Browse Voices' }).click();

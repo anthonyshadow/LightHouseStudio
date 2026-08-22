@@ -5,6 +5,9 @@ import type { SaveVideoState } from '../saved-videos/useSaveVideo';
 import { media } from '../../ui/media';
 import { ActionMenu, type ActionMenuItem } from '../../ui/primitives/ActionMenu';
 
+/** A secondary action, plus the shorter label the persistent control bar shows it under. */
+type TakeAction = ActionMenuItem & { readonly compactLabel?: string };
+
 export type TakeReviewActionsProps = {
   recording: RecordingController;
   presentation?: 'panel' | 'control-bar';
@@ -106,50 +109,53 @@ export const TakeReviewActions = ({
     onCloseTake?.();
   };
 
-  const closeLabel = compact ? 'Close' : 'Close without saving';
   const closeDescription = saved
     ? 'Closes review and clears this take from memory. Anything you already saved stays in Assets.'
     : 'Closes review and clears this take from memory. Nothing was changed since you saved it.';
 
   /*
-   * One primary, one destructive, and everything else behind the overflow. This is the moment of
-   * highest decision pressure in the product; six peer buttons made every option look equal.
+   * One list, two presentations. The panel puts these behind an overflow — this is the moment of
+   * highest decision pressure in the product, and six peer buttons made every option look equal —
+   * while the persistent control bar keeps them inline under shorter labels. Describing them once
+   * is what stops the two from drifting apart on which action exists or when it is available.
    */
-  const overflowItems: ActionMenuItem[] = [
+  const secondaryActions: readonly TakeAction[] = [
     ...(onReplaceSavedVideo
       ? [
           {
             id: 'replace',
             label: 'Replace Saved Version',
             disabled: locked || saving,
-            onSelect: () => onReplaceSavedVideo(),
+            onSelect: onReplaceSavedVideo,
           },
         ]
       : []),
     ...(onEditVideo
-      ? [{ id: 'edit', label: 'Edit video', disabled: locked, onSelect: () => onEditVideo() }]
+      ? [{ id: 'edit', label: 'Edit video', disabled: locked, onSelect: onEditVideo }]
       : []),
     ...(onOpenVoiceTreatments
       ? [
           {
             id: 'voice',
             label: 'Voice treatments',
+            compactLabel: 'Voice',
             disabled: locked,
-            onSelect: () => onOpenVoiceTreatments(),
+            onSelect: onOpenVoiceTreatments,
           },
         ]
       : []),
-    ...(!unsaved
-      ? [
+    ...(unsaved
+      ? []
+      : [
           {
             id: 'close',
-            label: closeLabel,
+            label: 'Close without saving',
+            compactLabel: 'Close',
             description: closeDescription,
             disabled: locked || saving,
-            onSelect: () => closeTake(),
+            onSelect: closeTake,
           },
-        ]
-      : []),
+        ]),
   ];
 
   return (
@@ -174,30 +180,19 @@ export const TakeReviewActions = ({
         </Button>
       ) : null}
       {compact ? (
-        <>
-          {onOpenVoiceTreatments ? (
-            <Button variant="secondary" disabled={locked} onClick={onOpenVoiceTreatments}>
-              Voice
-            </Button>
-          ) : null}
-          {onReplaceSavedVideo ? (
-            <Button variant="secondary" disabled={locked || saving} onClick={onReplaceSavedVideo}>
-              Replace Saved Version
-            </Button>
-          ) : null}
-          {!unsaved ? (
-            <Button
-              variant="secondary"
-              disabled={locked || saving}
-              title={closeDescription}
-              onClick={closeTake}
-            >
-              Close
-            </Button>
-          ) : null}
-        </>
+        secondaryActions.map((action) => (
+          <Button
+            key={action.id}
+            variant="secondary"
+            disabled={action.disabled ?? false}
+            {...(action.description === undefined ? {} : { title: action.description })}
+            onClick={() => action.onSelect(null)}
+          >
+            {action.compactLabel ?? action.label}
+          </Button>
+        ))
       ) : (
-        <ActionMenu label="More actions for this take" size="regular" items={overflowItems} />
+        <ActionMenu label="More actions for this take" items={secondaryActions} />
       )}
       {saveVideoState.status === 'error' && saveVideoState.artifactId === artifact.id ? (
         <span role="alert">{saveVideoState.message}</span>

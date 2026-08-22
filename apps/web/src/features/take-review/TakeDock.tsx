@@ -114,6 +114,9 @@ type MetadataChip = {
   dateTime?: string;
 };
 
+/** Built once: the locale is the system default and cannot change within a session. */
+const TAKE_TIME_FORMAT = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
+
 const takeModeLabel = (mode: TakeMetadata['mode']): string => {
   switch (mode) {
     case 'local':
@@ -182,10 +185,7 @@ const captureMetadataChips = (metadata: TakeMetadata | null): MetadataChip[] => 
   if (!Number.isNaN(started.getTime())) {
     chips.splice(1, 0, {
       key: 'started-at',
-      label: new Intl.DateTimeFormat(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-      }).format(started),
+      label: TAKE_TIME_FORMAT.format(started),
       title: started.toLocaleString(),
       dateTime: metadata.startedAt,
     });
@@ -225,15 +225,6 @@ export const TakeDock = ({
 }: TakeDockProps) => {
   const theme = useTheme();
   const artifact = recording.presented;
-  const captureChips = captureMetadataChips(recording.metadata);
-  const resolutionChip = captureChips.find((chip) => chip.key === 'resolution') ?? null;
-  const detailChips: MetadataChip[] = [
-    ...captureChips.filter((chip) => chip.key !== 'resolution'),
-    { key: 'size', label: formatBytes(artifact?.sizeBytes ?? 0) },
-    ...(artifact?.mimeType
-      ? [{ key: 'mime', label: artifact.mimeType, title: artifact.mimeType }]
-      : []),
-  ];
 
   if (!artifact) return null;
   if (view === 'voice') {
@@ -247,6 +238,18 @@ export const TakeDock = ({
       />
     );
   }
+
+  // Derived after the guards above, so `artifact` is known and nothing is computed for a render
+  // that returns early.
+  const captureChips = captureMetadataChips(recording.metadata);
+  const resolutionChip = captureChips.find((chip) => chip.key === 'resolution') ?? null;
+  const detailChips: MetadataChip[] = [
+    ...captureChips.filter((chip) => chip.key !== 'resolution'),
+    { key: 'size', label: formatBytes(artifact.sizeBytes) },
+    ...(artifact.mimeType
+      ? [{ key: 'mime', label: artifact.mimeType, title: artifact.mimeType }]
+      : []),
+  ];
 
   return (
     <Surface
@@ -281,29 +284,27 @@ export const TakeDock = ({
                 <span role="listitem">{formatDuration(artifact.durationMs / 1000)}</span>
                 {resolutionChip ? <span role="listitem">{resolutionChip.label}</span> : null}
               </div>
-              {detailChips.length > 0 ? (
-                <details css={detailsDisclosureStyles(theme)}>
-                  <summary>Details</summary>
-                  <div css={metadataStyles(theme)} role="list" aria-label="Take details">
-                    {detailChips.map((chip) =>
-                      chip.dateTime ? (
-                        <time
-                          key={chip.key}
-                          role="listitem"
-                          dateTime={chip.dateTime}
-                          title={chip.title}
-                        >
-                          {chip.label}
-                        </time>
-                      ) : (
-                        <span key={chip.key} role="listitem" title={chip.title}>
-                          {chip.label}
-                        </span>
-                      ),
-                    )}
-                  </div>
-                </details>
-              ) : null}
+              <details css={detailsDisclosureStyles(theme)}>
+                <summary>Details</summary>
+                <div css={metadataStyles(theme)} role="list" aria-label="Take details">
+                  {detailChips.map((chip) =>
+                    chip.dateTime ? (
+                      <time
+                        key={chip.key}
+                        role="listitem"
+                        dateTime={chip.dateTime}
+                        title={chip.title}
+                      >
+                        {chip.label}
+                      </time>
+                    ) : (
+                      <span key={chip.key} role="listitem" title={chip.title}>
+                        {chip.label}
+                      </span>
+                    ),
+                  )}
+                </div>
+              </details>
               <TakeReviewActions
                 recording={recording}
                 {...(onCloseTake ? { onCloseTake } : {})}

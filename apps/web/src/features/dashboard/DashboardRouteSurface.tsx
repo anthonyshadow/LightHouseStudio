@@ -37,6 +37,7 @@ import {
   continuePanelStyles,
   dashboardBodyStyles,
   dashboardHeaderStyles,
+  dashboardShellStyles,
   dashboardStyles,
   emptyRecentStyles,
   onboardingStyles,
@@ -285,8 +286,9 @@ export const DashboardRouteSurface = ({
 
   return (
     <section css={dashboardStyles(theme)} aria-labelledby="dashboard-heading">
-      <PageShell css={dashboardHeaderStyles(theme)}>
+      <PageShell css={dashboardShellStyles()}>
         <PageHeader
+          css={dashboardHeaderStyles(theme)}
           eyebrow={`Welcome back, ${displayName}`}
           title="Dashboard"
           headingId="dashboard-heading"

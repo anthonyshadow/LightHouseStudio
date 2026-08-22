@@ -47,6 +47,32 @@ const panelWidth = (
   return size === 'wide' ? theme.layout.overlays.drawerWide : theme.layout.overlays.drawer;
 };
 
+/**
+ * A non-centered bottom panel's height, per viewport tier.
+ *
+ * Every tier asks this rather than re-deriving the mode inline: `sheet` was previously consulted at
+ * two tiers of four, so a panel that promises to leave the surface behind it visible went
+ * full-screen on a tablet — the one tier with no visual baseline to catch it.
+ */
+const bottomHeight = (
+  theme: Theme,
+  height: OverlayPanelHeight,
+  tier: 'base' | 'compact' | 'tablet' | 'mobile',
+): string => {
+  if (height === 'sheet') return theme.layout.overlays.bottomSheet;
+  if (height === 'tall') return '75dvh';
+  switch (tier) {
+    case 'base':
+      return theme.layout.overlays.bottom;
+    case 'compact':
+      return theme.layout.overlays.bottomCompact;
+    case 'tablet':
+      return theme.layout.overlays.bottomTablet;
+    case 'mobile':
+      return '100%';
+  }
+};
+
 export const panelStyles = (
   theme: Theme,
   placement: OverlayPanelPlacement,
@@ -64,16 +90,12 @@ export const panelStyles = (
         : theme.layout.overlays.bottom
       : placement === 'right' || placement === 'fullscreen'
         ? '100%'
-        : height === 'tall'
-          ? '75dvh'
-          : theme.layout.overlays.bottom,
+        : bottomHeight(theme, height, 'base'),
     maxWidth: '100%',
     maxHeight: centered
       ? 'calc(100dvh - 2rem)'
       : placement === 'bottom'
-        ? height === 'tall'
-          ? '75dvh'
-          : theme.layout.overlays.bottom
+        ? bottomHeight(theme, height, 'base')
         : '100dvh',
     minWidth: 0,
     minHeight: 0,
@@ -105,20 +127,12 @@ export const panelStyles = (
           ? '86dvh'
           : undefined
         : placement === 'bottom'
-          ? height === 'sheet'
-            ? theme.layout.overlays.bottomSheet
-            : height === 'tall'
-              ? '75dvh'
-              : theme.layout.overlays.bottomCompact
+          ? bottomHeight(theme, height, 'compact')
           : undefined,
       maxHeight: centered
         ? 'calc(100dvh - 2rem)'
         : placement === 'bottom'
-          ? height === 'sheet'
-            ? theme.layout.overlays.bottomSheet
-            : height === 'tall'
-              ? '75dvh'
-              : theme.layout.overlays.bottomCompact
+          ? bottomHeight(theme, height, 'compact')
           : undefined,
     },
     [media.between('tablet', 'laptop')]: {
@@ -130,14 +144,14 @@ export const panelStyles = (
           : undefined,
       height:
         !centered && (placement === 'bottom' || (placement === 'right' && size !== 'standard'))
-          ? placement === 'bottom' && height === 'tall'
-            ? '75dvh'
+          ? placement === 'bottom'
+            ? bottomHeight(theme, height, 'tablet')
             : theme.layout.overlays.bottomTablet
           : undefined,
       maxHeight:
         !centered && (placement === 'bottom' || (placement === 'right' && size !== 'standard'))
-          ? placement === 'bottom' && height === 'tall'
-            ? '75dvh'
+          ? placement === 'bottom'
+            ? bottomHeight(theme, height, 'tablet')
             : theme.layout.overlays.bottomTablet
           : undefined,
       border:
@@ -153,8 +167,8 @@ export const panelStyles = (
       width: '100%',
       // A `sheet` is the one bottom panel that does not take the phone: it refers to the surface
       // behind it, so covering that surface would contradict what it says.
-      height: centered ? '88dvh' : sheet ? theme.layout.overlays.bottomSheet : '100%',
-      maxHeight: centered ? '88dvh' : sheet ? theme.layout.overlays.bottomSheet : '100dvh',
+      height: centered ? '88dvh' : bottomHeight(theme, height, 'mobile'),
+      maxHeight: centered ? '88dvh' : sheet ? bottomHeight(theme, height, 'mobile') : '100dvh',
       border: centered || sheet ? `1px solid ${theme.colors.border}` : 0,
       borderInlineStart: centered ? undefined : 0,
       borderRadius: centered || sheet ? `${theme.radii.large} ${theme.radii.large} 0 0` : 0,
