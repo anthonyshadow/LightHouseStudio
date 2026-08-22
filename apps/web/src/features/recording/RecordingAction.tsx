@@ -52,14 +52,18 @@ const recordingUnavailableReason = ({
   return null;
 };
 
-const recordActionStyles = (theme: Theme, active: boolean): CSSObject => ({
-  color: active ? theme.colors.text : theme.colors.recording,
-  borderColor: active ? theme.colors.recording : theme.colors.accent,
-  background: active
-    ? `linear-gradient(135deg, ${theme.colors.recording}, ${theme.colors.danger})`
-    : theme.colors.recordingSoft,
-  boxShadow: active ? theme.shadows.recording : 'none',
-});
+// Idle Record is the stage's primary action and takes the mint primary treatment from
+// `Button variant="primary"`; only the dot glyph is overridden, kept in the recording red
+// family but deepened so it still reads against mint. Active recording stays red.
+const recordActionStyles = (theme: Theme, active: boolean): CSSObject =>
+  active
+    ? {
+        color: theme.colors.text,
+        borderColor: theme.colors.recording,
+        background: `linear-gradient(135deg, ${theme.colors.recording}, ${theme.colors.danger})`,
+        boxShadow: theme.shadows.recording,
+      }
+    : { '& svg': { color: theme.colors.recordingSoft } };
 
 const disabledReasonStyles = (): CSSObject => ({
   position: 'absolute',
@@ -195,7 +199,7 @@ export const RecordingAction = ({
         <Button
           ref={actionRef}
           id="record-take-action"
-          variant="secondary"
+          variant="primary"
           disabled={unavailable}
           aria-label="Record"
           aria-describedby={unavailableReason ? 'recording-disabled-reason' : undefined}
