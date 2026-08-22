@@ -8,6 +8,7 @@ import {
 import {
   CREATIVE_ASSET_STORAGE_KEY,
   closeAiSettings,
+  chooseTakeAction,
   createLocalTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
@@ -494,8 +495,11 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'take-playback-review-settled',
     setup: async (page) => {
       await createLocalTake(page);
-      const review = page.getByRole('dialog', { name: 'Latest Take' });
-      await expect(review.getByRole('heading', { name: 'Latest take', exact: true })).toBeVisible();
+      const review = page.getByRole('dialog', { name: 'Latest take' });
+      // The heading is the region label now, so it is asserted as present rather than as visible.
+      await expect(
+        review.getByRole('heading', { name: 'Latest take', exact: true }),
+      ).toBeAttached();
       await expect(review.getByRole('button', { name: 'Save to Assets' })).toBeVisible();
       await expect(review.getByText('Loading studio tool…', { exact: true })).toHaveCount(0);
     },
@@ -618,7 +622,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'voice-browser-loaded',
     setup: async (page) => {
       await createLocalTake(page);
-      await page.getByRole('button', { name: 'Voice treatments' }).click();
+      await chooseTakeAction(page, 'Voice treatments');
       const treatments = page.getByRole('dialog', { name: 'Voice Treatments' });
       await expect(
         treatments.getByRole('heading', { name: 'Select Treatment', exact: true }),

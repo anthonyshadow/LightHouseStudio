@@ -1,5 +1,6 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { StatusNotice, Surface } from '../../ui';
+import { visuallyHiddenStyles } from '../../ui/primitives/VisuallyHidden';
 import { formatBytes, formatDuration } from '../recording';
 import type { RecordedTakeMetadata, RecordingController, TakeMetadata } from '../recording/types';
 import type { VoiceProcessingController } from '../voice-effects/types';
@@ -8,6 +9,7 @@ import { VoiceEffectsPanel } from '../voice-effects/VoiceEffectsPanel';
 import { SavedVideoSuccessActions } from '../saved-videos/SavedVideoSuccessActions';
 import { TakeReviewActions } from './TakeReviewActions';
 import type { SaveVideoState } from '../saved-videos/useSaveVideo';
+import { media } from '../../ui/media';
 
 export type TakeDockProps = {
   recording: RecordingController;
@@ -35,7 +37,7 @@ const gridStyles = (theme: Theme, view: NonNullable<TakeDockProps['view']>): CSS
   minWidth: 0,
   minHeight: 0,
   minBlockSize: '100%',
-  '@media (max-width: 64rem)': { gridTemplateColumns: '1fr' },
+  [media.down('laptop')]: { gridTemplateColumns: '1fr' },
 });
 const metadataStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
@@ -56,11 +58,6 @@ const metadataStyles = (theme: Theme): CSSObject => ({
     background: theme.colors.surfaceStrong,
   },
 });
-const headingStyles = (theme: Theme): CSSObject => ({
-  margin: 0,
-  fontFamily: theme.type.display,
-});
-
 const introStyles = (theme: Theme): CSSObject => ({
   marginBlockEnd: theme.space.sm,
   color: theme.colors.textMuted,
@@ -95,12 +92,30 @@ const reviewDetailsStyles = (): CSSObject => ({
   minWidth: 0,
 });
 
+const detailsDisclosureStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  '& > summary': {
+    display: 'inline-flex',
+    alignItems: 'center',
+    minHeight: '2.25rem',
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSizes.caption,
+    fontWeight: 700,
+    cursor: 'pointer',
+    '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '2px' },
+  },
+  '&[open] > summary': { color: theme.colors.text },
+});
+
 type MetadataChip = {
   key: string;
   label: string;
   title?: string;
   dateTime?: string;
 };
+
+/** Built once: the locale is the system default and cannot change within a session. */
+const TAKE_TIME_FORMAT = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' });
 
 const takeModeLabel = (mode: TakeMetadata['mode']): string => {
   switch (mode) {
@@ -170,10 +185,7 @@ const captureMetadataChips = (metadata: TakeMetadata | null): MetadataChip[] => 
   if (!Number.isNaN(started.getTime())) {
     chips.splice(1, 0, {
       key: 'started-at',
-      label: new Intl.DateTimeFormat(undefined, {
-        hour: 'numeric',
-        minute: '2-digit',
-      }).format(started),
+      label: TAKE_TIME_FORMAT.format(started),
       title: started.toLocaleString(),
       dateTime: metadata.startedAt,
     });
@@ -213,7 +225,6 @@ export const TakeDock = ({
 }: TakeDockProps) => {
   const theme = useTheme();
   const artifact = recording.presented;
-  const captureChips = captureMetadataChips(recording.metadata);
 
   if (!artifact) return null;
   if (view === 'voice') {
@@ -228,6 +239,18 @@ export const TakeDock = ({
     );
   }
 
+  // Derived after the guards above, so `artifact` is known and nothing is computed for a render
+  // that returns early.
+  const captureChips = captureMetadataChips(recording.metadata);
+  const resolutionChip = captureChips.find((chip) => chip.key === 'resolution') ?? null;
+  const detailChips: MetadataChip[] = [
+    ...captureChips.filter((chip) => chip.key !== 'resolution'),
+    { key: 'size', label: formatBytes(artifact.sizeBytes) },
+    ...(artifact.mimeType
+      ? [{ key: 'mime', label: artifact.mimeType, title: artifact.mimeType }]
+      : []),
+  ];
+
   return (
     <Surface
       as="section"
@@ -241,20 +264,30 @@ export const TakeDock = ({
       <div css={gridStyles(theme, view)}>
         <div css={latestPanelStyles()}>
           <header>
-            <h2 id="take-heading" tabIndex={-1} css={headingStyles(theme)}>
+            {/* The panel chrome already shows this title; the heading stays for the region label
+                and as the focus target, so it is hidden rather than repeated on screen. */}
+            <h2 id="take-heading" tabIndex={-1} css={visuallyHiddenStyles()}>
               Latest take
             </h2>
             <p role="status" aria-live="polite" aria-atomic="true" css={introStyles(theme)}>
               {hasUnsavedChanges === false
-                ? 'Playback remains on the main stage. This video has no unsaved changes.'
-                : 'Playback remains on the main stage. Save this temporary take before releasing it.'}
+                ? 'This video has no unsaved changes.'
+                : 'Save this take before you close it.'}
             </p>
           </header>
           <div css={reviewBodyStyles(theme)}>
             <div css={reviewDetailsStyles()}>
-              {captureChips.length > 0 ? (
-                <div css={metadataStyles(theme)} role="list" aria-label="Capture metadata">
-                  {captureChips.map((chip) =>
+              {/* Duration and resolution are review criteria. Codec, file size, frame rate and
+                  device names are not, so they are one disclosure away rather than eight chips
+                  ahead of the decision. Nothing is dropped. */}
+              <div css={metadataStyles(theme)} role="list" aria-label="Take summary">
+                <span role="listitem">{formatDuration(artifact.durationMs / 1000)}</span>
+                {resolutionChip ? <span role="listitem">{resolutionChip.label}</span> : null}
+              </div>
+              <details css={detailsDisclosureStyles(theme)}>
+                <summary>Details</summary>
+                <div css={metadataStyles(theme)} role="list" aria-label="Take details">
+                  {detailChips.map((chip) =>
                     chip.dateTime ? (
                       <time
                         key={chip.key}
@@ -271,16 +304,7 @@ export const TakeDock = ({
                     ),
                   )}
                 </div>
-              ) : null}
-              <div css={metadataStyles(theme)} role="list" aria-label="Take file details">
-                <span role="listitem">{formatDuration(artifact.durationMs / 1000)}</span>
-                <span role="listitem">{formatBytes(artifact.sizeBytes)}</span>
-                {artifact.mimeType ? (
-                  <span role="listitem" title={artifact.mimeType}>
-                    {artifact.mimeType}
-                  </span>
-                ) : null}
-              </div>
+              </details>
               <TakeReviewActions
                 recording={recording}
                 {...(onCloseTake ? { onCloseTake } : {})}
@@ -303,8 +327,8 @@ export const TakeDock = ({
               title={`“${saveVideoState.video.title}” is in Assets`}
             >
               <p>
-                Saved as Version {saveVideoState.video.currentVersion.ordinal}. This tab still owns
-                the temporary take until you release it.
+                Saved as Version {saveVideoState.video.currentVersion.ordinal}. This take stays in
+                this browser tab until you close it.
               </p>
               {onOpenSavedVideosLibrary ? (
                 <SavedVideoSuccessActions

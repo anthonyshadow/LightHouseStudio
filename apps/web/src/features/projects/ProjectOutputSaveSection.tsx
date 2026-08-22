@@ -346,8 +346,8 @@ export const ProjectOutputSaveSection = ({
           </Button>
         </div>
         <small>
-          “All changes saved” refers to your saved progress. Render preview, Save as New Video and
-          Add Version are separate actions you take yourself.
+          “Autosaved” refers to your Project setup. Render preview, Save as New Video and Add
+          Version are separate actions you take yourself.
         </small>
       </section>
 

@@ -156,7 +156,7 @@ export const ExistingVideoProjectProcessingActions = ({
           <Button variant="primary" busy disabled>
             {projectAttempt.isCurrent
               ? 'Processing accepted operation…'
-              : 'Earlier revision still processing…'}
+              : 'Earlier autosaved change still processing…'}
           </Button>
           {projectAttempt.cancellation === 'available' ? (
             <Button variant="secondary" onClick={() => void projectProcessing.cancel()}>
@@ -235,7 +235,7 @@ export const ExistingVideoProjectProcessingActions = ({
         description={
           retryNeedsDuplicateCostAcknowledgement
             ? 'The prior submission may already have incurred provider cost. This explicit retry creates a new operation and may duplicate that cost.'
-            : 'Retry creates a new provider submission for the exact saved Project revision and may incur provider cost.'
+            : 'Retry creates a new provider submission for the exact autosaved Project state and may incur provider cost.'
         }
         confirmLabel={
           retryNeedsDuplicateCostAcknowledgement

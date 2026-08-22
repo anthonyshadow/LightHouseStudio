@@ -109,7 +109,7 @@ export const CharacterWardrobeLibrary = ({
         ) : !addOutfitAvailable || !changeFeaturesAvailable ? (
           <StatusNotice tone="neutral">
             {!addOutfitAvailable ? 'Add Outfit is not configured. ' : ''}
-            {!changeFeaturesAvailable ? 'Change Features is not configured. ' : ''}Saved versions
+            {!changeFeaturesAvailable ? 'Change Features is not configured. ' : ''}Saved variants
             remain available.
           </StatusNotice>
         ) : null}
@@ -143,7 +143,7 @@ export const CharacterWardrobeLibrary = ({
               }
             />
           ) : (
-            <StatusNotice tone="neutral">No wardrobe versions match this search.</StatusNotice>
+            <StatusNotice tone="neutral">No wardrobe variants match this search.</StatusNotice>
           )}
           {error ? (
             <StatusNotice tone="danger" role="alert">

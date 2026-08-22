@@ -1,5 +1,6 @@
 import type { CSSObject, Theme } from '@emotion/react';
 import { rotatingSpinnerAnimationStyles } from '../../ui/animationStyles';
+import { media } from '../../ui/media';
 
 export const stageStyles = (theme: Theme): CSSObject => ({
   position: 'relative',
@@ -12,7 +13,7 @@ export const stageStyles = (theme: Theme): CSSObject => ({
   gridTemplateRows: 'minmax(0, 1fr) auto',
   gap: theme.space.sm,
   overflow: 'hidden',
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     gap: theme.space.xs,
   },
 });
@@ -65,7 +66,7 @@ export const stageFrameStyles = (
     content: '""',
     pointerEvents: 'none',
   },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     borderRadius: theme.radii.large,
   },
 });
@@ -140,7 +141,7 @@ export const emptyStyles = (theme: Theme): CSSObject => ({
       lineHeight: 1.45,
     },
   },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     padding: theme.space.md,
     '& > strong': {
       marginBlock: `${theme.space.sm} ${theme.space.xs}`,
@@ -203,7 +204,7 @@ export const topToolbarStyles = (theme: Theme, stacked = false): CSSObject => ({
   pointerEvents: 'none',
   ...(stacked
     ? {
-        '@media (max-width: 39.99rem), (max-height: 36rem)': {
+        [media.downOrShort('tablet', '36rem')]: {
           alignItems: 'flex-start',
         },
       }
@@ -218,7 +219,7 @@ export const toolbarGroupStyles = (theme: Theme, stacked = false): CSSObject => 
   pointerEvents: 'auto',
   ...(stacked
     ? {
-        '@media (max-width: 39.99rem), (max-height: 36rem)': {
+        [media.downOrShort('tablet', '36rem')]: {
           flexDirection: 'column',
           alignItems: 'flex-start',
         },
@@ -285,7 +286,7 @@ export const badgeStyles = (
     '[data-stage-aspect-ratio="9:16"] & [data-stage-status-long]': { display: 'none' },
     '[data-stage-aspect-ratio="9:16"] & [data-stage-status-short]': { display: 'inline' },
   },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     minHeight: '1.8rem',
     padding: '0.3rem 0.5rem',
     fontSize: '0.68rem',
@@ -317,7 +318,7 @@ export const iconButtonStyles = (theme: Theme): CSSObject => ({
     outlineOffset: '3px',
   },
   '& svg': { width: '1.1rem', height: '1.1rem' },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     width: '2.75rem',
     height: '2.75rem',
   },
@@ -341,7 +342,7 @@ export const framingGuideStyles = (theme: Theme, visible: boolean): CSSObject =>
   },
   '&::before': { width: '1.5rem', height: '1px' },
   '&::after': { width: '1px', height: '1.5rem' },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     inset: '3.25rem 1.25rem 3.75rem',
     opacity: visible ? 0.48 : 0.28,
   },
@@ -475,7 +476,7 @@ export const noticeStyles = (theme: Theme, severity: 'info' | 'warning' | 'error
   boxShadow: theme.shadows.lifted,
   backdropFilter: 'blur(12px)',
   pointerEvents: 'auto',
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     gridTemplateColumns: 'minmax(0, 1fr) auto',
     gap: theme.space.xs,
     paddingInlineStart: theme.space.sm,

@@ -189,7 +189,10 @@ test('provider-free upload previews and enters the existing take/save surface', 
 
   const review = page.getByRole('dialog', { name: 'Latest take' });
   await expect(review).toBeVisible();
-  await expect(review.getByRole('button', { name: 'Edit video' })).toBeVisible();
+  const takeOverflow = review.getByRole('button', { name: 'More actions for this take' });
+  await takeOverflow.click();
+  await expect(review.getByRole('menuitem', { name: 'Edit video' })).toBeVisible();
+  await takeOverflow.click();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
   await review.getByRole('button', { name: 'Save to Assets' }).click();
   await confirmSaveVideo(page);

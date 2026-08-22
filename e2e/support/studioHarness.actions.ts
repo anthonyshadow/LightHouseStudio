@@ -121,10 +121,27 @@ export const createLocalTake = async (page: Page): Promise<void> => {
  * Discarding is a real dialog rather than `window.confirm`, so the answer is part of the
  * interaction: clicking Discard alone leaves the take in place.
  */
+/**
+ * Opens the take-review overflow and picks one item.
+ *
+ * The panel keeps one primary and one destructive control inline; everything else is behind the
+ * menu, so a spec that wants Voice, Edit or Close goes through here rather than restating the
+ * two-step interaction.
+ */
+export const chooseTakeAction = async (
+  page: Page,
+  action: string,
+  scope?: Locator,
+): Promise<void> => {
+  const target = scope ?? page;
+  await target.getByRole('button', { name: 'More actions for this take' }).click();
+  await target.getByRole('menuitem', { name: action }).click();
+};
+
 export const discardTake = async (page: Page, scope?: Locator): Promise<void> => {
   await (scope ?? page).getByRole('button', { name: 'Discard' }).click();
   await page
-    .getByRole('dialog', { name: 'Discard this in-memory take?' })
+    .getByRole('dialog', { name: 'Discard this take?' })
     .getByRole('button', { name: 'Discard take' })
     .click();
 };

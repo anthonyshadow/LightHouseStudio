@@ -155,7 +155,7 @@ describe('VideoGallery', () => {
       `/api/videos/${item.id}/versions/${item.currentVersion.id}/content?download=true`,
     );
     fireEvent.click(screen.getByLabelText('More actions for Morning take'));
-    fireEvent.click(screen.getByRole('button', { name: 'Open in Studio' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open in Studio' }));
     await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, 'play'));
   });
 
@@ -211,10 +211,16 @@ describe('VideoGallery', () => {
       within(dialog).queryByText(/This saved video could not be previewed/u),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Edit video' }));
+    const overflow = within(dialog).getByLabelText('More actions for Morning take');
+    fireEvent.click(overflow);
+    fireEvent.click(within(dialog).getByRole('menuitem', { name: 'Edit video' }));
     await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, 'edit'));
-    expect(within(dialog).getByRole('button', { name: 'Export' })).toBeEnabled();
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Open in Studio' }));
+    fireEvent.click(overflow);
+    expect(within(dialog).getByRole('menuitem', { name: 'Export' })).not.toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    fireEvent.click(within(dialog).getByRole('menuitem', { name: 'Open in Studio' }));
     await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, 'play'));
   });
 
@@ -254,7 +260,8 @@ describe('VideoGallery', () => {
     try {
       fireEvent.click(await screen.findByRole('button', { name: 'Preview Morning take' }));
       const preview = await screen.findByRole('dialog', { name: 'Morning take' });
-      fireEvent.click(within(preview).getByRole('button', { name: 'Export' }));
+      fireEvent.click(within(preview).getByLabelText('More actions for Morning take'));
+      fireEvent.click(within(preview).getByRole('menuitem', { name: 'Export' }));
 
       const exportPanel = await screen.findByRole('dialog', { name: 'Export video' });
       // Until a placement is chosen the unchanged server-served download is what is offered.
@@ -311,7 +318,9 @@ describe('VideoGallery', () => {
       'href',
       `/api/videos/${current.id}/versions/${older.id}/content?download=true`,
     );
-    expect(within(dialog).queryByRole('button', { name: 'Open in Studio' })).toBeNull();
+    fireEvent.click(within(dialog).getByLabelText('More actions for Morning take'));
+    expect(within(dialog).queryByRole('menuitem', { name: 'Open in Studio' })).toBeNull();
+    expect(within(dialog).getByRole('menuitem', { name: 'Export' })).toBeVisible();
     expect(onUse).not.toHaveBeenCalled();
   });
 
@@ -401,7 +410,7 @@ describe('VideoGallery', () => {
     expect(screen.getByLabelText('Preview could not load')).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText('More actions for Morning take'));
-    fireEvent.click(screen.getByRole('button', { name: 'Edit video' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit video' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('The video could not be loaded.');
     expect(onUse).toHaveBeenCalledWith(item, 'edit');
   });
@@ -539,7 +548,7 @@ describe('VideoGallery', () => {
     await screen.findByRole('heading', { name: 'Morning take' });
 
     fireEvent.click(screen.getByLabelText('More actions for Morning take'));
-    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const renameDialog = screen.getByRole('dialog', { name: 'Rename saved video' });
     const renameInput = within(renameDialog).getByRole('textbox', { name: /Video title/u });
     expect(renameInput).toHaveFocus();
@@ -552,7 +561,7 @@ describe('VideoGallery', () => {
     expect(await screen.findByRole('heading', { name: 'Renamed take' })).toBeInTheDocument();
     expect(api.renameSavedVideo).toHaveBeenCalledWith(original.id, 'Renamed take');
     fireEvent.click(screen.getByLabelText('More actions for Renamed take'));
-    fireEvent.click(screen.getByRole('button', { name: 'Remove from Assets' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from Assets' }));
     const removeDialog = screen.getByRole('dialog', { name: 'Remove video from Assets' });
     expect(within(removeDialog).getByRole('button', { name: 'Keep video' })).toHaveFocus();
     expect(removeDialog).toHaveTextContent(
@@ -572,7 +581,7 @@ describe('VideoGallery', () => {
     await screen.findByRole('heading', { name: 'Morning take' });
 
     fireEvent.click(screen.getByLabelText('More actions for Morning take'));
-    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const renameDialog = screen.getByRole('dialog', { name: 'Rename saved video' });
     fireEvent.change(within(renameDialog).getByRole('textbox', { name: /Video title/u }), {
       target: { value: 'Retry title' },
@@ -588,7 +597,7 @@ describe('VideoGallery', () => {
     expect(screen.getByLabelText('More actions for Morning take')).toHaveFocus();
 
     fireEvent.click(screen.getByLabelText('More actions for Morning take'));
-    fireEvent.click(screen.getByRole('button', { name: 'Remove from Assets' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from Assets' }));
     const removeDialog = screen.getByRole('dialog', { name: 'Remove video from Assets' });
     fireEvent.click(within(removeDialog).getByRole('button', { name: 'Remove from Assets' }));
     expect(await within(removeDialog).findByRole('alert')).toHaveTextContent(

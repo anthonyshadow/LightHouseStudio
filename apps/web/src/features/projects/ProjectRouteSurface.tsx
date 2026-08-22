@@ -5,10 +5,10 @@ import { isProjectWorkspacePath, projectIdFromPath } from '../../app/paths';
 import { ProjectDetailSurface, type ProjectRouteSurfaceProps } from './ProjectDetailSurface';
 import {
   projectOverviewRouteStyles,
-  projectsIndexRouteStyles,
   projectWorkspaceRouteStyles,
 } from './ProjectRouteSurface.styles';
 import { ProjectsListSurface } from './ProjectsListSurface';
+import { pageScrollRegionStyles } from '../../ui/primitives/PageShell.styles';
 
 export type { ProjectRecordingCandidate } from './ProjectSourceSection';
 export type { ProjectRouteSurfaceProps } from './ProjectDetailSurface';
@@ -29,7 +29,7 @@ export const ProjectRouteSurface = (props: ProjectRouteSurfaceProps = {}) => {
       ref={routeRef}
       css={
         projectId === null
-          ? projectsIndexRouteStyles(theme)
+          ? pageScrollRegionStyles(theme)
           : workspaceMode
             ? projectWorkspaceRouteStyles()
             : projectOverviewRouteStyles(theme)

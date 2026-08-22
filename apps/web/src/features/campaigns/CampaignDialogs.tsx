@@ -141,7 +141,7 @@ export const MoveProjectDialog = ({
       open
       onClose={onClose}
       title="Move Project"
-      description="Membership changes use the Project version so concurrent work is never overwritten."
+      description="Membership changes check the Project’s latest autosaved state, so concurrent work is never overwritten."
       placement="bottom"
       size="standard"
       closeDisabled={projects.moveMutation.isPending}

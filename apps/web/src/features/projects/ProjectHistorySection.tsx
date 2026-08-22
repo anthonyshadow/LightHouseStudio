@@ -210,10 +210,10 @@ export const ProjectHistorySection = ({
 
       <div css={groupStyles}>
         <h4>Saved video Versions</h4>
-        {outputs.isPending ? <p role="status">Loading Project Versions…</p> : null}
+        {outputs.isPending ? <p role="status">Loading saved video Versions…</p> : null}
         {outputs.isError ? (
           <StatusNotice role="alert" tone="danger">
-            Project Versions could not be loaded.{' '}
+            Saved video Versions could not be loaded.{' '}
             <Button size="small" onClick={() => void outputs.refetch()}>
               Retry
             </Button>

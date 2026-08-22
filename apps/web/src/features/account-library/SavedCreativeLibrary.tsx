@@ -7,6 +7,7 @@ import type {
 } from '../creative-assets/types';
 import { useRef, useState } from 'react';
 import { Button, ConfirmationDialog, emptyExampleStyles, EmptyStatePreview } from '../../ui';
+import { media } from '../../ui/media';
 
 const compactGrid = (theme: Theme): CSSObject => ({
   display: 'grid',
@@ -44,7 +45,7 @@ const characterGridStyles = (theme: Theme): CSSObject => ({
   gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 18rem), 1fr))',
   alignItems: 'start',
   gap: theme.space.lg,
-  '@media (max-width: 48rem)': {
+  [media.down('compact')]: {
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   },
   '@media (max-width: 30rem)': {

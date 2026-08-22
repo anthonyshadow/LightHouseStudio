@@ -2,6 +2,7 @@ import { useTheme } from '@emotion/react';
 import { formatDuration } from '@studio/domain';
 import { useRef, useState } from 'react';
 import { Button } from '../../ui';
+import { media } from '../../ui/media';
 
 type ProjectVideoPreviewPlayerProps = Readonly<{
   src: string;
@@ -122,7 +123,7 @@ export const ProjectVideoPreviewPlayer = ({
             outline: `2px solid ${theme.colors.focus}`,
             outlineOffset: '2px',
           },
-          [`@media (max-width: ${theme.breakpoints.tablet})`]: {
+          [media.down('tablet')]: {
             gap: theme.space.xs,
             padding: theme.space.xs,
           },

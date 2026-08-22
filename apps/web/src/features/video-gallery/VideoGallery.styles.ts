@@ -1,5 +1,6 @@
 import type { CSSObject, Theme } from '@emotion/react';
 import { buttonVariantStyles } from '../../ui/primitives/Button';
+import { media } from '../../ui/media';
 
 export const galleryStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
@@ -20,7 +21,7 @@ export const gallerySummaryStyles = (theme: Theme): CSSObject => ({
 export const gallerySearchRowStyles = (): CSSObject => ({
   display: 'grid',
   gridTemplateColumns: 'minmax(0, 1fr)',
-  '@media (min-width: 64rem)': { maxWidth: '32rem' },
+  [media.up('laptop')]: { maxWidth: '32rem' },
 });
 
 export const filterControlsStyles = (theme: Theme): CSSObject => ({
@@ -33,10 +34,10 @@ export const filterControlsStyles = (theme: Theme): CSSObject => ({
   borderRadius: theme.radii.large,
   background: theme.colors.surfaceSoft,
   '& > button': { minHeight: '2.75rem' },
-  '@media (min-width: 40rem)': {
+  [media.up('tablet')]: {
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr)) auto',
   },
 });
@@ -46,10 +47,10 @@ export const gridStyles = (theme: Theme): CSSObject => ({
   gridTemplateColumns: 'minmax(0, 1fr)',
   gap: theme.space.lg,
   paddingBlockEnd: theme.space.lg,
-  '@media (min-width: 40rem)': {
+  [media.up('tablet')]: {
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   },
   '@media (max-height: 36rem)': { gap: theme.space.md },
@@ -262,64 +263,6 @@ export const actionsStyles = (theme: Theme): CSSObject => ({
   '& > a:first-of-type': { ...downloadLinkStyles(theme), flex: 1 },
 });
 
-export const actionMenuStyles = (theme: Theme): CSSObject => ({
-  position: 'relative',
-  flex: '0 0 auto',
-  '& summary': {
-    width: '2.75rem',
-    height: '2.75rem',
-    display: 'grid',
-    placeItems: 'center',
-    border: `1px solid ${theme.colors.borderStrong}`,
-    borderRadius: theme.radii.medium,
-    color: theme.colors.textMuted,
-    background: theme.colors.surfaceStrong,
-    cursor: 'pointer',
-    listStyle: 'none',
-    '&::-webkit-details-marker': { display: 'none' },
-    '&:hover': { color: theme.colors.text, borderColor: theme.colors.accent },
-    '&:focus-visible': {
-      outline: `2px solid ${theme.colors.focus}`,
-      outlineOffset: '2px',
-    },
-    '& svg': { width: '1.2rem', height: '1.2rem' },
-  },
-  '&[open] summary': { color: theme.colors.text, borderColor: theme.colors.accent },
-});
-
-export const actionMenuPopoverStyles = (theme: Theme): CSSObject => ({
-  position: 'absolute',
-  zIndex: 3,
-  insetInlineEnd: 0,
-  insetBlockEnd: `calc(100% + ${theme.space.xs})`,
-  width: '12rem',
-  display: 'grid',
-  gap: theme.space.xxs,
-  padding: theme.space.xs,
-  border: `1px solid ${theme.colors.borderStrong}`,
-  borderRadius: theme.radii.medium,
-  background: theme.colors.overlaySurface,
-  boxShadow: theme.shadows.lifted,
-  '& a, & button': {
-    width: '100%',
-    minHeight: '2.75rem',
-    display: 'flex',
-    alignItems: 'center',
-    padding: `${theme.space.xs} ${theme.space.sm}`,
-    border: 0,
-    borderRadius: theme.radii.small,
-    color: theme.colors.text,
-    background: 'transparent',
-    fontWeight: 700,
-    textAlign: 'start',
-    textDecoration: 'none',
-    cursor: 'pointer',
-    '&:hover': { background: theme.colors.surfaceStrong },
-    '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '-2px' },
-  },
-  '& [data-danger]': { color: theme.colors.danger },
-});
-
 export const paginationStyles = (theme: Theme): CSSObject => ({
   position: 'sticky',
   insetBlockEnd: 0,
@@ -354,7 +297,7 @@ export const previewPlayerStyles = (theme: Theme): CSSObject => ({
     objectFit: 'contain',
     background: '#000',
   },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     maxHeight: '46dvh',
     borderRadius: theme.radii.medium,
     '& video': { maxHeight: '46dvh' },
@@ -376,7 +319,7 @@ export const previewFooterStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.xs,
   '& > *': { minWidth: '8.5rem' },
   '& > a': downloadLinkStyles(theme),
-  '@media (max-width: 39.99rem)': {
+  [media.down('tablet')]: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
     '& > *': { minWidth: 0 },

@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../ui/media';
 
 export const pageStyles = (theme: Theme): CSSObject => ({
   width: '100%',
@@ -27,13 +28,13 @@ export const shellStyles = (): CSSObject => ({
   minWidth: 0,
   minHeight: 0,
   overflow: 'hidden',
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     gridTemplateColumns: '13.5rem minmax(0, 1fr)',
   },
-  '@media (min-width: 80rem)': {
+  [media.up('desktop')]: {
     gridTemplateColumns: '15.5rem minmax(0, 1fr)',
   },
-  '@media (max-width: 47.99rem)': {
+  [media.down('compact')]: {
     gridTemplateColumns: 'minmax(0, 1fr)',
     gridTemplateRows: '3.5rem minmax(0, 1fr)',
   },
@@ -46,11 +47,11 @@ export const headerRegionStyles = (theme: Theme): CSSObject => ({
   minHeight: 0,
   overflow: 'visible',
   background: theme.colors.canvas,
-  '@media (min-width: 48rem)': {
-    borderInlineEnd: `1px solid ${theme.colors.border}`,
+  [media.up('compact')]: {
+    borderInlineEnd: `1px solid ${theme.colors.divider}`,
   },
-  '@media (max-width: 47.99rem)': {
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+  [media.down('compact')]: {
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
   },
 });
 
@@ -75,7 +76,7 @@ export const headerStyles = (theme: Theme): CSSObject => ({
   justifyContent: 'space-between',
   gap: theme.space.md,
   minWidth: 0,
-  '@media (min-width: 48rem)': {
+  [media.up('compact')]: {
     display: 'grid',
     gridTemplateRows: 'auto auto auto minmax(0, 1fr) auto',
     alignItems: 'stretch',
@@ -83,8 +84,8 @@ export const headerStyles = (theme: Theme): CSSObject => ({
     gap: 0,
     padding: theme.space.lg,
   },
-  '@media (min-width: 64rem)': { padding: theme.space.xl },
-  '@media (max-width: 47.99rem)': {
+  [media.up('laptop')]: { padding: theme.space.xl },
+  [media.down('compact')]: {
     paddingInline: `max(${theme.space.md}, env(safe-area-inset-left)) max(${theme.space.md}, env(safe-area-inset-right))`,
     gap: theme.space.xs,
   },
@@ -102,7 +103,7 @@ export const headerActionsStyles = (theme: Theme): CSSObject => ({
     alignItems: 'center',
     gap: theme.space.sm,
   },
-  '@media (min-width: 48rem)': {
+  [media.up('compact')]: {
     display: 'contents',
     '& [data-create-action]': {
       gridRow: 2,
@@ -115,10 +116,10 @@ export const headerActionsStyles = (theme: Theme): CSSObject => ({
       alignItems: 'stretch',
       gap: theme.space.sm,
       paddingBlockStart: theme.space.md,
-      borderBlockStart: `1px solid ${theme.colors.border}`,
+      borderBlockStart: `1px solid ${theme.colors.divider}`,
     },
   },
-  '@media (max-width: 47.99rem)': {
+  [media.down('compact')]: {
     gap: theme.space.xs,
     '& [data-create-action], & [data-utility-actions]': { gap: theme.space.xs },
   },
@@ -146,7 +147,7 @@ export const primaryNavigationStyles = (theme: Theme): CSSObject => ({
     background: theme.colors.accent,
   },
   '& [data-nav-icon]': { display: 'none' },
-  '@media (min-width: 48rem)': {
+  [media.up('compact')]: {
     gridRow: 3,
     display: 'flex',
     flexDirection: 'column',
@@ -191,7 +192,7 @@ export const primaryNavigationStyles = (theme: Theme): CSSObject => ({
     },
     '& > button[aria-current="page"] [data-nav-icon]': { color: theme.colors.accent },
   },
-  '@media (max-width: 47.99rem)': { display: 'none' },
+  [media.down('compact')]: { display: 'none' },
 });
 
 /** The header brand with the wordmark column removed, leaving the logo mark on its own. */
@@ -235,7 +236,7 @@ export const brandStyles = (theme: Theme): CSSObject => ({
   },
   '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '2px' },
   '&:hover': { background: theme.colors.surfaceSoft },
-  '@media (min-width: 48rem)': {
+  [media.up('compact')]: {
     gridRow: 1,
     gridTemplateColumns: '2rem minmax(0, 1fr)',
     alignSelf: 'start',
@@ -245,8 +246,8 @@ export const brandStyles = (theme: Theme): CSSObject => ({
     '& strong': { fontSize: theme.fontSizes.section },
     '& span': { fontSize: '0.62rem' },
   },
-  '@media (min-width: 48rem) and (max-width: 63.99rem)': brandMarkOnly,
-  '@media (max-width: 47.99rem)': {
+  [media.between('compact', 'laptop')]: brandMarkOnly,
+  [media.down('compact')]: {
     gridTemplateColumns: '2rem minmax(0, 1fr)',
     padding: 0,
     '& img': { width: '2rem', height: '2rem' },
@@ -260,7 +261,7 @@ export const brandStyles = (theme: Theme): CSSObject => ({
 
 export const mobileNavigationStyles = (theme: Theme): CSSObject => ({
   display: 'none',
-  '@media (max-width: 47.99rem)': {
+  [media.down('compact')]: {
     position: 'fixed',
     zIndex: theme.layers.stageNotices + 2,
     insetInline: 0,
@@ -314,7 +315,7 @@ export const createMenuStyles = (theme: Theme): CSSObject => ({
     lineHeight: 1.4,
   },
   width: '100%',
-  '@media (min-width: 48rem)': {
+  [media.up('compact')]: {
     '& > button': {
       width: '100%',
       minHeight: '2.75rem',
@@ -330,7 +331,7 @@ export const createMenuStyles = (theme: Theme): CSSObject => ({
       insetInlineEnd: 'auto',
     },
   },
-  '@media (max-width: 47.99rem)': {
+  [media.down('compact')]: {
     width: 'auto',
     '& > button': { minWidth: '2.75rem', paddingInline: theme.space.sm },
     '& [data-create-label-long]': { display: 'none' },
@@ -377,7 +378,7 @@ export const capabilityStyles = (theme: Theme): CSSObject => ({
     background: theme.colors.surface,
   },
   width: '100%',
-  '@media (min-width: 48rem)': {
+  [media.up('compact')]: {
     '& > button': {
       width: '100%',
       justifyContent: 'flex-start',
@@ -394,7 +395,7 @@ export const capabilityStyles = (theme: Theme): CSSObject => ({
       background: theme.colors.surfaceSoft,
     },
   },
-  '@media (max-width: 47.99rem)': {
+  [media.down('compact')]: {
     width: 'auto',
     '& > button': {
       width: '2.75rem',
@@ -447,7 +448,7 @@ export const capabilityDetailStyles = (theme: Theme): CSSObject => ({
     display: 'grid',
     gap: theme.space.xxs,
     paddingBlockEnd: theme.space.sm,
-    borderBottom: `1px solid ${theme.colors.border}`,
+    borderBottom: `1px solid ${theme.colors.divider}`,
     '& > strong': { color: theme.colors.text, fontSize: theme.fontSizes.body },
     '& > span': { color: theme.colors.textMuted, fontSize: theme.fontSizes.caption },
   },
@@ -461,18 +462,18 @@ export const capabilityDetailStyles = (theme: Theme): CSSObject => ({
   '& strong': { color: theme.colors.text, fontWeight: 760 },
   '& small': {
     paddingBlockStart: theme.space.sm,
-    borderTop: `1px solid ${theme.colors.border}`,
+    borderTop: `1px solid ${theme.colors.divider}`,
     color: theme.colors.textFaint,
     fontSize: theme.fontSizes.caption,
     lineHeight: 1.45,
   },
-  '@media (min-width: 48rem)': {
+  [media.up('compact')]: {
     insetBlockStart: 'auto',
     insetBlockEnd: 0,
     insetInlineStart: `calc(100% + ${theme.space.sm})`,
     insetInlineEnd: 'auto',
   },
-  '@media (max-width: 47.99rem)': {
+  [media.down('compact')]: {
     position: 'fixed',
     insetInline: theme.space.xs,
     insetBlockStart: '4rem',
@@ -499,12 +500,12 @@ export const mainGridStyles = (
     ? { padding: 'clamp(0.75rem, 2vw, 1.5rem)' }
     : {}),
   /** Clears the fixed bottom navigation the shell renders below 48rem. */
-  '@media (max-width: 47.99rem)': {
+  [media.down('compact')]: {
     paddingBlockEnd: `max(4.5rem, calc(env(safe-area-inset-bottom) + 4.5rem))`,
   },
   ...(projectContextActive
     ? {
-        '@media (max-width: 63.99rem)': {
+        [media.down('laptop')]: {
           gridTemplateColumns: 'minmax(0, 1fr)',
           gridTemplateRows: '3rem auto auto',
           alignContent: 'start',
@@ -555,7 +556,7 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
   '&:fullscreen > [data-studio-tool-rail], &:fullscreen > [data-capture-controls]': {
     display: 'none',
   },
-  '@media (max-width: 80rem), (max-height: 48rem)': {
+  [media.downOrShort('desktop', '48rem')]: {
     gap: theme.space.xs,
     gridTemplateRows: 'minmax(0, 1fr) 3.15rem 2.85rem',
   },
@@ -592,13 +593,13 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
       gridTemplateRows: 'minmax(8rem, 1fr) 3.15rem minmax(11rem, 38vh)',
     },
   },
-  '@media (max-width: 39.99rem)': {
+  [media.down('tablet')]: {
     gridTemplateRows: 'minmax(0, 1fr) 3.15rem 2.85rem',
     '&[data-video-edit-active="true"]': {
       gridTemplateRows: 'minmax(8rem, 1fr) 3.15rem minmax(10.5rem, 42vh)',
     },
   },
-  '@media (max-width: 63.99rem)': {
+  [media.down('laptop')]: {
     '&[data-project-context="true"]': {
       alignSelf: 'start',
       boxSizing: 'border-box',
@@ -637,7 +638,7 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
       },
     },
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     gridTemplateColumns: 'minmax(12rem, 15rem) minmax(0, 1fr) minmax(18rem, 20rem)',
     gridTemplateRows: 'minmax(0, 1fr)',
     gap: theme.space.lg,
@@ -671,7 +672,7 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
       },
     },
   },
-  '@media (min-width: 64rem) and (max-height: 48rem)': {
+  [`${media.up('laptop')} and (max-height: 48rem)`]: {
     gap: theme.space.sm,
   },
 });
@@ -766,11 +767,11 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     flex: '0 0 auto',
     color: theme.colors.accent,
   },
-  '@media (max-width: 79.99rem), (max-height: 48rem)': {
+  [media.downOrShort('desktop', '48rem')]: {
     '& > button': { flex: '1 1 0', justifyContent: 'center' },
     '& > span': { display: 'none' },
   },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     gap: '0.3rem',
     padding: theme.space.xxs,
     '& > button': {
@@ -807,7 +808,7 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     '& [data-tool-label] strong': { fontSize: '0.66rem' },
     '& [data-tool-icon]': { width: '0.82rem', height: '0.82rem' },
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     flexDirection: 'column',
     alignItems: 'stretch',
     gap: theme.space.sm,
@@ -843,7 +844,7 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
       whiteSpace: 'normal',
     },
   },
-  '@media (min-width: 64rem) and (max-height: 48rem)': {
+  [`${media.up('laptop')} and (max-height: 48rem)`]: {
     gap: theme.space.xs,
     padding: theme.space.xs,
     '& > button': {

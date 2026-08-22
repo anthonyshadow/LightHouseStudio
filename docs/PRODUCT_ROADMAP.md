@@ -121,7 +121,7 @@ opened. See [`product-audit/10-implementation-roadmap.md`](product-audit/10-impl
   totals. Filters, tags, favorites, folders, bulk organization and review states are still gated on
   their semantics and persistence authority being defined.
 - **Variation is partly implemented**: a save states the placement it is for (Keep as it is, phone,
-  widescreen, square, tall feed) and records it on the Version, and **Make another version**
+  widescreen, square, tall feed) and records it on the Version, and **Duplicate Project**
   derives a new Project from an existing one by reference. Variation for audience, message,
   platform or experiment — carried as first-class metadata rather than a copy — is still future.
 - Evaluate independently resumable Project Deliverables only if one focused workflow per Project

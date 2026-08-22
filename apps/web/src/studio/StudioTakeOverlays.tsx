@@ -54,10 +54,11 @@ export const StudioTakeOverlays = ({
       <OverlayPanel
         open={activeOverlay === 'take-review' && Boolean(recording.presented)}
         onClose={onClose}
-        title="Latest Take"
-        description="Playback stays on the stage while you review this temporary in-memory take."
+        title="Latest take"
+        description="Playback stays on the stage above. This take is only in this browser tab until you save it."
         placement="bottom"
         size="wide"
+        height="sheet"
         bodyMode="contained"
         returnFocusRef={mainRef}
       >

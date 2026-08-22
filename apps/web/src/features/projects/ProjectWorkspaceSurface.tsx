@@ -116,11 +116,11 @@ const projectWorkspaceSaveStatus = (
   sourceBusy: boolean,
 ): { readonly label: string; readonly tone: 'success' | 'warning' | 'danger' } => {
   if (sourceBusy || session.phase === 'dirty' || session.phase === 'saving') {
-    return { label: 'Saving changes', tone: 'warning' };
+    return { label: 'Autosaving…', tone: 'warning' };
   }
   if (session.phase === 'conflict') return { label: 'Resolve conflict', tone: 'warning' };
-  if (session.phase === 'error') return { label: 'Changes not saved', tone: 'danger' };
-  return { label: 'All changes saved', tone: 'success' };
+  if (session.phase === 'error') return { label: 'Not autosaved', tone: 'danger' };
+  return { label: 'Autosaved', tone: 'success' };
 };
 
 interface ProjectWorkspaceSurfaceProps {

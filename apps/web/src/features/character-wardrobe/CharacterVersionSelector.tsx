@@ -1,6 +1,7 @@
 import { useTheme } from '@emotion/react';
 import { Button } from '../../ui';
 import { referenceImageContentUrl } from '../../adapters/api-client/referenceImageRoutes';
+import { media } from '../../ui/media';
 
 export type CharacterVersionOption = Readonly<{
   value: string;
@@ -34,12 +35,12 @@ export const CharacterVersionSelector = ({
   return (
     <div
       role="list"
-      aria-label="Character versions"
+      aria-label="Character and wardrobe variants"
       css={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 11rem), 1fr))',
         gap: theme.space.sm,
-        '@media (min-width: 22.01rem) and (max-width: 40rem)': {
+        [`${media.down('tablet')} and (min-width: 22.01rem)`]: {
           gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
         },
         '@media (max-width: 22rem)': {
@@ -75,7 +76,7 @@ export const CharacterVersionSelector = ({
               {version.referenceImageAssetId ? (
                 <img
                   src={referenceImageContentUrl(version.referenceImageAssetId)}
-                  alt={`${version.title} character version`}
+                  alt={`${version.title} character reference`}
                   css={{ width: '100%', height: '100%', display: 'block', objectFit: 'contain' }}
                 />
               ) : (

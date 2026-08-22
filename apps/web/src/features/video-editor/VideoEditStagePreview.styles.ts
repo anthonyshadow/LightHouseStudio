@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const previewLayerStyles = (): CSSObject => ({
   position: 'absolute',
@@ -160,7 +161,7 @@ export const playbackControlsStyles = (theme: Theme): CSSObject => ({
     fontSize: theme.fontSizes.caption,
   },
   '& input': { width: '100%', accentColor: theme.colors.accent },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     insetInline: theme.space.xxs,
     insetBlockEnd: theme.space.xxs,
     gap: theme.space.xs,

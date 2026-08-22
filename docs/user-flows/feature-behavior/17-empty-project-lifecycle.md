@@ -57,7 +57,7 @@ provider work.
    restores that global Asset view and cannot resurrect the prior Project workspace from mounted
    React state. Leaving a workspace cannot silently abandon recording, finalization, local render,
    unaccepted source, dirty creative state, or a pending semantic checkpoint.
-9. The UI distinguishes **Preparing source**, **Saving changes**, **All changes saved**,
+9. The UI distinguishes **Preparing source**, **Autosaving…**, **Autosaved**,
    **Conflict**, and safe failure. A Project becomes resumable only after durable byte storage or
    exact Version verification, server inspection, checksum/owner validation, and atomic source
    revision acceptance. A failed/unaccepted staging attempt can be replaced.
@@ -88,7 +88,7 @@ provider work.
     applied creative/Voice/treatment values, explicit live metadata, and validated local edit; the
     immutable source and current media references are copied from server authority. Compatible
     proposals coalesce for 750 ms and append one revision rather than one revision per input event.
-    **Saving changes** and **All changes saved** describe this server checkpoint only.
+    **Autosaving…** and **Autosaved** describe this server checkpoint only.
 15. A stale Project/revision CAS or unavailable response preserves the current tab's proposal and
     reloads server authority. If authority already contains the exact proposal, the lost response
     converges without another revision. Otherwise **Conflict** requires explicit **Reapply
@@ -169,7 +169,7 @@ provider work.
     the immutable original, Saved Video current pointer, or Add Version target, and stale work is
     never promoted automatically. A removed global Saved Video remains reachable only through an
     exact same-owner retaining Project relation with truthful retention copy.
-27. **Make another version** duplicates a Project from its overview or from a Projects list row. The
+27. **Duplicate Project** duplicates a Project from its overview or from a Projects list row. The
     copy starts from the same original video and the same creative setup — character, outfit, voice,
     visual treatment, live-mode metadata, creative intent, local edit and placement — all carried by
     reference, so no video is duplicated and no storage is used again. It carries no outputs, no

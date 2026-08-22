@@ -281,7 +281,7 @@ each Start or retry requires separate approval.
 Using synthetic compatible media and no live provider:
 
 - open a ready source-bearing Project and confirm the review surface distinguishes current media
-  from the immutable original, and that **All changes saved**, **Render preview**, **Save as New
+  from the immutable original, and that **Autosaved**, **Render preview**, **Save as New
   Video**, and **Add Version** describe separate states/actions;
 - save as a new titled video, then separately select an active Saved Video for **Add Version** and
   verify the confirmation names its title, current version ordinal, and current-media dimensions;
@@ -338,7 +338,8 @@ checks exercise local authenticated routes only and must not be converted into p
 Using keyboard and a screen reader:
 
 - traverse skip link, Quick Create, Start/AI choices, Character and Outfit selectors,
-  fields/files, Apply, settings, Record/Stop, Latest Take, Voice, Save, Release/Discard;
+  fields/files, Apply, settings, Record/Stop, Latest take, its action menu, Voice, Save,
+  Close/Discard;
 - verify names, roles, states, validation, live/status announcements, logical focus, visible focus,
   reduced motion, and approximately 44 px touch actions;
 - ensure topmost overlays alone are active, Tab wraps inside, Escape closes one layer, background

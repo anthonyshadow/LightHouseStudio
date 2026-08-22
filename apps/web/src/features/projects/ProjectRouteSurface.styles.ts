@@ -1,30 +1,8 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const projectWorkspaceRouteStyles = (): CSSObject => ({
   display: 'contents',
-});
-
-export const workspaceStyles = (theme: Theme): CSSObject => ({
-  minWidth: 0,
-  minHeight: 0,
-  height: '100%',
-  overflowY: 'auto',
-  overscrollBehavior: 'contain',
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: theme.radii.large,
-  background: [
-    'radial-gradient(circle at 12% 0%, rgba(98, 230, 194, 0.1), transparent 28rem)',
-    'radial-gradient(circle at 90% 8%, rgba(155, 124, 255, 0.08), transparent 24rem)',
-    theme.colors.canvasRaised,
-  ].join(', '),
-  scrollbarGutter: 'stable',
-});
-
-export const projectsIndexRouteStyles = (theme: Theme): CSSObject => ({
-  ...workspaceStyles(theme),
-  border: 0,
-  borderRadius: 0,
-  background: theme.colors.canvas,
 });
 
 export const projectOverviewRouteStyles = (theme: Theme): CSSObject => ({
@@ -32,8 +10,6 @@ export const projectOverviewRouteStyles = (theme: Theme): CSSObject => ({
   minHeight: 0,
   height: '100%',
   overscrollBehavior: 'contain',
-  border: 0,
-  borderRadius: 0,
   background: theme.colors.canvas,
   scrollbarGutter: 'stable',
   containerType: 'inline-size',
@@ -49,15 +25,15 @@ export const workspaceInnerStyles = (theme: Theme): CSSObject => ({
   padding: theme.space.lg,
   alignContent: 'start',
   overflowY: 'auto',
-  borderInlineStart: `1px solid ${theme.colors.border}`,
+  borderInlineStart: `1px solid ${theme.colors.divider}`,
   background: theme.colors.canvas,
-  '@media (max-width: 63.99rem)': {
+  [media.down('laptop')]: {
     gridColumn: 1,
     gridRow: 3,
     minHeight: '20rem',
     height: 'auto',
     borderInlineStart: 0,
-    borderBlockStart: `1px solid ${theme.colors.border}`,
+    borderBlockStart: `1px solid ${theme.colors.divider}`,
   },
 });
 
@@ -133,7 +109,7 @@ export const projectWorkflowProgressStyles = (theme: Theme): CSSObject => ({
       padding: `0.15rem ${theme.space.xs}`,
       fontSize: theme.fontSizes.metadata,
     },
-    '@media (max-width: 63.99rem)': {
+    [media.down('laptop')]: {
       '& li span[data-step-label]': { display: 'none' },
     },
   },

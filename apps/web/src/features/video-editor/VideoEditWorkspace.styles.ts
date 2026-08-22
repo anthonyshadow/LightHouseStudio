@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const editToolRailStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
@@ -36,7 +37,7 @@ export const editToolRailStyles = (theme: Theme): CSSObject => ({
     outline: `2px solid ${theme.colors.focus}`,
     outlineOffset: '2px',
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     flexDirection: 'column',
     alignItems: 'stretch',
     padding: theme.space.sm,
@@ -67,7 +68,7 @@ export const editSettingsStyles = (theme: Theme): CSSObject => ({
     alignItems: 'center',
     gap: theme.space.xs,
     padding: theme.space.sm,
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
     background: theme.colors.surfaceStrong,
   },
   '& > header h2': { margin: 0, fontSize: theme.fontSizes.body },
@@ -91,7 +92,7 @@ export const editSettingsBodyStyles = (theme: Theme): CSSObject => ({
   scrollbarWidth: 'thin',
   '& h3': { margin: 0, fontSize: theme.fontSizes.body },
   '& p': { margin: 0, color: theme.colors.textMuted, fontSize: theme.fontSizes.metadata },
-  '@media (max-width: 63.99rem)': {
+  [media.down('laptop')]: {
     padding: theme.space.sm,
     gap: theme.space.sm,
   },
@@ -140,7 +141,7 @@ export const editorFooterStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.xs,
   padding: theme.space.sm,
   paddingBlockEnd: `max(${theme.space.sm}, env(safe-area-inset-bottom))`,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   background: theme.colors.surfaceStrong,
   '& [data-editor-primary-actions]': {
     display: 'grid',

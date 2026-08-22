@@ -6,6 +6,7 @@ import type { CreativeAssetStore } from '@studio/domain';
 import {
   CREATIVE_ASSET_STORAGE_KEY,
   closeAiSettings,
+  chooseTakeAction,
   createLocalTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
@@ -233,7 +234,7 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
 
 const showVoiceTreatment = async (page: Page): Promise<void> => {
   await createLocalTake(page);
-  await page.getByRole('button', { name: 'Voice treatments' }).click();
+  await chooseTakeAction(page, 'Voice treatments');
   await expect(page.getByRole('dialog', { name: 'Voice Treatments' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Back to take review' })).toBeVisible();
   const heading = page.getByRole('heading', { name: 'Select Treatment', exact: true });

@@ -32,7 +32,7 @@ describe('Project Assets Single Flow styles', () => {
   it('uses the approved underline filters without rounded button boxes', () => {
     expect(projectAssetFiltersStyles(studioTheme)).toMatchObject({
       overflowX: 'auto',
-      borderBlockEnd: `1px solid ${studioTheme.colors.border}`,
+      borderBlockEnd: `1px solid ${studioTheme.colors.divider}`,
       '& > button': {
         border: 0,
         borderRadius: 0,
