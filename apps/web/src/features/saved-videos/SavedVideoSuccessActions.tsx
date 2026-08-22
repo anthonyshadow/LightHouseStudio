@@ -1,18 +1,10 @@
-import { downloadBlobFile } from '../../adapters/browser-media/downloadBlobFile';
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import type { SavedVideoDetail } from '@studio/contracts';
 import type { ProjectExportSpecification } from '@studio/domain';
-import { useEffect, useRef, useState } from 'react';
-import {
-  downloadSavedVideoUrl,
-  readSavedVideoContent,
-} from '../../adapters/api-client/savedVideosApi';
+import { downloadSavedVideoUrl } from '../../adapters/api-client/savedVideosApi';
 import { Button, StatusNotice } from '../../ui';
-import {
-  ExportPlacementProgress,
-  exportPlacementLabel,
-  useExportPlacementRender,
-} from '../export-placements';
+import { ExportPlacementProgress, exportPlacementLabel } from '../export-placements';
+import { useSavedVideoPlacementDownload } from './useSavedVideoPlacementDownload';
 
 const actionRowStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
@@ -69,56 +61,11 @@ export const SavedVideoSuccessActions = ({
   createAnotherLabel = 'Create another',
 }: SavedVideoSuccessActionsProps) => {
   const theme = useTheme();
-  const placement = useExportPlacementRender();
-  const fetchRef = useRef<AbortController | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
+  const { render, failure, download } = useSavedVideoPlacementDownload();
   // A placement can only be produced where the browser can render; elsewhere the original shape is
   // what the operator gets, and saying so is better than offering a control that cannot work.
-  const reframing = exportSpecification !== null && placement.supported;
-  const placementName =
-    exportSpecification === null ? null : exportPlacementLabel(exportSpecification.aspect);
-
-  useEffect(() => () => fetchRef.current?.abort('unmount'), []);
-
-  const downloadPlacement = async () => {
-    if (exportSpecification === null || placement.phase === 'rendering') return;
-    setFailure(null);
-    const controller = new AbortController();
-    fetchRef.current = controller;
-    let media: Blob;
-    try {
-      media = await readSavedVideoContent({
-        videoId: video.id,
-        versionId: video.currentVersion.id,
-        mimeType: video.currentVersion.mimeType,
-        signal: controller.signal,
-        abortMessage: 'Preparing this download was cancelled.',
-      });
-    } catch {
-      if (!controller.signal.aborted) {
-        setFailure('This video could not be read to re-frame it. Download it as it is instead.');
-      }
-      return;
-    } finally {
-      if (fetchRef.current === controller) fetchRef.current = null;
-    }
-    const rendered = await placement.render({
-      media,
-      specification: exportSpecification,
-      source: {
-        width: video.currentVersion.width,
-        height: video.currentVersion.height,
-        durationMs: video.currentVersion.durationMs,
-      },
-      // The retained record does not state whether it carries audio, so an existing track is kept
-      // rather than required.
-      hasAudio: false,
-      filename: video.currentVersion.filename,
-    });
-    if (rendered === null) return;
-    // The Blob exists only for the length of the click that hands it over.
-    downloadBlobFile(rendered.blob, rendered.filename);
-  };
+  // Carrying the specification rather than a boolean lets the offer below narrow to it.
+  const reframing = render.supported ? exportSpecification : null;
 
   return (
     <div css={{ display: 'grid', gap: theme.space.xs }} data-saved-video-success-actions="">
@@ -126,12 +73,14 @@ export const SavedVideoSuccessActions = ({
         {reframing ? (
           <Button
             variant="secondary"
-            busy={placement.phase === 'rendering'}
-            disabled={placement.phase === 'rendering'}
-            aria-label={`Download ${video.title}, Version ${video.currentVersion.ordinal}, for ${placementName}`}
-            onClick={() => void downloadPlacement()}
+            busy={render.phase === 'rendering'}
+            disabled={render.phase === 'rendering'}
+            aria-label={`Download ${video.title}, Version ${video.currentVersion.ordinal}, for ${exportPlacementLabel(reframing.aspect)}`}
+            onClick={() =>
+              void download({ version: video.currentVersion, specification: reframing })
+            }
           >
-            Download for {placementName?.toLowerCase()}
+            Download for {exportPlacementLabel(reframing.aspect).toLowerCase()}
           </Button>
         ) : (
           <a
@@ -152,7 +101,7 @@ export const SavedVideoSuccessActions = ({
           </Button>
         ) : null}
       </div>
-      {exportSpecification !== null && !placement.supported ? (
+      {exportSpecification !== null && !render.supported ? (
         <StatusNotice tone="warning" title="Local editor unavailable">
           This browser cannot re-frame a video, so Download gives you the video in its original
           shape. The placement is still recorded on this Project.
@@ -164,10 +113,10 @@ export const SavedVideoSuccessActions = ({
         </StatusNotice>
       )}
       <ExportPlacementProgress
-        phase={placement.phase}
-        progress={placement.progress}
-        error={placement.error}
-        onCancel={placement.cancel}
+        phase={render.phase}
+        progress={render.progress}
+        error={render.error}
+        onCancel={render.cancel}
       />
       {reframing ? (
         <a
