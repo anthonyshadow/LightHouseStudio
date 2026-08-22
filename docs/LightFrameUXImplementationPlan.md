@@ -29,7 +29,7 @@ Visual baselines under `screenshots/` are asserted by `bun run test:visual`. Any
 
 | Tier                      | Items | Theme                                                         | Rough effort |
 | ------------------------- | ----- | ------------------------------------------------------------- | ------------ |
-| 1 — Fix immediately       | 1–10  | Stop the product telling the user things that are not true    | 1–2 days     |
+| ~~1 — Fix immediately~~   | 1–10  | **DONE** — the product no longer tells the user untrue things | 1–2 days     |
 | 2 — Work on next          | 11–16 | One vocabulary, one action model, one page shell              | 1–2 weeks    |
 | 3 — Important, can follow | 17–22 | The four redesigns, plus mobile capability and loading states | 2–4 weeks    |
 | 4 — Polish later          | 23–34 | Design-system consolidation and copy tone                     | ongoing      |
@@ -43,9 +43,25 @@ running Tier 3 first would mean designing against a system that is about to chan
 
 ---
 
-# Tier 1 — Fix immediately
+# ~~Tier 1 — Fix immediately~~ · COMPLETE
 
-## 1. `Record New Video` does not record
+**Shipped 2026-08-22 on `LightFrameUxImprovements`**, one commit per item, each validated with the
+scoped command below before the next began. The full `apps/web/src` unit suite (146 files, 1056
+tests) passes, as do `app-routing`, `existing-video`, `successful-studio-journeys`,
+`accessibility-responsive` (axe), `studio-character-builder` and `reference-image-workflow`.
+
+Thirteen visual baselines were re-captured and reviewed image by image. Four of them needed
+`--update-snapshots=all`: a label change alone falls under the 0.5% `maxDiffPixelRatio`, so the
+suite passed while the committed baseline still showed a control that no longer exists.
+
+**One pre-existing visual failure remains and is not from this work**: `small-mobile /
+character-builder-combined-ready` cannot reach `Select Character`, because
+`showDesktopAiTools` removes the AI tools below 64rem. Verified by running that test on the base
+commit `2399167` in a clean worktree, where it fails identically. **Tier 3 item 21 owns it.**
+
+The prompts below are kept verbatim as the record of what was asked.
+
+## ~~1. `Record New Video` does not record~~ · DONE
 
 **Audit ID** LF-S01 · **P1** · **XS** · **touches baselines**
 
@@ -75,10 +91,13 @@ step while performing the first.
 >
 > Validate with `vitest run apps/web/src/studio`.
 
-**Validation** `vitest run apps/web/src/studio`, then `bun run test:visual` and re-capture.
-**Risk** The label appears in E2E specs and Storybook stories; grep before assuming two files.
+**Outcome** Label only. `RecordingAction` already read `Record` / `Stop recording`, so it was left
+alone, as were every handler and the `intent=record` auto-start path. Updated the unit test, both
+Storybook stories, 10 e2e specs and the user-flow docs that named the old label.
+**Validated** `vitest run apps/web/src/studio` (26 files, 174 tests), `tsc -p e2e`, baselines
+re-captured.
 
-## 2. Primary and destructive actions share red
+## ~~2. Primary and destructive actions share red~~ · DONE
 
 **Audit ID** LF-S02 · **P1** · **XS** · **touches baselines**
 
@@ -110,10 +129,14 @@ step while performing the first.
 >
 > Validate with `vitest run apps/web/src/studio apps/web/src/features/recording`.
 
-**Validation** `vitest run apps/web/src/studio apps/web/src/features/recording`, then re-capture.
-**Risk** None functional. This item establishes the colour rule that items 12 and 15 rely on.
+**Outcome** Idle Record takes `Button variant="primary"`; `recordActionStyles` now overrides only
+the dot glyph, deepened to `recordingSoft` because vivid `recording` red is **1.96:1** on `accent`
+and would have vanished (`recordingSoft` is **9.49:1**). Active recording unchanged. `Close`
+demoted to `secondary`. `TakeReviewActions`' `Discard` untouched.
+**Validated** `vitest run apps/web/src/studio apps/web/src/features/recording` (29 files, 194
+tests), 5 baselines re-captured. **This is the colour rule items 12 and 15 build on.**
 
-## 3. Internal language shipped as a user-facing blocked reason
+## ~~3. Internal language shipped as a user-facing blocked reason~~ · DONE
 
 **Audit ID** LF-X04 · **P1** · **XS**
 
@@ -141,10 +164,17 @@ because they do not use the recoverable Project processing command."_ It renders
 >
 > Validate with `vitest run apps/web/src/studio apps/web/src/features/existing-video`.
 
-**Validation** `vitest run apps/web/src/studio apps/web/src/features/existing-video`.
-**Risk** `AIExperienceChooser.test.tsx` may assert the old text.
+**Outcome** Constant value only; name, export and both call sites untouched.
+**Reported, not fixed** — other strings on those surfaces that name a mechanism:
+`REVIEW_LOCK_REASON` and `characterBuilderBlockedReasons` ("release", "temporary take");
+`characterRemovalBlockedReason` ("session cleanup"); `ExistingVideoActionBar`'s "accepted job" /
+"no new submission" copy and its `aria-label`s; `AIExperienceChooser.tsx:86` ("Decart"); and
+`RecordingAction.tsx:41` ("Start local preview"), which item 1's rename left naming a control that
+no longer exists — "local preview" appears in ~18 sites, so it is a vocabulary sweep for item 11.
+**Validated** `vitest run apps/web/src/studio apps/web/src/features/existing-video` (31 files, 246
+tests).
 
-## 4. Campaigns promises a feature that does not exist
+## ~~4. Campaigns promises a feature that does not exist~~ · DONE
 
 **Audit ID** LF-C01 · **P1** · **XS**
 
@@ -171,10 +201,13 @@ available in Projects."_ There is no "Quick Start" anywhere in the UI; the contr
 >
 > Validate with `vitest run apps/web/src/features/campaigns`.
 
-**Validation** `vitest run apps/web/src/features/campaigns`.
-**Risk** `CampaignRouteSurface.test.tsx` may assert the sentence.
+**Outcome** Description rewritten as specified.
+**Remaining `Quick Start` references, all outside the UI:** `projectsApi.test.ts:152` (a test
+name), `docs/ARCHITECTURE.md:706`, `docs/PRODUCT_ROADMAP.md:87`, and two files under
+`docs/archived/`.
+**Validated** `vitest run apps/web/src/features/campaigns` (2 files, 21 tests).
 
-## 5. A permanently disabled `Export` button
+## ~~5. A permanently disabled `Export` button~~ · DONE
 
 **Audit ID** LF-A02 · **P1** · **XS** (remove) or **S** (wire up)
 
@@ -210,11 +243,21 @@ implemented and used by the Project save step and the standalone save.
 >
 > Validate with `vitest run apps/web/src/features/video-gallery apps/web/src/features/export-placements`.
 
-**Validation** `vitest run apps/web/src/features/video-gallery apps/web/src/features/export-placements`.
-**Risk** The render path needs WebGL/WebCodecs/OffscreenCanvas; the chooser already degrades
-honestly, so reuse rather than reimplement.
+**Finding, as asked, before changing anything:** the render path does **not** depend on save-time
+state. `useExportPlacementRender` takes bytes, geometry, `hasAudio` and a filename, and
+`SavedVideoSuccessActions` already drives it from an already-retained `SavedVideoDetail` via
+`readSavedVideoContent`. **Option (a) applied.**
 
-## 6. Brand wordmark breaks to three lines at 320px
+**Outcome** `Export` opens a bottom `OverlayPanel` holding `ExportPlacementChooser` unchanged —
+same options, same schematic crop preview, same unsupported-browser degradation — plus
+`ExportPlacementProgress`. Choosing a placement swaps the plain server anchor for
+`Download for <placement>`, which reads the selected version's bytes, re-frames locally and hands
+over the file. With no placement, or where the browser cannot render, the unchanged download is
+offered. The disabled button, its `<small>` note and the `aria-describedby` are gone.
+**Validated** `vitest run apps/web/src/features/video-gallery apps/web/src/features/export-placements`,
+plus a new test covering chooser → render → file handover.
+
+## ~~6. Brand wordmark breaks to three lines at 320px~~ · DONE
 
 **Audit ID** LF-R01 · **P1** · **XS** · **touches baselines**
 
@@ -242,10 +285,13 @@ honestly, so reuse rather than reimplement.
 > Validate with `vitest run apps/web/src/studio/StudioHeader.test.tsx`, then re-capture the
 > 320px baselines.
 
-**Validation** `vitest run apps/web/src/studio/StudioHeader.test.tsx`, then `bun run test:visual`.
-**Risk** Several 320px baselines change. Review each re-captured image.
+**Outcome** `white-space: nowrap` on the wordmark, plus `overflow`/`text-overflow` so the nowrap
+cannot overflow its `minmax(0, 1fr)` column, and a `max-width: 22rem` rule hiding the text column —
+the same treatment the 48–64rem rail rule uses. `aria-label` unchanged.
+**Validated** `vitest run apps/web/src/studio/StudioHeader.test.tsx`; verified in the re-captured
+320px, 390px and 834px baselines — one header row, no break.
 
-## 7. Download is the hidden action on a finished video
+## ~~7. Download is the hidden action on a finished video~~ · DONE
 
 **Audit ID** LF-A01 · **P1** · **S** · **touches baselines**
 
@@ -277,10 +323,17 @@ overflow menu. Retrieval is the library's purpose and is its deepest action.
 >
 > Validate with `vitest run apps/web/src/features/video-gallery`.
 
-**Validation** `vitest run apps/web/src/features/video-gallery`.
-**Risk** `VideoGallery.test.tsx` asserts action order and roles. Item 12 replaces `<details>`.
+**Outcome** `Download` is the card primary; `Open in Studio`, `Edit video`, `Use as Project
+source`, `Rename` and `Remove from Assets` are in the overflow with every handler, confirmation and
+disabled condition intact. The version-preview footer takes the same ordering and `Open in Studio`
+drops to secondary.
+**On the link-styled button:** `Button` still has no anchor form, so rather than a third
+hand-restyled copy the treatment already in `VideoGallery.styles.ts` was extracted to one exported
+`downloadLinkStyles` shared by both surfaces. **Item 25 should collapse it onto `Button as="a"`.**
+`<details>` untouched, as instructed — item 12 owns it.
+**Validated** `vitest run apps/web/src/features/video-gallery`, plus the `app-routing` e2e spec.
 
-## 8. Provider model names in user-facing copy
+## ~~8. Provider model names in user-facing copy~~ · DONE
 
 **Audit ID** LF-A04 · **P1** · **XS**
 
@@ -313,10 +366,16 @@ Assets hub describes the same library differently.
 >
 > Validate with `vitest run apps/web/src/features/assets apps/web/src/studio`.
 
-**Validation** `vitest run apps/web/src/features/assets apps/web/src/studio`.
-**Risk** Low. Shared-description extraction may need a small barrel update.
+**Outcome** All four descriptions extracted to
+`apps/web/src/features/assets/assetLibraryDescriptions.ts`, consumed by the hub cards and the
+overlays, following the precedent `creativeLibraryStorage.ts` already sets for storage copy.
+Voices also lost "the **provider** catalog". No barrel update was needed and the module graph stays
+acyclic.
+**Reported, not fixed** — see item 3's outcome for the full provider-name list.
+**Validated** `vitest run apps/web/src/features/assets apps/web/src/studio` (27 files, 178 tests),
+`check-module-graph`.
 
-## 9. The Dashboard explainer sits below the content it explains
+## ~~9. The Dashboard explainer sits below the content it explains~~ · DONE
 
 **Audit ID** LF-D04 · **P1** · **XS** · **touches baselines**
 
@@ -346,10 +405,15 @@ users meet `No Campaign` and `Campaign Project` labels before being told what th
 >
 > Validate with `vitest run apps/web/src/features/dashboard`.
 
-**Validation** `vitest run apps/web/src/features/dashboard`.
-**Risk** Dashboard visual baselines at all five viewports change.
+**Outcome** The explainer and its storage-warning fallback moved above `dashboardBodyStyles`, with
+dismissal, the visually-hidden heading and the ARIA structure unchanged. `borderBlockStart` became
+`borderBlockEnd` and the padding grew to `space.sm`, so it reads as a quiet strip between the
+header and the body.
+**Validated** `vitest run apps/web/src/features/dashboard`, with a new assertion that the explainer
+precedes Recent Work in document order. Two baselines changed, not five — only the desktop and
+320px Dashboard views are in the matrix.
 
-## 10. The concept explainer omits Studio
+## ~~10. The concept explainer omits Studio~~ · DONE
 
 **Audit ID** LF-E03 · **P1** · **XS**
 
@@ -382,8 +446,10 @@ but not Studio, the one destination you cannot create anything without.
 >
 > Validate with `vitest run apps/web/src/studio/HowLightframeWorksPanel.test.tsx`.
 
-**Validation** `vitest run apps/web/src/studio/HowLightframeWorksPanel.test.tsx`.
-**Risk** None.
+**Outcome** Studio added as the first concept, exactly as specified. Panel structure, styling and
+`OverlayPanel` props unchanged.
+**Validated** `vitest run apps/web/src/studio/HowLightframeWorksPanel.test.tsx`; the test now
+asserts seven concepts with Studio leading.
 
 ---
 
@@ -891,7 +957,12 @@ Run the scoped command in each item. In addition:
 - **After any documentation edit** — `bun run format:check && bun run check:docs`
 - **After token, primitive, shell or breakpoint work** (items 13, 14, 16, 23–25) — `bun run quality`
 - **After any item marked "touches baselines"** — `bun run test:visual`, then
-  `bun run test:visual:update` and review every re-captured image before committing
+  `bun run test:visual:update` and review every re-captured image before committing.
+  **Beware:** `test:visual:update` only rewrites a baseline the suite _failed_ on, and a
+  label-sized change falls under the 0.5% `maxDiffPixelRatio`. A copy change therefore leaves a
+  stale baseline behind and the suite still passes. Use
+  `playwright test --config playwright.visual.config.ts --update-snapshots=all -g "<scenario>"`
+  for the affected scenarios — Tier 1 needed this for four of its thirteen baselines.
 - **After route changes** (item 19) — `apps/web/src/app/route-inventory.test.ts` and
   `paths.test.ts` will fail until their expected lists are updated. That is the oracle working.
 

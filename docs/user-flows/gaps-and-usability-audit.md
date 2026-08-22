@@ -202,8 +202,9 @@ through tasks instead of leaving. This also closes **M6**.
 Projects vs Campaigns vs Assets again.
 
 **Shipped (step 15).** A quiet **How Lightframe works** control sits in the header on every
-protected route and opens a static explainer (`studio/HowLightframeWorksPanel.tsx`) covering when a
-Project helps, when a Campaign helps, and what each Asset library holds — reachable long after the
+protected route and opens a static explainer (`studio/HowLightframeWorksPanel.tsx`) covering what
+Studio is for, when a Project helps, when a Campaign helps, and what each Asset library holds —
+reachable long after the
 getting-started card is dismissed, and storing nothing beyond the boolean that already existed.
 Each list empty state also gained a visual and one worked example, so a surface teaches when it has
 nothing to show. This closes **M7** with it.

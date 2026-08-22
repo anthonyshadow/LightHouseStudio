@@ -55,17 +55,21 @@ reference**.
    `useDesktopStudioLayout`. On desktop the panel opens from the **Capture settings** control and
    stays mounted while collapsed; the column keeps showing the active devices and any blocked
    camera.
-4. `useRecording` (`orchestration/recording/useRecording.ts`) drives `MediaRecorder`, tracks
+4. Capture is a second, explicit press: once the preview is live the control bar exposes
+   **Record**, which reads **Stop recording** while capturing (`RecordingAction.tsx`). Framing and
+   rolling are deliberately separate steps, and the labels say so.
+5. `useRecording` (`orchestration/recording/useRecording.ts`) drives `MediaRecorder`, tracks
    elapsed seconds, and enforces a maximum duration; hitting it triggers `onAutomaticStop`, which
    opens a finalization window and then review (`useTakeReviewFlow.ts:113-125`).
-5. **Stop** → `finishTake()`: sets a finalizing presentation, stops the recorder, releases live
-   media (`releaseForRecordedReview`), then publishes the artifact and sets `reviewReady`
-   (`useTakeReviewFlow.ts:170-199`). If the recorder produced nothing, review is not entered.
-6. Safety finalizations also fire when the model output becomes unusable
+6. **Stop recording** → `finishTake()`: sets a finalizing presentation, stops the recorder,
+   releases live media (`releaseForRecordedReview`), then publishes the artifact and sets
+   `reviewReady` (`useTakeReviewFlow.ts:170-199`). If the recorder produced nothing, review is not
+   entered.
+7. Safety finalizations also fire when the model output becomes unusable
    (`studioPolicies.shouldFinalizeForUnusableModelOutput`), when the recorded track set changes
    mid-recording, and when a realtime session reaches its time limit
    (`useTakeReviewFlow.ts:201-238`).
-7. The stage switches to `playback`. `reviewLocked` is now true, which locks capture settings and
+8. The stage switches to `playback`. `reviewLocked` is now true, which locks capture settings and
    mode switching.
 
 **Exit** — Save, discard, voice treatments, Edit Video, or the existing-video overlay.
