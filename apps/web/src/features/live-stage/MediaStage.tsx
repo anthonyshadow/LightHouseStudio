@@ -45,6 +45,7 @@ export type MediaStageProps = {
   onPlaybackError?: (message: string) => void;
   fullscreenTargetRef?: RefObject<HTMLElement | null>;
   editPreview?: VideoEditStagePreviewContract;
+  videoRef?: RefObject<HTMLVideoElement | null>;
 };
 
 export type StageControlVisibility = {
@@ -226,10 +227,12 @@ export const MediaStage = ({
   onPlaybackError,
   fullscreenTargetRef,
   editPreview,
+  videoRef: providedVideoRef,
 }: MediaStageProps) => {
   const theme = useTheme();
   const figureRef = useRef<HTMLElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const internalVideoRef = useRef<HTMLVideoElement>(null);
+  const videoRef = providedVideoRef ?? internalVideoRef;
   const boundKindRef = useRef<'idle' | 'stream' | 'playback'>('idle');
   const boundPlaybackUrlRef = useRef<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
@@ -388,7 +391,7 @@ export const MediaStage = ({
         video.removeEventListener('loadedmetadata', restorePlaybackPosition);
       }
     };
-  }, [editingPlayback, playbackLocked, playbackUrl, presentation.kind, stream]);
+  }, [editingPlayback, playbackLocked, playbackUrl, presentation.kind, stream, videoRef]);
 
   useEffect(
     () => () => {
@@ -398,7 +401,7 @@ export const MediaStage = ({
       video.srcObject = null;
       video.removeAttribute('src');
     },
-    [],
+    [videoRef],
   );
 
   useEffect(() => {

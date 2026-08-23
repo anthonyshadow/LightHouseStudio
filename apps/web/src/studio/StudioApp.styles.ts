@@ -19,6 +19,7 @@ export const pageStyles = (theme: Theme): CSSObject => ({
  * render inside this same shell, so the layout never depends on which surface is active.
  */
 export const shellStyles = (): CSSObject => ({
+  '--studio-shell-rail-width': '11.5rem',
   width: '100%',
   height: '100%',
   display: 'grid',
@@ -29,12 +30,15 @@ export const shellStyles = (): CSSObject => ({
   minHeight: 0,
   overflow: 'hidden',
   [media.up('laptop')]: {
+    '--studio-shell-rail-width': '13.5rem',
     gridTemplateColumns: '13.5rem minmax(0, 1fr)',
   },
   [media.up('desktop')]: {
+    '--studio-shell-rail-width': '15.5rem',
     gridTemplateColumns: '15.5rem minmax(0, 1fr)',
   },
   [media.down('compact')]: {
+    '--studio-shell-rail-width': '0rem',
     gridTemplateColumns: 'minmax(0, 1fr)',
     gridTemplateRows: '3.5rem minmax(0, 1fr)',
   },
@@ -516,6 +520,15 @@ export const mainGridStyles = (
         },
       }
     : {}),
+  '&:has(> [data-video-edit-active="true"])': {
+    gridTemplateColumns: 'minmax(0, 1fr)',
+    gridTemplateRows: 'minmax(0, 1fr)',
+    padding: 0,
+    overflow: 'hidden',
+  },
+  '&:has(> [data-video-edit-active="true"][data-project-context="true"]) > [data-project-route]': {
+    display: 'none',
+  },
 });
 
 export const stageColumnStyles = (theme: Theme): CSSObject => ({
@@ -599,7 +612,7 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
       gridTemplateRows: 'minmax(8rem, 1fr) 3.15rem minmax(10.5rem, 42vh)',
     },
   },
-  [media.down('laptop')]: {
+  [`${media.down('laptop')} and (min-width: 0px)`]: {
     '&[data-project-context="true"]': {
       alignSelf: 'start',
       boxSizing: 'border-box',

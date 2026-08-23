@@ -823,7 +823,7 @@ between rows stayed quiet.
 
 # Tier 3 — Important, can follow
 
-## 17. Video editor redesign
+## ~~17. Video editor redesign~~ · DONE
 
 **Audit IDs** LF-V01, LF-V02, LF-V03, LF-V04, LF-V05, LF-R04 · **P1** · **L** · **Superdesign**
 
@@ -845,6 +845,20 @@ Brief: [Superdesign prompts → Local Video Editor](LightFrameSuperdesignPrompts
 **Validation** `vitest run apps/web/src/features/video-editor`, then the editor E2E specs, then
 `bun run test:visual`. **Risk** `stageColumnStyles` is shared with the Project workspace; changing
 it can regress the Project stage. Split before you restyle.
+
+**Outcome** The approved Superdesign frame-first direction now owns a lazy editor-only grid around
+the persistent `MediaStage`: a dominant 16:9 frame, horizontal tool segments, labelled history and
+hold/split comparison, a dedicated frame-steppable trim timeline, on-frame crop/rotate controls, a
+docked desktop/tablet inspector, and a collapsible 40dvh mobile sheet above the persistent action
+bar. The Project workspace hides its route chrome during editing and mounts this same editor view
+without replacing its working-media/session owner. All five canonical viewports enforce stage,
+History, Timeline, inspector and action-bar geometry; Darwin and Linux keep one curated editor
+baseline at each size.
+
+**Validated** Editor unit tests **35/35**; standalone and Project editor journeys **2/2**, each
+covering all five canonical viewports; full repository `bun run quality`; Darwin visual matrix
+**38/38**; pinned Playwright Linux editor matrix **5/5**; **76/76** curated platform baselines with
+zero missing or removable files.
 
 ## 18. Project save-step redesign
 

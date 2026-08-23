@@ -77,6 +77,20 @@ beforeEach(() => {
 });
 
 describe('useVideoEditSession', () => {
+  it('resets transient compare modes when a source begins or closes', () => {
+    const hook = beginSession();
+    act(() => {
+      hook.result.current.setShowingBefore(true);
+      hook.result.current.setSplitComparison(true);
+    });
+    expect(hook.result.current.showingBefore).toBe(true);
+    expect(hook.result.current.splitComparison).toBe(true);
+
+    act(() => hook.result.current.close());
+    expect(hook.result.current.showingBefore).toBe(false);
+    expect(hook.result.current.splitComparison).toBe(false);
+  });
+
   it('groups a slider or crop gesture into one undo entry and preserves redo', () => {
     const hook = beginSession();
     act(() => hook.result.current.beginTransaction());

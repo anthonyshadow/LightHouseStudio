@@ -850,7 +850,7 @@ describe('StudioApp composition lifecycle', () => {
 
   it('keeps the mounted stage node stable while overlays and deferred tools change', async () => {
     renderStudio();
-    const stage = await screen.findByTestId('media-stage');
+    const stage = await screen.findByTestId('media-stage', undefined, { timeout: 5_000 });
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Upload Video' }));

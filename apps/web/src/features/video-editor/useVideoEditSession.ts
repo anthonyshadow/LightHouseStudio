@@ -71,6 +71,7 @@ export const useVideoEditSession = () => {
   }));
   const [activeTool, setActiveTool] = useState<VideoEditTool>('trim');
   const [showingBefore, setShowingBefore] = useState(false);
+  const [splitComparison, setSplitComparison] = useState(false);
   const [playheadMs, setPlayheadMs] = useState(0);
   const [phase, setPhase] = useState<VideoEditSessionPhase>('closed');
   const [progress, setProgress] = useState(0);
@@ -109,6 +110,7 @@ export const useVideoEditSession = () => {
     setHistory({ past: [], present: nextBaseline, future: [] });
     setActiveTool('trim');
     setShowingBefore(false);
+    setSplitComparison(false);
     setPlayheadMs(0);
     setProgress(0);
     setError(null);
@@ -126,6 +128,7 @@ export const useVideoEditSession = () => {
     setSource(null);
     setCandidate(null);
     setShowingBefore(false);
+    setSplitComparison(false);
     setError(null);
     setProgress(0);
     setPhase('closed');
@@ -327,6 +330,7 @@ export const useVideoEditSession = () => {
       draft,
       activeTool,
       showingBefore,
+      splitComparison,
       playheadMs,
       phase,
       progress,
@@ -341,6 +345,7 @@ export const useVideoEditSession = () => {
       close,
       setActiveTool,
       setShowingBefore,
+      setSplitComparison,
       setPlayheadMs,
       applySpec,
       beginTransaction,
@@ -363,6 +368,7 @@ export const useVideoEditSession = () => {
       draft,
       activeTool,
       showingBefore,
+      splitComparison,
       playheadMs,
       phase,
       progress,

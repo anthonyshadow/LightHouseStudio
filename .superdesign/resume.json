@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "feature:local-video-editor": {
+      "targetKind": "existing-ui",
+      "projectId": "fa7b9261-565f-4748-8d41-b9c36863b898",
+      "baselineDraftId": "2f974a0a-0c29-4fc1-974b-433e3a68a2fc",
+      "activeDraftId": "9c411436-35c9-44f5-a3ac-f893bf70110a",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "04930603-9788-4c5e-96d5-1bec6ea4e0ed",
+        "6b63e518-a38a-4ec3-a4f6-f59be98bc906",
+        "apps-web-public-favicon.svg"
+      ],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "apps-web-public-favicon.svg",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/fa7b9261-565f-4748-8d41-b9c36863b898/brand-assets/apps-web-public-favicon.svg/favicon.svg",
+          "sourcePath": "apps/web/public/favicon.svg"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "apps/web/src/ui/theme.ts",
+        "apps/web/src/ui/StudioDesignProvider.tsx",
+        "apps/web/src/ui/media.ts",
+        "apps/web/src/ui/primitives/Button.tsx",
+        "apps/web/src/ui/primitives/StatusNotice.tsx",
+        "apps/web/src/studio/StudioHeader.tsx",
+        "apps/web/src/studio/StudioApp.styles.ts",
+        "apps/web/src/studio/StudioWorkspace.tsx",
+        "apps/web/src/features/live-stage/MediaStage.tsx",
+        "apps/web/src/features/live-stage/MediaStage.styles.ts",
+        "apps/web/src/features/live-stage/MediaStageSections.tsx",
+        "apps/web/src/features/video-editor/VideoEditWorkspace.tsx",
+        "apps/web/src/features/video-editor/VideoEditWorkspace.styles.ts",
+        "apps/web/src/features/video-editor/VideoEditStagePreview.tsx",
+        "apps/web/src/features/video-editor/VideoEditStagePreview.styles.ts"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "5959f087940683a9c4751c92b1671805fdb87aa215aa6c3ca51687ddc3974d8a",
+        "apps/web/src/ui/theme.ts": "626cbc3bef3b1df450f441545744b5a40173bfdabf6f061a6949ec28336ac1a5",
+        "apps/web/src/ui/StudioDesignProvider.tsx": "0d2743c24ff70c86cb81b8b2df57ce1d222f5a66131c1dd8b8746998a5ec8f9c",
+        "apps/web/src/ui/media.ts": "fab4f59c856d46dc81ae6854bdb2fb78b2ef608a9a38b629f32c645c71b9be6e",
+        "apps/web/src/ui/primitives/Button.tsx": "0a226d4088621ab8da593349f483a956132cccbd161801afaa5277b4bfd36d03",
+        "apps/web/src/ui/primitives/StatusNotice.tsx": "9f31a9af1ec27276fe8673f60d7eb901777a2f597d96efc4d71a1f6ec5092d78",
+        "apps/web/src/studio/StudioHeader.tsx": "ea6cc7cb978769ca168e19d828e1d27c847e6ff42ba3082b319af686df38424c",
+        "apps/web/src/studio/StudioApp.styles.ts": "6cbe8b665ad5182ecf9046435ef94b8b6d4c2be7b46f73650c56b0252e915044",
+        "apps/web/src/studio/StudioWorkspace.tsx": "949d31c6f6ddd216b3d307285381bb9783d350284869513ae237cbc903ea8d98",
+        "apps/web/src/features/live-stage/MediaStage.tsx": "2c86f7032c5e670969c24c3e7e6bfe006f32b84e4defdd99e2f6c37b7194cd0a",
+        "apps/web/src/features/live-stage/MediaStage.styles.ts": "18fa7bb3f4fb3bd22f43babfe04e85b8ac2d8d9179837dadcbd53398f30e8e98",
+        "apps/web/src/features/live-stage/MediaStageSections.tsx": "149e8bd99a452a1f74acb418e792ef10e485ed17e690d82a41e5dcb827d461ca",
+        "apps/web/src/features/video-editor/VideoEditWorkspace.tsx": "3ecb8f488c01fb962eedcbfdc43e69e83d7555c59fe3cf640484ef24185a3e8c",
+        "apps/web/src/features/video-editor/VideoEditWorkspace.styles.ts": "2d548c9d414e36372a7f1c87ebb5ebdbd7fb56b147f6fc0def26446992155f42",
+        "apps/web/src/features/video-editor/VideoEditStagePreview.tsx": "85b92a40c911983da57f8e5cacff534f12635b920c8b649be2fcf550626de4b4",
+        "apps/web/src/features/video-editor/VideoEditStagePreview.styles.ts": "a2033d6c3747c621a4d8a5585454bffa91e535ff302778a8d68ef02c29f881cf"
+      },
+      "drafts": {
+        "2f974a0a-0c29-4fc1-974b-433e3a68a2fc": {
+          "title": "Lightframe Studio — Video Editor",
+          "visualDirection": "faithful current editor baseline",
+          "currentVersion": 1
+        },
+        "9c411436-35c9-44f5-a3ac-f893bf70110a": {
+          "title": "Lightframe Studio — Frame-first Video Editor",
+          "visualDirection": "frame-first adaptive inspector dock",
+          "parentDraftId": "2f974a0a-0c29-4fc1-974b-433e3a68a2fc",
+          "currentVersion": 1
+        },
+        "91fad53b-a1fc-4a61-95c7-784a04f1b8ac": {
+          "title": "Lightframe Studio — Timeline-first Video Editor",
+          "visualDirection": "timeline-first production console",
+          "parentDraftId": "2f974a0a-0c29-4fc1-974b-433e3a68a2fc",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-08-22T23:43:00Z"
+    }
+  }
+}

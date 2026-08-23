@@ -22,6 +22,9 @@ afterEach(() => {
 
 const PreviewHarness = ({
   showingBefore = false,
+  splitComparison = false,
+  activeTool = 'crop',
+  onApplySpec = vi.fn(),
   onCropStart,
   onCropChange,
   onCropCommit,
@@ -32,6 +35,9 @@ const PreviewHarness = ({
   },
 }: {
   showingBefore?: boolean;
+  splitComparison?: boolean;
+  activeTool?: 'crop' | 'rotate';
+  onApplySpec?: (spec: VideoEditSpec) => void;
   onCropStart: () => void;
   onCropChange: (spec: VideoEditSpec) => void;
   onCropCommit: () => void;
@@ -54,10 +60,12 @@ const PreviewHarness = ({
           spec,
           sourceWidth: 1_280,
           sourceHeight: 720,
-          activeTool: 'crop',
+          activeTool,
           showingBefore,
+          splitComparison,
           playheadMs: 0,
           onPlayheadChange,
+          onApplySpec,
           onCropStart,
           onCropChange: (nextSpec) => {
             onCropChange(nextSpec);
@@ -208,7 +216,33 @@ describe('VideoEditStagePreview', () => {
     expect(view.container.querySelector('canvas')).toBeNull();
   });
 
-  it('scrubs, loops within trim bounds, and uses the custom playback control', () => {
+  it('provides on-frame rotation and a split comparison without replacing the source video', () => {
+    const onApplySpec = vi.fn<(spec: VideoEditSpec) => void>();
+    const callbacks = {
+      onCropStart: vi.fn(),
+      onCropChange: vi.fn(),
+      onCropCommit: vi.fn(),
+    };
+    const view = render(
+      <PreviewHarness
+        {...callbacks}
+        activeTool="rotate"
+        splitComparison
+        onApplySpec={onApplySpec}
+      />,
+    );
+    const video = screen.getByTestId('source-video');
+
+    expect(
+      getComputedStyle(view.container.querySelector('[data-video-edit-frame]')!).clipPath,
+    ).toBe('inset(0 50% 0 0)');
+    fireEvent.click(screen.getByRole('button', { name: 'Rotate right 90 degrees' }));
+    expect(onApplySpec).toHaveBeenCalledWith(expect.objectContaining({ rotation: 90 }));
+    expect(screen.getByLabelText('On-frame rotation controls')).toBeVisible();
+    expect(screen.getByTestId('source-video')).toBe(video);
+  });
+
+  it('keeps playback looped within the trim bounds while the external timeline owns transport', () => {
     const onPlayheadChange = vi.fn<(playheadMs: number) => void>();
     render(
       <PreviewHarness
@@ -226,26 +260,15 @@ describe('VideoEditStagePreview', () => {
       play: { configurable: true, value: play },
       pause: { configurable: true, value: pause },
     });
-    video.currentTime = 12;
-
-    fireEvent.click(screen.getByRole('button', { name: 'Play edited preview' }));
-    expect(video.currentTime).toBe(0);
-    expect(play).toHaveBeenCalledOnce();
-
-    fireEvent.change(screen.getByRole('slider', { name: 'Edited preview playhead' }), {
-      target: { value: '1200' },
-    });
-    expect(video.currentTime).toBe(1.2);
+    video.currentTime = 1.2;
+    fireEvent.timeUpdate(video);
     expect(onPlayheadChange).toHaveBeenCalledWith(1_200);
 
     Object.defineProperty(video, 'paused', { configurable: true, value: false });
     video.currentTime = 10;
     fireEvent.timeUpdate(video);
     expect(video.currentTime).toBe(0);
-    expect(play).toHaveBeenCalledTimes(2);
-
-    fireEvent.play(video);
-    fireEvent.click(screen.getByRole('button', { name: 'Pause edited preview' }));
-    expect(pause).toHaveBeenCalledOnce();
+    expect(play).toHaveBeenCalledOnce();
+    expect(pause).not.toHaveBeenCalled();
   });
 });

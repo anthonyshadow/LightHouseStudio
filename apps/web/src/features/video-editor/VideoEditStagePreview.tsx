@@ -5,17 +5,20 @@ import {
   normalizeVideoCrop,
   rotatedVideoEditDimensions,
 } from '@studio/domain';
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { Button } from '../../ui';
-import { formatVideoEditTime, type VideoEditStagePreviewContract } from './types';
+import { VideoEditIcon } from './VideoEditIcon';
+import type { VideoEditStagePreviewContract } from './types';
 import { createVideoEditFrameRenderer } from './videoEditShader';
 import {
   canvasFrameStyles,
+  comparisonBadgeStyles,
   cropHandleStyles,
   cropMoveHandleStyles,
   cropSelectionStyles,
-  playbackControlsStyles,
   previewLayerStyles,
+  rotateControlsStyles,
+  splitDividerStyles,
 } from './VideoEditStagePreview.styles';
 
 type Props = Readonly<{
@@ -97,7 +100,6 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
     y: number;
     crop: CropState;
   }> | null>(null);
-  const [playing, setPlaying] = useState(false);
   const geometry = useMemo(
     () =>
       getVideoEditOutputGeometry(
@@ -197,19 +199,10 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
         return;
       }
       onPlayheadChange(currentMs);
-      setPlaying(!video.paused);
-    };
-    const updatePlayback = () => {
-      setPlaying(!video.paused);
-      updateTime();
     };
     video.addEventListener('timeupdate', updateTime);
-    video.addEventListener('play', updatePlayback);
-    video.addEventListener('pause', updatePlayback);
     return () => {
       video.removeEventListener('timeupdate', updateTime);
-      video.removeEventListener('play', updatePlayback);
-      video.removeEventListener('pause', updatePlayback);
     };
   }, [onPlayheadChange, trimEndMs, trimStartMs, videoRef]);
 
@@ -253,28 +246,19 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
     if (event.key.startsWith('Arrow')) contract.onCropCommit();
   };
 
-  const togglePlayback = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (video.paused) {
-      if (
-        video.currentTime * 1_000 < contract.spec.trim.startMs ||
-        video.currentTime * 1_000 >= contract.spec.trim.endMs
-      ) {
-        video.currentTime = contract.spec.trim.startMs / 1_000;
-      }
-      void video.play().catch(() => undefined);
-    } else {
-      video.pause();
-    }
-  };
+  const rotate = (amount: number) =>
+    contract.onApplySpec({
+      ...contract.spec,
+      rotation: ((contract.spec.rotation + amount + 360) %
+        360) as VideoEditStagePreviewContract['spec']['rotation'],
+    });
 
   return (
     <div css={previewLayerStyles()} data-video-edit-preview="">
       {!contract.showingBefore ? (
         <div
           ref={frameRef}
-          css={canvasFrameStyles(theme, displayGeometry.aspectRatio)}
+          css={canvasFrameStyles(theme, displayGeometry.aspectRatio, contract.splitComparison)}
           data-video-edit-frame=""
         >
           <canvas ref={canvasRef} aria-hidden="true" />
@@ -322,39 +306,33 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
           ) : null}
         </div>
       ) : null}
-      <div css={playbackControlsStyles(theme)} aria-label="Video edit playback controls">
-        <Button
-          size="small"
-          variant="primary"
-          aria-label={playing ? 'Pause edited preview' : 'Play edited preview'}
-          onClick={togglePlayback}
-        >
-          {playing ? '❚❚' : '▶'}
-        </Button>
-        <label>
-          <span>
-            <span>{formatVideoEditTime(contract.playheadMs)}</span>
-            <span>{formatVideoEditTime(contract.spec.trim.endMs)}</span>
-          </span>
-          <input
-            type="range"
-            min={contract.spec.trim.startMs}
-            max={contract.spec.trim.endMs}
-            step={10}
-            value={Math.min(
-              contract.spec.trim.endMs,
-              Math.max(contract.spec.trim.startMs, contract.playheadMs),
-            )}
-            aria-label="Edited preview playhead"
-            onChange={(event) => {
-              const next = Number(event.currentTarget.value);
-              const video = videoRef.current;
-              if (video) video.currentTime = next / 1_000;
-              contract.onPlayheadChange(next);
-            }}
-          />
-        </label>
-      </div>
+      {contract.showingBefore ? <span css={comparisonBadgeStyles(theme)}>Original</span> : null}
+      {contract.splitComparison && !contract.showingBefore ? (
+        <span css={splitDividerStyles(theme)} aria-hidden="true" />
+      ) : null}
+      {contract.activeTool === 'rotate' && !contract.showingBefore ? (
+        <div css={rotateControlsStyles(theme)} aria-label="On-frame rotation controls">
+          <Button
+            size="small"
+            variant="quiet"
+            aria-label="Rotate left 90 degrees"
+            onClick={() => rotate(-90)}
+          >
+            <VideoEditIcon name="undo" width="1rem" height="1rem" />
+            −90°
+          </Button>
+          <output>{contract.spec.rotation}°</output>
+          <Button
+            size="small"
+            variant="quiet"
+            aria-label="Rotate right 90 degrees"
+            onClick={() => rotate(90)}
+          >
+            +90°
+            <VideoEditIcon name="redo" width="1rem" height="1rem" />
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 };

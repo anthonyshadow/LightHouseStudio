@@ -19,6 +19,7 @@ import {
 import { installProjectHarness, TEST_PROJECT_ID } from './support/projectHarness';
 import { installCampaignHarness, TEST_CAMPAIGN_ID } from './support/campaignHarness';
 import { loadDecodableH264VideoFixture } from './support/existingVideoHarness';
+import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 
 const loginFromEntry = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Log in' }).click();
@@ -606,6 +607,28 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
   const existingVideo = page.getByRole('dialog', { name: 'Use existing video' });
   await expect(existingVideo).toBeVisible();
   await existingVideo.getByRole('button', { name: 'Adjust video' }).click();
+  await expect(page.getByRole('heading', { name: 'Edit video' })).toBeVisible();
+  await expect(page.locator('[data-video-edit-workspace]')).toBeAttached();
+  await expect(page.locator('[data-project-route]')).toHaveCSS('display', 'none');
+  await expect(page.getByRole('region', { name: 'Timeline' })).toBeVisible();
+  await expect(page.getByLabel('Video edit settings')).toBeVisible();
+
+  for (const viewport of Object.values(STUDIO_VIEWPORT_SIZES)) {
+    await page.setViewportSize(viewport);
+    const [stageBox, historyBox] = await Promise.all([
+      page.getByLabel('Studio media stage').boundingBox(),
+      page.locator('[data-video-editor-history]').boundingBox(),
+    ]);
+    expect(stageBox).not.toBeNull();
+    expect(historyBox).not.toBeNull();
+    if (stageBox && historyBox) {
+      expect(historyBox.y).toBeGreaterThanOrEqual(stageBox.y + stageBox.height - 1);
+      expect(historyBox.y).toBeLessThanOrEqual(stageBox.y + stageBox.height + 16);
+    }
+    await expect(page.locator('[data-project-route]')).toHaveCSS('display', 'none');
+  }
+
+  await page.setViewportSize(STUDIO_VIEWPORT_SIZES.compactDesktop);
   await page.getByRole('button', { name: 'Lighting', exact: true }).click();
   await page.getByRole('slider', { name: 'Brightness' }).fill('12');
   await page.getByRole('button', { name: 'Render preview' }).click();

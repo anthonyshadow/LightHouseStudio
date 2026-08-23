@@ -130,9 +130,10 @@ export type VisualScenarioId =
 const viewportById = new Map(VISUAL_VIEWPORTS.map((viewport) => [viewport.id, viewport]));
 const desktopViewport = viewportById.get('desktop');
 const compactViewport = viewportById.get('compact');
+const mobileViewport = viewportById.get('mobile');
 const smallMobileViewport = viewportById.get('small-mobile');
 
-if (!desktopViewport || !compactViewport || !smallMobileViewport) {
+if (!desktopViewport || !compactViewport || !mobileViewport || !smallMobileViewport) {
   throw new Error('The visual matrix requires desktop, compact, and small-mobile viewports.');
 }
 
@@ -163,8 +164,13 @@ export const VISUAL_CASE_MATRIX = [
   })),
   { viewport: compactViewport, scenario: FOCUSED_VISUAL_SCENARIOS.uploadProcessing },
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.uploadResult },
-  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.videoEditLightingDirty },
-  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS.videoEditCropDirty },
+  ...VISUAL_VIEWPORTS.map((viewport) => ({
+    viewport,
+    scenario:
+      viewport.id === 'mobile' || viewport.id === 'small-mobile'
+        ? FOCUSED_VISUAL_SCENARIOS.videoEditCropDirty
+        : FOCUSED_VISUAL_SCENARIOS.videoEditLightingDirty,
+  })),
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.campaignsWorkspace },
   { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS.projectOutputReview },
   ...DESKTOP_VISUAL_SCENARIOS.map((scenario) => ({ viewport: desktopViewport, scenario })),
@@ -178,7 +184,7 @@ export const VISUAL_BASELINE_PATHS = VISUAL_CASE_MATRIX.map(
   ({ viewport, scenario }) => `${viewport.folder}/${scenario.baseline}`,
 );
 
-const VISUAL_CASE_BUDGET = 35;
+const VISUAL_CASE_BUDGET = 38;
 const coveredViewportIds = new Set(VISUAL_CASE_MATRIX.map(({ viewport }) => viewport.id));
 const corePairs = new Set(
   VISUAL_CASE_MATRIX.map(({ viewport, scenario }) => `${viewport.id}/${scenario.id}`),

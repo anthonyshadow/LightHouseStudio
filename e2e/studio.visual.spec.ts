@@ -98,6 +98,43 @@ const expectStandardStudioLayout = async (
   const toolRail = page.locator('[data-studio-tool-rail]');
   const capture = page.locator('[data-capture-controls]');
   const projectContextActive = (await page.locator('[data-project-context="true"]').count()) > 0;
+  if (videoEditorActive) {
+    const history = page.locator('[data-video-editor-history]');
+    const timeline = page.locator('[data-video-edit-timeline]');
+    const actions = page.locator('[data-video-editor-actions]');
+    const [stageBox, toolRailBox, captureBox, historyBox, timelineBox, actionsBox] =
+      await Promise.all([
+        stage.boundingBox(),
+        toolRail.boundingBox(),
+        capture.boundingBox(),
+        history.boundingBox(),
+        timeline.boundingBox(),
+        actions.boundingBox(),
+      ]);
+    expect(stageBox).not.toBeNull();
+    expect(toolRailBox).not.toBeNull();
+    expect(captureBox).not.toBeNull();
+    expect(historyBox).not.toBeNull();
+    expect(timelineBox).not.toBeNull();
+    expect(actionsBox).not.toBeNull();
+    if (!stageBox || !toolRailBox || !captureBox || !historyBox || !timelineBox || !actionsBox) {
+      return;
+    }
+
+    expect(toolRailBox.y + toolRailBox.height).toBeLessThanOrEqual(stageBox.y + 1);
+    expect(historyBox.y).toBeGreaterThanOrEqual(stageBox.y + stageBox.height - 1);
+    expect(historyBox.y).toBeLessThanOrEqual(stageBox.y + stageBox.height + 16);
+    expect(timelineBox.y).toBeGreaterThanOrEqual(historyBox.y + historyBox.height - 1);
+    if (viewport.width >= 1_024) {
+      expect(captureBox.x).toBeGreaterThanOrEqual(stageBox.x + stageBox.width - 1);
+    } else if (viewport.width >= 768) {
+      expect(captureBox.y).toBeGreaterThanOrEqual(timelineBox.y + timelineBox.height - 1);
+    } else {
+      expect(actionsBox.y + actionsBox.height).toBeLessThanOrEqual(viewport.height - 72 + 1);
+      expect(captureBox.y + captureBox.height).toBeLessThanOrEqual(actionsBox.y + 1);
+    }
+    return;
+  }
   if (projectContextActive) {
     const [stageBox, frameBox, toolRailBox] = await Promise.all([
       stage.boundingBox(),
