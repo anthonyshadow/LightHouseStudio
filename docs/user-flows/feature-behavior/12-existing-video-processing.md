@@ -253,11 +253,11 @@ an explicit, potentially billable action with no automatic retry or fallback.
 An explicit **Use Saved Video** action inside an empty Project is a separate source command, not
 this editing workflow. It selects the exact current Version, verifies same-owner active lineage,
 and retains the existing bytes as the Project's immutable source without copying them, starting a
-provider, or selecting an Add Version output target. That accepted Project source is durable and
+provider, or selecting an existing-video Version target. That accepted Project source is durable and
 rehydrates through the Project content route; this standalone workflow remains temporary.
 
 For a source-bearing Project, the existing-video controls remain the feature-local configuration
-owner for one visual treatment followed by optional Voice. **Save progress** checkpoints the
+owner for one visual treatment followed by optional Voice. **Keep this setup** checkpoints the
 plan without provider contact. Project **Start Character Swap** and **Start Virtual Try-On** first
 save that exact setup, then use one app-owned operation command that commits the exact initiating
 revision before provider submission. Refresh/reopen reads current authority and resumes bounded

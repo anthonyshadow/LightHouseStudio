@@ -50,7 +50,7 @@ recorded there.
   media asset or Saved Video Version. Local renders are durably stored, checksummed, inspected, and
   attached in the revision transaction. Exact retained media is reused without copying bytes.
   Exact replay returns the original revision; changed media/edit/base tokens conflict. The source
-  row and source asset remain unchanged, and no output or Add Version relation is created.
+  row and source asset remain unchanged, and no output or existing-video Version relation is created.
 - Project output save uses additive migration `0020` and one owner-scoped command. The application
   verifies the exact already-durable current bytes before metadata commit. One PostgreSQL
   transaction then creates or CAS-appends the immutable Video Version, records its pre-save

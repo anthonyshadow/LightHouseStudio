@@ -47,7 +47,7 @@ state:
 | `session-expiry-logout`     | An expired/revoked session with no unsaved work returns to entry immediately; with an unsaved take, active work, or unsaved Project changes it holds Studio behind one "Your session ended" notice naming what is lost, discards only on acknowledgement, and lands on entry saying the session ended. Logout blocks non-discardable work, confirms discardable work, releases indicators/resources, clears the cookie, and returns to Login                                                  |
 | `creative-library-recovery` | With Neon authoritative, edit the creative library in a second browser profile so both copies diverge; confirm the paused-sync notice appears on every protected route, that **Keep this browser's copy** and **Use the cloud copy** both confirm before overwriting, that each resolution resumes syncing, and that a transport failure offers only **Try again**                                                                                                                            |
 | `studio-library-routing`    | `/dashboard`, `/campaigns`, `/projects`, and `/assets` with Videos, Characters, Outfits, and Voices keep one mounted authenticated shell; legacy organization/Recipe URLs and the singular `/campaign` normalize; no media stage is mounted on organization pages; Back/Forward, Escape, bottom navigation, and return focus behave correctly. Closing a library returns to wherever it was opened from and adds no history entry, so repeated open/close cycles never bury the previous page |
-| `local-mvp-journey`         | Campaign, named Project, or unnamed Project → workspace → durable source → reusable creative choice/local edit → synthetic recoverable processing → Save/Add Version → history/exact Download → leave/resume/archive stays coherent and contacts no external provider                                                                                                                                                                                                                         |
+| `local-mvp-journey`         | Campaign, named Project, or unnamed Project → workspace → durable source → reusable creative choice/local edit → synthetic recoverable processing → Save video as new/existing Version → history/exact Download → leave/resume/archive stays coherent and contacts no external provider                                                                                                                                                                                                       |
 | `save-video`                | Save is idempotent and is the only review durability action; optional thumbnail failure is non-fatal; replace confirms and appends a version; download/rename/delete operate on the selected owner gallery record; R2 deletion removes its unshared versions/thumbnails                                                                                                                                                                                                                       |
 | `save-video-completion`     | An explicit save opens the completion surface naming the Video and Version; Download retrieves that exact Version; View in Assets opens `/assets/videos`; Create another releases the take and leaves a clean stage; a `?projectId=` save shows no completion surface and still attaches and returns                                                                                                                                                                                          |
 | `voices-library`            | `/assets/voices` browses, previews, saves and removes voices; Use in Studio with a loaded source applies immediately, and with an empty Studio holds the voice, names it on the stage, and applies it once a source is ready; a voice chosen in the workflow wins; discard drops the hold; an unconfigured provider explains itself                                                                                                                                                           |
@@ -281,10 +281,11 @@ each Start or retry requires separate approval.
 Using synthetic compatible media and no live provider:
 
 - open a ready source-bearing Project and confirm the review surface distinguishes current media
-  from the immutable original, and that **Autosaved**, **Render preview**, **Save as New
-  Video**, and **Add Version** describe separate states/actions;
-- save as a new titled video, then separately select an active Saved Video for **Add Version** and
-  verify the confirmation names its title, current version ordinal, and current-media dimensions;
+  from the immutable original, keeps **Autosaved · &lt;time&gt;** ambient, calls the creative
+  checkpoint **Keep this setup**, and reserves **Save video** for producing a library Version;
+- choose a placement, save as a new titled video, then reopen the same single destination surface,
+  select **New version of an existing video**, and verify it names the target and current Version
+  without opening a second confirmation dialog;
 - simulate an unavailable response or refresh immediately after submission and confirm the pending
   operation reconciles to the exact one Saved Video/Version/Project result rather than offering a
   blind duplicate submission; and
@@ -323,7 +324,7 @@ Using synthetic compatible media and no live provider:
   Video nor Project current pointer changes;
 - choose **Use in Project** for an old Version and for a valid stale processing result in separate
   runs; confirm adoption is explicit, updates only working media, preserves the immutable original,
-  and never preselects an Add Version target;
+  and never preselects an existing-video save target;
 - remove the Saved Video globally and confirm only its exact retaining Project can still preview,
   use, and download it with truthful retention copy; and
 - open a legacy/independently saved video without a Project output relation and confirm it is usable

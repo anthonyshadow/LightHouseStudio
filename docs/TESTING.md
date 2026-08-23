@@ -162,7 +162,7 @@ The retained suite protects:
   output-reference revisions; exact old-Version selection, preview, reuse, and Download; retained
   tombstoned Project content; explicit stale-result adoption; legacy **No Project** videos without
   producer backfill; and proof that these actions do not move the Saved Video pointer or infer an
-  Add Version target;
+  existing-video save target;
 - a no-provider Chromium journey from reusable Character selection through one Project semantic
   checkpoint, local edit/Render preview, explicit working-media adoption, and refresh, including
   denial of unexpected external HTTP and WebSocket traffic;
@@ -245,12 +245,13 @@ The touch project runs that smoke plus the dedicated control-timeout/recording-S
 browser-specific test must be tagged in its title with `@cross-browser` or `@touch`; do not run
 every desktop journey under every engine by default.
 
-The current visual matrix contains 38 cases within the 38-case review budget. It retains Local live
+The current visual matrix contains 44 cases within the 44-case review budget. It retains Local live
 and recording at all five canonical viewports, plus selected entry, idle, Character, Builder,
 creative-library, playback, existing-video setup at all five viewports, processing/result, VTO, Voice,
 finalizing, permission-error, the video editor at all five canonical viewports, desktop Campaigns
-workspace, and small-mobile Project output-review compositions. Visual
-tests are not part of `bun run test`, `bun run quality`, or ordinary push/pull-request CI.
+workspace, Project output review at all five canonical viewports, and the Project output destination
+choice on desktop and small mobile. Visual tests are not part of `bun run test`, `bun run quality`,
+or ordinary push/pull-request CI.
 
 Run `bun run test:visual` when:
 

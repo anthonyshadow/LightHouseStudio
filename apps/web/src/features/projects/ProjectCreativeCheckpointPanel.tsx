@@ -46,8 +46,8 @@ export const ProjectCreativeCheckpointPanel = ({
       <div>
         <strong>Creative setup</strong>
         <p>
-          Your setup stays in this browser until you save it. Starting Character Swap or Virtual Try
-          On saves it first.
+          Keep this setup with the Project before moving on. Starting Character Swap or Virtual Try
+          On keeps it first.
         </p>
         {issue ? (
           <StatusNotice tone="warning" title={issue.historicalLabel} role="status">
@@ -103,7 +103,7 @@ export const ProjectCreativeCheckpointPanel = ({
         disabled={controller.phase === 'saving'}
         onClick={() => void controller.checkpoint()}
       >
-        {controller.phase === 'saving' ? 'Saving progress…' : 'Save progress'}
+        {controller.phase === 'saving' ? 'Keeping setup…' : 'Keep this setup'}
       </Button>
     </aside>
   );

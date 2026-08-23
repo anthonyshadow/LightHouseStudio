@@ -562,8 +562,7 @@ export const VideoGallery = ({
         <EmptyStatePreview />
         <h2 css={{ margin: 0 }}>No videos in Assets yet</h2>
         <p css={{ margin: 0 }}>
-          Finish a Project with Save as New Video or Add Version, or save a video straight from
-          Studio.
+          Finish a Project with Save video, or save a video straight from Studio.
         </p>
         <p data-empty-example css={emptyExampleStyles(theme)}>
           For example: record a take in Studio, save it, and it appears here with a preview and
@@ -943,7 +942,7 @@ export const VideoGallery = ({
             {!selectedIsCurrent && selectedVersion ? (
               <p>
                 Use this older version from the history of a Project that kept it. Viewing or
-                downloading here does not set a target for Add Version.
+                downloading here does not choose where the Project’s next saved Version goes.
               </p>
             ) : null}
           </div>

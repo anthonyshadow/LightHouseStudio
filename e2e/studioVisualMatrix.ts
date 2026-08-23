@@ -102,6 +102,10 @@ export const FOCUSED_VISUAL_SCENARIOS = {
     id: 'project-output-review',
     baseline: '09-projects/output-review.png',
   },
+  projectOutputDestination: {
+    id: 'project-output-destination',
+    baseline: '09-projects/output-destination.png',
+  },
 } as const;
 
 export const DESKTOP_VISUAL_SCENARIOS = [
@@ -172,7 +176,12 @@ export const VISUAL_CASE_MATRIX = [
         : FOCUSED_VISUAL_SCENARIOS.videoEditLightingDirty,
   })),
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.campaignsWorkspace },
-  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS.projectOutputReview },
+  ...VISUAL_VIEWPORTS.map((viewport) => ({
+    viewport,
+    scenario: FOCUSED_VISUAL_SCENARIOS.projectOutputReview,
+  })),
+  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.projectOutputDestination },
+  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS.projectOutputDestination },
   ...DESKTOP_VISUAL_SCENARIOS.map((scenario) => ({ viewport: desktopViewport, scenario })),
   ...SMALL_MOBILE_VISUAL_SCENARIOS.map((scenario) => ({
     viewport: smallMobileViewport,
@@ -184,7 +193,7 @@ export const VISUAL_BASELINE_PATHS = VISUAL_CASE_MATRIX.map(
   ({ viewport, scenario }) => `${viewport.folder}/${scenario.baseline}`,
 );
 
-const VISUAL_CASE_BUDGET = 38;
+const VISUAL_CASE_BUDGET = 44;
 const coveredViewportIds = new Set(VISUAL_CASE_MATRIX.map(({ viewport }) => viewport.id));
 const corePairs = new Set(
   VISUAL_CASE_MATRIX.map(({ viewport, scenario }) => `${viewport.id}/${scenario.id}`),

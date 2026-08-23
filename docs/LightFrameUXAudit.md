@@ -743,7 +743,14 @@ capability is removed rather than reorganised.
 - **Redesign needed:** **Yes.**
 - **Dependencies:** `VideoEditStagePreview`, `stageColumnStyles`. **Risks:** shares the stage grid with capture; regressions possible in Project workspace layout.
 
-### LF-P04 · Four competing save concepts in the Project workspace
+### ~~LF-P04 · Four competing save concepts in the Project workspace~~ — FIXED
+
+**Resolved.** Project revisions now report an ambient timestamped `Autosaved` state, the creative
+checkpoint is **Keep this setup**, and the output step reserves **Save** for one placement-labelled
+**Save video** action. Its New video/New version destination choice stays inline in the
+desktop/tablet inspector and becomes one fitted bottom sheet on mobile, while the persistent action
+remains above the mobile navigation. CAS, idempotency, immutable originals, and exact-Version rules
+are unchanged.
 
 - **Where:** `ProjectWorkspaceSurface.tsx` (`projectWorkspaceSaveStatus`), `ProjectCreativeCheckpointPanel.tsx` (`Save progress`), `ProjectOutputSaveSection.tsx` (`Save as New Video` / `Add Version`)
 - **Category:** Mental model · **Redesign** · **P1** · **L**
@@ -1132,7 +1139,7 @@ the luminance. The old value survives as `divider` for separators, which carry n
 | #      | Work                                                                         | IDs                        |
 | ------ | ---------------------------------------------------------------------------- | -------------------------- |
 | 17     | **Video editor redesign** (Superdesign)                                      | LF-V01–V05, LF-R04         |
-| 18     | **Project save-step redesign** (Superdesign)                                 | LF-P04                     |
+| ~~18~~ | ~~**Project save-step redesign** (Superdesign)~~ **DONE**                    | LF-P04                     |
 | 19     | **Assets consolidation** (Superdesign)                                       | LF-N02, LF-A05–A08, LF-R05 |
 | 20     | **Dashboard recomposition** (Superdesign)                                    | LF-D02, LF-D03, LF-D05     |
 | ~~21~~ | ~~**Mobile AI-tool availability** — reorganise rather than remove~~ **DONE** | LF-S04, LF-A11Y3           |
@@ -1226,7 +1233,7 @@ along the way. None of the three is architectural.
 
 1. ~~`Record New Video` does not record (LF-S01)~~ — fixed in Tier 1
 2. The video editor's media is its smallest element (LF-V01) — **open, item 17**
-3. Four competing save concepts in the Project workspace (LF-P04) — **open, item 18**
+3. ~~Four competing save concepts in the Project workspace (LF-P04)~~ — **fixed in Tier 3**
 4. ~~Download is hidden; Export is dead (LF-A01, LF-A02)~~ — fixed in Tier 1
 5. ~~Primary and destructive actions share red (LF-S02)~~ — fixed in Tier 1
 6. ~~Five page frames and 29 breakpoints (LF-DS01, LF-DS02)~~ — fixed in Tier 2

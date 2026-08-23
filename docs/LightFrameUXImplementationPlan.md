@@ -860,7 +860,7 @@ covering all five canonical viewports; full repository `bun run quality`; Darwin
 **38/38**; pinned Playwright Linux editor matrix **5/5**; **76/76** curated platform baselines with
 zero missing or removable files.
 
-## 18. Project save-step redesign
+## ~~18. Project save-step redesign~~ · DONE
 
 **Audit ID** LF-P04 · **P1** · **L** · **Superdesign**
 
@@ -885,6 +885,22 @@ Brief: [Superdesign prompts → Project Workspace: the Save Step](LightFrameSupe
 **Validation** `vitest run apps/web/src/features/projects`, then the Projects E2E specs.
 **Risk** `ProjectOutputSaveSection.test.tsx` is the largest test file in the feature. CAS versions
 and idempotency keys must survive untouched.
+
+**Outcome** The approved Superdesign **Destination-first Inspector** now leads with the exact
+current cut, makes placement part of saving, and exposes one persistent placement-labelled **Save
+video** action. That action progressively reveals New video or a named existing-video Version
+target in one surface: inline on desktop/tablet and in one focus-trapped bottom sheet below
+`40rem`. The CTA is pinned within the desktop inspector and above the mobile navigation, including
+the 320×568 and 200%-text cases. Autosave is ambient and timestamped, the creative checkpoint is
+**Keep this setup**, and the prior save disclaimer and picker-to-confirmation chain are gone. The
+existing pending-operation receipt, Project/revision CAS, exact append target, immutable original,
+and response-loss reconciliation paths remain unchanged.
+
+**Validated** focused Project/export/gallery unit suites **170/170**; full repository `bun run
+quality` (**261** files passed, **4** skipped; **2,005** tests passed, **9** skipped); built-production
+smoke **1/1**; functional browser journeys **77/77**; Darwin visual matrix **44/44**; pinned
+Playwright Linux affected Save matrix **7/7**; and **88/88** curated platform baselines with zero
+missing or removable files.
 
 ## 19. Assets consolidation
 

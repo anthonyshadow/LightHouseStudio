@@ -75,6 +75,81 @@
         }
       },
       "updatedAt": "2026-08-22T23:43:00Z"
+    },
+    "feature:project-save-step": {
+      "targetKind": "existing-ui",
+      "projectId": "c2cfb089-6501-4a26-b06e-b9a771596efc",
+      "baselineDraftId": "a605097b-859b-4358-b0f9-1bd6d7cbc60e",
+      "activeDraftId": "bb931e4e-ad7e-423c-9417-b3939f32b4e4",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": ["apps-web-public-favicon.svg"],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "apps-web-public-favicon.svg",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/c2cfb089-6501-4a26-b06e-b9a771596efc/brand-assets/apps-web-public-favicon.svg/favicon.svg",
+          "sourcePath": "apps/web/public/favicon.svg"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        ".superdesign/init/layouts.md",
+        "apps/web/src/ui/theme.ts",
+        "apps/web/src/ui/primitives/Button.tsx",
+        "apps/web/src/ui/primitives/AppIcon.tsx",
+        "apps/web/src/ui/primitives/StatusNotice.tsx",
+        "apps/web/src/ui/primitives/SegmentedControl.tsx",
+        "apps/web/src/ui/primitives/OverlayPanel.styles.ts",
+        "apps/web/src/studio/StudioHeader.tsx",
+        "apps/web/src/studio/StudioApp.styles.ts",
+        "apps/web/src/studio/StudioWorkspace.tsx",
+        "apps/web/src/studio/CreativeWorkspace.tsx",
+        "apps/web/src/features/projects/ProjectWorkspaceSurface.tsx",
+        "apps/web/src/features/projects/ProjectWorkspaceSurface.styles.ts",
+        "apps/web/src/features/projects/ProjectWorkflowProgress.tsx",
+        "apps/web/src/features/projects/ProjectOutputSaveSection.tsx",
+        "apps/web/src/features/projects/ProjectSavedVideoPicker.tsx",
+        "apps/web/src/features/export-placements/ExportPlacementChooser.tsx"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "5959f087940683a9c4751c92b1671805fdb87aa215aa6c3ca51687ddc3974d8a",
+        ".superdesign/init/layouts.md": "6c6aaaafc0b30b75aa0565fe3a93aa47817f1debae5b4dcabf190f77d9972eb2",
+        "apps/web/src/ui/theme.ts": "626cbc3bef3b1df450f441545744b5a40173bfdabf6f061a6949ec28336ac1a5",
+        "apps/web/src/ui/primitives/Button.tsx": "0a226d4088621ab8da593349f483a956132cccbd161801afaa5277b4bfd36d03",
+        "apps/web/src/ui/primitives/AppIcon.tsx": "ff5e222461affff020974c8ca778db2dc439fbdcc8cb8d7ca5ca138a9be3fffa",
+        "apps/web/src/ui/primitives/StatusNotice.tsx": "9f31a9af1ec27276fe8673f60d7eb901777a2f597d96efc4d71a1f6ec5092d78",
+        "apps/web/src/ui/primitives/SegmentedControl.tsx": "265611b9a8c6668c0aabb750ddd0572f57fb65aa46fc803aba617ba4606a03dd",
+        "apps/web/src/ui/primitives/OverlayPanel.styles.ts": "36dbc636a5837d00947836689f7d9fe956a774fdadce007479cfda09a581ec90",
+        "apps/web/src/studio/StudioHeader.tsx": "ea6cc7cb978769ca168e19d828e1d27c847e6ff42ba3082b319af686df38424c",
+        "apps/web/src/studio/StudioApp.styles.ts": "204b3f5336e2f2a360ee4b847674de7ca01684879305cd55a6cc6baefd6bba98",
+        "apps/web/src/studio/StudioWorkspace.tsx": "88fb3208a82bbbc1fbf6e342bf3f20fcb66be87a82b919f902686b6635bc768f",
+        "apps/web/src/studio/CreativeWorkspace.tsx": "66e237f8f2a98c8357cc954e266358c1a40790bec8e76c6fd0e312229c447201",
+        "apps/web/src/features/projects/ProjectWorkspaceSurface.tsx": "e8c5b254b9b1227f4743de1dd6dbee2020606d6098219efe1a137e1cfff3462f",
+        "apps/web/src/features/projects/ProjectWorkspaceSurface.styles.ts": "28725ace7c732207a9b159c7eeebba5bb311f7d892f4078757edfd79543f0877",
+        "apps/web/src/features/projects/ProjectWorkflowProgress.tsx": "bc2b560abe37cbc8a20549857b8f8fb32a4c1f2b60cb0b44f088349a56d16dc6",
+        "apps/web/src/features/projects/ProjectOutputSaveSection.tsx": "3aebc5b3821b5f098baca3fa5ce69adf8042833503d85a06994f8b50cc74e7f0",
+        "apps/web/src/features/projects/ProjectSavedVideoPicker.tsx": "49d4e8422dbce7ba77110085858aefeb7a715493ae99f4d3ae1fa1b564445a1a",
+        "apps/web/src/features/export-placements/ExportPlacementChooser.tsx": "c57720c6d69743e1b380245654b9f188ca9c40ca99e55cb0781a9165c45a4759"
+      },
+      "drafts": {
+        "a605097b-859b-4358-b0f9-1bd6d7cbc60e": {
+          "title": "Current Lightframe Project Save Step",
+          "visualDirection": "faithful current Save-step baseline",
+          "currentVersion": 1
+        },
+        "09ffecaf-7931-4814-bae4-ab623c76f6ee": {
+          "title": "Lightframe Studio — Focused Save Flow",
+          "visualDirection": "focused output-target sheet with persistent Save video action",
+          "parentDraftId": "a605097b-859b-4358-b0f9-1bd6d7cbc60e",
+          "currentVersion": 1
+        },
+        "bb931e4e-ad7e-423c-9417-b3939f32b4e4": {
+          "title": "Lightframe Studio — Responsive Destination-first Inspector",
+          "visualDirection": "calm destination-first inspector with progressive output-target reveal and fitted tablet/mobile layouts",
+          "parentDraftId": "a605097b-859b-4358-b0f9-1bd6d7cbc60e",
+          "currentVersion": 2
+        }
+      },
+      "updatedAt": "2026-08-23T02:37:44Z"
     }
   }
 }

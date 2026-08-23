@@ -11,10 +11,18 @@ import {
   EXPORT_PLACEMENT_OPTIONS,
   exportPlacementDescription,
   exportPlacementHint,
+  exportPlacementLabel,
 } from './placements';
 
 const PREVIEW_WIDTH = 220;
 const PREVIEW_HEIGHT = 124;
+const PLACEMENT_ASPECT_RATIOS: Readonly<Record<ProjectExportAspect, number>> = {
+  source: 16 / 9,
+  '9:16': 9 / 16,
+  '16:9': 16 / 9,
+  '1:1': 1,
+  '4:5': 4 / 5,
+};
 
 const SEGMENTS = EXPORT_PLACEMENT_OPTIONS.map(({ aspect, label, shortLabel }) => ({
   value: aspect,
@@ -25,11 +33,36 @@ const SEGMENTS = EXPORT_PLACEMENT_OPTIONS.map(({ aspect, label, shortLabel }) =>
 const previewStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   justifyItems: 'center',
-  gap: theme.space.xs,
+  gap: theme.space.sm,
   padding: theme.space.sm,
   border: `1px solid ${theme.colors.border}`,
   borderRadius: theme.radii.medium,
   background: theme.colors.canvasRaised,
+});
+
+const chooserStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  display: 'grid',
+  gap: theme.space.sm,
+  containerType: 'inline-size',
+  '& [data-placement-segments] > [role="group"]': {
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  },
+  '& [data-placement-segments] > [role="group"] > button:last-child': {
+    gridColumn: '1 / -1',
+  },
+  '& [data-placement-segments] [data-segment-label="full"]': { display: 'none' },
+  '& [data-placement-segments] [data-segment-label="short"]': { display: 'inline' },
+  '@container (min-width: 31rem)': {
+    '& [data-placement-segments] > [role="group"]': {
+      gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+    },
+    '& [data-placement-segments] > [role="group"] > button:last-child': {
+      gridColumn: 'auto',
+    },
+    '& [data-placement-segments] [data-segment-label="full"]': { display: 'inline' },
+    '& [data-placement-segments] [data-segment-label="short"]': { display: 'none' },
+  },
 });
 
 /**
@@ -85,6 +118,52 @@ const CropPreview = ({
   );
 };
 
+/**
+ * The Project snapshot does not carry source dimensions. In that case this shows the selected
+ * output shape without inventing a crop percentage; the adjacent copy states that the center is
+ * kept and leaves the exact amount to the measured render path.
+ */
+const PlacementShapePreview = ({ aspect }: { readonly aspect: ProjectExportAspect }) => {
+  const theme = useTheme();
+  const ratio = PLACEMENT_ASPECT_RATIOS[aspect];
+  const maximumWidth = 198;
+  const maximumHeight = 104;
+  const width = Math.min(maximumWidth, maximumHeight * ratio);
+  const height = width / ratio;
+  const x = (PREVIEW_WIDTH - width) / 2;
+  const y = (PREVIEW_HEIGHT - height) / 2;
+
+  return (
+    <svg
+      role="presentation"
+      aria-hidden="true"
+      width={PREVIEW_WIDTH}
+      height={PREVIEW_HEIGHT}
+      viewBox={`0 0 ${PREVIEW_WIDTH} ${PREVIEW_HEIGHT}`}
+      css={{ maxWidth: '100%', height: 'auto' }}
+    >
+      <rect
+        x={0.5}
+        y={0.5}
+        width={PREVIEW_WIDTH - 1}
+        height={PREVIEW_HEIGHT - 1}
+        fill={theme.colors.surfaceStrong}
+        stroke={theme.colors.border}
+      />
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        fill={theme.colors.accent}
+        fillOpacity={0.22}
+        stroke={theme.colors.accent}
+        strokeWidth={2}
+      />
+    </svg>
+  );
+};
+
 export interface ExportPlacementChooserProps {
   readonly value: ProjectExportSpecification | null;
   /**
@@ -114,20 +193,22 @@ export const ExportPlacementChooser = ({
   const active = unavailable ? null : value;
 
   return (
-    <div css={{ display: 'grid', gap: theme.space.sm }}>
+    <div css={chooserStyles(theme)} data-export-placement-chooser="">
       <div>
         <p css={{ margin: 0, fontWeight: 700 }}>Where is this going?</p>
         <p css={{ margin: 0, fontSize: '0.85rem', color: theme.colors.textMuted }}>
-          Choosing a destination re-frames the video for it. Keeping it as it is changes nothing.
+          Choose the shape that fits where people will watch it.
         </p>
       </div>
-      <SegmentedControl
-        label="Where is this going?"
-        value={aspect}
-        options={SEGMENTS}
-        disabled={disabled || unavailable}
-        onChange={(next) => onChange(projectExportSpecificationForAspect(next))}
-      />
+      <div data-placement-segments="">
+        <SegmentedControl
+          label="Where is this going?"
+          value={aspect}
+          options={SEGMENTS}
+          disabled={disabled || unavailable}
+          onChange={(next) => onChange(projectExportSpecificationForAspect(next))}
+        />
+      </div>
       <p css={{ margin: 0, fontSize: '0.85rem' }}>{exportPlacementHint(aspect)}</p>
       {unavailable ? (
         <StatusNotice tone="warning" title="Local editor unavailable">
@@ -138,7 +219,14 @@ export const ExportPlacementChooser = ({
       ) : null}
       {active !== null ? (
         <div css={previewStyles(theme)}>
-          {source === null ? null : <CropPreview specification={active} source={source} />}
+          {source === null ? (
+            <PlacementShapePreview aspect={active.aspect} />
+          ) : (
+            <CropPreview specification={active} source={source} />
+          )}
+          <strong css={{ fontSize: theme.fontSizes.metadata }}>
+            {exportPlacementLabel(active.aspect)}
+          </strong>
           <p css={{ margin: 0, fontSize: '0.85rem', textAlign: 'center' }}>
             {exportPlacementDescription(active, source)}
           </p>

@@ -347,7 +347,7 @@ describe('VideoGallery', () => {
     expect(
       await screen.findByRole('heading', { name: 'No videos in Assets yet' }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Save as New Video/u)).toBeInTheDocument();
+    expect(screen.getByText(/Finish a Project with Save video/u)).toBeInTheDocument();
   });
 
   it('aggregates cursor pages through Query', async () => {

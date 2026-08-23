@@ -27,11 +27,12 @@ Studio stage.
    idempotent. An artifact with unsaved changes shows **Discard** but not **Release**. Once that
    artifact is saved, or when an unchanged Saved Video is opened in Studio, the same control slot
    shows **Release** but not **Discard**.
-2. **Save as New Video** creates a titled gallery record and immutable first version. In the
+2. **Save video** creates a titled gallery record and immutable first version. In the
    standalone workflow, **Replace Existing Video** is secondary, requires confirmation, checks the
-   expected current version, and appends bytes rather than overwriting history. In a Project,
-   **Add Version** is a separate explicit target selection and confirmation; it is never inferred
-   from a Saved Video Version reused as source.
+   expected current version, and appends bytes rather than overwriting history. In a Project, one
+   **Save video** action offers either **New video** or **New version of an existing video** inside
+   one destination surface; that existing target is explicit and is never inferred from a Saved
+   Video Version reused as source.
    In authoritative Neon/private-R2 mode, the authenticated API stages the save and the browser
    transfers multipart bytes directly to R2; the result is not visible until the API verifies and
    attaches it. Local and shadow modes retain their existing API-mediated upload behavior.

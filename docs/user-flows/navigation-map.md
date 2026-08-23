@@ -128,8 +128,8 @@ ProjectDetail (overview)
 ProjectDetail (workspace)
   ├─ Overview breadcrumb ───────────────► /projects/{id}
   ├─ Source ▸ Record ───────────────────► starts local capture on the stage, stays on route
-  ├─ Create ▸ Save progress ────────────► checkpoint revision
-  ├─ Save ▸ Save as New Video ──────────► Saved Video (stays)
+  ├─ Create ▸ Keep this setup ──────────► checkpoint revision
+  ├─ Save ▸ Save video ─────────────────► new Saved Video or new Version (stays)
   └─ History ▸ Download ────────────────► /api/projects/{id}/outputs/{versionId}/content?download=true
 
 CampaignsWorkspace

@@ -215,8 +215,8 @@ Reusing a prior Version may produce a new Project Revision without creating anot
 An output relation records the revision whose ready working/presented media and intent produced the
 saved Version. The atomically appended post-save revision then references that exact output as its
 last successful output. It does not rewrite the producing revision. Reusing a Saved Video Version
-as a Project source also does not make that Saved Video an Add Version target; the save target is a
-separate explicit choice at save time.
+as a Project source also does not make that Saved Video the existing-video Version target; the save
+target is a separate explicit choice inside **Save video**.
 
 If future export settings generate different bytes, those bytes must first become a ready Version
 and Project output; then download that exact Version. Merely downloading existing bytes does not
@@ -391,8 +391,8 @@ persistence mode unless a mode is explicitly and canonically unsupported before 
     Version, and find legacy videos with no producing Project.
 13. The user can move coherently among Dashboard, Create, Campaigns, Project overview/workspace,
     and Assets without losing or silently discarding work.
-14. Download selects an exact ready Video Version and is labeled distinctly from **All changes
-    saved**, **Render preview**, **Save as New Video**, and **Add Version**.
+14. Download selects an exact ready Video Version and is labeled distinctly from timestamped
+    **Autosaved**, **Keep this setup**, **Render preview**, and **Save video**.
 15. Cross-owner, missing, archived/deleted, replay, conflict, cleanup-retention, refresh-resume, and
     migration cases have focused automated coverage.
 16. The complete no-paid-provider E2E journey, relevant visual/responsive cases, affected typechecks,

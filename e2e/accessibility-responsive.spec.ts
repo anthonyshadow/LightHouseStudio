@@ -419,25 +419,32 @@ test('small-mobile Project output review reflows at 200% text with accessible sa
     document.documentElement.style.fontSize = '200%';
   });
 
-  const createTrigger = page.getByRole('button', { name: 'Save as New Video' });
-  const appendTrigger = page.getByRole('button', { name: 'Add Version' });
-  await expect(createTrigger).toBeVisible();
-  await expect(appendTrigger).toBeVisible();
-  for (const trigger of [createTrigger, appendTrigger]) {
-    const bounds = await trigger.boundingBox();
-    expect(bounds).not.toBeNull();
-    expect(bounds!.height).toBeGreaterThanOrEqual(44);
-  }
+  const saveTrigger = page.getByRole('button', { name: 'Save video · Keep as it is' });
+  const mobileNavigation = page.getByRole('navigation', { name: 'Mobile primary' });
+  await expect(saveTrigger).toBeVisible();
+  const [saveBounds, navigationBounds] = await Promise.all([
+    saveTrigger.boundingBox(),
+    mobileNavigation.boundingBox(),
+  ]);
+  expect(saveBounds).not.toBeNull();
+  expect(navigationBounds).not.toBeNull();
+  expect(saveBounds!.height).toBeGreaterThanOrEqual(44);
+  expect(saveBounds!.y + saveBounds!.height).toBeLessThanOrEqual(navigationBounds!.y + 1);
   await expectNoDocumentOverflow(page);
   await expectNoAxeViolations(page);
 
-  await createTrigger.click();
-  const dialog = page.getByRole('dialog', { name: 'Save as New Video' });
+  await saveTrigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Save video' });
+  await expect(dialog.getByRole('form', { name: 'Save destination' })).toBeVisible();
+  await expect(dialog.getByRole('radio', { name: 'New video' })).toBeChecked();
+  await expect(
+    dialog.getByRole('radio', { name: 'New version of an existing video' }),
+  ).toBeVisible();
   await expect(dialog.getByLabel('Video title')).toBeFocused();
   await expectNoDocumentOverflow(page);
   await expectNoAxeViolations(page);
   await page.keyboard.press('Escape');
-  await expect(createTrigger).toBeFocused();
+  await expect(saveTrigger).toBeFocused();
   expectNoExternalProviderTraffic(network);
 });
 

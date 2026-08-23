@@ -90,7 +90,7 @@ them. Whether a media stage exists at all is `isStudioRuntimePath`.
 /projects ──► /projects/{id} ──► /projects/{id}/workspace
                   │                    ├── Source  (record · upload · reuse Saved Video)
                   │                    ├── Create  (creative checkpoint · working media · processing)
-                  │                    ├── Save    (Save as New Video · Add Version)
+                  │                    ├── Save    (placement · Save video · destination choice)
                   │                    └── History (revisions · outputs · download)
                   └── Assets section (attach Videos / Characters / Outfits / Voices)
 

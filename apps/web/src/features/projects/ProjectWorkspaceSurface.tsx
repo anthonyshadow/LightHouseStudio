@@ -8,6 +8,7 @@ import { AppIcon, Button, StatusNotice } from '../../ui';
 import { projectProcessingBlockedReason } from './projectProcessingPresentation';
 import { ProjectHistorySection } from './ProjectHistorySection';
 import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
+import { saveTaskPanelStyles } from './ProjectOutputSaveSection.styles';
 import { ProjectProcessingStatusPanel } from './ProjectProcessingStatusPanel';
 import { dialogActionsStyles } from './ProjectRouteSurface.styles';
 import { ProjectSourceSection, type ProjectRecordingCandidate } from './ProjectSourceSection';
@@ -69,23 +70,10 @@ const ProjectSessionNotice = ({
 
   switch (session.phase) {
     case 'hydrating':
-      return (
-        <StatusNotice role="status" tone="neutral" title="Opening Project">
-          Checking for changes saved elsewhere.
-        </StatusNotice>
-      );
+      return null;
     case 'dirty':
-      return (
-        <StatusNotice role="status" tone="neutral" title="Saving changes">
-          Your changes are queued and save automatically in a moment.
-        </StatusNotice>
-      );
     case 'saving':
-      return (
-        <StatusNotice role="status" tone="neutral" title="Saving changes">
-          Saving your recent changes together as one change.
-        </StatusNotice>
-      );
+      return null;
     case 'conflict':
       return (
         <StatusNotice role="alert" tone="warning" title="Conflict">
@@ -114,13 +102,23 @@ const ProjectSessionNotice = ({
 const projectWorkspaceSaveStatus = (
   session: ReturnType<typeof useProjectSession>,
   sourceBusy: boolean,
-): { readonly label: string; readonly tone: 'success' | 'warning' | 'danger' } => {
-  if (sourceBusy || session.phase === 'dirty' || session.phase === 'saving') {
-    return { label: 'Autosaving…', tone: 'warning' };
+  updatedAt: string,
+): {
+  readonly label: string;
+  readonly tone: 'neutral' | 'warning' | 'danger';
+  readonly dateTime?: string;
+} => {
+  if (sourceBusy || session.phase === 'saving') {
+    return { label: 'Autosaving…', tone: 'neutral' };
   }
-  if (session.phase === 'conflict') return { label: 'Resolve conflict', tone: 'warning' };
+  if (session.phase === 'dirty') return { label: 'Unsaved changes', tone: 'neutral' };
+  if (session.phase === 'hydrating') return { label: 'Checking save…', tone: 'neutral' };
+  if (session.phase === 'conflict') return { label: 'Conflict', tone: 'warning' };
   if (session.phase === 'error') return { label: 'Not autosaved', tone: 'danger' };
-  return { label: 'Autosaved', tone: 'success' };
+  const time = new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(
+    new Date(updatedAt),
+  );
+  return { label: `Autosaved · ${time}`, tone: 'neutral', dateTime: updatedAt };
 };
 
 interface ProjectWorkspaceSurfaceProps {
@@ -196,7 +194,11 @@ export const ProjectWorkspaceSurface = ({
   );
   if (enteredWorkspaceTask === null)
     setEnteredWorkspaceTask(stepForSnapshot(current.revision.snapshot));
-  const saveStatus = projectWorkspaceSaveStatus(session, sourceActivity?.busy ?? false);
+  const saveStatus = projectWorkspaceSaveStatus(
+    session,
+    sourceActivity?.busy ?? false,
+    current.revision.snapshot.updatedAt,
+  );
   // Removing the source moves the Project out from under anything still deriving from it. The
   // server refuses these too; naming the reason here keeps the operator from guessing.
   //
@@ -255,7 +257,13 @@ export const ProjectWorkspaceSurface = ({
           data-tone={saveStatus.tone}
         >
           <span data-workspace-save-status-dot aria-hidden="true" />
-          <span data-workspace-save-label>{saveStatus.label}</span>
+          <span data-workspace-save-label>
+            {saveStatus.dateTime ? (
+              <time dateTime={saveStatus.dateTime}>{saveStatus.label}</time>
+            ) : (
+              saveStatus.label
+            )}
+          </span>
         </span>
       </header>
 
@@ -341,14 +349,12 @@ export const ProjectWorkspaceSurface = ({
             tabIndex={0}
             aria-labelledby="project-task-save-tab"
             hidden={activeWorkspaceTask !== 'save'}
-            css={taskPanelStyles(theme)}
+            css={[taskPanelStyles(theme), saveTaskPanelStyles(theme)]}
+            data-project-save-task-panel=""
           >
             <header>
               <h2>Save</h2>
-              <p>
-                Keep what you’re viewing as a new video, or as the next version of one you already
-                saved.
-              </p>
+              <p>Choose a placement, then save the exact current cut shown on the stage.</p>
             </header>
             <ProjectOutputSaveSection
               current={current}

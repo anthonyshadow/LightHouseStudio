@@ -340,7 +340,7 @@ describe('Project route surface', () => {
       expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`),
     );
     expect(await screen.findByRole('heading', { name: 'No original video yet' })).toBeVisible();
-    expect(screen.getByText('Autosaved').closest('[role="status"]')).toBeInTheDocument();
+    expect(screen.getByText(/^Autosaved ·/u).closest('[role="status"]')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Record' })).toBeDisabled();
     expect(screen.queryByRole('video')).not.toBeInTheDocument();
   });
@@ -1577,7 +1577,7 @@ describe('Project route surface', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Use finalized recording' }));
     expect(await screen.findByText(/Uploading and checking your video/u)).toBeVisible();
-    expect(screen.queryByText('Autosaved')).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Autosaved ·/u)).not.toBeInTheDocument();
 
     expect(await screen.findByRole('heading', { name: 'Original video ready' })).toBeVisible();
     expect(present).toHaveBeenCalledWith(activeId, expect.objectContaining({ blob: file }));
@@ -1932,7 +1932,8 @@ describe('Project route surface', () => {
     act(() => {
       sessionPort?.propose({ workflowPhase: 'creative' });
     });
-    expect(screen.getByText(/changes are queued and save automatically/u)).toBeVisible();
+    expect(screen.getByText('Unsaved changes')).toBeVisible();
+    expect(screen.queryByRole('status', { name: /Saving changes/u })).not.toBeInTheDocument();
     await act(async () => {
       expect(await sessionPort?.flush()).toBe(false);
     });
@@ -1942,10 +1943,8 @@ describe('Project route surface', () => {
       'This Project changed somewhere else. Your unsaved changes are still here.',
     );
     await user.click(within(conflict).getByRole('button', { name: 'Reapply changes' }));
-    expect(
-      await screen.findByText(/Saving your recent changes together as one change/u),
-    ).toBeVisible();
-    expect(await screen.findByText('Autosaved')).toBeVisible();
+    expect(await screen.findByText('Autosaving…')).toBeVisible();
+    expect(await screen.findByText(/^Autosaved ·/u)).toBeVisible();
     expect(revisionWrites).toBe(2);
   });
 
@@ -1980,6 +1979,6 @@ describe('Project route surface', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Project saving unavailable.');
     await user.click(within(alert).getByRole('button', { name: 'Discard local changes' }));
-    expect(await screen.findByText('Autosaved')).toBeVisible();
+    expect(await screen.findByText(/^Autosaved ·/u)).toBeVisible();
   });
 });

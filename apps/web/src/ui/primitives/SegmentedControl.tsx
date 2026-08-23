@@ -84,10 +84,10 @@ export const SegmentedControl = <T extends string>({
         >
           {option.shortLabel ? (
             <>
-              <span aria-hidden="true" css={fullLabelStyles()}>
+              <span aria-hidden="true" css={fullLabelStyles()} data-segment-label="full">
                 {option.label}
               </span>
-              <span aria-hidden="true" css={shortLabelStyles()}>
+              <span aria-hidden="true" css={shortLabelStyles()} data-segment-label="short">
                 {option.shortLabel}
               </span>
             </>

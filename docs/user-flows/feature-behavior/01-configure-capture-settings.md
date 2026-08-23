@@ -48,7 +48,7 @@ for browser-reported front/rear modes and hardware zoom only when the track repo
   still be opened and read while disabled, and say why they are unavailable.
 - A session error that points at capture settings opens the desktop panel and moves focus to it.
 - Preferences are in-memory for the tab; device IDs are not written to creative-library storage.
-- In an open Project, **Save progress** may checkpoint only the applied format class and
+- In an open Project, **Keep this setup** may checkpoint only the applied format class and
   app-owned audio-source mode as live metadata. It never stores device IDs, starts media, or writes
   per-control changes; Capture Settings keeps its existing session owner.
 
