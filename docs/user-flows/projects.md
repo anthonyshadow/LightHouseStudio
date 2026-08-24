@@ -296,6 +296,17 @@ the app:
 Both actions are disabled when archived, busy, `readyMedia === null`, or the project is
 `processing`.
 
+**A settled save frees the next round.** The post-save revision `saveProjectOutput` appends clears
+the creative configuration it was produced from — `selectedCharacter`, `selectedOutfit`,
+`selectedVoice`, `visualTreatment`, the applied prompt and `localEdit` — keeping only the operator's
+own `userIntent`, the live-capture metadata and the chosen placement. The exact configuration that
+made the Version stays immutable on the producing revision and on the Version itself, so nothing is
+lost; it simply stops pre-filling the next round, which is what made a Character Swap Project
+unable to move to Virtual Try-On. `useProjectCreativeSessionAdapter` frees the live visual tool once
+for that one revision, rather than whenever the snapshot carries no treatment — a tool chosen after
+a save is not checkpointed until progress is saved, so an unsaved choice looks the same and must not
+be swept away.
+
 ### Task 4 — History
 
 `ProjectHistorySection` lists retained revisions and outputs, states the placement on any Project

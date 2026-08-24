@@ -452,6 +452,43 @@ export const createEmptyProjectSnapshot = (nowValue: string): ProjectSnapshot =>
   };
 };
 
+/**
+ * The creative configuration a Project starts a round of work from.
+ *
+ * A saved output ends the round it was configured for: the exact character, outfit, voice, prompt
+ * and cut that produced it are immutable on the producing revision and on the retained Version, so
+ * carrying them onto the post-save revision only pre-fills the next round with settings the
+ * operator has to clear before choosing a different treatment. Live capture metadata and the export
+ * placement are not part of that configuration and are left alone.
+ */
+const clearedProjectCreativeConfiguration = (
+  snapshot: ProjectSnapshot,
+): Pick<
+  ProjectSnapshot,
+  | 'selectedCharacter'
+  | 'selectedOutfit'
+  | 'selectedVoice'
+  | 'visualTreatment'
+  | 'creativeIntent'
+  | 'localEdit'
+> => ({
+  selectedCharacter: null,
+  selectedOutfit: null,
+  selectedVoice: null,
+  visualTreatment: { kind: 'none' },
+  creativeIntent: {
+    promptId: null,
+    promptLabel: null,
+    recipeId: null,
+    recipeLabel: null,
+    userIntent: snapshot.creativeIntent.userIntent,
+    appliedPrompt: null,
+    referenceAssetId: null,
+    resourceRevision: null,
+  },
+  localEdit: null,
+});
+
 const materialSnapshot = (snapshot: ProjectSnapshot) => ({
   sourceAssetId: snapshot.sourceAssetId,
   workingMedia: snapshot.workingMedia,
@@ -950,6 +987,9 @@ export interface SaveProjectOutputInput {
  * distinct post-save revision that presents the exact retained Version. This is intentionally a
  * dedicated transition: changing an ordinary revision's media clears a stale output pointer,
  * while this command proves the replacement reference names the same newly retained output.
+ *
+ * The post-save revision also starts the next round of work with its creative configuration
+ * cleared — see `clearedProjectCreativeConfiguration`.
  */
 export const saveProjectOutput = (
   aggregate: ProjectAggregate,
@@ -1018,6 +1058,7 @@ export const saveProjectOutput = (
   const outputReference = { savedVideoId, videoVersionId };
   const snapshot = validateProjectSnapshot({
     ...producingRevision.snapshot,
+    ...clearedProjectCreativeConfiguration(producingRevision.snapshot),
     workingMedia: { kind: 'saved-video-version', ...outputReference },
     presentedMedia: { kind: 'saved-video-version', ...outputReference },
     lastSuccessfulOutput: outputReference,

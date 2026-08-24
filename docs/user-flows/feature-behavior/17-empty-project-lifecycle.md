@@ -141,7 +141,9 @@ provider work.
     freshly reads Project authority, checks exact Project/revision/media and append CAS, reuses the
     already-durable current bytes, creates one
     immutable Video Version, attributes it to the producing pre-save revision, and appends a
-    distinct completed post-save revision with the exact retained output pointer. Reusing a Saved
+    distinct completed post-save revision with the exact retained output pointer and a freed
+    creative configuration, so the next round starts without the settings that produced the
+    Version. Reusing a Saved
     Video Version as source never preselects an existing-video save target. A final CAS conflict clears the
     operation and refreshes current Project authority before asking the operator to review and save
     again. A settled save names the Saved Video and Version it produced and offers that exact

@@ -92,8 +92,20 @@ const current = (): ProjectCurrentResponse => ({
   },
 });
 
-const setup = () => {
-  const snapshot = current();
+const setup = (
+  overrides: {
+    readonly snapshot?: Partial<ProjectCurrentResponse['revision']['snapshot']>;
+    readonly existingVideo?: Record<string, unknown>;
+  } = {},
+) => {
+  const base = current();
+  const snapshot: ProjectCurrentResponse = {
+    ...base,
+    revision: {
+      ...base.revision,
+      snapshot: { ...base.revision.snapshot, ...overrides.snapshot },
+    },
+  };
   const restoreAspectRatio = vi.fn(() => true);
   const selectVoice = vi.fn();
   const dependencies = {
@@ -137,10 +149,70 @@ const setup = () => {
       removeStep: vi.fn(),
       addStep: vi.fn(),
       updateStep: vi.fn(),
+      ...overrides.existingVideo,
     },
   } as unknown as Parameters<typeof useProjectCreativeSessionAdapter>[0];
   return { dependencies, restoreAspectRatio, selectVoice };
 };
+
+const completedOutputSnapshot = {
+  selectedVoice: null,
+  visualTreatment: { kind: 'none' },
+  lastSuccessfulOutput: {
+    savedVideoId: 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338',
+    videoVersionId: 'b276694b-58c4-40d3-8fb6-315e32b66fd0',
+  },
+  workflowPhase: 'complete',
+} as const;
+
+const leftoverStep = {
+  id: 'a2e6a2f8-3f1a-4c2e-8a53-6f5d0b6d9a11',
+  modelId: 'lucy-latest',
+  savedRecipeId: 'character-one',
+  prompt: 'Nova presenting the product',
+};
+
+describe('useProjectCreativeSessionAdapter output completion', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('frees the visual tool once for a saved output revision', async () => {
+    const { dependencies } = setup({
+      snapshot: completedOutputSnapshot,
+      existingVideo: { steps: [leftoverStep], voiceSelection: { voiceId: 'voice-one' } },
+    });
+    const existingVideo = dependencies.existingVideo as unknown as {
+      removeStep: ReturnType<typeof vi.fn>;
+      clearVoice: ReturnType<typeof vi.fn>;
+      addStep: ReturnType<typeof vi.fn>;
+    };
+
+    const { rerender } = renderHook(() => useProjectCreativeSessionAdapter(dependencies));
+    await waitFor(() => expect(existingVideo.removeStep).toHaveBeenCalledWith(leftoverStep.id));
+    expect(existingVideo.clearVoice).toHaveBeenCalled();
+    expect(existingVideo.addStep).not.toHaveBeenCalled();
+
+    // A tool chosen after the save is not checkpointed yet, so re-running must not sweep it away.
+    rerender();
+    rerender();
+    expect(existingVideo.removeStep).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves the controls alone while the Project is still being configured', async () => {
+    const { dependencies, restoreAspectRatio } = setup({
+      snapshot: { selectedVoice: null, visualTreatment: { kind: 'none' } },
+      existingVideo: { steps: [leftoverStep] },
+    });
+    const existingVideo = dependencies.existingVideo as unknown as {
+      removeStep: ReturnType<typeof vi.fn>;
+    };
+
+    renderHook(() => useProjectCreativeSessionAdapter(dependencies));
+
+    // Hydration settling proves the effects ran; no saved output means nothing was freed.
+    await waitFor(() => expect(restoreAspectRatio).toHaveBeenCalled());
+    expect(existingVideo.removeStep).not.toHaveBeenCalled();
+  });
+});
 
 describe('useProjectCreativeSessionAdapter saved Voice hydration', () => {
   beforeEach(() => vi.clearAllMocks());

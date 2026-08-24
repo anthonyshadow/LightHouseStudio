@@ -79,6 +79,7 @@ export const useProjectCreativeSessionAdapter = ({
   const historicalHydrationControllerRef = useRef<AbortController | null>(null);
   const existingVideoSourceKeyRef = useRef<string | null>(null);
   const existingVideoConfigurationKeyRef = useRef<string | null>(null);
+  const freedOutputRevisionRef = useRef<string | null>(null);
 
   const current = projectSession?.current ?? null;
   const snapshot = current?.revision.snapshot ?? null;
@@ -254,6 +255,28 @@ export const useProjectCreativeSessionAdapter = ({
     snapshot,
     studioSession,
   ]);
+
+  /**
+   * A saved output ends the round it was configured for, and the Project clears its own creative
+   * configuration with it, so the visual tool is freed for the next round. The voice needs no
+   * handling here: the configuration effect below already follows the snapshot back to none.
+   *
+   * This is keyed to the one post-save revision rather than driven by "the snapshot carries no
+   * treatment": a tool the operator picks after a save is not checkpointed until they save
+   * progress, so an unsaved choice looks exactly the same and must not be swept away.
+   */
+  useEffect(() => {
+    const revisionId = current?.revision.id ?? null;
+    if (projectId === null || snapshot === null || revisionId === null) return;
+    if (snapshot.workflowPhase !== 'complete' || snapshot.lastSuccessfulOutput === null) {
+      freedOutputRevisionRef.current = null;
+      return;
+    }
+    if (freedOutputRevisionRef.current === revisionId) return;
+    freedOutputRevisionRef.current = revisionId;
+    const step = existingVideo.steps[0];
+    if (step) existingVideo.removeStep(step.id);
+  }, [current?.revision.id, existingVideo, projectId, snapshot]);
 
   useEffect(() => {
     if (projectId === null || snapshot === null) return;
