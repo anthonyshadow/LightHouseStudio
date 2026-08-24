@@ -2,6 +2,7 @@ import { useTheme } from '@emotion/react';
 import { Button, StatusNotice } from '../../ui';
 import type { useProjectCreativeSessionAdapter } from './useProjectCreativeSessionAdapter';
 import type { useProjectWorkingMediaController } from './useProjectWorkingMediaController';
+import { media } from '../../ui/media';
 
 export const PROJECT_PROVIDER_START_BLOCKED_REASON =
   "Live AI isn't available inside a Project yet. You can still run Character Swap and Virtual Try-On on this Project's video.";
@@ -36,7 +37,7 @@ export const ProjectCreativeCheckpointPanel = ({
         background: theme.colors.canvasRaised,
         '& > div': { minWidth: 0 },
         '& p': { margin: 0 },
-        '@media (max-width: 47.99rem)': {
+        [media.down('compact')]: {
           alignItems: 'stretch',
           flexDirection: 'column',
         },
@@ -45,8 +46,8 @@ export const ProjectCreativeCheckpointPanel = ({
       <div>
         <strong>Creative setup</strong>
         <p>
-          Your setup stays in this browser until you save it. Starting Character Swap or Virtual Try
-          On saves it first.
+          Keep this setup with the Project before moving on. Starting Character Swap or Virtual Try
+          On keeps it first.
         </p>
         {issue ? (
           <StatusNotice tone="warning" title={issue.historicalLabel} role="status">
@@ -102,7 +103,7 @@ export const ProjectCreativeCheckpointPanel = ({
         disabled={controller.phase === 'saving'}
         onClick={() => void controller.checkpoint()}
       >
-        {controller.phase === 'saving' ? 'Saving progress…' : 'Save progress'}
+        {controller.phase === 'saving' ? 'Keeping setup…' : 'Keep this setup'}
       </Button>
     </aside>
   );

@@ -189,7 +189,10 @@ test('provider-free upload previews and enters the existing take/save surface', 
 
   const review = page.getByRole('dialog', { name: 'Latest take' });
   await expect(review).toBeVisible();
-  await expect(review.getByRole('button', { name: 'Edit video' })).toBeVisible();
+  const takeOverflow = review.getByRole('button', { name: 'More actions for this take' });
+  await takeOverflow.click();
+  await expect(review.getByRole('menuitem', { name: 'Edit video' })).toBeVisible();
+  await takeOverflow.click();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
   await review.getByRole('button', { name: 'Save to Assets' }).click();
   await confirmSaveVideo(page);
@@ -238,15 +241,58 @@ test('provider-free Adjust video renders locally and atomically replaces the per
     ),
   ).toBe(true);
 
+  for (const viewport of Object.values(STUDIO_VIEWPORT_SIZES)) {
+    await page.setViewportSize(viewport);
+    await expectNoDocumentOverflow(page);
+
+    const [stageBox, toolsBox, historyBox, timelineBox, settingsBox, actionsBox] =
+      await Promise.all([
+        page.getByLabel('Studio media stage').boundingBox(),
+        page.getByRole('navigation', { name: 'Video editing tools' }).boundingBox(),
+        page.locator('[data-video-editor-history]').boundingBox(),
+        page.locator('[data-video-edit-timeline]').boundingBox(),
+        page.getByLabel('Video edit settings').boundingBox(),
+        page.locator('[data-video-editor-actions]').boundingBox(),
+      ]);
+
+    expect(stageBox).not.toBeNull();
+    expect(toolsBox).not.toBeNull();
+    expect(historyBox).not.toBeNull();
+    expect(timelineBox).not.toBeNull();
+    expect(settingsBox).not.toBeNull();
+    expect(actionsBox).not.toBeNull();
+    if (!stageBox || !toolsBox || !historyBox || !timelineBox || !settingsBox || !actionsBox) {
+      continue;
+    }
+
+    expect(Math.abs(stageBox.width / stageBox.height - 16 / 9)).toBeLessThan(0.01);
+    expect(toolsBox.y + toolsBox.height).toBeLessThanOrEqual(stageBox.y + 1);
+    expect(historyBox.y).toBeGreaterThanOrEqual(stageBox.y + stageBox.height - 1);
+    expect(historyBox.y).toBeLessThanOrEqual(stageBox.y + stageBox.height + 16);
+    expect(timelineBox.y).toBeGreaterThanOrEqual(historyBox.y + historyBox.height - 1);
+
+    if (viewport.width >= 1_024) {
+      expect(settingsBox.x).toBeGreaterThanOrEqual(stageBox.x + stageBox.width - 1);
+    } else if (viewport.width >= 768) {
+      expect(settingsBox.y).toBeGreaterThanOrEqual(timelineBox.y + timelineBox.height - 1);
+    } else {
+      expect(settingsBox.y + settingsBox.height).toBeLessThanOrEqual(actionsBox.y + 1);
+      expect(actionsBox.y + actionsBox.height).toBeLessThanOrEqual(viewport.height - 72 + 1);
+    }
+  }
+
+  await page.setViewportSize(STUDIO_VIEWPORT_SIZES.compactDesktop);
+
   await page.getByRole('button', { name: 'Lighting', exact: true }).click();
   await page.getByRole('slider', { name: 'Brightness' }).fill('24');
-  const beforeToggle = page.getByRole('button', { name: 'Preview before' });
-  await beforeToggle.click();
-  await expect(page.getByRole('button', { name: 'Showing before' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await page.getByRole('button', { name: 'Showing before' }).click();
+  const compare = page.getByRole('button', {
+    name: 'Hold to show original. Keyboard shortcut C.',
+  });
+  await compare.hover();
+  await page.mouse.down();
+  await expect(compare).toHaveAttribute('aria-pressed', 'true');
+  await page.mouse.up();
+  await expect(compare).toHaveAttribute('aria-pressed', 'false');
 
   await page.getByRole('button', { name: 'Save edited video' }).click();
   const replacement = page.getByRole('dialog', { name: 'Replace the current video?' });

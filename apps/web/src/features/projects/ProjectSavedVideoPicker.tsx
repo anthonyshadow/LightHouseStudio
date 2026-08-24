@@ -9,6 +9,7 @@ import {
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
 import { Button, OverlayPanel, StatusNotice } from '../../ui';
+import { media } from '../../ui/media';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { durationBadgeStyles as galleryDurationBadgeStyles } from '../video-gallery/VideoGallery.styles';
 import { ProjectAssetThumbnail } from './ProjectAssetThumbnail';
@@ -19,9 +20,14 @@ const rowStyles = (theme: Theme) => ({
   gridTemplateColumns: 'minmax(0, 1fr) auto',
   alignItems: 'center',
   gap: theme.space.sm,
+  minWidth: 0,
+  [media.down('tablet')]: {
+    gridTemplateColumns: 'minmax(0, 1fr)',
+    '& > [data-saved-video-action="preview"]': { justifySelf: 'start' },
+  },
 });
 
-const selectStyles = (theme: Theme) => ({
+const selectStyles = (theme: Theme, selected: boolean) => ({
   display: 'grid',
   gridTemplateColumns: 'clamp(4.5rem, 18vw, 7rem) minmax(0, 1fr)',
   alignItems: 'center',
@@ -30,6 +36,11 @@ const selectStyles = (theme: Theme) => ({
   minWidth: 0,
   padding: theme.space.xs,
   textAlign: 'start' as const,
+  borderColor: selected ? theme.colors.accent : undefined,
+  background: selected ? theme.colors.accentSoft : undefined,
+  [media.down('tablet')]: {
+    gridTemplateColumns: '4rem minmax(0, 1fr)',
+  },
 });
 
 const copyStyles = (theme: Theme) => ({
@@ -55,70 +66,60 @@ const durationBadgeStyles = (theme: Theme) => ({
 
 const previewStyles = (theme: Theme) => ({
   marginBlockStart: theme.space.xs,
+  width: '100%',
+  maxWidth: '100%',
   height: 'clamp(11rem, 32vh, 18rem)',
 });
 
-export const ProjectSavedVideoPicker = ({
-  open,
-  busy,
-  returnFocusRef,
-  onClose,
-  onSelect,
-  title = 'Use Saved Video',
-  description = 'Choose one exact active Version. The stored bytes are referenced, not copied.',
-  emptyTitle = 'No Saved Videos yet',
-  emptyBody = 'Save a video in Studio first, or use Upload or Record for this Project.',
-  listLabel = 'Saved Videos available as a Project source',
-}: {
-  readonly open: boolean;
+interface ProjectSavedVideoListProps {
+  readonly active: boolean;
   readonly busy: boolean;
-  readonly returnFocusRef: RefObject<HTMLElement | null>;
-  readonly onClose: () => void;
   readonly onSelect: (video: SavedVideoSummary) => void;
-  readonly title?: string;
-  readonly description?: string;
+  readonly selectedVideoId?: string | null | undefined;
   readonly emptyTitle?: string;
   readonly emptyBody?: string;
   readonly listLabel?: string;
-}) => {
+}
+
+/**
+ * The query and exact-Version rows shared by modal source pickers and the Save inspector's inline
+ * destination choice. Keeping one row owner prevents the Save redesign from weakening the same
+ * availability, pagination, preview, or exact-Version rules the other Project pickers enforce.
+ */
+export const ProjectSavedVideoList = ({
+  active,
+  busy,
+  onSelect,
+  selectedVideoId = null,
+  emptyTitle = 'No Saved Videos yet',
+  emptyBody = 'Save a video in Studio first, or use Upload or Record for this Project.',
+  listLabel = 'Saved Videos available as a Project source',
+}: ProjectSavedVideoListProps) => {
   const theme = useTheme();
   // One preview at a time: every open player holds its own ranged request against the local API,
-  // and the panel scrolls through unbounded pages.
+  // and this list can scroll through unbounded pages.
   const [previewVideoId, setPreviewVideoId] = useState<string | null>(null);
-  // Adjusted during render rather than in an effect: reopening the panel must not flash the
-  // previously expanded row, and remounting a player mid-transition is worse than not showing one.
-  if (!open && previewVideoId !== null) setPreviewVideoId(null);
+  // Adjusted during render rather than in an effect: reopening must not flash the previously
+  // expanded row, and remounting a player mid-transition is worse than not showing one.
+  if (!active && previewVideoId !== null) setPreviewVideoId(null);
   const query = useInfiniteQuery({
     queryKey: savedVideoQueryKeys.lists,
     queryFn: ({ pageParam, signal }) =>
       listSavedVideos({ sort: 'latest', ...(pageParam ? { cursor: pageParam } : {}), signal }),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
-    enabled: open,
+    enabled: active,
   });
-  // A disabled query still serves cached pages, so a closed picker would otherwise build the whole
-  // row tree — thumbnails, badges and preview controls included — only for `OverlayPanel` to
-  // discard it. Two pickers share this query key on the Project overview.
-  const videos = open ? (query.data?.pages.flatMap((page) => page.videos) ?? []) : [];
+  // A disabled query still serves cached pages. An inactive list must not build thumbnails,
+  // badges and preview controls only for its owner to hide them.
+  const videos = active ? (query.data?.pages.flatMap((page) => page.videos) ?? []) : [];
   const rowCss = rowStyles(theme);
-  const selectCss = selectStyles(theme);
   const copyCss = copyStyles(theme);
   const badgeCss = durationBadgeStyles(theme);
   const previewCss = previewStyles(theme);
 
   return (
-    <OverlayPanel
-      open={open}
-      onClose={onClose}
-      title={title}
-      description={description}
-      placement="bottom"
-      size="wide"
-      bodyMode="scroll"
-      closeDisabled={busy}
-      closeOnBackdrop={!busy}
-      returnFocusRef={returnFocusRef}
-    >
+    <>
       {query.isPending ? <p role="status">Loading Saved Videos…</p> : null}
       {query.isError ? (
         <StatusNotice role="alert" tone="danger" title="Saved Videos unavailable">
@@ -148,6 +149,7 @@ export const ProjectSavedVideoPicker = ({
             const unavailable = video.status !== 'ready';
             const disabled = busy || unavailable;
             const previewOpen = previewVideoId === video.id;
+            const selected = selectedVideoId === video.id;
             const thumbnailUrl = video.thumbnailAvailable
               ? savedVideoThumbnailUrl(video.id, video.currentVersion.id)
               : null;
@@ -159,8 +161,9 @@ export const ProjectSavedVideoPicker = ({
                     variant="secondary"
                     data-saved-video-action="select"
                     disabled={disabled}
+                    aria-pressed={selected}
                     onClick={() => onSelect(video)}
-                    css={selectCss}
+                    css={selectStyles(theme, selected)}
                   >
                     <ProjectAssetThumbnail
                       kind="video"
@@ -214,6 +217,54 @@ export const ProjectSavedVideoPicker = ({
           Load more Saved Videos
         </Button>
       ) : null}
+    </>
+  );
+};
+
+export const ProjectSavedVideoPicker = ({
+  open,
+  busy,
+  returnFocusRef,
+  onClose,
+  onSelect,
+  title = 'Use Saved Video',
+  description = 'Choose one exact active Version. The stored bytes are referenced, not copied.',
+  emptyTitle = 'No Saved Videos yet',
+  emptyBody = 'Save a video in Studio first, or use Upload or Record for this Project.',
+  listLabel = 'Saved Videos available as a Project source',
+}: {
+  readonly open: boolean;
+  readonly busy: boolean;
+  readonly returnFocusRef: RefObject<HTMLElement | null>;
+  readonly onClose: () => void;
+  readonly onSelect: (video: SavedVideoSummary) => void;
+  readonly title?: string;
+  readonly description?: string;
+  readonly emptyTitle?: string;
+  readonly emptyBody?: string;
+  readonly listLabel?: string;
+}) => {
+  return (
+    <OverlayPanel
+      open={open}
+      onClose={onClose}
+      title={title}
+      description={description}
+      placement="bottom"
+      size="wide"
+      bodyMode="scroll"
+      closeDisabled={busy}
+      closeOnBackdrop={!busy}
+      returnFocusRef={returnFocusRef}
+    >
+      <ProjectSavedVideoList
+        active={open}
+        busy={busy}
+        onSelect={onSelect}
+        emptyTitle={emptyTitle}
+        emptyBody={emptyBody}
+        listLabel={listLabel}
+      />
     </OverlayPanel>
   );
 };

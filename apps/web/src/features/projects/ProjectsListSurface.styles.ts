@@ -1,93 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
 
-export const projectsWorkspaceInnerStyles = (theme: Theme): CSSObject => ({
-  minHeight: '100%',
-  marginInline: 'auto',
-  paddingInline: `clamp(${theme.space.md}, 4vw, ${theme.space.xxl})`,
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr)',
-  alignContent: 'start',
-  containerType: 'inline-size',
-  '& button': { borderRadius: 0 },
-  '& > [role="alert"]': {
-    marginBlockStart: theme.space.lg,
-    borderRadius: 0,
-  },
-  '& > [role="status"]:empty': { display: 'none' },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
-    paddingInline: theme.space.md,
-  },
-});
-
-export const projectsWorkspaceHeaderStyles = (theme: Theme): CSSObject => ({
-  minWidth: 0,
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) auto',
-  alignItems: 'end',
-  gap: theme.space.xl,
-  paddingBlock: `clamp(${theme.space.xl}, 5vw, 4.5rem) ${theme.space.xl}`,
-  borderBlockEnd: `1px solid ${theme.colors.borderStrong}`,
-  '& > div': { minWidth: 0 },
-  '& h1': {
-    margin: 0,
-    fontFamily: theme.type.display,
-    fontSize: 'clamp(2.4rem, 5cqi, 4rem)',
-    fontWeight: 660,
-    letterSpacing: '-0.055em',
-    lineHeight: 0.98,
-  },
-  '& p': {
-    maxWidth: '42rem',
-    margin: `${theme.space.md} 0 0`,
-    color: theme.colors.textMuted,
-    fontSize: theme.fontSizes.label,
-    lineHeight: 1.55,
-  },
-  '@container (max-width: 52rem)': {
-    gridTemplateColumns: 'minmax(0, 1fr)',
-    alignItems: 'stretch',
-    gap: theme.space.lg,
-  },
-  '@container (max-width: 28rem)': {
-    '& h1': { fontSize: 'clamp(2.15rem, 13cqi, 3rem)' },
-    '& p': { fontSize: theme.fontSizes.body },
-  },
-});
-
-export const projectsHeaderActionsStyles = (theme: Theme): CSSObject => ({
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
-  gap: theme.space.md,
-  '& > button': {
-    minWidth: '8rem',
-    borderRadius: 0,
-    boxShadow: 'none',
-    whiteSpace: 'nowrap',
-  },
-  '& > button[data-project-create="named"]': {
-    borderColor: theme.colors.accent,
-    color: theme.colors.onAccent,
-    background: theme.colors.accent,
-    '&:hover:not(:disabled):not([aria-disabled="true"])': {
-      borderColor: theme.colors.accentStrong,
-      background: theme.colors.accentStrong,
-      transform: 'none',
-    },
-  },
-  '@container (max-width: 52rem)': {
-    width: '100%',
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    justifyContent: 'stretch',
-    '& > button': { width: '100%', minWidth: 0 },
-  },
-  '@container (max-width: 28rem)': {
-    gridTemplateColumns: 'minmax(0, 1fr)',
-  },
-});
-
 export const projectsSearchRowStyles = (theme: Theme): CSSObject => ({
   paddingBlockStart: theme.space.lg,
 });
@@ -98,7 +10,7 @@ export const projectsGroupFilterStyles = (theme: Theme): CSSObject => ({
   alignItems: 'end',
   gap: theme.space.lg,
   paddingBlock: theme.space.lg,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   '& > button': {
     position: 'relative',
     minWidth: 0,
@@ -153,7 +65,7 @@ export const projectsLedgerSectionStyles = (theme: Theme): CSSObject => ({
     justifyContent: 'space-between',
     gap: theme.space.md,
     paddingBlockEnd: theme.space.md,
-    borderBlockEnd: `1px solid ${theme.colors.borderStrong}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
   },
   '& h3': {
     margin: 0,
@@ -175,7 +87,7 @@ export const projectsLedgerSectionStyles = (theme: Theme): CSSObject => ({
   '& > [role="status"]': {
     margin: 0,
     paddingBlock: theme.space.lg,
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
     color: theme.colors.textMuted,
   },
   '&[data-project-ledger-section="archived"] [data-project-status]': {
@@ -205,7 +117,7 @@ export const projectsLedgerRowStyles = (theme: Theme): CSSObject => ({
   columnGap: theme.space.lg,
   rowGap: theme.space.sm,
   paddingBlock: theme.space.md,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   '& [data-project-identity]': {
     minWidth: 0,
     display: 'grid',
@@ -273,9 +185,6 @@ export const projectsLedgerRowStyles = (theme: Theme): CSSObject => ({
   '& [data-project-actions] > button[data-project-action="open"]': {
     color: theme.colors.accent,
   },
-  '& [data-project-actions] > button[data-project-action="delete"]': {
-    color: theme.colors.danger,
-  },
   '@container (min-width: 32rem)': {
     gridTemplateColumns: 'minmax(0, 1fr) auto',
     '& [data-project-meta]': { gridColumn: 1 },
@@ -302,7 +211,7 @@ export const projectsLedgerEmptyStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gap: theme.space.xs,
   paddingBlock: theme.space.xl,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   color: theme.colors.textMuted,
   '& strong': { color: theme.colors.text },
   '& p': { maxWidth: '46rem', margin: 0, lineHeight: 1.55 },

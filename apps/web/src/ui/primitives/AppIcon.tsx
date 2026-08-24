@@ -8,6 +8,7 @@ export type AppIconName =
   | 'dashboard'
   | 'history'
   | 'info'
+  | 'more'
   | 'plus'
   | 'projects'
   | 'save'
@@ -62,6 +63,13 @@ const iconPaths: Record<AppIconName, ReactNode> = {
       <circle cx="12" cy="12" r="9" />
       <path d="M12 11v5" />
       <path d="M12 8h.01" />
+    </>
+  ),
+  more: (
+    <>
+      <circle cx="5" cy="12" r="1.7" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.7" fill="currentColor" stroke="none" />
     </>
   ),
   plus: (

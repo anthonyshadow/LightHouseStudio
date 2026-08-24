@@ -465,7 +465,7 @@ export const createCreativeAssetRepository = (
         health = 'session-only';
         notice =
           error instanceof CreativeAssetPersistenceConflictError
-            ? 'Creative-library persistence paused because another browser context changed the library. This tab kept its in-memory copy.'
+            ? 'Creative-library persistence paused because another Lightframe tab changed the library. This tab kept its in-memory copy.'
             : storageNotice(health);
       }
     }
@@ -478,7 +478,7 @@ export const createCreativeAssetRepository = (
     if (!persistence) {
       throw new CreativeAssetError(
         'storage-unavailable',
-        'Durable browser storage is unavailable. The character was not saved.',
+        'Lightframe could not stage the character for account sync. The character was not saved.',
         { retryable: true },
       );
     }
@@ -489,8 +489,8 @@ export const createCreativeAssetRepository = (
       throw new CreativeAssetError(
         conflict ? 'storage-conflict' : 'storage-write-failed',
         conflict
-          ? 'The durable creative library changed in another browser context. Reload before retrying.'
-          : 'Durable browser storage could not save the character. No character was published.',
+          ? 'The creative library changed in another Lightframe tab. Reload before retrying.'
+          : 'Lightframe could not stage the character for account sync. No character was published.',
         { cause: error, retryable: true },
       );
     }

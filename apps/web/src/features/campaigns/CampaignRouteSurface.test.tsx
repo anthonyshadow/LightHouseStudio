@@ -7,6 +7,7 @@ import { HttpResponse, http } from 'msw';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
+import { chooseMenuAction } from '../../test/actionMenu';
 import { mockApiServer } from '../../test/msw/server';
 import { StudioDesignProvider } from '../../ui';
 import { CampaignRouteSurface } from './CampaignRouteSurface';
@@ -589,8 +590,7 @@ describe('Campaign route surface', () => {
     const user = userEvent.setup();
     renderCampaigns(`/campaigns/${campaignId}`);
 
-    const edit = await screen.findByRole('button', { name: 'Edit' });
-    await user.click(edit);
+    const edit = await chooseMenuAction(user, 'Summer launch', 'Edit');
     await user.click(
       within(screen.getByRole('dialog', { name: 'Edit Campaign' })).getByRole('button', {
         name: 'Cancel',
@@ -598,7 +598,7 @@ describe('Campaign route surface', () => {
     );
     expect(edit).toHaveFocus();
 
-    await user.click(edit);
+    await chooseMenuAction(user, 'Summer launch', 'Edit');
     const dialog = screen.getByRole('dialog', { name: 'Edit Campaign' });
     const name = within(dialog).getByRole('textbox', { name: /Campaign name/u });
     const brief = within(dialog).getByRole('textbox', { name: /Brief/u });
@@ -835,7 +835,7 @@ describe('Campaign route surface', () => {
     await waitFor(() => expect(movedBody).toEqual({ campaignId: null, expectedVersion: 1 }));
     expect(await screen.findByText('Launch cut moved to No Campaign.')).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: 'Archive' }));
+    await chooseMenuAction(user, 'Summer launch', 'Archive');
     const archiveDialog = screen.getByRole('dialog', { name: 'Archive Campaign' });
     expect(archiveDialog).toHaveTextContent('It does not archive or move Projects.');
     await user.click(within(archiveDialog).getByRole('button', { name: 'Archive Campaign' }));
@@ -872,7 +872,7 @@ describe('Campaign route surface', () => {
     const user = userEvent.setup();
     renderCampaigns(`/campaigns/${campaignId}`);
 
-    await user.click(await screen.findByRole('button', { name: 'Delete Campaign' }));
+    await chooseMenuAction(user, 'Summer launch', 'Delete Campaign');
     const dialog = screen.getByRole('dialog', { name: 'Delete Campaign' });
     await user.click(within(dialog).getByRole('button', { name: 'Confirm Delete Campaign' }));
 
@@ -944,8 +944,7 @@ describe('Campaign route surface', () => {
     expect(screen.getByRole('button', { name: 'New Project' })).toBeVisible();
     expect(restoreAttempts).toBe(2);
 
-    const archive = screen.getByRole('button', { name: 'Archive' });
-    await user.click(archive);
+    const archive = await chooseMenuAction(user, 'Summer launch', 'Archive');
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog', { name: 'Archive Campaign' })).not.toBeInTheDocument();
     expect(archive).toHaveFocus();
@@ -985,13 +984,12 @@ describe('Campaign route surface', () => {
     const user = userEvent.setup();
     const { router } = renderCampaigns(`/campaigns/${campaignId}`);
 
-    const deleteCampaign = await screen.findByRole('button', { name: 'Delete Campaign' });
-    await user.click(deleteCampaign);
+    const deleteCampaign = await chooseMenuAction(user, 'Summer launch', 'Delete Campaign');
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog', { name: 'Delete Campaign' })).not.toBeInTheDocument();
     expect(deleteCampaign).toHaveFocus();
 
-    await user.click(deleteCampaign);
+    await chooseMenuAction(user, 'Summer launch', 'Delete Campaign');
     await user.click(
       within(screen.getByRole('dialog', { name: 'Delete Campaign' })).getByRole('button', {
         name: 'Confirm Delete Campaign',

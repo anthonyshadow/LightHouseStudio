@@ -36,12 +36,12 @@ describe('CreativeLibrarySyncNotice', () => {
     const user = userEvent.setup();
 
     expect(screen.getByText('Both sides changed.')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Keep this browser’s copy' }));
+    await user.click(screen.getByRole('button', { name: 'Save current copy' }));
 
     // Overwriting the other copy is destructive, so nothing happens until it is confirmed.
     expect(actions.keepLocal).not.toHaveBeenCalled();
     const dialog = screen.getByRole('dialog');
-    await user.click(within(dialog).getByRole('button', { name: 'Keep this browser’s copy' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Save current copy' }));
     expect(actions.keepLocal).toHaveBeenCalledOnce();
   });
 
@@ -49,7 +49,7 @@ describe('CreativeLibrarySyncNotice', () => {
     const actions = renderNotice(paused('conflict'));
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: 'Use the cloud copy' }));
+    await user.click(screen.getByRole('button', { name: 'Reload account copy' }));
     const dialog = screen.getByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: 'Stay' }));
 
@@ -62,10 +62,8 @@ describe('CreativeLibrarySyncNotice', () => {
     const actions = renderNotice(paused('unavailable'));
     const user = userEvent.setup();
 
-    expect(
-      screen.queryByRole('button', { name: 'Keep this browser’s copy' }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Use the cloud copy' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save current copy' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Reload account copy' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(actions.retry).toHaveBeenCalledOnce();
   });

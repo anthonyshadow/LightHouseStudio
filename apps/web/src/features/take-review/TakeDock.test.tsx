@@ -82,7 +82,8 @@ afterEach(() => {
 });
 
 describe('TakeDock metadata', () => {
-  it('shows only truthful captured values reported by the recording controller', () => {
+  it('leads with duration and resolution and keeps every other value one disclosure away', async () => {
+    const user = userEvent.setup();
     render(
       <StudioDesignProvider>
         <TakeDock
@@ -94,17 +95,42 @@ describe('TakeDock metadata', () => {
       </StudioDesignProvider>,
     );
 
-    const metadata = within(screen.getByRole('list', { name: 'Capture metadata' }));
-    expect(metadata.getByText('Local Camera')).toBeInTheDocument();
-    expect(metadata.getByText('Video: FaceTime HD Camera')).toHaveAttribute(
+    // Only what a review decision needs is inline.
+    const summary = within(screen.getByRole('list', { name: 'Take summary' }));
+    expect(summary.getByText('1920 × 1080')).toBeInTheDocument();
+    expect(summary.queryByText('29.97 fps')).not.toBeInTheDocument();
+    expect(screen.getByRole('list', { name: 'Take details' })).not.toBeVisible();
+
+    await user.click(screen.getByText('Details'));
+
+    // Nothing was deleted; it is one click away.
+    const details = within(screen.getByRole('list', { name: 'Take details' }));
+    expect(details.getByText('Local Camera')).toBeInTheDocument();
+    expect(details.getByText('Video: FaceTime HD Camera')).toHaveAttribute(
       'title',
       'FaceTime HD Camera',
     );
-    expect(metadata.getByText('Audio: Studio Microphone')).toBeInTheDocument();
-    expect(metadata.getByText('1920 × 1080')).toBeInTheDocument();
-    expect(metadata.getByText('29.97 fps')).toBeInTheDocument();
+    expect(details.getByText('Audio: Studio Microphone')).toBeInTheDocument();
+    expect(details.getByText('29.97 fps')).toBeInTheDocument();
     expect(screen.queryByText('browser default format')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Recorded take playback')).not.toBeInTheDocument();
+  });
+
+  it('shows the panel title once, and keeps the heading as the region label', () => {
+    render(
+      <StudioDesignProvider>
+        <TakeDock
+          recording={recording()}
+          processing={processing}
+          elevenLabsAvailable={false}
+          view="take"
+        />
+      </StudioDesignProvider>,
+    );
+
+    const heading = screen.getByRole('heading', { name: 'Latest take' });
+    expect(heading).toHaveAttribute('id', 'take-heading');
+    expect(screen.getByRole('region', { name: 'Latest take' })).toBeInTheDocument();
   });
 
   it('discards only after confirmation and delegates overlay closure after acceptance', async () => {
@@ -152,7 +178,8 @@ describe('TakeDock metadata', () => {
       </StudioDesignProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Edit video' }));
+    await user.click(screen.getByRole('button', { name: 'More actions for this take' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Edit video' }));
     expect(onEditVideo).toHaveBeenCalledOnce();
   });
 });

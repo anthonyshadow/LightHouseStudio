@@ -77,6 +77,26 @@ export const jsonScenario = (
   observe?: RequestObserver,
 ): HttpHandler => sequenceHandler(method, pathname, steps, observe);
 
+/**
+ * A request that never settles, observed through the intercepted request itself.
+ *
+ * Every other scenario hands its observer `request.clone()` so the observer can read a body the
+ * resolver still needs. A clone is the wrong thing to watch for cancellation: its `AbortSignal`
+ * only *follows* the real one, and the runtime keeps that link alive weakly, so once the throwaway
+ * clone is collected the clone's signal silently stops aborting. A test asserting on it then fails
+ * whenever a collection happens to land in between.
+ */
+export const pendingRequestScenario = (
+  method: ApiMethod,
+  pathname: string,
+  observe: RequestObserver,
+): HttpHandler =>
+  apiHandler(method, pathname, async ({ request }) => {
+    await observe(request);
+    await delay('infinite');
+    return new HttpResponse(null, { status: 504 });
+  });
+
 export const providerAvailabilityScenario = (
   steps: JsonStep | readonly JsonStep[],
   observe?: RequestObserver,

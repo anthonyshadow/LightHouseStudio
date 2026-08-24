@@ -18,7 +18,6 @@ import {
 } from './ProjectDialogs';
 import {
   projectOverviewHeaderStyles,
-  projectOverviewInnerStyles,
   projectOverviewSourceStyles,
 } from './ProjectOverviewSurface.styles';
 import { ProjectSourceSection, type ProjectRecordingCandidate } from './ProjectSourceSection';
@@ -26,6 +25,8 @@ import { projectStatusLabel } from './projectStatusPresentation';
 import { ProjectWorkflowProgress, stepForSnapshot } from './ProjectWorkflowProgress';
 import type { useProjectSession } from './useProjectSession';
 import type { ProjectSourceActivity, ProjectSourceRuntime } from './useProjectSourceController';
+import { ActionMenu } from '../../ui/primitives/ActionMenu';
+import { PageHeader, PageShell } from '../../ui/primitives/PageShell';
 
 const projectWorkflowLabel = (
   phase: ProjectCurrentResponse['revision']['snapshot']['workflowPhase'],
@@ -101,60 +102,32 @@ export const ProjectOverviewSurface = ({
   );
 
   return (
-    <div css={projectOverviewInnerStyles(theme)} data-project-overview="">
-      <header css={projectOverviewHeaderStyles(theme)}>
-        <Button
-          data-detail-breadcrumb
-          variant="quiet"
-          onClick={() =>
-            goBack(
-              project.campaignId === null ? APP_PATHS.projects : campaignPath(project.campaignId),
-            )
-          }
-        >
-          {project.campaignId === null
-            ? '← All Projects'
-            : campaignName === null
-              ? '← Campaign'
-              : `← ${campaignName}`}
-        </Button>
-        <div data-detail-identity>
-          <div>
-            <h1 ref={headingRef} tabIndex={-1}>
-              {project.title}
-            </h1>
-            <div data-detail-meta>
-              <span data-project-overview-status>{projectStatusLabel(project.status)}</span>
-              <span>
-                Updated{' '}
-                <time dateTime={project.updatedAt}>{formatDateTime(project.updatedAt)}</time>
-              </span>
-              {project.campaignId === null ? (
-                <span>No Campaign</span>
-              ) : (
-                <span aria-live="polite">
-                  {campaign.isPending
-                    ? 'Campaign: loading…'
-                    : campaign.isError || campaignName === null
-                      ? 'Campaign unavailable'
-                      : `Campaign: ${campaignName}`}
-                </span>
-              )}
-            </div>
-            <div data-project-workspace-status>
-              <AppIcon name="info" />
-              <span>
-                {overviewHasSource
-                  ? `Original video ready • ${projectWorkflowLabel(current.revision.snapshot.workflowPhase)} workflow active.`
-                  : 'No original video yet • Choose one below to begin.'}
-              </span>
-            </div>
-            <ProjectWorkflowProgress snapshot={current.revision.snapshot} />
-          </div>
-          <div data-detail-actions>
+    <PageShell data-project-overview="">
+      <PageHeader
+        css={projectOverviewHeaderStyles(theme)}
+        title={project.title}
+        headingRef={headingRef}
+        breadcrumb={
+          <Button
+            data-detail-breadcrumb
+            variant="quiet"
+            onClick={() =>
+              goBack(
+                project.campaignId === null ? APP_PATHS.projects : campaignPath(project.campaignId),
+              )
+            }
+          >
+            {project.campaignId === null
+              ? '← All Projects'
+              : campaignName === null
+                ? '← Campaign'
+                : `← ${campaignName}`}
+          </Button>
+        }
+        actions={
+          <>
             <Button
               variant="primary"
-              data-detail-action="continue"
               onClick={() => void navigate(projectWorkspacePath(project.id))}
             >
               {archived
@@ -163,60 +136,91 @@ export const ProjectOverviewSurface = ({
                   ? 'Continue editing'
                   : 'Add original video'}
             </Button>
-            <Button
-              data-detail-action="duplicate"
-              onClick={(event) => {
-                dialogReturnRef.current = event.currentTarget;
-                setDuplicateTarget(project);
-              }}
-            >
-              Make another version
-            </Button>
-            <Button
-              data-detail-action="move"
-              onClick={(event) => {
-                dialogReturnRef.current = event.currentTarget;
-                setCampaignDialog(true);
-              }}
-            >
-              Move Project
-            </Button>
-            {!archived ? (
-              <Button
-                data-detail-action="rename"
-                onClick={(event) => {
-                  dialogReturnRef.current = event.currentTarget;
-                  setRenameTarget(project);
-                }}
-              >
-                Rename
-              </Button>
-            ) : null}
-            <Button
-              variant={archived ? 'secondary' : 'danger'}
-              data-detail-action="archive"
-              onClick={(event) => {
-                dialogReturnRef.current = event.currentTarget;
-                setLifecycleDialog({ action: archived ? 'restore' : 'archive', project });
-              }}
-            >
-              {archived ? 'Restore' : 'Archive'}
-            </Button>
-            {archived ? (
-              <Button
-                variant="danger"
-                data-detail-action="delete"
-                onClick={(event) => {
-                  dialogReturnRef.current = event.currentTarget;
-                  setDeleteTarget(project);
-                }}
-              >
-                Delete Project
-              </Button>
-            ) : null}
-          </div>
+            <ActionMenu
+              label={`More actions for ${project.title}`}
+              items={[
+                {
+                  id: 'duplicate',
+                  label: 'Duplicate Project',
+                  onSelect: (trigger) => {
+                    dialogReturnRef.current = trigger;
+                    setDuplicateTarget(project);
+                  },
+                },
+                {
+                  id: 'move',
+                  label: 'Move Project',
+                  onSelect: (trigger) => {
+                    dialogReturnRef.current = trigger;
+                    setCampaignDialog(true);
+                  },
+                },
+                ...(archived
+                  ? []
+                  : [
+                      {
+                        id: 'rename',
+                        label: 'Rename',
+                        onSelect: (trigger: HTMLButtonElement | null) => {
+                          dialogReturnRef.current = trigger;
+                          setRenameTarget(project);
+                        },
+                      },
+                    ]),
+                {
+                  id: 'archive',
+                  label: archived ? 'Restore' : 'Archive',
+                  danger: !archived,
+                  onSelect: (trigger) => {
+                    dialogReturnRef.current = trigger;
+                    setLifecycleDialog({ action: archived ? 'restore' : 'archive', project });
+                  },
+                },
+                ...(archived
+                  ? [
+                      {
+                        id: 'delete',
+                        label: 'Delete Project',
+                        danger: true,
+                        onSelect: (trigger: HTMLButtonElement | null) => {
+                          dialogReturnRef.current = trigger;
+                          setDeleteTarget(project);
+                        },
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          </>
+        }
+      >
+        <div data-detail-meta>
+          <span data-project-overview-status>{projectStatusLabel(project.status)}</span>
+          <span>
+            Updated <time dateTime={project.updatedAt}>{formatDateTime(project.updatedAt)}</time>
+          </span>
+          {project.campaignId === null ? (
+            <span>No Campaign</span>
+          ) : (
+            <span aria-live="polite">
+              {campaign.isPending
+                ? 'Campaign: loading…'
+                : campaign.isError || campaignName === null
+                  ? 'Campaign unavailable'
+                  : `Campaign: ${campaignName}`}
+            </span>
+          )}
         </div>
-      </header>
+        <div data-project-workspace-status>
+          <AppIcon name="info" />
+          <span>
+            {overviewHasSource
+              ? `Original video ready • ${projectWorkflowLabel(current.revision.snapshot.workflowPhase)} workflow active.`
+              : 'No original video yet • Choose one below to begin.'}
+          </span>
+        </div>
+        <ProjectWorkflowProgress snapshot={current.revision.snapshot} />
+      </PageHeader>
 
       <div role="status" aria-live="polite" aria-atomic="true">
         {announcement}
@@ -329,6 +333,6 @@ export const ProjectOverviewSurface = ({
           }
         />
       ) : null}
-    </div>
+    </PageShell>
   );
 };

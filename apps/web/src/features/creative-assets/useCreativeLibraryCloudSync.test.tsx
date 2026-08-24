@@ -81,6 +81,32 @@ describe('useCreativeLibraryCloudSync', () => {
     rendered.unmount();
   });
 
+  it('hydrates a fresh signed-in session from the account library', async () => {
+    const repository = createCreativeAssetRepository({ storage: null });
+    const accountRepository = addPrompt('Account presenter');
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'GET',
+        '/api/creative-library',
+        { body: { revision: 6, store: accountRepository.getSnapshot().store } },
+        observe,
+      ),
+    );
+
+    const rendered = renderHook(() =>
+      useCreativeLibraryCloudSync(repository, { cloudMirror: true }),
+    );
+
+    await waitFor(() =>
+      expect(repository.getSnapshot().store.savedPrompts[0]?.title).toBe('Account presenter'),
+    );
+    expect(rendered.result.current.mirror).toBe('cloud');
+    expect(rendered.result.current.status).toEqual({ state: 'idle' });
+    expect(requests).toHaveLength(1);
+    rendered.unmount();
+  });
+
   it('preserves the browser copy and pauses when both sides contain different data', async () => {
     const repository = addPrompt('Browser look');
     const remoteRepository = addPrompt('Cloud look');

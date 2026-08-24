@@ -61,6 +61,10 @@ export const EXPORT_PLACEMENT_OPTIONS: readonly ExportPlacementOption[] =
 export const exportPlacementLabel = (aspect: ProjectExportAspect): string =>
   PLACEMENT_COPY[aspect].label;
 
+/** Compact CTA copy for the same placement; the full label remains its accessible name. */
+export const exportPlacementShortLabel = (aspect: ProjectExportAspect): string =>
+  PLACEMENT_COPY[aspect].shortLabel;
+
 /** Where it goes, then the ratio and size as supporting detail. */
 export const exportPlacementHint = (aspect: ProjectExportAspect): string => {
   const resolution = defaultProjectExportResolution(aspect);

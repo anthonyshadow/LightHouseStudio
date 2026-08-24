@@ -43,6 +43,23 @@ const resultRevisionId = '99a972fe-bfb5-5214-94f7-4bd54f12ce06';
 const savedVideoId = '62f18176-14c6-4a2a-b615-0058e89ea46c';
 const versionId = 'b2289672-bfb5-4214-94f7-4bd54f12ce06';
 const now = '2026-08-13T16:00:00.000Z';
+const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
+
+const useMobileViewport = () => {
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: vi.fn((query: string): MediaQueryList => ({
+      matches: query === '(max-width: 39.99rem)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(() => true),
+    })),
+  });
+};
 
 const current = (): ProjectCurrentResponse => ({
   project: {
@@ -255,6 +272,31 @@ const AdoptingSection = ({ port }: { readonly port: ProjectSessionPort }) => {
   );
 };
 
+type TestUser = ReturnType<typeof userEvent.setup>;
+
+const openSaveDestination = async (user: TestUser) => {
+  await user.click(screen.getByRole('button', { name: /^Save video ·/u }));
+  return screen.findByRole('form', { name: 'Save destination' });
+};
+
+const submitNewVideo = async (user: TestUser, nextTitle?: string) => {
+  const form = await openSaveDestination(user);
+  if (nextTitle !== undefined) {
+    const title = within(form).getByRole('textbox', { name: 'Video title' });
+    await user.clear(title);
+    await user.type(title, nextTitle);
+  }
+  await user.click(screen.getByRole('button', { name: 'Save video · New video' }));
+  return form;
+};
+
+const chooseVersionTarget = async (user: TestUser) => {
+  const form = await openSaveDestination(user);
+  await user.click(within(form).getByRole('radio', { name: 'New version of an existing video' }));
+  await user.click(await within(form).findByRole('button', { name: /Existing master/u }));
+  return form;
+};
+
 beforeEach(() => {
   const values = new Map<string, string>();
   Object.defineProperty(window, 'localStorage', {
@@ -280,11 +322,13 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  if (originalMatchMedia) Object.defineProperty(window, 'matchMedia', originalMatchMedia);
+  else Reflect.deleteProperty(window, 'matchMedia');
   vi.restoreAllMocks();
 });
 
 describe('Project output save UI', () => {
-  it('keeps Save as New Video separate and sends one exact current-media command', async () => {
+  it('reveals one destination choice and sends one exact current-media command', async () => {
     let requestBody: unknown;
     let operationId = '';
     mockApiServer.use(
@@ -298,27 +342,18 @@ describe('Project output save UI', () => {
     const user = userEvent.setup();
     renderSection(session(acceptCurrent));
 
-    expect(screen.getByText('All changes saved', { exact: false })).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    await user.click(screen.getByRole('button', { name: 'Close panel' }));
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Save as New Video' })).not.toBeInTheDocument(),
-    );
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    await user.click(
-      within(screen.getByRole('dialog', { name: 'Save as New Video' })).getByRole('button', {
-        name: 'Cancel',
-      }),
-    );
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Save as New Video' })).not.toBeInTheDocument(),
-    );
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    const dialog = screen.getByRole('dialog', { name: 'Save as New Video' });
-    const title = within(dialog).getByRole('textbox', { name: 'Video title' });
+    expect(screen.getByRole('heading', { name: 'Current cut' })).toBeVisible();
+    expect(screen.queryByText(/“Autosaved” refers/u)).not.toBeInTheDocument();
+    let form = await openSaveDestination(user);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.click(within(form).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('form', { name: 'Save destination' })).not.toBeInTheDocument();
+
+    form = await openSaveDestination(user);
+    const title = within(form).getByRole('textbox', { name: 'Video title' });
     await user.clear(title);
     await user.type(title, 'Launch master');
-    await user.click(within(dialog).getByRole('button', { name: 'Save as New Video' }));
+    await user.click(screen.getByRole('button', { name: 'Save video · New video' }));
 
     expect(await screen.findByText('Saved “Launch master” as Version 1.')).toBeVisible();
     expect(operationId).toMatch(/^[0-9a-f-]{36}$/u);
@@ -334,7 +369,7 @@ describe('Project output save UI', () => {
     });
   });
 
-  it('requires target selection and a second confirmation before Add Version', async () => {
+  it('names one existing target inline and saves without a modal chain', async () => {
     const target = savedSummary();
     let posted: unknown = null;
     mockApiServer.use(
@@ -357,38 +392,18 @@ describe('Project output save UI', () => {
     const user = userEvent.setup();
     renderSection();
 
-    await user.click(screen.getByRole('button', { name: 'Add Version' }));
-    let picker = await screen.findByRole('dialog', { name: 'Choose Add Version target' });
-    await user.click(within(picker).getByRole('button', { name: 'Close panel' }));
-    await waitFor(() =>
-      expect(
-        screen.queryByRole('dialog', { name: 'Choose Add Version target' }),
-      ).not.toBeInTheDocument(),
-    );
-    await user.click(screen.getByRole('button', { name: 'Add Version' }));
-    picker = await screen.findByRole('dialog', { name: 'Choose Add Version target' });
-    await user.click(within(picker).getByRole('button', { name: /Existing master/u }));
-    let confirmation = await screen.findByRole('dialog', { name: 'Confirm Add Version' });
-    expect(confirmation).toHaveTextContent('Target: Existing master');
-    expect(confirmation).toHaveTextContent('Current Version 3');
+    const form = await openSaveDestination(user);
+    const versionChoice = within(form).getByRole('radio', {
+      name: 'New version of an existing video',
+    });
+    await user.click(versionChoice);
     expect(posted).toBeNull();
-    await user.click(within(confirmation).getByRole('button', { name: 'Cancel' }));
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Confirm Add Version' })).not.toBeInTheDocument(),
-    );
-    await user.click(screen.getByRole('button', { name: 'Add Version' }));
-    picker = await screen.findByRole('dialog', { name: 'Choose Add Version target' });
-    await user.click(within(picker).getByRole('button', { name: /Existing master/u }));
-    confirmation = await screen.findByRole('dialog', { name: 'Confirm Add Version' });
-    await user.click(within(confirmation).getByRole('button', { name: 'Close panel' }));
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Confirm Add Version' })).not.toBeInTheDocument(),
-    );
-    await user.click(screen.getByRole('button', { name: 'Add Version' }));
-    picker = await screen.findByRole('dialog', { name: 'Choose Add Version target' });
-    await user.click(within(picker).getByRole('button', { name: /Existing master/u }));
-    confirmation = await screen.findByRole('dialog', { name: 'Confirm Add Version' });
-    await user.click(within(confirmation).getByRole('button', { name: 'Add Version' }));
+    await user.click(await within(form).findByRole('button', { name: /Existing master/u }));
+    expect(form).toHaveTextContent('New version of “Existing master”');
+    expect(form).toHaveTextContent('Target: Existing master · Current Version 3');
+    expect(posted).toBeNull();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save video · Existing master' }));
 
     await waitFor(() =>
       expect(posted).toEqual({
@@ -402,6 +417,23 @@ describe('Project output save UI', () => {
         },
       }),
     );
+  });
+
+  it('uses one focused bottom sheet for the destination choice on mobile', async () => {
+    useMobileViewport();
+    const user = userEvent.setup();
+    renderSection();
+
+    await waitFor(() => expect(window.matchMedia).toHaveBeenCalled());
+    await user.click(screen.getByRole('button', { name: /^Save video ·/u }));
+
+    const sheet = await screen.findByRole('dialog', { name: 'Save video' });
+    const form = within(sheet).getByRole('form', { name: 'Save destination' });
+    expect(within(form).getByRole('radio', { name: 'New video' })).toBeChecked();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    await user.click(within(sheet).getByRole('button', { name: 'Close panel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Save video' })).toBeNull());
+    expect(screen.getByRole('button', { name: /^Save video ·/u })).toHaveFocus();
   });
 
   it('reuses the persisted operation ID and exact request after response loss and remount', async () => {
@@ -421,12 +453,7 @@ describe('Project output save UI', () => {
     );
     const user = userEvent.setup();
     const first = renderSection();
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    const dialog = screen.getByRole('dialog', { name: 'Save as New Video' });
-    const title = within(dialog).getByRole('textbox', { name: 'Video title' });
-    await user.clear(title);
-    await user.type(title, 'Launch master');
-    await user.click(within(dialog).getByRole('button', { name: 'Save as New Video' }));
+    await submitNewVideo(user, 'Launch master');
     expect(await screen.findByText(/save reply never arrived/u)).toBeVisible();
     expect(
       window.localStorage.getItem(projectOutputOperationStorageKey(ownerUserId, projectId)),
@@ -460,9 +487,7 @@ describe('Project output save UI', () => {
     const user = userEvent.setup();
     renderSection(session(), { owner: null });
 
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    const dialog = screen.getByRole('dialog', { name: 'Save as New Video' });
-    await user.click(within(dialog).getByRole('button', { name: 'Save as New Video' }));
+    await submitNewVideo(user);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Your account could not be confirmed for this save.',
@@ -483,12 +508,7 @@ describe('Project output save UI', () => {
     const user = userEvent.setup();
     renderSection(port);
 
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    await user.click(
-      within(screen.getByRole('dialog', { name: 'Save as New Video' })).getByRole('button', {
-        name: 'Save as New Video',
-      }),
-    );
+    await submitNewVideo(user);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Save or discard your pending Project changes before saving.',
@@ -522,12 +542,7 @@ describe('Project output save UI', () => {
     const user = userEvent.setup();
     renderSection(port);
 
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    await user.click(
-      within(screen.getByRole('dialog', { name: 'Save as New Video' })).getByRole('button', {
-        name: 'Save as New Video',
-      }),
-    );
+    await submitNewVideo(user);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'The Project no longer has the media this save was for.',
@@ -549,12 +564,7 @@ describe('Project output save UI', () => {
     const user = userEvent.setup();
     renderSection();
 
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    await user.click(
-      within(screen.getByRole('dialog', { name: 'Save as New Video' })).getByRole('button', {
-        name: 'Save as New Video',
-      }),
-    );
+    await submitNewVideo(user);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This browser cannot store the save record, so nothing was saved.',
@@ -578,16 +588,8 @@ describe('Project output save UI', () => {
     const user = userEvent.setup();
     renderSection();
 
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    await user.click(
-      within(screen.getByRole('dialog', { name: 'Save as New Video' })).getByRole('button', {
-        name: 'Save as New Video',
-      }),
-    );
+    await submitNewVideo(user);
     expect(await screen.findByText(/save reply never arrived/u)).toBeVisible();
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Save as New Video' })).not.toBeInTheDocument(),
-    );
     await user.click(screen.getByRole('button', { name: 'Check this save' }));
 
     expect(await screen.findByText('Saved “Launch master” as Version 1.')).toBeVisible();
@@ -616,12 +618,7 @@ describe('Project output save UI', () => {
     const user = userEvent.setup();
     renderSection(session(acceptCurrent));
 
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    await user.click(
-      within(screen.getByRole('dialog', { name: 'Save as New Video' })).getByRole('button', {
-        name: 'Save as New Video',
-      }),
-    );
+    await submitNewVideo(user);
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'The Project changed before output save.',
@@ -646,26 +643,22 @@ describe('Project output save UI', () => {
     const user = userEvent.setup();
     const { router } = renderSection();
 
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    const dialog = screen.getByRole('dialog', { name: 'Save as New Video' });
-    await user.click(within(dialog).getByRole('button', { name: 'Save as New Video' }));
+    await submitNewVideo(user);
 
     expect(await screen.findByText('Saved “Launch master” as Version 1.')).toBeVisible();
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Save as New Video' })).not.toBeInTheDocument(),
-    );
+    expect(screen.queryByRole('form', { name: 'Save destination' })).not.toBeInTheDocument();
     const download = screen.getByRole('link', { name: 'Download Launch master, Version 1' });
     expect(download).toHaveAttribute('href', downloadSavedVideoUrl(savedVideoId, versionId));
     expect(download).toHaveAttribute('download', 'existing.mp4');
     // The operator keeps the focus they had; the actions arrive beside the announcement.
-    expect(screen.getByRole('button', { name: 'Save as New Video' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: /^Save video ·/u })).toHaveFocus();
 
     await user.click(screen.getByRole('button', { name: 'View in Assets' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/assets/videos'));
     expect(router.state.location.search).toBe(`?video=${savedVideoId}`);
   });
 
-  it('offers the added Version itself after Add Version', async () => {
+  it('offers the added Version itself after saving a new Version', async () => {
     const appendedVersionId = 'c3289672-bfb5-5214-94f7-4bd54f12ce06';
     mockApiServer.use(
       http.get('*/api/videos', () =>
@@ -685,16 +678,11 @@ describe('Project output save UI', () => {
     const user = userEvent.setup();
     renderSection();
 
-    await user.click(screen.getByRole('button', { name: 'Add Version' }));
-    const picker = await screen.findByRole('dialog', { name: 'Choose Add Version target' });
-    await user.click(within(picker).getByRole('button', { name: /Existing master/u }));
-    const confirmation = await screen.findByRole('dialog', { name: 'Confirm Add Version' });
-    await user.click(within(confirmation).getByRole('button', { name: 'Add Version' }));
+    await chooseVersionTarget(user);
+    await user.click(screen.getByRole('button', { name: 'Save video · Existing master' }));
 
     expect(await screen.findByText('Added Version 4 to “Existing master”.')).toBeVisible();
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Confirm Add Version' })).not.toBeInTheDocument(),
-    );
+    expect(screen.queryByRole('form', { name: 'Save destination' })).not.toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Download Existing master, Version 4' }),
     ).toHaveAttribute('href', downloadSavedVideoUrl(savedVideoId, appendedVersionId));
@@ -712,24 +700,19 @@ describe('Project output save UI', () => {
     const user = userEvent.setup();
     renderRouted(<AdoptingSection port={session()} />);
 
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    const first = screen.getByRole('dialog', { name: 'Save as New Video' });
+    const first = await openSaveDestination(user);
     const proposed = within(first).getByRole('textbox', { name: 'Video title' });
     expect(proposed).toHaveValue('Launch cut · change 2');
     await user.clear(proposed);
     await user.type(proposed, 'Launch master');
-    await user.click(within(first).getByRole('button', { name: 'Save as New Video' }));
+    await user.click(screen.getByRole('button', { name: 'Save video · New video' }));
     expect(await screen.findByText('Saved “Launch master” as Version 1.')).toBeVisible();
-    await waitFor(() =>
-      expect(screen.queryByRole('dialog', { name: 'Save as New Video' })).not.toBeInTheDocument(),
-    );
+    expect(screen.queryByRole('form', { name: 'Save destination' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    expect(
-      within(screen.getByRole('dialog', { name: 'Save as New Video' })).getByRole('textbox', {
-        name: 'Video title',
-      }),
-    ).toHaveValue('Launch cut · change 3');
+    const second = await openSaveDestination(user);
+    expect(within(second).getByRole('textbox', { name: 'Video title' })).toHaveValue(
+      'Launch cut · change 3',
+    );
   });
 
   it('bounds the proposed title by the same number the save request is validated against', () => {
@@ -794,9 +777,9 @@ describe('ProjectOutputSaveSection placement', () => {
       'aria-pressed',
       'true',
     );
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Save as New Video' });
-    expect(within(dialog).getByText('Tall feed post')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Save video · Tall feed post' })).toBeVisible();
+    const form = await openSaveDestination(user);
+    expect(within(form).getByText('Tall feed post')).toBeVisible();
   });
 
   it('keeps the unchanged server download when no placement was recorded', async () => {
@@ -810,9 +793,7 @@ describe('ProjectOutputSaveSection placement', () => {
     );
     renderSection();
 
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Save as New Video' });
-    await user.click(within(dialog).getByRole('button', { name: 'Save as New Video' }));
+    await submitNewVideo(user);
 
     await waitFor(() => expect(saved).toBe(1));
     const download = await screen.findByRole('link', { name: /^Download Launch master/u });
@@ -835,9 +816,7 @@ describe('ProjectOutputSaveSection placement', () => {
     expect(screen.getByText('Local editor unavailable')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Phone, full screen' })).toBeDisabled();
 
-    await user.click(screen.getByRole('button', { name: 'Save as New Video' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Save as New Video' });
-    await user.click(within(dialog).getByRole('button', { name: 'Save as New Video' }));
+    await submitNewVideo(user);
 
     await waitFor(() => expect(saved).toBe(1));
     expect(propose).not.toHaveBeenCalled();

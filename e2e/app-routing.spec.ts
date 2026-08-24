@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import type { CreativeAssetStore } from '@studio/domain';
 import {
   CREATIVE_ASSET_STORAGE_KEY,
+  expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
   openCharacterOptions,
@@ -19,6 +20,7 @@ import {
 import { installProjectHarness, TEST_PROJECT_ID } from './support/projectHarness';
 import { installCampaignHarness, TEST_CAMPAIGN_ID } from './support/campaignHarness';
 import { loadDecodableH264VideoFixture } from './support/existingVideoHarness';
+import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 
 const loginFromEntry = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Log in' }).click();
@@ -28,12 +30,34 @@ const loginFromEntry = async (page: Page): Promise<void> => {
   await dialog.getByRole('button', { name: 'Log in' }).click();
 };
 
+const readHistoryIndex = (page: Page): Promise<number | null> =>
+  page.evaluate(() => {
+    const state: unknown = window.history.state;
+    if (typeof state !== 'object' || state === null || !('idx' in state)) return null;
+    return typeof state.idx === 'number' ? state.idx : null;
+  });
+
 const openProjectTask = async (
   page: Page,
   task: 'Original' | 'Create' | 'Save' | 'History',
 ): Promise<void> => {
   await page.getByRole('tab', { name: task, exact: true }).click();
   await expect(page.getByRole('tabpanel', { name: task, exact: true })).toBeVisible();
+};
+
+const openProjectSaveDestination = async (page: Page) => {
+  await page.getByRole('button', { name: /^Save video ·/u }).click();
+  const form = page.getByRole('form', { name: 'Save destination' });
+  await expect(form).toBeVisible();
+  return form;
+};
+
+const chooseProjectVersionTarget = async (page: Page, title: string) => {
+  const form = await openProjectSaveDestination(page);
+  await form.getByRole('radio', { name: 'New version of an existing video' }).click();
+  await form.getByRole('button', { name: new RegExp(title, 'u') }).click();
+  await expect(form).toContainText(`New version of “${title}”`);
+  return form;
 };
 
 const SEEDED_PROJECT_CREATIVE_STORE = {
@@ -138,16 +162,16 @@ test('Back and Forward restore focus across canonical organization routes', asyn
   await expect(page.locator('#studio-main')).toBeFocused();
 
   await page.getByRole('button', { name: 'Assets', exact: true }).click();
-  await expect(page).toHaveURL(/\/assets$/u);
-  await expect(page.locator('#studio-main')).toBeFocused();
+  await expect(page).toHaveURL(/\/assets\/videos$/u);
+  await expect(page.getByRole('dialog', { name: 'Videos' })).toBeVisible();
 
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`${DASHBOARD_PATH}$`, 'u'));
   await expect(page.locator('#studio-main')).toBeFocused();
 
   await page.goForward();
-  await expect(page).toHaveURL(/\/assets$/u);
-  await expect(page.locator('#studio-main')).toBeFocused();
+  await expect(page).toHaveURL(/\/assets\/videos$/u);
+  await expect(page.getByRole('dialog', { name: 'Videos' })).toBeVisible();
 });
 
 test('direct and refreshed Studio entries preserve one stage', async ({ page }) => {
@@ -173,30 +197,44 @@ test('Asset libraries open with no Studio stage and hand a selection back to it'
   await expect(page.getByLabel('Studio media stage')).toHaveCount(1);
 
   await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  await expect(page).toHaveURL(/\/assets\/videos$/u);
   for (const library of [
     { label: 'Videos', path: '/assets/videos', empty: 'No videos in Assets yet' },
     { label: 'Characters', path: '/assets/characters', empty: 'No saved characters yet' },
     { label: 'Outfits', path: '/assets/outfits', empty: 'No saved outfits yet' },
   ]) {
-    await page.getByRole('button', { name: `Open ${library.label}` }).click();
+    if (!page.url().endsWith(library.path)) {
+      await page
+        .getByRole('navigation', { name: 'Asset libraries' })
+        .getByRole('button', { name: new RegExp(library.label, 'u') })
+        .click();
+    }
     await expect(page).toHaveURL(new RegExp(`${library.path}$`, 'u'));
     const dialog = page.getByRole('dialog', { name: library.label });
     await expect(dialog.getByRole('heading', { name: library.empty })).toBeVisible();
     if (library.path === '/assets/characters') {
-      await expect(dialog.getByRole('button', { name: 'Create new character' })).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Create character' })).toBeVisible();
     }
     // A library needs no camera, so it gets none: the stage is absent, not hidden behind CSS.
     await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
-    await dialog.getByRole('button', { name: 'Close panel' }).click();
-    await expect(page).toHaveURL(/\/assets$/u);
   }
+
+  await page
+    .getByRole('dialog', { name: 'Outfits' })
+    .getByRole('button', { name: 'Close Assets' })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
 
   // Creating from a library still lands in Studio with the runtime mounted, which is the path the
   // shell's handoff channel exists to serve.
-  await page.getByRole('button', { name: 'Open Characters' }).click();
+  await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: 'Asset libraries' })
+    .getByRole('button', { name: /Characters/u })
+    .click();
   await page
     .getByRole('dialog', { name: 'Characters' })
-    .getByRole('button', { name: 'Create new character' })
+    .getByRole('button', { name: 'Create character' })
     .click();
   await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
   await expect(page.getByLabel('Studio media stage')).toHaveCount(1);
@@ -205,27 +243,88 @@ test('Asset libraries open with no Studio stage and hand a selection back to it'
     .toMatchObject({ cameraCalls: 0, connections: [] });
 });
 
-test('closing an Asset library consumes its history entry instead of stacking the hub', async ({
+test('closing an Asset library consumes its history entry without stacking a hub', async ({
   page,
 }) => {
   await installSuccessfulStudioHarness(page);
   await page.goto(DASHBOARD_PATH);
-  await page.getByRole('button', { name: 'Assets', exact: true }).click();
-  await expect(page).toHaveURL(/\/assets$/u);
+  const dashboardHistoryIndex = await readHistoryIndex(page);
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    await page.getByRole('button', { name: 'Open Videos' }).click();
+    await page.getByRole('button', { name: 'Assets', exact: true }).click();
     await expect(page).toHaveURL(/\/assets\/videos$/u);
     await page
       .getByRole('dialog', { name: 'Videos' })
-      .getByRole('button', { name: 'Close panel' })
+      .getByRole('button', { name: 'Close Assets' })
       .click();
-    await expect(page).toHaveURL(/\/assets$/u);
+    await expect(page).toHaveURL(new RegExp(`${DASHBOARD_PATH}$`, 'u'));
+    await expect.poll(() => readHistoryIndex(page)).toBe(dashboardHistoryIndex);
   }
+});
 
-  // Three open/close pairs used to bury the Dashboard under six entries.
-  await page.goBack();
-  await expect(page).toHaveURL(new RegExp(`${DASHBOARD_PATH}$`, 'u'));
+test('Assets matches the responsive design matrix without clipping controls', async ({ page }) => {
+  await installSuccessfulStudioHarness(page);
+  await installProjectHarness(page, true, { includeUnassignedVideo: true });
+  await page.goto('/assets/videos');
+
+  for (const viewport of Object.values(STUDIO_VIEWPORT_SIZES)) {
+    await page.setViewportSize(viewport);
+    const dialog = page.getByRole('dialog', { name: 'Videos' });
+    await expect(dialog.getByRole('heading', { name: 'Legacy unassigned' })).toBeVisible();
+    await expectNoDocumentOverflow(page);
+
+    const tabs = dialog.getByRole('navigation', { name: 'Asset libraries' });
+    await expect(tabs.getByRole('button')).toHaveCount(4);
+    const tabsBox = await tabs.boundingBox();
+    expect(tabsBox).not.toBeNull();
+    expect(tabsBox!.x).toBeGreaterThanOrEqual(0);
+    expect(tabsBox!.x + tabsBox!.width).toBeLessThanOrEqual(viewport.width + 1);
+
+    const search = dialog.getByRole('searchbox', { name: 'Search videos by title' });
+    await search.fill('Legacy');
+    await dialog.getByRole('button', { name: 'Clear search' }).click();
+    await expect(search).toHaveValue('');
+    await expect(dialog.getByRole('button', { name: 'Clear search' })).toHaveCount(0);
+
+    const mobileFilters = dialog.getByRole('button', { name: 'Filters', exact: true });
+    if (viewport.width >= 1_024) {
+      await expect(mobileFilters).toBeHidden();
+      await expect(dialog.getByLabel('Filter and sort saved videos')).toBeVisible();
+      continue;
+    }
+
+    await expect(mobileFilters).toBeVisible();
+    const [searchBox, mobileFiltersBox] = await Promise.all([
+      search.boundingBox(),
+      mobileFilters.boundingBox(),
+    ]);
+    expect(searchBox).not.toBeNull();
+    expect(mobileFiltersBox).not.toBeNull();
+    expect(Math.abs(searchBox!.y - mobileFiltersBox!.y)).toBeLessThanOrEqual(2);
+    await mobileFilters.click();
+    const filters = page.getByRole('dialog', { name: 'Filters' });
+    const clear = filters.getByRole('button', { name: 'Clear filters' });
+    const show = filters.getByRole('button', { name: 'Show 1 video' });
+    const sort = filters.getByRole('combobox', { name: 'Sort by' });
+    const footer = filters.locator('[data-filter-sheet-actions]').locator('..');
+    const [clearBox, showBox, sortBox, footerBox] = await Promise.all([
+      clear.boundingBox(),
+      show.boundingBox(),
+      sort.boundingBox(),
+      footer.boundingBox(),
+    ]);
+    expect(clearBox).not.toBeNull();
+    expect(showBox).not.toBeNull();
+    expect(sortBox).not.toBeNull();
+    expect(footerBox).not.toBeNull();
+    expect(Math.abs(clearBox!.y - showBox!.y)).toBeLessThanOrEqual(1);
+    expect(clearBox!.x).toBeGreaterThanOrEqual(0);
+    expect(showBox!.x + showBox!.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(sortBox!.y + sortBox!.height).toBeLessThanOrEqual(footerBox!.y + 1);
+    await show.click();
+    await expect(filters).toHaveCount(0);
+    await expectNoDocumentOverflow(page);
+  }
 });
 
 test('Projects quick creation, lifecycle, refresh, and explicit Assets exit keep one shell', async ({
@@ -251,13 +350,15 @@ test('Projects quick creation, lifecycle, refresh, and explicit Assets exit keep
     .poll(async () => readBrowserState(page))
     .toMatchObject({ cameraCalls: 0, requirementModels: [], connections: [], recorderStarts: 0 });
 
-  await page.getByRole('button', { name: 'Rename' }).click();
+  await page.getByLabel('More actions for Untitled Project').click();
+  await page.getByRole('menuitem', { name: 'Rename' }).click();
   const rename = page.getByRole('dialog', { name: 'Rename Project' });
   await rename.getByRole('textbox', { name: /Project name/u }).fill('Launch edit');
   await rename.getByRole('button', { name: 'Rename Project' }).click();
   await expect(page.getByRole('heading', { name: 'Launch edit' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Archive' }).click();
+  await page.getByLabel('More actions for Launch edit').click();
+  await page.getByRole('menuitem', { name: 'Archive' }).click();
   await page
     .getByRole('dialog', { name: 'Archive Project' })
     .getByRole('button', { name: 'Archive Project' })
@@ -265,7 +366,8 @@ test('Projects quick creation, lifecycle, refresh, and explicit Assets exit keep
   await expect(page.getByText('Archived', { exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Launch edit' })).toBeVisible();
-  await page.getByRole('button', { name: 'Restore' }).click();
+  await page.getByLabel('More actions for Launch edit').click();
+  await page.getByRole('menuitem', { name: 'Restore' }).click();
   await page
     .getByRole('dialog', { name: 'Restore Project' })
     .getByRole('button', { name: 'Restore Project' })
@@ -273,7 +375,6 @@ test('Projects quick creation, lifecycle, refresh, and explicit Assets exit keep
   await expect(page.getByText('Draft', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Assets', exact: true }).click();
-  await page.getByRole('button', { name: 'Open Videos' }).click();
   await expect(page).toHaveURL(/\/assets\/videos$/u);
   await page.reload();
   await expect(page).toHaveURL(/\/assets\/videos$/u);
@@ -288,8 +389,8 @@ test('Project overview gives the title the full tablet content width', async ({ 
   await page.goto(`/projects/${TEST_PROJECT_ID}`);
 
   const title = page.getByRole('heading', { name: 'Untitled Project' });
-  const identity = page.locator('[data-detail-identity]');
-  const actions = page.locator('[data-detail-actions]');
+  const identity = page.locator('[data-page-identity]');
+  const actions = page.locator('[data-page-actions]');
   await expect(title).toBeVisible();
   await expect(actions.getByRole('button', { name: 'Add original video' })).toBeVisible();
 
@@ -324,7 +425,7 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   });
 
   await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
-  await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^Autosaved ·/u)).toBeVisible();
   await expect(stageVideo).toHaveAttribute('src', /^blob:/u);
   const firstObjectUrl = await stageVideo.getAttribute('src');
   expect(projects.sourceOperationKeys).toHaveLength(1);
@@ -335,7 +436,7 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   // Source task explicitly to check what the refresh restored.
   await openProjectTask(page, 'Original');
   await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
-  await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^Autosaved ·/u)).toBeVisible();
   // Reopening streams the accepted source from its ranged content route rather than downloading
   // it into a Blob, so the stage binds the app-owned URL instead of a fresh object URL.
   await expect(stageVideo).toHaveAttribute('src', /\/source\/content$/u);
@@ -383,22 +484,17 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
     buffer: fixture,
   });
   await openProjectTask(page, 'Save');
-  await expect(page.getByRole('heading', { name: 'Review and save' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Current cut' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Save as New Video' }).click();
-  const createDialog = page.getByRole('dialog', { name: 'Save as New Video' });
-  await createDialog.getByLabel('Video title').fill('Launch master');
-  await createDialog.getByRole('button', { name: 'Save as New Video' }).click();
+  const createForm = await openProjectSaveDestination(page);
+  await createForm.getByLabel('Video title').fill('Launch master');
+  await page.getByRole('button', { name: 'Save video · New video' }).click();
   await expect(page.getByText('Saved “Launch master” as Version 1.')).toBeVisible();
   expect(projects.outputRequests[0]?.target).toEqual({ kind: 'new', title: 'Launch master' });
 
-  await page.getByRole('button', { name: 'Add Version' }).click();
-  const picker = page.getByRole('dialog', { name: 'Choose Add Version target' });
-  await expect(picker.getByText('Launch master', { exact: true })).toBeVisible();
-  await picker.getByRole('button', { name: /Launch master/u }).click();
-  const confirmation = page.getByRole('dialog', { name: 'Confirm Add Version' });
-  await expect(confirmation).toContainText('Current Version 1');
-  await confirmation.getByRole('button', { name: 'Add Version' }).click();
+  const versionForm = await chooseProjectVersionTarget(page, 'Launch master');
+  await expect(versionForm).toContainText('Current Version 1');
+  await page.getByRole('button', { name: 'Save video · Launch master' }).click();
   await expect(page.getByText('The save reply never arrived.')).toBeVisible();
   expect(projects.outputOperationKeys).toHaveLength(2);
   expect(projects.outputRequests[1]?.target).toMatchObject({ kind: 'version' });
@@ -439,19 +535,19 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   await page.keyboard.press('Escape');
 
   await openProjectTask(page, 'Save');
-  await page.getByRole('button', { name: 'Add Version' }).click();
-  await expect(page.getByRole('dialog', { name: 'Choose Add Version target' })).toBeVisible();
-  await page.keyboard.press('Escape');
+  const targetForm = await openProjectSaveDestination(page);
+  await targetForm.getByRole('radio', { name: 'New version of an existing video' }).click();
+  await expect(targetForm.getByText('Launch master', { exact: true })).toBeVisible();
+  await targetForm.getByRole('button', { name: 'Cancel' }).click();
 
   await page.getByRole('button', { name: 'Assets', exact: true }).click();
-  await page.getByRole('button', { name: 'Open Videos' }).click();
   const gallery = page.getByRole('dialog', { name: 'Videos' });
   await expect(gallery.getByText('No Project').first()).toBeVisible();
   await expect(gallery.getByRole('heading', { name: 'Legacy unassigned' })).toBeVisible();
   await expect(gallery.getByRole('link', { name: /^Download / }).first()).toBeVisible();
 
   await gallery.getByLabel('More actions for Launch master').click();
-  await gallery.getByRole('button', { name: 'Remove from Assets' }).click();
+  await gallery.getByRole('menuitem', { name: 'Remove from Assets' }).click();
   await page
     .getByRole('dialog', { name: 'Remove video from Assets' })
     .getByRole('button', { name: 'Remove from Assets' })
@@ -502,7 +598,7 @@ test('an accepted Project operation reconnects after refresh and presents its re
     .getByRole('button', { name: 'Use in Studio' })
     .click();
   await openProjectTask(page, 'Create');
-  await page.getByRole('button', { name: 'Save progress' }).click();
+  await page.getByRole('button', { name: 'Keep this setup' }).click();
   await expect(
     page.getByText('Progress saved. Saving on its own starts no paid AI work.'),
   ).toBeVisible();
@@ -521,7 +617,8 @@ test('an accepted Project operation reconnects after refresh and presents its re
   expect(projects.processingProviderIntents).toEqual(['video']);
   await expect(existingVideo).toBeHidden();
   await page.getByRole('button', { name: '← Project overview' }).click();
-  await page.getByRole('button', { name: 'Archive' }).click();
+  await page.getByLabel('More actions for Untitled Project').click();
+  await page.getByRole('menuitem', { name: 'Archive' }).click();
   const archive = page.getByRole('dialog', { name: 'Archive Project' });
   await expect(archive.getByRole('button', { name: 'Archive Project' })).toBeDisabled();
   await expect(archive).toContainText('accepted provider work is running');
@@ -581,7 +678,7 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
     (character) => character.id === 'project-field-host',
   );
   expect(selectedCharacter).toBeDefined();
-  await page.getByRole('button', { name: 'Save progress' }).click();
+  await page.getByRole('button', { name: 'Keep this setup' }).click();
   await expect(
     page.getByText('Progress saved. Saving on its own starts no paid AI work.'),
   ).toBeVisible();
@@ -602,6 +699,28 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
   const existingVideo = page.getByRole('dialog', { name: 'Use existing video' });
   await expect(existingVideo).toBeVisible();
   await existingVideo.getByRole('button', { name: 'Adjust video' }).click();
+  await expect(page.getByRole('heading', { name: 'Edit video' })).toBeVisible();
+  await expect(page.locator('[data-video-edit-workspace]')).toBeAttached();
+  await expect(page.locator('[data-project-route]')).toHaveCSS('display', 'none');
+  await expect(page.getByRole('region', { name: 'Timeline' })).toBeVisible();
+  await expect(page.getByLabel('Video edit settings')).toBeVisible();
+
+  for (const viewport of Object.values(STUDIO_VIEWPORT_SIZES)) {
+    await page.setViewportSize(viewport);
+    const [stageBox, historyBox] = await Promise.all([
+      page.getByLabel('Studio media stage').boundingBox(),
+      page.locator('[data-video-editor-history]').boundingBox(),
+    ]);
+    expect(stageBox).not.toBeNull();
+    expect(historyBox).not.toBeNull();
+    if (stageBox && historyBox) {
+      expect(historyBox.y).toBeGreaterThanOrEqual(stageBox.y + stageBox.height - 1);
+      expect(historyBox.y).toBeLessThanOrEqual(stageBox.y + stageBox.height + 16);
+    }
+    await expect(page.locator('[data-project-route]')).toHaveCSS('display', 'none');
+  }
+
+  await page.setViewportSize(STUDIO_VIEWPORT_SIZES.compactDesktop);
   await page.getByRole('button', { name: 'Lighting', exact: true }).click();
   await page.getByRole('slider', { name: 'Brightness' }).fill('12');
   await page.getByRole('button', { name: 'Render preview' }).click();
@@ -617,7 +736,7 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
   expect(projects.workingMediaOperationKeys).toHaveLength(1);
   expect(projects.workingMediaOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
 
-  await page.getByRole('button', { name: 'Save progress' }).click();
+  await page.getByRole('button', { name: 'Keep this setup' }).click();
   expect(projects.checkpointRequests).toHaveLength(2);
   await openProjectTask(page, 'History');
   await expect(
@@ -734,7 +853,7 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
     .getByRole('button', { name: 'Use in Studio' })
     .click();
   await openProjectTask(page, 'Create');
-  await page.getByRole('button', { name: 'Save progress' }).click();
+  await page.getByRole('button', { name: 'Keep this setup' }).click();
   await expect(
     page.getByText('Progress saved. Saving on its own starts no paid AI work.'),
   ).toBeVisible();
@@ -773,20 +892,12 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   expect(projects.processingOperationKeys).toHaveLength(1);
 
   await openProjectTask(page, 'Save');
-  await page.getByRole('button', { name: 'Save as New Video' }).click();
-  const createVideo = page.getByRole('dialog', { name: 'Save as New Video' });
+  const createVideo = await openProjectSaveDestination(page);
   await createVideo.getByLabel('Video title').fill('Campaign master');
-  await createVideo.getByRole('button', { name: 'Save as New Video' }).click();
+  await page.getByRole('button', { name: 'Save video · New video' }).click();
   await expect(page.getByText('Saved “Campaign master” as Version 1.')).toBeVisible();
-  await page.getByRole('button', { name: 'Add Version' }).click();
-  await page
-    .getByRole('dialog', { name: 'Choose Add Version target' })
-    .getByRole('button', { name: /Campaign master/u })
-    .click();
-  await page
-    .getByRole('dialog', { name: 'Confirm Add Version' })
-    .getByRole('button', { name: 'Add Version' })
-    .click();
+  await chooseProjectVersionTarget(page, 'Campaign master');
+  await page.getByRole('button', { name: 'Save video · Campaign master' }).click();
   await expect(page.getByText('The save reply never arrived.')).toBeVisible();
   expect(projects.outputOperationKeys).toHaveLength(2);
   const pendingAppendKey = projects.outputOperationKeys[1];
@@ -811,7 +922,8 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
 
   await page.getByRole('button', { name: '← Project overview' }).click();
   await page.getByRole('button', { name: '← Summer launch' }).click();
-  await page.getByRole('button', { name: 'Archive' }).click();
+  await page.getByLabel('More actions for Summer launch').click();
+  await page.getByRole('menuitem', { name: 'Archive' }).click();
   await page
     .getByRole('dialog', { name: 'Archive Campaign' })
     .getByRole('button', { name: 'Archive Campaign' })

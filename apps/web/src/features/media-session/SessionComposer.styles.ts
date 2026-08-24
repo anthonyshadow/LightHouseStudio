@@ -16,7 +16,7 @@ export const composerHeaderStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gap: theme.space.sm,
   padding: theme.space.md,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   background: theme.colors.canvasRaised,
 });
 
@@ -70,7 +70,7 @@ export const composerFooterStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.xs,
   padding: theme.space.md,
   paddingBlockEnd: `max(${theme.space.md}, env(safe-area-inset-bottom))`,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   background: theme.colors.canvasRaised,
 });
 

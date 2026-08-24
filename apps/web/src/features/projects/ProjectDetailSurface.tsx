@@ -6,7 +6,6 @@ import { useRouteBack } from '../../app/useRouteBack';
 import { Button, StatusNotice } from '../../ui';
 import { projectProcessingBlockedReason } from './projectProcessingPresentation';
 import { ProjectOverviewSurface } from './ProjectOverviewSurface';
-import { projectOverviewInnerStyles } from './ProjectOverviewSurface.styles';
 import { dialogActionsStyles, workspaceInnerStyles } from './ProjectRouteSurface.styles';
 import { unavailableSourceRuntime, type ProjectRecordingCandidate } from './ProjectSourceSection';
 import type { ProjectWorkingMediaActivity } from './ProjectWorkingMediaSection';
@@ -14,6 +13,7 @@ import { ProjectWorkspaceSurface } from './ProjectWorkspaceSurface';
 import type { ProjectProcessingController } from './useProjectProcessingController';
 import { useProjectSession, type ProjectSessionPort } from './useProjectSession';
 import type { ProjectSourceActivity, ProjectSourceRuntime } from './useProjectSourceController';
+import { pageShellStyles } from '../../ui/primitives/PageShell.styles';
 
 export interface ProjectRouteSurfaceProps {
   readonly workspaceMode?: boolean;
@@ -56,7 +56,7 @@ export const ProjectDetailSurface = ({
   const theme = useTheme();
   const goBack = useRouteBack();
   const session = useProjectSession(projectId);
-  const detailContentStyles = workspaceMode ? workspaceInnerStyles : projectOverviewInnerStyles;
+  const detailContentStyles = workspaceMode ? workspaceInnerStyles : pageShellStyles;
 
   useEffect(() => {
     onSessionChange?.(session.port);

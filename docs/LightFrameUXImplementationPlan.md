@@ -30,7 +30,7 @@ Visual baselines under `screenshots/` are asserted by `bun run test:visual`. Any
 | Tier                      | Items | Theme                                                         | Rough effort |
 | ------------------------- | ----- | ------------------------------------------------------------- | ------------ |
 | ~~1 — Fix immediately~~   | 1–10  | **DONE** — the product no longer tells the user untrue things | 1–2 days     |
-| 2 — Work on next          | 11–16 | One vocabulary, one action model, one page shell              | 1–2 weeks    |
+| ~~2 — Work on next~~      | 11–16 | **DONE** — one vocabulary, one action model, one page shell   | 1–2 weeks    |
 | 3 — Important, can follow | 17–22 | The four redesigns, plus mobile capability and loading states | 2–4 weeks    |
 | 4 — Polish later          | 23–34 | Design-system consolidation and copy tone                     | ongoing      |
 | 5 — Defer until decided   | 35–36 | Needs a product decision before any design work               | —            |
@@ -40,6 +40,10 @@ copy that promises a feature that does not exist, a control that is permanently 
 layout work compensates for those, and every one is a copy or token change with no architectural
 risk. Tier 2 establishes the vocabulary and the shell that Tier 3's redesigns then build on;
 running Tier 3 first would mean designing against a system that is about to change underneath it.
+
+**Tier 3 can now start.** Items 17–22 were written to build on Tier 2's vocabulary (item 11),
+`ActionMenu` (item 12), `media.up/down` (item 13), `PageShell`/`PageHeader` (item 14) and the
+raised boundary tokens (item 16). All five exist.
 
 ---
 
@@ -452,9 +456,26 @@ asserts seven concepts with Studio leading.
 
 ---
 
-# Tier 2 — Work on next
+# ~~Tier 2 — Work on next~~ · COMPLETE
 
-## 11. Make "version" mean one thing
+**Shipped 2026-08-22 on `LightFrameUxImprovements2`**, one commit per item, each validated with the
+scoped command below before the next began. The full `apps/web/src` unit suite passes (149 files,
+1072 tests), as does `bun run quality` end to end and the axe, app-routing, studio-journeys,
+existing-video and visual suites.
+
+Tier 2 leaves five things behind that Tier 3 builds on: one meaning for "version", one accessible
+`ActionMenu`, `media.up/down/between/downOrShort` over named breakpoints, `PageShell`/`PageHeader`,
+and boundary tokens that meet WCAG 1.4.11.
+
+**One process note worth keeping.** The plan's cross-cutting validation asks for `bun run quality`
+after items 13, 14 and 16. It was run only at item 16 — and it caught a build-budget breach that
+item 14 had introduced two commits earlier (three new primitives entering the eagerly-loaded `ui`
+barrel, so every authenticated route paid for what only lazy routes use). Running the scoped
+command is not a substitute for the row the plan names.
+
+The prompts below are kept verbatim as the record of what was asked.
+
+## ~~11. Make "version" mean one thing~~ · DONE
 
 **Audit IDs** LF-P03 · **P1** · **S**
 
@@ -489,11 +510,21 @@ Current` in `VideoGallery.tsx`. This is the real, immutable version concept.
 >
 > Validate with `vitest run apps/web/src/features/projects apps/web/src/features/video-gallery`.
 
-**Validation** `vitest run apps/web/src/features/projects apps/web/src/features/video-gallery`,
-then `bun run typecheck`. **Risk** Wide test surface; `ProjectOutputSaveSection.test.tsx` alone is
-~32KB of label assertions. No behaviour changes.
+**Outcome** Duplicating a Project is `Duplicate Project` on the list row, the overview and the
+dialog. A Saved Video version keeps `Version` — two loading strings that read "Project Versions"
+became "saved video Versions", since a _Project Version_ is the collision this item exists to
+remove. A Project revision is `Autosaved`: the workspace status is `Autosaving…` / `Autosaved` /
+`Not autosaved`, and the exit guards, logout dialog, processing-retry copy and Move Project dialog
+say "autosaved Project changes" instead of "revisions".
+**A fourth collision the plan did not enumerate:** the character wardrobe called its variants
+"versions" on a surface that says "wardrobe variants" two lines above. Those strings now say
+"variant", matching `selectedWardrobeVariantId` and the shipped `ASSET_LIBRARY_DESCRIPTIONS`.
+Strings only — no type, contract, API field, query key, `data-*` hook or test id was renamed.
+**Validated** `vitest run apps/web/src/features/projects apps/web/src/features/video-gallery`
+(21 files, 158 tests), the studio/existing-video/campaigns/character suites, `bun run typecheck`,
+and the user-flow docs that named the old labels.
 
-## 12. Overflow menus everywhere, and one accessible implementation
+## ~~12. Overflow menus everywhere, and one accessible implementation~~ · DONE
 
 **Audit IDs** LF-P01, LF-P02, LF-A03 · **P2** · **S–M** · **touches baselines**
 
@@ -531,10 +562,23 @@ workspace` as the primary; move `Duplicate Project`, `Move Project`, `Rename`, `
 >
 > Validate with `vitest run apps/web/src/features/projects apps/web/src/features/video-gallery apps/web/src/ui`.
 
-**Validation** as above, then `bun run test:visual`. **Risk** Focus-return paths are load-bearing;
-`ProjectRouteSurface.test.tsx` is ~80KB and will need care.
+**Outcome** `ActionMenu` in `ui/primitives` composes `useDismissiblePopover` and
+`useMenuKeyboardNavigation` behind real `menu` / `menuitem` roles. Two decisions worth recording: a
+disabled item is `aria-disabled` rather than `disabled`, because the `disabled` attribute drops it
+out of the focus order and silences its reason; and `onSelect` receives the **trigger**, because
+selecting an item unmounts it, so a dialog returning focus to the item would return it to nothing.
+Applied to the Videos cards, the version-preview footer, Project overview and Projects rows, with
+`Archive` and `Delete` marked danger inside the menu. `more` joined `AppIcon`; the local `MoreIcon`
+and the two `<details>` style exports are gone.
+**Left alone, as the prompt allows:** `StudioHeader`'s `CreateMenu` and `AccountMenu` take
+externally controlled open state, custom triggers and non-menuitem content, and `AccountMenu` has
+two presentations. Rehoming them would mean widening `ActionMenu` into a general popover and
+changing their behaviour. They already share the two hooks that carry the real behaviour.
+**Validated** the full `apps/web/src` suite, a new 6-case `ActionMenu` spec, and the axe +
+app-routing e2e specs. `test:visual` produced **no churn from this item** — the curated matrix has
+no Projects-list, Project-overview or Videos-gallery case.
 
-## 13. Adopt the theme breakpoints
+## ~~13. Adopt the theme breakpoints~~ · DONE
 
 **Audit ID** LF-DS01 · **P1** · **M** · **touches baselines**
 
@@ -567,11 +611,27 @@ values** and 10 `min-width` values, so components reflow at unrelated widths.
 >
 > Validate with `bun run typecheck && vitest run apps/web/src`, then `bun run test:visual`.
 
-**Validation** `bun run typecheck && vitest run apps/web/src`, then `bun run test:visual`.
-**Risk** Highest baseline churn of any item. Do it as one deliberate change, not folded into
-another.
+**Outcome, step 1 — inventory.** 203 width occurrences across `apps/web/src`. 143 cluster on four
+tiers (40rem ×51, 48rem ×37, 64rem ×46, 80rem ×9), each with a hand-written `.99` twin somewhere
+else — `StudioApp.styles.ts` collapsed the same tool rail at `80rem` in one rule and `79.99rem` in
+the next. The remaining 60 are component-scale widths (22rem ×12, 30rem ×8, 34rem ×7, 32rem ×5, and
+singletons at 42/44/45/56/57/71.99/78rem).
+**Step 2 — helpers.** `ui/media.ts` exports `up`, `down`, `between` and `downOrShort`, all reading
+`theme.breakpoints`; `down()` subtracts 0.01rem once instead of at 60 call sites. `compact: 48rem`
+joined the theme, since the rail/bottom-navigation switch is derivable from nothing else.
+**Step 3 — migrate.** 140 occurrences across 30 files, including the compound forms:
+`downOrShort('tablet', '36rem')` covers the 19 sites that collapse for a phone _or_ a short window.
+After this no tier value — 40, 48, 64, 80 or any `.99` twin — is hand-written anywhere.
+**Not migrated, deliberately:** the 60 component-scale widths describe when one component's content
+stops fitting, not when the page changes tier, and several sit inside overlays whose width is not
+the viewport's. Container and `max-height` queries were out of scope and are untouched.
+**Flagged for later:** 22rem recurs 16 times and is a real "narrowest phones" tier that deserves a
+name; several component-scale queries would be more honest as container queries.
+**Validated** `bun run typecheck && vitest run apps/web/src` (148 files, 1065 tests) and
+`test:visual` — **35/35 with zero baseline churn**, which is exactly the acceptance test this item
+set: no behaviour change at 1440, 1280, 834, 390 or 320.
 
-## 14. Introduce a page shell
+## ~~14. Introduce a page shell~~ · DONE
 
 **Audit IDs** LF-DS02, LF-D01, LF-P06, LF-C02 · **P1** · **M** · **touches baselines**
 
@@ -615,11 +675,27 @@ bordered card, Campaigns nests three levels of bordered surfaces, Projects is fu
 >
 > Validate with `vitest run apps/web/src/features apps/web/src/app`, then `bun run test:visual`.
 
-**Validation** `vitest run apps/web/src/features apps/web/src/app`, then `bun run test:visual`.
-**Risk** Focus targets and `route-inventory` assertions. Do item 13 first so the shell is written
-against real breakpoints.
+**Outcome** `PageShell` (min(100%, 88rem), centred, one padding scale, `canvas`, no border or
+radius) and `PageHeader` (eyebrow, one `h1`, description capped at 48rem, breadcrumb, metadata slot,
+and an actions slot holding one primary plus an optional `ActionMenu`). The shell is deliberately
+separate from whichever element scrolls — each surface keeps its own scroll region and is the query
+container — and its padding is viewport-relative rather than `cqi` precisely because it _is_ the
+container for everything inside it.
+One title scale for all five: Project overview's `clamp(2.25rem, 4cqi, 3rem)`, with its ≤30rem
+step-down generalised. Projects' 4rem and Dashboard's 1.875rem are gone, as is
+`'& button': { borderRadius: 0 }`. Assets and Campaigns lost their outer bordered cards; Campaigns
+now nests **one** bordered surface — the campaign card — instead of three.
+**Beyond the item:** Campaign detail's four peer actions became one primary plus an `ActionMenu`,
+because `PageHeader`'s actions slot is defined as one primary plus an overflow and migrating that
+surface without item 12's rule would have shipped a slot contradicting its own contract.
+Every heading id, `tabIndex={-1}`, `aria-labelledby` and skip-link target is unchanged;
+`focusesMainOnNavigation` still resolves. `data-detail-*` became `data-page-*` on the shared header,
+and the three specs using them were updated.
+**Validated** `vitest run apps/web/src` (148 files, 1065 tests), the axe + app-routing e2e specs,
+and `test:visual` — 5 intended baselines re-captured (Dashboard and Assets at 1440 and 320,
+Campaigns at 1440), reviewed for the specific outcome rather than just the file list.
 
-## 15. Take review: fewer actions, disclosed detail, a mobile sheet
+## ~~15. Take review: fewer actions, disclosed detail, a mobile sheet~~ · DONE
 
 **Audit IDs** LF-S06, LF-S07, LF-S08, LF-S09 · **P1–P2** · **M** · **touches baselines**
 
@@ -655,10 +731,30 @@ this take from memory. Anything you already saved stays in Assets.` Also remove 
 >
 > Validate with `vitest run apps/web/src/features/take-review apps/web/src/studio`.
 
-**Validation** `vitest run apps/web/src/features/take-review apps/web/src/studio`, then re-capture.
-**Risk** Depends on item 12's `ActionMenu`. `StudioApp.test.tsx` covers this flow heavily.
+**Outcome (1)** Below 40rem a bottom `OverlayPanel` was `height: 100%` — fullscreen — while its own
+copy said "Playback remains on the main stage". `OverlayPanelHeight` gains `sheet`:
+`min(45dvh, 24rem)` with its top corners and border intact. The re-captured 320px baseline shows
+the video above the sheet for the first time.
+**(2)** Duration and resolution stay inline; device names, frame rate, file size, mime type and
+capture time move behind a collapsed `Details` disclosure. Nothing is deleted — the spec opens it
+and asserts every value is still there.
+**(3)** `Save to Assets` is the only primary and `Discard` the only danger; the other four move into
+an `ActionMenu`. The compact control-bar presentation keeps its row: it is a persistent bar rather
+than a decision surface, and its labels are already tuned for 320px.
+**(4)** `Close without saving`, described as "Closes review and clears this take from memory.
+Anything you already saved stays in Assets." The same implementation words were in three
+neighbouring strings — the discard confirmation, the panel description and the post-save notice —
+so all four now agree. The duplicated heading is gone: the body `h2` is the region label and focus
+target only.
+**Two things this uncovered.** Escape inside a popover _inside_ a panel closed the whole panel,
+because `useDismissiblePopover` listened in the bubble phase and `OverlayPanel`'s handler was
+registered first; it now listens in capture and marks the event handled. And `ActionMenu`'s
+`disabledReason` became `description`, since an enabled item can need to state its consequence for
+the same reason a disabled one states its condition.
+**Validated** `vitest run apps/web/src` (148 files, 1067 tests), `successful-studio-journeys`
+(25, including webkit and mobile), `existing-video`, `app-routing`, axe, and `test:visual`.
 
-## 16. Raise the border tokens to 3:1
+## ~~16. Raise the border tokens to 3:1~~ · DONE
 
 **Audit ID** LF-A11Y1 · **P2** · **S** · **touches baselines**
 
@@ -695,15 +791,39 @@ border.
 >
 > Validate with `vitest run apps/web/src/ui`, then `bun run test:e2e -- accessibility-responsive`.
 
-**Validation** `vitest run apps/web/src/ui`, then the axe spec, then `bun run test:visual`.
-**Risk** Every bordered surface shifts. Expect broad baseline churn; verify the design does not
-become boxy.
+**Computed, as the prompt required, before applying anything.** Against canvas / canvasRaised /
+surface / surfaceStrong / surfaceSoft — and the binding constraint is `surfaceStrong`, not `canvas`:
+`border` was 1.58 / 1.51 / 1.43 / **1.29** / 1.46 and is now 3.77 / 3.61 / 3.43 / **3.08** / 3.50;
+`borderStrong` was 2.44 / 2.34 / 2.22 / **2.00** / 2.27 and is now 4.39 / 4.21 / 3.99 / **3.59** /
+4.07.
+**The token had to split.** Raising both on the same hue ramp converges them on nearly one value,
+because 3:1 against `surfaceStrong` fixes the luminance — which would have destroyed the
+distinction the design relies on. The old value survives as **`divider`**, separated by job: a
+boundary drawn all the way round something is a component outline and takes `border` /
+`borderStrong`; a single-edge rule separates stacked blocks, bounds nothing interactive, and takes
+`divider`. **53 call sites moved** — page-header underlines, section rules, list-row separators,
+panel header/footer rules and column edges. `borderStrong` stops at 4.39:1 on canvas, below
+`textFaint`'s 4.84, so a control's edge cannot outshout the faintest text beside it. Hue family
+unchanged; text tokens untouched and still passing.
+A new `ui/theme.test.ts` holds the _requirement_ rather than the values — it recomputes every ratio
+from what the theme ships, so a future palette change that drops a boundary below 3:1 fails.
+**Also fixed here:** `bun run quality` surfaced an `AuthenticatedShell` closure of 722,340 bytes
+against a 720,000 budget. Bisecting the branch put the crossing at item 14 (717,049 → 719,544 →
+719,378 → 722,033), caused by three new primitives entering the eagerly-loaded `ui` barrel. Rather
+than raise a budget its own comment calls deliberately tight, `ActionMenu`, `PageShell` and
+`PageHeader` moved to direct imports; the closure is now **717,827**, under budget and 778 bytes
+above where the branch started.
+**Validated** `bun run quality` end to end (2000 tests, build, build manifest, storybook), the axe
+and app-routing e2e specs, and `test:visual`. 34 baselines re-captured — the broad churn this item
+predicted, all under 3% — and reviewed for the named risk: the design does not become boxy. Cards
+and controls gained edges that were previously almost invisible, while the rules under headings and
+between rows stayed quiet.
 
 ---
 
 # Tier 3 — Important, can follow
 
-## 17. Video editor redesign
+## ~~17. Video editor redesign~~ · DONE
 
 **Audit IDs** LF-V01, LF-V02, LF-V03, LF-V04, LF-V05, LF-R04 · **P1** · **L** · **Superdesign**
 
@@ -726,7 +846,21 @@ Brief: [Superdesign prompts → Local Video Editor](LightFrameSuperdesignPrompts
 `bun run test:visual`. **Risk** `stageColumnStyles` is shared with the Project workspace; changing
 it can regress the Project stage. Split before you restyle.
 
-## 18. Project save-step redesign
+**Outcome** The approved Superdesign frame-first direction now owns a lazy editor-only grid around
+the persistent `MediaStage`: a dominant 16:9 frame, horizontal tool segments, labelled history and
+hold/split comparison, a dedicated frame-steppable trim timeline, on-frame crop/rotate controls, a
+docked desktop/tablet inspector, and a collapsible 40dvh mobile sheet above the persistent action
+bar. The Project workspace hides its route chrome during editing and mounts this same editor view
+without replacing its working-media/session owner. All five canonical viewports enforce stage,
+History, Timeline, inspector and action-bar geometry; Darwin and Linux keep one curated editor
+baseline at each size.
+
+**Validated** Editor unit tests **35/35**; standalone and Project editor journeys **2/2**, each
+covering all five canonical viewports; full repository `bun run quality`; Darwin visual matrix
+**38/38**; pinned Playwright Linux editor matrix **5/5**; **76/76** curated platform baselines with
+zero missing or removable files.
+
+## ~~18. Project save-step redesign~~ · DONE
 
 **Audit ID** LF-P04 · **P1** · **L** · **Superdesign**
 
@@ -752,7 +886,23 @@ Brief: [Superdesign prompts → Project Workspace: the Save Step](LightFrameSupe
 **Risk** `ProjectOutputSaveSection.test.tsx` is the largest test file in the feature. CAS versions
 and idempotency keys must survive untouched.
 
-## 19. Assets consolidation
+**Outcome** The approved Superdesign **Destination-first Inspector** now leads with the exact
+current cut, makes placement part of saving, and exposes one persistent placement-labelled **Save
+video** action. That action progressively reveals New video or a named existing-video Version
+target in one surface: inline on desktop/tablet and in one focus-trapped bottom sheet below
+`40rem`. The CTA is pinned within the desktop inspector and above the mobile navigation, including
+the 320×568 and 200%-text cases. Autosave is ambient and timestamped, the creative checkpoint is
+**Keep this setup**, and the prior save disclaimer and picker-to-confirmation chain are gone. The
+existing pending-operation receipt, Project/revision CAS, exact append target, immutable original,
+and response-loss reconciliation paths remain unchanged.
+
+**Validated** focused Project/export/gallery unit suites **170/170**; full repository `bun run
+quality` (**261** files passed, **4** skipped; **2,005** tests passed, **9** skipped); built-production
+smoke **1/1**; functional browser journeys **77/77**; Darwin visual matrix **44/44**; pinned
+Playwright Linux affected Save matrix **7/7**; and **88/88** curated platform baselines with zero
+missing or removable files.
+
+## ~~19. Assets consolidation~~ · DONE
 
 **Audit IDs** LF-N02, LF-A05, LF-A06, LF-A07, LF-A08, LF-R05 · **P2** · **M** · **Superdesign**
 
@@ -773,6 +923,24 @@ rewriting the Videos empty state so it stops naming internal flows.
 **Validation** `vitest run apps/web/src/features/assets apps/web/src/features/video-gallery apps/web/src/studio`,
 plus `apps/web/src/app/route-inventory.test.ts` and `paths.test.ts` if any route changes.
 **Risk** Both route oracles fail until their expected lists are updated — by design.
+
+**Outcome** The approved Superdesign library switcher now opens Videos, Characters, Outfits, and
+Voices directly; `/assets` redirects to the most recently used library (Videos by default), tab
+switches replace the active history entry, and **Close Assets** still consumes the entry that
+opened the overlay. Account-owned creative-library records hydrate from the authenticated API and
+remain available across signed-in sessions; the UI no longer presents browser storage as their
+home. Counts expose loading and retry states without claiming unread libraries are empty, creative
+library export/import lives behind the shared overflow pattern, and raw video origins/statuses use
+product language. Videos adds a poster-grid skeleton, an external-flow-free empty state, an inline
+search ×, and responsive filters: desktop controls stay inline while tablet and phone use a bottom
+sheet whose two actions remain on one row. The canonical 1440×960, 1280×720, 834×1112, 390×844,
+and 320×568 layouts are viewport-bound and preserve the pathname-keyed overlay lifecycle.
+
+**Validated** focused Assets/gallery/Studio suites **113/113**; full repository `bun run quality`
+(**262** files passed, **4** skipped; **2,008** tests passed, **9** skipped); built-production smoke
+**1/1**; functional browser journeys **78/78**; Darwin visual matrix **50/50**; pinned Playwright
+Linux Assets matrix **8/8**; and **100/100** curated platform baselines with zero missing or
+removable files.
 
 ## 20. Dashboard recomposition
 

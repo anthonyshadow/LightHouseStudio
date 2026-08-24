@@ -1,0 +1,255 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "feature:local-video-editor": {
+      "targetKind": "existing-ui",
+      "projectId": "fa7b9261-565f-4748-8d41-b9c36863b898",
+      "baselineDraftId": "2f974a0a-0c29-4fc1-974b-433e3a68a2fc",
+      "activeDraftId": "9c411436-35c9-44f5-a3ac-f893bf70110a",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "04930603-9788-4c5e-96d5-1bec6ea4e0ed",
+        "6b63e518-a38a-4ec3-a4f6-f59be98bc906",
+        "apps-web-public-favicon.svg"
+      ],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "apps-web-public-favicon.svg",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/fa7b9261-565f-4748-8d41-b9c36863b898/brand-assets/apps-web-public-favicon.svg/favicon.svg",
+          "sourcePath": "apps/web/public/favicon.svg"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "apps/web/src/ui/theme.ts",
+        "apps/web/src/ui/StudioDesignProvider.tsx",
+        "apps/web/src/ui/media.ts",
+        "apps/web/src/ui/primitives/Button.tsx",
+        "apps/web/src/ui/primitives/StatusNotice.tsx",
+        "apps/web/src/studio/StudioHeader.tsx",
+        "apps/web/src/studio/StudioApp.styles.ts",
+        "apps/web/src/studio/StudioWorkspace.tsx",
+        "apps/web/src/features/live-stage/MediaStage.tsx",
+        "apps/web/src/features/live-stage/MediaStage.styles.ts",
+        "apps/web/src/features/live-stage/MediaStageSections.tsx",
+        "apps/web/src/features/video-editor/VideoEditWorkspace.tsx",
+        "apps/web/src/features/video-editor/VideoEditWorkspace.styles.ts",
+        "apps/web/src/features/video-editor/VideoEditStagePreview.tsx",
+        "apps/web/src/features/video-editor/VideoEditStagePreview.styles.ts"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "5959f087940683a9c4751c92b1671805fdb87aa215aa6c3ca51687ddc3974d8a",
+        "apps/web/src/ui/theme.ts": "626cbc3bef3b1df450f441545744b5a40173bfdabf6f061a6949ec28336ac1a5",
+        "apps/web/src/ui/StudioDesignProvider.tsx": "0d2743c24ff70c86cb81b8b2df57ce1d222f5a66131c1dd8b8746998a5ec8f9c",
+        "apps/web/src/ui/media.ts": "fab4f59c856d46dc81ae6854bdb2fb78b2ef608a9a38b629f32c645c71b9be6e",
+        "apps/web/src/ui/primitives/Button.tsx": "0a226d4088621ab8da593349f483a956132cccbd161801afaa5277b4bfd36d03",
+        "apps/web/src/ui/primitives/StatusNotice.tsx": "9f31a9af1ec27276fe8673f60d7eb901777a2f597d96efc4d71a1f6ec5092d78",
+        "apps/web/src/studio/StudioHeader.tsx": "ea6cc7cb978769ca168e19d828e1d27c847e6ff42ba3082b319af686df38424c",
+        "apps/web/src/studio/StudioApp.styles.ts": "6cbe8b665ad5182ecf9046435ef94b8b6d4c2be7b46f73650c56b0252e915044",
+        "apps/web/src/studio/StudioWorkspace.tsx": "949d31c6f6ddd216b3d307285381bb9783d350284869513ae237cbc903ea8d98",
+        "apps/web/src/features/live-stage/MediaStage.tsx": "2c86f7032c5e670969c24c3e7e6bfe006f32b84e4defdd99e2f6c37b7194cd0a",
+        "apps/web/src/features/live-stage/MediaStage.styles.ts": "18fa7bb3f4fb3bd22f43babfe04e85b8ac2d8d9179837dadcbd53398f30e8e98",
+        "apps/web/src/features/live-stage/MediaStageSections.tsx": "149e8bd99a452a1f74acb418e792ef10e485ed17e690d82a41e5dcb827d461ca",
+        "apps/web/src/features/video-editor/VideoEditWorkspace.tsx": "3ecb8f488c01fb962eedcbfdc43e69e83d7555c59fe3cf640484ef24185a3e8c",
+        "apps/web/src/features/video-editor/VideoEditWorkspace.styles.ts": "2d548c9d414e36372a7f1c87ebb5ebdbd7fb56b147f6fc0def26446992155f42",
+        "apps/web/src/features/video-editor/VideoEditStagePreview.tsx": "85b92a40c911983da57f8e5cacff534f12635b920c8b649be2fcf550626de4b4",
+        "apps/web/src/features/video-editor/VideoEditStagePreview.styles.ts": "a2033d6c3747c621a4d8a5585454bffa91e535ff302778a8d68ef02c29f881cf"
+      },
+      "drafts": {
+        "2f974a0a-0c29-4fc1-974b-433e3a68a2fc": {
+          "title": "Lightframe Studio — Video Editor",
+          "visualDirection": "faithful current editor baseline",
+          "currentVersion": 1
+        },
+        "9c411436-35c9-44f5-a3ac-f893bf70110a": {
+          "title": "Lightframe Studio — Frame-first Video Editor",
+          "visualDirection": "frame-first adaptive inspector dock",
+          "parentDraftId": "2f974a0a-0c29-4fc1-974b-433e3a68a2fc",
+          "currentVersion": 1
+        },
+        "91fad53b-a1fc-4a61-95c7-784a04f1b8ac": {
+          "title": "Lightframe Studio — Timeline-first Video Editor",
+          "visualDirection": "timeline-first production console",
+          "parentDraftId": "2f974a0a-0c29-4fc1-974b-433e3a68a2fc",
+          "currentVersion": 1
+        }
+      },
+      "updatedAt": "2026-08-22T23:43:00Z"
+    },
+    "feature:project-save-step": {
+      "targetKind": "existing-ui",
+      "projectId": "c2cfb089-6501-4a26-b06e-b9a771596efc",
+      "baselineDraftId": "a605097b-859b-4358-b0f9-1bd6d7cbc60e",
+      "activeDraftId": "bb931e4e-ad7e-423c-9417-b3939f32b4e4",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": ["apps-web-public-favicon.svg"],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "apps-web-public-favicon.svg",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/c2cfb089-6501-4a26-b06e-b9a771596efc/brand-assets/apps-web-public-favicon.svg/favicon.svg",
+          "sourcePath": "apps/web/public/favicon.svg"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        ".superdesign/init/layouts.md",
+        "apps/web/src/ui/theme.ts",
+        "apps/web/src/ui/primitives/Button.tsx",
+        "apps/web/src/ui/primitives/AppIcon.tsx",
+        "apps/web/src/ui/primitives/StatusNotice.tsx",
+        "apps/web/src/ui/primitives/SegmentedControl.tsx",
+        "apps/web/src/ui/primitives/OverlayPanel.styles.ts",
+        "apps/web/src/studio/StudioHeader.tsx",
+        "apps/web/src/studio/StudioApp.styles.ts",
+        "apps/web/src/studio/StudioWorkspace.tsx",
+        "apps/web/src/studio/CreativeWorkspace.tsx",
+        "apps/web/src/features/projects/ProjectWorkspaceSurface.tsx",
+        "apps/web/src/features/projects/ProjectWorkspaceSurface.styles.ts",
+        "apps/web/src/features/projects/ProjectWorkflowProgress.tsx",
+        "apps/web/src/features/projects/ProjectOutputSaveSection.tsx",
+        "apps/web/src/features/projects/ProjectSavedVideoPicker.tsx",
+        "apps/web/src/features/export-placements/ExportPlacementChooser.tsx"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "5959f087940683a9c4751c92b1671805fdb87aa215aa6c3ca51687ddc3974d8a",
+        ".superdesign/init/layouts.md": "6c6aaaafc0b30b75aa0565fe3a93aa47817f1debae5b4dcabf190f77d9972eb2",
+        "apps/web/src/ui/theme.ts": "626cbc3bef3b1df450f441545744b5a40173bfdabf6f061a6949ec28336ac1a5",
+        "apps/web/src/ui/primitives/Button.tsx": "0a226d4088621ab8da593349f483a956132cccbd161801afaa5277b4bfd36d03",
+        "apps/web/src/ui/primitives/AppIcon.tsx": "ff5e222461affff020974c8ca778db2dc439fbdcc8cb8d7ca5ca138a9be3fffa",
+        "apps/web/src/ui/primitives/StatusNotice.tsx": "9f31a9af1ec27276fe8673f60d7eb901777a2f597d96efc4d71a1f6ec5092d78",
+        "apps/web/src/ui/primitives/SegmentedControl.tsx": "265611b9a8c6668c0aabb750ddd0572f57fb65aa46fc803aba617ba4606a03dd",
+        "apps/web/src/ui/primitives/OverlayPanel.styles.ts": "36dbc636a5837d00947836689f7d9fe956a774fdadce007479cfda09a581ec90",
+        "apps/web/src/studio/StudioHeader.tsx": "ea6cc7cb978769ca168e19d828e1d27c847e6ff42ba3082b319af686df38424c",
+        "apps/web/src/studio/StudioApp.styles.ts": "204b3f5336e2f2a360ee4b847674de7ca01684879305cd55a6cc6baefd6bba98",
+        "apps/web/src/studio/StudioWorkspace.tsx": "88fb3208a82bbbc1fbf6e342bf3f20fcb66be87a82b919f902686b6635bc768f",
+        "apps/web/src/studio/CreativeWorkspace.tsx": "66e237f8f2a98c8357cc954e266358c1a40790bec8e76c6fd0e312229c447201",
+        "apps/web/src/features/projects/ProjectWorkspaceSurface.tsx": "e8c5b254b9b1227f4743de1dd6dbee2020606d6098219efe1a137e1cfff3462f",
+        "apps/web/src/features/projects/ProjectWorkspaceSurface.styles.ts": "28725ace7c732207a9b159c7eeebba5bb311f7d892f4078757edfd79543f0877",
+        "apps/web/src/features/projects/ProjectWorkflowProgress.tsx": "bc2b560abe37cbc8a20549857b8f8fb32a4c1f2b60cb0b44f088349a56d16dc6",
+        "apps/web/src/features/projects/ProjectOutputSaveSection.tsx": "3aebc5b3821b5f098baca3fa5ce69adf8042833503d85a06994f8b50cc74e7f0",
+        "apps/web/src/features/projects/ProjectSavedVideoPicker.tsx": "49d4e8422dbce7ba77110085858aefeb7a715493ae99f4d3ae1fa1b564445a1a",
+        "apps/web/src/features/export-placements/ExportPlacementChooser.tsx": "c57720c6d69743e1b380245654b9f188ca9c40ca99e55cb0781a9165c45a4759"
+      },
+      "drafts": {
+        "a605097b-859b-4358-b0f9-1bd6d7cbc60e": {
+          "title": "Current Lightframe Project Save Step",
+          "visualDirection": "faithful current Save-step baseline",
+          "currentVersion": 1
+        },
+        "09ffecaf-7931-4814-bae4-ab623c76f6ee": {
+          "title": "Lightframe Studio — Focused Save Flow",
+          "visualDirection": "focused output-target sheet with persistent Save video action",
+          "parentDraftId": "a605097b-859b-4358-b0f9-1bd6d7cbc60e",
+          "currentVersion": 1
+        },
+        "bb931e4e-ad7e-423c-9417-b3939f32b4e4": {
+          "title": "Lightframe Studio — Responsive Destination-first Inspector",
+          "visualDirection": "calm destination-first inspector with progressive output-target reveal and fitted tablet/mobile layouts",
+          "parentDraftId": "a605097b-859b-4358-b0f9-1bd6d7cbc60e",
+          "currentVersion": 2
+        }
+      },
+      "updatedAt": "2026-08-23T02:37:44Z"
+    },
+    "feature:assets-libraries": {
+      "targetKind": "existing-ui",
+      "projectId": "398c207e-297e-435f-b132-d6eab3e4d8b7",
+      "baselineDraftId": "ad8e5c1d-93e5-44b9-8675-1500191f8db5",
+      "activeDraftId": "7bec0821-abd8-4694-a757-abb0e698d1c8",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": [
+        "4455f44f-d8a2-4c71-9b74-31db455f9679",
+        "09a08f4b-5f9a-40df-b49a-dc903a64fb16",
+        "apps-web-public-favicon.svg"
+      ],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "apps-web-public-favicon.svg",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/398c207e-297e-435f-b132-d6eab3e4d8b7/brand-assets/apps-web-public-favicon.svg/favicon.svg",
+          "sourcePath": "apps/web/public/favicon.svg"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        ".superdesign/init/layouts.md",
+        "apps/web/src/ui/theme.ts",
+        "apps/web/src/ui/StudioDesignProvider.tsx",
+        "apps/web/src/ui/media.ts",
+        "apps/web/src/ui/primitives/Button.tsx",
+        "apps/web/src/ui/primitives/PageShell.tsx",
+        "apps/web/src/ui/primitives/PageShell.styles.ts",
+        "apps/web/src/ui/primitives/OverlayPanel.tsx:220:338",
+        "apps/web/src/ui/primitives/OverlayPanel.styles.ts",
+        "apps/web/src/ui/primitives/ActionMenu.tsx",
+        "apps/web/src/ui/primitives/ActionMenu.styles.ts",
+        "apps/web/src/ui/primitives/FormControls.tsx",
+        "apps/web/src/ui/primitives/FormControl.styles.ts",
+        "apps/web/src/ui/primitives/SelectField.tsx",
+        "apps/web/src/ui/primitives/SelectField.styles.ts",
+        "apps/web/src/ui/primitives/SegmentedControl.tsx",
+        "apps/web/src/ui/primitives/ListSearchField.tsx",
+        "apps/web/src/ui/primitives/EmptyStatePreview.tsx",
+        "apps/web/src/ui/primitives/StatusNotice.tsx",
+        "apps/web/src/studio/StudioHeader.tsx:197:338",
+        "apps/web/src/studio/StudioApp.styles.ts:1:295",
+        "apps/web/src/features/assets/AssetsRouteSurface.tsx",
+        "apps/web/src/features/assets/assetLibraryDescriptions.ts",
+        "apps/web/src/studio/StudioLibraryOverlays.tsx",
+        "apps/web/src/features/video-gallery/VideoGallery.tsx:1:226",
+        "apps/web/src/features/video-gallery/VideoGallery.tsx:535:962",
+        "apps/web/src/features/video-gallery/VideoGallery.styles.ts",
+        "apps/web/src/features/account-library/SavedCreativeLibrary.tsx",
+        "apps/web/src/features/voice-effects/VoiceLibrary.tsx",
+        "apps/web/src/features/voice-effects/VoiceList.tsx",
+        "apps/web/src/features/creative-assets/CreativeLibraryPortability.tsx"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "5959f087940683a9c4751c92b1671805fdb87aa215aa6c3ca51687ddc3974d8a",
+        ".superdesign/init/layouts.md": "6c6aaaafc0b30b75aa0565fe3a93aa47817f1debae5b4dcabf190f77d9972eb2",
+        "apps/web/src/ui/theme.ts": "626cbc3bef3b1df450f441545744b5a40173bfdabf6f061a6949ec28336ac1a5",
+        "apps/web/src/ui/StudioDesignProvider.tsx": "0d2743c24ff70c86cb81b8b2df57ce1d222f5a66131c1dd8b8746998a5ec8f9c",
+        "apps/web/src/ui/media.ts": "fab4f59c856d46dc81ae6854bdb2fb78b2ef608a9a38b629f32c645c71b9be6e",
+        "apps/web/src/ui/primitives/Button.tsx": "0a226d4088621ab8da593349f483a956132cccbd161801afaa5277b4bfd36d03",
+        "apps/web/src/ui/primitives/PageShell.tsx": "ea58aa79826126afc5a1ac01d33c5edf298d9e8366f0f97f96095b69144a618f",
+        "apps/web/src/ui/primitives/PageShell.styles.ts": "7c4797de2a7b1bb063b1c6d38ba5f4c853dfac72d33a0a00e40ff293929979cc",
+        "apps/web/src/ui/primitives/OverlayPanel.tsx": "571d2df0c36d2372f22dbf5741bc647fe789331bc6214da432e8f65b70bc2a73",
+        "apps/web/src/ui/primitives/OverlayPanel.styles.ts": "36dbc636a5837d00947836689f7d9fe956a774fdadce007479cfda09a581ec90",
+        "apps/web/src/ui/primitives/ActionMenu.tsx": "130df21cb45c796980069168d9a16ae9557cdaff94798fa02fe047eb1fe298f7",
+        "apps/web/src/ui/primitives/ActionMenu.styles.ts": "449024ffeb794e3dc62a666b006b313175a731ffc152ca8a872bac600dddff87",
+        "apps/web/src/ui/primitives/FormControls.tsx": "05485d773cad5d5c175633ebac9fd5ae7c54bc0fc58329800308888b0f5166b2",
+        "apps/web/src/ui/primitives/FormControl.styles.ts": "347054c48cadc69d7af0f90d42edbc66746a7c0f44a642f52ac5975ec1ea9f87",
+        "apps/web/src/ui/primitives/SelectField.tsx": "4bd085b393bf4acee35b81d587a9923edbf1feadc3feed0082fff7ff25e7bdc0",
+        "apps/web/src/ui/primitives/SelectField.styles.ts": "1974b5708fd6485362670d283987421a2ce4a9e7898feea4fc1ad2a1107ea541",
+        "apps/web/src/ui/primitives/SegmentedControl.tsx": "265611b9a8c6668c0aabb750ddd0572f57fb65aa46fc803aba617ba4606a03dd",
+        "apps/web/src/ui/primitives/ListSearchField.tsx": "9151d2c6d6a1df77cebe0583e9faed98da2d346553e4cc295be1749ac91c5caa",
+        "apps/web/src/ui/primitives/EmptyStatePreview.tsx": "503ef9750f4a31811771eee939e76a1e04aa984a04248ff613e14cb9aa1afb93",
+        "apps/web/src/ui/primitives/StatusNotice.tsx": "9f31a9af1ec27276fe8673f60d7eb901777a2f597d96efc4d71a1f6ec5092d78",
+        "apps/web/src/studio/StudioHeader.tsx": "ea6cc7cb978769ca168e19d828e1d27c847e6ff42ba3082b319af686df38424c",
+        "apps/web/src/studio/StudioApp.styles.ts": "204b3f5336e2f2a360ee4b847674de7ca01684879305cd55a6cc6baefd6bba98",
+        "apps/web/src/features/assets/AssetsRouteSurface.tsx": "87a779eb50a00434eecc20edc4f752bfae8777f98f8d84c7812cefab1685504a",
+        "apps/web/src/features/assets/assetLibraryDescriptions.ts": "c6585aded1a922b5028eb5e4c9fd2acf314be3251afc2cd22971ed918f2b13b2",
+        "apps/web/src/studio/StudioLibraryOverlays.tsx": "bf86200ebbfc8340ed2e0c2ee63bb6b843720a8fa18abb1b37d9b4e127e2b8f8",
+        "apps/web/src/features/video-gallery/VideoGallery.tsx": "8fe15f31dbe2ff6aa31aea15fe879ac896588e0685dde64de7143de72ef08df4",
+        "apps/web/src/features/video-gallery/VideoGallery.styles.ts": "ee9b620f3d676e1d2654290db84400ec1cb91303186055d1fa1b12cfa3dd5fc9",
+        "apps/web/src/features/account-library/SavedCreativeLibrary.tsx": "2dbc3d6ab7cf71f0ccb5cd8d77cf2028ee3f699e6d34da481607cd30867db5c9",
+        "apps/web/src/features/voice-effects/VoiceLibrary.tsx": "20148f1a5f633ad39d4aa1782b31d87a2f11f5c8e399f0c6d60b67cdf21bb72f",
+        "apps/web/src/features/voice-effects/VoiceList.tsx": "772aa799aeca42953904c4cda4f1d39782d9a44b79bf888e4eb5056a98b7c999",
+        "apps/web/src/features/creative-assets/CreativeLibraryPortability.tsx": "e2bbeb0697ba83bffa5369aafe22b6a9ecfb81cb9959955cd677af277ef81e34"
+      },
+      "drafts": {
+        "ad8e5c1d-93e5-44b9-8675-1500191f8db5": {
+          "title": "Current Lightframe Assets Hub",
+          "visualDirection": "faithful current Assets hub baseline",
+          "currentVersion": 1
+        },
+        "7bec0821-abd8-4694-a757-abb0e698d1c8": {
+          "title": "Lightframe Assets — Persistent Library Overlay",
+          "visualDirection": "token-matched account-synced tabbed library overlay with inline search clearing and bounded responsive filters",
+          "parentDraftId": "ad8e5c1d-93e5-44b9-8675-1500191f8db5",
+          "currentVersion": 7
+        }
+      },
+      "updatedAt": "2026-08-24T03:11:37Z"
+    }
+  }
+}

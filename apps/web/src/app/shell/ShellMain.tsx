@@ -1,7 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, type ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { Navigate, useLocation, useNavigate } from 'react-router';
 import { mainGridStyles } from '../../studio/StudioApp.styles';
-import type { AssetCountState } from '../../features/assets/AssetsRouteSurface';
 import { APP_PATHS, focusesMainOnNavigation } from '../paths';
 import type { ShellServices } from './useShellServices';
 
@@ -18,11 +17,6 @@ const CampaignRouteSurface = lazy(() =>
 const DashboardRouteSurface = lazy(() =>
   import('../../features/dashboard/DashboardRouteSurface').then((module) => ({
     default: module.DashboardRouteSurface,
-  })),
-);
-const AssetsRouteSurface = lazy(() =>
-  import('../../features/assets/AssetsRouteSurface').then((module) => ({
-    default: module.AssetsRouteSurface,
   })),
 );
 const LiveBetaRouteSurface = lazy(() =>
@@ -92,21 +86,6 @@ export const ShellMain = ({ services, displayName, studioRuntime }: ShellMainPro
     openOverlay('ai-experience');
     void navigate(APP_PATHS.create, { replace: true, state: null });
   }, [navigate, openOverlay]);
-  /*
-   * Both browser-held libraries answer from the same store, so they share one state: unread until
-   * IndexedDB has loaded, and unavailable — with a reopen — when it could not be opened at all.
-   */
-  const creativeReopen = creative.reopen;
-  const creativeCount = useCallback(
-    (count: number): AssetCountState =>
-      creative.health === 'session-only'
-        ? { status: 'error', retry: creativeReopen }
-        : creative.hydrated
-          ? { status: 'ready', count }
-          : { status: 'loading' },
-    [creative.health, creative.hydrated, creativeReopen],
-  );
-
   // Not a mount-time effect: the shell stays mounted, so arriving somewhere new is a change of
   // `location.key` rather than a remount. 'default' is a cold direct entry, where stealing focus
   // would move it away from the top of the document the operator just loaded.
@@ -143,20 +122,7 @@ export const ShellMain = ({ services, displayName, studioRuntime }: ShellMainPro
         </Suspense>
       ) : null}
 
-      {route.assetsRouteActive ? (
-        <Suspense fallback={<p role="status">Loading Assets…</p>}>
-          <AssetsRouteSurface
-            characters={creativeCount(creative.store.savedCharacterPrompts.length)}
-            outfits={creativeCount(
-              creative.store.savedPrompts.filter((item) => item.modelModeId === 'lucy-vton-latest')
-                .length,
-            )}
-            creativeLibraryMirror={creative.sync.mirror}
-            onOpen={nav.openAssetLibrary}
-            onUploadVideo={nav.uploadVideo}
-          />
-        </Suspense>
-      ) : null}
+      {route.pathname === APP_PATHS.assets ? <Navigate to={nav.assetEntryPath()} replace /> : null}
 
       {route.liveRouteActive ? (
         <>

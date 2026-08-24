@@ -12,6 +12,7 @@ import {
 } from '../features/recording';
 import { TakeReviewActions } from '../features/take-review/TakeReviewActions';
 import type { SaveVideoState } from '../features/saved-videos/useSaveVideo';
+import { media } from '../ui/media';
 
 type StudioSessionControlBarProps = {
   session: StudioSessionController;
@@ -107,7 +108,7 @@ const barStyles = (theme: Theme, visible: boolean): CSSObject => ({
     padding: theme.space.xs,
     borderRadius: '1.4rem',
   },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     padding: '0.35rem',
     borderRadius: theme.radii.medium,
   },
@@ -148,7 +149,7 @@ const identityStyles = (theme: Theme): CSSObject => ({
     fontWeight: 800,
     cursor: 'pointer',
   },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     gridTemplateColumns: '1.65rem minmax(0, 1fr) auto',
     '& img, & > span:first-of-type': { width: '1.65rem', height: '1.65rem' },
   },
@@ -173,7 +174,7 @@ const actionRowStyles = (theme: Theme): CSSObject => ({
     height: '1.45rem',
   },
   '& [data-ai-label-short]': { display: 'none' },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     gap: '0.3rem',
     '& > button': {
       minWidth: '2.75rem',
@@ -266,7 +267,7 @@ const cameraToolsStyles = (theme: Theme): CSSObject => ({
     color: theme.colors.warning,
     fontSize: theme.fontSizes.caption,
   },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     gap: '0.3rem',
     '& button': { paddingInline: '0.55rem' },
     '& [data-switch-camera-label]': {

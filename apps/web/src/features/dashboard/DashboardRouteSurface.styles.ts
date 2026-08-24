@@ -1,55 +1,32 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
+import { pageScrollRegionStyles } from '../../ui/primitives/PageShell.styles';
 
+/** The scroll region and query container; `PageShell` inside it owns width and padding. */
 export const dashboardStyles = (theme: Theme): CSSObject => ({
+  ...pageScrollRegionStyles(theme),
   width: '100%',
-  height: '100%',
-  minWidth: 0,
-  minHeight: 0,
-  marginInline: 'auto',
-  padding: `4.5rem ${theme.space.xxl} 4rem`,
-  overflowY: 'auto',
-  background: theme.colors.canvas,
-  '& h1, & h2, & h3': { fontFamily: theme.type.display },
+  '& h2, & h3': { fontFamily: theme.type.display },
   '& p': { margin: 0 },
-  '@media (max-width: 47.99rem)': {
-    padding: `${theme.space.xl} ${theme.space.lg} max(5rem, calc(env(safe-area-inset-bottom) + 4.5rem))`,
-  },
-  '@media (max-width: 22rem)': {
-    paddingInline: theme.space.lg,
+});
+
+/** Layered onto `PageShell`: the one thing the Dashboard's scroll region needs that no page does. */
+export const dashboardShellStyles = (): CSSObject => ({
+  // The fixed bottom navigation sits over the last rows of a scrolled Dashboard without this.
+  [media.down('compact')]: {
+    paddingBlockEnd: `max(5rem, calc(env(safe-area-inset-bottom) + 4.5rem))`,
   },
 });
 
+/**
+ * Layered onto `PageHeader` — not onto the shell above it. The eyebrow, title scale and identity
+ * grid come from the shared header; only the Dashboard's own action pair stays here.
+ *
+ * These rules have to sit on the same element the shared ones do. Declared from an ancestor they
+ * tie on specificity and are settled by stylesheet insertion order, which is decided by whichever
+ * surface happened to mount a `PageHeader` first in the session.
+ */
 export const dashboardHeaderStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) auto',
-  alignItems: 'end',
-  gap: theme.space.lg,
-  paddingBlockEnd: theme.space.xl,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
-  // A greeting, not a category label: the old uppercase 0.2em-tracked 0.625rem treatment made
-  // "Welcome back, …" read as an eyebrow rather than as a sentence addressed to the operator.
-  '& [data-dashboard-eyebrow]': {
-    display: 'block',
-    marginBlockEnd: theme.space.xs,
-    color: theme.colors.textMuted,
-    fontSize: '0.9375rem',
-    fontWeight: 600,
-    letterSpacing: '-0.01em',
-  },
-  '& h1': {
-    margin: 0,
-    color: theme.colors.text,
-    fontSize: 'clamp(1.5rem, 3vw, 1.875rem)',
-    letterSpacing: '-0.035em',
-    lineHeight: 1.05,
-  },
-  '& p': {
-    maxWidth: '34rem',
-    marginBlockStart: theme.space.xs,
-    color: theme.colors.textMuted,
-    fontSize: 'clamp(0.875rem, 1.5vw, 1rem)',
-    lineHeight: 1.55,
-  },
   '& [data-dashboard-actions]': {
     display: 'flex',
     alignItems: 'center',
@@ -61,14 +38,10 @@ export const dashboardHeaderStyles = (theme: Theme): CSSObject => ({
     boxShadow: 'none',
   },
   '& [data-dashboard-actions] > button:last-of-type': { paddingInline: 0 },
-  '@media (max-width: 57rem)': {
-    gridTemplateColumns: 'minmax(0, 1fr)',
-    alignItems: 'start',
-  },
-  '@media (max-width: 30rem)': {
-    '& [data-dashboard-actions]': {
-      flexWrap: 'wrap',
-    },
+  '@container (max-width: 30rem)': {
+    '& [data-dashboard-actions]': { flexWrap: 'wrap' },
+    // The Dashboard's slot holds two peer controls, so it opts out of the one-primary grid.
+    '& [data-page-actions]': { display: 'flex' },
   },
 });
 
@@ -82,7 +55,7 @@ export const onboardingStyles = (theme: Theme): CSSObject => ({
   // uses it. Quiet by construction — muted, metadata-sized, one rule below it — so it introduces
   // the words without competing with the `Create video` primary above it.
   paddingBlock: theme.space.sm,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   color: theme.colors.textMuted,
   fontSize: theme.fontSizes.metadata,
   lineHeight: 1.5,
@@ -122,7 +95,7 @@ export const processingQueueStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gap: theme.space.md,
   paddingBlock: theme.space.xl,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   '& > header': {
     display: 'flex',
     alignItems: 'start',
@@ -145,7 +118,7 @@ export const processingQueueStyles = (theme: Theme): CSSObject => ({
     display: 'grid',
     margin: 0,
     padding: 0,
-    borderBlockStart: `1px solid ${theme.colors.border}`,
+    borderBlockStart: `1px solid ${theme.colors.divider}`,
     listStyle: 'none',
   },
   '& > ul > li': {
@@ -156,7 +129,7 @@ export const processingQueueStyles = (theme: Theme): CSSObject => ({
     alignItems: 'center',
     gap: theme.space.md,
     padding: `${theme.space.md} ${theme.space.xs}`,
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
   },
   '& [data-job-status]': {
     padding: `${theme.space.xxs} ${theme.space.sm}`,
@@ -233,7 +206,7 @@ export const dashboardBodyStyles = (theme: Theme): CSSObject => ({
     gridTemplateColumns: 'minmax(0, 1fr)',
     gap: theme.space.xxl,
   },
-  '@media (max-width: 47.99rem)': {
+  [media.down('compact')]: {
     paddingBlock: theme.space.xl,
     gap: theme.space.xxl,
   },
@@ -299,7 +272,7 @@ export const recentWorkStyles = (theme: Theme): CSSObject => ({
     color: theme.colors.textMuted,
     fontSize: theme.fontSizes.metadata,
   },
-  '@media (max-width: 80rem)': { '& > header': { gap: theme.space.sm } },
+  [media.down('desktop')]: { '& > header': { gap: theme.space.sm } },
   '@media (max-width: 34rem)': {
     '& > header': {
       alignItems: 'flex-start',
@@ -333,16 +306,16 @@ export const recentFilterStyles = (theme: Theme): CSSObject => ({
     outline: `2px solid ${theme.colors.focus}`,
     outlineOffset: '3px',
   },
-  '@media (max-width: 80rem)': { gap: theme.space.xs },
+  [media.down('desktop')]: { gap: theme.space.xs },
   '@media (max-width: 34rem)': { justifyContent: 'flex-start' },
 });
 
 export const recentListStyles = (theme: Theme): CSSObject => ({
   margin: 0,
   padding: 0,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   listStyle: 'none',
-  '& li': { minWidth: 0, borderBlockEnd: `1px solid ${theme.colors.border}` },
+  '& li': { minWidth: 0, borderBlockEnd: `1px solid ${theme.colors.divider}` },
   '& li > button': {
     width: '100%',
     minHeight: '4.5rem',
@@ -388,7 +361,7 @@ export const emptyRecentStyles = (theme: Theme): CSSObject => ({
   justifyItems: 'start',
   gap: theme.space.sm,
   paddingBlock: theme.space.xl,
-  borderBlock: `1px solid ${theme.colors.border}`,
+  borderBlock: `1px solid ${theme.colors.divider}`,
   color: theme.colors.textMuted,
   fontSize: theme.fontSizes.body,
   lineHeight: 1.55,

@@ -244,7 +244,10 @@ presentations share one overlay controller, creative-selection handoff, activity
 return-focus behavior. They never mount duplicate stateful selectors or start media/provider work.
 
 All tools use the shared `OverlayPanel` portal. It owns focus trap, inert background, Escape,
-topmost dismissal, scroll lock, transition-safe backdrop behavior, and return focus. The portal
+topmost dismissal, scroll lock, transition-safe backdrop behavior, and return focus. A popover
+opened _inside_ a panel — an `ActionMenu` — takes Escape first: `useDismissiblePopover` listens in
+the capture phase and marks the event handled, so the innermost layer closes and the panel still
+owns Escape once nothing is open inside it. The portal
 follows the active browser fullscreen element. In stage fullscreen, the existing media stage fills
 the viewport and the creative-tool and session/device regions are hidden; the stage control bar
 remains beneath the video frame. A panel triggered from the stage still renders above the
@@ -651,7 +654,7 @@ conflicting. Upload and finalized-recording commands
 store an owner-bound ready asset, server-computed checksum, inspected video metadata, source record,
 and revision-scoped source/working/presented links before claiming resume. Exact Saved Video Version
 reuse verifies an active same-owner Version and references its existing asset without copying bytes;
-the used-by relationship does not claim Project production and does not select an Add Version save
+the used-by relationship does not claim Project production and does not select an existing-video save
 target. Authenticated metadata and byte-range/HEAD content routes expose only normalized metadata
 and a controlled relative content URL, never storage keys, paths, checksums, or provider bodies.
 
@@ -695,7 +698,7 @@ The owner-derived **Adopt Project Working Media** command accepts either a valid
 whose durable bytes were inspected and checksummed or an exact same-owner ready Media Asset/Saved
 Video Version. It flushes the Project session, uses Project/revision CAS plus an operation-key
 fingerprint, appends normalized working/presented lineage and the exact local edit, clears obsolete
-output status, and never changes `sourceAssetId`, chooses an Add Version target, or adds produced-by
+output status, and never changes `sourceAssetId`, chooses an existing-video save target, or adds produced-by
 provenance. Exact replay returns the original adoption revision; changing media, edit, or base
 tokens under the key conflicts. A Render preview remains worker-owned and temporary until this
 command succeeds. The creator aborts or releases failures and consults Project retention before
@@ -741,15 +744,17 @@ polling, not accepted provider work; reopen reconnects it. Configuration alone s
 provider request. Provider-backed Voice and live Character/VTO starts remain composition-gated
 because they cannot satisfy this command's recovery contract.
 
-The Project review surface offers **Save as New Video** and a separate **Add Version** path. Add
-Version first loads an active Saved Video, then confirms its title, current ordinal, dimensions, and
-expected current Version; Project source lineage never selects that target. Before sending, the
-browser flushes the Project session and stores a strict environment/user/Project-scoped v1 pending
-operation containing the exact request and UUID. A lost response or reload reuses that operation
-unchanged until the durable receipt returns the one original result. Final 4xx/conflict responses
-clear the pending operation; ambiguous transport failure preserves it for explicit or automatic
-reconciliation. This small browser record coordinates retry only and is never Project or Saved
-Video authority.
+The Project review surface offers one placement-labelled **Save video** action. It reveals one
+destination choice: a titled new Saved Video, or a new Version of one explicitly selected active
+Saved Video. The latter loads and names the target plus its expected current Version inside that
+same surface; Project source lineage never selects it, and no picker-to-confirmation modal chain
+exists. Desktop and tablet keep the choice in the inspector; mobile uses one focus-trapped bottom
+sheet. Before sending, the browser flushes the Project session and stores a strict
+environment/user/Project-scoped v1 pending operation containing the exact request and UUID. A lost
+response or reload reuses that operation unchanged until the durable receipt returns the one
+original result. Final 4xx/conflict responses clear the pending operation; ambiguous transport
+failure preserves it for explicit or automatic reconciliation. This small browser record
+coordinates retry only and is never Project or Saved Video authority.
 
 Project processing admits one app-owned operation against the exact current Project revision and
 durable working/source Media Asset before provider contact. The atomic local journal or relational
@@ -948,7 +953,7 @@ provider path and never causes provider fallback.
 | Decart                      | `POST /api/realtime-token`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Existing-video processing   | `GET /api/video-jobs` lists the owner queue; `PUT /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId/content`, and `DELETE /api/video-jobs/:jobId` own temporary submission/delivery; acknowledged `POST /api/video-jobs/:jobId/abandon` durably releases local tracking without claiming provider cancellation                                                                                                                                                                                          |
 | Saved videos                | `POST/GET /api/videos`, `GET/PATCH/DELETE /api/videos/:videoId`, `POST /api/videos/:videoId/versions`, owner-checked current/version content, and optional thumbnail upload/content. Authoritative Neon/R2 also registers `POST /api/videos/uploads`, staged part list/sign/complete, and `DELETE /api/videos/uploads/:uploadId`; all expose only the app upload UUID.                                                                                                                                                                   |
-| Creative library            | `GET/PUT /api/creative-library` with an owner-derived revision compare-and-swap when Neon is authoritative. A paused mirror is recoverable from the browser: `CreativeLibrarySyncNotice` offers Try again, Keep this browser's copy (fresh read, then full-store PUT) and Use the cloud copy (`replaceFromRemote`). No merge exists, because the contract has no per-record identity                                                                                                                                                     |
+| Creative library            | `GET/PUT /api/creative-library` with an owner-derived revision compare-and-swap and normalized owner rows when Neon is authoritative; a fresh signed-in session hydrates its IndexedDB cache from that account snapshot. `CreativeLibrarySyncNotice` recovers a paused mirror with Try again, Save current copy (fresh read, then full-store PUT) or Reload account copy (`replaceFromRemote`). No merge exists, because the contract has no per-record identity                                                                         |
 | Reference optimization/work | `POST /api/reference-images/optimize`, `POST /api/reference-images`, `POST /api/reference-images/import`, `POST /api/reference-images/:sourceAssetId/edits`, `POST /api/reference-images/:sourceAssetId/compositions`, `POST /api/reference-images/:sourceAssetId/outfit-try-ons`                                                                                                                                                                                                                                                        |
 | Reference asset lifecycle   | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`, trusted-origin `DELETE /api/reference-images/:assetId`                                                                                                                                                                                                                                                                                                                                                         |
 | Saved-Voice relationship    | Authenticated `GET /api/elevenlabs/voices/:voiceId/relationship`; returns only the submitted ID and current owner's saved boolean without provider contact                                                                                                                                                                                                                                                                                                                                                                               |

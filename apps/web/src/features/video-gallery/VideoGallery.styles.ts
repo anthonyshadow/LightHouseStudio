@@ -1,5 +1,6 @@
 import type { CSSObject, Theme } from '@emotion/react';
 import { buttonVariantStyles } from '../../ui/primitives/Button';
+import { media } from '../../ui/media';
 
 export const galleryStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
@@ -17,15 +18,33 @@ export const gallerySummaryStyles = (theme: Theme): CSSObject => ({
   '& strong': { color: theme.colors.text, fontWeight: 760 },
 });
 
-export const gallerySearchRowStyles = (): CSSObject => ({
+export const gallerySearchRowStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr)',
-  '@media (min-width: 64rem)': { maxWidth: '32rem' },
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  alignItems: 'start',
+  gap: theme.space.sm,
+  '& [data-mobile-filter-trigger]': {
+    minHeight: '2.85rem',
+    marginBlockStart: '1.55rem',
+    paddingInline: theme.space.sm,
+    whiteSpace: 'nowrap',
+  },
+  '& [data-active-filter-count]': {
+    padding: `0.12rem ${theme.space.xs}`,
+    borderRadius: theme.radii.round,
+    color: theme.colors.accentStrong,
+    background: theme.colors.accentSoft,
+    fontSize: '0.68rem',
+  },
+  [media.up('laptop')]: {
+    maxWidth: '32rem',
+    gridTemplateColumns: 'minmax(0, 1fr)',
+    '& [data-mobile-filter-trigger]': { display: 'none' },
+  },
 });
 
 export const filterControlsStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr)',
+  display: 'none',
   alignItems: 'end',
   gap: theme.space.sm,
   padding: theme.space.md,
@@ -33,11 +52,29 @@ export const filterControlsStyles = (theme: Theme): CSSObject => ({
   borderRadius: theme.radii.large,
   background: theme.colors.surfaceSoft,
   '& > button': { minHeight: '2.75rem' },
-  '@media (min-width: 40rem)': {
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
+    display: 'grid',
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr)) auto',
+  },
+});
+
+export const filterSheetFieldsStyles = (theme: Theme): CSSObject => ({
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  gap: theme.space.md,
+  [media.up('tablet')]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
+  '@media (max-height: 36rem)': { gap: theme.space.xxs },
+});
+
+export const filterSheetFooterStyles = (theme: Theme): CSSObject => ({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: theme.space.sm,
+  '& > button': {
+    minWidth: 0,
+    paddingInline: theme.space.xs,
+    fontSize: theme.fontSizes.caption,
+    whiteSpace: 'nowrap',
   },
 });
 
@@ -46,10 +83,10 @@ export const gridStyles = (theme: Theme): CSSObject => ({
   gridTemplateColumns: 'minmax(0, 1fr)',
   gap: theme.space.lg,
   paddingBlockEnd: theme.space.lg,
-  '@media (min-width: 40rem)': {
+  [media.up('tablet')]: {
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   },
-  '@media (min-width: 64rem)': {
+  [media.up('laptop')]: {
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
   },
   '@media (max-height: 36rem)': { gap: theme.space.md },
@@ -68,6 +105,32 @@ export const cardStyles = (theme: Theme): CSSObject => ({
   '&:hover': { borderColor: theme.colors.borderStrong, transform: 'translateY(-1px)' },
   '&:has(details[open])': { zIndex: 2 },
   '& h3, & p': { margin: 0 },
+});
+
+export const skeletonCardStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  overflow: 'hidden',
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: theme.radii.large,
+  background: theme.colors.surfaceSoft,
+  '& [data-skeleton-poster]': {
+    display: 'block',
+    aspectRatio: '16 / 9',
+    background: theme.colors.surfaceStrong,
+  },
+  '& [data-skeleton-copy]': {
+    display: 'grid',
+    gap: theme.space.sm,
+    padding: theme.space.md,
+  },
+  '& [data-skeleton-line]': {
+    display: 'block',
+    width: '72%',
+    height: '0.8rem',
+    borderRadius: theme.radii.small,
+    background: theme.colors.border,
+  },
+  '& [data-skeleton-line="short"]': { width: '44%' },
 });
 
 export const posterButtonStyles = (theme: Theme): CSSObject => ({
@@ -126,7 +189,8 @@ export const thumbnailPlaceholderStyles = (theme: Theme): CSSObject => ({
   placeItems: 'center',
   color: theme.colors.textMuted,
   fontSize: theme.fontSizes.caption,
-  '& svg': { width: '2rem', height: '2rem' },
+  '& svg': { display: 'none' },
+  '& > span': { transform: 'translateY(2.35rem)' },
 });
 
 export const playBadgeStyles = (theme: Theme): CSSObject => ({
@@ -262,64 +326,6 @@ export const actionsStyles = (theme: Theme): CSSObject => ({
   '& > a:first-of-type': { ...downloadLinkStyles(theme), flex: 1 },
 });
 
-export const actionMenuStyles = (theme: Theme): CSSObject => ({
-  position: 'relative',
-  flex: '0 0 auto',
-  '& summary': {
-    width: '2.75rem',
-    height: '2.75rem',
-    display: 'grid',
-    placeItems: 'center',
-    border: `1px solid ${theme.colors.borderStrong}`,
-    borderRadius: theme.radii.medium,
-    color: theme.colors.textMuted,
-    background: theme.colors.surfaceStrong,
-    cursor: 'pointer',
-    listStyle: 'none',
-    '&::-webkit-details-marker': { display: 'none' },
-    '&:hover': { color: theme.colors.text, borderColor: theme.colors.accent },
-    '&:focus-visible': {
-      outline: `2px solid ${theme.colors.focus}`,
-      outlineOffset: '2px',
-    },
-    '& svg': { width: '1.2rem', height: '1.2rem' },
-  },
-  '&[open] summary': { color: theme.colors.text, borderColor: theme.colors.accent },
-});
-
-export const actionMenuPopoverStyles = (theme: Theme): CSSObject => ({
-  position: 'absolute',
-  zIndex: 3,
-  insetInlineEnd: 0,
-  insetBlockEnd: `calc(100% + ${theme.space.xs})`,
-  width: '12rem',
-  display: 'grid',
-  gap: theme.space.xxs,
-  padding: theme.space.xs,
-  border: `1px solid ${theme.colors.borderStrong}`,
-  borderRadius: theme.radii.medium,
-  background: theme.colors.overlaySurface,
-  boxShadow: theme.shadows.lifted,
-  '& a, & button': {
-    width: '100%',
-    minHeight: '2.75rem',
-    display: 'flex',
-    alignItems: 'center',
-    padding: `${theme.space.xs} ${theme.space.sm}`,
-    border: 0,
-    borderRadius: theme.radii.small,
-    color: theme.colors.text,
-    background: 'transparent',
-    fontWeight: 700,
-    textAlign: 'start',
-    textDecoration: 'none',
-    cursor: 'pointer',
-    '&:hover': { background: theme.colors.surfaceStrong },
-    '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '-2px' },
-  },
-  '& [data-danger]': { color: theme.colors.danger },
-});
-
 export const paginationStyles = (theme: Theme): CSSObject => ({
   position: 'sticky',
   insetBlockEnd: 0,
@@ -354,7 +360,7 @@ export const previewPlayerStyles = (theme: Theme): CSSObject => ({
     objectFit: 'contain',
     background: '#000',
   },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  [media.downOrShort('tablet', '36rem')]: {
     maxHeight: '46dvh',
     borderRadius: theme.radii.medium,
     '& video': { maxHeight: '46dvh' },
@@ -376,7 +382,7 @@ export const previewFooterStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.xs,
   '& > *': { minWidth: '8.5rem' },
   '& > a': downloadLinkStyles(theme),
-  '@media (max-width: 39.99rem)': {
+  [media.down('tablet')]: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
     '& > *': { minWidth: 0 },

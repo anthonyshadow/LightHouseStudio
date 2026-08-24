@@ -40,8 +40,31 @@ failure traced straight to them:
 | LF-S04   | AI tools disappear below 64rem, unexplained       | The rail carries all three tools at every width          |
 | LF-A11Y3 | A blocked tool's reason survives only in `title=` | The reason stays visible on mobile, clamped to two lines |
 
-The rest of Tiers 2–5 is open. Everything else in this document still describes the product as
-audited.
+**Tier 2 of the plan is also complete** (2026-08-22, branch `LightFrameUxImprovements2`). These
+findings are fixed in the product and struck through below and in the plan:
+
+| ID       | Finding                                            | Fixed by                                                           |
+| -------- | -------------------------------------------------- | ------------------------------------------------------------------ |
+| LF-P03   | "Version" means three different things             | Duplicate Project · Version · Autosaved — one meaning each         |
+| LF-P01   | Five peer actions with a red `Archive` among them  | One state-derived primary plus `ActionMenu`                        |
+| LF-P02   | Four to five inline actions per Projects row       | `Open` leads; the rest move into the row's `ActionMenu`            |
+| LF-A03   | A `<details>` menu with no Escape or outside-click | One `ActionMenu` primitive with real `menu` / `menuitem` semantics |
+| LF-DS01  | The breakpoint system is unused                    | `media.up/down/between/downOrShort`; 140 occurrences migrated      |
+| LF-DS02  | There is no page shell                             | `PageShell` + `PageHeader`, on all five top-level surfaces         |
+| LF-D01   | The Dashboard has no page max-width                | Same — `PageShell` caps it at 88rem                                |
+| LF-P06   | `h1` to 4rem and `borderRadius: 0` on all buttons  | Same — one title scale, and the blanket radius rule is deleted     |
+| LF-C02   | Three levels of nested bordered surfaces           | Same — Campaigns nests exactly one, the campaign card              |
+| LF-S06   | Take review hides the take on mobile               | A 45dvh bottom sheet; the stage stays visible above it             |
+| LF-S07   | Eight technical chips precede the decision         | Duration and resolution inline; the rest behind `Details`          |
+| LF-S08   | "Close and release" / "temporary in-memory take"   | `Close without saving`, and three neighbouring strings to match    |
+| LF-S09   | Up to six peer actions at peak decision pressure   | One primary, one danger, four in an `ActionMenu`                   |
+| LF-A11Y1 | `border` 1.58:1, `borderStrong` 2.44:1             | 3.08:1 and 3.59:1 worst case; the old value becomes `divider`      |
+
+Tier 2 also removed a latent defect neither this audit nor the plan had found: **Escape inside a
+popover that sat inside an `OverlayPanel` closed the whole panel**, because `useDismissiblePopover`
+listened in the bubble phase behind the panel's own handler.
+
+Tiers 3–5 are open. Everything else in this document still describes the product as audited.
 
 ---
 
@@ -720,7 +743,14 @@ capability is removed rather than reorganised.
 - **Redesign needed:** **Yes.**
 - **Dependencies:** `VideoEditStagePreview`, `stageColumnStyles`. **Risks:** shares the stage grid with capture; regressions possible in Project workspace layout.
 
-### LF-P04 · Four competing save concepts in the Project workspace
+### ~~LF-P04 · Four competing save concepts in the Project workspace~~ — FIXED
+
+**Resolved.** Project revisions now report an ambient timestamped `Autosaved` state, the creative
+checkpoint is **Keep this setup**, and the output step reserves **Save** for one placement-labelled
+**Save video** action. Its New video/New version destination choice stays inline in the
+desktop/tablet inspector and becomes one fitted bottom sheet on mobile, while the persistent action
+remains above the mobile navigation. CAS, idempotency, immutable originals, and exact-Version rules
+are unchanged.
 
 - **Where:** `ProjectWorkspaceSurface.tsx` (`projectWorkspaceSaveStatus`), `ProjectCreativeCheckpointPanel.tsx` (`Save progress`), `ProjectOutputSaveSection.tsx` (`Save as New Video` / `Add Version`)
 - **Category:** Mental model · **Redesign** · **P1** · **L**
@@ -735,7 +765,11 @@ capability is removed rather than reorganised.
 - **Redesign needed:** **Yes** — for the save step only.
 - **Dependencies:** LF-P03 (version vocabulary). **Risks:** `ProjectOutputSaveSection.test.tsx` is 32KB of label assertions.
 
-### LF-P03 · "Version" means three different things
+### ~~LF-P03 · "Version" means three different things~~ — FIXED
+
+**Resolved.** Duplicating a Project is `Duplicate Project`, a Saved Video version keeps `Version`,
+and a Project revision is `Autosaved`. A fourth collision the audit missed — the character
+wardrobe calling its variants "versions" — was fixed with them.
 
 - **Where:** `ProjectsListSurface.tsx:181` (`Make another version`), `ProjectOutputSaveSection.tsx` (`Add Version`), `VideoGallery.tsx` (`Version 3 · Current`), `ProjectWorkspaceSurface.tsx` (revisions)
 - **Category:** Terminology · **Improve** · **P1** · **S**
@@ -780,7 +814,10 @@ capability is removed rather than reorganised.
 - **Change:** _"Live AI isn't available inside a Project yet. You can still run Character Swap and Virtual Try-On on the Project's video."_
 - **Redesign needed:** No.
 
-### LF-S06 · Take review hides the take on mobile
+### ~~LF-S06 · Take review hides the take on mobile~~ — FIXED
+
+**Resolved** via the bottom-sheet option: `OverlayPanelHeight` gains `sheet`, capping the panel at
+`min(45dvh, 24rem)` so the stage stays visible above it.
 
 - **Where:** `StudioTakeOverlays.tsx` (fullscreen `OverlayPanel`) + copy _"Playback remains on the main stage."_
 - **Category:** Review UX · **Improve** · **P1** · **M**
@@ -800,7 +837,11 @@ capability is removed rather than reorganised.
 - **Change:** `white-space: nowrap` + hide the wordmark below ~22rem (icon only), matching the 48–64rem rule.
 - **Redesign needed:** No.
 
-### LF-DS01 · The breakpoint system is unused
+### ~~LF-DS01 · The breakpoint system is unused~~ — FIXED
+
+**Resolved.** `media.up/down/between/downOrShort` read `theme.breakpoints`; 140 of the 203 width
+occurrences migrated, and no tier value is hand-written anywhere. The 60 component-scale widths
+stayed — they describe when a component's content stops fitting, not when the page changes tier.
 
 - **Where:** `ui/theme.ts` `breakpoints` — 1 consumer. 29 distinct hard-coded `max-width` values across `apps/web/src`.
 - **Category:** Design system · **Consolidate** · **P1** · **M**
@@ -809,7 +850,10 @@ capability is removed rather than reorganised.
 - **Change:** Adopt `tablet 40rem / laptop 64rem / desktop 80rem / wide 100rem` plus a documented `compact 48rem`. Add `media.up()/down()` helpers. Migrate surface by surface, visual baselines as the guard.
 - **Redesign needed:** No. **Risks:** every visual baseline moves; do it as one deliberate change.
 
-### LF-DS02 · There is no page shell
+### ~~LF-DS02 · There is no page shell~~ — FIXED
+
+**Resolved.** `PageShell` and `PageHeader` frame all five top-level surfaces, on one title scale,
+with no page-level border or radius and no `borderRadius: 0` policy.
 
 - **Where:** `DashboardRouteSurface.styles.ts:3`, `AssetsRouteSurface.tsx:33`, `ProjectsListSurface.styles.ts:3`, `ProjectOverviewSurface.styles.ts:3`, `CampaignRouteSurface.styles.ts`
 - **Category:** Design system · **Consolidate** · **P1** · **M**
@@ -831,27 +875,27 @@ capability is removed rather than reorganised.
 | LF-N05       | —                                            | **No Settings destination exists.** Account is read-only.                                                                            | Investigate | M           |
 | LF-S03       | `stageColumnStyles`                          | Stage does not fill its column; large dead space around it.                                                                          | Improve     | M           |
 | ~~LF-S04~~   | `CreativeWorkspace.tsx`                      | ~~Character/Outfit tools disappear below 64rem, unexplained.~~ **Fixed** — the rail carries all three tools at every width.          | Improve     | M           |
-| LF-S07       | `StudioTakeOverlays.tsx`                     | 8 technical chips (fps, KiB, mime) above the decision.                                                                               | Simplify    | S           |
-| LF-S08       | `TakeReviewActions.tsx`                      | "Close and release" / "release the temporary in-memory take".                                                                        | Polish      | XS          |
-| LF-S09       | `TakeReviewActions.tsx`                      | Up to six peer actions at the moment of highest decision pressure.                                                                   | Simplify    | S           |
+| ~~LF-S07~~   | `StudioTakeOverlays.tsx`                     | ~~8 technical chips (fps, KiB, mime) above the decision.~~ **Fixed** — duration and resolution inline, the rest behind `Details`.    | Simplify    | S           |
+| ~~LF-S08~~   | `TakeReviewActions.tsx`                      | ~~"Close and release" / "release the temporary in-memory take".~~ **Fixed** — `Close without saving`, and its neighbours to match.   | Polish      | XS          |
+| ~~LF-S09~~   | `TakeReviewActions.tsx`                      | ~~Up to six peer actions at the moment of highest decision pressure.~~ **Fixed** — one primary, one danger, four in an `ActionMenu`. | Simplify    | S           |
 | LF-V02       | `VideoEditWorkspace.tsx`                     | No timeline; trim has no visual reference.                                                                                           | Redesign    | L           |
 | LF-V03       | editor settings header                       | Unlabelled low-contrast undo/redo glyphs.                                                                                            | Polish      | XS          |
 | LF-V05       | mobile editor                                | Tool row truncates (`Lig`) with no scroll affordance.                                                                                | Polish      | S           |
 | LF-X01       | `ExistingVideoSourcePreview`, `VideoGallery` | Native `<video controls>` vs custom player elsewhere.                                                                                | Consolidate | M           |
 | LF-X02       | `ExistingVideoActionBar.tsx`                 | Four identical full-width result buttons.                                                                                            | Improve     | S           |
 | LF-X03       | multiple                                     | `Save to Assets` / `Saved Videos` / `Videos` — three names, one place.                                                               | Polish      | S           |
-| LF-P01       | `ProjectOverviewSurface.tsx:153`             | Five peer actions with a red `Archive` in the default row.                                                                           | Simplify    | S           |
-| LF-P02       | `ProjectsListSurface.tsx:167`                | 4–5 inline actions per row.                                                                                                          | Simplify    | S           |
-| LF-P06       | `ProjectsListSurface.styles.ts`              | `h1` to 4rem and `borderRadius: 0` on all buttons — a second design language.                                                        | Improve     | S           |
+| ~~LF-P01~~   | `ProjectOverviewSurface.tsx`                 | ~~Five peer actions with a red `Archive` in the default row.~~ **Fixed** — one primary plus `ActionMenu`; danger lives inside it.    | Simplify    | S           |
+| ~~LF-P02~~   | `ProjectsListSurface.tsx`                    | ~~4–5 inline actions per row.~~ **Fixed** — `Open` leads, the rest move into the row's `ActionMenu`.                                 | Simplify    | S           |
+| ~~LF-P06~~   | `ProjectsListSurface.styles.ts`              | ~~`h1` to 4rem and `borderRadius: 0` on all buttons.~~ **Fixed** — one shared title scale; the blanket radius rule is deleted.       | Improve     | S           |
 | ~~LF-C01~~   | `CampaignRouteSurface.tsx:292`               | ~~Copy promises **"Quick Start"**, which does not exist.~~ **Fixed** — rewritten to name only real controls.                         | Polish      | XS          |
-| LF-C02       | `CampaignRouteSurface.styles.ts`             | Three levels of nested bordered/rounded surfaces.                                                                                    | Simplify    | S           |
-| LF-A03       | `VideoGallery.tsx:239`                       | `<details>` overflow menu: no Escape, no outside-click, no menu semantics. **Still open** — item 7 deliberately left it for item 12. | Improve     | S           |
+| ~~LF-C02~~   | `CampaignRouteSurface.styles.ts`             | ~~Three levels of nested bordered/rounded surfaces.~~ **Fixed** — exactly one, the campaign card.                                    | Simplify    | S           |
+| ~~LF-A03~~   | `VideoGallery.tsx`                           | ~~`<details>` overflow menu: no Escape, no outside-click, no menu semantics.~~ **Fixed** — one `ActionMenu` primitive.               | Improve     | S           |
 | ~~LF-A04~~   | `StudioLibraryOverlays.tsx:113`              | ~~_"Manage your **Lucy 2.5** cast"_ — provider model name in the UI.~~ **Fixed** — see `assetLibraryDescriptions.ts`.                | Polish      | XS          |
 | LF-A07       | `VideoGallery.tsx:583`                       | Empty state uses internal flow names.                                                                                                | Polish      | XS          |
 | LF-DS03      | 6 locations                                  | Six visual answers to "choose one of N".                                                                                             | Consolidate | M           |
 | LF-DS04      | 13 files                                     | Icon sets with three stroke weights.                                                                                                 | Consolidate | S           |
 | LF-DS06      | 37 sites                                     | Bare-text loading everywhere; one skeleton total.                                                                                    | Improve     | M           |
-| LF-A11Y1     | `theme.ts`                                   | `border` 1.58:1, `borderStrong` 2.44:1 — WCAG 1.4.11 needs 3:1.                                                                      | Improve     | S           |
+| ~~LF-A11Y1~~ | `theme.ts`                                   | ~~`border` 1.58:1, `borderStrong` 2.44:1 — WCAG 1.4.11 needs 3:1.~~ **Fixed** — 3.08:1 and 3.59:1; separators become `divider`.      | Improve     | S           |
 | ~~LF-A11Y3~~ | `toolRailStyles` mobile                      | ~~Blocked reason survives only in `title=`.~~ **Fixed** — a blocked tool keeps its reason on mobile, clamped to two lines.           | Improve     | XS          |
 | LF-R04       | mobile editor                                | Media/chrome ratio inverted.                                                                                                         | Redesign    | (in LF-V01) |
 | LF-R05       | `/assets` at 320px                           | ~5 screens of scroll for four navigation cards.                                                                                      | Simplify    | (in LF-N02) |
@@ -861,7 +905,7 @@ capability is removed rather than reorganised.
 | ID         | Where                            | Finding                                                                    | Class       |
 | ---------- | -------------------------------- | -------------------------------------------------------------------------- | ----------- |
 | LF-E02     | `EntryPage.tsx`                  | No product explanation or visual on the entry screen.                      | Improve     |
-| LF-D01     | `dashboardStyles`                | No page max-width.                                                         | Polish      |
+| ~~LF-D01~~ | `dashboardStyles`                | ~~No page max-width.~~ **Fixed** — `PageShell` caps it at 88rem.           | Polish      |
 | LF-D03     | dashboard header                 | `Browse Assets` reads as text, not a control.                              | Polish      |
 | LF-D05     | dashboard                        | Processing Queue is an ops panel on a creative home.                       | Improve     |
 | LF-D06/07  | dashboard                        | Bespoke filter + footer link styles instead of primitives.                 | Consolidate |
@@ -1071,23 +1115,31 @@ surfaces — chiefly `useReferenceRecipeAttribution.ts:97`, `CharacterNameDialog
 `ExistingVideoVisualEditor.tsx:176`. Cost and contact disclosures that name a provider at the point
 of spend are deliberate and stay.
 
-## 2 — Work on next (1–2 weeks)
+## 2 — ~~Work on next~~ · **DONE** (2026-08-22)
 
-| #   | Work                                                                                                                          | IDs                             |
-| --- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| 11  | **Terminology pass on "version"** — Duplicate Project / Version / Autosaved                                                   | LF-P03                          |
-| 12  | **Overflow menus everywhere** — Project overview, Projects rows, Videos cards; replace `<details>` with the product's popover | LF-P01, LF-P02, LF-A03          |
-| 13  | **Adopt the theme breakpoints** and retire the 29 ad-hoc values                                                               | LF-DS01                         |
-| 14  | **Introduce `PageShell` + `PageHeader`**; one `h1` scale; delete `borderRadius: 0`                                            | LF-DS02, LF-D01, LF-P06, LF-C02 |
-| 15  | **Take review**: fewer actions, details behind disclosure, mobile sheet that keeps the media visible                          | LF-S06, LF-S07, LF-S08, LF-S09  |
-| 16  | **Raise `border`/`borderStrong` to 3:1**                                                                                      | LF-A11Y1                        |
+| #      | Work                                                                                                                              | IDs                             | Status |
+| ------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------ |
+| ~~11~~ | ~~**Terminology pass on "version"** — Duplicate Project / Version / Autosaved~~                                                   | LF-P03                          | done   |
+| ~~12~~ | ~~**Overflow menus everywhere** — Project overview, Projects rows, Videos cards; replace `<details>` with the product's popover~~ | LF-P01, LF-P02, LF-A03          | done   |
+| ~~13~~ | ~~**Adopt the theme breakpoints** and retire the ad-hoc values~~                                                                  | LF-DS01                         | done   |
+| ~~14~~ | ~~**Introduce `PageShell` + `PageHeader`**; one `h1` scale; delete `borderRadius: 0`~~                                            | LF-DS02, LF-D01, LF-P06, LF-C02 | done   |
+| ~~15~~ | ~~**Take review**: fewer actions, details behind disclosure, mobile sheet that keeps the media visible~~                          | LF-S06, LF-S07, LF-S08, LF-S09  | done   |
+| ~~16~~ | ~~**Raise `border`/`borderStrong` to 3:1**~~                                                                                      | LF-A11Y1                        | done   |
+
+The inventory in item 13 came out larger than this audit estimated: **203** width occurrences, not
+29 distinct `max-width` values alone. 140 migrated onto named tiers; the 60 that did not are
+component-scale thresholds, which is a different problem and is noted in the plan.
+
+Item 16 had to split the token. Raising `border` and `borderStrong` together on one hue ramp
+converges them, because 3:1 against `surfaceStrong` — not `canvas`, as this audit assumed — fixes
+the luminance. The old value survives as `divider` for separators, which carry no 1.4.11 duty.
 
 ## 3 — Important but can follow (2–4 weeks)
 
 | #      | Work                                                                         | IDs                        |
 | ------ | ---------------------------------------------------------------------------- | -------------------------- |
 | 17     | **Video editor redesign** (Superdesign)                                      | LF-V01–V05, LF-R04         |
-| 18     | **Project save-step redesign** (Superdesign)                                 | LF-P04                     |
+| ~~18~~ | ~~**Project save-step redesign** (Superdesign)~~ **DONE**                    | LF-P04                     |
 | 19     | **Assets consolidation** (Superdesign)                                       | LF-N02, LF-A05–A08, LF-R05 |
 | 20     | **Dashboard recomposition** (Superdesign)                                    | LF-D02, LF-D03, LF-D05     |
 | ~~21~~ | ~~**Mobile AI-tool availability** — reorganise rather than remove~~ **DONE** | LF-S04, LF-A11Y3           |
@@ -1158,9 +1210,9 @@ everything else is copy, colour and button count.
 
 1. The **local video editor** — the media is the smallest thing on screen, and there is no timeline.
 2. The **Project save step** — four save concepts and a shipped disclaimer.
-3. **Getting a finished video out** — Download is the deepest action, next to a dead Export button.
+3. ~~**Getting a finished video out** — Download is the deepest action, next to a dead Export button.~~ Fixed in Tier 1.
 4. **The first 90 seconds** — the model before the outcome, and a Record button that doesn't record.
-5. **Cross-page consistency** — five page frames, `h1` from 1.875rem to 4rem, two button-radius policies.
+5. ~~**Cross-page consistency** — five page frames, `h1` from 1.875rem to 4rem, two button-radius policies.~~ Fixed in Tier 2.
 6. **Below 64rem** — capability is removed rather than reorganised.
 
 ## First-time user assessment
@@ -1179,26 +1231,26 @@ along the way. None of the three is architectural.
 
 ## Most serious problems, ranked
 
-1. `Record New Video` does not record (LF-S01)
-2. The video editor's media is its smallest element (LF-V01)
-3. Four competing save concepts in the Project workspace (LF-P04)
-4. Download is hidden; Export is dead (LF-A01, LF-A02)
-5. Primary and destructive actions share red (LF-S02)
-6. Five page frames and 29 breakpoints (LF-DS01, LF-DS02)
-7. "Version" means three different things (LF-P03)
-8. ~~AI tools silently disappear below 64rem (LF-S04)~~ — **fixed**
-9. Take review hides the take on mobile (LF-S06)
-10. Internal and non-existent language in shipped copy (LF-X04, LF-C01, LF-A04)
+1. ~~`Record New Video` does not record (LF-S01)~~ — fixed in Tier 1
+2. The video editor's media is its smallest element (LF-V01) — **open, item 17**
+3. ~~Four competing save concepts in the Project workspace (LF-P04)~~ — **fixed in Tier 3**
+4. ~~Download is hidden; Export is dead (LF-A01, LF-A02)~~ — fixed in Tier 1
+5. ~~Primary and destructive actions share red (LF-S02)~~ — fixed in Tier 1
+6. ~~Five page frames and 29 breakpoints (LF-DS01, LF-DS02)~~ — fixed in Tier 2
+7. ~~"Version" means three different things (LF-P03)~~ — fixed in Tier 2
+8. ~~AI tools silently disappear below 64rem (LF-S04)~~ — fixed in Tier 1, out of order
+9. ~~Take review hides the take on mobile (LF-S06)~~ — fixed in Tier 2
+10. ~~Internal and non-existent language in shipped copy (LF-X04, LF-C01, LF-A04)~~ — fixed in Tier 1
 
 ## Biggest cross-page inconsistencies
 
-1. **No page shell.** Dashboard full-bleed and uncapped; Assets a bordered card; Campaigns nested
-   cards; Projects full-bleed with a 4rem `h1` and square buttons; Project overview capped at 88rem.
-2. **`theme.breakpoints` used once** against 29 hard-coded max-widths.
+1. ~~**No page shell.**~~ **Fixed in Tier 2** — `PageShell` + `PageHeader` on all five surfaces.
+2. ~~**`theme.breakpoints` used once**~~ **Fixed in Tier 2** — `media.up/down/between/downOrShort`.
 3. **Six patterns for "choose one of N".**
 4. **Icons from four sources at three stroke weights.**
 5. **Two video players.**
-6. **Two overflow-menu implementations**, one of them inaccessible.
+6. ~~**Two overflow-menu implementations**, one of them inaccessible.~~ **Fixed in Tier 2** — one
+   `ActionMenu`. `StudioHeader`'s two menus stay bespoke by design, sharing the same hooks.
 7. **Three names for the saved-video destination.**
 8. **Loading is bare text in 37 places; one skeleton exists.**
 
@@ -1214,16 +1266,18 @@ Character builder · Upload/AI transform panel · Global chrome & Help
 
 ## Top 10 improvements by user impact
 
-1. Make `Record New Video` do what it says
-2. Give the video editor its media back — and a timeline
-3. Make `Download` the lead action in the Videos library
-4. Resolve `Export`: wire it to the existing placement chooser, or delete it
-5. Collapse the four save concepts to one `Save video`
-6. Split primary from destructive in the recording controls
-7. Introduce a real page shell and adopt the theme breakpoints
-8. Fix "version" so it means one thing
-9. Keep AI tools available below 64rem
-10. Remove copy that references non-existent features and internal architecture
+1. ~~Make `Record New Video` do what it says~~ · Tier 1
+2. Give the video editor its media back — and a timeline · **open, item 17**
+3. ~~Make `Download` the lead action in the Videos library~~ · Tier 1
+4. ~~Resolve `Export`: wire it to the existing placement chooser, or delete it~~ · Tier 1
+5. Collapse the four save concepts to one `Save video` · **open, item 18**
+6. ~~Split primary from destructive in the recording controls~~ · Tier 1
+7. ~~Introduce a real page shell and adopt the theme breakpoints~~ · Tier 2
+8. ~~Fix "version" so it means one thing~~ · Tier 2
+9. ~~Keep AI tools available below 64rem~~ · Tier 1, out of order
+10. ~~Remove copy that references non-existent features and internal architecture~~ · Tier 1
+
+Two of the ten remain, and both are Tier 3 redesigns rather than fixes.
 
 ## Quick wins (all XS, all today)
 

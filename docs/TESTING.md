@@ -162,7 +162,7 @@ The retained suite protects:
   output-reference revisions; exact old-Version selection, preview, reuse, and Download; retained
   tombstoned Project content; explicit stale-result adoption; legacy **No Project** videos without
   producer backfill; and proof that these actions do not move the Saved Video pointer or infer an
-  Add Version target;
+  existing-video save target;
 - a no-provider Chromium journey from reusable Character selection through one Project semantic
   checkpoint, local edit/Render preview, explicit working-media adoption, and refresh, including
   denial of unexpected external HTTP and WebSocket traffic;
@@ -198,7 +198,7 @@ The retained suite protects:
 - export placement: the domain aspect list and the resolution each produces, the browser
   support gate, the chooser's copy/crop preview, and render progress, cancellation and failure
   leaving the save path intact;
-- **Make another version**: the domain rule's stale-version conflict, by-reference snapshot,
+- **Duplicate Project**: the domain rule's stale-version conflict, by-reference snapshot,
   cleared last output and derived phase; route replay under `Idempotency-Key`; retention through
   the duplicate's own asset links; and the browser dialog's Campaign default and post-create step;
 - URL-backed Project source presentation: the single narrowing from presentable media to owned
@@ -245,12 +245,14 @@ The touch project runs that smoke plus the dedicated control-timeout/recording-S
 browser-specific test must be tagged in its title with `@cross-browser` or `@touch`; do not run
 every desktop journey under every engine by default.
 
-The current visual matrix contains 31 cases within the 31-case review budget. It retains Local live
+The current visual matrix contains 50 cases within the 50-case review budget. It retains Local live
 and recording at all five canonical viewports, plus selected entry, idle, Character, Builder,
-creative-library, playback, existing-video setup at all five viewports, processing/result, VTO, Voice,
-finalizing, permission-error, desktop Campaigns workspace, and small-mobile Project output-review
-compositions. Visual
-tests are not part of `bun run test`, `bun run quality`, or ordinary push/pull-request CI.
+creative-library, playback, existing-video setup at all five viewports, processing/result, VTO,
+Voice, finalizing, permission-error, the video editor at all five canonical viewports, Assets at all
+five canonical viewports plus its filter sheet at tablet and both phone sizes, desktop Campaigns
+workspace, Project output review at all five canonical viewports, and the Project output destination
+choice on desktop and small mobile. Visual tests are not part of `bun run test`, `bun run quality`,
+or ordinary push/pull-request CI.
 
 Run `bun run test:visual` when:
 

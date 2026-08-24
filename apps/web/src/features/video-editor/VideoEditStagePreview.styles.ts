@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const previewLayerStyles = (): CSSObject => ({
   position: 'absolute',
@@ -9,7 +10,11 @@ export const previewLayerStyles = (): CSSObject => ({
   pointerEvents: 'none',
 });
 
-export const canvasFrameStyles = (theme: Theme, aspectRatio: number): CSSObject => ({
+export const canvasFrameStyles = (
+  theme: Theme,
+  aspectRatio: number,
+  splitComparison = false,
+): CSSObject => ({
   position: 'relative',
   width: aspectRatio >= 1 ? '100%' : 'auto',
   height: aspectRatio >= 1 ? 'auto' : '100%',
@@ -19,9 +24,68 @@ export const canvasFrameStyles = (theme: Theme, aspectRatio: number): CSSObject 
   overflow: 'hidden',
   background: theme.colors.shadow,
   boxShadow: theme.shadows.soft,
+  clipPath: splitComparison ? 'inset(0 50% 0 0)' : 'none',
   '& canvas': {
     width: '100%',
     height: '100%',
+  },
+});
+
+export const comparisonBadgeStyles = (theme: Theme): CSSObject => ({
+  position: 'absolute',
+  zIndex: 8,
+  insetBlockStart: theme.space.sm,
+  insetInlineEnd: theme.space.sm,
+  minHeight: '2rem',
+  display: 'inline-flex',
+  alignItems: 'center',
+  paddingInline: theme.space.sm,
+  border: `1px solid ${theme.colors.accent}`,
+  borderRadius: theme.radii.round,
+  color: theme.colors.accentStrong,
+  background: theme.colors.accentSoft,
+  boxShadow: theme.shadows.soft,
+  fontSize: theme.fontSizes.caption,
+  fontWeight: 760,
+});
+
+export const splitDividerStyles = (theme: Theme): CSSObject => ({
+  position: 'absolute',
+  zIndex: 7,
+  insetBlock: '8%',
+  insetInlineStart: '50%',
+  width: '1px',
+  background: theme.colors.accent,
+  boxShadow: theme.shadows.soft,
+  pointerEvents: 'none',
+});
+
+export const rotateControlsStyles = (theme: Theme): CSSObject => ({
+  position: 'absolute',
+  zIndex: 8,
+  insetInlineStart: '50%',
+  insetBlockEnd: theme.space.md,
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.space.xs,
+  padding: theme.space.xxs,
+  border: `1px solid ${theme.colors.borderStrong}`,
+  borderRadius: theme.radii.medium,
+  background: theme.colors.overlaySurface,
+  boxShadow: theme.shadows.soft,
+  transform: 'translateX(-50%)',
+  pointerEvents: 'auto',
+  '& button': { whiteSpace: 'nowrap' },
+  '& output': {
+    minWidth: '2.75rem',
+    color: theme.colors.accent,
+    fontFamily: theme.type.mono,
+    fontSize: theme.fontSizes.caption,
+    textAlign: 'center',
+  },
+  [media.down('tablet')]: {
+    insetBlockEnd: theme.space.xs,
+    '& button': { paddingInline: theme.space.xs },
   },
 });
 
@@ -117,53 +181,5 @@ export const cropMoveHandleStyles = (theme: Theme): CSSObject => ({
     outline: `2px solid ${theme.colors.focus}`,
     outlineOffset: '2px',
     background: 'rgba(255,255,255,.08)',
-  },
-});
-
-export const playbackControlsStyles = (theme: Theme): CSSObject => ({
-  position: 'absolute',
-  zIndex: 5,
-  insetInline: 'max(0.5rem, 5%)',
-  insetBlockEnd: theme.space.sm,
-  display: 'grid',
-  gridTemplateColumns: '2.75rem minmax(0, 1fr)',
-  alignItems: 'center',
-  gap: theme.space.sm,
-  padding: theme.space.xs,
-  border: `1px solid ${theme.colors.borderStrong}`,
-  borderRadius: theme.radii.medium,
-  background: theme.colors.overlaySurface,
-  boxShadow: theme.shadows.soft,
-  pointerEvents: 'auto',
-  backdropFilter: 'blur(12px)',
-  '& button': {
-    width: '2.75rem',
-    height: '2.75rem',
-    padding: 0,
-    border: `1px solid ${theme.colors.borderStrong}`,
-    borderRadius: theme.radii.round,
-    color: theme.colors.onAccent,
-    background: theme.colors.accent,
-    cursor: 'pointer',
-  },
-  '& button:focus-visible, & input:focus-visible': {
-    outline: `2px solid ${theme.colors.focus}`,
-    outlineOffset: '2px',
-  },
-  '& label': { minWidth: 0, display: 'grid', gap: '0.2rem' },
-  '& label > span': {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: theme.space.sm,
-    color: theme.colors.textMuted,
-    fontFamily: theme.type.mono,
-    fontSize: theme.fontSizes.caption,
-  },
-  '& input': { width: '100%', accentColor: theme.colors.accent },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
-    insetInline: theme.space.xxs,
-    insetBlockEnd: theme.space.xxs,
-    gap: theme.space.xs,
-    padding: theme.space.xxs,
   },
 });

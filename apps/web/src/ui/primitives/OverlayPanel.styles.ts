@@ -7,6 +7,7 @@ import type {
   OverlayPanelSize,
   OverlayPhase,
 } from './OverlayPanel.types';
+import { media } from '../media';
 
 export const backdropStyles = (
   theme: Theme,
@@ -27,11 +28,11 @@ export const backdropStyles = (
   overflow: 'hidden',
   background: theme.colors.scrim,
   ...overlayBackdropAnimationStyles(theme, phase === 'exiting'),
-  '@media (min-width: 40rem) and (max-width: 63.99rem)':
+  [media.between('tablet', 'laptop')]:
     !centered && placement === 'right' && size !== 'standard'
       ? { alignItems: 'flex-end', justifyContent: 'stretch' }
       : undefined,
-  '@media (max-width: 40rem)': centered
+  [media.down('tablet')]: centered
     ? { alignItems: 'flex-end', justifyContent: 'stretch', padding: 0 }
     : undefined,
 });
@@ -46,6 +47,32 @@ const panelWidth = (
   return size === 'wide' ? theme.layout.overlays.drawerWide : theme.layout.overlays.drawer;
 };
 
+/**
+ * A non-centered bottom panel's height, per viewport tier.
+ *
+ * Every tier asks this rather than re-deriving the mode inline: `sheet` was previously consulted at
+ * two tiers of four, so a panel that promises to leave the surface behind it visible went
+ * full-screen on a tablet — the one tier with no visual baseline to catch it.
+ */
+const bottomHeight = (
+  theme: Theme,
+  height: OverlayPanelHeight,
+  tier: 'base' | 'compact' | 'tablet' | 'mobile',
+): string => {
+  if (height === 'sheet') return theme.layout.overlays.bottomSheet;
+  if (height === 'tall') return '75dvh';
+  switch (tier) {
+    case 'base':
+      return theme.layout.overlays.bottom;
+    case 'compact':
+      return theme.layout.overlays.bottomCompact;
+    case 'tablet':
+      return theme.layout.overlays.bottomTablet;
+    case 'mobile':
+      return '100%';
+  }
+};
+
 export const panelStyles = (
   theme: Theme,
   placement: OverlayPanelPlacement,
@@ -53,104 +80,101 @@ export const panelStyles = (
   height: OverlayPanelHeight,
   phase: OverlayPhase,
   centered = false,
-): CSSObject => ({
-  width: centered ? 'min(64rem, 100%)' : panelWidth(theme, placement, size),
-  height: centered
-    ? height === 'tall'
-      ? '80dvh'
-      : theme.layout.overlays.bottom
-    : placement === 'right' || placement === 'fullscreen'
-      ? '100%'
-      : height === 'tall'
-        ? '75dvh'
-        : theme.layout.overlays.bottom,
-  maxWidth: '100%',
-  maxHeight: centered
-    ? 'calc(100dvh - 2rem)'
-    : placement === 'bottom'
-      ? height === 'tall'
-        ? '75dvh'
-        : theme.layout.overlays.bottom
-      : '100dvh',
-  minWidth: 0,
-  minHeight: 0,
-  display: 'grid',
-  gridTemplateRows: 'auto minmax(0, 1fr) auto',
-  overflow: 'hidden',
-  border: placement === 'right' ? 0 : `1px solid ${theme.colors.border}`,
-  borderInlineStart: placement === 'right' ? `1px solid ${theme.colors.border}` : undefined,
-  borderRadius: centered
-    ? theme.radii.large
-    : placement === 'right' || placement === 'fullscreen'
-      ? 0
-      : `${theme.radii.large} ${theme.radii.large} 0 0`,
-  color: theme.colors.text,
-  background: theme.colors.overlaySurface,
-  boxShadow: theme.shadows.lifted,
-  ...overlayPanelAnimationStyles(theme, placement, phase === 'exiting'),
-  '@media (max-width: 80rem), (max-height: 48rem)': {
-    width:
-      !centered && placement === 'right'
-        ? size === 'workspace'
-          ? theme.layout.overlays.drawerWorkspaceCompact
-          : size === 'wide'
-            ? theme.layout.overlays.drawerWideCompact
-            : undefined
-        : undefined,
+): CSSObject => {
+  const sheet = !centered && placement === 'bottom' && height === 'sheet';
+  return {
+    width: centered ? 'min(64rem, 100%)' : panelWidth(theme, placement, size),
     height: centered
       ? height === 'tall'
-        ? '86dvh'
-        : undefined
-      : placement === 'bottom'
-        ? height === 'tall'
-          ? '75dvh'
-          : theme.layout.overlays.bottomCompact
-        : undefined,
+        ? '80dvh'
+        : theme.layout.overlays.bottom
+      : placement === 'right' || placement === 'fullscreen'
+        ? '100%'
+        : bottomHeight(theme, height, 'base'),
+    maxWidth: '100%',
     maxHeight: centered
       ? 'calc(100dvh - 2rem)'
       : placement === 'bottom'
+        ? bottomHeight(theme, height, 'base')
+        : '100dvh',
+    minWidth: 0,
+    minHeight: 0,
+    display: 'grid',
+    gridTemplateRows: 'auto minmax(0, 1fr) auto',
+    overflow: 'hidden',
+    border: placement === 'right' ? 0 : `1px solid ${theme.colors.border}`,
+    borderInlineStart: placement === 'right' ? `1px solid ${theme.colors.divider}` : undefined,
+    borderRadius: centered
+      ? theme.radii.large
+      : placement === 'right' || placement === 'fullscreen'
+        ? 0
+        : `${theme.radii.large} ${theme.radii.large} 0 0`,
+    color: theme.colors.text,
+    background: theme.colors.overlaySurface,
+    boxShadow: theme.shadows.lifted,
+    ...overlayPanelAnimationStyles(theme, placement, phase === 'exiting'),
+    [media.downOrShort('desktop', '48rem')]: {
+      width:
+        !centered && placement === 'right'
+          ? size === 'workspace'
+            ? theme.layout.overlays.drawerWorkspaceCompact
+            : size === 'wide'
+              ? theme.layout.overlays.drawerWideCompact
+              : undefined
+          : undefined,
+      height: centered
         ? height === 'tall'
-          ? '75dvh'
-          : theme.layout.overlays.bottomCompact
-        : undefined,
-  },
-  '@media (min-width: 40rem) and (max-width: 63.99rem)': {
-    width:
-      !centered && placement === 'right'
-        ? size !== 'standard'
-          ? '100%'
-          : theme.layout.overlays.drawerTablet
-        : undefined,
-    height:
-      !centered && (placement === 'bottom' || (placement === 'right' && size !== 'standard'))
-        ? placement === 'bottom' && height === 'tall'
-          ? '75dvh'
-          : theme.layout.overlays.bottomTablet
-        : undefined,
-    maxHeight:
-      !centered && (placement === 'bottom' || (placement === 'right' && size !== 'standard'))
-        ? placement === 'bottom' && height === 'tall'
-          ? '75dvh'
-          : theme.layout.overlays.bottomTablet
-        : undefined,
-    border:
-      !centered && placement === 'right' && size !== 'standard'
-        ? `1px solid ${theme.colors.border}`
-        : undefined,
-    borderRadius:
-      !centered && placement === 'right' && size !== 'standard'
-        ? `${theme.radii.large} ${theme.radii.large} 0 0`
-        : undefined,
-  },
-  '@media (max-width: 40rem)': {
-    width: '100%',
-    height: centered ? '88dvh' : '100%',
-    maxHeight: centered ? '88dvh' : '100dvh',
-    border: centered ? `1px solid ${theme.colors.border}` : 0,
-    borderInlineStart: centered ? undefined : 0,
-    borderRadius: centered ? `${theme.radii.large} ${theme.radii.large} 0 0` : 0,
-  },
-});
+          ? '86dvh'
+          : undefined
+        : placement === 'bottom'
+          ? bottomHeight(theme, height, 'compact')
+          : undefined,
+      maxHeight: centered
+        ? 'calc(100dvh - 2rem)'
+        : placement === 'bottom'
+          ? bottomHeight(theme, height, 'compact')
+          : undefined,
+    },
+    [media.between('tablet', 'laptop')]: {
+      width:
+        !centered && placement === 'right'
+          ? size !== 'standard'
+            ? '100%'
+            : theme.layout.overlays.drawerTablet
+          : undefined,
+      height:
+        !centered && (placement === 'bottom' || (placement === 'right' && size !== 'standard'))
+          ? placement === 'bottom'
+            ? bottomHeight(theme, height, 'tablet')
+            : theme.layout.overlays.bottomTablet
+          : undefined,
+      maxHeight:
+        !centered && (placement === 'bottom' || (placement === 'right' && size !== 'standard'))
+          ? placement === 'bottom'
+            ? bottomHeight(theme, height, 'tablet')
+            : theme.layout.overlays.bottomTablet
+          : undefined,
+      border:
+        !centered && placement === 'right' && size !== 'standard'
+          ? `1px solid ${theme.colors.border}`
+          : undefined,
+      borderRadius:
+        !centered && placement === 'right' && size !== 'standard'
+          ? `${theme.radii.large} ${theme.radii.large} 0 0`
+          : undefined,
+    },
+    [media.down('tablet')]: {
+      width: '100%',
+      // A `sheet` is the one bottom panel that does not take the phone: it refers to the surface
+      // behind it, so covering that surface would contradict what it says.
+      height: centered ? '88dvh' : bottomHeight(theme, height, 'mobile'),
+      maxHeight: centered ? '88dvh' : sheet ? bottomHeight(theme, height, 'mobile') : '100dvh',
+      border: centered || sheet ? `1px solid ${theme.colors.border}` : 0,
+      borderInlineStart: centered ? undefined : 0,
+      borderRadius: centered || sheet ? `${theme.radii.large} ${theme.radii.large} 0 0` : 0,
+    },
+  };
+};
 
 export const headerStyles = (theme: Theme, hasActions = false): CSSObject => ({
   minWidth: 0,
@@ -161,7 +185,7 @@ export const headerStyles = (theme: Theme, hasActions = false): CSSObject => ({
   alignItems: 'start',
   gap: theme.space.md,
   padding: `max(${theme.space.md}, env(safe-area-inset-top)) max(${theme.space.md}, env(safe-area-inset-right)) ${theme.space.md} max(${theme.space.md}, env(safe-area-inset-left))`,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   background: theme.colors.overlaySurface,
   '@media (max-width: 56rem)': hasActions
     ? {
@@ -216,6 +240,6 @@ export const bodyStyles = (theme: Theme, bodyMode: OverlayPanelBodyMode): CSSObj
 export const footerStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   padding: `${theme.space.md} max(${theme.space.md}, env(safe-area-inset-right)) max(${theme.space.md}, env(safe-area-inset-bottom)) max(${theme.space.md}, env(safe-area-inset-left))`,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   background: theme.colors.overlaySurface,
 });

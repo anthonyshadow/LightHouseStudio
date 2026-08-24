@@ -1,26 +1,11 @@
 import type { CSSObject, Theme } from '@emotion/react';
 
-export const projectOverviewInnerStyles = (theme: Theme): CSSObject => ({
-  width: 'min(100%, 88rem)',
-  minHeight: '100%',
-  marginInline: 'auto',
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr)',
-  alignContent: 'start',
-  '& > [role="status"]:empty': { display: 'none' },
-  '@container (max-width: 52rem)': {
-    paddingInline: 'clamp(1.5rem, 4cqi, 2.5rem)',
-  },
-  '@container (max-width: 30rem)': {
-    paddingBlock: theme.space.xl,
-    paddingInline: theme.space.md,
-  },
-});
-
+/**
+ * Only what `PageHeader` does not own: the breadcrumb above the identity row, and the metadata and
+ * workflow lines this surface adds under its title. Width, title scale, identity grid and the
+ * actions slot come from the shared header.
+ */
 export const projectOverviewHeaderStyles = (theme: Theme): CSSObject => ({
-  minWidth: 0,
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr)',
   '& [data-detail-breadcrumb]': {
     justifySelf: 'start',
     minWidth: 0,
@@ -28,7 +13,6 @@ export const projectOverviewHeaderStyles = (theme: Theme): CSSObject => ({
     marginBlockEnd: theme.space.xl,
     padding: `${theme.space.xs} 0`,
     border: 0,
-    borderRadius: 0,
     color: theme.colors.textMuted,
     background: 'transparent',
     boxShadow: 'none',
@@ -39,30 +23,6 @@ export const projectOverviewHeaderStyles = (theme: Theme): CSSObject => ({
       background: 'transparent',
       transform: 'none',
     },
-  },
-  '& [data-detail-identity]': {
-    minWidth: 0,
-    display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1fr) auto',
-    alignItems: 'end',
-    gap: theme.space.xl,
-    paddingBlockEnd: '2.5rem',
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
-  },
-  '& [data-detail-identity] > div:first-of-type': {
-    minWidth: 0,
-    width: '100%',
-  },
-  '& h1': {
-    width: '100%',
-    maxWidth: '48rem',
-    margin: 0,
-    overflowWrap: 'anywhere',
-    fontFamily: theme.type.display,
-    fontSize: 'clamp(2.25rem, 4cqi, 3rem)',
-    fontWeight: 660,
-    letterSpacing: '-0.05em',
-    lineHeight: 1,
   },
   '& [data-detail-meta]': {
     display: 'flex',
@@ -97,72 +57,9 @@ export const projectOverviewHeaderStyles = (theme: Theme): CSSObject => ({
     flex: '0 0 auto',
     color: theme.colors.accent,
   },
-  '& [data-detail-actions]': {
-    minWidth: 0,
-    display: 'flex',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: `${theme.space.xs} ${theme.space.lg}`,
-  },
-  '& [data-detail-actions] > button': {
-    minWidth: 0,
-    minHeight: '2.75rem',
-    padding: `${theme.space.xs} 0`,
-    border: 0,
-    borderRadius: 0,
-    color: theme.colors.textMuted,
-    background: 'transparent',
-    boxShadow: 'none',
-    fontSize: theme.fontSizes.body,
-    fontWeight: 600,
-    '&:hover:not(:disabled):not([aria-disabled="true"])': {
-      color: theme.colors.text,
-      background: 'transparent',
-      transform: 'none',
-    },
-  },
-  '& [data-detail-actions] > button[data-detail-action="continue"]': {
-    minWidth: '9.5rem',
-    paddingInline: theme.space.lg,
-    borderRadius: theme.radii.small,
-    color: theme.colors.onAccent,
-    background: theme.colors.accent,
-    '&:hover:not(:disabled):not([aria-disabled="true"])': {
-      color: theme.colors.onAccent,
-      background: theme.colors.accentStrong,
-    },
-  },
-  '& [data-detail-actions] > button[data-detail-action="archive"], & [data-detail-actions] > button[data-detail-action="delete"]':
-    {
-      color: theme.colors.danger,
-    },
-  '@container (max-width: 64rem)': {
-    '& [data-detail-identity]': {
-      gridTemplateColumns: 'minmax(0, 1fr)',
-      alignItems: 'stretch',
-    },
-    '& [data-detail-identity] > div:first-of-type': { maxWidth: 'none' },
-    '& h1': { maxWidth: 'none' },
-    '& [data-detail-actions]': { justifyContent: 'flex-start' },
-  },
   '@container (max-width: 30rem)': {
     '& [data-detail-breadcrumb]': { marginBlockEnd: theme.space.lg },
-    '& [data-detail-identity]': { gap: theme.space.lg, paddingBlockEnd: theme.space.xl },
-    '& h1': { fontSize: 'clamp(2rem, 11cqi, 2.6rem)' },
     '& [data-detail-meta]': { columnGap: theme.space.md, fontSize: theme.fontSizes.metadata },
-    '& [data-detail-actions]': {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(3, minmax(0, auto))',
-      justifyContent: 'start',
-    },
-    '& [data-detail-actions] > button[data-detail-action="continue"]': {
-      width: '100%',
-      gridColumn: '1 / -1',
-    },
-  },
-  '@container (max-width: 21rem)': {
-    '& [data-detail-actions]': { gridTemplateColumns: 'repeat(2, minmax(0, auto))' },
   },
 });
 

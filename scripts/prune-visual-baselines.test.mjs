@@ -12,10 +12,10 @@ afterEach(async () => {
 });
 
 describe('visual baseline pruning inventory', () => {
-  it('shares the exact 35-case executable matrix', () => {
-    expect(VISUAL_CASE_MATRIX).toHaveLength(35);
-    expect(VISUAL_BASELINE_PATHS).toHaveLength(35);
-    expect(new Set(VISUAL_BASELINE_PATHS).size).toBe(35);
+  it('shares the exact 50-case executable matrix', () => {
+    expect(VISUAL_CASE_MATRIX).toHaveLength(50);
+    expect(VISUAL_BASELINE_PATHS).toHaveLength(50);
+    expect(new Set(VISUAL_BASELINE_PATHS).size).toBe(50);
     expect(curatedBaselines).toEqual(new Set(VISUAL_BASELINE_PATHS));
   });
 
@@ -37,7 +37,7 @@ describe('visual baseline pruning inventory', () => {
     const inventory = await inspectVisualBaselines(root);
 
     expect(inventory.platformFolders).toEqual(['chromium-darwin', 'chromium-linux']);
-    expect(inventory.retained.size).toBe(70);
+    expect(inventory.retained.size).toBe(100);
     expect(inventory.missing).toEqual([]);
     expect(inventory.removable).toEqual(['chromium-darwin/legacy/broad-capture.png']);
     await expect(readdirSafe(extra)).resolves.toBe(true);

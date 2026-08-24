@@ -228,6 +228,88 @@ describe('Project aggregate rules', () => {
     });
   });
 
+  it('frees the creative configuration for the next round on the post-save revision', () => {
+    const accepted = acceptProjectSource(
+      emptyProject(),
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        assetId: sourceAssetId,
+        mediaReference: { kind: 'asset', assetId: sourceAssetId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    expect(accepted.ok).toBe(true);
+    if (!accepted.ok) return;
+    const configuredRevisionId = '2a8b1f3d-9a52-4a0b-9a3f-9a2c1f4d6b70';
+    const selectedCharacter = {
+      characterId: '0d1b0a1c-6d2b-4d3f-9d1e-2a3b4c5d6e7f',
+      characterLabel: 'Nova',
+      characterRevision: later,
+      variantId: null,
+      variantLabel: null,
+      variantRevision: null,
+      referenceAssetId: null,
+    };
+    const configured = appendProjectRevision(
+      accepted.value,
+      {
+        expectedProjectVersion: 2,
+        expectedRevisionNumber: 2,
+        snapshot: {
+          ...accepted.value.revisions.at(-1)!.snapshot,
+          selectedCharacter,
+          visualTreatment: { kind: 'character-swap', providerId: null, outputResolution: null },
+          creativeIntent: {
+            ...accepted.value.revisions.at(-1)!.snapshot.creativeIntent,
+            userIntent: 'A product walkthrough',
+            appliedPrompt: 'Nova presenting the product',
+          },
+          localEdit: createDefaultVideoEditSpec(12_000),
+          updatedAt: latest,
+        },
+        author: { kind: 'user', authorId: ownerUserId },
+        source: 'user-edit',
+        facts: readyFacts,
+      },
+      { now: latest, createId: () => configuredRevisionId },
+    );
+    expect(configured.ok).toBe(true);
+    if (!configured.ok) return;
+
+    const outputRevisionId = '5354b1d3-4022-4c85-a7b6-b230b58ba10b';
+    const saved = saveProjectOutput(
+      configured.value,
+      {
+        expectedProjectVersion: 3,
+        expectedRevisionNumber: 3,
+        savedVideoId: 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338',
+        videoVersionId: 'b276694b-58c4-40d3-8fb6-315e32b66fd0',
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => outputRevisionId },
+    );
+    expect(saved.ok).toBe(true);
+    if (!saved.ok) return;
+    // Nothing pre-fills the next round: a different treatment can be chosen without clearing up.
+    expect(saved.value.revisions.at(-1)!.snapshot).toMatchObject({
+      selectedCharacter: null,
+      selectedOutfit: null,
+      selectedVoice: null,
+      visualTreatment: { kind: 'none' },
+      creativeIntent: { appliedPrompt: null, userIntent: 'A product walkthrough' },
+      localEdit: null,
+      workflowPhase: 'complete',
+    });
+    // The producing revision keeps the exact configuration that made the retained Version.
+    expect(saved.value.revisions.at(-2)!.snapshot).toMatchObject({
+      selectedCharacter,
+      visualTreatment: { kind: 'character-swap' },
+      creativeIntent: { appliedPrompt: 'Nova presenting the product' },
+    });
+  });
+
   it('carries a chosen placement onto the revision and through the output save', () => {
     const accepted = acceptProjectSource(
       emptyProject(),

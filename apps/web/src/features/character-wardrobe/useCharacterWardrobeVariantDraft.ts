@@ -38,7 +38,7 @@ export type CharacterVariantCreationKind = 'add-outfit' | 'change-features';
 const variantSaveGuidance = (hasPreview: boolean, hasTitle: boolean): string => {
   if (!hasPreview) return 'Generate a preview before saving this variant.';
   if (!hasTitle) return 'Enter a variant name to enable Save variant.';
-  return 'Ready to save. Saving does not select this version.';
+  return 'Ready to save. Saving does not select this variant.';
 };
 
 const generationActionLabel = (kind: CharacterVariantCreationKind, hasPreview: boolean): string => {

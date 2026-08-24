@@ -8,6 +8,7 @@ import {
 import {
   CREATIVE_ASSET_STORAGE_KEY,
   closeAiSettings,
+  chooseTakeAction,
   createLocalTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
@@ -97,6 +98,43 @@ const expectStandardStudioLayout = async (
   const toolRail = page.locator('[data-studio-tool-rail]');
   const capture = page.locator('[data-capture-controls]');
   const projectContextActive = (await page.locator('[data-project-context="true"]').count()) > 0;
+  if (videoEditorActive) {
+    const history = page.locator('[data-video-editor-history]');
+    const timeline = page.locator('[data-video-edit-timeline]');
+    const actions = page.locator('[data-video-editor-actions]');
+    const [stageBox, toolRailBox, captureBox, historyBox, timelineBox, actionsBox] =
+      await Promise.all([
+        stage.boundingBox(),
+        toolRail.boundingBox(),
+        capture.boundingBox(),
+        history.boundingBox(),
+        timeline.boundingBox(),
+        actions.boundingBox(),
+      ]);
+    expect(stageBox).not.toBeNull();
+    expect(toolRailBox).not.toBeNull();
+    expect(captureBox).not.toBeNull();
+    expect(historyBox).not.toBeNull();
+    expect(timelineBox).not.toBeNull();
+    expect(actionsBox).not.toBeNull();
+    if (!stageBox || !toolRailBox || !captureBox || !historyBox || !timelineBox || !actionsBox) {
+      return;
+    }
+
+    expect(toolRailBox.y + toolRailBox.height).toBeLessThanOrEqual(stageBox.y + 1);
+    expect(historyBox.y).toBeGreaterThanOrEqual(stageBox.y + stageBox.height - 1);
+    expect(historyBox.y).toBeLessThanOrEqual(stageBox.y + stageBox.height + 16);
+    expect(timelineBox.y).toBeGreaterThanOrEqual(historyBox.y + historyBox.height - 1);
+    if (viewport.width >= 1_024) {
+      expect(captureBox.x).toBeGreaterThanOrEqual(stageBox.x + stageBox.width - 1);
+    } else if (viewport.width >= 768) {
+      expect(captureBox.y).toBeGreaterThanOrEqual(timelineBox.y + timelineBox.height - 1);
+    } else {
+      expect(actionsBox.y + actionsBox.height).toBeLessThanOrEqual(viewport.height - 72 + 1);
+      expect(captureBox.y + captureBox.height).toBeLessThanOrEqual(actionsBox.y + 1);
+    }
+    return;
+  }
   if (projectContextActive) {
     const [stageBox, frameBox, toolRailBox] = await Promise.all([
       stage.boundingBox(),
@@ -297,6 +335,19 @@ const selectVisualVideo = async (page: Page, decodable = false) => {
   return { dialog, fixture };
 };
 
+const prepareProjectOutputReview = async (page: Page): Promise<void> => {
+  await installProjectHarness(page, true);
+  await page.goto(`/projects/${TEST_PROJECT_ID}/workspace`);
+  const fixture = await loadDecodableH264VideoFixture();
+  await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
+    name: 'project-output-review.mp4',
+    mimeType: 'video/mp4',
+    buffer: fixture,
+  });
+  await page.getByRole('tab', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Current cut' })).toBeVisible();
+};
+
 const addVisualStep = async (
   dialog: ReturnType<Page['getByRole']>,
   modelId: 'lucy-latest' | 'lucy-vton-latest',
@@ -339,14 +390,28 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
   'assets-overview': {
     id: 'assets-overview',
     setup: async (page) => {
-      await page.goto('/assets');
-      await expect(page.getByRole('heading', { name: 'Assets' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Open Videos' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Open Voices' })).toBeVisible();
-      // Every card has resolved its size, so no skeleton is captured mid-count.
-      await expect(page.getByText(/^Counting /u)).toHaveCount(0);
+      await installProjectHarness(page, true, { includeUnassignedVideo: true });
+      await page.goto('/assets/videos');
+      const dialog = page.getByRole('dialog', { name: 'Videos' });
+      await expect(dialog.getByRole('navigation', { name: 'Asset libraries' })).toBeVisible();
+      await expect(dialog.getByRole('heading', { name: 'Legacy unassigned' })).toBeVisible();
+      // Account and server reads have settled, so no placeholder is captured mid-count or mid-grid.
+      await expect(dialog.getByText('Loading saved videos…', { exact: true })).toHaveCount(0);
       await expect(page.getByText(/Recipe/u)).toHaveCount(0);
       await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
+    },
+  },
+  'assets-filter-sheet': {
+    id: 'assets-filter-sheet',
+    setup: async (page) => {
+      await installProjectHarness(page, true, { includeUnassignedVideo: true });
+      await page.goto('/assets/videos');
+      const library = page.getByRole('dialog', { name: 'Videos' });
+      await expect(library.getByRole('heading', { name: 'Legacy unassigned' })).toBeVisible();
+      await library.getByRole('button', { name: 'Filters', exact: true }).click();
+      const filters = page.getByRole('dialog', { name: 'Filters' });
+      await expect(filters.getByRole('button', { name: 'Clear filters' })).toBeVisible();
+      await expect(filters.getByRole('button', { name: 'Show 1 video' })).toBeVisible();
     },
   },
   'studio-initial-closed': {
@@ -494,8 +559,9 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'take-playback-review-settled',
     setup: async (page) => {
       await createLocalTake(page);
-      const review = page.getByRole('dialog', { name: 'Latest Take' });
-      await expect(review.getByRole('heading', { name: 'Latest take', exact: true })).toBeVisible();
+      const review = page.getByRole('dialog', { name: 'Latest take' });
+      // The heading is the region label now, so it is asserted as present rather than as visible.
+      await expect(review.locator('#take-heading')).toHaveText('Latest take');
       await expect(review.getByRole('button', { name: 'Save to Assets' })).toBeVisible();
       await expect(review.getByText('Loading studio tool…', { exact: true })).toHaveCount(0);
     },
@@ -581,21 +647,39 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
   'project-output-review': {
     id: 'project-output-review',
     setup: async (page) => {
-      await installProjectHarness(page, true);
-      await page.goto(`/projects/${TEST_PROJECT_ID}/workspace`);
-      const fixture = await loadDecodableH264VideoFixture();
-      await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
-        name: 'project-output-review.mp4',
-        mimeType: 'video/mp4',
-        buffer: fixture,
-      });
-      await page.getByRole('tab', { name: 'Save', exact: true }).click();
-      const outputHeading = page.getByRole('heading', { name: 'Review and save' });
+      await prepareProjectOutputReview(page);
+      const outputHeading = page.getByRole('heading', { name: 'Current cut' });
       await expect(outputHeading).toBeVisible();
-      await page.getByRole('button', { name: 'Add Version' }).scrollIntoViewIfNeeded();
+      const saveVideo = page.getByRole('button', { name: /^Save video ·/u });
+      await saveVideo.scrollIntoViewIfNeeded();
       await expect(page.getByLabel('Studio media stage')).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Save as New Video' })).toBeEnabled();
-      await expect(page.getByRole('button', { name: 'Add Version' })).toBeEnabled();
+      await expect(saveVideo).toBeEnabled();
+    },
+  },
+  'project-output-destination': {
+    id: 'project-output-destination',
+    setup: async (page) => {
+      await prepareProjectOutputReview(page);
+      const square = page.getByRole('button', { name: 'Square post', exact: true });
+      await square.click();
+      await expect(square).toHaveAttribute('aria-pressed', 'true');
+      await page.getByRole('button', { name: 'Save video · Square post' }).click();
+      if ((page.viewportSize()?.width ?? 1_024) < 640) {
+        const destinationSheet = page.getByRole('dialog', { name: 'Save video' });
+        await expect(destinationSheet).toBeVisible();
+        const [stageBox, sheetBox] = await Promise.all([
+          page.getByLabel('Studio media stage').boundingBox(),
+          destinationSheet.boundingBox(),
+        ]);
+        expect(stageBox).not.toBeNull();
+        expect(sheetBox).not.toBeNull();
+        const visibleStageHeight =
+          Math.min(stageBox!.y + stageBox!.height, sheetBox!.y) - Math.max(stageBox!.y, 0);
+        expect(stageBox!.y).toBeGreaterThanOrEqual(0);
+        expect(visibleStageHeight).toBeGreaterThanOrEqual(stageBox!.height * 0.5);
+      } else {
+        await expect(page.getByRole('form', { name: 'Save destination' })).toBeVisible();
+      }
     },
   },
   'vton-prepared-with-reference': {
@@ -618,7 +702,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'voice-browser-loaded',
     setup: async (page) => {
       await createLocalTake(page);
-      await page.getByRole('button', { name: 'Voice treatments' }).click();
+      await chooseTakeAction(page, 'Voice treatments');
       const treatments = page.getByRole('dialog', { name: 'Voice Treatments' });
       await expect(
         treatments.getByRole('heading', { name: 'Select Treatment', exact: true }),

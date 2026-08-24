@@ -70,7 +70,7 @@ response can be safely replayed. Conflicts return `409` with a typed `ProjectCon
 | POST     | `/api/projects`                                                                      | Create (Idempotency-Key required)                                            |
 | GET      | `/api/projects/:id`                                                                  | Current project + head revision                                              |
 | PATCH    | `/api/projects/:id`                                                                  | Rename (expectedVersion)                                                     |
-| POST     | `/api/projects/:id/duplicate`                                                        | Make another version (expectedVersion + Idempotency-Key)                     |
+| POST     | `/api/projects/:id/duplicate`                                                        | Duplicate Project (expectedVersion + Idempotency-Key)                        |
 | POST     | `/api/projects/:id/archive` · `/restore` · `/tombstone`                              | Lifecycle; tombstone requires archived + explicit confirmation               |
 | POST     | `/api/projects/:id/campaign`                                                         | Attach/detach campaign membership                                            |
 | POST     | `/api/projects/:id/revisions`                                                        | Semantic checkpoint (creative setup autosave)                                |
@@ -195,9 +195,9 @@ This is the only organization route that mounts the Studio runtime (`isStudioRun
 recording and preview happen in place.
 
 **Layout** — a masthead (Overview breadcrumb, title, status, a compact `ProjectWorkflowProgress`
-strip, and a live "All changes saved / Saving changes / Resolve conflict / Changes not saved"
-indicator) plus a four-tab inspector: **Source · Create · Save · History**. The tabs are a proper
-ARIA tablist with arrow/Home/End keyboard support.
+strip, and an ambient live `Autosaved · <time>` / `Autosaving…` / `Unsaved changes` indicator) plus
+a four-tab inspector: **Source · Create · Save · History**. Only `Conflict` and `Not autosaved`
+become prominent notices. The tabs are a proper ARIA tablist with arrow/Home/End keyboard support.
 
 The masthead strip is the compact `variant="masthead"` of the same component the overview uses, and
 the tablist derives its four tasks from the same `PROJECT_WORKFLOW_STEPS` list, so progress and
@@ -249,7 +249,7 @@ Contains three stacked blocks:
 
 1. **`ProjectCreativeCheckpointPanel`** — the bridge between the local Studio creative state and
    the durable Project. Local configuration (character, outfit, voice, prompt, reference) is _not_
-   persisted until **Save progress**, which posts `/api/projects/{id}/revisions`. If a
+   persisted until **Keep this setup**, which posts `/api/projects/{id}/revisions`. If a
    referenced creative resource has disappeared, a per-issue warning with **Choose another** is
    shown (`ProjectCreativeCheckpointPanel.tsx:52-59`).
 2. **`ProjectWorkingMediaSection`** — adopt a locally rendered edit (`POST …/working-media`) or
@@ -263,26 +263,28 @@ Contains three stacked blocks:
 `ProjectOutputSaveSection` (`ProjectOutputSaveSection.tsx`), the most defensively written flow in
 the app:
 
-1. Renders only when a source exists (`:243`).
-2. Describes the current review media (original / working media / retained Version).
+1. Renders only when a source exists.
+2. Leads with **Current cut**: the exact media on the adjacent stage, the producing Project change,
+   and the selected placement.
 3. `ExportPlacementChooser` asks where the video is going. Keeping the shape is the default and
    is stored as `exportSpecification: null`, so a Project that never answers is unchanged. Choosing
    a placement calls `session.propose({ exportSpecification })`, which the ordinary session
    checkpoint writes onto a new revision under `expectedVersion`/`expectedRevisionNumber` — the
    output-save request itself never carries it. `begin()` already flushes that checkpoint before it
    reads authority, so no second concurrency path exists.
-4. **Save as New Video** opens a title dialog whose field is proposed as the Project title plus
-   the change being saved (`defaultProjectOutputTitle`), so successive saves from one Project do
-   not all reach the library under one name; **Add Version** opens a Saved Video picker then a
-   confirm dialog showing the target's current Version ordinal. Both restate the recorded
-   placement.
+4. One placement-labelled **Save video** action reveals one destination choice. On desktop and
+   tablet that choice stays inline in the inspector; below `40rem` it uses one focus-trapped bottom
+   sheet. **New video** shows the proposed title (`defaultProjectOutputTitle`). **New version of an
+   existing video** loads the shared exact-Version picker inside that same surface, then names the
+   selected video and current Version directly. There is no picker-to-confirmation modal chain.
+   Both choices restate the recorded placement.
 5. `begin()` flushes any pending session checkpoint, re-fetches the authoritative project, re-checks
    that ready media still matches, mints an operation id, **persists the pending operation to
    `localStorage`**, and only then posts `/api/projects/{id}/outputs`.
 6. On reload, a stored pending operation is replayed in "reconciling" mode so a lost response can
    never produce a duplicate save (`:163-170`).
 7. Client failures (4xx/conflict) clear the pending record and refresh authoritative state;
-   transport failures keep it and offer **Reconcile saved operation**.
+   transport failures keep it and offer **Check this save**.
 8. A settled save renders `SavedVideoSuccessActions` inside the same polite notice that names the
    Saved Video and Version — **Download** (`downloadSavedVideoUrl` and the retained filename) and
    **View in Assets** (`savedVideoLibraryPath`, the Videos library focused on that record). They
@@ -294,6 +296,17 @@ the app:
 Both actions are disabled when archived, busy, `readyMedia === null`, or the project is
 `processing`.
 
+**A settled save frees the next round.** The post-save revision `saveProjectOutput` appends clears
+the creative configuration it was produced from — `selectedCharacter`, `selectedOutfit`,
+`selectedVoice`, `visualTreatment`, the applied prompt and `localEdit` — keeping only the operator's
+own `userIntent`, the live-capture metadata and the chosen placement. The exact configuration that
+made the Version stays immutable on the producing revision and on the Version itself, so nothing is
+lost; it simply stops pre-filling the next round, which is what made a Character Swap Project
+unable to move to Virtual Try-On. `useProjectCreativeSessionAdapter` frees the live visual tool once
+for that one revision, rather than whenever the snapshot carries no treatment — a tool chosen after
+a save is not checkpointed until progress is saved, so an unsaved choice looks the same and must not
+be swept away.
+
 ### Task 4 — History
 
 `ProjectHistorySection` lists retained revisions and outputs, states the placement on any Project
@@ -303,7 +316,7 @@ links to `/api/projects/{id}/outputs/{versionId}/content?download=true`
 affordance inside a Project, reached through the Saved Video content route rather than this
 Project-scoped one.
 
-## Flow: Make another version
+## Flow: Duplicate Project
 
 `duplicateProject` (`packages/domain/src/projects/rules.ts`) derives a new Project from an existing
 revision, and `ProjectService.duplicate` composes it with the same create path everything else uses.
@@ -330,7 +343,7 @@ revision, and `ProjectService.duplicate` composes it with the same create path e
 6. Campaign membership is checked by the same create path, so a duplicate aimed at an archived or
    missing Campaign is refused with `campaign-membership` exactly as a move would be, and nothing is
    created.
-7. The UI offers it as **Make another version** on the Projects list rows and the Project overview.
+7. The UI offers it as **Duplicate Project** on the Projects list rows and the Project overview.
    The dialog proposes `"<title> (copy)"` (bounded by `duplicateProjectTitle`), keeps the original's
    Campaign as the default, and states plainly that no video is duplicated and nothing is charged
    until work is started in the new Project. On success it opens the copy at

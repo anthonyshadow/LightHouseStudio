@@ -150,7 +150,7 @@ describe('CreativeLibraryPortability', () => {
     chooseFile(view.container, file);
 
     const dialog = await screen.findByRole('dialog', {
-      name: 'Replace this browser’s creative library?',
+      name: 'Replace your account creative library?',
     });
     // The confirmation states what arrives and what leaves before anything is replaced.
     expect(
@@ -183,7 +183,7 @@ describe('CreativeLibraryPortability', () => {
     const view = renderPortability(existing);
     chooseFile(view.container, file);
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Keep this library' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Keep account library' }));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(existing.getSnapshot().store.savedPrompts[0]?.title).toBe('Only local');
@@ -231,15 +231,15 @@ describe('CreativeLibraryPortability', () => {
     expect(repository.getSnapshot().store.savedCharacterPrompts).toHaveLength(0);
   });
 
-  it('states where the library is stored without claiming a cloud copy that may not exist', () => {
+  it('states account availability without claiming server persistence that may not exist', () => {
     const repository = createCreativeAssetRepository({ storage: null });
 
     const view = renderPortability(repository, 'browser-only');
-    expect(screen.getByText(/stored in this browser only/iu, { exact: false })).toBeVisible();
+    expect(screen.getByText(/account sync is unavailable/iu, { exact: false })).toBeVisible();
     expect(screen.getByText(/never contains the images themselves/u)).toBeVisible();
     view.unmount();
 
     renderPortability(repository, 'cloud');
-    expect(screen.getByText(/copied to your account on the server/u)).toBeVisible();
+    expect(screen.getByText(/available wherever you sign in/u)).toBeVisible();
   });
 });

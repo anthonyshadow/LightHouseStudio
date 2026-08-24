@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const characterBuilderShellStyles = (theme: Theme): CSSObject => ({
   width: `calc(100% + ${theme.space.xl})`,
@@ -35,13 +36,13 @@ export const characterBuilderFooterStyles = (theme: Theme): CSSObject => ({
     color: theme.colors.textMuted,
     fontSize: theme.fontSizes.caption,
   },
-  '@media (max-width: 39.99rem)': {
+  [media.down('tablet')]: {
     gridTemplateColumns: '1fr 1fr',
     gap: '8px',
     '& > span': { gridColumn: '1 / -1' },
     '& > button': { width: '100%' },
   },
-  '@media (max-width: 39.99rem) and (max-height: 36rem)': {
+  [`${media.down('tablet')} and (max-height: 36rem)`]: {
     '& > span[data-footer-status="default"]': { display: 'none' },
   },
 });

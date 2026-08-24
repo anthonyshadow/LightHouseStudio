@@ -375,7 +375,7 @@ export const useProjectProcessingController = ({
     }
     const commandToken = Symbol('project-processing-retry');
     commandActiveRef.current = commandToken;
-    patchState({ phase: 'preparing', message: 'Confirming the exact saved Project revision.' });
+    patchState({ phase: 'preparing', message: 'Confirming the exact autosaved Project state.' });
     try {
       if (!(await activeSession.flush())) {
         patchState({

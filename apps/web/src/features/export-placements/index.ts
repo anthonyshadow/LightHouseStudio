@@ -1,6 +1,10 @@
 export { ExportPlacementChooser } from './ExportPlacementChooser';
 export { ExportPlacementProgress } from './ExportPlacementProgress';
-export { exportPlacementLabel, exportSpecificationSummary } from './placements';
+export {
+  exportPlacementLabel,
+  exportPlacementShortLabel,
+  exportSpecificationSummary,
+} from './placements';
 export {
   exportPlacementRenderSupported,
   useExportPlacementRender,

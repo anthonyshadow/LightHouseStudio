@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const workspaceMastheadStyles = (theme: Theme): CSSObject => ({
   gridColumn: '1 / -1',
@@ -77,19 +78,26 @@ export const workspaceMastheadStyles = (theme: Theme): CSSObject => ({
     flex: '0 0 auto',
     alignItems: 'center',
     gap: theme.space.xs,
-    color: theme.colors.accent,
+    color: theme.colors.textMuted,
     fontSize: '0.6875rem',
-    fontWeight: 650,
+    fontWeight: 560,
     whiteSpace: 'nowrap',
   },
-  '& [data-workspace-save-status][data-tone="warning"]': { color: theme.colors.warning },
-  '& [data-workspace-save-status][data-tone="danger"]': { color: theme.colors.danger },
+  '& [data-workspace-save-status][data-tone="warning"]': {
+    color: theme.colors.warning,
+    fontWeight: 720,
+  },
+  '& [data-workspace-save-status][data-tone="danger"]': {
+    color: theme.colors.danger,
+    fontWeight: 720,
+  },
   '& [data-workspace-save-status-dot]': {
     width: '0.4rem',
     height: '0.4rem',
     flex: '0 0 auto',
     borderRadius: '50%',
     background: 'currentColor',
+    opacity: 0.72,
   },
   '@media (max-width: 31.99rem)': {
     gap: theme.space.sm,
@@ -111,15 +119,15 @@ export const taskInspectorStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
   flexDirection: 'column',
   overflow: 'hidden',
-  borderInlineStart: `1px solid ${theme.colors.border}`,
+  borderInlineStart: `1px solid ${theme.colors.divider}`,
   background: theme.colors.canvas,
-  '@media (max-width: 63.99rem)': {
+  [media.down('laptop')]: {
     gridColumn: 1,
     gridRow: 3,
     minHeight: '34rem',
     overflow: 'visible',
     borderInlineStart: 0,
-    borderBlockStart: `1px solid ${theme.colors.border}`,
+    borderBlockStart: `1px solid ${theme.colors.divider}`,
   },
 });
 
@@ -132,7 +140,7 @@ export const taskNavigationStyles = (theme: Theme): CSSObject => ({
   gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
   gap: theme.space.xxs,
   padding: theme.space.xs,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   background: theme.colors.canvas,
   '& > button': {
     position: 'relative',
@@ -193,7 +201,7 @@ export const taskBodyStyles = (theme: Theme): CSSObject => ({
     borderRadius: theme.radii.round,
     background: theme.colors.border,
   },
-  '@media (max-width: 63.99rem)': { overflow: 'visible' },
+  [media.down('laptop')]: { overflow: 'visible' },
 });
 
 export const taskPanelStyles = (theme: Theme): CSSObject => ({
@@ -220,7 +228,7 @@ export const taskPanelStyles = (theme: Theme): CSSObject => ({
   '& > section, & > [role="status"], & > [role="alert"]': {
     boxShadow: 'none',
   },
-  '@media (max-width: 39.99rem)': {
+  [media.down('tablet')]: {
     padding: `${theme.space.lg} ${theme.space.md} 5.5rem`,
   },
 });

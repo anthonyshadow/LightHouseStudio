@@ -83,7 +83,7 @@ export const HowLightframeWorksPanel = ({
             display: 'grid',
             gap: '0.3rem',
             paddingBlockEnd: theme.space.sm,
-            borderBlockEnd: `1px solid ${theme.colors.border}`,
+            borderBlockEnd: `1px solid ${theme.colors.divider}`,
           },
           '& > div:last-of-type': { borderBlockEnd: 0, paddingBlockEnd: 0 },
           '& dt': {

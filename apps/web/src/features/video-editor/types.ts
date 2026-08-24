@@ -22,6 +22,15 @@ export const formatVideoEditTime = (milliseconds: number): string => {
   return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 };
 
+export const formatVideoEditTimelineTime = (milliseconds: number): string => {
+  const centiseconds = Math.max(0, Math.floor(milliseconds / 10));
+  const minutes = Math.floor(centiseconds / 6_000);
+  const seconds = Math.floor((centiseconds % 6_000) / 100);
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(
+    centiseconds % 100,
+  ).padStart(2, '0')}`;
+};
+
 export type VideoEditSource = Readonly<{
   artifact: RecordingArtifact;
   metadata: UploadedTakeMetadata;
@@ -33,8 +42,10 @@ export type VideoEditStagePreviewContract = Readonly<{
   sourceHeight: number;
   activeTool: VideoEditTool;
   showingBefore: boolean;
+  splitComparison: boolean;
   playheadMs: number;
   onPlayheadChange: (playheadMs: number) => void;
+  onApplySpec: (spec: VideoEditSpec) => void;
   onCropStart: () => void;
   onCropChange: (spec: VideoEditSpec) => void;
   onCropCommit: () => void;

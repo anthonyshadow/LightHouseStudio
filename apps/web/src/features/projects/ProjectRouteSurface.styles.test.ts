@@ -1,40 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import { studioTheme } from '../../ui';
-import {
-  projectOverviewHeaderStyles,
-  projectOverviewInnerStyles,
-} from './ProjectOverviewSurface.styles';
-import { projectOverviewRouteStyles, projectsIndexRouteStyles } from './ProjectRouteSurface.styles';
-import {
-  projectsHeaderActionsStyles,
-  projectsLedgerRowStyles,
-  projectsWorkspaceInnerStyles,
-} from './ProjectsListSurface.styles';
+import { pageScrollRegionStyles } from '../../ui/primitives/PageShell.styles';
+import { projectOverviewHeaderStyles } from './ProjectOverviewSurface.styles';
+import { projectOverviewRouteStyles } from './ProjectRouteSurface.styles';
+import { projectsLedgerRowStyles } from './ProjectsListSurface.styles';
+import { pageHeaderStyles, pageShellStyles } from '../../ui/primitives/PageShell.styles';
 
 describe('Project index responsive ledger styles', () => {
   it('keeps the index flat and establishes a content-width query boundary', () => {
-    expect(projectsIndexRouteStyles(studioTheme)).toMatchObject({
-      border: 0,
-      borderRadius: 0,
+    expect(pageScrollRegionStyles(studioTheme)).toMatchObject({
       background: studioTheme.colors.canvas,
-    });
-    expect(projectsWorkspaceInnerStyles(studioTheme)).toMatchObject({
       containerType: 'inline-size',
     });
-  });
-
-  it('reflows both creation actions before the tablet content area can clip them', () => {
-    expect(projectsHeaderActionsStyles(studioTheme)).toMatchObject({
-      '@container (max-width: 52rem)': {
-        width: '100%',
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-        '& > button': { width: '100%', minWidth: 0 },
-      },
-      '@container (max-width: 28rem)': {
-        gridTemplateColumns: 'minmax(0, 1fr)',
-      },
-    });
+    // Flat means the property is absent, not set to zero: a page declares no border at all.
+    expect(pageScrollRegionStyles(studioTheme)).not.toHaveProperty('border');
+    expect(pageScrollRegionStyles(studioTheme)).not.toHaveProperty('borderRadius');
   });
 
   it('moves ledger rows from one to two to four columns without boxed controls', () => {
@@ -59,30 +39,43 @@ describe('Project index responsive ledger styles', () => {
 describe('Project overview Single Flow styles', () => {
   it('uses the approved flat route and content-width query boundary', () => {
     expect(projectOverviewRouteStyles(studioTheme)).toMatchObject({
-      border: 0,
-      borderRadius: 0,
       background: studioTheme.colors.canvas,
       containerType: 'inline-size',
     });
-    expect(projectOverviewInnerStyles(studioTheme)).toMatchObject({
+    expect(projectOverviewRouteStyles(studioTheme)).not.toHaveProperty('border');
+    expect(projectOverviewRouteStyles(studioTheme)).not.toHaveProperty('borderRadius');
+    // The page frame is the shared shell now, so the cap is asserted once, where it lives.
+    expect(pageShellStyles(studioTheme)).toMatchObject({
       width: 'min(100%, 88rem)',
+      marginInline: 'auto',
       gridTemplateColumns: 'minmax(0, 1fr)',
+      background: studioTheme.colors.canvas,
+      containerType: 'inline-size',
     });
+    expect(pageShellStyles(studioTheme)).not.toHaveProperty('border');
+    expect(pageShellStyles(studioTheme)).not.toHaveProperty('borderRadius');
   });
 
   it('gives the title the full content width throughout tablet layouts', () => {
-    expect(projectOverviewHeaderStyles(studioTheme)).toMatchObject({
-      '& [data-detail-identity]': {
+    expect(pageHeaderStyles(studioTheme)).toMatchObject({
+      '& [data-page-identity]': {
         gridTemplateColumns: 'minmax(0, 1fr) auto',
       },
       '& h1': { width: '100%', maxWidth: '48rem' },
       '@container (max-width: 64rem)': {
-        '& [data-detail-identity]': {
+        '& [data-page-identity]': {
           gridTemplateColumns: 'minmax(0, 1fr)',
           alignItems: 'stretch',
         },
         '& h1': { maxWidth: 'none' },
       },
+    });
+  });
+
+  it('keeps the overview header owning only what it adds to the shared one', () => {
+    expect(projectOverviewHeaderStyles(studioTheme)).toMatchObject({
+      '& [data-detail-breadcrumb]': { justifySelf: 'start' },
+      '& [data-detail-meta]': { display: 'flex' },
     });
   });
 });

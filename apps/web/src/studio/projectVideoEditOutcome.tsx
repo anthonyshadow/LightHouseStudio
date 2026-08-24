@@ -15,6 +15,8 @@ export const projectVideoEditOutcome = (
 ): VideoEditOutcome => ({
   commitLabel: 'Render preview',
   errorTitle: 'Render preview not ready',
+  readyTitle: 'Ready to render locally',
+  readyDescription: 'Rendering creates a temporary Project preview. Discard requires confirmation.',
   notices: (
     <>
       <StatusNotice tone="neutral" title="Temporary Render preview" role="status">

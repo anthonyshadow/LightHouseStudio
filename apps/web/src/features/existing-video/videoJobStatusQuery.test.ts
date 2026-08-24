@@ -3,7 +3,7 @@
 import type { VideoJobStatusResponse } from '@studio/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRemoteStateQueryClient } from '../../application/remote-state/RemoteStateProvider';
-import { jsonScenario, videoJobPollingScenario } from '../../test/msw/handlers';
+import { pendingRequestScenario, videoJobPollingScenario } from '../../test/msw/handlers';
 import { mockApiServer } from '../../test/msw/server';
 
 import { pollVideoJobStatus } from './videoJobStatusQuery';
@@ -96,7 +96,7 @@ describe('video job status Query polling', () => {
     let querySignal: AbortSignal | undefined;
     let requests = 0;
     mockApiServer.use(
-      jsonScenario('GET', `/api/video-jobs/${jobId}`, { kind: 'pending' }, (request) => {
+      pendingRequestScenario('GET', `/api/video-jobs/${jobId}`, (request) => {
         requests += 1;
         querySignal = request.signal;
       }),

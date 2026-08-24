@@ -57,7 +57,7 @@ provider work.
    restores that global Asset view and cannot resurrect the prior Project workspace from mounted
    React state. Leaving a workspace cannot silently abandon recording, finalization, local render,
    unaccepted source, dirty creative state, or a pending semantic checkpoint.
-9. The UI distinguishes **Preparing source**, **Saving changes**, **All changes saved**,
+9. The UI distinguishes **Preparing source**, **Autosaving…**, **Autosaved**,
    **Conflict**, and safe failure. A Project becomes resumable only after durable byte storage or
    exact Version verification, server inspection, checksum/owner validation, and atomic source
    revision acceptance. A failed/unaccepted staging attempt can be replaced.
@@ -72,7 +72,7 @@ provider work.
     converges on current authority, so a lost response is safe to replay, while a stale attempt
     against a source that has since been replaced conflicts instead. Exact Saved Video Version
     reuse references existing bytes and used-by lineage; it does not claim that the Project produced
-    that Version or infer a later Add Version target.
+    that Version or infer a later existing-video save target.
 11. Accepted source metadata exposes only normalized media facts and a controlled Project content
     URL. Owner-checked range/HEAD content rehydrates a fresh Blob through the existing recording
     artifact owner after navigation, browser refresh/restart, or app restart. Blob/data URLs,
@@ -88,7 +88,9 @@ provider work.
     applied creative/Voice/treatment values, explicit live metadata, and validated local edit; the
     immutable source and current media references are copied from server authority. Compatible
     proposals coalesce for 750 ms and append one revision rather than one revision per input event.
-    **Saving changes** and **All changes saved** describe this server checkpoint only.
+    `Unsaved changes`, **Autosaving…**, and timestamped **Autosaved · &lt;time&gt;** describe this
+    server checkpoint only and remain ambient in the masthead. Only conflict and failure states
+    become prominent notices.
 15. A stale Project/revision CAS or unavailable response preserves the current tab's proposal and
     reloads server authority. If authority already contains the exact proposal, the lost response
     converges without another revision. Otherwise **Conflict** requires explicit **Reapply
@@ -101,7 +103,7 @@ provider work.
 17. The existing creative rail remains available beside one source-bearing Project stage. Character
     and Variant, Outfit, prompt configuration, one visual treatment, optional local/saved Voice, capture
     metadata, and validated local edit map through feature-local adapters into the same Project
-    session. **Save progress** is an explicit semantic boundary; keystrokes, frames, slider
+    session. **Keep this setup** is an explicit semantic boundary; keystrokes, frames, slider
     ticks, and undo/redo entries never append revisions.
 18. Snapshot v2 records stable resource IDs plus only exact applied labels, child/reference IDs,
     prompt/treatment/settings, and resource revisions needed to explain the checkpoint. The V1 read
@@ -113,7 +115,7 @@ provider work.
 20. **Render preview** is temporary. **Use as the current cut** accepts a validated local render or
     exact same-owner ready Media Asset/Saved Video Version, flushes the session, verifies both CAS
     tokens and one operation-key fingerprint, and appends working/presented lineage. It never
-    changes the immutable source, copies exact retained media unnecessarily, infers Add Version,
+    changes the immutable source, copies exact retained media unnecessarily, infers a save target,
     or creates Project output provenance. Exact replay retains the original adoption revision ID,
     number, media, and receipt while also reporting the current Project revision; changed replay
     conflicts.
@@ -131,13 +133,18 @@ provider work.
     releases admission without claiming provider cancellation or refund; local rendering or
     working-media adoption still blocks switching/exit until it completes or returns to a safe
     cancellable checkpoint.
-23. A ready Project review exposes **Save as New Video** and, only after separate Saved Video target
-    selection and confirmation, **Add Version**. The command flushes the session, checks exact
+23. A ready Project review exposes one placement-labelled **Save video** action. It reveals one
+    destination choice: **New video**, with an editable proposed title, or **New version of an
+    existing video**, with the exact current target named inside the same choice surface. The
+    choice is inline in the desktop/tablet inspector and a single focus-trapped bottom sheet below
+    `40rem`; it never chains a picker and confirmation modal. The command flushes the session,
     freshly reads Project authority, checks exact Project/revision/media and append CAS, reuses the
     already-durable current bytes, creates one
     immutable Video Version, attributes it to the producing pre-save revision, and appends a
-    distinct completed post-save revision with the exact retained output pointer. Reusing a Saved
-    Video Version as source never preselects an Add Version target. A final CAS conflict clears the
+    distinct completed post-save revision with the exact retained output pointer and a freed
+    creative configuration, so the next round starts without the settings that produced the
+    Version. Reusing a Saved
+    Video Version as source never preselects an existing-video save target. A final CAS conflict clears the
     operation and refreshes current Project authority before asking the operator to review and save
     again. A settled save names the Saved Video and Version it produced and offers that exact
     Version in place — **Download** and **View in Assets** — belonging to the one settled operation.
@@ -148,8 +155,9 @@ provider work.
     is stored as no specification at all, so a Project that never answers behaves exactly as before.
     A chosen placement is written onto the revision through the ordinary session checkpoint, under
     the same CAS as every other creative change, never through the output-save request; the save
-    flushes it before it reads Project authority. Both confirmation dialogs restate the recorded
-    placement. Because the retained bytes are the ones the Project already holds, the placement is
+    flushes it before it reads Project authority. The same destination surface restates the
+    recorded placement. Because the retained bytes are the ones the Project already holds, the
+    placement is
     produced at the settled save's **Download**, which re-frames locally to that shape and names the
     file after it, and offers the original shape alongside. A browser that cannot render explains
     that and gives the original shape; the placement stays recorded either way.
@@ -166,10 +174,10 @@ provider work.
     for.
 26. **Use in Project** can explicitly adopt one exact retained output Version or valid stale
     processing result as working media after current lifecycle and CAS validation. It never changes
-    the immutable original, Saved Video current pointer, or Add Version target, and stale work is
+    the immutable original, Saved Video current pointer, or existing-video save target, and stale work is
     never promoted automatically. A removed global Saved Video remains reachable only through an
     exact same-owner retaining Project relation with truthful retention copy.
-27. **Make another version** duplicates a Project from its overview or from a Projects list row. The
+27. **Duplicate Project** duplicates a Project from its overview or from a Projects list row. The
     copy starts from the same original video and the same creative setup — character, outfit, voice,
     visual treatment, live-mode metadata, creative intent, local edit and placement — all carried by
     reference, so no video is duplicated and no storage is used again. It carries no outputs, no

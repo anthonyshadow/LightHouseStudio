@@ -40,21 +40,21 @@ optional organizer for Projects.
 
 ## The primary entities
 
-| Entity                          | Owned by | Durable store                                                     | Notes                                                          |
-| ------------------------------- | -------- | ----------------------------------------------------------------- | -------------------------------------------------------------- |
-| **Saved Video**                 | Account  | API (`saved_videos` / `video_versions` or local JSON)             | Append-only Versions; the only durable video library           |
-| **Project**                     | Account  | API (`projects`, `project_revisions`, …)                          | One immutable source, a revision chain, working media, outputs |
-| **Campaign**                    | Account  | API (`campaigns`)                                                 | Name + optional brief only; never owns Project working state   |
-| **Character / Outfit / Prompt** | Account  | Browser IndexedDB, optionally mirrored to `/api/creative-library` | Local-first "creative library"                                 |
-| **Saved Voice**                 | Account  | API (`saved_voices`)                                              | Provider-catalog voices retained for the account               |
-| **Reference image**             | Account  | API (`reference_image_assets` + byte store)                       | Generated or uploaded character/outfit imagery                 |
-| **Video job**                   | Account  | API (`processing_jobs`)                                           | A provider Character Swap / Virtual Try-On operation           |
+| Entity                          | Owned by | Durable store                                                          | Notes                                                          |
+| ------------------------------- | -------- | ---------------------------------------------------------------------- | -------------------------------------------------------------- |
+| **Saved Video**                 | Account  | API (`saved_videos` / `video_versions` or local JSON)                  | Append-only Versions; the only durable video library           |
+| **Project**                     | Account  | API (`projects`, `project_revisions`, …)                               | One immutable source, a revision chain, working media, outputs |
+| **Campaign**                    | Account  | API (`campaigns`)                                                      | Name + optional brief only; never owns Project working state   |
+| **Character / Outfit / Prompt** | Account  | `/api/creative-library` normalized Neon rows; IndexedDB cache/fallback | Account creative library                                       |
+| **Saved Voice**                 | Account  | API (`saved_voices`)                                                   | Provider-catalog voices retained for the account               |
+| **Reference image**             | Account  | API (`reference_image_assets` + byte store)                            | Generated or uploaded character/outfit imagery                 |
+| **Video job**                   | Account  | API (`processing_jobs`)                                                | A provider Character Swap / Virtual Try-On operation           |
 
 Key architectural fact that shapes every flow: **the authenticated app is one persistent shell
 with a runtime that comes and goes** (`apps/web/src/app/shell/AuthenticatedShell.tsx`). It is not a
 tree of nested routes. `ShellMain` (`apps/web/src/app/shell/ShellMain.tsx`) conditionally renders
-the Dashboard, Assets, Projects, Campaigns and Live-beta surfaces, and the asset libraries are
-full-screen **overlays keyed off `location.pathname`**
+the Dashboard, Projects, Campaigns and Live-beta surfaces (plus the `/assets` compatibility
+redirect), and the asset libraries are full-screen **overlays keyed off `location.pathname`**
 (`apps/web/src/studio/StudioLibraryOverlays.tsx`).
 
 The Studio's capture runtime mounts only where the stage is visible — `/studio/create`,
@@ -84,13 +84,13 @@ them. Whether a media stage exists at all is `isStudioRuntimePath`.
 ├── Continue Project ─────────► /projects/{id}
 ├── New Project (dialog) ─────► /projects  (createIntent) ──► /projects/{id}
 ├── New Campaign (dialog) ────► /campaigns  (createIntent) ──► /campaigns/{id}
-├── Browse Assets ────────────► /assets
+├── Browse Assets ────────────► /assets/videos (or the shell session's last-used library)
 └── Recent Work ──────────────► /projects/{id} · /campaigns/{id} · /assets/videos?video={id}
 
 /projects ──► /projects/{id} ──► /projects/{id}/workspace
                   │                    ├── Source  (record · upload · reuse Saved Video)
                   │                    ├── Create  (creative checkpoint · working media · processing)
-                  │                    ├── Save    (Save as New Video · Add Version)
+                  │                    ├── Save    (placement · Save video · destination choice)
                   │                    └── History (revisions · outputs · download)
                   └── Assets section (attach Videos / Characters / Outfits / Voices)
 
@@ -110,29 +110,29 @@ them. Whether a media stage exists at all is `isStudioRuntimePath`.
 
 ## Flow completeness
 
-| Flow                                                                   | State                   | Notes                                                                                                                                                                                 |
-| ---------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Entry, login, session restore, protected deep link                     | **Complete**            | Covered by e2e (`e2e/app-routing.spec.ts`)                                                                                                                                            |
-| Logout with unsaved-work guards                                        | **Complete**            | `useStudioLogoutController.ts`                                                                                                                                                        |
-| Dashboard                                                              | **Complete**            | All sections load, empty and error states present                                                                                                                                     |
-| Standalone record → review → save                                      | **Complete**            |                                                                                                                                                                                       |
-| Standalone upload/import → review → save                               | **Complete**            |                                                                                                                                                                                       |
-| Character Swap / Virtual Try-On on an uploaded video                   | **Complete**            | Requires a configured provider                                                                                                                                                        |
-| Voice treatment (local effects)                                        | **Complete**            |                                                                                                                                                                                       |
-| Voice treatment (ElevenLabs)                                           | **Complete**            | Requires `ELEVENLABS_API_KEY`                                                                                                                                                         |
-| Local video adjust (trim/crop render in-browser)                       | **Complete**            |                                                                                                                                                                                       |
-| Save to Assets, completion surface, Versions, rename, remove, download | **Complete**            |                                                                                                                                                                                       |
-| Character builder, wardrobe variants, outfits                          | **Complete**            |                                                                                                                                                                                       |
-| Projects: create, source, checkpoint, working media, output, history   | **Complete**            |                                                                                                                                                                                       |
-| Project-scoped Character Swap / Virtual Try-On with reconnect          | **Complete**            |                                                                                                                                                                                       |
-| Campaigns: create, edit, archive, restore, delete, membership          | **Complete**            | Every lifecycle action is reachable from the list as well as the detail page                                                                                                          |
-| Attaching assets to a Project                                          | **Complete**            |                                                                                                                                                                                       |
-| **Live AI (realtime) sessions**                                        | **Partial / gated**     | Code paths exist end-to-end but are disabled unless `REALTIME_VIDEO_BETA_ENABLED` **and** a Decart key are configured; `/studio/create/live` otherwise renders an unavailable surface |
-| Voices library page                                                    | **Complete**            | `/assets/voices` browses, previews, saves and removes voices, and hands one to Studio; disabled with an explanation only when ElevenLabs is unconfigured                              |
-| Cloud creative-library sync                                            | **Complete**            | Fails closed on divergence, conflict or transport error, and is recoverable in place: Try again · Keep this browser's copy · Use the cloud copy. No merge exists, by design           |
-| **Project provider voice / live starts**                               | **Deliberately absent** | Blocked with an explicit reason (`ProjectCreativeCheckpointPanel.tsx:14`)                                                                                                             |
-| **`/studio/{videoId}` deep link**                                      | **Orphaned**            | The route loads a Saved Video into review, but no UI in the app ever links to it                                                                                                      |
-| **Account settings**                                                   | **Absent**              | The account menu contains only "Log out" (`AccountMenu.tsx:245-247`)                                                                                                                  |
+| Flow                                                                   | State                   | Notes                                                                                                                                                                                                                                             |
+| ---------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Entry, login, session restore, protected deep link                     | **Complete**            | Covered by e2e (`e2e/app-routing.spec.ts`)                                                                                                                                                                                                        |
+| Logout with unsaved-work guards                                        | **Complete**            | `useStudioLogoutController.ts`                                                                                                                                                                                                                    |
+| Dashboard                                                              | **Complete**            | All sections load, empty and error states present                                                                                                                                                                                                 |
+| Standalone record → review → save                                      | **Complete**            |                                                                                                                                                                                                                                                   |
+| Standalone upload/import → review → save                               | **Complete**            |                                                                                                                                                                                                                                                   |
+| Character Swap / Virtual Try-On on an uploaded video                   | **Complete**            | Requires a configured provider                                                                                                                                                                                                                    |
+| Voice treatment (local effects)                                        | **Complete**            |                                                                                                                                                                                                                                                   |
+| Voice treatment (ElevenLabs)                                           | **Complete**            | Requires `ELEVENLABS_API_KEY`                                                                                                                                                                                                                     |
+| Local video adjust (trim/crop render in-browser)                       | **Complete**            |                                                                                                                                                                                                                                                   |
+| Save to Assets, completion surface, Versions, rename, remove, download | **Complete**            |                                                                                                                                                                                                                                                   |
+| Character builder, wardrobe variants, outfits                          | **Complete**            |                                                                                                                                                                                                                                                   |
+| Projects: create, source, checkpoint, working media, output, history   | **Complete**            |                                                                                                                                                                                                                                                   |
+| Project-scoped Character Swap / Virtual Try-On with reconnect          | **Complete**            |                                                                                                                                                                                                                                                   |
+| Campaigns: create, edit, archive, restore, delete, membership          | **Complete**            | Every lifecycle action is reachable from the list as well as the detail page                                                                                                                                                                      |
+| Attaching assets to a Project                                          | **Complete**            |                                                                                                                                                                                                                                                   |
+| **Live AI (realtime) sessions**                                        | **Partial / gated**     | Code paths exist end-to-end but are disabled unless `REALTIME_VIDEO_BETA_ENABLED` **and** a Decart key are configured; `/studio/create/live` otherwise renders an unavailable surface                                                             |
+| Voices library page                                                    | **Complete**            | `/assets/voices` browses, previews, saves and removes voices, and hands one to Studio; disabled with an explanation only when ElevenLabs is unconfigured                                                                                          |
+| Account creative-library sync                                          | **Complete**            | Neon is authoritative in relational modes; fresh sessions hydrate the local-first cache. Divergence, conflict and transport failures fail closed and recover with Try again · Save current copy · Reload account copy. No merge exists, by design |
+| **Project provider voice / live starts**                               | **Deliberately absent** | Blocked with an explicit reason (`ProjectCreativeCheckpointPanel.tsx:14`)                                                                                                                                                                         |
+| **`/studio/{videoId}` deep link**                                      | **Orphaned**            | The route loads a Saved Video into review, but no UI in the app ever links to it                                                                                                                                                                  |
+| **Account settings**                                                   | **Absent**              | The account menu contains only "Log out" (`AccountMenu.tsx:245-247`)                                                                                                                                                                              |
 
 ## How a new user is expected to move through the product
 

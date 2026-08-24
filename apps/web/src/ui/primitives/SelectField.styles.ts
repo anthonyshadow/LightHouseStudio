@@ -1,6 +1,7 @@
 import type { CSSObject, Theme } from '@emotion/react';
 import { focusRingStyles } from '../theme';
 import { controlStyles } from './FormControl.styles';
+import { media } from '../media';
 
 export interface SelectPopoverPosition {
   readonly top: number;
@@ -82,7 +83,7 @@ export const popoverLayerStyles = (theme: Theme, position: SelectPopoverPosition
   color: theme.colors.text,
   background: 'transparent',
   '&::backdrop': { background: 'transparent' },
-  '@media (max-width: 40rem)': {
+  [media.down('tablet')]: {
     inset: 0,
     width: '100%',
     height: '100%',
@@ -105,21 +106,21 @@ export const menuStyles = (theme: Theme, position: SelectPopoverPosition): CSSOb
   borderRadius: theme.radii.medium,
   background: theme.colors.surfaceStrong,
   boxShadow: theme.shadows.lifted,
-  '@media (max-width: 40rem)': {
+  [media.down('tablet')]: {
     maxHeight: 'min(80dvh, 34rem)',
     borderInline: 0,
     borderBlockEnd: 0,
     borderRadius: `${theme.radii.large} ${theme.radii.large} 0 0`,
     paddingBlockEnd: 'env(safe-area-inset-bottom)',
   },
-  '@media (max-height: 36rem) and (max-width: 40rem)': {
+  [`${media.down('tablet')} and (max-height: 36rem)`]: {
     maxHeight: '92dvh',
   },
 });
 
 export const mobileHeaderStyles = (theme: Theme): CSSObject => ({
   display: 'none',
-  '@media (max-width: 40rem)': {
+  [media.down('tablet')]: {
     minWidth: 0,
     minHeight: '3.5rem',
     display: 'grid',
@@ -127,7 +128,7 @@ export const mobileHeaderStyles = (theme: Theme): CSSObject => ({
     alignItems: 'center',
     gap: theme.space.sm,
     padding: `${theme.space.sm} max(${theme.space.md}, env(safe-area-inset-right)) ${theme.space.sm} max(${theme.space.md}, env(safe-area-inset-left))`,
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
   },
 });
 
@@ -173,7 +174,7 @@ export const optionListStyles = (theme: Theme): CSSObject => ({
   margin: 0,
   padding: theme.space.xxs,
   listStyle: 'none',
-  '@media (max-width: 40rem)': {
+  [media.down('tablet')]: {
     gap: theme.space.xs,
     padding: `${theme.space.sm} max(${theme.space.sm}, env(safe-area-inset-right)) ${theme.space.sm} max(${theme.space.sm}, env(safe-area-inset-left))`,
   },
@@ -211,7 +212,7 @@ export const optionStyles = (theme: Theme, selected: boolean, active: boolean): 
     boxShadow: `inset 0 0 0 2px ${theme.colors.focus}`,
   },
   '&:disabled': { cursor: 'not-allowed', opacity: 0.45 },
-  '@media (max-width: 40rem)': {
+  [media.down('tablet')]: {
     minHeight: '3.5rem',
     padding: `${theme.space.sm} ${theme.space.md}`,
     borderRadius: theme.radii.medium,

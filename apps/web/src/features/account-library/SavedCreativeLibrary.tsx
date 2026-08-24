@@ -7,6 +7,7 @@ import type {
 } from '../creative-assets/types';
 import { useRef, useState } from 'react';
 import { Button, ConfirmationDialog, emptyExampleStyles, EmptyStatePreview } from '../../ui';
+import { media } from '../../ui/media';
 
 const compactGrid = (theme: Theme): CSSObject => ({
   display: 'grid',
@@ -44,7 +45,7 @@ const characterGridStyles = (theme: Theme): CSSObject => ({
   gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 18rem), 1fr))',
   alignItems: 'start',
   gap: theme.space.lg,
-  '@media (max-width: 48rem)': {
+  [media.down('compact')]: {
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   },
   '@media (max-width: 30rem)': {
@@ -362,11 +363,14 @@ export const SavedOutfitLibrary = ({
   repository,
   onUse,
   onCreate,
+  showCreateAction = true,
 }: {
   items: readonly SavedPrompt[];
   repository: CreativeAssetRepository;
   onUse: (item: SavedPrompt) => void;
   onCreate: () => void;
+  /** Asset overlays promote creation into their library toolbar; embedded callers keep it here. */
+  showCreateAction?: boolean;
 }) => {
   'use memo';
 
@@ -413,12 +417,12 @@ export const SavedOutfitLibrary = ({
                 For example: a jacket you styled once with Virtual Try-On, ready to try on in any
                 new video.
               </p>
-              {createOutfitButton}
+              {showCreateAction ? createOutfitButton : null}
             </div>
           </div>
         ) : (
           <>
-            <div>{createOutfitButton}</div>
+            {showCreateAction ? <div>{createOutfitButton}</div> : null}
             <div css={compactGrid(theme)}>
               {items.map((item) => (
                 <article key={item.id} css={compactCard(theme)}>

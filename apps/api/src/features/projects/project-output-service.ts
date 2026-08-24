@@ -189,7 +189,12 @@ export class ProjectOutputService {
     reference: ProjectMediaReference,
   ): Promise<ReadyProjectMedia> {
     const [working, source] = await Promise.all([
-      this.projects.getWorkingMedia(ownerUserId, current.project.id, current.revision.id),
+      // The adoption is looked up by the media the current revision presents, not by the revision
+      // that adopted it: an ordinary Project change (a creative checkpoint, a placement choice)
+      // appends a revision without re-adopting unchanged media, and the durable record still
+      // describes exactly these bytes. Keying on the current revision id made every save after
+      // such a change report the ready media as having no durable record.
+      this.projects.getWorkingMedia(ownerUserId, current.project.id),
       this.projects.getSource(ownerUserId, current.project.id),
     ]);
     let assetId: string;

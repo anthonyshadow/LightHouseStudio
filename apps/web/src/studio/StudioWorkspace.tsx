@@ -1,6 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { CreativeAssetStore } from '@studio/domain';
-import { lazy, Suspense, type ReactNode, type RefObject } from 'react';
+import { lazy, Suspense, useRef, type ReactNode, type RefObject } from 'react';
 import type { BrowserCapabilities } from '../application/types';
 import { CaptureSettingsPanel, RecordingAction, RecordingControls } from '../features/recording';
 import { ownedRecordingArtifact } from '../features/recording/types';
@@ -111,6 +111,7 @@ export const StudioWorkspace = ({
   actions,
 }: StudioWorkspaceProps) => {
   const theme = useTheme();
+  const editorVideoRef = useRef<HTMLVideoElement>(null);
   const { fullscreen: fullscreenWorkspaceRef, uploadToggle: uploadToggleRef } = refs;
   const { projectContextActive, projectRecordingAvailable } = route;
   const { session, takeReview, videoEditor, savedVideo, project, projectProcessing } = controllers;
@@ -173,6 +174,7 @@ export const StudioWorkspace = ({
         data-capture-settings={captureSettingsCollapsed ? 'collapsed' : undefined}
       >
         <MediaStage
+          videoRef={editorVideoRef}
           presentation={stagePresentation}
           mode={session.draft.mode}
           lifecycle={session.lifecycle}
@@ -250,6 +252,7 @@ export const StudioWorkspace = ({
           <Suspense fallback={deferredWorkspaceFallback}>
             <VideoEditWorkspace
               session={videoEditor}
+              videoRef={editorVideoRef}
               onRequestDiscard={savedVideo.requestVideoEditDiscard}
               {...(projectContextActive
                 ? {

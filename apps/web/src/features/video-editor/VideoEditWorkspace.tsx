@@ -1,4 +1,4 @@
-import { useTheme } from '@emotion/react';
+import { Global, useTheme } from '@emotion/react';
 import {
   VIDEO_EDIT_CROP_PRESETS,
   VIDEO_EDIT_FILTERS,
@@ -9,26 +9,64 @@ import {
   type VideoEditFilter,
   type VideoEditSpec,
 } from '@studio/domain';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode, type RefObject } from 'react';
 import { Button, StatusNotice } from '../../ui';
+import { VideoEditIcon, type VideoEditIconName } from './VideoEditIcon';
 import type { VideoEditSession } from './useVideoEditSession';
+import { VideoEditTimeline } from './VideoEditTimeline';
 import { formatVideoEditTime, isVideoEditBusy, type VideoEditTool } from './types';
 import {
   editSettingsBodyStyles,
   editSettingsStyles,
+  editToolRailFrameStyles,
   editToolRailStyles,
   editorFooterStyles,
+  editorHeaderStyles,
+  editorWorkspaceStyles,
+  historyCompareStyles,
+  inspectorIntroStyles,
   optionGridStyles,
   rangeFieldStyles,
   renderProgressStyles,
+  videoEditStageLayoutStyles,
 } from './VideoEditWorkspace.styles';
 
-const TOOLS: readonly Readonly<{ id: VideoEditTool; label: string }>[] = [
-  { id: 'trim', label: 'Trim' },
-  { id: 'crop', label: 'Crop' },
-  { id: 'rotate', label: 'Rotate' },
-  { id: 'lighting', label: 'Lighting' },
-  { id: 'filters', label: 'Filters' },
+const TOOLS: readonly Readonly<{
+  id: VideoEditTool;
+  label: string;
+  icon: VideoEditIconName;
+  description: string;
+}>[] = [
+  {
+    id: 'trim',
+    label: 'Trim',
+    icon: 'scissors',
+    description: 'Set the visible in and out points; playback loops inside the selection.',
+  },
+  {
+    id: 'crop',
+    label: 'Crop',
+    icon: 'crop',
+    description: 'Choose a ratio, then drag the frame or use its keyboard-accessible handles.',
+  },
+  {
+    id: 'rotate',
+    label: 'Rotate',
+    icon: 'rotate',
+    description: 'Rotate or flip the frame; the result is baked into the local render.',
+  },
+  {
+    id: 'lighting',
+    label: 'Lighting',
+    icon: 'lighting',
+    description: 'Adjustments combine with the selected filter and render locally.',
+  },
+  {
+    id: 'filters',
+    label: 'Filters',
+    icon: 'filters',
+    description: 'Choose a look rendered through the same local color pipeline as the preview.',
+  },
 ];
 
 const ADJUSTMENT_LABELS: Record<keyof VideoEditAdjustments, string> = {
@@ -95,8 +133,9 @@ const EditRange = ({
         aria-label={label}
         onPointerDown={onStart}
         onKeyDown={(event) => {
-          if (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End')
+          if (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End') {
             onStart();
+          }
         }}
         onChange={(event) => onChange(Number(event.currentTarget.value))}
         onPointerUp={onCommit}
@@ -115,11 +154,10 @@ const ToolSettings = ({ session }: { session: VideoEditSession }) => {
   const theme = useTheme();
   const source = session.source;
   if (!source) return null;
+
   if (session.activeTool === 'trim') {
     return (
       <>
-        <h3>Trim selection</h3>
-        <p>Playback loops between the selected start and end times.</p>
         <EditRange
           label="Start time"
           value={session.draft.trim.startMs}
@@ -167,6 +205,7 @@ const ToolSettings = ({ session }: { session: VideoEditSession }) => {
       </>
     );
   }
+
   if (session.activeTool === 'crop') {
     const rotated = rotatedVideoEditDimensions(
       source.metadata.width,
@@ -174,37 +213,34 @@ const ToolSettings = ({ session }: { session: VideoEditSession }) => {
       session.draft.rotation,
     );
     return (
-      <>
-        <h3>Crop</h3>
-        <p>Choose a ratio, then drag the frame or use its keyboard-accessible corner handles.</p>
-        <div css={optionGridStyles(theme, 2)}>
-          {VIDEO_EDIT_CROP_PRESETS.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              aria-pressed={session.draft.crop.preset === preset}
-              onClick={() =>
-                session.applySpec({
-                  ...session.draft,
-                  crop: {
+      <div css={optionGridStyles(theme, 2)}>
+        {VIDEO_EDIT_CROP_PRESETS.map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            aria-pressed={session.draft.crop.preset === preset}
+            onClick={() =>
+              session.applySpec({
+                ...session.draft,
+                crop: {
+                  preset,
+                  rectangle: cropForVideoEditPreset(
                     preset,
-                    rectangle: cropForVideoEditPreset(
-                      preset,
-                      rotated.width,
-                      rotated.height,
-                      session.draft.crop.rectangle,
-                    ),
-                  },
-                })
-              }
-            >
-              {CROP_LABELS[preset]}
-            </button>
-          ))}
-        </div>
-      </>
+                    rotated.width,
+                    rotated.height,
+                    session.draft.crop.rectangle,
+                  ),
+                },
+              })
+            }
+          >
+            {CROP_LABELS[preset]}
+          </button>
+        ))}
+      </div>
     );
   }
+
   if (session.activeTool === 'rotate') {
     const rotate = (amount: number) =>
       session.applySpec({
@@ -212,46 +248,41 @@ const ToolSettings = ({ session }: { session: VideoEditSession }) => {
         rotation: ((session.draft.rotation + amount + 360) % 360) as VideoEditSpec['rotation'],
       });
     return (
-      <>
-        <h3>Rotate and flip</h3>
-        <p>Rotation is baked into the rendered frames; the output does not rely on metadata.</p>
-        <div css={optionGridStyles(theme, 2)}>
-          <button type="button" onClick={() => rotate(-90)}>
-            Rotate left
-          </button>
-          <button type="button" onClick={() => rotate(90)}>
-            Rotate right
-          </button>
-          <button
-            type="button"
-            aria-pressed={session.draft.flipHorizontal}
-            onClick={() =>
-              session.applySpec({
-                ...session.draft,
-                flipHorizontal: !session.draft.flipHorizontal,
-              })
-            }
-          >
-            Flip horizontal
-          </button>
-          <button
-            type="button"
-            aria-pressed={session.draft.flipVertical}
-            onClick={() =>
-              session.applySpec({ ...session.draft, flipVertical: !session.draft.flipVertical })
-            }
-          >
-            Flip vertical
-          </button>
-        </div>
-      </>
+      <div css={optionGridStyles(theme, 2)}>
+        <button type="button" onClick={() => rotate(-90)}>
+          Rotate left
+        </button>
+        <button type="button" onClick={() => rotate(90)}>
+          Rotate right
+        </button>
+        <button
+          type="button"
+          aria-pressed={session.draft.flipHorizontal}
+          onClick={() =>
+            session.applySpec({
+              ...session.draft,
+              flipHorizontal: !session.draft.flipHorizontal,
+            })
+          }
+        >
+          Flip horizontal
+        </button>
+        <button
+          type="button"
+          aria-pressed={session.draft.flipVertical}
+          onClick={() =>
+            session.applySpec({ ...session.draft, flipVertical: !session.draft.flipVertical })
+          }
+        >
+          Flip vertical
+        </button>
+      </div>
     );
   }
+
   if (session.activeTool === 'lighting') {
     return (
       <>
-        <h3>Lighting</h3>
-        <p>Adjustments are combined with the selected filter and rendered locally.</p>
         {(Object.keys(ADJUSTMENT_LABELS) as (keyof VideoEditAdjustments)[]).map((key) => (
           <EditRange
             key={key}
@@ -272,131 +303,281 @@ const ToolSettings = ({ session }: { session: VideoEditSession }) => {
       </>
     );
   }
+
   return (
-    <>
-      <h3>Filters</h3>
-      <p>Filters use the same local color renderer as the live preview.</p>
-      <div css={optionGridStyles(theme, 2)}>
-        {VIDEO_EDIT_FILTERS.map((filter) => (
-          <button
-            key={filter}
-            type="button"
-            aria-pressed={session.draft.filter === filter}
-            onClick={() => session.applySpec({ ...session.draft, filter })}
-          >
-            {FILTER_LABELS[filter]}
-          </button>
-        ))}
-      </div>
-    </>
+    <div css={optionGridStyles(theme, 2)}>
+      {VIDEO_EDIT_FILTERS.map((filter) => (
+        <button
+          key={filter}
+          type="button"
+          aria-pressed={session.draft.filter === filter}
+          onClick={() => session.applySpec({ ...session.draft, filter })}
+        >
+          {FILTER_LABELS[filter]}
+        </button>
+      ))}
+    </div>
   );
 };
 
-/**
- * What committing a render produces, described by whoever owns the surrounding workflow.
- *
- * The editor renders bytes locally and knows nothing about where they go: a standalone edit
- * replaces the video being viewed, while a caller with durable media of its own may treat the same
- * render as a disposable preview. Keeping that as caller-supplied copy is what stops the editor
- * from having to enumerate the workflows that embed it.
- */
+/** Describes what the caller does with a successfully rendered local edit. */
 export type VideoEditOutcome = Readonly<{
   commitLabel: string;
   errorTitle: string;
-  /** Guidance shown above the tool settings, e.g. what the render does and does not persist. */
+  readyTitle?: string;
+  readyDescription?: string;
   notices?: ReactNode;
 }>;
 
 const SAVE_EDITED_VIDEO: VideoEditOutcome = {
   commitLabel: 'Save edited video',
   errorTitle: 'Edit not saved',
+  readyTitle: 'Ready to save locally',
+  readyDescription: 'Saving replaces the current edited preview. Discard requires confirmation.',
+};
+
+const isTextEntry = (target: EventTarget | null) => {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest('textarea, select, [contenteditable="true"], input:not([type="range"])'),
+  );
 };
 
 export type VideoEditWorkspaceProps = Readonly<{
   session: VideoEditSession;
+  videoRef: RefObject<HTMLVideoElement | null>;
   onRequestDiscard: () => void;
   outcome?: VideoEditOutcome;
 }>;
 
 export const VideoEditWorkspace = ({
   session,
+  videoRef,
   onRequestDiscard,
   outcome = SAVE_EDITED_VIDEO,
 }: VideoEditWorkspaceProps) => {
   const theme = useTheme();
+  const [inspectorExpanded, setInspectorExpanded] = useState(true);
   const busy = isVideoEditBusy(session.phase);
-  const activeToolLabel = TOOLS.find((tool) => tool.id === session.activeTool)?.label;
+  const activeTool = TOOLS.find((tool) => tool.id === session.activeTool) ?? TOOLS[0]!;
+  const setShowingBefore = session.setShowingBefore;
+
+  useEffect(() => {
+    const holdCompare = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'c' || event.repeat || isTextEntry(event.target)) return;
+      setShowingBefore(true);
+    };
+    const releaseCompare = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === 'c') setShowingBefore(false);
+    };
+    const releaseOnBlur = () => setShowingBefore(false);
+    window.addEventListener('keydown', holdCompare);
+    window.addEventListener('keyup', releaseCompare);
+    window.addEventListener('blur', releaseOnBlur);
+    return () => {
+      window.removeEventListener('keydown', holdCompare);
+      window.removeEventListener('keyup', releaseCompare);
+      window.removeEventListener('blur', releaseOnBlur);
+    };
+  }, [setShowingBefore]);
+
+  useEffect(() => {
+    if (!inspectorExpanded) return;
+    const collapseOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setInspectorExpanded(false);
+    };
+    window.addEventListener('keydown', collapseOnEscape);
+    return () => window.removeEventListener('keydown', collapseOnEscape);
+  }, [inspectorExpanded]);
+
   return (
-    <>
-      <nav
-        css={editToolRailStyles(theme)}
-        aria-label="Video editing tools"
-        data-studio-tool-rail=""
-        data-video-edit-tool-rail=""
-      >
-        {TOOLS.map((tool) => (
-          <button
-            key={tool.id}
-            type="button"
-            aria-current={session.activeTool === tool.id ? 'page' : undefined}
-            disabled={busy}
-            onClick={() => session.setActiveTool(tool.id)}
-          >
-            {tool.label}
-          </button>
-        ))}
-        <button
-          type="button"
-          data-edit-rail-reset=""
-          disabled={!session.dirty || busy}
-          onClick={session.resetTool}
+    <div
+      css={editorWorkspaceStyles()}
+      data-video-edit-workspace=""
+      data-inspector-expanded={inspectorExpanded ? 'true' : 'false'}
+    >
+      <Global styles={videoEditStageLayoutStyles(theme)} />
+      <header css={editorHeaderStyles(theme)} data-video-editor-header="">
+        <div>
+          <h1>Edit video</h1>
+          <p>Local edits stay in this browser until you save.</p>
+        </div>
+        <span data-editor-dirty={session.dirty ? 'true' : 'false'}>
+          <span aria-hidden="true" />
+          {session.dirty ? 'Unsaved edits' : 'No unsaved edits'}
+        </span>
+      </header>
+
+      <div css={editToolRailFrameStyles(theme)}>
+        <nav
+          css={editToolRailStyles(theme)}
+          aria-label="Video editing tools"
+          data-studio-tool-rail=""
+          data-video-edit-tool-rail=""
         >
-          Reset tool
-        </button>
-      </nav>
+          {TOOLS.map((tool) => (
+            <button
+              key={tool.id}
+              type="button"
+              aria-current={session.activeTool === tool.id ? 'page' : undefined}
+              disabled={busy}
+              onClick={() => session.setActiveTool(tool.id)}
+            >
+              <VideoEditIcon name={tool.icon} width="1rem" height="1rem" />
+              {tool.label}
+            </button>
+          ))}
+        </nav>
+        <span data-tool-overflow-cue="" aria-hidden="true">
+          <VideoEditIcon name="chevronRight" width="0.9rem" height="0.9rem" />
+          <VideoEditIcon name="chevronRight" width="0.9rem" height="0.9rem" />
+        </span>
+      </div>
+
+      <section
+        css={historyCompareStyles(theme)}
+        aria-labelledby="video-editor-history-title"
+        data-video-editor-history=""
+      >
+        <header>
+          <h2 id="video-editor-history-title">History and compare</h2>
+          <span>Hold C to show original</span>
+        </header>
+        <div>
+          <Button
+            size="small"
+            variant="secondary"
+            disabled={!session.canUndo || busy}
+            onClick={session.undo}
+          >
+            <VideoEditIcon name="undo" width="1rem" height="1rem" />
+            Undo
+          </Button>
+          <Button
+            size="small"
+            variant="secondary"
+            disabled={!session.canRedo || busy}
+            onClick={session.redo}
+          >
+            <VideoEditIcon name="redo" width="1rem" height="1rem" />
+            Redo
+          </Button>
+          <Button
+            size="small"
+            variant="secondary"
+            disabled={!session.dirty || busy}
+            onClick={session.resetTool}
+          >
+            <VideoEditIcon name="reset" width="1rem" height="1rem" />
+            Reset tool
+          </Button>
+          <Button
+            size="small"
+            variant="secondary"
+            disabled={!session.dirty || busy}
+            onClick={session.resetAll}
+          >
+            <VideoEditIcon name="history" width="1rem" height="1rem" />
+            Reset all
+          </Button>
+          <Button
+            size="small"
+            variant="secondary"
+            aria-label="Hold to show original. Keyboard shortcut C."
+            aria-pressed={session.showingBefore}
+            disabled={busy}
+            onPointerDown={(event) => {
+              event.currentTarget.setPointerCapture?.(event.pointerId);
+              session.setShowingBefore(true);
+            }}
+            onPointerUp={() => session.setShowingBefore(false)}
+            onPointerCancel={() => session.setShowingBefore(false)}
+            onKeyDown={(event) => {
+              if (event.key === ' ' || event.key === 'Enter') session.setShowingBefore(true);
+            }}
+            onKeyUp={(event) => {
+              if (event.key === ' ' || event.key === 'Enter') session.setShowingBefore(false);
+            }}
+            onBlur={() => session.setShowingBefore(false)}
+          >
+            <VideoEditIcon name="compare" width="1rem" height="1rem" />
+            Hold Compare
+            <kbd>C</kbd>
+          </Button>
+          <Button
+            size="small"
+            variant="quiet"
+            aria-pressed={session.splitComparison}
+            disabled={busy}
+            onClick={() => {
+              session.setShowingBefore(false);
+              session.setSplitComparison(!session.splitComparison);
+            }}
+          >
+            <VideoEditIcon name="split" width="1rem" height="1rem" />
+            Split
+          </Button>
+        </div>
+      </section>
+
+      <VideoEditTimeline session={session} videoRef={videoRef} />
 
       <aside
         css={editSettingsStyles(theme)}
         aria-label="Video edit settings"
         data-capture-controls=""
         data-video-edit-settings=""
+        data-expanded={inspectorExpanded ? 'true' : 'false'}
       >
         <header>
-          <h2>{activeToolLabel} settings</h2>
-          <div data-editor-history="">
-            <Button
-              size="small"
-              variant="quiet"
-              aria-label="Undo video edit"
-              disabled={!session.canUndo || busy}
-              onClick={session.undo}
-            >
-              ↶
-            </Button>
-            <Button
-              size="small"
-              variant="quiet"
-              aria-label="Redo video edit"
-              disabled={!session.canRedo || busy}
-              onClick={session.redo}
-            >
-              ↷
-            </Button>
+          <div>
+            <span data-inspector-drag-handle="" aria-hidden="true" />
+            <span data-inspector-title="">
+              <VideoEditIcon name={activeTool.icon} width="1rem" height="1rem" />
+              <h2>{activeTool.label} settings</h2>
+              {session.dirty ? <strong>Edited</strong> : null}
+            </span>
           </div>
+          <Button
+            size="small"
+            variant="quiet"
+            aria-label={inspectorExpanded ? 'Collapse inspector' : 'Expand inspector'}
+            aria-expanded={inspectorExpanded}
+            onClick={() => setInspectorExpanded((expanded) => !expanded)}
+          >
+            <span data-desktop-inspector-icon="">
+              <VideoEditIcon
+                name={inspectorExpanded ? 'collapse' : 'chevronLeft'}
+                width="1.1rem"
+                height="1.1rem"
+              />
+            </span>
+            <span data-mobile-inspector-icon="">
+              <VideoEditIcon name="chevronDown" width="1.1rem" height="1.1rem" />
+            </span>
+          </Button>
         </header>
         <div
           css={editSettingsBodyStyles(theme)}
           role="region"
-          aria-label={`${activeToolLabel} controls`}
+          aria-label={`${activeTool.label} controls`}
         >
-          <Button
-            size="small"
-            variant={session.showingBefore ? 'primary' : 'secondary'}
-            aria-pressed={session.showingBefore}
-            onClick={() => session.setShowingBefore(!session.showingBefore)}
-          >
-            {session.showingBefore ? 'Showing before' : 'Preview before'}
-          </Button>
+          <div css={inspectorIntroStyles(theme)}>
+            <div>
+              <h3>{activeTool.label}</h3>
+              <p>{activeTool.description}</p>
+            </div>
+            <Button
+              size="small"
+              variant="quiet"
+              disabled={!session.dirty || busy}
+              onClick={session.resetTool}
+            >
+              <VideoEditIcon name="reset" width="1rem" height="1rem" />
+              Reset
+            </Button>
+          </div>
+          <ToolSettings session={session} />
           {!session.supported ? (
             <StatusNotice tone="warning" title="Local editor unavailable">
               This browser cannot provide the required WebGL, WebCodecs, worker, and OffscreenCanvas
@@ -404,7 +585,6 @@ export const VideoEditWorkspace = ({
             </StatusNotice>
           ) : null}
           {outcome.notices}
-          <ToolSettings session={session} />
           {session.phase === 'rendering' || session.phase === 'validating' ? (
             <div css={renderProgressStyles(theme)} role="status" aria-live="polite">
               <span>
@@ -425,30 +605,40 @@ export const VideoEditWorkspace = ({
             </StatusNotice>
           ) : null}
         </div>
-        <footer css={editorFooterStyles(theme)}>
-          <Button
-            size="small"
-            variant="quiet"
-            disabled={!session.dirty || busy}
-            onClick={session.resetAll}
-          >
-            Reset all
-          </Button>
-          <div data-editor-primary-actions="">
-            <Button
-              variant="primary"
-              busy={busy}
-              disabled={!session.dirty || !session.supported || busy}
-              onClick={() => void session.startRender()}
-            >
-              {outcome.commitLabel}
-            </Button>
-            <Button variant="danger" disabled={busy} onClick={onRequestDiscard}>
-              Discard
-            </Button>
-          </div>
-        </footer>
       </aside>
-    </>
+
+      <footer
+        css={editorFooterStyles(theme)}
+        aria-label="Editor actions"
+        data-video-editor-actions=""
+      >
+        <div>
+          <strong>{outcome.readyTitle ?? 'Ready to save locally'}</strong>
+          <span>
+            {outcome.readyDescription ??
+              'Saving replaces the current edited preview. Discard requires confirmation.'}
+          </span>
+        </div>
+        <Button
+          variant="primary"
+          busy={busy}
+          disabled={!session.dirty || !session.supported || busy}
+          onClick={() => void session.startRender()}
+        >
+          <VideoEditIcon name="save" width="1.1rem" height="1.1rem" />
+          {outcome.commitLabel}
+        </Button>
+        <Button
+          variant="quiet"
+          disabled={busy}
+          aria-label="Discard"
+          data-editor-discard=""
+          onClick={onRequestDiscard}
+        >
+          <VideoEditIcon name="trash" width="1.1rem" height="1.1rem" />
+          <span>Discard</span>
+        </Button>
+      </footer>
+    </div>
   );
 };

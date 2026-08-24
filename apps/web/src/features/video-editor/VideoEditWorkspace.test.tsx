@@ -2,6 +2,7 @@
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createDefaultVideoEditSpec, type VideoEditSpec } from '@studio/domain';
+import { createRef } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import type { VideoEditSession } from './useVideoEditSession';
@@ -47,6 +48,7 @@ const createSession = (overrides: Partial<VideoEditSession> = {}): VideoEditSess
     draft,
     activeTool: 'trim',
     showingBefore: false,
+    splitComparison: false,
     playheadMs: 2_500,
     phase: 'editing',
     progress: 0,
@@ -61,6 +63,7 @@ const createSession = (overrides: Partial<VideoEditSession> = {}): VideoEditSess
     close: vi.fn(),
     setActiveTool: vi.fn(),
     setShowingBefore: vi.fn(),
+    setSplitComparison: vi.fn(),
     setPlayheadMs: vi.fn(),
     applySpec: vi.fn(),
     beginTransaction: vi.fn(),
@@ -80,12 +83,21 @@ const createSession = (overrides: Partial<VideoEditSession> = {}): VideoEditSess
   };
 };
 
-const renderWorkspace = (session: VideoEditSession, onRequestDiscard = vi.fn()) =>
-  render(
+const renderWorkspace = (session: VideoEditSession, onRequestDiscard = vi.fn()) => {
+  const videoRef = createRef<HTMLVideoElement>();
+  return render(
     <StudioDesignProvider>
-      <VideoEditWorkspace session={session} onRequestDiscard={onRequestDiscard} />
+      <video ref={videoRef} data-testid="editor-source-video">
+        <track kind="captions" />
+      </video>
+      <VideoEditWorkspace
+        session={session}
+        videoRef={videoRef}
+        onRequestDiscard={onRequestDiscard}
+      />
     </StudioDesignProvider>,
   );
+};
 
 const renderProjectWorkspace = (
   session: VideoEditSession,
@@ -95,6 +107,7 @@ const renderProjectWorkspace = (
     <StudioDesignProvider>
       <VideoEditWorkspace
         session={session}
+        videoRef={createRef<HTMLVideoElement>()}
         onRequestDiscard={vi.fn()}
         outcome={projectVideoEditOutcome(appliedProjectEdit)}
       />
@@ -125,9 +138,13 @@ describe('VideoEditWorkspace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Set start to playhead' }));
     fireEvent.click(screen.getByRole('button', { name: 'Set end to playhead' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Preview before' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Undo video edit' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Redo video edit' }));
+    const compare = screen.getByRole('button', {
+      name: 'Hold to show original. Keyboard shortcut C.',
+    });
+    fireEvent.pointerDown(compare, { pointerId: 1 });
+    fireEvent.pointerUp(compare, { pointerId: 1 });
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Redo' }));
     fireEvent.click(screen.getByRole('button', { name: 'Reset tool' }));
     fireEvent.click(screen.getByRole('button', { name: 'Reset all' }));
     fireEvent.click(screen.getByRole('button', { name: 'Save edited video' }));
@@ -135,7 +152,8 @@ describe('VideoEditWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Crop' }));
 
     expect(session.applySpec).toHaveBeenCalledTimes(2);
-    expect(session.setShowingBefore).toHaveBeenCalledWith(true);
+    expect(session.setShowingBefore).toHaveBeenNthCalledWith(1, true);
+    expect(session.setShowingBefore).toHaveBeenNthCalledWith(2, false);
     expect(session.undo).toHaveBeenCalledOnce();
     expect(session.redo).toHaveBeenCalledOnce();
     expect(session.resetTool).toHaveBeenCalledOnce();
@@ -143,6 +161,58 @@ describe('VideoEditWorkspace', () => {
     expect(session.startRender).toHaveBeenCalledOnce();
     expect(onRequestDiscard).toHaveBeenCalledOnce();
     expect(session.setActiveTool).toHaveBeenCalledWith('crop');
+  });
+
+  it('uses the persistent stage video for timeline playback, frame stepping, and trim handles', () => {
+    const session = createSession();
+    renderWorkspace(session);
+    const video = screen.getByTestId<HTMLVideoElement>('editor-source-video');
+    const play = vi.fn(() => Promise.resolve());
+    const pause = vi.fn();
+    Object.defineProperties(video, {
+      paused: { configurable: true, value: true },
+      play: { configurable: true, value: play },
+      pause: { configurable: true, value: pause },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play edited preview' }));
+    expect(play).toHaveBeenCalledOnce();
+
+    const playhead = screen.getByRole('slider', {
+      name: 'Timeline playhead. Use left and right arrows to step one frame.',
+    });
+    fireEvent.change(playhead, { target: { value: '1200' } });
+    expect(video.currentTime).toBe(1.2);
+    expect(session.setPlayheadMs).toHaveBeenCalledWith(1_200);
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Drag trim in point' }), {
+      key: 'ArrowRight',
+    });
+    fireEvent.keyUp(screen.getByRole('button', { name: 'Drag trim in point' }), {
+      key: 'ArrowRight',
+    });
+    expect(session.beginTransaction).toHaveBeenCalled();
+    expect(session.previewSpec).toHaveBeenCalled();
+    expect(session.commitTransaction).toHaveBeenCalled();
+  });
+
+  it('holds compare from the C key, toggles split, and collapses the inspector with Escape', () => {
+    const session = createSession();
+    renderWorkspace(session);
+
+    fireEvent.keyDown(window, { key: 'c' });
+    fireEvent.keyUp(window, { key: 'c' });
+    expect(session.setShowingBefore).toHaveBeenNthCalledWith(1, true);
+    expect(session.setShowingBefore).toHaveBeenNthCalledWith(2, false);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Split' }));
+    expect(session.setSplitComparison).toHaveBeenCalledWith(true);
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Expand inspector' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
   });
 
   it.each([
@@ -188,6 +258,7 @@ describe('VideoEditWorkspace', () => {
       <StudioDesignProvider>
         <VideoEditWorkspace
           session={createSession({ supported: false, phase: 'error', error: 'Render failed.' })}
+          videoRef={createRef<HTMLVideoElement>()}
           onRequestDiscard={vi.fn()}
         />
       </StudioDesignProvider>,

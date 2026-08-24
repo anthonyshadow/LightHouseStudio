@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { media } from '../../ui/media';
 
 export const workspaceStyles = (theme: Theme, embedded: boolean): CSSObject => ({
   width: embedded ? '100%' : `calc(100% + (${theme.space.md} * 2))`,
@@ -21,7 +22,7 @@ export const workspaceHeaderStyles = (theme: Theme): CSSObject => ({
   justifyContent: 'space-between',
   gap: theme.space.md,
   padding: theme.space.md,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   '& > div': { minWidth: 0 },
   '& h3': { fontFamily: theme.type.display, fontSize: theme.fontSizes.section },
   '& p': {
@@ -47,7 +48,7 @@ export const workspaceBodyStyles = (theme: Theme, embedded: boolean): CSSObject 
   display: 'grid',
   gridTemplateColumns: '20rem minmax(0, 1fr)',
   overflow: embedded ? 'visible' : 'hidden',
-  '@media (max-width: 48rem)': {
+  [media.down('compact')]: {
     gridTemplateColumns: 'minmax(0, 1fr)',
     gridTemplateRows: 'auto minmax(0, 1fr)',
     overflow: embedded ? 'visible' : 'hidden',
@@ -67,15 +68,15 @@ export const treatmentRailStyles = (theme: Theme): CSSObject => ({
   alignContent: 'start',
   gap: theme.space.md,
   padding: theme.space.lg,
-  borderInlineEnd: `1px solid ${theme.colors.border}`,
+  borderInlineEnd: `1px solid ${theme.colors.divider}`,
   background: `color-mix(in srgb, ${theme.colors.canvasRaised} 70%, transparent)`,
   '& > h3': { fontSize: theme.fontSizes.body, fontWeight: 700 },
-  '@media (max-width: 48rem)': {
+  [media.down('compact')]: {
     gridTemplateRows: 'auto auto',
     gap: theme.space.sm,
     padding: theme.space.md,
     borderInlineEnd: 0,
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
     '& details': { display: 'none' },
   },
   '@container (max-width: 48rem)': {
@@ -83,10 +84,10 @@ export const treatmentRailStyles = (theme: Theme): CSSObject => ({
     gap: theme.space.sm,
     padding: theme.space.md,
     borderInlineEnd: 0,
-    borderBlockEnd: `1px solid ${theme.colors.border}`,
+    borderBlockEnd: `1px solid ${theme.colors.divider}`,
     '& details': { display: 'none' },
   },
-  '@media (max-width: 40rem)': { paddingInline: theme.space.sm },
+  [media.down('tablet')]: { paddingInline: theme.space.sm },
 });
 
 export const treatmentListStyles = (theme: Theme): CSSObject => ({
@@ -101,7 +102,7 @@ export const treatmentListStyles = (theme: Theme): CSSObject => ({
   overflowY: 'auto',
   overscrollBehaviorBlock: 'contain',
   scrollbarWidth: 'thin',
-  '@media (max-width: 48rem)': {
+  [media.down('compact')]: {
     gridAutoFlow: 'column',
     gridAutoColumns: 'minmax(12rem, 15rem)',
     gridTemplateColumns: 'none',
@@ -170,7 +171,7 @@ export const treatmentChoiceStyles = (theme: Theme, selected: boolean): CSSObjec
 
 export const compatibilityStyles = (theme: Theme): CSSObject => ({
   paddingBlockStart: theme.space.md,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   color: theme.colors.textMuted,
   fontSize: theme.fontSizes.metadata,
   '& summary': {
@@ -197,9 +198,9 @@ export const workspaceContentStyles = (theme: Theme, embedded: boolean): CSSObje
   overscrollBehavior: 'contain',
   scrollbarGutter: embedded ? undefined : 'stable',
   background: theme.colors.canvas,
-  '@media (max-width: 48rem)': { padding: theme.space.md },
+  [media.down('compact')]: { padding: theme.space.md },
   '@container (max-width: 48rem)': { padding: theme.space.md },
-  '@media (max-width: 40rem)': {
+  [media.down('tablet')]: {
     padding: theme.space.sm,
     scrollbarGutter: 'auto',
   },
@@ -218,7 +219,7 @@ export const selectionHeadingStyles = (theme: Theme): CSSObject => ({
   justifyContent: 'space-between',
   gap: theme.space.sm,
   paddingBlockEnd: theme.space.md,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  borderBlockEnd: `1px solid ${theme.colors.divider}`,
   '& > div': { minWidth: 0 },
   '& h4': { fontFamily: theme.type.display, fontSize: theme.fontSizes.section },
   '& p': { marginBlockStart: theme.space.xs, color: theme.colors.textMuted, lineHeight: 1.5 },
@@ -272,7 +273,7 @@ export const workspaceFooterStyles = (theme: Theme, embedded: boolean): CSSObjec
   alignItems: 'center',
   gap: theme.space.lg,
   padding: embedded ? theme.space.md : `${theme.space.md} ${theme.space.lg}`,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
   background: theme.colors.canvasRaised,
   boxShadow: '0 -12px 40px rgba(0, 0, 0, 0.5)',
   '& [data-footer-selection]': {
@@ -342,7 +343,7 @@ export const workspaceFooterStyles = (theme: Theme, embedded: boolean): CSSObjec
     '& [data-footer-actions]': { justifyContent: 'stretch' },
     '& [data-footer-disclosure]': { flex: '1 1 auto', textAlign: 'start' },
   },
-  '@media (max-width: 40rem)': {
+  [media.down('tablet')]: {
     padding: `${theme.space.sm} max(${theme.space.sm}, env(safe-area-inset-right)) max(${theme.space.sm}, env(safe-area-inset-bottom)) max(${theme.space.sm}, env(safe-area-inset-left))`,
     '& [data-footer-selection]': {
       gridTemplateColumns: '2.5rem minmax(0, 1fr)',

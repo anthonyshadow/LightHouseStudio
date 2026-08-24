@@ -50,7 +50,7 @@ recorded there.
   media asset or Saved Video Version. Local renders are durably stored, checksummed, inspected, and
   attached in the revision transaction. Exact retained media is reused without copying bytes.
   Exact replay returns the original revision; changed media/edit/base tokens conflict. The source
-  row and source asset remain unchanged, and no output or Add Version relation is created.
+  row and source asset remain unchanged, and no output or existing-video Version relation is created.
 - Project output save uses additive migration `0020` and one owner-scoped command. The application
   verifies the exact already-durable current bytes before metadata commit. One PostgreSQL
   transaction then creates or CAS-appends the immutable Video Version, records its pre-save
@@ -126,9 +126,11 @@ recorded there.
 - Global and per-provider admission limits in addition to the existing one-active-job-per-owner
   rule. Durable rows enforce one active job per owner across server instances. Limits are set by
   `VIDEO_JOB_MAX_ACTIVE` and `VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER`.
-- A browser creative-library sync seam. The browser remains an immediate local cache; Neon uses a
-  revision compare-and-swap. Conflicts pause sync and preserve the local copy instead of applying a
-  last-writer-wins overwrite.
+- An account creative-library sync seam. IndexedDB remains the immediate local-first cache and
+  configured local-development fallback; authoritative Neon stores normalized owner rows behind a
+  revision compare-and-swap. A fresh signed-in session hydrates from that account snapshot.
+  Conflicts pause sync and preserve the current session copy instead of applying a last-writer-wins
+  overwrite.
 - Relationship-safe reference-image retention in authoritative `neon`: uploads and generated
   results may be staged in the selected byte store, canonical creative-library rows define the
   saved set, trusted-origin discard and removed saved relationships delete only after an

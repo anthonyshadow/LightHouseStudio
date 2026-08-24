@@ -73,7 +73,7 @@ describe('ProjectCreativeCheckpointPanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Choose another' }));
     expect(onChooseAnother).toHaveBeenCalledWith('outfit');
-    await user.click(screen.getByRole('button', { name: 'Save progress' }));
+    await user.click(screen.getByRole('button', { name: 'Keep this setup' }));
     expect(checkpoint).toHaveBeenCalledOnce();
   });
 
@@ -105,7 +105,7 @@ describe('ProjectCreativeCheckpointPanel', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Saving progress…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Keeping setup…' })).toBeDisabled();
     expect(screen.getByText('Current cut ready')).toBeVisible();
   });
 

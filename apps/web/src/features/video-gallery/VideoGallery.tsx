@@ -1,6 +1,7 @@
 import { useTheme } from '@emotion/react';
 import type {
   SavedVideoFormat,
+  SavedVideoOrigin,
   SavedVideoSort,
   SavedVideoSummary,
   SavedVideoVersion,
@@ -41,8 +42,6 @@ import { AddVideoToProjectDialog } from '../projects/AddVideoToProjectDialog';
 import { GeneratePreviewDialog } from './GeneratePreviewDialog';
 import { VideoExportPanel } from './VideoExportPanel';
 import {
-  actionMenuPopoverStyles,
-  actionMenuStyles,
   actionsStyles,
   cardBodyStyles,
   cardCopyStyles,
@@ -51,6 +50,8 @@ import {
   chipStyles,
   durationBadgeStyles,
   filterControlsStyles,
+  filterSheetFieldsStyles,
+  filterSheetFooterStyles,
   gallerySearchRowStyles,
   galleryStyles,
   gallerySummaryStyles,
@@ -64,9 +65,11 @@ import {
   previewFooterStyles,
   previewMetadataStyles,
   previewPlayerStyles,
+  skeletonCardStyles,
   thumbnailPlaceholderStyles,
   thumbnailStyles,
 } from './VideoGallery.styles';
+import { ActionMenu } from '../../ui/primitives/ActionMenu';
 
 const PlayIcon = () => (
   <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor">
@@ -81,14 +84,6 @@ const VideoPlaceholderIcon = () => (
   </svg>
 );
 
-const MoreIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor">
-    <circle cx="5" cy="12" r="1.8" />
-    <circle cx="12" cy="12" r="1.8" />
-    <circle cx="19" cy="12" r="1.8" />
-  </svg>
-);
-
 const duration = (milliseconds: number): string => {
   const seconds = Math.round(milliseconds / 1_000);
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -98,6 +93,23 @@ const FORMAT_LABELS: Readonly<Record<SavedVideoFormat, string>> = {
   landscape: 'Landscape',
   portrait: 'Portrait',
   square: 'Square',
+};
+
+const ORIGIN_LABELS: Readonly<Record<SavedVideoOrigin, string>> = {
+  recorded: 'Studio recording',
+  uploaded: 'Uploaded video',
+  'character-swap': 'Character Swap',
+  'virtual-try-on': 'Virtual Try-On',
+  'voice-treatment': 'Voice treatment',
+  editor: 'Edited locally',
+  'legacy-import': 'Imported video',
+};
+
+const STATUS_LABELS: Readonly<Record<SavedVideoSummary['status'], string>> = {
+  ready: 'Ready',
+  processing: 'Processing',
+  failed: 'Processing failed',
+  missing: 'File unavailable',
 };
 
 const SORT_OPTIONS = [
@@ -113,6 +125,78 @@ const formatForDimensions = ({
 }: Pick<SavedVideoVersion, 'width' | 'height'>): SavedVideoFormat => {
   return width === height ? 'square' : width > height ? 'landscape' : 'portrait';
 };
+
+const VideoGallerySkeleton = () => {
+  const theme = useTheme();
+  return (
+    <div css={galleryStyles(theme)} aria-busy="true">
+      <p role="status">Loading saved videos…</p>
+      <div css={gridStyles(theme)} aria-hidden="true">
+        {Array.from({ length: 6 }, (_, index) => (
+          <div key={index} css={skeletonCardStyles(theme)}>
+            <span data-skeleton-poster="" />
+            <span data-skeleton-copy="">
+              <span data-skeleton-line="" />
+              <span data-skeleton-line="short" />
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+interface VideoFilterFieldsProps {
+  readonly characterName: string;
+  readonly characterNames: readonly string[];
+  readonly format: SavedVideoFormat | '';
+  readonly availableFormats: readonly SavedVideoFormat[];
+  readonly sort: SavedVideoSort;
+  readonly setCharacterName: (value: string) => void;
+  readonly setFormat: (value: SavedVideoFormat | '') => void;
+  readonly setSort: (value: SavedVideoSort) => void;
+}
+
+const VideoFilterFields = ({
+  characterName,
+  characterNames,
+  format,
+  availableFormats,
+  sort,
+  setCharacterName,
+  setFormat,
+  setSort,
+}: VideoFilterFieldsProps) => (
+  <>
+    <SelectField
+      label="Character used"
+      value={characterName}
+      options={[
+        { value: '', label: 'All characters' },
+        ...characterNames.map((name) => ({ value: name, label: name })),
+      ]}
+      {...(characterNames.length === 0
+        ? { hint: 'No saved videos have character attribution yet.' }
+        : {})}
+      onValueChange={setCharacterName}
+    />
+    <SelectField
+      label="Video format"
+      value={format}
+      options={[
+        { value: '', label: 'All formats' },
+        ...availableFormats.map((value) => ({ value, label: FORMAT_LABELS[value] })),
+      ]}
+      onValueChange={(value) => setFormat(value as SavedVideoFormat | '')}
+    />
+    <SelectField
+      label="Sort by"
+      value={sort}
+      options={SORT_OPTIONS}
+      onValueChange={(value) => setSort(value as SavedVideoSort)}
+    />
+  </>
+);
 
 const VideoGalleryGrid = ({
   videos,
@@ -134,9 +218,9 @@ const VideoGalleryGrid = ({
   onOpenPreview: (video: SavedVideoSummary, trigger: HTMLButtonElement) => void;
   onGeneratePreview: (video: SavedVideoSummary, trigger: HTMLElement) => void;
   onUse: (video: SavedVideoSummary, intent: 'play' | 'edit') => Promise<void>;
-  onAddToProject: (video: SavedVideoSummary, trigger: HTMLElement) => void;
-  onRename: (video: SavedVideoSummary, trigger: HTMLElement) => void;
-  onRemove: (video: SavedVideoSummary, trigger: HTMLElement) => void;
+  onAddToProject: (video: SavedVideoSummary, trigger: HTMLElement | null) => void;
+  onRename: (video: SavedVideoSummary, trigger: HTMLElement | null) => void;
+  onRemove: (video: SavedVideoSummary, trigger: HTMLElement | null) => void;
 }) => {
   'use memo';
 
@@ -199,7 +283,7 @@ const VideoGalleryGrid = ({
                 <span css={chipStyles(theme)}>
                   {video.versionCount} version{video.versionCount === 1 ? '' : 's'}
                 </span>
-                <span css={chipStyles(theme)}>{version.origin}</span>
+                <span css={chipStyles(theme)}>{ORIGIN_LABELS[version.origin]}</span>
                 <span css={chipStyles(theme)}>{FORMAT_LABELS[formatForDimensions(version)]}</span>
                 {version.characterName ? (
                   <span css={chipStyles(theme)}>{version.characterName}</span>
@@ -208,7 +292,7 @@ const VideoGalleryGrid = ({
                   <span css={chipStyles(theme)}>Variant: {version.characterVariantName}</span>
                 ) : null}
                 {video.status !== 'ready' ? (
-                  <span css={chipStyles(theme)}>{video.status}</span>
+                  <span css={chipStyles(theme)}>{STATUS_LABELS[video.status]}</span>
                 ) : null}
                 {video.assignment === 'unassigned' ? (
                   <span css={chipStyles(theme)}>No Project</span>
@@ -235,64 +319,43 @@ const VideoGalleryGrid = ({
                 >
                   Download
                 </a>
-                <details css={actionMenuStyles(theme)}>
-                  <summary aria-label={`More actions for ${video.title}`}>
-                    <MoreIcon />
-                  </summary>
-                  <div css={actionMenuPopoverStyles(theme)}>
-                    <button
-                      type="button"
-                      disabled={busy || video.status !== 'ready'}
-                      onClick={() => void onUse(video, 'play')}
-                    >
-                      Open in Studio
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy || video.status !== 'ready'}
-                      onClick={() => void onUse(video, 'edit')}
-                    >
-                      Edit video
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy || video.status !== 'ready'}
-                      onClick={(event) => {
-                        const details = event.currentTarget.closest('details');
-                        const trigger = details?.querySelector<HTMLElement>('summary');
-                        details?.removeAttribute('open');
-                        onAddToProject(video, trigger ?? event.currentTarget);
-                      }}
-                    >
-                      Use as Project source
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={(event) => {
-                        const details = event.currentTarget.closest('details');
-                        const trigger = details?.querySelector<HTMLElement>('summary');
-                        details?.removeAttribute('open');
-                        onRename(video, trigger ?? event.currentTarget);
-                      }}
-                    >
-                      Rename
-                    </button>
-                    <button
-                      type="button"
-                      data-danger=""
-                      disabled={busy}
-                      onClick={(event) => {
-                        const details = event.currentTarget.closest('details');
-                        const trigger = details?.querySelector<HTMLElement>('summary');
-                        details?.removeAttribute('open');
-                        onRemove(video, trigger ?? event.currentTarget);
-                      }}
-                    >
-                      Remove from Assets
-                    </button>
-                  </div>
-                </details>
+                <ActionMenu
+                  label={`More actions for ${video.title}`}
+                  placement="above"
+                  items={[
+                    {
+                      id: 'play',
+                      label: 'Open in Studio',
+                      disabled: busy || video.status !== 'ready',
+                      onSelect: () => void onUse(video, 'play'),
+                    },
+                    {
+                      id: 'edit',
+                      label: 'Edit video',
+                      disabled: busy || video.status !== 'ready',
+                      onSelect: () => void onUse(video, 'edit'),
+                    },
+                    {
+                      id: 'project-source',
+                      label: 'Use as Project source',
+                      disabled: busy || video.status !== 'ready',
+                      onSelect: (trigger) => onAddToProject(video, trigger),
+                    },
+                    {
+                      id: 'rename',
+                      label: 'Rename',
+                      disabled: busy,
+                      onSelect: (trigger) => onRename(video, trigger),
+                    },
+                    {
+                      id: 'remove',
+                      label: 'Remove from Assets',
+                      danger: true,
+                      disabled: busy,
+                      onSelect: (trigger) => onRemove(video, trigger),
+                    },
+                  ]}
+                />
               </div>
             </div>
           </article>
@@ -318,6 +381,7 @@ export const VideoGallery = ({
   const [characterName, setCharacterName] = useState('');
   const [format, setFormat] = useState<SavedVideoFormat | ''>('');
   const [sort, setSort] = useState<SavedVideoSort>('latest');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const search = useListSearch();
   const [notice, setNotice] = useState<{
     readonly role: 'status' | 'alert';
@@ -347,6 +411,7 @@ export const VideoGallery = ({
   const projectTriggerRef = useRef<HTMLElement | null>(null);
   const previewRepairTriggerRef = useRef<HTMLElement | null>(null);
   const exportTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const filtersTriggerRef = useRef<HTMLButtonElement | null>(null);
 
   const videosQuery = useInfiniteQuery({
     queryKey: [
@@ -481,7 +546,7 @@ export const VideoGallery = ({
   const openAction = (
     kind: 'rename' | 'remove',
     video: SavedVideoSummary,
-    trigger: HTMLElement,
+    trigger: HTMLElement | null,
   ) => {
     actionTriggerRef.current = trigger;
     setRenameTitle(video.title);
@@ -564,7 +629,7 @@ export const VideoGallery = ({
   };
 
   if (videosQuery.isPending) {
-    return <p role="status">Loading saved videos…</p>;
+    return <VideoGallerySkeleton />;
   }
   if (videosQuery.isError && !videosQuery.data) {
     return (
@@ -577,7 +642,12 @@ export const VideoGallery = ({
     );
   }
   const libraryHasVideos = availableFormats.length > 0;
-  const filtersActive = Boolean(characterName || format);
+  const activeFilterCount = Number(Boolean(characterName)) + Number(Boolean(format));
+  const filtersActive = activeFilterCount > 0;
+  const clearFilters = () => {
+    setCharacterName('');
+    setFormat('');
+  };
   const previewDetail = previewDetailQuery.data;
   const selectedVersion: SavedVideoVersion | null =
     previewDetail?.versions.find((version) => version.id === selectedVersionId) ??
@@ -591,13 +661,9 @@ export const VideoGallery = ({
       <div css={{ display: 'grid', justifyItems: 'start', gap: theme.space.sm }}>
         <EmptyStatePreview />
         <h2 css={{ margin: 0 }}>No videos in Assets yet</h2>
-        <p css={{ margin: 0 }}>
-          Finish a Project with Save as New Video or Add Version, or save a video straight from
-          Studio.
-        </p>
+        <p css={{ margin: 0 }}>Videos you save to Assets will appear here.</p>
         <p data-empty-example css={emptyExampleStyles(theme)}>
-          For example: record a take in Studio, save it, and it appears here with a preview and
-          every version you keep.
+          Each saved video keeps its preview, download and version history together.
         </p>
       </div>
     );
@@ -610,47 +676,33 @@ export const VideoGallery = ({
           {notice.message}
         </StatusNotice>
       ) : null}
-      {/* Its own row, above the filter grid: search joins the filters rather than displacing them,
-          and the grid's tested three-fields-plus-button layout stays exactly as it was. */}
-      <div css={gallerySearchRowStyles()}>
+      <div css={gallerySearchRowStyles(theme)}>
         <ListSearchField label="Search videos by title" placeholder="Video title" search={search} />
+        <Button
+          ref={filtersTriggerRef}
+          variant="secondary"
+          data-mobile-filter-trigger=""
+          aria-label={`Filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ''}`}
+          onClick={() => setFiltersOpen(true)}
+        >
+          Filters
+          {activeFilterCount > 0 ? (
+            <span data-active-filter-count="">{activeFilterCount} active</span>
+          ) : null}
+        </Button>
       </div>
       <div css={filterControlsStyles(theme)} aria-label="Filter and sort saved videos">
-        <SelectField
-          label="Character used"
-          value={characterName}
-          options={[
-            { value: '', label: 'All characters' },
-            ...characterNames.map((name) => ({ value: name, label: name })),
-          ]}
-          {...(characterNames.length === 0
-            ? { hint: 'No saved videos have character attribution yet.' }
-            : {})}
-          onValueChange={setCharacterName}
+        <VideoFilterFields
+          characterName={characterName}
+          characterNames={characterNames}
+          format={format}
+          availableFormats={availableFormats}
+          sort={sort}
+          setCharacterName={setCharacterName}
+          setFormat={setFormat}
+          setSort={setSort}
         />
-        <SelectField
-          label="Video format"
-          value={format}
-          options={[
-            { value: '', label: 'All formats' },
-            ...availableFormats.map((value) => ({ value, label: FORMAT_LABELS[value] })),
-          ]}
-          onValueChange={(value) => setFormat(value as SavedVideoFormat | '')}
-        />
-        <SelectField
-          label="Sort by"
-          value={sort}
-          options={SORT_OPTIONS}
-          onValueChange={(value) => setSort(value as SavedVideoSort)}
-        />
-        <Button
-          variant="secondary"
-          disabled={!filtersActive}
-          onClick={() => {
-            setCharacterName('');
-            setFormat('');
-          }}
-        >
+        <Button variant="secondary" disabled={!filtersActive} onClick={clearFilters}>
           Clear filters
         </Button>
       </div>
@@ -672,13 +724,8 @@ export const VideoGallery = ({
           <p>
             {search.term === undefined
               ? 'Choose a different character or video format, or clear the filters.'
-              : 'Try a shorter term, or clear the search to see everything again.'}
+              : 'Try a shorter term, or use the × in the search field to see everything again.'}
           </p>
-          {search.term === undefined ? null : (
-            <Button size="small" onClick={search.clear}>
-              Clear search
-            </Button>
-          )}
         </div>
       ) : (
         <VideoGalleryGrid
@@ -715,6 +762,44 @@ export const VideoGallery = ({
           </Button>
         </div>
       ) : null}
+      <OverlayPanel
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title="Filters"
+        description="Narrow the Videos library without hiding the title search."
+        placement="bottom"
+        height="tall"
+        closeLabel="Close filters"
+        returnFocusRef={filtersTriggerRef}
+        footer={
+          <div css={filterSheetFooterStyles(theme)} data-filter-sheet-actions="">
+            <Button
+              size="small"
+              variant="secondary"
+              disabled={!filtersActive}
+              onClick={clearFilters}
+            >
+              Clear filters
+            </Button>
+            <Button size="small" variant="primary" onClick={() => setFiltersOpen(false)}>
+              Show {total} {total === 1 ? 'video' : 'videos'}
+            </Button>
+          </div>
+        }
+      >
+        <div css={filterSheetFieldsStyles(theme)} aria-label="Filter and sort saved videos">
+          <VideoFilterFields
+            characterName={characterName}
+            characterNames={characterNames}
+            format={format}
+            availableFormats={availableFormats}
+            sort={sort}
+            setCharacterName={setCharacterName}
+            setFormat={setFormat}
+            setSort={setSort}
+          />
+        </div>
+      </OverlayPanel>
       <OverlayPanel
         open={action?.kind === 'rename'}
         onClose={closeAction}
@@ -844,27 +929,35 @@ export const VideoGallery = ({
               >
                 Download
               </a>
-              <Button variant="secondary" onClick={(event) => openExport(event.currentTarget)}>
-                Export
-              </Button>
-              {selectedIsCurrent ? (
-                <>
-                  <Button
-                    variant="secondary"
-                    disabled={busyId === previewVideo.id}
-                    onClick={() => void handleUseVideo(previewVideo, 'edit')}
-                  >
-                    Edit video
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    busy={busyId === previewVideo.id}
-                    onClick={() => void handleUseVideo(previewVideo, 'play')}
-                  >
-                    Open in Studio
-                  </Button>
-                </>
-              ) : null}
+              <ActionMenu
+                label={`More actions for ${previewVideo.title}`}
+                placement="above"
+                items={[
+                  {
+                    id: 'export',
+                    label: 'Export',
+                    onSelect: (trigger) => {
+                      if (trigger) openExport(trigger);
+                    },
+                  },
+                  ...(selectedIsCurrent
+                    ? [
+                        {
+                          id: 'edit',
+                          label: 'Edit video',
+                          disabled: busyId === previewVideo.id,
+                          onSelect: () => void handleUseVideo(previewVideo, 'edit'),
+                        },
+                        {
+                          id: 'play',
+                          label: 'Open in Studio',
+                          disabled: busyId === previewVideo.id,
+                          onSelect: () => void handleUseVideo(previewVideo, 'play'),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             </div>
           ) : null
         }
@@ -938,12 +1031,12 @@ export const VideoGallery = ({
               <div css={previewMetadataStyles(theme)}>
                 <span>Version {selectedVersion.ordinal}</span>
                 <span>{selectedIsCurrent ? 'Current Version' : 'Older Version'}</span>
-                <span>{previewVideo.status}</span>
+                <span>{STATUS_LABELS[previewVideo.status]}</span>
                 <span>{duration(selectedVersion.durationMs)} duration</span>
                 <span>
                   {selectedVersion.width}×{selectedVersion.height}
                 </span>
-                <span>{selectedVersion.origin}</span>
+                <span>{ORIGIN_LABELS[selectedVersion.origin]}</span>
                 <span>{FORMAT_LABELS[formatForDimensions(selectedVersion)]}</span>
                 <span>
                   <time dateTime={selectedVersion.createdAt}>
@@ -965,7 +1058,7 @@ export const VideoGallery = ({
             {!selectedIsCurrent && selectedVersion ? (
               <p>
                 Use this older version from the history of a Project that kept it. Viewing or
-                downloading here does not set a target for Add Version.
+                downloading here does not choose where the Project’s next saved Version goes.
               </p>
             ) : null}
           </div>
