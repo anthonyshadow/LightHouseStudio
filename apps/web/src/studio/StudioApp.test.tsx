@@ -6,7 +6,7 @@ import type {
   SavedVideoDetail,
 } from '@studio/contracts';
 import { createPhaseOneEntitlements } from '@studio/domain';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { InputHTMLAttributes, PropsWithChildren, ReactNode } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -613,11 +613,15 @@ vi.mock('../ui', async () => {
     title,
     children,
     footer,
+    headerActions,
+    closeLabel,
     onClose,
   }: PropsWithChildren<{
     open: boolean;
     title: string;
     footer?: ReactNode;
+    headerActions?: ReactNode;
+    closeLabel?: string;
     onClose: () => void;
   }>) => {
     const panelRef = useRef<HTMLElement>(null);
@@ -627,10 +631,11 @@ vi.mock('../ui', async () => {
 
     return open ? (
       <section ref={panelRef} aria-label={title} tabIndex={-1}>
+        {headerActions}
         {children}
         {footer}
-        <button type="button" onClick={onClose}>
-          Close {title}
+        <button type="button" aria-label={closeLabel} onClick={onClose}>
+          {closeLabel ?? `Close ${title}`}
         </button>
       </section>
     ) : null;
@@ -872,22 +877,24 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('releases the stage entirely when the operator leaves Studio for an Asset library', async () => {
-    renderStudio();
+    const { router } = renderStudio();
     expect(await screen.findByTestId('media-stage')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Assets' }));
-    await screen.findByRole('heading', { name: 'Assets' });
+    await screen.findByText('Deferred saved videos');
+    expect(router.state.location.pathname).toBe('/assets/videos');
     // Not hidden — absent. A stage kept behind `display: none` still holds a camera, a <video>
     // element and the whole capture graph on a route that has no use for any of it.
     expect(screen.queryByTestId('media-stage')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Videos' }));
-    await screen.findByText('Deferred saved videos');
-    expect(screen.queryByTestId('media-stage')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Assets' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Open Characters' }));
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'Asset libraries' })).getByRole('button', {
+        name: /Characters/u,
+      }),
+    );
     await screen.findByText('Deferred saved characters');
+    expect(router.state.location.pathname).toBe('/assets/characters');
+    expect(router.state.historyAction).toBe('REPLACE');
     expect(screen.queryByTestId('media-stage')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Studio' }));
@@ -917,15 +924,23 @@ describe('StudioApp composition lifecycle', () => {
     expect(await screen.findByText('Requested video: none')).toBeInTheDocument();
   });
 
-  it('leaves an Asset library without stacking another history entry on the hub', async () => {
-    const { router } = renderStudio(undefined, '/assets');
+  it('switches Asset libraries in one entry and closes without stacking a hub route', async () => {
+    const { router } = renderStudio();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Open Outfits' }));
-    await waitFor(() => expect(router.state.location.pathname).toBe('/assets/outfits'));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Assets' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/assets/videos'));
     expect(router.state.historyAction).toBe('PUSH');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close Outfits' }));
-    await waitFor(() => expect(router.state.location.pathname).toBe('/assets'));
+    fireEvent.click(
+      within(screen.getByRole('navigation', { name: 'Asset libraries' })).getByRole('button', {
+        name: /Outfits/u,
+      }),
+    );
+    await waitFor(() => expect(router.state.location.pathname).toBe('/assets/outfits'));
+    expect(router.state.historyAction).toBe('REPLACE');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close Assets' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard'));
     // A memory router has no `window.history.state.idx`, so `useRouteBack` takes its replace
     // fallback here; a real browser pops instead. Either way the close never pushes, which is the
     // property N3 is about. The pop itself is covered in `e2e/app-routing.spec.ts`.

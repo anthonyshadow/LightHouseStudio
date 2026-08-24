@@ -18,15 +18,33 @@ export const gallerySummaryStyles = (theme: Theme): CSSObject => ({
   '& strong': { color: theme.colors.text, fontWeight: 760 },
 });
 
-export const gallerySearchRowStyles = (): CSSObject => ({
+export const gallerySearchRowStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr)',
-  [media.up('laptop')]: { maxWidth: '32rem' },
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  alignItems: 'start',
+  gap: theme.space.sm,
+  '& [data-mobile-filter-trigger]': {
+    minHeight: '2.85rem',
+    marginBlockStart: '1.55rem',
+    paddingInline: theme.space.sm,
+    whiteSpace: 'nowrap',
+  },
+  '& [data-active-filter-count]': {
+    padding: `0.12rem ${theme.space.xs}`,
+    borderRadius: theme.radii.round,
+    color: theme.colors.accentStrong,
+    background: theme.colors.accentSoft,
+    fontSize: '0.68rem',
+  },
+  [media.up('laptop')]: {
+    maxWidth: '32rem',
+    gridTemplateColumns: 'minmax(0, 1fr)',
+    '& [data-mobile-filter-trigger]': { display: 'none' },
+  },
 });
 
 export const filterControlsStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr)',
+  display: 'none',
   alignItems: 'end',
   gap: theme.space.sm,
   padding: theme.space.md,
@@ -34,11 +52,29 @@ export const filterControlsStyles = (theme: Theme): CSSObject => ({
   borderRadius: theme.radii.large,
   background: theme.colors.surfaceSoft,
   '& > button': { minHeight: '2.75rem' },
-  [media.up('tablet')]: {
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  },
   [media.up('laptop')]: {
+    display: 'grid',
     gridTemplateColumns: 'repeat(3, minmax(0, 1fr)) auto',
+  },
+});
+
+export const filterSheetFieldsStyles = (theme: Theme): CSSObject => ({
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  gap: theme.space.md,
+  [media.up('tablet')]: { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
+  '@media (max-height: 36rem)': { gap: theme.space.xxs },
+});
+
+export const filterSheetFooterStyles = (theme: Theme): CSSObject => ({
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: theme.space.sm,
+  '& > button': {
+    minWidth: 0,
+    paddingInline: theme.space.xs,
+    fontSize: theme.fontSizes.caption,
+    whiteSpace: 'nowrap',
   },
 });
 
@@ -69,6 +105,32 @@ export const cardStyles = (theme: Theme): CSSObject => ({
   '&:hover': { borderColor: theme.colors.borderStrong, transform: 'translateY(-1px)' },
   '&:has(details[open])': { zIndex: 2 },
   '& h3, & p': { margin: 0 },
+});
+
+export const skeletonCardStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  overflow: 'hidden',
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: theme.radii.large,
+  background: theme.colors.surfaceSoft,
+  '& [data-skeleton-poster]': {
+    display: 'block',
+    aspectRatio: '16 / 9',
+    background: theme.colors.surfaceStrong,
+  },
+  '& [data-skeleton-copy]': {
+    display: 'grid',
+    gap: theme.space.sm,
+    padding: theme.space.md,
+  },
+  '& [data-skeleton-line]': {
+    display: 'block',
+    width: '72%',
+    height: '0.8rem',
+    borderRadius: theme.radii.small,
+    background: theme.colors.border,
+  },
+  '& [data-skeleton-line="short"]': { width: '44%' },
 });
 
 export const posterButtonStyles = (theme: Theme): CSSObject => ({
@@ -127,7 +189,8 @@ export const thumbnailPlaceholderStyles = (theme: Theme): CSSObject => ({
   placeItems: 'center',
   color: theme.colors.textMuted,
   fontSize: theme.fontSizes.caption,
-  '& svg': { width: '2rem', height: '2rem' },
+  '& svg': { display: 'none' },
+  '& > span': { transform: 'translateY(2.35rem)' },
 });
 
 export const playBadgeStyles = (theme: Theme): CSSObject => ({

@@ -89,6 +89,17 @@ export const ASSET_DESTINATION_PATHS: Readonly<Record<AssetDestination, string>>
   voices: APP_PATHS.voices,
 };
 
+const ASSET_PATH_DESTINATIONS = new Map<string, AssetDestination>(
+  Object.entries(ASSET_DESTINATION_PATHS).map(([destination, path]) => [
+    path,
+    destination as AssetDestination,
+  ]),
+);
+
+/** The library represented by an exact asset pathname, excluding the compatibility `/assets` entry. */
+export const assetDestinationFromPath = (pathname: string): AssetDestination | null =>
+  ASSET_PATH_DESTINATIONS.get(pathname) ?? null;
+
 /**
  * The Videos library focused on one Saved Video. A query parameter rather than a path segment: the
  * library is an overlay whose `open` prop compares `pathname` alone, so `/assets/videos/<id>` would

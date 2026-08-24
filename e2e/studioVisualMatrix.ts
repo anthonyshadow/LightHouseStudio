@@ -43,6 +43,11 @@ export const ORGANIZATION_VISUAL_SCENARIOS = [
   { id: 'assets-overview', baseline: '12-assets/overview.png' },
 ] as const;
 
+export const ASSET_FILTER_VISUAL_SCENARIO = {
+  id: 'assets-filter-sheet',
+  baseline: '12-assets/filters.png',
+} as const;
+
 export const STUDIO_INITIAL_VISUAL_SCENARIO = {
   id: 'studio-initial-closed',
   baseline: '01-studio/initial-closed.png',
@@ -124,6 +129,7 @@ export const SMALL_MOBILE_VISUAL_SCENARIOS = [
 export type VisualScenarioId =
   | (typeof ENTRY_VISUAL_SCENARIO)['id']
   | (typeof ORGANIZATION_VISUAL_SCENARIOS)[number]['id']
+  | (typeof ASSET_FILTER_VISUAL_SCENARIO)['id']
   | (typeof STUDIO_INITIAL_VISUAL_SCENARIO)['id']
   | (typeof STUDIO_PORTRAIT_INITIAL_VISUAL_SCENARIO)['id']
   | (typeof CORE_VISUAL_SCENARIOS)[number]['id']
@@ -134,19 +140,31 @@ export type VisualScenarioId =
 const viewportById = new Map(VISUAL_VIEWPORTS.map((viewport) => [viewport.id, viewport]));
 const desktopViewport = viewportById.get('desktop');
 const compactViewport = viewportById.get('compact');
+const tabletViewport = viewportById.get('tablet');
 const mobileViewport = viewportById.get('mobile');
 const smallMobileViewport = viewportById.get('small-mobile');
+const dashboardOverviewScenario = ORGANIZATION_VISUAL_SCENARIOS[0];
+const assetsOverviewScenario = ORGANIZATION_VISUAL_SCENARIOS[1];
 
-if (!desktopViewport || !compactViewport || !mobileViewport || !smallMobileViewport) {
-  throw new Error('The visual matrix requires desktop, compact, and small-mobile viewports.');
+if (
+  !desktopViewport ||
+  !compactViewport ||
+  !tabletViewport ||
+  !mobileViewport ||
+  !smallMobileViewport
+) {
+  throw new Error('The visual matrix requires all five supported responsive viewports.');
 }
 
 export const VISUAL_CASE_MATRIX = [
   { viewport: smallMobileViewport, scenario: ENTRY_VISUAL_SCENARIO },
-  ...ORGANIZATION_VISUAL_SCENARIOS.flatMap((scenario) => [
-    { viewport: desktopViewport, scenario },
-    { viewport: smallMobileViewport, scenario },
-  ]),
+  { viewport: desktopViewport, scenario: dashboardOverviewScenario },
+  { viewport: smallMobileViewport, scenario: dashboardOverviewScenario },
+  ...VISUAL_VIEWPORTS.map((viewport) => ({ viewport, scenario: assetsOverviewScenario })),
+  ...[tabletViewport, mobileViewport, smallMobileViewport].map((viewport) => ({
+    viewport,
+    scenario: ASSET_FILTER_VISUAL_SCENARIO,
+  })),
   ...VISUAL_VIEWPORTS.flatMap((viewport) =>
     CORE_VISUAL_SCENARIOS.map((scenario) => ({ viewport, scenario })),
   ),
@@ -193,7 +211,7 @@ export const VISUAL_BASELINE_PATHS = VISUAL_CASE_MATRIX.map(
   ({ viewport, scenario }) => `${viewport.folder}/${scenario.baseline}`,
 );
 
-const VISUAL_CASE_BUDGET = 44;
+const VISUAL_CASE_BUDGET = 50;
 const coveredViewportIds = new Set(VISUAL_CASE_MATRIX.map(({ viewport }) => viewport.id));
 const corePairs = new Set(
   VISUAL_CASE_MATRIX.map(({ viewport, scenario }) => `${viewport.id}/${scenario.id}`),

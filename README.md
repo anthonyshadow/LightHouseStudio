@@ -41,13 +41,13 @@ approved for LAN, tunnel, proxy, or public exposure.
   upload and recorded on the Version that was saved.
 - **Make another version** derives a new Project from an existing one by reference — same source,
   same creative setup, no bytes copied, nothing charged until work starts in the copy.
-- **Assets** holds Videos, Characters, Outfits, and Voices. Each list can be searched by name and
-  states a real total, stated as a floor past its counting ceiling rather than as a number the list
-  did not establish.
+- **Assets** opens Videos, Characters, Outfits, or Voices directly in one account library switcher.
+  Counts reserve their footprint until known, and library tabs do not add Back-stack hops.
 - **Every saved video can have a preview.** One missing a thumbnail can generate it on demand, from
   a frame or a chosen image, without touching its saved Versions.
-- **The creative library is browser-local and says so**, and can be exported to a file and imported
-  back. The file carries records, not reference-image bytes.
+- **The creative library is account-backed in relational modes** and hydrates wherever that account
+  signs in, with IndexedDB as its local-first cache. It can also be exported and imported; the file
+  carries records, not reference-image bytes.
 - **The account menu shows the account**: plan, what this configured install can and cannot do, and
   how much work is currently running. A **How Lightframe works** panel explains Projects, Campaigns
   and each Asset library, and stays reachable after the getting-started card is dismissed.
@@ -214,9 +214,10 @@ resumable Project working media. Local editing and configuration do not contact 
   opaque key, signs only short-lived exact part operations, and verifies size, metadata, checksum,
   and media structure before attaching the asset. Local and shadow modes retain the existing
   server-mediated path; transfer-part retries never retry provider or other billable operations.
-- Character Builder saves browser-local character metadata and immutable reference assets under
-  `LIGHTFRAME_DATA_DIR` in local mode. In authoritative Neon/private-R2 mode, uploads and generated
-  results are staged until a saved creative-library relationship retains them; explicit discard,
+- Character Builder saves account-scoped character metadata, with an IndexedDB cache and a
+  configured local-mode fallback; local-mode immutable reference assets live under
+  `LIGHTFRAME_DATA_DIR`. In authoritative Neon/private-R2 mode, uploads and generated results are
+  staged until a saved creative-library relationship retains them; explicit discard,
   saved-record deletion, and a 24-hour inactivity sweep remove unreferenced staged bytes and rows.
   Prompt-only save and upload do not generate images. Every newly generated,
   regenerated, edited, or composed character reference is staged as one character on a uniform
@@ -225,7 +226,8 @@ resumable Project working media. Local editing and configuration do not contact 
 - Saved Characters expose a normalized Wardrobe containing the labelled original plus saved
   variants, an optional saved-voice default, and image-backed saved outfits as garment choices.
   Browsing, duplication into a new Character Builder draft, exact version selection, and default
-  voice persistence stay local. Opening default-voice configuration explicitly loads the saved
+  voice persistence stay in the account creative library. Opening default-voice configuration
+  explicitly loads the saved
   ElevenLabs library; selecting the character in Existing Video preselects that voice without
   processing, and the edit can override it. **Add Outfit** contacts Pruna only
   from explicit Generate/Regenerate; **Change Features** uses the startup-selected OpenAI/BFL/Wiro
@@ -233,7 +235,7 @@ resumable Project working media. Local editing and configuration do not contact 
   variant-source edits treat the selected image as authoritative and send no parent prompt. An
   optional, default-off major-departure control also treats the selected image as image-only input
   and allows requested identity and defining-trait changes. Saving never selects a variant
-  implicitly. Deleting a variant removes its browser-local metadata and links. Local mode retains
+  implicitly. Deleting a variant removes its saved relationship metadata and links. Local mode retains
   immutable image bytes; authoritative Neon/R2 removes result/source/garment assets only after its
   saved-library relationship check proves that no retained record uses them.
 - Outfit Builder creates reusable prompt or reference-image VTO recipes from Studio or the Saved

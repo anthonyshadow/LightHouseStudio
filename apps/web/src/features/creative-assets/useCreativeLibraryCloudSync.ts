@@ -31,13 +31,13 @@ const itemCount = (store: CreativeAssetStore): number =>
   store.savedCharacterVariants.length;
 
 const DIVERGED_MESSAGE =
-  'Cloud library sync paused because this browser and the cloud both contain changes. The local copy was preserved.';
+  'Account library sync paused because this session and the account both contain changes. Your current copy was preserved.';
 const CONFLICT_MESSAGE =
-  'Cloud library sync paused because another session changed the library. Your local copy was preserved.';
+  'Account library sync paused because another signed-in session changed it. Your current copy was preserved.';
 const INITIALIZED_ELSEWHERE_MESSAGE =
-  'Cloud library sync paused because another session initialized it first.';
+  'Account library sync paused because another signed-in session initialized it first.';
 const UNAVAILABLE_MESSAGE =
-  'Cloud library sync is unavailable. Your local copy remains available on this browser.';
+  'Account library sync is unavailable. Your current copy remains available, but changes will not reach another device until sync resumes.';
 
 /**
  * How the operator answered a divergence, carried into the next attempt.
@@ -74,9 +74,9 @@ export interface CreativeLibraryCloudSync {
   readonly mirror: CreativeLibraryMirror;
   /** Re-runs the whole startup sequence, including the divergence check. */
   readonly retry: () => void;
-  /** Overwrites the cloud copy with this browser's. */
+  /** Overwrites the account copy with the current session's preserved copy. */
   readonly keepLocal: () => void;
-  /** Overwrites this browser's copy with the cloud's. */
+  /** Replaces the current cache with the account copy. */
   readonly keepCloud: () => void;
 }
 

@@ -363,11 +363,14 @@ export const SavedOutfitLibrary = ({
   repository,
   onUse,
   onCreate,
+  showCreateAction = true,
 }: {
   items: readonly SavedPrompt[];
   repository: CreativeAssetRepository;
   onUse: (item: SavedPrompt) => void;
   onCreate: () => void;
+  /** Asset overlays promote creation into their library toolbar; embedded callers keep it here. */
+  showCreateAction?: boolean;
 }) => {
   'use memo';
 
@@ -414,12 +417,12 @@ export const SavedOutfitLibrary = ({
                 For example: a jacket you styled once with Virtual Try-On, ready to try on in any
                 new video.
               </p>
-              {createOutfitButton}
+              {showCreateAction ? createOutfitButton : null}
             </div>
           </div>
         ) : (
           <>
-            <div>{createOutfitButton}</div>
+            {showCreateAction ? <div>{createOutfitButton}</div> : null}
             <div css={compactGrid(theme)}>
               {items.map((item) => (
                 <article key={item.id} css={compactCard(theme)}>

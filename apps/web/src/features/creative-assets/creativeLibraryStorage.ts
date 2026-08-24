@@ -1,44 +1,36 @@
 import type { CreativeAssetStore } from '@studio/domain';
-import type { AssetDestination } from '../../app/paths';
 import type { CreativeLibraryMirror } from './useCreativeLibraryCloudSync';
 
 /**
  * What the operator is told about where this library lives.
  *
- * One owner for both the hub cards and the library surfaces, so the two can never disagree, and
- * none of the three answers claims a cloud copy that the deployment may not have: the routes are
- * registered only in the relational database modes, and `DATABASE_MODE` defaults to `local`.
+ * None of the three answers claims account persistence that the deployment may not have: the
+ * owner-scoped routes are registered only in relational database modes. Production requires Neon;
+ * local mode remains a development fallback and is stated as unavailable account sync, not as a
+ * second product storage model.
  */
 const STORAGE_SUMMARIES: Readonly<Record<CreativeLibraryMirror, string>> = {
-  checking: 'Stored in this browser.',
-  'browser-only': 'Stored in this browser only — clearing site data deletes it.',
-  cloud: 'Stored in this browser and copied to your account.',
+  checking: 'Checking your account library…',
+  'browser-only': 'Account sync is unavailable in this configuration.',
+  cloud: 'Available wherever you sign in.',
 };
 
 const STORAGE_DETAILS: Readonly<Record<CreativeLibraryMirror, string>> = {
   checking:
-    'Characters, Outfits, wardrobe variants and saved prompts are stored in this browser. Whether this account also keeps a copy on the server has not been confirmed.',
+    'Lightframe is checking whether this account can store Characters, Outfits, wardrobe variants and saved prompts on the server.',
   'browser-only':
-    'Characters, Outfits, wardrobe variants and saved prompts are stored in this browser only. Clearing site data for this browser deletes them, and there is no copy anywhere else.',
+    'Account sync is unavailable in this configuration. Export a backup before clearing local site data.',
   cloud:
-    'Characters, Outfits, wardrobe variants and saved prompts are stored in this browser and copied to your account on the server.',
+    'Characters, Outfits, wardrobe variants and saved prompts are saved to your Lightframe account and available wherever you sign in.',
 };
 
 /** The reference images live outside the file in every mode, so this line never varies. */
 export const CREATIVE_LIBRARY_EXPORT_CONTENTS_NOTE =
   'An exported file lists the reference images each record uses, but never contains the images themselves.';
 
-/**
- * The destinations this statement is about. Videos and Voices are the server's and are not covered
- * by it, so they must not carry it — stated here rather than at each surface that renders a card.
- */
-const BROWSER_HELD_DESTINATIONS: ReadonlySet<AssetDestination> = new Set(['characters', 'outfits']);
-
-/** One short line for a hub card, or nothing for a destination this statement does not cover. */
-export const creativeLibraryStorageSummary = (
-  destination: AssetDestination,
-  mirror: CreativeLibraryMirror,
-): string | null => (BROWSER_HELD_DESTINATIONS.has(destination) ? STORAGE_SUMMARIES[mirror] : null);
+/** The compact account-availability statement shown above Characters and Outfits. */
+export const creativeLibraryStorageSummary = (mirror: CreativeLibraryMirror): string =>
+  STORAGE_SUMMARIES[mirror];
 
 /** The fuller statement for the surface where the library is managed. */
 export const creativeLibraryStorageDetail = (mirror: CreativeLibraryMirror): string =>

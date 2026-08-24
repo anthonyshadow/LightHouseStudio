@@ -245,10 +245,11 @@ The touch project runs that smoke plus the dedicated control-timeout/recording-S
 browser-specific test must be tagged in its title with `@cross-browser` or `@touch`; do not run
 every desktop journey under every engine by default.
 
-The current visual matrix contains 44 cases within the 44-case review budget. It retains Local live
+The current visual matrix contains 50 cases within the 50-case review budget. It retains Local live
 and recording at all five canonical viewports, plus selected entry, idle, Character, Builder,
-creative-library, playback, existing-video setup at all five viewports, processing/result, VTO, Voice,
-finalizing, permission-error, the video editor at all five canonical viewports, desktop Campaigns
+creative-library, playback, existing-video setup at all five viewports, processing/result, VTO,
+Voice, finalizing, permission-error, the video editor at all five canonical viewports, Assets at all
+five canonical viewports plus its filter sheet at tablet and both phone sizes, desktop Campaigns
 workspace, Project output review at all five canonical viewports, and the Project output destination
 choice on desktop and small mobile. Visual tests are not part of `bun run test`, `bun run quality`,
 or ordinary push/pull-request CI.

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   APP_PATHS,
   ASSET_DESTINATION_PATHS,
+  assetDestinationFromPath,
   campaignIdFromPath,
   campaignPath,
   canonicalizeLegacyAppPath,
@@ -54,6 +55,9 @@ describe('authenticated application paths', () => {
     expect(ASSET_DESTINATION_PATHS.characters).toBe(APP_PATHS.characters);
     expect(ASSET_DESTINATION_PATHS.outfits).toBe(APP_PATHS.outfits);
     expect(ASSET_DESTINATION_PATHS.voices).toBe(APP_PATHS.voices);
+    expect(assetDestinationFromPath(APP_PATHS.videos)).toBe('videos');
+    expect(assetDestinationFromPath(APP_PATHS.characters)).toBe('characters');
+    expect(assetDestinationFromPath(APP_PATHS.assets)).toBeNull();
     expect(savedVideoLibraryPath(videoId)).toBe(`${APP_PATHS.videos}?video=${videoId}`);
     expect(requestedSavedVideoIdFromSearch(`?video=${videoId}`)).toBe(videoId);
     expect(requestedSavedVideoIdFromSearch('?sort=latest')).toBeNull();

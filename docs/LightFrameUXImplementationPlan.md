@@ -902,7 +902,7 @@ smoke **1/1**; functional browser journeys **77/77**; Darwin visual matrix **44/
 Playwright Linux affected Save matrix **7/7**; and **88/88** curated platform baselines with zero
 missing or removable files.
 
-## 19. Assets consolidation
+## ~~19. Assets consolidation~~ · DONE
 
 **Audit IDs** LF-N02, LF-A05, LF-A06, LF-A07, LF-A08, LF-R05 · **P2** · **M** · **Superdesign**
 
@@ -923,6 +923,24 @@ rewriting the Videos empty state so it stops naming internal flows.
 **Validation** `vitest run apps/web/src/features/assets apps/web/src/features/video-gallery apps/web/src/studio`,
 plus `apps/web/src/app/route-inventory.test.ts` and `paths.test.ts` if any route changes.
 **Risk** Both route oracles fail until their expected lists are updated — by design.
+
+**Outcome** The approved Superdesign library switcher now opens Videos, Characters, Outfits, and
+Voices directly; `/assets` redirects to the most recently used library (Videos by default), tab
+switches replace the active history entry, and **Close Assets** still consumes the entry that
+opened the overlay. Account-owned creative-library records hydrate from the authenticated API and
+remain available across signed-in sessions; the UI no longer presents browser storage as their
+home. Counts expose loading and retry states without claiming unread libraries are empty, creative
+library export/import lives behind the shared overflow pattern, and raw video origins/statuses use
+product language. Videos adds a poster-grid skeleton, an external-flow-free empty state, an inline
+search ×, and responsive filters: desktop controls stay inline while tablet and phone use a bottom
+sheet whose two actions remain on one row. The canonical 1440×960, 1280×720, 834×1112, 390×844,
+and 320×568 layouts are viewport-bound and preserve the pathname-keyed overlay lifecycle.
+
+**Validated** focused Assets/gallery/Studio suites **113/113**; full repository `bun run quality`
+(**262** files passed, **4** skipped; **2,008** tests passed, **9** skipped); built-production smoke
+**1/1**; functional browser journeys **78/78**; Darwin visual matrix **50/50**; pinned Playwright
+Linux Assets matrix **8/8**; and **100/100** curated platform baselines with zero missing or
+removable files.
 
 ## 20. Dashboard recomposition
 

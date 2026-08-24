@@ -5,18 +5,17 @@ Studio is the local-first creation surface at `/studio/create` (plus the deep-li
 
 ## Entry points
 
-| From                                               | Result                                                         |
-| -------------------------------------------------- | -------------------------------------------------------------- |
-| Dashboard **Create video**                         | `/studio/create`                                               |
-| Quick Create ▸ **New video**                       | `/studio/create`                                               |
-| Quick Create ▸ **Create Asset** ▸ Video ▸ Record   | `/studio/create?intent=record` — capture starts automatically  |
-| Quick Create ▸ **Create Asset** ▸ Video ▸ Upload   | `/studio/create?intent=upload` — upload overlay opens          |
-| Assets hub **Upload video**                        | `/studio/create` + router state `{ creationIntent: 'upload' }` |
-| Videos library **Open in Studio** / **Edit video** | `/studio/create` (**replace**) with the video already loaded   |
-| Characters/Outfits library actions                 | `/studio/create` + the matching builder overlay                |
-| Project overview ▸ Assets ▸ add video              | `/studio/create?projectId={id}[&intent=…]`                     |
-| Quick Create ▸ **Live AI · Beta**                  | `/studio/create/live`                                          |
-| Direct URL `/studio/{uuid}`                        | Loads that Saved Video's current Version into review           |
+| From                                               | Result                                                        |
+| -------------------------------------------------- | ------------------------------------------------------------- |
+| Dashboard **Create video**                         | `/studio/create`                                              |
+| Quick Create ▸ **New video**                       | `/studio/create`                                              |
+| Quick Create ▸ **Create Asset** ▸ Video ▸ Record   | `/studio/create?intent=record` — capture starts automatically |
+| Quick Create ▸ **Create Asset** ▸ Video ▸ Upload   | `/studio/create?intent=upload` — upload overlay opens         |
+| Videos library **Open in Studio** / **Edit video** | `/studio/create` (**replace**) with the video already loaded  |
+| Characters/Outfits library actions                 | `/studio/create` + the matching builder overlay               |
+| Project overview ▸ Assets ▸ add video              | `/studio/create?projectId={id}[&intent=…]`                    |
+| Quick Create ▸ **Live AI · Beta**                  | `/studio/create/live`                                         |
+| Direct URL `/studio/{uuid}`                        | Loads that Saved Video's current Version into review          |
 
 ## The Studio stage
 
@@ -134,7 +133,7 @@ Voice is independent of the visual edit and can be applied alone
 - The voice catalog (`VoiceLibrary`) supports browse, preview, save-to-account and remove, in the
   Voice treatments overlay and in Assets ▸ Voices alike. A voice chosen from Assets ▸ Voices is
   carried into the next video workflow — see
-  [Assets and Libraries](assets-and-libraries.md#flow-voices-library-assetsvoices).
+  [Assets and Libraries](assets-and-libraries.md#voices-assetsvoices).
 
 ## Flow: Local video adjust
 

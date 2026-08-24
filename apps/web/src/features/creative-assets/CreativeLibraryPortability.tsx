@@ -73,7 +73,7 @@ export const CreativeLibraryPortability = ({
       setOutcome({
         kind: 'failure',
         title: 'The library was not exported',
-        message: 'This browser could not save the file. Your library is unchanged.',
+        message: 'Lightframe could not save the file on this device. Your library is unchanged.',
       });
     }
   };
@@ -165,8 +165,8 @@ export const CreativeLibraryPortability = ({
       </div>
       <ConfirmationDialog
         open={candidate !== null}
-        title="Replace this browser’s creative library?"
-        description="Every Character, Outfit, wardrobe variant and saved prompt in this browser is replaced with the contents of the file. Anything not in the file is lost."
+        title="Replace your account creative library?"
+        description="Every Character, Outfit, wardrobe variant and saved prompt in your current library is replaced with the contents of the file. Anything not in the file is lost."
         body={
           <>
             <p>
@@ -182,7 +182,7 @@ export const CreativeLibraryPortability = ({
         alert={replaceFailure ?? undefined}
         alertTitle={replaceFailure ? 'The library was not replaced' : undefined}
         confirmLabel={replacing ? 'Replacing library…' : 'Replace library'}
-        cancelLabel="Keep this library"
+        cancelLabel="Keep account library"
         danger
         busy={replacing}
         returnFocusRef={importTriggerRef}

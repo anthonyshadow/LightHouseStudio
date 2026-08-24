@@ -10,18 +10,18 @@ export type CreativeLibrarySyncNoticeProps = Pick<
 >;
 
 const KEEP_LOCAL = {
-  title: 'Keep this browser’s creative library?',
+  title: 'Save the current creative library to your account?',
   description:
-    'The cloud copy of your Characters, Outfits and saved prompts is replaced with the copy on this browser. Anything saved only in the cloud is lost.',
-  confirmLabel: 'Keep this browser’s copy',
+    'The account copy of your Characters, Outfits and saved prompts is replaced with the current copy. Changes saved only by another session are lost.',
+  confirmLabel: 'Save current copy',
   danger: true,
 } as const;
 
 const KEEP_CLOUD = {
-  title: 'Use the cloud creative library?',
+  title: 'Reload the account creative library?',
   description:
-    'This browser’s copy of your Characters, Outfits and saved prompts is replaced with the cloud copy. Anything saved only on this browser is lost.',
-  confirmLabel: 'Use the cloud copy',
+    'The current Characters, Outfits and saved prompts are replaced with the account copy. Any unsynced changes in this session are lost.',
+  confirmLabel: 'Reload account copy',
   danger: true,
 } as const;
 
@@ -61,7 +61,7 @@ export const CreativeLibrarySyncNotice = ({
       <StatusNotice
         role="status"
         tone="warning"
-        title="Creative library sync paused"
+        title="Account library sync paused"
         data-creative-sync-notice=""
       >
         <p>{status.message}</p>

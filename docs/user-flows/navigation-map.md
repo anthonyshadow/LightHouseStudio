@@ -26,23 +26,23 @@ Consequences that matter for every flow:
 
 ## Canonical routes
 
-| Path                              | Protected | Surface rendered                          | Notes                                                                                                                                                          |
-| --------------------------------- | --------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/`                               | No        | `EntryPage`                               | Redirects to `/dashboard` when already authenticated (`EntryPage.tsx:73-80`)                                                                                   |
-| `/dashboard`                      | Yes       | `DashboardRouteSurface`                   | Organization chrome                                                                                                                                            |
-| `/studio/create`                  | Yes       | Media stage + `CreativeWorkspace`         | Studio chrome. Accepts `?intent=record\|upload` and `?projectId=<uuid>`                                                                                        |
-| `/studio/create/live`             | Yes       | `LiveBetaRouteSurface`                    | No stage, so no capture runtime. If beta **and** provider are configured, the shell opens the AI-experience overlay and replaces the URL with `/studio/create` |
-| `/studio/{videoId}`               | Yes       | Media stage, take review                  | `videoId` must match a UUID. Loads the Saved Video's current Version into review. **No UI links here**                                                         |
-| `/projects`                       | Yes       | `ProjectsListSurface`                     | Accepts router state `{ createIntent: 'project' }`                                                                                                             |
-| `/projects/{projectId}`           | Yes       | `ProjectOverviewSurface`                  |                                                                                                                                                                |
-| `/projects/{projectId}/workspace` | Yes       | `ProjectWorkspaceSurface` + media stage   | The only organization route that mounts the capture runtime, because it records source into the Project                                                        |
-| `/campaigns`                      | Yes       | `CampaignsWorkspace`                      | Accepts router state `{ createIntent: 'campaign' }`, consumed and stripped on close or successful create                                                       |
-| `/campaigns/{campaignId}`         | Yes       | `CampaignDetail`                          |                                                                                                                                                                |
-| `/assets`                         | Yes       | `AssetsRouteSurface`                      | Hub of four cards                                                                                                                                              |
-| `/assets/videos`                  | Yes       | `AssetsRouteSurface` + Videos overlay     | Optional `?video=<uuid>` opens that Saved Video's preview, then replaces itself away                                                                           |
-| `/assets/characters`              | Yes       | `AssetsRouteSurface` + Characters overlay |                                                                                                                                                                |
-| `/assets/outfits`                 | Yes       | `AssetsRouteSurface` + Outfits overlay    |                                                                                                                                                                |
-| `/assets/voices`                  | Yes       | `AssetsRouteSurface` + Voices overlay     | Browse, preview, save, remove, and **Use in Studio**; disabled only when ElevenLabs is unconfigured                                                            |
+| Path                              | Protected | Surface rendered                        | Notes                                                                                                                                                          |
+| --------------------------------- | --------- | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                               | No        | `EntryPage`                             | Redirects to `/dashboard` when already authenticated (`EntryPage.tsx:73-80`)                                                                                   |
+| `/dashboard`                      | Yes       | `DashboardRouteSurface`                 | Organization chrome                                                                                                                                            |
+| `/studio/create`                  | Yes       | Media stage + `CreativeWorkspace`       | Studio chrome. Accepts `?intent=record\|upload` and `?projectId=<uuid>`                                                                                        |
+| `/studio/create/live`             | Yes       | `LiveBetaRouteSurface`                  | No stage, so no capture runtime. If beta **and** provider are configured, the shell opens the AI-experience overlay and replaces the URL with `/studio/create` |
+| `/studio/{videoId}`               | Yes       | Media stage, take review                | `videoId` must match a UUID. Loads the Saved Video's current Version into review. **No UI links here**                                                         |
+| `/projects`                       | Yes       | `ProjectsListSurface`                   | Accepts router state `{ createIntent: 'project' }`                                                                                                             |
+| `/projects/{projectId}`           | Yes       | `ProjectOverviewSurface`                |                                                                                                                                                                |
+| `/projects/{projectId}/workspace` | Yes       | `ProjectWorkspaceSurface` + media stage | The only organization route that mounts the capture runtime, because it records source into the Project                                                        |
+| `/campaigns`                      | Yes       | `CampaignsWorkspace`                    | Accepts router state `{ createIntent: 'campaign' }`, consumed and stripped on close or successful create                                                       |
+| `/campaigns/{campaignId}`         | Yes       | `CampaignDetail`                        |                                                                                                                                                                |
+| `/assets`                         | Yes       | Compatibility redirect                  | Replaces to the shell session's last-used Asset library, defaulting to `/assets/videos`                                                                        |
+| `/assets/videos`                  | Yes       | Videos fullscreen overlay               | Optional `?video=<uuid>` opens that Saved Video's preview, then replaces the parameter away                                                                    |
+| `/assets/characters`              | Yes       | Characters fullscreen overlay           | Account-hydrated creative library                                                                                                                              |
+| `/assets/outfits`                 | Yes       | Outfits fullscreen overlay              | Account-hydrated creative library                                                                                                                              |
+| `/assets/voices`                  | Yes       | Voices fullscreen overlay               | Browse, preview, save, remove, and **Use in Studio**; disabled only when ElevenLabs is unconfigured                                                            |
 
 ## Legacy redirects
 
@@ -99,9 +99,11 @@ DashboardRouteSurface
   ├─ All Projects / All Videos / All Campaigns
   └─ Processing Queue ▸ Remove ─────────► DELETE-equivalent abandon, stays on page
 
-AssetsRouteSurface
-  ├─ Upload video ──────────────────────► /studio/create with state {creationIntent:'upload'}
-  └─ Open <library> ────────────────────► /assets/{videos|characters|outfits|voices}
+StudioHeader · Assets
+  └─ open last-used library ────────────► /assets/{videos|characters|outfits|voices}
+
+Asset libraries tab strip
+  └─ switch library (replace) ──────────► /assets/{videos|characters|outfits|voices}
 
 Videos overlay (VideoGallery)
   ├─ Open in Studio ────────────────────► /studio/create (push, so Back returns to the library)
@@ -109,7 +111,7 @@ Videos overlay (VideoGallery)
   ├─ Use as Project source ─────────────► /projects/{id}/workspace (source accepted)
   ├─ Download ──────────────────────────► /api/videos/{id}/content?download=true
   ├─ Rename / Remove ───────────────────► in-place
-  └─ close ─────────────────────────────► back one entry, fallback /assets
+  └─ Close Assets ──────────────────────► back one entry, fallback /dashboard
 
 ProjectsWorkspace
   ├─ New Project ▸ Create without a name ► /projects/{new id}
@@ -160,7 +162,9 @@ Studio (create)
 - `ProjectDetail` overview breadcrumb (fallback `/projects` or the campaign)
 - `ProjectDetail` workspace "Overview" breadcrumb (fallback `/projects/{id}`)
 - `CampaignDetail` "← All Campaigns" (fallback `/campaigns`)
-- Every Asset library overlay's close control (fallback `/assets`), via `nav.closeAssetLibrary`.
+- Every Asset library overlay's **Close Assets** control (fallback `/dashboard`), via
+  `nav.closeAssetLibrary`. Library tab changes replace the current entry so close still consumes
+  the one that opened Assets.
   A library opened from somewhere other than the hub therefore closes back to _that_ origin — the
   point of the change, since closing used to push `/assets` and cost two Back presses per visit.
 - The Saved-Video-route error notice action (`StudioApp.tsx`)

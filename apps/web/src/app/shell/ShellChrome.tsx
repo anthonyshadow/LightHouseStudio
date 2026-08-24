@@ -1,16 +1,22 @@
 import { useTheme } from '@emotion/react';
 import type { AuthenticatedSessionResponse, AuthenticatedUser } from '@studio/contracts';
-import { useRef, useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
+import type { AssetCountState } from '../../features/assets/AssetLibraryTabs';
 import { CreativeLibrarySyncNotice } from '../../features/creative-assets/CreativeLibrarySyncNotice';
 import { AssetCreationLauncher } from '../../studio/AssetCreationLauncher';
 import { HowLightframeWorksPanel } from '../../studio/HowLightframeWorksPanel';
 import { headerRegionStyles } from '../../studio/StudioApp.styles';
 import { StudioHeader } from '../../studio/StudioHeader';
-import { StudioLibraryOverlays } from '../../studio/StudioLibraryOverlays';
 import { ShellCreativeBuilders } from './ShellCreativeBuilders';
 import type { useStudioLogoutController } from '../../studio/useStudioLogoutController';
 import { studioCreatePath } from '../paths';
 import type { ShellServices } from './useShellServices';
+
+const StudioLibraryOverlays = lazy(() =>
+  import('../../studio/StudioLibraryOverlays').then((module) => ({
+    default: module.StudioLibraryOverlays,
+  })),
+);
 
 interface ShellChromeProps {
   readonly services: ShellServices;
@@ -40,6 +46,12 @@ export const ShellChrome = ({ services, user, session, logout }: ShellChromeProp
     services;
   const { availability, state: capabilityState } = provider;
   const { repository, store, sync } = creative;
+  const creativeCount = (count: number): AssetCountState =>
+    creative.health === 'session-only'
+      ? { status: 'error', retry: creative.reopen }
+      : creative.hydrated
+        ? { status: 'ready', count }
+        : { status: 'loading' };
 
   return (
     <>
@@ -130,29 +142,38 @@ export const ShellChrome = ({ services, user, session, logout }: ShellChromeProp
         onOpenVoiceLibrary={nav.openVoices}
       />
 
-      <StudioLibraryOverlays
-        pathname={route.pathname}
-        mainRef={mainRef}
-        repository={repository}
-        store={store}
-        creativeLibraryMirror={sync.mirror}
-        onClose={nav.closeAssetLibrary}
-        focusedSavedVideoId={route.focusedSavedVideoId}
-        onFocusedSavedVideoConsumed={nav.clearFocusedSavedVideo}
-        onUseVideo={libraryHandoff.useVideo}
-        onCreateCharacter={libraryHandoff.createCharacter}
-        onCopyCharacter={libraryHandoff.copyCharacter}
-        onOpenWardrobe={libraryHandoff.openWardrobe}
-        onUseCharacter={libraryHandoff.useCharacter}
-        onCreateOutfit={libraryHandoff.createOutfit}
-        onUseOutfit={libraryHandoff.useOutfit}
-        voiceLibraryUnavailableReason={
-          availability.elevenLabs
-            ? null
-            : 'Saving, removing, and using voices needs a configured ElevenLabs provider. Browsing and previewing stay available.'
-        }
-        onUseVoice={libraryHandoff.useVoice}
-      />
+      {route.assetsRouteActive ? (
+        <Suspense fallback={<p role="status">Loading Assets…</p>}>
+          <StudioLibraryOverlays
+            pathname={route.pathname}
+            mainRef={mainRef}
+            repository={repository}
+            store={store}
+            charactersCount={creativeCount(store.savedCharacterPrompts.length)}
+            outfitsCount={creativeCount(
+              store.savedPrompts.filter((item) => item.modelModeId === 'lucy-vton-latest').length,
+            )}
+            creativeLibraryMirror={sync.mirror}
+            onSwitchLibrary={nav.switchAssetLibrary}
+            onClose={nav.closeAssetLibrary}
+            focusedSavedVideoId={route.focusedSavedVideoId}
+            onFocusedSavedVideoConsumed={nav.clearFocusedSavedVideo}
+            onUseVideo={libraryHandoff.useVideo}
+            onCreateCharacter={libraryHandoff.createCharacter}
+            onCopyCharacter={libraryHandoff.copyCharacter}
+            onOpenWardrobe={libraryHandoff.openWardrobe}
+            onUseCharacter={libraryHandoff.useCharacter}
+            onCreateOutfit={libraryHandoff.createOutfit}
+            onUseOutfit={libraryHandoff.useOutfit}
+            voiceLibraryUnavailableReason={
+              availability.elevenLabs
+                ? null
+                : 'Saving, removing, and using voices needs a configured ElevenLabs provider. Browsing and previewing stay available.'
+            }
+            onUseVoice={libraryHandoff.useVoice}
+          />
+        </Suspense>
+      ) : null}
 
       <ShellCreativeBuilders services={services} />
     </>

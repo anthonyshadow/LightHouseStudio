@@ -148,6 +148,8 @@ describe('VideoGallery', () => {
     ).toHaveAttribute('src', `/api/videos/${item.id}/thumbnail?v=${item.currentVersion.id}`);
     expect(screen.getByText('0:12')).toBeInTheDocument();
     expect(screen.getAllByText('Landscape').length).toBeGreaterThan(0);
+    expect(screen.getByText('Studio recording')).toBeInTheDocument();
+    expect(screen.queryByText('recorded')).not.toBeInTheDocument();
     expect(screen.getByText('Mara')).toBeInTheDocument();
     // Retrieval leads the card; everything else lives behind the overflow.
     expect(screen.getByRole('link', { name: 'Download Morning take' })).toHaveAttribute(
@@ -157,6 +159,14 @@ describe('VideoGallery', () => {
     fireEvent.click(screen.getByLabelText('More actions for Morning take'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Open in Studio' }));
     await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, 'play'));
+  });
+
+  it('reserves the gallery layout with poster skeletons while account data loads', () => {
+    mockApiServer.use(http.get('*/api/videos', () => new Promise<never>(() => {})));
+    renderGallery();
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading saved videos');
+    expect(document.querySelectorAll('[data-skeleton-poster]')).toHaveLength(6);
   });
 
   it('opens a centered authenticated preview on thumbnail activation and restores focus on close', async () => {
@@ -347,7 +357,10 @@ describe('VideoGallery', () => {
     expect(
       await screen.findByRole('heading', { name: 'No videos in Assets yet' }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Finish a Project with Save video/u)).toBeInTheDocument();
+    expect(screen.getByText('Videos you save to Assets will appear here.')).toBeInTheDocument();
+    expect(
+      screen.getByText(/keeps its preview, download and version history together/u),
+    ).toBeInTheDocument();
   });
 
   it('aggregates cursor pages through Query', async () => {
@@ -614,8 +627,10 @@ describe('VideoGallery', () => {
     renderGallery();
     await screen.findByRole('heading', { name: 'Morning take' });
     expect(screen.getByText('Variant: Evening')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const filters = await screen.findByRole('dialog', { name: 'Filters' });
 
-    fireEvent.click(screen.getByRole('combobox', { name: 'Character used' }));
+    fireEvent.click(within(filters).getByRole('combobox', { name: 'Character used' }));
     fireEvent.click(screen.getByRole('option', { name: 'Mara' }));
     await waitFor(() =>
       expect(Object.fromEntries(new URL(requests.at(-1)!.url).searchParams)).toMatchObject({
@@ -624,7 +639,7 @@ describe('VideoGallery', () => {
       }),
     );
 
-    fireEvent.click(screen.getByRole('combobox', { name: 'Video format' }));
+    fireEvent.click(within(filters).getByRole('combobox', { name: 'Video format' }));
     fireEvent.click(screen.getByRole('option', { name: 'Portrait' }));
     await waitFor(() =>
       expect(Object.fromEntries(new URL(requests.at(-1)!.url).searchParams)).toMatchObject({
@@ -635,19 +650,56 @@ describe('VideoGallery', () => {
     );
 
     for (const label of ['Oldest', 'Shortest', 'Longest']) {
-      fireEvent.click(screen.getByRole('combobox', { name: 'Sort by' }));
+      fireEvent.click(within(filters).getByRole('combobox', { name: 'Sort by' }));
       fireEvent.click(screen.getByRole('option', { name: label }));
       await waitFor(() =>
         expect(new URL(requests.at(-1)!.url).searchParams.get('sort')).toBe(label.toLowerCase()),
       );
     }
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    fireEvent.click(within(filters).getByRole('button', { name: 'Clear filters' }));
     await waitFor(() => {
       const parameters = new URL(requests.at(-1)!.url).searchParams;
       expect(parameters.has('characterName')).toBe(false);
       expect(parameters.has('format')).toBe(false);
     });
+  });
+
+  it('clears title search from the inline trailing action and returns focus to the input', async () => {
+    mockGalleryPages({ '': page([video()]) });
+    renderGallery();
+    await screen.findByRole('heading', { name: 'Morning take' });
+
+    const search = screen.getByRole('searchbox', { name: 'Search videos by title' });
+    fireEvent.change(search, { target: { value: 'Morning' } });
+    const clear = screen.getByRole('button', { name: 'Clear search' });
+    expect(clear).toBeVisible();
+
+    fireEvent.click(clear);
+    await waitFor(() => expect(search).toHaveValue(''));
+    await waitFor(() => expect(search).toHaveFocus());
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Clear search' })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('keeps mobile filters in a focused sheet with one compact action row', async () => {
+    mockGalleryPages({ '': page([video()]) });
+    renderGallery();
+    await screen.findByRole('heading', { name: 'Morning take' });
+
+    const trigger = screen.getByRole('button', { name: 'Filters' });
+    fireEvent.click(trigger);
+    const dialog = await screen.findByRole('dialog', { name: 'Filters' });
+    expect(within(dialog).getByRole('combobox', { name: 'Character used' })).toBeVisible();
+    const actions = dialog.querySelector<HTMLElement>('[data-filter-sheet-actions]');
+    expect(actions).not.toBeNull();
+    expect(within(actions!).getByRole('button', { name: 'Clear filters' })).toBeVisible();
+    expect(within(actions!).getByRole('button', { name: 'Show 1 video' })).toBeVisible();
+
+    fireEvent.click(within(actions!).getByRole('button', { name: 'Show 1 video' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Filters' })).toBeNull());
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 
   it('keeps the character control operable when older videos have no attribution', async () => {
@@ -670,8 +722,12 @@ describe('VideoGallery', () => {
     renderGallery();
 
     await screen.findByRole('heading', { name: 'Morning take' });
-    expect(screen.getByRole('combobox', { name: 'Character used' })).toBeEnabled();
-    expect(screen.getByText('No saved videos have character attribution yet.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const filters = await screen.findByRole('dialog', { name: 'Filters' });
+    expect(within(filters).getByRole('combobox', { name: 'Character used' })).toBeEnabled();
+    expect(
+      within(filters).getByText('No saved videos have character attribution yet.'),
+    ).toBeInTheDocument();
   });
 
   it('opens a requested Version preview for a video no loaded page contains', async () => {

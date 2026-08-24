@@ -126,9 +126,11 @@ recorded there.
 - Global and per-provider admission limits in addition to the existing one-active-job-per-owner
   rule. Durable rows enforce one active job per owner across server instances. Limits are set by
   `VIDEO_JOB_MAX_ACTIVE` and `VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER`.
-- A browser creative-library sync seam. The browser remains an immediate local cache; Neon uses a
-  revision compare-and-swap. Conflicts pause sync and preserve the local copy instead of applying a
-  last-writer-wins overwrite.
+- An account creative-library sync seam. IndexedDB remains the immediate local-first cache and
+  configured local-development fallback; authoritative Neon stores normalized owner rows behind a
+  revision compare-and-swap. A fresh signed-in session hydrates from that account snapshot.
+  Conflicts pause sync and preserve the current session copy instead of applying a last-writer-wins
+  overwrite.
 - Relationship-safe reference-image retention in authoritative `neon`: uploads and generated
   results may be staged in the selected byte store, canonical creative-library rows define the
   saved set, trusted-origin discard and removed saved relationships delete only after an

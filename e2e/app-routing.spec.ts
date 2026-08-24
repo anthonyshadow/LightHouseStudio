@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import type { CreativeAssetStore } from '@studio/domain';
 import {
   CREATIVE_ASSET_STORAGE_KEY,
+  expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
   openCharacterOptions,
@@ -28,6 +29,13 @@ const loginFromEntry = async (page: Page): Promise<void> => {
   await expect(dialog.getByLabel('Password')).toHaveValue('lightframe-demo');
   await dialog.getByRole('button', { name: 'Log in' }).click();
 };
+
+const readHistoryIndex = (page: Page): Promise<number | null> =>
+  page.evaluate(() => {
+    const state: unknown = window.history.state;
+    if (typeof state !== 'object' || state === null || !('idx' in state)) return null;
+    return typeof state.idx === 'number' ? state.idx : null;
+  });
 
 const openProjectTask = async (
   page: Page,
@@ -154,16 +162,16 @@ test('Back and Forward restore focus across canonical organization routes', asyn
   await expect(page.locator('#studio-main')).toBeFocused();
 
   await page.getByRole('button', { name: 'Assets', exact: true }).click();
-  await expect(page).toHaveURL(/\/assets$/u);
-  await expect(page.locator('#studio-main')).toBeFocused();
+  await expect(page).toHaveURL(/\/assets\/videos$/u);
+  await expect(page.getByRole('dialog', { name: 'Videos' })).toBeVisible();
 
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`${DASHBOARD_PATH}$`, 'u'));
   await expect(page.locator('#studio-main')).toBeFocused();
 
   await page.goForward();
-  await expect(page).toHaveURL(/\/assets$/u);
-  await expect(page.locator('#studio-main')).toBeFocused();
+  await expect(page).toHaveURL(/\/assets\/videos$/u);
+  await expect(page.getByRole('dialog', { name: 'Videos' })).toBeVisible();
 });
 
 test('direct and refreshed Studio entries preserve one stage', async ({ page }) => {
@@ -189,30 +197,44 @@ test('Asset libraries open with no Studio stage and hand a selection back to it'
   await expect(page.getByLabel('Studio media stage')).toHaveCount(1);
 
   await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  await expect(page).toHaveURL(/\/assets\/videos$/u);
   for (const library of [
     { label: 'Videos', path: '/assets/videos', empty: 'No videos in Assets yet' },
     { label: 'Characters', path: '/assets/characters', empty: 'No saved characters yet' },
     { label: 'Outfits', path: '/assets/outfits', empty: 'No saved outfits yet' },
   ]) {
-    await page.getByRole('button', { name: `Open ${library.label}` }).click();
+    if (!page.url().endsWith(library.path)) {
+      await page
+        .getByRole('navigation', { name: 'Asset libraries' })
+        .getByRole('button', { name: new RegExp(library.label, 'u') })
+        .click();
+    }
     await expect(page).toHaveURL(new RegExp(`${library.path}$`, 'u'));
     const dialog = page.getByRole('dialog', { name: library.label });
     await expect(dialog.getByRole('heading', { name: library.empty })).toBeVisible();
     if (library.path === '/assets/characters') {
-      await expect(dialog.getByRole('button', { name: 'Create new character' })).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Create character' })).toBeVisible();
     }
     // A library needs no camera, so it gets none: the stage is absent, not hidden behind CSS.
     await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
-    await dialog.getByRole('button', { name: 'Close panel' }).click();
-    await expect(page).toHaveURL(/\/assets$/u);
   }
+
+  await page
+    .getByRole('dialog', { name: 'Outfits' })
+    .getByRole('button', { name: 'Close Assets' })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
 
   // Creating from a library still lands in Studio with the runtime mounted, which is the path the
   // shell's handoff channel exists to serve.
-  await page.getByRole('button', { name: 'Open Characters' }).click();
+  await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: 'Asset libraries' })
+    .getByRole('button', { name: /Characters/u })
+    .click();
   await page
     .getByRole('dialog', { name: 'Characters' })
-    .getByRole('button', { name: 'Create new character' })
+    .getByRole('button', { name: 'Create character' })
     .click();
   await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
   await expect(page.getByLabel('Studio media stage')).toHaveCount(1);
@@ -221,27 +243,88 @@ test('Asset libraries open with no Studio stage and hand a selection back to it'
     .toMatchObject({ cameraCalls: 0, connections: [] });
 });
 
-test('closing an Asset library consumes its history entry instead of stacking the hub', async ({
+test('closing an Asset library consumes its history entry without stacking a hub', async ({
   page,
 }) => {
   await installSuccessfulStudioHarness(page);
   await page.goto(DASHBOARD_PATH);
-  await page.getByRole('button', { name: 'Assets', exact: true }).click();
-  await expect(page).toHaveURL(/\/assets$/u);
+  const dashboardHistoryIndex = await readHistoryIndex(page);
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    await page.getByRole('button', { name: 'Open Videos' }).click();
+    await page.getByRole('button', { name: 'Assets', exact: true }).click();
     await expect(page).toHaveURL(/\/assets\/videos$/u);
     await page
       .getByRole('dialog', { name: 'Videos' })
-      .getByRole('button', { name: 'Close panel' })
+      .getByRole('button', { name: 'Close Assets' })
       .click();
-    await expect(page).toHaveURL(/\/assets$/u);
+    await expect(page).toHaveURL(new RegExp(`${DASHBOARD_PATH}$`, 'u'));
+    await expect.poll(() => readHistoryIndex(page)).toBe(dashboardHistoryIndex);
   }
+});
 
-  // Three open/close pairs used to bury the Dashboard under six entries.
-  await page.goBack();
-  await expect(page).toHaveURL(new RegExp(`${DASHBOARD_PATH}$`, 'u'));
+test('Assets matches the responsive design matrix without clipping controls', async ({ page }) => {
+  await installSuccessfulStudioHarness(page);
+  await installProjectHarness(page, true, { includeUnassignedVideo: true });
+  await page.goto('/assets/videos');
+
+  for (const viewport of Object.values(STUDIO_VIEWPORT_SIZES)) {
+    await page.setViewportSize(viewport);
+    const dialog = page.getByRole('dialog', { name: 'Videos' });
+    await expect(dialog.getByRole('heading', { name: 'Legacy unassigned' })).toBeVisible();
+    await expectNoDocumentOverflow(page);
+
+    const tabs = dialog.getByRole('navigation', { name: 'Asset libraries' });
+    await expect(tabs.getByRole('button')).toHaveCount(4);
+    const tabsBox = await tabs.boundingBox();
+    expect(tabsBox).not.toBeNull();
+    expect(tabsBox!.x).toBeGreaterThanOrEqual(0);
+    expect(tabsBox!.x + tabsBox!.width).toBeLessThanOrEqual(viewport.width + 1);
+
+    const search = dialog.getByRole('searchbox', { name: 'Search videos by title' });
+    await search.fill('Legacy');
+    await dialog.getByRole('button', { name: 'Clear search' }).click();
+    await expect(search).toHaveValue('');
+    await expect(dialog.getByRole('button', { name: 'Clear search' })).toHaveCount(0);
+
+    const mobileFilters = dialog.getByRole('button', { name: 'Filters', exact: true });
+    if (viewport.width >= 1_024) {
+      await expect(mobileFilters).toBeHidden();
+      await expect(dialog.getByLabel('Filter and sort saved videos')).toBeVisible();
+      continue;
+    }
+
+    await expect(mobileFilters).toBeVisible();
+    const [searchBox, mobileFiltersBox] = await Promise.all([
+      search.boundingBox(),
+      mobileFilters.boundingBox(),
+    ]);
+    expect(searchBox).not.toBeNull();
+    expect(mobileFiltersBox).not.toBeNull();
+    expect(Math.abs(searchBox!.y - mobileFiltersBox!.y)).toBeLessThanOrEqual(2);
+    await mobileFilters.click();
+    const filters = page.getByRole('dialog', { name: 'Filters' });
+    const clear = filters.getByRole('button', { name: 'Clear filters' });
+    const show = filters.getByRole('button', { name: 'Show 1 video' });
+    const sort = filters.getByRole('combobox', { name: 'Sort by' });
+    const footer = filters.locator('[data-filter-sheet-actions]').locator('..');
+    const [clearBox, showBox, sortBox, footerBox] = await Promise.all([
+      clear.boundingBox(),
+      show.boundingBox(),
+      sort.boundingBox(),
+      footer.boundingBox(),
+    ]);
+    expect(clearBox).not.toBeNull();
+    expect(showBox).not.toBeNull();
+    expect(sortBox).not.toBeNull();
+    expect(footerBox).not.toBeNull();
+    expect(Math.abs(clearBox!.y - showBox!.y)).toBeLessThanOrEqual(1);
+    expect(clearBox!.x).toBeGreaterThanOrEqual(0);
+    expect(showBox!.x + showBox!.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(sortBox!.y + sortBox!.height).toBeLessThanOrEqual(footerBox!.y + 1);
+    await show.click();
+    await expect(filters).toHaveCount(0);
+    await expectNoDocumentOverflow(page);
+  }
 });
 
 test('Projects quick creation, lifecycle, refresh, and explicit Assets exit keep one shell', async ({
@@ -292,7 +375,6 @@ test('Projects quick creation, lifecycle, refresh, and explicit Assets exit keep
   await expect(page.getByText('Draft', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Assets', exact: true }).click();
-  await page.getByRole('button', { name: 'Open Videos' }).click();
   await expect(page).toHaveURL(/\/assets\/videos$/u);
   await page.reload();
   await expect(page).toHaveURL(/\/assets\/videos$/u);
@@ -459,7 +541,6 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   await targetForm.getByRole('button', { name: 'Cancel' }).click();
 
   await page.getByRole('button', { name: 'Assets', exact: true }).click();
-  await page.getByRole('button', { name: 'Open Videos' }).click();
   const gallery = page.getByRole('dialog', { name: 'Videos' });
   await expect(gallery.getByText('No Project').first()).toBeVisible();
   await expect(gallery.getByRole('heading', { name: 'Legacy unassigned' })).toBeVisible();

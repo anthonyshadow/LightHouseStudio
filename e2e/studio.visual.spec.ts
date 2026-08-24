@@ -390,14 +390,28 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
   'assets-overview': {
     id: 'assets-overview',
     setup: async (page) => {
-      await page.goto('/assets');
-      await expect(page.getByRole('heading', { name: 'Assets' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Open Videos' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Open Voices' })).toBeVisible();
-      // Every card has resolved its size, so no skeleton is captured mid-count.
-      await expect(page.getByText(/^Counting /u)).toHaveCount(0);
+      await installProjectHarness(page, true, { includeUnassignedVideo: true });
+      await page.goto('/assets/videos');
+      const dialog = page.getByRole('dialog', { name: 'Videos' });
+      await expect(dialog.getByRole('navigation', { name: 'Asset libraries' })).toBeVisible();
+      await expect(dialog.getByRole('heading', { name: 'Legacy unassigned' })).toBeVisible();
+      // Account and server reads have settled, so no placeholder is captured mid-count or mid-grid.
+      await expect(dialog.getByText('Loading saved videos…', { exact: true })).toHaveCount(0);
       await expect(page.getByText(/Recipe/u)).toHaveCount(0);
       await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
+    },
+  },
+  'assets-filter-sheet': {
+    id: 'assets-filter-sheet',
+    setup: async (page) => {
+      await installProjectHarness(page, true, { includeUnassignedVideo: true });
+      await page.goto('/assets/videos');
+      const library = page.getByRole('dialog', { name: 'Videos' });
+      await expect(library.getByRole('heading', { name: 'Legacy unassigned' })).toBeVisible();
+      await library.getByRole('button', { name: 'Filters', exact: true }).click();
+      const filters = page.getByRole('dialog', { name: 'Filters' });
+      await expect(filters.getByRole('button', { name: 'Clear filters' })).toBeVisible();
+      await expect(filters.getByRole('button', { name: 'Show 1 video' })).toBeVisible();
     },
   },
   'studio-initial-closed': {
