@@ -317,14 +317,18 @@ describe('ProjectWorkingMediaSection', () => {
     expect(onActivityChange).toHaveBeenCalledWith({ projectId: ids.project, busy: true });
 
     act(() => resolveAdoption(response));
-    await waitFor(() => expect(session.acceptCurrent).toHaveBeenCalled());
+    // `waitFor` runs outside React's act environment, so an effect is not guaranteed to have
+    // flushed once an earlier signal resolves. Wait on the idle activity report, which is the last
+    // link in the chain — `acceptCurrent`, then the saved commit, then the effect that reports it.
+    await waitFor(() =>
+      expect(onActivityChange).toHaveBeenLastCalledWith({ projectId: ids.project, busy: false }),
+    );
     expect(session.acceptCurrent).toHaveBeenCalledWith({
       project: response.project,
       revision: response.revision,
     });
     expect(screen.getByRole('status')).toHaveTextContent('Current cut ready');
     expect(screen.getByRole('status')).toHaveTextContent('Nothing was copied');
-    expect(onActivityChange).toHaveBeenLastCalledWith({ projectId: ids.project, busy: false });
   });
 
   it('preserves a conflicting local proposal before making any adoption request', async () => {
