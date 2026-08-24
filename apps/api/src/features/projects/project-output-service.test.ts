@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createDefaultVideoEditSpec } from '@studio/domain';
 import { KeyedLock } from '../../application/keyed-lock.js';
 import { LocalAssetByteStore } from '../../storage/asset-byte-store.js';
 import { FileSavedVideoRepository } from '../saved-videos/saved-video-repository.js';
@@ -265,4 +266,58 @@ describe('ProjectOutputService local composite authority', () => {
       });
     },
   );
+
+  it('saves an adopted render whose adoption revision is no longer current', async () => {
+    const { current } = await createReadyProject();
+    const projectId = current.project.id;
+    const renderKey = randomUUID();
+    const adopted = await new ProjectWorkingMediaService(projects, savedVideos, bytes, {
+      now: () => new Date('2026-08-13T12:01:30.000Z'),
+      inspect: () => Promise.resolve(inspected),
+      projectRetention: projects,
+    }).uploadLocalRender({
+      ownerUserId,
+      projectId,
+      operationKey: renderKey,
+      expectedVersion: current.project.version,
+      expectedRevisionNumber: current.revision.revisionNumber,
+      sourcePath,
+      checksumSha256,
+      filename: 'render.mp4',
+      localEdit: createDefaultVideoEditSpec(inspected.durationMs),
+    });
+    if (!adopted.ok) throw new Error('Expected working-media adoption.');
+    const adoptedSnapshot = adopted.response.revision.snapshot;
+    const checkpointed = await new ProjectService(projects, {
+      now: () => new Date('2026-08-13T12:01:45.000Z'),
+    }).checkpoint(ownerUserId, projectId, {
+      expectedVersion: adopted.response.project.version,
+      expectedRevisionNumber: adopted.response.revision.revisionNumber,
+      proposal: {
+        workflowPhase: 'creative',
+        liveMode: adoptedSnapshot.liveMode,
+        selectedCharacter: adoptedSnapshot.selectedCharacter,
+        selectedOutfit: adoptedSnapshot.selectedOutfit,
+        selectedVoice: adoptedSnapshot.selectedVoice,
+        visualTreatment: adoptedSnapshot.visualTreatment,
+        creativeIntent: adoptedSnapshot.creativeIntent,
+        localEdit: adoptedSnapshot.localEdit,
+        exportSpecification: adoptedSnapshot.exportSpecification,
+      },
+    });
+    if (!checkpointed.ok) throw new Error('Expected Project checkpoint.');
+    const saved = await outputService().save(ownerUserId, projectId, randomUUID(), {
+      expectedVersion: checkpointed.current.project.version,
+      expectedRevisionNumber: checkpointed.current.revision.revisionNumber,
+      media: checkpointed.current.revision.snapshot.workingMedia!,
+      target: { kind: 'new', title: 'Rendered cut' },
+    });
+    expect(saved).toMatchObject({
+      ok: true,
+      response: {
+        savedVideo: { title: 'Rendered cut', currentVersion: { filename: 'render.mp4' } },
+        revision: { snapshot: { workflowPhase: 'complete' } },
+      },
+    });
+  });
 });
