@@ -33,14 +33,14 @@ import {
   EmptyStatePreview,
   LinkButton,
   ListSearchField,
-  LoadingPlaceholder,
   OverlayPanel,
   SelectField,
-  Skeleton,
   StatusNotice,
   TextField,
   useListSearch,
 } from '../../ui';
+import { LoadingPlaceholder } from '../../ui/primitives/LoadingPlaceholder';
+import { Skeleton } from '../../ui/primitives/Skeleton';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { VideoPlayer } from '../video-player/VideoPlayer';
 import { AddVideoToProjectDialog } from '../projects/AddVideoToProjectDialog';

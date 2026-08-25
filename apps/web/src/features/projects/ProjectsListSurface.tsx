@@ -6,17 +6,17 @@ import { useLocation, useNavigate } from 'react-router';
 import { projectPath, projectWorkspacePath } from '../../app/paths';
 import {
   Button,
-  CollapsedListSection,
   emptyExampleStyles,
   EmptyStatePreview,
   ListSearchField,
-  LoadingPlaceholder,
   SearchEmptyState,
   SegmentedControl,
-  Skeleton,
   StatusNotice,
   useListSearch,
 } from '../../ui';
+import { CollapsedListSection } from '../../ui/primitives/CollapsedListSection';
+import { LoadingPlaceholder } from '../../ui/primitives/LoadingPlaceholder';
+import { Skeleton } from '../../ui/primitives/Skeleton';
 import {
   NewProjectDialog,
   DeleteProjectDialog,

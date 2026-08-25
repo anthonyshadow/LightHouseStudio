@@ -7,14 +7,9 @@ import type {
 import { formatDateTime } from '@studio/domain';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
-import {
-  Button,
-  LinkButton,
-  LoadingPlaceholder,
-  OverlayPanel,
-  Skeleton,
-  StatusNotice,
-} from '../../ui';
+import { Button, LinkButton, OverlayPanel, StatusNotice } from '../../ui';
+import { LoadingPlaceholder } from '../../ui/primitives/LoadingPlaceholder';
+import { Skeleton } from '../../ui/primitives/Skeleton';
 import { exportSpecificationSummary } from '../export-placements';
 import { getProjectProcessingHistory } from './projectProcessingApi';
 import { projectProcessingCapabilityLabel } from './projectProcessingPresentation';

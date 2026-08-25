@@ -22,10 +22,10 @@ import {
   EmptyStatePreview,
   listTotalLabel,
   SegmentedControl,
-  Skeleton,
   StatusNotice,
   VisuallyHidden,
 } from '../../ui';
+import { Skeleton } from '../../ui/primitives/Skeleton';
 import { PageHeader, PageShell } from '../../ui/primitives/PageShell';
 import { useCampaignList } from '../campaigns/useCampaignsController';
 import { VIDEO_TRANSFORM_OPERATION_LABELS } from '../existing-video/videoTransformLabels';
