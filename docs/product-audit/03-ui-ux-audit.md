@@ -1,5 +1,12 @@
 # UI/UX audit
 
+> **Superseded.** This document describes the interface as it was in August 2026, before the
+> [UI/UX audit](../LightFrameUXAudit.md) and its
+> [implementation plan](../LightFrameUXImplementationPlan.md) ran to completion across all five
+> tiers. Several findings here were fixed by that work, and a few name components that no longer
+> exist. Read it as the reasoning that led to that plan, not as a description of the product. For
+> current behaviour use [`../user-flows/`](../user-flows/README.md) and the code.
+
 ## The one-line finding
 
 The interface is a faithful, careful, well-tested rendering of the domain model — and that is the

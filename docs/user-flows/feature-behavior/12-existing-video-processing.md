@@ -15,7 +15,9 @@ source, then edit either base, save, start over, or discard.
    Upload needs no camera permission, provider credentials, Decart SDK, or external traffic.
 3. Studio accepts a file picker or drop, validates browser metadata and decode, and publishes a
    playable temporary source on the Studio stage and the upload panel's accessible inline
-   player. Both expose play/pause, seek, volume, and fullscreen where supported. **Use existing
+   player. The inline player is the product's one `VideoPlayer` — the same transport the Videos
+   library preview and the Project surfaces use — with play/pause, elapsed and total time, a
+   position slider and mute. **Use existing
    video** presents a compact **Source → Edit → Review** progress indicator, a stable source
    preview, and the next action without requiring the creator to scan the whole form. The inline player
    is the sole second-video exception: it borrows source/result artifact URLs, owns no
@@ -118,9 +120,11 @@ source, then edit either base, save, start over, or discard.
    same UUID. Both states lock submission controls. **Resume accepted job** checks that UUID with
    `GET` and never repeats the potentially billable `PUT`. A new UUID is possible only after that
    lookup confirms not-found and the creator explicitly submits again.
-10. **Original** and conditional **Result** update both players. **Edit original** snapshots the
-    immutable source; **Edit result** snapshots the latest result and its inspected metadata as the
-    next frame source. If an accepted approximate-resolution result is not exactly 16:9 or 9:16,
+10. **Original** and conditional **Result** are a segmented choice that updates both players.
+    **Edit original** snapshots the immutable source; **Edit result** snapshots the latest result
+    and its inspected metadata as the next frame source. Both live in the result footer's overflow
+    menu: the footer leads with one primary — **Save to Assets** — keeps the irreversible
+    **Discard video and result** visible, and discloses the two ways of continuing to edit. If an accepted approximate-resolution result is not exactly 16:9 or 9:16,
     the next explicit Start prepares and revalidates a temporary contain-fit canonical copy without
     changing the retained or saved result. Review keeps **Save Video**, the selected edit summary,
     and the destructive action visible. Save as New is default; confirmed Replace Existing appends an immutable gallery
@@ -130,9 +134,9 @@ source, then edit either base, save, start over, or discard.
 11. Every source/result has a UUID, app-owned name, timestamp, kind, and parent lineage. Uploaded
     originals remain unchanged; recorded and all generated results pass the local H.264/AAC MP4
     gate before publication. Downloads are available only after Save, from Videos.
-12. **Start over from original** revokes generated visual and voice URLs, retains and presents the uploaded
-    original, clears the selected transformation and voice selection, and returns to **Choose your
-    edits**. The creator can choose either operation and make another explicit submission.
+12. **Start over from original**, in that same overflow menu, revokes generated visual and voice
+    URLs, retains and presents the uploaded original, clears the selected transformation and voice
+    selection, and returns to **Choose your edits**. The creator can choose either operation and make another explicit submission.
 13. Confirmed **Discard video and result** in the panel, or **Discard** in the recorded-take control bar,
     revokes the uploaded source and all generated results. The control bar returns from **Edit
     video** to **Upload Video**, and the next panel open starts at **Add a video** with

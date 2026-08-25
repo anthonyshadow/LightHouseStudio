@@ -60,9 +60,10 @@ Studio stage.
    the card without a page reload. A failed repair reports an actionable message with a retry and
    leaves the record unchanged. Listing the library issues no per-row request.
 6. Activating a ready thumbnail explicitly fetches owner-checked bytes into a centered video
-   preview over a darkened gallery. The dialog traps focus, closes with Escape, returns focus to the
-   thumbnail, and detaches its player source when closed; it owns no tracks, object URL, recorder,
-   or provider session. The dialog lists immutable Versions with ordinal, current marker, origin,
+   preview over a darkened gallery, played by the product's one `VideoPlayer` — the same transport
+   the upload panel and the Project surfaces use. The dialog traps focus, closes with Escape,
+   returns focus to the thumbnail, and detaches its player source when closed; it owns no tracks,
+   object URL, recorder, or provider session. The dialog lists immutable Versions with ordinal, current marker, origin,
    timestamp, media facts, and status. Selecting an older Version previews and downloads that exact
    content without changing the Saved Video current pointer.
 7. **Open in Studio** navigates to `/studio/:videoId`, fetches owner-checked metadata and only the

@@ -27,10 +27,11 @@ Imports point inward. `apps/web` must never import `apps/api` implementation.
 | Recording, take review, stage                                         | `apps/web/src/orchestration/{recording,session}`, `features/live-stage`, `studio/useTakeReviewFlow.ts`                                                 |
 | Upload / Character Swap / Virtual Try-On / voice on an existing video | `apps/web/src/features/existing-video`                                                                                                                 |
 | Local video editing                                                   | `apps/web/src/features/video-editor`                                                                                                                   |
+| Playing a finished or borrowed video anywhere                         | `apps/web/src/features/video-player` — one player; the live capture stage is the only exception                                                        |
 | Characters, outfits, prompts (browser-local)                          | `apps/web/src/features/{creative-assets,character-builder,character-wardrobe}`; the Characters/Outfits overlays render from `features/account-library` |
 | Saved Videos and Versions                                             | `apps/web/src/features/{saved-videos,video-gallery}`, `apps/api/src/features/saved-videos`                                                             |
 | Export placement (where the video is going) at save time              | `apps/web/src/features/export-placements`; aspects, resolutions and crop live in `packages/domain/src/projects`                                        |
-| Account details, capabilities and usage; the help explainer           | `apps/web/src/features/account`, `apps/web/src/studio/HowLightframeWorksPanel.tsx`                                                                     |
+| Account details, Settings, capabilities and usage; the help explainer | `apps/web/src/features/account`, `apps/web/src/studio/HowLightframeWorksPanel.tsx`                                                                     |
 | An HTTP endpoint                                                      | `apps/api/src/features/<area>/routes.ts`; the canonical list is `apps/api/src/route-inventory.test.ts`                                                 |
 | Business rules / invariants                                           | `packages/domain/src/<area>/rules.ts`                                                                                                                  |
 | Request/response shape                                                | `packages/contracts/src/<area>.ts`                                                                                                                     |
@@ -132,7 +133,9 @@ check as passing.
   persists, so arriving somewhere is a new history entry rather than a remount, and the same keying
   is what makes a return _within_ Studio behave like a fresh visit.
 - **Asset libraries are overlays**, not pages — they key off `location.pathname` in
-  `StudioLibraryOverlays.tsx`.
+  `StudioLibraryOverlays.tsx`. That is also why the compact bottom navigation carries four
+  destinations and not five: below `48rem` Assets is reached from the Dashboard, because a shelf
+  you open over the current surface is not a place to stand. The rail keeps all five.
 - **Route registration is conditional.** Project source/working-media/output and creative-library
   routes only exist in certain `DATABASE_MODE` configurations. `503 feature_unavailable` is a
   legitimate response; handle it.

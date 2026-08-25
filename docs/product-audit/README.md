@@ -13,6 +13,15 @@ won. Findings are separated into **confirmed** (reproduced or read in the code) 
 agreed to. The roadmap in [10](10-implementation-roadmap.md) is the exception: all fifteen of its
 steps have since been implemented on `develop`.
 
+> **Superseded for UI and UX.** [`03-ui-ux-audit.md`](03-ui-ux-audit.md) and the interface findings
+> in [`02`](02-user-flow-audit.md), [`04`](04-creative-workflow-audit.md) and
+> [`08`](08-prioritized-findings.md) describe the product before the
+> [UI/UX audit](../LightFrameUXAudit.md) and its
+> [implementation plan](../LightFrameUXImplementationPlan.md), which have since run to completion
+> across all five tiers. Where they disagree with those two documents, or with the code, they are
+> the older record. They are kept because they are the reasoning that led there — not because they
+> still describe the interface. The architecture, bug and opportunity documents are unaffected.
+
 ## Read in this order
 
 | #                                        | Document                | Answers                                                          |
