@@ -94,7 +94,7 @@ export const ExistingVideoResultSummary = ({
         <h2 id="existing-video-result-heading">Your result is ready</h2>
         <p>
           Compare Original and Result beside this summary. Save the healthy result, continue editing
-          either version, or start over from the original source. Downloads are available from Saved
+          either version, or start over from the original source. Downloads are available from
           Videos.
         </p>
       </div>

@@ -7,27 +7,19 @@ const playerStyles = (theme: Theme): CSSObject => ({
   width: '100%',
   minWidth: 0,
   display: 'grid',
+  /*
+   * The frame, not the picture, holds the 16:9 box: the transport lives inside it and the video
+   * letterboxes into what is left, so adopting the shared player did not make this card taller
+   * than the native-controls one it replaced. The player fills whatever box it is given, so the
+   * ratio belongs here rather than reaching into it.
+   */
+  aspectRatio: '16 / 9',
+  maxHeight: 'min(56vh, 30rem)',
   overflow: 'hidden',
   margin: 0,
   border: `1px solid ${theme.colors.border}`,
   borderRadius: theme.radii.medium,
   background: theme.colors.canvas,
-  /*
-   * The frame, not the picture, holds the 16:9 box: the transport lives inside it and the video
-   * letterboxes into what is left, so adopting the shared player did not make this card taller
-   * than the native-controls one it replaced.
-   */
-  '& [data-video-player]': {
-    aspectRatio: '16 / 9',
-    maxHeight: 'min(56vh, 30rem)',
-  },
-  '& video': {
-    width: '100%',
-    height: '100%',
-    display: 'block',
-    objectFit: 'contain',
-    background: theme.colors.canvas,
-  },
   '& figcaption': {
     position: 'absolute',
     width: '1px',

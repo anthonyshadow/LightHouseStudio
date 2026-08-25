@@ -27,7 +27,14 @@ export const characterBuilderPreviewActionsStyles = (theme: Theme): CSSObject =>
 export const characterBuilderFooterStyles = (theme: Theme): CSSObject => ({
   width: '100%',
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) repeat(3, auto)',
+  /*
+   * The status line takes the free column and every control gets its own after it. A track count
+   * would have to be kept in step with a footer whose buttons are conditional — and was not: four
+   * tracks held five children on step two, which wrapped Save onto its own row.
+   */
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  gridAutoFlow: 'column',
+  gridAutoColumns: 'auto',
   alignItems: 'center',
   gap: theme.space.sm,
   paddingBlockEnd: 'env(safe-area-inset-bottom)',
@@ -38,6 +45,7 @@ export const characterBuilderFooterStyles = (theme: Theme): CSSObject => ({
   },
   [media.down('tablet')]: {
     gridTemplateColumns: '1fr 1fr',
+    gridAutoFlow: 'row',
     gap: '8px',
     '& > span': { gridColumn: '1 / -1' },
     '& > button': { width: '100%' },

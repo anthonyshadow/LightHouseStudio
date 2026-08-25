@@ -9,15 +9,16 @@ import { useRouteViewState } from '../../app/useRouteViewState';
 import {
   AppIcon,
   Button,
+  CollapsedListSection,
   emptyExampleStyles,
   EmptyStatePreview,
   ListSearchField,
   listTotalLabel,
+  LoadingPlaceholder,
   SearchEmptyState,
   Skeleton,
   StatusNotice,
   useListSearch,
-  VisuallyHidden,
 } from '../../ui';
 import { pageScrollRegionStyles } from '../../ui/primitives/PageShell.styles';
 import { NewProjectDialog } from '../projects/ProjectDialogs';
@@ -89,16 +90,16 @@ const CampaignListSection = ({
    * and one word, so the page does not open with an empty container under the real work.
    */
   const collapsed = archived && search === undefined && !query.isPending && total?.count === 0;
+  // Built once rather than per placeholder card: it spreads the whole real card treatment.
+  const skeletonCardCss = campaignSkeletonCardStyles(theme);
 
   if (collapsed) {
     return (
-      <section
+      <CollapsedListSection
         css={collapsedSectionStyles(theme)}
-        aria-labelledby={`${lifecycle}-campaigns-heading`}
-      >
-        <h3 id={`${lifecycle}-campaigns-heading`}>Archived</h3>
-        <span>None yet</span>
-      </section>
+        headingId={`${lifecycle}-campaigns-heading`}
+        heading="Archived"
+      />
     );
   }
 
@@ -119,23 +120,22 @@ const CampaignListSection = ({
         </span>
       </header>
       {query.isPending ? (
-        <>
-          <VisuallyHidden role="status">Loading {lifecycle} Campaigns…</VisuallyHidden>
-          <ul css={campaignGridStyles(theme)} aria-hidden="true">
-            {Array.from({ length: 3 }, (_, index) => (
-              <li key={index}>
-                <div css={campaignSkeletonCardStyles(theme)}>
-                  <div data-campaign-identity>
-                    <Skeleton variant="poster" />
-                    <Skeleton height="1.1rem" width="72%" />
-                  </div>
-                  <Skeleton width="92%" />
-                  <Skeleton width="48%" />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </>
+        <LoadingPlaceholder
+          css={campaignGridStyles(theme)}
+          label={`Loading ${lifecycle} Campaigns…`}
+          count={3}
+        >
+          {() => (
+            <div css={skeletonCardCss}>
+              <div data-campaign-cover>
+                <Skeleton variant="poster" />
+              </div>
+              <Skeleton height="1.1rem" width="72%" />
+              <Skeleton width="92%" />
+              <Skeleton width="48%" />
+            </div>
+          )}
+        </LoadingPlaceholder>
       ) : null}
       {query.isError ? (
         <StatusNotice role="alert" tone="danger" title="Campaigns unavailable">
@@ -147,20 +147,15 @@ const CampaignListSection = ({
       ) : null}
       {!query.isPending && !query.isError && campaigns.length === 0 ? (
         <div css={emptyListStyles(theme)}>
+          {/* An empty archive returned above, so an unsearched empty list here is always active. */}
           {search === undefined ? (
             <>
-              {archived ? null : <EmptyStatePreview />}
-              <strong>{archived ? 'No archived Campaigns' : 'No Campaigns yet'}</strong>
-              <p>
-                {archived
-                  ? 'Archived Campaigns remain available here until explicitly deleted.'
-                  : 'Create a lightweight organizer, or keep using standalone Projects.'}
+              <EmptyStatePreview />
+              <strong>No Campaigns yet</strong>
+              <p>Create a lightweight organizer, or keep using standalone Projects.</p>
+              <p data-empty-example css={emptyExampleStyles(theme)}>
+                For example: a “Spring launch” Campaign holding one Project per ad placement.
               </p>
-              {archived ? null : (
-                <p data-empty-example css={emptyExampleStyles(theme)}>
-                  For example: a “Spring launch” Campaign holding one Project per ad placement.
-                </p>
-              )}
             </>
           ) : (
             <SearchEmptyState
@@ -445,21 +440,19 @@ const CampaignProjectGroup = ({
         </span>
       </header>
       {query.isPending ? (
-        <>
-          <VisuallyHidden role="status">Loading {lifecycle} Projects…</VisuallyHidden>
-          <ul aria-hidden="true">
-            {Array.from({ length: 2 }, (_, index) => (
-              <li key={index}>
-                <article>
-                  <div data-project-identity>
-                    <Skeleton variant="poster" width="min(5rem, 22vw)" />
-                    <Skeleton height="1.1rem" width="62%" />
-                  </div>
-                </article>
-              </li>
-            ))}
-          </ul>
-        </>
+        <LoadingPlaceholder label={`Loading ${lifecycle} Projects…`} count={2}>
+          {() => (
+            <article>
+              <div data-project-identity>
+                {/* Inside the real row's wrapper, so the poster width has one owner. */}
+                <span data-project-poster>
+                  <Skeleton variant="poster" />
+                </span>
+                <Skeleton height="1.1rem" width="62%" />
+              </div>
+            </article>
+          )}
+        </LoadingPlaceholder>
       ) : null}
       {query.isError ? (
         <StatusNotice role="alert" tone="danger" title="Projects unavailable">

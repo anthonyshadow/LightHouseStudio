@@ -96,7 +96,6 @@ export const VideoPlayer = ({
 
   return (
     <div
-      data-video-player=""
       css={{
         width: '100%',
         height: '100%',
@@ -109,7 +108,7 @@ export const VideoPlayer = ({
         background: theme.colors.canvas,
       }}
     >
-      <div css={{ minWidth: 0, minHeight: 0, placeItems: 'center' }}>
+      <div css={{ display: 'grid', minWidth: 0, minHeight: 0, placeItems: 'center' }}>
         {/* Saved local videos may not include a captions track. */}
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
         <video
@@ -135,8 +134,8 @@ export const VideoPlayer = ({
             syncTimeline();
           }}
           onVolumeChange={() => setMuted(videoRef.current?.muted ?? false)}
-          {...(onLoadedData ? { onLoadedData } : {})}
-          {...(onError ? { onError } : {})}
+          onLoadedData={onLoadedData}
+          onError={onError}
         />
       </div>
 

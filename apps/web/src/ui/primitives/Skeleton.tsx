@@ -5,7 +5,7 @@ import { keyframes, useTheme, type CSSObject, type Theme } from '@emotion/react'
  * them into the two list shapes this product actually repeats, so a surface that shows a list of
  * posters with two lines of copy does not have to redraw that arrangement itself.
  */
-export type SkeletonVariant = 'line' | 'poster' | 'row' | 'card';
+type SkeletonVariant = 'line' | 'poster' | 'row' | 'card';
 
 const skeletonPulse = keyframes({
   '0%, 100%': { opacity: 0.48 },
@@ -86,8 +86,6 @@ interface SkeletonProps {
   readonly width?: string;
   /** Overrides the atom's height, for a line standing in for a heading rather than body copy. */
   readonly height?: string;
-  /** Emotion passes the `css` prop through here, so a surface can pin the exact row geometry. */
-  readonly className?: string;
 }
 
 /**
@@ -96,14 +94,13 @@ interface SkeletonProps {
  * that says a load is in progress, and a screen reader should hear that sentence once rather than
  * a shape per row.
  */
-export const Skeleton = ({ variant = 'line', width, height, className }: SkeletonProps) => {
+export const Skeleton = ({ variant = 'line', width, height }: SkeletonProps) => {
   const theme = useTheme();
   const composite = variant === 'row' || variant === 'card';
   return (
     <span
       aria-hidden="true"
       data-skeleton={variant}
-      className={className}
       css={[variantStyles(theme, variant), { width, height }]}
     >
       {composite ? (

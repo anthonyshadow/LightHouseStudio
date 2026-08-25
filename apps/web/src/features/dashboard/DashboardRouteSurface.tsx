@@ -640,11 +640,16 @@ export const DashboardRouteSurface = ({
               </StatusNotice>
             ))}
 
+            {/*
+              The skeleton list is hand-written rather than `LoadingPlaceholder`, which announces
+              the load itself: this section already owns a polite region — the recent count beside
+              its heading — and a second one would say the same thing twice.
+            */}
             {visibleLoading ? (
               <ul css={recentSkeletonStyles(theme)} aria-hidden="true">
                 {Array.from({ length: RECENT_LIMIT }, (_, index) => (
                   <li key={index}>
-                    <Skeleton variant="poster" />
+                    <Skeleton />
                     <Skeleton />
                     <Skeleton />
                   </li>

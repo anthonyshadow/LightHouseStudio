@@ -95,7 +95,7 @@ describe('ShellLifecycleDialogs', () => {
     );
 
     const notice = screen.getByRole('dialog', { name: 'Your session ended' });
-    expect(notice).toHaveTextContent('The current temporary take');
+    expect(notice).toHaveTextContent('Anything you have not saved is discarded');
     expect(notice).toHaveTextContent('Unsaved Project changes cannot be saved without a session');
     // There is no session left to stay in, so a cancel affordance would be a false promise.
     expect(screen.queryByRole('button', { name: /Stay/u })).not.toBeInTheDocument();

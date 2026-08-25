@@ -1,6 +1,7 @@
 import { lazy, Suspense, type RefObject } from 'react';
 import type { useStudioLogoutController } from '../../studio/useStudioLogoutController';
 import type { useStudioSessionExpiryController } from '../../studio/useStudioSessionExpiryController';
+import { UNSAVED_WORK_DISCARD_NOTICE } from '../../studio/sessionNotices';
 import {
   Button,
   ConfirmationRequestDialog,
@@ -77,7 +78,7 @@ export const ShellLifecycleDialogs = ({
             ? 'Cleanup and sign-out did not complete. Lightframe kept you in Studio so you can retry without silently abandoning the session.'
             : logout.hasProjectProposal
               ? 'Project saving did not complete. Logging out now explicitly discards the preserved local proposal plus any temporary media or library work. Autosaved Project changes remain available.'
-              : 'Logging out stops your camera and microphone and discards anything you have not saved, including the current take. Everything you have already saved stays in your account.'
+              : `Logging out stops your camera and microphone. ${UNSAVED_WORK_DISCARD_NOTICE}`
         }
         alert={logout.failure ?? undefined}
         confirmLabel={

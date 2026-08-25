@@ -73,14 +73,13 @@ export const campaignCardStyles = (theme: Theme): CSSObject => ({
 });
 
 /**
- * The card placeholder keeps the real card's box and cover geometry, so the grid does not reflow
- * when the Campaigns land.
+ * The card placeholder is the real card, laid out from the top: it renders the same
+ * `[data-campaign-cover]` wrapper, so the cover's width stays declared once, in `campaignCardStyles`.
  */
 export const campaignSkeletonCardStyles = (theme: Theme): CSSObject => ({
   ...campaignCardStyles(theme),
   alignContent: 'start',
   gap: theme.space.md,
-  '& [data-skeleton="poster"]': { width: 'min(4.5rem, 20vw)' },
 });
 
 export const projectGroupStyles = (theme: Theme): CSSObject => ({
@@ -144,14 +143,10 @@ export const listSectionStyles = (theme: Theme): CSSObject => ({
   '& header span': { color: theme.colors.textFaint, fontSize: theme.fontSizes.caption },
 });
 
-/** A section with nothing in it and nothing being looked for: a heading and one word. */
+/** The collapsed archive's own spacing and type; `CollapsedListSection` owns its arrangement. */
 export const collapsedSectionStyles = (theme: Theme): CSSObject => ({
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'baseline',
-  gap: theme.space.sm,
   paddingBlockStart: theme.space.lg,
-  '& h3': { margin: 0, fontSize: theme.fontSizes.section },
+  '& h3': { fontSize: theme.fontSizes.section },
   '& span': { color: theme.colors.textFaint, fontSize: theme.fontSizes.caption },
 });
 

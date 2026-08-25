@@ -1,5 +1,6 @@
 import type { RefObject } from 'react';
 import { Button, OverlayPanel } from '../ui';
+import { UNSAVED_WORK_DISCARD_NOTICE } from './sessionNotices';
 
 interface SessionExpiryNoticeProps {
   readonly open: boolean;
@@ -44,7 +45,7 @@ export const SessionExpiryNotice = ({
     <p>
       {activeWork
         ? 'The recording, render, or provider processing running now will stop. Anything already saved to your account is unaffected.'
-        : 'The current temporary take, active Voice work, unsaved video edits, and unsaved creative settings will be discarded. Saved account items and browser-local libraries remain available.'}
+        : UNSAVED_WORK_DISCARD_NOTICE}
     </p>
     {projectProposal ? (
       <p>Unsaved Project changes cannot be saved without a session and will be discarded.</p>

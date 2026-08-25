@@ -576,6 +576,18 @@ export const mainGridStyles = (
   },
 });
 
+/*
+ * The stage is the work, so the two columns beside it are sized to their content rather than to a
+ * comfortable band: the tool rail holds three labelled buttons, and a collapsed capture column
+ * holds two device rows and a control. Every rem taken back here is width the 16:9 frame can use,
+ * and width is what binds it — the column is far taller than 16:9 of itself.
+ *
+ * Named because three layout branches must agree on them.
+ */
+const STUDIO_COLUMNS = 'minmax(10.5rem, 13rem) minmax(0, 1fr) minmax(16rem, 18rem)';
+const STUDIO_COLUMNS_CAPTURE_COLLAPSED =
+  'minmax(10.5rem, 13rem) minmax(0, 1fr) minmax(10rem, 11.5rem)';
+
 export const stageColumnStyles = (theme: Theme): CSSObject => ({
   position: 'relative',
   isolation: 'isolate',
@@ -645,7 +657,6 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
         padding: `${theme.space.xxs} ${theme.space.sm}`,
         whiteSpace: 'nowrap',
       },
-      '& > span': { display: 'none' },
     },
     '&[data-video-edit-active="true"]': {
       gridTemplateRows: 'minmax(8rem, 1fr) 3.15rem minmax(11rem, 38vh)',
@@ -697,13 +708,7 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
     },
   },
   [media.up('laptop')]: {
-    /*
-     * The stage is the work, so the two columns beside it are sized to their content rather than
-     * to a comfortable band: the tool rail holds three labelled buttons, and a collapsed capture
-     * column holds two device rows and a control. Every rem taken back here is width the 16:9
-     * frame can use, and width is what binds it — the column is far taller than 16:9 of itself.
-     */
-    gridTemplateColumns: 'minmax(10.5rem, 13rem) minmax(0, 1fr) minmax(16rem, 18rem)',
+    gridTemplateColumns: STUDIO_COLUMNS,
     gridTemplateRows: 'minmax(0, 1fr)',
     gap: theme.space.md,
     '& > [data-media-stage-layout]': { gridColumn: 2, gridRow: 1 },
@@ -716,7 +721,7 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
      * the operator just clicked.
      */
     '&[data-capture-settings="collapsed"]': {
-      gridTemplateColumns: 'minmax(10.5rem, 13rem) minmax(0, 1fr) minmax(10rem, 11.5rem)',
+      gridTemplateColumns: STUDIO_COLUMNS_CAPTURE_COLLAPSED,
     },
     '&[data-video-edit-active="true"]': {
       gridTemplateRows: 'minmax(0, 1fr)',
@@ -729,7 +734,7 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
       '& > [data-studio-tool-rail]': { gridColumn: 1, gridRow: 2 },
       '&[data-video-edit-active="true"]': {
         gridTemplateRows: 'minmax(0, 1fr)',
-        gridTemplateColumns: 'minmax(10.5rem, 13rem) minmax(0, 1fr) minmax(16rem, 18rem)',
+        gridTemplateColumns: STUDIO_COLUMNS,
         '& > [data-media-stage-layout]': { gridColumn: 2, gridRow: 1 },
         '& > [data-studio-tool-rail]': { gridColumn: 1, gridRow: 1 },
         '& > [data-capture-controls]': { gridColumn: 3, gridRow: 1 },
@@ -813,27 +818,8 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
   // A blocked tool trades its description for the condition it is waiting on, which is a sentence
   // rather than a label: two clamped lines fit the button, and `title` carries the rest.
   '& [data-tool-label] small[data-tool-blocked]': { opacity: 0.9 },
-  '& > span': {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: theme.space.xs,
-    minWidth: 0,
-    marginInlineStart: 'auto',
-    color: theme.colors.textFaint,
-    fontSize: '0.7rem',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  '& > span svg': {
-    width: '0.95rem',
-    height: '0.95rem',
-    flex: '0 0 auto',
-    color: theme.colors.accent,
-  },
   [media.downOrShort('desktop', '48rem')]: {
     '& > button': { flex: '1 1 0', justifyContent: 'center' },
-    '& > span': { display: 'none' },
   },
   [media.downOrShort('tablet', '36rem')]: {
     gap: '0.3rem',
@@ -904,14 +890,6 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
       whiteSpace: 'normal',
       lineHeight: 1.25,
     },
-    '& > span': {
-      alignItems: 'flex-start',
-      marginBlockStart: 'auto',
-      marginInlineStart: 0,
-      padding: theme.space.xs,
-      overflow: 'visible',
-      whiteSpace: 'normal',
-    },
   },
   [`${media.up('laptop')} and (max-height: 48rem)`]: {
     gap: theme.space.xs,
@@ -921,6 +899,5 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
       minHeight: '3.55rem',
       padding: theme.space.xs,
     },
-    '& > span': { display: 'none' },
   },
 });

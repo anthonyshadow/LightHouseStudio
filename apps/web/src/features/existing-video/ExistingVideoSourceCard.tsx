@@ -3,7 +3,6 @@ import type { RefObject } from 'react';
 import { Button, SegmentedControl } from '../../ui';
 import { formatBytes, formatDuration } from '../recording';
 import {
-  comparisonStyles,
   metadataStyles,
   sourceCardStyles,
   sourceDetailsStyles,
@@ -68,17 +67,15 @@ export const ExistingVideoSourceCard = ({
       </header>
 
       {workflow.result ? (
-        <div css={comparisonStyles()}>
-          <SegmentedControl
-            columns={COMPARISON_OPTIONS.length}
-            label="Compare original and result"
-            value={workflow.comparison}
-            options={COMPARISON_OPTIONS}
-            onChange={(next) =>
-              next === 'original' ? workflow.showOriginal() : workflow.showResult()
-            }
-          />
-        </div>
+        <SegmentedControl
+          columns={COMPARISON_OPTIONS.length}
+          label="Compare original and result"
+          value={workflow.comparison}
+          options={COMPARISON_OPTIONS}
+          onChange={(next) =>
+            next === 'original' ? workflow.showOriginal() : workflow.showResult()
+          }
+        />
       ) : null}
 
       <div css={sourceFactsStyles(theme)} aria-label="Video summary">

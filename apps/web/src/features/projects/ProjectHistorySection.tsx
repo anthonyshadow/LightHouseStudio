@@ -1,4 +1,4 @@
-import { useTheme, type CSSObject } from '@emotion/react';
+import { useTheme } from '@emotion/react';
 import type {
   AdoptProjectWorkingMediaRequest,
   ProjectCurrentResponse,
@@ -7,7 +7,14 @@ import type {
 import { formatDateTime } from '@studio/domain';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef, useState } from 'react';
-import { Button, LinkButton, OverlayPanel, Skeleton, StatusNotice, VisuallyHidden } from '../../ui';
+import {
+  Button,
+  LinkButton,
+  LoadingPlaceholder,
+  OverlayPanel,
+  Skeleton,
+  StatusNotice,
+} from '../../ui';
 import { exportSpecificationSummary } from '../export-placements';
 import { getProjectProcessingHistory } from './projectProcessingApi';
 import { projectProcessingCapabilityLabel } from './projectProcessingPresentation';
@@ -38,25 +45,6 @@ const historyListStyles = {
   display: 'grid',
   gap: '0.65rem',
 } as const;
-
-/**
- * Each history group loads independently, so each states its own load once and draws the entries
- * it is about to show. The placeholders are hidden; the sentence is not visible, because the
- * placeholders already say the same thing to anyone who can see them.
- */
-const HistoryLoading = ({ label, itemCss }: { label: string; itemCss: CSSObject }) => (
-  <>
-    <VisuallyHidden role="status">{label}</VisuallyHidden>
-    <ul css={historyListStyles} aria-hidden="true">
-      {Array.from({ length: 2 }, (_, index) => (
-        <li key={index} css={itemCss}>
-          <Skeleton width="56%" height="1rem" />
-          <Skeleton width="84%" />
-        </li>
-      ))}
-    </ul>
-  </>
-);
 
 export const ProjectHistorySection = ({
   current,
@@ -209,7 +197,18 @@ export const ProjectHistorySection = ({
       <div css={groupStyles}>
         <h4>Saved video Versions</h4>
         {outputs.isPending ? (
-          <HistoryLoading label="Loading saved video Versions…" itemCss={itemStyles} />
+          <LoadingPlaceholder
+            css={historyListStyles}
+            label="Loading saved video Versions…"
+            count={2}
+          >
+            {() => (
+              <span css={itemStyles}>
+                <Skeleton width="56%" height="1rem" />
+                <Skeleton width="84%" />
+              </span>
+            )}
+          </LoadingPlaceholder>
         ) : null}
         {outputs.isError ? (
           <StatusNotice role="alert" tone="danger">
@@ -315,7 +314,14 @@ export const ProjectHistorySection = ({
       <div css={groupStyles}>
         <h4>Processing attempts and results</h4>
         {processing.isPending ? (
-          <HistoryLoading label="Loading processing history…" itemCss={itemStyles} />
+          <LoadingPlaceholder css={historyListStyles} label="Loading processing history…" count={2}>
+            {() => (
+              <span css={itemStyles}>
+                <Skeleton width="56%" height="1rem" />
+                <Skeleton width="84%" />
+              </span>
+            )}
+          </LoadingPlaceholder>
         ) : null}
         {processing.isError ? (
           <StatusNotice role="alert" tone="warning">
@@ -377,7 +383,14 @@ export const ProjectHistorySection = ({
       <div css={groupStyles}>
         <h4>Project changes</h4>
         {revisions.isPending ? (
-          <HistoryLoading label="Loading Project changes…" itemCss={itemStyles} />
+          <LoadingPlaceholder css={historyListStyles} label="Loading Project changes…" count={2}>
+            {() => (
+              <span css={itemStyles}>
+                <Skeleton width="56%" height="1rem" />
+                <Skeleton width="84%" />
+              </span>
+            )}
+          </LoadingPlaceholder>
         ) : null}
         {revisions.isError ? (
           <StatusNotice role="alert" tone="danger">

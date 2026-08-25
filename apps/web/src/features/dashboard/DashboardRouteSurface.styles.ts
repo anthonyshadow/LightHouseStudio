@@ -334,11 +334,13 @@ export const recentSkeletonStyles = (theme: Theme): CSSObject => ({
     ...recentRowGeometry(theme),
     borderBlockEnd: `1px solid ${theme.colors.divider}`,
   },
-  '& [data-skeleton="poster"]': { width: '100%', aspectRatio: 'auto', height: '3.25rem' },
-  '& [data-skeleton="line"]:last-of-type': { width: '62%' },
+  // The poster's stand-in is a block of the right size, not a `poster` whose aspect ratio this
+  // would then have to cancel from outside: the row gives it a fixed column, not a 16:9 box.
+  '& [data-skeleton]:first-of-type': { height: '3.25rem' },
+  '& [data-skeleton]:last-of-type': { width: '62%' },
   [media.up('tablet')]: {
     '& li': { gridTemplateColumns: '6rem minmax(0, 1fr) 5.5rem' },
-    '& [data-skeleton="poster"]': { height: '3.75rem' },
+    '& [data-skeleton]:first-of-type': { height: '3.75rem' },
   },
 });
 
