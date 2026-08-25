@@ -2,6 +2,7 @@ import { useTheme } from '@emotion/react';
 import type { RefObject } from 'react';
 import type { VideoProcessingOperationCapability } from '@studio/contracts';
 import { Button } from '../../ui';
+import { ActionMenu } from '../../ui/primitives/ActionMenu';
 import type { ProjectProcessingController } from '../projects/useProjectProcessingController';
 import { SavedVideoSuccessActions } from '../saved-videos/SavedVideoSuccessActions';
 import type { SaveVideoState } from '../saved-videos/useSaveVideo';
@@ -115,6 +116,11 @@ export const ExistingVideoActionBar = ({
               : 'Compare Original and Result, then save or continue editing.'}
           </span>
         </div>
+        {/*
+         * One first read, as at take review: saving leads, discarding stays visible because it is
+         * irreversible, and the two ways of continuing to edit are disclosed rather than competing
+         * with the save.
+         */}
         <div css={actionButtonsStyles(theme)}>
           {workflow.result && onSaveVideo ? (
             <Button
@@ -126,15 +132,25 @@ export const ExistingVideoActionBar = ({
               {saving ? 'Saving…' : saved ? 'Saved to Assets' : 'Save to Assets'}
             </Button>
           ) : null}
-          <Button variant="secondary" onClick={onEditSelected}>
-            Edit {workflow.comparison}
-          </Button>
-          <Button variant="secondary" onClick={onStartOver}>
-            Start over from original
-          </Button>
           <Button ref={discardButtonRef} variant="danger" onClick={onRequestDiscard}>
             Discard video and result
           </Button>
+          <ActionMenu
+            label="More actions for this result"
+            placement="above"
+            items={[
+              {
+                id: 'edit',
+                label: `Edit ${workflow.comparison}`,
+                onSelect: () => onEditSelected(),
+              },
+              {
+                id: 'start-over',
+                label: 'Start over from original',
+                onSelect: () => onStartOver(),
+              },
+            ]}
+          />
         </div>
         {savedVideo && onOpenSavedVideosLibrary ? (
           <SavedVideoSuccessActions video={savedVideo} onOpenInAssets={onOpenSavedVideosLibrary} />
