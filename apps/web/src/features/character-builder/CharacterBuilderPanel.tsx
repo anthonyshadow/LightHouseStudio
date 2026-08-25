@@ -127,13 +127,6 @@ const buildReferenceGenerationDisclosure = ({
   return `${optimizerContact}${provider}${model} creates the image. This may use provider credits. The result is stored in your local data directory. Upload and Save without generation do not contact image or optimizer providers.`;
 };
 
-const characterSaveLabel = (state: CharacterBuilderState): string => {
-  if (!state.preview?.stale) return 'Save Character';
-  return state.uploadedReference
-    ? 'Save Character (uploaded image)'
-    : 'Save Character (prompt only)';
-};
-
 export const CharacterBuilderPanel = ({
   open,
   state,
@@ -178,8 +171,7 @@ export const CharacterBuilderPanel = ({
   const resetButtonRef = useRef<HTMLButtonElement>(null);
   const regenerateButtonRef = useRef<HTMLButtonElement>(null);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
-  const imageOnlySaveButtonRef = useRef<HTMLButtonElement>(null);
-  const [namingMode, setNamingMode] = useState<'default' | 'image-only' | null>(null);
+  const [namingOpen, setNamingOpen] = useState(false);
   const [activeStep, setActiveStep] = useState<CharacterBuilderStep>(1);
   const status = operationLabel(state);
   const generationBusy = isGenerationBusy(state);
@@ -197,7 +189,6 @@ export const CharacterBuilderPanel = ({
   const uploadedReference = state.uploadedReference;
   const previewCapabilityAvailable = generationAvailable && (!uploadedReference || editAvailable);
   const heroReference = state.preview?.asset ?? uploadedReference?.asset ?? null;
-  const saveLabel = characterSaveLabel(state);
   const referenceGenerationDisclosure = buildReferenceGenerationDisclosure({
     generationAvailable,
     referenceImageProvider,
@@ -210,7 +201,7 @@ export const CharacterBuilderPanel = ({
       <OverlayPanel
         open={open}
         onClose={() => {
-          setNamingMode(null);
+          setNamingOpen(false);
           setActiveStep(1);
           onClose();
         }}
@@ -254,19 +245,20 @@ export const CharacterBuilderPanel = ({
             </span>
             <Button
               ref={resetButtonRef}
-              variant="quiet"
+              variant="link"
               disabled={operationLocked || state.phase === 'restoring' || resetBusy}
               onClick={onRequestReset}
             >
               Reset Draft
             </Button>
-            <Button
-              variant="secondary"
-              disabled={activeStep === 1}
-              onClick={() => setActiveStep((step) => (step === 3 ? 2 : 1))}
-            >
-              Back
-            </Button>
+            {activeStep > 1 ? (
+              <Button
+                variant="secondary"
+                onClick={() => setActiveStep((step) => (step === 3 ? 2 : 1))}
+              >
+                Back
+              </Button>
+            ) : null}
             {activeStep < 3 ? (
               <Button
                 variant="primary"
@@ -275,39 +267,30 @@ export const CharacterBuilderPanel = ({
                 Continue
               </Button>
             ) : null}
-            {uploadedReference ? (
-              <Button
-                ref={imageOnlySaveButtonRef}
-                variant="secondary"
-                busy={saving}
-                disabled={
-                  !canSaveImageOnly || state.uploadPending || generationBusy || operationLocked
-                }
-                aria-disabled={Boolean(saveBlockedReason) || undefined}
-                aria-describedby={
-                  saveBlockedReason ? 'character-builder-save-blocked-reason' : undefined
-                }
-                onClick={() => {
-                  if (!saveBlockedReason) setNamingMode('image-only');
-                }}
-              >
-                Save &amp; Use Image Only
-              </Button>
-            ) : null}
+            {/*
+             * One save. What a save produces — the described character, or the uploaded image on
+             * its own — is a choice inside naming, where the two options can be explained, rather
+             * than two buttons whose labels never said how they differed.
+             */}
             <Button
               ref={saveButtonRef}
               variant={activeStep === 3 ? 'primary' : 'quiet'}
               busy={saving}
-              disabled={!canSave || state.uploadPending || generationBusy || operationLocked}
+              disabled={
+                (!canSave && !canSaveImageOnly) ||
+                state.uploadPending ||
+                generationBusy ||
+                operationLocked
+              }
               aria-disabled={Boolean(saveBlockedReason) || undefined}
               aria-describedby={
                 saveBlockedReason ? 'character-builder-save-blocked-reason' : undefined
               }
               onClick={() => {
-                if (!saveBlockedReason) setNamingMode('default');
+                if (!saveBlockedReason) setNamingOpen(true);
               }}
             >
-              {editingCharacterName ? 'Save Changes' : saveLabel}
+              {editingCharacterName ? 'Save Changes' : 'Save Character'}
             </Button>
           </div>
         }
@@ -453,23 +436,19 @@ export const CharacterBuilderPanel = ({
       </OverlayPanel>
 
       <CharacterNameDialog
-        key={`${namingMode ?? 'closed'}:${characterNameLocked ? 'locked' : 'editable'}`}
-        open={open && namingMode !== null}
-        initialName={
-          namingMode === 'image-only' ? suggestedImageOnlyCharacterName : suggestedCharacterName
-        }
-        imageOnly={namingMode === 'image-only'}
-        retainsReferenceAsset={Boolean(
-          namingMode === 'image-only' || previewIsUsable || uploadedReference,
-        )}
+        key={`${namingOpen ? 'open' : 'closed'}:${characterNameLocked ? 'locked' : 'editable'}`}
+        open={open && namingOpen}
+        initialName={canSave ? suggestedCharacterName : suggestedImageOnlyCharacterName}
+        imageOnlyInitialName={suggestedImageOnlyCharacterName}
+        canSaveUploadedImageOnly={canSaveImageOnly && canSave}
+        retainsReferenceAsset={Boolean(previewIsUsable || uploadedReference)}
         locked={characterNameLocked}
-        returnFocusRef={namingMode === 'image-only' ? imageOnlySaveButtonRef : saveButtonRef}
-        onCancel={() => setNamingMode(null)}
-        onSubmit={(name) => {
-          const requestedMode = namingMode;
-          setNamingMode(null);
-          if (requestedMode === 'image-only') onSaveImageOnly(name);
-          else if (requestedMode === 'default') onSave(name);
+        returnFocusRef={saveButtonRef}
+        onCancel={() => setNamingOpen(false)}
+        onSubmit={(name, mode) => {
+          setNamingOpen(false);
+          if (mode === 'image-only' || !canSave) onSaveImageOnly(name);
+          else onSave(name);
         }}
       />
 

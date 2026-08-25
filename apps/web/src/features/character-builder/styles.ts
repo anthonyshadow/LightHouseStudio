@@ -27,7 +27,7 @@ export const characterBuilderPreviewActionsStyles = (theme: Theme): CSSObject =>
 export const characterBuilderFooterStyles = (theme: Theme): CSSObject => ({
   width: '100%',
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) repeat(5, auto)',
+  gridTemplateColumns: 'minmax(0, 1fr) repeat(3, auto)',
   alignItems: 'center',
   gap: theme.space.sm,
   paddingBlockEnd: 'env(safe-area-inset-bottom)',
