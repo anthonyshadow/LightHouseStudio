@@ -980,8 +980,8 @@ describe('StudioApp composition lifecycle', () => {
     harness.getSavedVideo.mockRejectedValueOnce(new Error('private upstream detail'));
     const { router } = renderStudio(undefined, `/studio/${directVideoId}`);
 
-    expect(await screen.findByLabelText('Saved Video unavailable')).toHaveTextContent(
-      'The Saved Video could not be loaded safely. Your Assets are unchanged.',
+    expect(await screen.findByLabelText('Video unavailable')).toHaveTextContent(
+      'That video could not be loaded safely. Your Assets are unchanged.',
     );
     expect(screen.queryByText('private upstream detail')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Back to Assets' }));

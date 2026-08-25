@@ -23,9 +23,9 @@ const ENTITLEMENT_LABELS = {
   'virtual-try-on': 'Virtual Try-On',
   'voice-effects': 'Voice effects',
   'video-editor': 'Video editor',
-  'saved-characters': 'Saved Characters',
-  'saved-outfits': 'Saved Outfits',
-  'saved-videos': 'Saved Videos',
+  'saved-characters': 'Characters',
+  'saved-outfits': 'Outfits',
+  'saved-videos': 'Videos',
 } as const;
 
 const limitLabel = (value: number | null): string => (value === null ? 'No limit' : String(value));
@@ -175,15 +175,15 @@ export const AccountPanel = ({
           </ul>
           <dl>
             <div>
-              <dt>Saved Videos limit</dt>
+              <dt>Videos limit</dt>
               <dd>{limitLabel(entitlements.limits.maximumSavedVideos)}</dd>
             </div>
             <div>
-              <dt>Saved Characters limit</dt>
+              <dt>Characters limit</dt>
               <dd>{limitLabel(entitlements.limits.maximumSavedCharacters)}</dd>
             </div>
             <div>
-              <dt>Saved Outfits limit</dt>
+              <dt>Outfits limit</dt>
               <dd>{limitLabel(entitlements.limits.maximumSavedOutfits)}</dd>
             </div>
             <div>

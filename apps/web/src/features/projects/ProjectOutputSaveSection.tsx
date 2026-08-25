@@ -477,7 +477,7 @@ export const ProjectOutputSaveSection = ({
                 onSelect={setAppendTarget}
                 emptyTitle="No version targets yet"
                 emptyBody="Choose New video above to create your first library video."
-                listLabel="Saved Videos available as a new Version target"
+                listLabel="Videos available as a new Version target"
               />
             </div>
           ) : null}

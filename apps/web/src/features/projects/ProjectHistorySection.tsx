@@ -234,7 +234,7 @@ export const ProjectHistorySection = ({
                 <strong>
                   {item.savedVideo.title} · Version {item.version.ordinal}
                   {item.savedVideo.currentVersionId === item.version.id
-                    ? ' · Current in Saved Videos'
+                    ? ' · Current in Videos'
                     : ''}
                 </strong>
                 <span>
@@ -480,7 +480,7 @@ export const ProjectHistorySection = ({
               Version {preview.version.ordinal} · {preview.version.origin} · {preview.version.width}
               ×{preview.version.height} · {formatDateTime(preview.version.createdAt)}
               {preview.savedVideo.currentVersionId === preview.version.id
-                ? ' · Current in Saved Videos'
+                ? ' · Current in Videos'
                 : ' · Older Version'}
             </p>
           </div>

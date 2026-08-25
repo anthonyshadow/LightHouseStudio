@@ -545,7 +545,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   ).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Project changes' })).toBeVisible();
   await expect(olderVersion).toContainText('Saved at change 2');
-  await expect(versionHistory).toContainText('Version 2 · Current in Saved Videos');
+  await expect(versionHistory).toContainText('Version 2 · Current in Videos');
 
   const [firstDownload] = await Promise.all([
     page.waitForEvent('download'),
@@ -942,7 +942,7 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   await openProjectTask(page, 'History');
   const history = page.getByRole('list', { name: 'Saved video Version history' });
   const firstVersion = history.getByRole('listitem').filter({ hasText: 'Version 1' });
-  await expect(history).toContainText('Version 2 · Current in Saved Videos');
+  await expect(history).toContainText('Version 2 · Current in Videos');
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     firstVersion.getByRole('link', { name: 'Download Campaign master, Version 1' }).click(),

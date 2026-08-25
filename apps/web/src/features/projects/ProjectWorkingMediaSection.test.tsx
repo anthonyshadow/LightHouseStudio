@@ -251,7 +251,7 @@ const selectSavedVideo = async () => {
   const choice = await screen.findByRole('button', { name: /Retained master/u });
   await user.click(choice);
   await waitFor(() =>
-    expect(screen.queryByRole('dialog', { name: 'Use Saved Video' })).not.toBeInTheDocument(),
+    expect(screen.queryByRole('dialog', { name: 'Use a saved video' })).not.toBeInTheDocument(),
   );
 };
 

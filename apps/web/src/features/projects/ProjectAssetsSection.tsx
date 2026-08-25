@@ -95,7 +95,7 @@ const labelForMembership = (
             ? savedVideoThumbnailUrl(video.id, video.currentVersion.id)
             : null,
         }
-      : { label: 'Saved Video unavailable', unavailable: true, thumbnailUrl: null };
+      : { label: 'Video unavailable', unavailable: true, thumbnailUrl: null };
   }
   if (membership.kind === 'character') {
     const character = store?.savedCharacterPrompts.find(({ id }) => id === membership.resourceId);
@@ -169,8 +169,8 @@ const ProjectVideoPreview = ({
     <OverlayPanel
       open
       onClose={onClose}
-      title={detail?.title ?? 'Saved Video preview'}
-      description="Preview the current Saved Video Version without leaving this Project."
+      title={detail?.title ?? 'Video preview'}
+      description="Preview the current Version without leaving this Project."
       placement="fullscreen"
       size="wide"
       height="tall"
@@ -199,9 +199,9 @@ const ProjectVideoPreview = ({
         ) : null
       }
     >
-      {loading ? <p role="status">Loading Saved Video…</p> : null}
+      {loading ? <p role="status">Loading video…</p> : null}
       {error ? (
-        <StatusNotice role="alert" tone="danger" title="Saved Video unavailable">
+        <StatusNotice role="alert" tone="danger" title="Video unavailable">
           {error}
         </StatusNotice>
       ) : null}
@@ -511,9 +511,9 @@ export const ProjectAssetsSection = ({
         returnFocusRef={addTriggerRef}
         onClose={() => setPicker(null)}
         onSelect={(video) => void attach('video', video.id)}
-        title="Import Saved Video"
+        title="Import a saved video"
         description="Adds this video to the Project without replacing its original video."
-        listLabel="Saved Videos available to attach to this Project"
+        listLabel="Videos available to attach to this Project"
       />
       <OverlayPanel
         open={picker === 'character' || picker === 'outfit'}
@@ -578,7 +578,7 @@ export const ProjectAssetsSection = ({
         placement="right"
         returnFocusRef={addTriggerRef}
       >
-        <Button onClick={() => setPicker('video-existing')}>Import Saved Video</Button>
+        <Button onClick={() => setPicker('video-existing')}>Import a saved video</Button>
         <Button onClick={() => void navigate(studioCreatePath({ intent: 'record', projectId }))}>
           Record Video
         </Button>
