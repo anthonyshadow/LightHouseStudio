@@ -10,6 +10,7 @@ import {
   EmptyStatePreview,
   ListSearchField,
   SearchEmptyState,
+  SegmentedControl,
   Skeleton,
   StatusNotice,
   useListSearch,
@@ -59,6 +60,13 @@ interface ProjectListSectionProps {
   ) => void;
   readonly onDelete: (project: ProjectContract, trigger: HTMLButtonElement | null) => void;
 }
+
+type ProjectGroup = 'all' | 'none';
+
+const PROJECT_GROUP_OPTIONS = [
+  { value: 'all', label: 'All Active' },
+  { value: 'none', label: 'No Campaign' },
+] as const satisfies readonly { value: ProjectGroup; label: string }[];
 
 const ProjectListSection = ({
   lifecycle,
@@ -258,7 +266,7 @@ export const ProjectsListSurface = () => {
   const [deleteProject, setDeleteProject] = useState<ProjectContract | null>(null);
   const [duplicateProject, setDuplicateProject] = useState<ProjectContract | null>(null);
   const [announcement, setAnnouncement] = useState<string | null>(null);
-  const [activeGroup, setActiveGroup] = useState<'all' | 'none'>('all');
+  const [activeGroup, setActiveGroup] = useState<ProjectGroup>('all');
   const [creating, setCreating] = useState(false);
   const search = useListSearch();
   const routeCreateRequested =
@@ -345,23 +353,14 @@ export const ProjectsListSurface = () => {
         />
       </div>
 
-      <div css={projectsGroupFilterStyles(theme)} aria-label="Project groups">
-        <Button
-          variant="quiet"
-          data-project-group="all"
-          aria-pressed={activeGroup === 'all'}
-          onClick={() => setActiveGroup('all')}
-        >
-          All Active
-        </Button>
-        <Button
-          variant="quiet"
-          data-project-group="none"
-          aria-pressed={activeGroup === 'none'}
-          onClick={() => setActiveGroup('none')}
-        >
-          No Campaign
-        </Button>
+      <div css={projectsGroupFilterStyles(theme)}>
+        <SegmentedControl
+          columns={PROJECT_GROUP_OPTIONS.length}
+          label="Project groups"
+          value={activeGroup}
+          options={PROJECT_GROUP_OPTIONS}
+          onChange={setActiveGroup}
+        />
       </div>
 
       <div css={projectsLedgerLayoutStyles(theme)}>

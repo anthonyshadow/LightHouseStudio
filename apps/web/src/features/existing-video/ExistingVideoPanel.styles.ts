@@ -318,11 +318,10 @@ export const metadataStyles = (theme: Theme): CSSObject => ({
   '@media (max-width: 22rem)': { gridTemplateColumns: 'minmax(0, 1fr)' },
 });
 
-export const comparisonStyles = (theme: Theme): CSSObject => ({
+/** Layout only: the two segments are `SegmentedControl`'s, not this panel's. */
+export const comparisonStyles = (): CSSObject => ({
   display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: theme.space.xs,
-  '& > *': { width: '100%' },
+  gridTemplateColumns: 'minmax(0, 1fr)',
 });
 
 export const editorColumnStyles = (theme: Theme): CSSObject => ({
