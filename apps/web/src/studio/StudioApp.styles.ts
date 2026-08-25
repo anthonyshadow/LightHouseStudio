@@ -120,7 +120,14 @@ export const headerStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   [media.up('compact')]: {
     display: 'grid',
-    gridTemplateRows: 'auto auto auto minmax(0, 1fr) auto',
+    /*
+     * The fourth row is the gap between the destinations and the bottom cluster. It was `1fr`,
+     * which on a tall viewport pushed the cluster to the far edge and left a third of the rail
+     * empty. Capped, the rail reads as one column: the cluster still sits below everything else,
+     * just not at the end of a void.
+     */
+    gridTemplateRows: `auto auto auto minmax(${theme.space.xl}, 6rem) auto`,
+    alignContent: 'start',
     alignItems: 'stretch',
     justifyContent: 'initial',
     gap: 0,
@@ -288,7 +295,6 @@ export const brandStyles = (theme: Theme): CSSObject => ({
     '& strong': { fontSize: theme.fontSizes.section },
     '& span': { fontSize: '0.62rem' },
   },
-  [media.between('compact', 'laptop')]: brandMarkOnly,
   [media.down('compact')]: {
     gridTemplateColumns: '2rem minmax(0, 1fr)',
     padding: 0,

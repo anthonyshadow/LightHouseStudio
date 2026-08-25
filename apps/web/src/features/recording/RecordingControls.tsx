@@ -192,8 +192,20 @@ const desktopDeviceRowStyles = (theme: Theme): CSSObject => ({
   '& small': { color: theme.colors.textMuted, fontSize: '0.68rem' },
 });
 
+/**
+ * The compact capture bar's one line about the current devices. It wraps to two lines rather than
+ * ending in `64×6…`: the resolution is the part an operator checks before recording, and it was
+ * the part the ellipsis ate.
+ */
 const compactDeviceSummaryStyles = (theme: Theme): CSSObject => ({
   ...detailsStyles(theme),
+  display: '-webkit-box',
+  overflow: 'hidden',
+  WebkitBoxOrient: 'vertical',
+  WebkitLineClamp: 2,
+  whiteSpace: 'normal',
+  lineHeight: 1.35,
+  overflowWrap: 'anywhere',
   [media.up('laptop')]: { display: 'none' },
 });
 /**
