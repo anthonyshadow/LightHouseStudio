@@ -40,12 +40,17 @@ const chooseAdultCharacterDirection = async (
 const confirmCharacterName = async (
   page: Page,
   name: string,
-  submitLabel: 'Save Character' | 'Save & Use Character' = 'Save Character',
+  saveMode: 'default' | 'image-only' = 'default',
 ): Promise<void> => {
   const dialog = page.getByRole('dialog', { name: 'Name your character' });
   await expect(dialog).toBeVisible();
+  if (saveMode === 'image-only') {
+    const choice = dialog.getByRole('group', { name: 'What to save' });
+    if ((await choice.count()) > 0)
+      await choice.getByRole('button', { name: 'Uploaded image only' }).click();
+  }
   await dialog.getByRole('textbox', { name: /Character name/u }).fill(name);
-  await dialog.getByRole('button', { name: submitLabel, exact: true }).click();
+  await dialog.getByRole('button', { name: 'Save Character', exact: true }).click();
 };
 
 const openConstraints = async (page: Page): Promise<void> => {
@@ -229,13 +234,13 @@ test('image-only upload saves and preloads without starting AI, then appears in 
   await expect(
     dialog.getByText('Uploaded reference — no generated preview', { exact: true }),
   ).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Save & Use Image Only' })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: 'Save Character' })).toBeEnabled();
   expect(network.referenceWorkflowCalls).toEqual(['upload']);
   const uploaded = network.referenceImageUploads[0];
   expect(uploaded).toBeDefined();
 
-  await dialog.getByRole('button', { name: 'Save & Use Image Only' }).click();
-  await confirmCharacterName(page, 'Portrait Coach', 'Save & Use Character');
+  await dialog.getByRole('button', { name: 'Save Character' }).click();
+  await confirmCharacterName(page, 'Portrait Coach', 'image-only');
   await expect(dialog).toBeHidden();
   expect((await readBrowserState(page)).connections).toEqual([]);
 
@@ -349,7 +354,6 @@ test('uploaded draft references restore across reload and Detach does not contac
 
   await dialog.getByRole('button', { name: 'Detach uploaded character reference' }).click();
   await expect(dialog.getByAltText('Current uploaded character reference')).toHaveCount(0);
-  await expect(dialog.getByRole('button', { name: 'Save & Use Image Only' })).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Close character builder' }).click();
   await expect(dialog).toBeHidden();
   await page.reload();
@@ -436,8 +440,8 @@ test('Generate Preview always optimizes, and stale form edits detach the image f
   await constraints.fill('Keep the enamel field badge visible.');
   await page.getByRole('button', { name: /^Preview(?: |$)/u }).click();
   await expect(page.getByText(/Regenerate to attach an image/u)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Save Character (prompt only)' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Save Character (prompt only)' }).click();
+  await expect(page.getByRole('button', { name: 'Save Character' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Save Character' }).click();
   await confirmCharacterName(page, 'Copper Presenter');
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
 

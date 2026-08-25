@@ -1,22 +1,38 @@
 import { ASSET_NAME_MAX_LENGTH, containsMeaningfulText, normalizeWhitespace } from '@studio/domain';
 import { useId, useRef, useState, type FormEvent, type RefObject } from 'react';
-import { Button, OverlayPanel, StatusNotice, TextField } from '../../ui';
+import { Button, OverlayPanel, SegmentedControl, StatusNotice, TextField } from '../../ui';
+
+/** What a save produces: the described character, or the uploaded image on its own. */
+export type CharacterSaveMode = 'default' | 'image-only';
+
+const SAVE_MODE_OPTIONS = [
+  { value: 'default', label: 'Described character' },
+  { value: 'image-only', label: 'Uploaded image only' },
+] as const satisfies readonly { value: CharacterSaveMode; label: string }[];
+
+const SAVE_MODE_EXPLANATION: Readonly<Record<CharacterSaveMode, string>> = {
+  default: 'Keeps your description and its generated portrait, so you can edit it again later.',
+  'image-only': 'Keeps the image you uploaded and nothing else. There is no description to edit.',
+};
 
 export interface CharacterNameDialogProps {
   readonly open: boolean;
   readonly initialName: string;
-  readonly imageOnly?: boolean;
+  /** Offered only when there is an uploaded image, which is the only thing the choice is about. */
+  readonly canSaveUploadedImageOnly?: boolean;
+  readonly imageOnlyInitialName?: string;
   readonly retainsReferenceAsset?: boolean;
   readonly locked?: boolean;
   readonly returnFocusRef?: RefObject<HTMLElement | null>;
   readonly onCancel: () => void;
-  readonly onSubmit: (name: string) => void;
+  readonly onSubmit: (name: string, mode: CharacterSaveMode) => void;
 }
 
 export const CharacterNameDialog = ({
   open,
   initialName,
-  imageOnly = false,
+  canSaveUploadedImageOnly = false,
+  imageOnlyInitialName,
   retainsReferenceAsset = false,
   locked = false,
   returnFocusRef,
@@ -26,6 +42,7 @@ export const CharacterNameDialog = ({
   const formId = useId();
   const fieldRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(initialName);
+  const [mode, setMode] = useState<CharacterSaveMode>('default');
   const [attempted, setAttempted] = useState(false);
   const normalizedName = normalizeWhitespace(name, ASSET_NAME_MAX_LENGTH);
   const nameError =
@@ -33,8 +50,16 @@ export const CharacterNameDialog = ({
       ? 'Enter a useful character name.'
       : undefined;
 
+  const chooseMode = (next: CharacterSaveMode) => {
+    setMode(next);
+    // The suggested name describes what is being saved, so it follows the choice unless edited.
+    if (name === initialName || name === imageOnlyInitialName)
+      setName(next === 'image-only' ? (imageOnlyInitialName ?? initialName) : initialName);
+  };
+
   const cancel = () => {
     setAttempted(false);
+    setMode('default');
     onCancel();
   };
 
@@ -42,7 +67,7 @@ export const CharacterNameDialog = ({
     event.preventDefault();
     setAttempted(true);
     if (!containsMeaningfulText(normalizedName)) return;
-    onSubmit(normalizedName);
+    onSubmit(normalizedName, mode);
   };
 
   return (
@@ -66,11 +91,23 @@ export const CharacterNameDialog = ({
             Cancel
           </Button>
           <Button type="submit" form={formId} variant="primary">
-            {locked ? 'Resume Save' : imageOnly ? 'Save & Use Character' : 'Save Character'}
+            {locked ? 'Resume Save' : 'Save Character'}
           </Button>
         </div>
       }
     >
+      {canSaveUploadedImageOnly && !locked ? (
+        <div css={{ display: 'grid', gap: '0.5rem', marginBlockEnd: '1rem' }}>
+          <SegmentedControl
+            columns={SAVE_MODE_OPTIONS.length}
+            label="What to save"
+            value={mode}
+            options={SAVE_MODE_OPTIONS}
+            onChange={chooseMode}
+          />
+          <small>{SAVE_MODE_EXPLANATION[mode]}</small>
+        </div>
+      ) : null}
       <form id={formId} noValidate onSubmit={submit}>
         <TextField
           ref={fieldRef}
