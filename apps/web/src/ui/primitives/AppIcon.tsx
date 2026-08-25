@@ -22,8 +22,6 @@ type AppIconProps = Readonly<{
   height?: number | string;
   className?: string;
   'data-nav-icon'?: boolean;
-  'data-onboarding-icon'?: boolean;
-  'data-recent-icon'?: boolean;
 }>;
 
 const iconPaths: Record<AppIconName, ReactNode> = {
@@ -121,8 +119,6 @@ export const AppIcon = ({
   height,
   className,
   'data-nav-icon': dataNavIcon,
-  'data-onboarding-icon': dataOnboardingIcon,
-  'data-recent-icon': dataRecentIcon,
 }: AppIconProps) => (
   <svg
     aria-hidden="true"
@@ -136,8 +132,6 @@ export const AppIcon = ({
     {...(height === undefined ? {} : { height })}
     {...(className === undefined ? {} : { className })}
     {...(dataNavIcon === undefined ? {} : { 'data-nav-icon': '' })}
-    {...(dataOnboardingIcon === undefined ? {} : { 'data-onboarding-icon': '' })}
-    {...(dataRecentIcon === undefined ? {} : { 'data-recent-icon': '' })}
   >
     {iconPaths[name]}
   </svg>

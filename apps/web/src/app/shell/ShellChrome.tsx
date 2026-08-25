@@ -5,7 +5,7 @@ import type { AssetCountState } from '../../features/assets/AssetLibraryTabs';
 import { CreativeLibrarySyncNotice } from '../../features/creative-assets/CreativeLibrarySyncNotice';
 import { AssetCreationLauncher } from '../../studio/AssetCreationLauncher';
 import { HowLightframeWorksPanel } from '../../studio/HowLightframeWorksPanel';
-import { creativeSyncNoticeRegionStyles, headerRegionStyles } from '../../studio/StudioApp.styles';
+import { headerRegionStyles, shellNoticeRegionStyles } from '../../studio/StudioApp.styles';
 import { StudioHeader } from '../../studio/StudioHeader';
 import { ShellCreativeBuilders } from './ShellCreativeBuilders';
 import type { useStudioLogoutController } from '../../studio/useStudioLogoutController';
@@ -99,7 +99,7 @@ export const ShellChrome = ({ services, user, session, logout }: ShellChromeProp
         overlays that would hide a hub-level notice, and the dedicated shell row keeps it clear of
         both the navigation and the active surface.
       */}
-      <div css={creativeSyncNoticeRegionStyles(theme)} data-creative-sync-notice-region="">
+      <div css={shellNoticeRegionStyles(theme)} data-shell-notice-region="">
         <CreativeLibrarySyncNotice {...sync} />
       </div>
 

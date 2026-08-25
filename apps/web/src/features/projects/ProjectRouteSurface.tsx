@@ -1,7 +1,7 @@
 import { useTheme } from '@emotion/react';
-import { useLayoutEffect, useRef } from 'react';
 import { useLocation } from 'react-router';
 import { isProjectWorkspacePath, projectIdFromPath } from '../../app/paths';
+import { useRouteViewState } from '../../app/useRouteViewState';
 import { ProjectDetailSurface, type ProjectRouteSurfaceProps } from './ProjectDetailSurface';
 import {
   projectOverviewRouteStyles,
@@ -18,15 +18,14 @@ export const ProjectRouteSurface = (props: ProjectRouteSurfaceProps = {}) => {
   const location = useLocation();
   const projectId = projectIdFromPath(location.pathname);
   const workspaceMode = props.workspaceMode ?? isProjectWorkspacePath(location.pathname);
-  const routeRef = useRef<HTMLDivElement>(null);
-
-  useLayoutEffect(() => {
-    if (routeRef.current) routeRef.current.scrollTop = 0;
-  }, [location.pathname]);
+  const { routeRef, onScroll } = useRouteViewState<HTMLDivElement>({
+    storageKey: 'lightframeProjectRouteView',
+  });
 
   return (
     <div
       ref={routeRef}
+      onScroll={onScroll}
       css={
         projectId === null
           ? pageScrollRegionStyles(theme)

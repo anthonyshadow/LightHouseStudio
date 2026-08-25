@@ -105,15 +105,17 @@ export const pageHeaderStyles = (theme: Theme): CSSObject => ({
     '& [data-page-actions]': { justifyContent: 'flex-start' },
   },
   '@container (max-width: 30rem)': {
-    '& [data-page-identity]': { gap: theme.space.lg, paddingBlockEnd: theme.space.xl },
+    '& [data-page-identity]': { gap: theme.space.sm, paddingBlockEnd: theme.space.lg },
     '& h1': { fontSize: 'clamp(1.75rem, 11cqi, 2.6rem)' },
-    '& [data-page-description]': { fontSize: theme.fontSizes.body },
-    // One primary and one overflow: the primary takes the width it needs, the menu stays square.
-    '& [data-page-actions]': {
-      display: 'grid',
-      gridTemplateColumns: 'minmax(0, 1fr) auto',
-      columnGap: theme.space.sm,
+    '& [data-page-description]': {
+      marginBlockStart: theme.space.sm,
+      fontSize: theme.fontSizes.metadata,
+      lineHeight: 1.45,
     },
-    '& [data-page-actions] > button:first-of-type': { width: '100%' },
+    // The actions become one row: the leading control takes the free width and the rest keep
+    // their own, which is what a primary plus an overflow menu and a primary plus peers both
+    // need. Stated here rather than per surface, or the row gets a second owner.
+    '& [data-page-actions]': { width: '100%', flexWrap: 'nowrap' },
+    '& [data-page-actions] > *:first-child': { minWidth: 0, flex: '1 1 auto' },
   },
 });

@@ -4,6 +4,7 @@ import type { CampaignContract, ProjectContract, SavedVideoSummary } from '@stud
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HttpResponse, http } from 'msw';
+import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import { mockApiServer } from '../../test/msw/server';
@@ -78,11 +79,17 @@ const callbacks = () => ({
 
 const renderDashboard = (ownerUserId: string, actions = callbacks()) => {
   const view = render(
-    <StudioDesignProvider>
-      <RemoteStateTestProvider>
-        <DashboardRouteSurface ownerUserId={ownerUserId} displayName="Demo Creator" {...actions} />
-      </RemoteStateTestProvider>
-    </StudioDesignProvider>,
+    <MemoryRouter>
+      <StudioDesignProvider>
+        <RemoteStateTestProvider>
+          <DashboardRouteSurface
+            ownerUserId={ownerUserId}
+            displayName="Demo Creator"
+            {...actions}
+          />
+        </RemoteStateTestProvider>
+      </StudioDesignProvider>
+    </MemoryRouter>,
   );
   return { ...view, actions };
 };

@@ -23,7 +23,8 @@ export const PageShell = ({
 
 /**
  * The masthead of a top-level page: an optional eyebrow, one `h1` on the shared scale, an optional
- * description, and an actions slot that holds one primary plus an optional `ActionMenu`.
+ * description, and an actions slot holding a leading primary control and any number of peers —
+ * an `ActionMenu`, a secondary control, a status chip.
  *
  * `headingId` and `headingRef` stay callers' business because `focusesMainOnNavigation` and the
  * surfaces' own announcements move focus to these headings by id.
@@ -48,7 +49,7 @@ export const PageHeader = ({
    */
   headingRef?: RefObject<HTMLHeadingElement | null> | ((node: HTMLHeadingElement | null) => void);
   description?: ReactNode;
-  /** One primary control, optionally followed by an `ActionMenu`. */
+  /** A leading primary control, optionally followed by peers; below 30rem the leader takes the row. */
   actions?: ReactNode;
   /** Rendered above the identity row, for surfaces that are reached from a parent. */
   breadcrumb?: ReactNode;
