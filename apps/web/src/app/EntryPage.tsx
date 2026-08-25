@@ -2,6 +2,7 @@ import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../application/auth/AuthProvider';
+import { AppIcon, type AppIconName } from '../ui/primitives/AppIcon';
 import { Button } from '../ui/primitives/Button';
 import { APP_PATHS, canonicalizeProtectedDestination } from './paths';
 
@@ -38,8 +39,73 @@ const entryStyles = (theme: Theme): CSSObject => ({
     letterSpacing: '0.14em',
     textTransform: 'uppercase',
   },
+  /*
+   * A drawing of the idle stage, not a screenshot of one: the same gradient and corner brackets
+   * the Studio stage uses, so the first thing a newcomer sees is what they are about to open.
+   * It is the first thing to go on a short viewport, where the words matter more than the picture.
+   */
+  '& [data-entry-stage]': {
+    position: 'relative',
+    aspectRatio: '16 / 9',
+    marginBlock: theme.space.xs,
+    display: 'grid',
+    placeItems: 'center',
+    borderRadius: theme.radii.large,
+    background: theme.gradients.stageIdle,
+    boxShadow: theme.shadows.soft,
+    color: theme.colors.accentStrong,
+    '&::before, &::after': {
+      position: 'absolute',
+      width: '1.5rem',
+      height: '1.5rem',
+      content: '""',
+    },
+    '&::before': {
+      insetBlockStart: theme.space.sm,
+      insetInlineStart: theme.space.sm,
+      borderBlockStart: `2px solid ${theme.colors.accent}`,
+      borderInlineStart: `2px solid ${theme.colors.accent}`,
+    },
+    '&::after': {
+      insetBlockEnd: theme.space.sm,
+      insetInlineEnd: theme.space.sm,
+      borderBlockEnd: `2px solid ${theme.colors.accent}`,
+      borderInlineEnd: `2px solid ${theme.colors.accent}`,
+    },
+    '@media (max-height: 38rem)': { display: 'none' },
+  },
+  '& [data-entry-capabilities]': {
+    display: 'grid',
+    gap: theme.space.sm,
+    margin: 0,
+    padding: 0,
+    listStyle: 'none',
+    textAlign: 'start',
+  },
+  '& [data-entry-capabilities] li': {
+    display: 'grid',
+    gridTemplateColumns: 'auto minmax(0, 1fr)',
+    alignItems: 'start',
+    gap: theme.space.sm,
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSizes.metadata,
+    lineHeight: 1.5,
+  },
+  '& [data-entry-capabilities] svg': {
+    width: '1.15rem',
+    height: '1.15rem',
+    marginBlockStart: '0.1rem',
+    color: theme.colors.accent,
+  },
   '& button': { minHeight: '3rem' },
 });
+
+/** What the product does, said as outcomes and without a noun the visitor has not met yet. */
+const ENTRY_CAPABILITIES: ReadonlyArray<{ icon: AppIconName; text: string }> = [
+  { icon: 'video', text: 'Record with your camera, or upload a video you already have.' },
+  { icon: 'character', text: 'Change who is on screen, what they wear, or how they sound.' },
+  { icon: 'editVideo', text: 'Trim, crop, rotate, relight and filter on this device.' },
+];
 
 interface EntryPageProps {
   readonly focusEnterOnMount: boolean;
@@ -75,9 +141,18 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
       <div>
         <span data-entry-eyebrow>Local-first video creation</span>
         <h1>Lightframe</h1>
-        <p>
-          Create a video quickly, resume focused Project work, or organize Projects in Campaigns.
-        </p>
+        <p>Record or upload a video, restyle it, and download the result.</p>
+        <div data-entry-stage aria-hidden="true">
+          <AppIcon name="video" width="2.5rem" height="2.5rem" />
+        </div>
+        <ul data-entry-capabilities>
+          {ENTRY_CAPABILITIES.map((capability) => (
+            <li key={capability.icon}>
+              <AppIcon name={capability.icon} />
+              <span>{capability.text}</span>
+            </li>
+          ))}
+        </ul>
         <Button
           ref={enterRef}
           variant="primary"
