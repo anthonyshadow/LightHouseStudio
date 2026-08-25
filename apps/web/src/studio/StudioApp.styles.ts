@@ -691,9 +691,15 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
     },
   },
   [media.up('laptop')]: {
-    gridTemplateColumns: 'minmax(12rem, 15rem) minmax(0, 1fr) minmax(18rem, 20rem)',
+    /*
+     * The stage is the work, so the two columns beside it are sized to their content rather than
+     * to a comfortable band: the tool rail holds three labelled buttons, and a collapsed capture
+     * column holds two device rows and a control. Every rem taken back here is width the 16:9
+     * frame can use, and width is what binds it — the column is far taller than 16:9 of itself.
+     */
+    gridTemplateColumns: 'minmax(10.5rem, 13rem) minmax(0, 1fr) minmax(16rem, 18rem)',
     gridTemplateRows: 'minmax(0, 1fr)',
-    gap: theme.space.lg,
+    gap: theme.space.md,
     '& > [data-media-stage-layout]': { gridColumn: 2, gridRow: 1 },
     '& > [data-studio-tool-rail]': { gridColumn: 1, gridRow: 1 },
     '& > [data-capture-controls]': { gridColumn: 3, gridRow: 1 },
@@ -704,7 +710,7 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
      * the operator just clicked.
      */
     '&[data-capture-settings="collapsed"]': {
-      gridTemplateColumns: 'minmax(12rem, 15rem) minmax(0, 1fr) minmax(10.5rem, 12rem)',
+      gridTemplateColumns: 'minmax(10.5rem, 13rem) minmax(0, 1fr) minmax(10rem, 11.5rem)',
     },
     '&[data-video-edit-active="true"]': {
       gridTemplateRows: 'minmax(0, 1fr)',
@@ -717,7 +723,7 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
       '& > [data-studio-tool-rail]': { gridColumn: 1, gridRow: 2 },
       '&[data-video-edit-active="true"]': {
         gridTemplateRows: 'minmax(0, 1fr)',
-        gridTemplateColumns: 'minmax(12rem, 15rem) minmax(0, 1fr) minmax(18rem, 20rem)',
+        gridTemplateColumns: 'minmax(10.5rem, 13rem) minmax(0, 1fr) minmax(16rem, 18rem)',
         '& > [data-media-stage-layout]': { gridColumn: 2, gridRow: 1 },
         '& > [data-studio-tool-rail]': { gridColumn: 1, gridRow: 1 },
         '& > [data-capture-controls]': { gridColumn: 3, gridRow: 1 },
@@ -875,10 +881,15 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
       padding: theme.space.sm,
       whiteSpace: 'normal',
     },
+    // Two clamped lines rather than one truncated one: the rail is sized to its buttons now, and
+    // a description that ends in an ellipsis teaches nothing.
     '& [data-tool-label] small': {
-      display: 'block',
+      display: '-webkit-box',
       maxWidth: 'none',
-      whiteSpace: 'nowrap',
+      WebkitBoxOrient: 'vertical',
+      WebkitLineClamp: 2,
+      whiteSpace: 'normal',
+      lineHeight: 1.25,
     },
     '& [data-tool-label] small[data-tool-blocked]': {
       display: '-webkit-box',
