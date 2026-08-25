@@ -114,7 +114,7 @@ export const ProjectWorkingMediaSection = ({
         operation.reset();
         setPhase('saved');
         setMessage(
-          'The current cut is now that version. Nothing was copied, your original video was not replaced, and no new version was saved.',
+          'The current cut is now that version. Your original video and every saved version are exactly as they were.',
         );
       } catch (error) {
         setPhase(error instanceof ProjectApiConflictError ? 'conflict' : 'error');

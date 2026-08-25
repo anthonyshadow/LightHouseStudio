@@ -434,11 +434,11 @@ describe('Project route surface', () => {
     renderProjects(`/projects/${activeId}`);
 
     const progress = await screen.findByRole('list', { name: 'Project workflow progress' });
-    expect(within(progress).getByText('History').closest('li')).toHaveAttribute(
-      'aria-current',
-      'step',
-    );
+    // History is the record, not a fourth step: a finished Project has every step behind it and
+    // nothing current.
+    expect(within(progress).queryByText('History')).not.toBeInTheDocument();
     expect(within(progress).getByText('Save').closest('li')).toHaveAttribute('data-state', 'done');
+    expect(progress.querySelector('[aria-current="step"]')).toBeNull();
   });
 
   it('reads a review-phase Project as waiting on Save', async () => {
