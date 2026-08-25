@@ -1,6 +1,6 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { useEffect, useRef } from 'react';
 import type { PresentedRecordingArtifact } from '../recording/types';
+import { VideoPlayer } from '../video-player/VideoPlayer';
 
 const playerStyles = (theme: Theme): CSSObject => ({
   position: 'relative',
@@ -12,10 +12,18 @@ const playerStyles = (theme: Theme): CSSObject => ({
   border: `1px solid ${theme.colors.border}`,
   borderRadius: theme.radii.medium,
   background: theme.colors.canvas,
-  '& video': {
-    height: '100%',
-    maxHeight: 'min(56vh, 30rem)',
+  /*
+   * The frame, not the picture, holds the 16:9 box: the transport lives inside it and the video
+   * letterboxes into what is left, so adopting the shared player did not make this card taller
+   * than the native-controls one it replaced.
+   */
+  '& [data-video-player]': {
     aspectRatio: '16 / 9',
+    maxHeight: 'min(56vh, 30rem)',
+  },
+  '& video': {
+    width: '100%',
+    height: '100%',
     display: 'block',
     objectFit: 'contain',
     background: theme.colors.canvas,
@@ -38,40 +46,19 @@ export interface ExistingVideoSourcePreviewProps {
 /**
  * Secondary upload-panel player. It borrows an existing source/result artifact
  * URL and never participates in live preview, recording, or finalization.
+ *
+ * The transport is {@link VideoPlayer}, the product's one player, so a borrowed source wears the
+ * same chrome here as a saved video does in the library; this only supplies the frame around it.
  */
 export const ExistingVideoSourcePreview = ({
   artifact,
   displayName,
 }: ExistingVideoSourcePreviewProps) => {
   const theme = useTheme();
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.pause();
-    video.muted = false;
-    if (artifact) video.src = artifact.objectUrl;
-    else video.removeAttribute('src');
-    video.load();
-    return () => {
-      video.pause();
-      video.removeAttribute('src');
-      video.load();
-    };
-  }, [artifact]);
 
   return (
     <figure css={playerStyles(theme)}>
-      {/* User-provided video has no caption asset to attach; native controls remain fully exposed. */}
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      <video
-        ref={videoRef}
-        controls
-        playsInline
-        preload="metadata"
-        aria-label={`Video preview for ${displayName}`}
-      />
+      <VideoPlayer src={artifact?.objectUrl ?? null} title={displayName} />
       <figcaption>{displayName}</figcaption>
     </figure>
   );

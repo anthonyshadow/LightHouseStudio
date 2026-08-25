@@ -39,7 +39,7 @@ import {
   projectAssetsOwnershipStyles,
   projectAssetsSectionStyles,
 } from './ProjectAssetsSection.styles';
-import { ProjectVideoPreviewPlayer } from './ProjectVideoPreviewPlayer';
+import { VideoPlayer } from '../video-player/VideoPlayer';
 import { useProjectAssetsController } from './useProjectAssetsController';
 import {
   projectAssetVideoWorkspaceError,
@@ -216,7 +216,7 @@ const ProjectVideoPreview = ({
             gap: theme.space.sm,
           }}
         >
-          <ProjectVideoPreviewPlayer
+          <VideoPlayer
             src={savedVideoContentUrl(detail.id, detail.currentVersion.id)}
             title={detail.title}
           />

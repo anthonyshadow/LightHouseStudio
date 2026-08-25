@@ -388,7 +388,7 @@ test('the upload editor and open saved-character chooser reflow at every support
     const dialog = page.getByRole('dialog', { name: 'Use existing video' });
     await dialog.getByRole('button', { name: 'Character Swap', exact: true }).click();
     await expectNoDocumentOverflow(page);
-    await expect(dialog.getByLabel('Video preview for responsive-source.mp4')).toBeAttached();
+    await expect(dialog.getByLabel('Preview of responsive-source.mp4')).toBeAttached();
 
     const flow = dialog.locator('[data-scroll-region="existing-video-flow"]');
     const editor = dialog.getByRole('region', { name: 'Choose edits and configure' });

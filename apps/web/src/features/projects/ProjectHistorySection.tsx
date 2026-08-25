@@ -11,7 +11,7 @@ import { Button, LinkButton, OverlayPanel, Skeleton, StatusNotice, VisuallyHidde
 import { exportSpecificationSummary } from '../export-placements';
 import { getProjectProcessingHistory } from './projectProcessingApi';
 import { projectProcessingCapabilityLabel } from './projectProcessingPresentation';
-import { ProjectVideoPreviewPlayer } from './ProjectVideoPreviewPlayer';
+import { VideoPlayer } from '../video-player/VideoPlayer';
 import {
   getProjectHistory,
   getProjectOutputs,
@@ -472,7 +472,7 @@ export const ProjectHistorySection = ({
               gap: theme.space.md,
             }}
           >
-            <ProjectVideoPreviewPlayer
+            <VideoPlayer
               src={projectOutputContentUrl(projectId, preview.version.id)}
               title={`${preview.savedVideo.title}, Version ${preview.version.ordinal}`}
             />

@@ -3,13 +3,13 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
-import { ProjectVideoPreviewPlayer } from './ProjectVideoPreviewPlayer';
+import { VideoPlayer } from './VideoPlayer';
 
-describe('ProjectVideoPreviewPlayer', () => {
+describe('VideoPlayer', () => {
   it('keeps accessible playback controls visible and owns playback state', () => {
     render(
       <StudioDesignProvider>
-        <ProjectVideoPreviewPlayer src="/preview.mp4" title="Library source" />
+        <VideoPlayer src="/preview.mp4" title="Library source" />
       </StudioDesignProvider>,
     );
 

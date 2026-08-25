@@ -42,6 +42,7 @@ import {
   VisuallyHidden,
 } from '../../ui';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
+import { VideoPlayer } from '../video-player/VideoPlayer';
 import { AddVideoToProjectDialog } from '../projects/AddVideoToProjectDialog';
 import { GeneratePreviewDialog } from './GeneratePreviewDialog';
 import { VideoExportPanel } from './VideoExportPanel';
@@ -992,16 +993,11 @@ export const VideoGallery = ({
             ) : null}
             <div css={previewPlayerStyles(theme)}>
               {selectedVersion ? (
-                // Saved local videos may not include a captions track.
-                // eslint-disable-next-line jsx-a11y/media-has-caption
-                <video
+                <VideoPlayer
                   key={selectedVersion.id}
-                  ref={previewPlayerRef}
+                  videoRef={previewPlayerRef}
                   src={savedVideoContentUrl(previewVideo.id, selectedVersion.id)}
-                  controls
-                  playsInline
-                  preload="metadata"
-                  aria-label={`Preview of ${previewVideo.title}, Version ${selectedVersion.ordinal}`}
+                  title={`${previewVideo.title}, Version ${selectedVersion.ordinal}`}
                   onLoadedData={() => setPreviewError(false)}
                   onError={() => setPreviewError(true)}
                 />

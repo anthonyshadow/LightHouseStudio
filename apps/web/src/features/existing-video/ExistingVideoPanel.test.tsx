@@ -628,7 +628,7 @@ describe('ExistingVideoPanel', () => {
     );
 
     expect(screen.getAllByTitle(source.name)[0]).toHaveTextContent(source.name);
-    expect(screen.getByLabelText(`Video preview for ${source.name}`)).toBeVisible();
+    expect(screen.getByLabelText(`Preview of ${source.name}`)).toBeVisible();
     expect(screen.getAllByText('1920 × 1080')[0]).toBeInTheDocument();
     expect(screen.getByText(/Apply Character Swap/u)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Character Swap/u })).toHaveAttribute(
