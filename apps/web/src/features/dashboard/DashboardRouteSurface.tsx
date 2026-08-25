@@ -7,7 +7,7 @@ import type {
 } from '@studio/contracts';
 import { formatDateTime, formatDuration } from '@studio/domain';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { listSavedVideos, savedVideoThumbnailUrl } from '../../adapters/api-client/savedVideosApi';
 import { useRouteViewState } from '../../app/useRouteViewState';
 import {
@@ -37,6 +37,7 @@ import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import {
   loadDashboardOnboardingDismissed,
   persistDashboardOnboardingDismissed,
+  subscribeDashboardOnboarding,
 } from './dashboardOnboarding';
 import {
   allDestinationsStyles,
@@ -205,8 +206,12 @@ export const DashboardRouteSurface = ({
     owner: ownerUserId,
     isView: isRecentKind,
   });
-  const [onboardingVisible, setOnboardingVisible] = useState(
-    () => !loadDashboardOnboardingDismissed(ownerUserId),
+  // Read through the store rather than copied into state: Settings can restore the guidance while
+  // this surface is mounted underneath it, and the Dashboard has to notice.
+  const onboardingVisible = !useSyncExternalStore(
+    subscribeDashboardOnboarding,
+    () => loadDashboardOnboardingDismissed(ownerUserId),
+    () => true,
   );
   const [onboardingStorageWarning, setOnboardingStorageWarning] = useState(false);
   const [recentKind, setRecentKind] = useState<RecentKind>(initialView ?? 'all');
@@ -358,9 +363,7 @@ export const DashboardRouteSurface = ({
   };
 
   const dismissOnboarding = () => {
-    const persisted = persistDashboardOnboardingDismissed(ownerUserId);
-    setOnboardingVisible(false);
-    setOnboardingStorageWarning(!persisted);
+    setOnboardingStorageWarning(!persistDashboardOnboardingDismissed(ownerUserId));
   };
 
   const emptyRecent: Record<

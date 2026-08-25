@@ -5,6 +5,7 @@ import { Button } from '../../ui/primitives/Button';
 import { useDismissiblePopover } from '../../ui/primitives/useDismissiblePopover';
 import { useMenuKeyboardNavigation } from '../../ui/primitives/useMenuKeyboardNavigation';
 import { AccountPanel, type AccountCapabilityRow } from './AccountPanel';
+import { SettingsPanel } from './SettingsPanel';
 import { media } from '../../ui/media';
 
 /** Everything the read-only account panel shows; all of it already lives in memory. */
@@ -39,6 +40,7 @@ export const AccountMenu = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useDismissiblePopover({ open, onOpenChange, rootRef, triggerRef });
   const handleMenuKeyDown = useMenuKeyboardNavigation(menuRef, open);
@@ -244,11 +246,20 @@ export const AccountMenu = ({
               Account details
             </Button>
           ) : null}
+          <Button role="menuitem" variant="quiet" onClick={() => run(() => setSettingsOpen(true))}>
+            Settings
+          </Button>
           <Button data-logout role="menuitem" variant="danger" onClick={() => run(onLogout)}>
             Log out
           </Button>
         </div>
       ) : null}
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        returnFocusRef={triggerRef}
+        ownerUserId={user.id}
+      />
       {details ? (
         <AccountPanel
           open={detailsOpen}

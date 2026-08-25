@@ -446,6 +446,34 @@ for (const viewport of dashboardViewports) {
   });
 }
 
+test('Settings brings back the getting-started guide the Dashboard dismissed', async ({ page }) => {
+  await installSuccessfulStudioHarness(page);
+  await installCampaignHarness(page);
+  await installProjectHarness(page);
+  await page.goto('/dashboard');
+
+  const guide = page.getByRole('heading', { name: 'Make your first reusable video' });
+  await expect(guide).toBeVisible();
+  await page.getByRole('button', { name: 'Got it' }).click();
+  await expect(guide).toHaveCount(0);
+
+  // Settings is reached from the profile card, and the Dashboard is still mounted underneath it:
+  // the preference has one owner, so restoring it here shows the guide there without a remount.
+  await page.getByRole('button', { name: 'Lightframe Demo account menu' }).click();
+  await page.getByRole('menuitem', { name: 'Settings' }).click();
+  const settings = page.getByRole('dialog', { name: 'Settings' });
+  await expect(settings).toBeVisible();
+  await settings.getByRole('button', { name: 'Show the guide again' }).click();
+  // The panel reflects its own change: the control it offered is replaced by the settled state.
+  await expect(settings.getByRole('button', { name: 'Show the guide again' })).toHaveCount(0);
+  await expect(settings.getByText(/The guide is available/u)).toBeVisible();
+
+  // The Dashboard is `aria-hidden` behind the modal, so its guide is only assertable once closed.
+  await page.keyboard.press('Escape');
+  await expect(settings).toHaveCount(0);
+  await expect(guide).toBeVisible();
+});
+
 test('first-run Dashboard explains the first reusable-video flow at every canonical width', async ({
   page,
 }) => {
