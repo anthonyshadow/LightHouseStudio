@@ -196,6 +196,30 @@ const compactDeviceSummaryStyles = (theme: Theme): CSSObject => ({
   ...detailsStyles(theme),
   [media.up('laptop')]: { display: 'none' },
 });
+/**
+ * The one place the product states what a session keeps. It only fits the wide session column, so
+ * on a compact layout the same sentence stays where it has always been reachable: the Help panel's
+ * privacy section and the idle stage's own line about the camera.
+ */
+const retentionNoteStyles = (theme: Theme): CSSObject => ({
+  display: 'none',
+  [media.up('laptop')]: {
+    display: 'grid',
+    gridTemplateColumns: 'auto minmax(0, 1fr)',
+    alignItems: 'start',
+    gap: theme.space.xs,
+    margin: 0,
+    marginBlockStart: 'auto',
+    paddingBlockStart: theme.space.sm,
+    borderBlockStart: `1px solid ${theme.colors.divider}`,
+    color: theme.colors.textFaint,
+    fontSize: '0.7rem',
+    lineHeight: 1.4,
+    '& svg': { width: '0.95rem', height: '0.95rem', color: theme.colors.accent },
+  },
+  [`${media.up('laptop')} and (max-height: 48rem)`]: { display: 'none' },
+});
+
 const settingsActionStyles = (theme: Theme): CSSObject => ({
   minHeight: '2.75rem',
   paddingInline: theme.space.sm,
@@ -349,6 +373,18 @@ export const RecordingControls = ({
             Device settings
           </Button>
         ) : null}
+        {/*
+          What persists is a fact about this session, so it belongs beside the other facts about
+          it. It used to occupy a slot in the tool rail, where it displaced a tool and survived
+          only as a `title` a touch user never sees; here it is a visible sentence.
+        */}
+        <p css={retentionNoteStyles(theme)}>
+          <AppIcon name="privacy" />
+          <span>
+            Prompts and generated references persist locally. Manual uploads and takes stay
+            temporary until you save them.
+          </span>
+        </p>
       </div>
       {desktopSettings ? (
         <div css={desktopSettingsStyles(theme, desktopSettingsExpanded)}>

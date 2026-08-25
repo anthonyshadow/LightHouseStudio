@@ -157,10 +157,6 @@ export const CreativeWorkspace = ({ state, actions, refs }: CreativeWorkspacePro
           </small>
         </span>
       </Button>
-      <span title="Prompts and generated references persist locally; manual uploads and takes stay temporary.">
-        <AppIcon name="privacy" />
-        Local-first workspace · generated references persist locally
-      </span>
     </nav>
   );
 };
