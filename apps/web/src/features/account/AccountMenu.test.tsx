@@ -84,9 +84,9 @@ describe('AccountMenu', () => {
     const trigger = screen.getByRole('button', { name: 'Lightframe Demo account menu' });
 
     await userInput.click(trigger);
-    await waitFor(() => expect(screen.getByRole('menuitem', { name: 'Log out' })).toHaveFocus());
+    // Settings leads the menu, so it is what the roving focus lands on.
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: 'Settings' })).toHaveFocus());
     expect(screen.getByText('demo@lightframe.local')).toBeVisible();
-    expect(screen.getByRole('menuitem', { name: 'Log out' })).toHaveFocus();
     await userInput.keyboard('{Escape}');
     expect(trigger).toHaveFocus();
 
@@ -168,7 +168,7 @@ describe('AccountMenu', () => {
     ).toBeVisible();
   });
 
-  it('keeps the menu to Log out alone when no details source is provided', async () => {
+  it('keeps Settings and Log out when no details source is provided', async () => {
     const userInput = userEvent.setup();
     render(
       <StudioDesignProvider>
@@ -177,8 +177,33 @@ describe('AccountMenu', () => {
     );
 
     await userInput.click(screen.getByRole('button', { name: 'Lightframe Demo account menu' }));
-    expect(screen.getAllByRole('menuitem')).toHaveLength(1);
+    // Settings is about this browser, not this account, so it does not depend on a details source.
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+      'Settings',
+      'Log out',
+    ]);
     expect(screen.queryByRole('menuitem', { name: 'Account details' })).not.toBeInTheDocument();
+  });
+
+  it('opens the settings panel from the profile menu and returns focus to the trigger', async () => {
+    const userInput = userEvent.setup();
+    render(
+      <StudioDesignProvider>
+        <AccountMenuHarness user={user} onLogout={vi.fn()} />
+      </StudioDesignProvider>,
+    );
+    const trigger = screen.getByRole('button', { name: 'Lightframe Demo account menu' });
+
+    await userInput.click(trigger);
+    await userInput.click(screen.getByRole('menuitem', { name: 'Settings' }));
+
+    const panel = await screen.findByRole('dialog', { name: 'Settings' });
+    expect(within(panel).getByRole('heading', { name: 'Getting started' })).toBeVisible();
+    expect(within(panel).getByRole('heading', { name: 'Capture defaults' })).toBeVisible();
+    expect(within(panel).getByRole('heading', { name: 'What this browser keeps' })).toBeVisible();
+
+    await userInput.keyboard('{Escape}');
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 
   it('opens from ArrowDown and closes on an outside pointer', async () => {

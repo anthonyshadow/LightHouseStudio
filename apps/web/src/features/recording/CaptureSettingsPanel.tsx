@@ -243,12 +243,13 @@ const actualSettingsStyles = (theme: Theme): CSSObject => ({
   },
 });
 
-const profileLabels: Record<LocalCaptureProfileId, string> = {
+/** Exported so Settings can name the remembered capture choices with the same words. */
+export const profileLabels: Record<LocalCaptureProfileId, string> = {
   '720p30': '720p · 30 fps',
   '1080p30': '1080p · 30 fps',
 };
 
-const aspectRatioLabels: Record<LocalCaptureAspectRatio, string> = {
+export const aspectRatioLabels: Record<LocalCaptureAspectRatio, string> = {
   '16:9': 'Landscape · 16:9',
   '9:16': 'Portrait · 9:16',
 };
