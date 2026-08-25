@@ -9,7 +9,16 @@ export const BUILD_CLOSURE_BUDGETS = {
   // before anything they protect and is therefore necessarily static. Its budget is deliberately
   // tight, unlike the others: growth here is paid on the Dashboard, on Assets and on every Project
   // list, so a regression is exactly what this number exists to catch.
-  'src/app/shell/AuthenticatedShell.tsx': 720_000,
+  //
+  // Raised from 720_000 on 2026-08-25, once and deliberately. The UI/UX plan's design-system
+  // consolidation replaced five parallel icon sets with one `AppIcon`, which moves a handful of
+  // glyphs that only the lazy editor draws into what every route loads — the price of a product
+  // that draws one icon per concept. Everything recoverable was recovered first: the Settings
+  // panel loads on first open rather than with the shell, and the skeleton, collapsed-section and
+  // loading-placeholder primitives left the `ui` barrel for deep imports, because only lazy routes
+  // use them and the shell imports that barrel. Those two together gave back 5_836 bytes.
+  // `FORBIDDEN_CLOSURE_DEPENDENCIES` is the half that must never be relaxed, and was not.
+  'src/app/shell/AuthenticatedShell.tsx': 726_000,
   // Shell plus capture graph, which is what a Studio route costs. Looser, because a Studio route is
   // where media code belongs; `FORBIDDEN_CLOSURE_DEPENDENCIES` is what keeps it from leaking out.
   'src/studio/StudioApp.tsx': 910_000,

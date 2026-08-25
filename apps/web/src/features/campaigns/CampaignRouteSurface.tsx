@@ -9,17 +9,17 @@ import { useRouteViewState } from '../../app/useRouteViewState';
 import {
   AppIcon,
   Button,
-  CollapsedListSection,
   emptyExampleStyles,
   EmptyStatePreview,
   ListSearchField,
   listTotalLabel,
-  LoadingPlaceholder,
   SearchEmptyState,
-  Skeleton,
   StatusNotice,
   useListSearch,
 } from '../../ui';
+import { CollapsedListSection } from '../../ui/primitives/CollapsedListSection';
+import { LoadingPlaceholder } from '../../ui/primitives/LoadingPlaceholder';
+import { Skeleton } from '../../ui/primitives/Skeleton';
 import { pageScrollRegionStyles } from '../../ui/primitives/PageShell.styles';
 import { NewProjectDialog } from '../projects/ProjectDialogs';
 import { KIND_ICONS } from '../projects/ProjectAssetThumbnail';

@@ -25,6 +25,3 @@ export { OverlayPanel } from './primitives/OverlayPanel';
 export { ReferenceImagePreview } from './primitives/ReferenceImagePreview';
 export { ImagePickerDropField } from './primitives/ImagePickerDropField';
 export { AppIcon, type AppIconName } from './primitives/AppIcon';
-export { CollapsedListSection } from './primitives/CollapsedListSection';
-export { LoadingPlaceholder } from './primitives/LoadingPlaceholder';
-export { Skeleton } from './primitives/Skeleton';

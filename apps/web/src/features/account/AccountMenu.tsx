@@ -1,11 +1,18 @@
 import { useTheme } from '@emotion/react';
 import type { AuthenticatedSessionResponse, AuthenticatedUser } from '@studio/contracts';
-import { useRef, useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
 import { Button } from '../../ui/primitives/Button';
 import { useDismissiblePopover } from '../../ui/primitives/useDismissiblePopover';
 import { useMenuKeyboardNavigation } from '../../ui/primitives/useMenuKeyboardNavigation';
 import { AccountPanel, type AccountCapabilityRow } from './AccountPanel';
-import { SettingsPanel } from './SettingsPanel';
+/*
+ * Loaded when it is first opened, not when the shell mounts. Settings is reached from a menu on a
+ * surface that lives for the whole session, so an eager import would put its whole graph — and the
+ * capture record it reads — into what every authenticated route pays before rendering anything.
+ */
+const SettingsPanel = lazy(() =>
+  import('./SettingsPanel').then((module) => ({ default: module.SettingsPanel })),
+);
 import { media } from '../../ui/media';
 
 /** Everything the read-only account panel shows; all of it already lives in memory. */
@@ -41,6 +48,8 @@ export const AccountMenu = ({
   const menuRef = useRef<HTMLDivElement>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // Latched so the panel stays mounted through its exit animation once it has been opened.
+  const [settingsMounted, setSettingsMounted] = useState(false);
 
   useDismissiblePopover({ open, onOpenChange, rootRef, triggerRef });
   const handleMenuKeyDown = useMenuKeyboardNavigation(menuRef, open);
@@ -246,7 +255,16 @@ export const AccountMenu = ({
               Account details
             </Button>
           ) : null}
-          <Button role="menuitem" variant="quiet" onClick={() => run(() => setSettingsOpen(true))}>
+          <Button
+            role="menuitem"
+            variant="quiet"
+            onClick={() =>
+              run(() => {
+                setSettingsMounted(true);
+                setSettingsOpen(true);
+              })
+            }
+          >
             Settings
           </Button>
           <Button data-logout role="menuitem" variant="danger" onClick={() => run(onLogout)}>
@@ -254,12 +272,16 @@ export const AccountMenu = ({
           </Button>
         </div>
       ) : null}
-      <SettingsPanel
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        returnFocusRef={triggerRef}
-        ownerUserId={user.id}
-      />
+      {settingsMounted ? (
+        <Suspense fallback={null}>
+          <SettingsPanel
+            open={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+            returnFocusRef={triggerRef}
+            ownerUserId={user.id}
+          />
+        </Suspense>
+      ) : null}
       {details ? (
         <AccountPanel
           open={detailsOpen}
