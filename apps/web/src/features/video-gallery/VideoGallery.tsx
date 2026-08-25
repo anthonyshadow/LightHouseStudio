@@ -33,9 +33,11 @@ import {
   ListSearchField,
   OverlayPanel,
   SelectField,
+  Skeleton,
   StatusNotice,
   TextField,
   useListSearch,
+  VisuallyHidden,
 } from '../../ui';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { AddVideoToProjectDialog } from '../projects/AddVideoToProjectDialog';
@@ -65,7 +67,6 @@ import {
   previewFooterStyles,
   previewMetadataStyles,
   previewPlayerStyles,
-  skeletonCardStyles,
   thumbnailPlaceholderStyles,
   thumbnailStyles,
 } from './VideoGallery.styles';
@@ -130,16 +131,10 @@ const VideoGallerySkeleton = () => {
   const theme = useTheme();
   return (
     <div css={galleryStyles(theme)} aria-busy="true">
-      <p role="status">Loading saved videos…</p>
+      <VisuallyHidden role="status">Loading saved videos…</VisuallyHidden>
       <div css={gridStyles(theme)} aria-hidden="true">
         {Array.from({ length: 6 }, (_, index) => (
-          <div key={index} css={skeletonCardStyles(theme)}>
-            <span data-skeleton-poster="" />
-            <span data-skeleton-copy="">
-              <span data-skeleton-line="" />
-              <span data-skeleton-line="short" />
-            </span>
-          </div>
+          <Skeleton key={index} variant="card" />
         ))}
       </div>
     </div>

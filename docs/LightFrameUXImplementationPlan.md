@@ -27,13 +27,13 @@ Visual baselines under `screenshots/` are asserted by `bun run test:visual`. Any
 
 ## Order at a glance
 
-| Tier                      | Items | Theme                                                         | Rough effort |
-| ------------------------- | ----- | ------------------------------------------------------------- | ------------ |
-| ~~1 — Fix immediately~~   | 1–10  | **DONE** — the product no longer tells the user untrue things | 1–2 days     |
-| ~~2 — Work on next~~      | 11–16 | **DONE** — one vocabulary, one action model, one page shell   | 1–2 weeks    |
-| 3 — Important, can follow | 17–22 | The four redesigns, plus mobile capability and loading states | 2–4 weeks    |
-| 4 — Polish later          | 23–34 | Design-system consolidation and copy tone                     | ongoing      |
-| 5 — Defer until decided   | 35–36 | Needs a product decision before any design work               | —            |
+| Tier                          | Items | Theme                                                            | Rough effort |
+| ----------------------------- | ----- | ---------------------------------------------------------------- | ------------ |
+| ~~1 — Fix immediately~~       | 1–10  | **DONE** — the product no longer tells the user untrue things    | 1–2 days     |
+| ~~2 — Work on next~~          | 11–16 | **DONE** — one vocabulary, one action model, one page shell      | 1–2 weeks    |
+| ~~3 — Important, can follow~~ | 17–22 | **DONE** — the four redesigns, mobile capability, loading states | 2–4 weeks    |
+| 4 — Polish later              | 23–34 | Design-system consolidation and copy tone                        | ongoing      |
+| 5 — Defer until decided       | 35–36 | Needs a product decision before any design work                  | —            |
 
 **Why this order.** Tier 1 removes _wrong information_ — a button that lies about what it does,
 copy that promises a feature that does not exist, a control that is permanently dead. No amount of
@@ -1047,7 +1047,7 @@ carrying the rest.
 **Validated** `vitest run apps/web/src/studio apps/web/src/features/character-builder`, the full
 `apps/web/src` suite, and `bun run test:visual` — including the case that used to fail.
 
-## 22. Skeleton loading
+## ~~22. Skeleton loading~~ · DONE
 
 **Audit ID** LF-DS06 · **P2** · **M**
 
@@ -1077,9 +1077,25 @@ in the product (the Assets count).
 >
 > Validate with `vitest run apps/web/src/features apps/web/src/ui`.
 
-**Validation** `vitest run apps/web/src/features apps/web/src/ui`.
-**Risk** Tests that assert on "Loading …" text will need updating; keep the live-region text so
-they mostly still pass.
+**Outcome.** `apps/web/src/ui/primitives/Skeleton.tsx` owns the placeholder: two atoms (`line`,
+`poster`) and the two shapes this product repeats (`row`, `card`), all built from one exported
+`skeletonSurfaceStyles` material. The three placeholders that already existed were migrated onto
+it — the Dashboard's Continue card and Recent Work list, the Videos grid, and the Assets tab count,
+whose pill shape stays its tab list's and takes only the material — so the colour, radius and pulse
+now have one owner. Text fallbacks became reserved layout in the Projects ledger, the Campaigns
+grid, the Campaign detail's Project group and all three Project history groups.
+
+Every placeholder is `aria-hidden`, and each section keeps exactly one polite live region: the
+Dashboard reuses its existing Recent Work count region, and elsewhere the sentence moved into
+`VisuallyHidden role="status"`, the one role that primitive now accepts. The whole-route `Suspense`
+fallbacks in `ShellMain` and `AuthenticatedShell` stay text, as the prompt required — no layout is
+known there. `projectsLedgerSectionStyles` lost its `& > [role="status"]` rule, which existed only
+to pad and underline the loading paragraph that no longer renders.
+
+**Validated** `vitest run apps/web/src/features apps/web/src/ui apps/web/src/app` (**100** files,
+**717** tests); `bun run typecheck`, `lint`, `format:check`, `check:dead-code`, `check:modules`; and
+the Darwin visual matrix **50/50** with no baseline re-capture needed — the placeholders are
+transient and no captured screen shows one.
 
 ---
 

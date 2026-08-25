@@ -1,17 +1,7 @@
-import { keyframes, type CSSObject, type Theme } from '@emotion/react';
+import { type CSSObject, type Theme } from '@emotion/react';
 import { media } from '../../ui/media';
 import { pageScrollRegionStyles } from '../../ui/primitives/PageShell.styles';
-
-const skeletonPulse = keyframes({
-  '0%, 100%': { opacity: 0.48 },
-  '50%': { opacity: 0.82 },
-});
-
-const skeletonBlockStyles = (theme: Theme): CSSObject => ({
-  borderRadius: theme.radii.small,
-  background: theme.colors.surfaceStrong,
-  animation: `${skeletonPulse} 1.4s ease-in-out infinite`,
-});
+import { skeletonSurfaceStyles } from '../../ui/primitives/Skeleton';
 
 /** The recent list and everything that stands in for it reserve one box, so the region never jumps. */
 const RECENT_REGION_MIN_HEIGHT = '20rem';
@@ -113,7 +103,7 @@ export const processingStatusSkeletonStyles = (theme: Theme): CSSObject => ({
     content: '""',
     width: '0.75rem',
     height: '0.75rem',
-    ...skeletonBlockStyles(theme),
+    ...skeletonSurfaceStyles(theme),
   },
 });
 
@@ -269,10 +259,6 @@ export const continueSkeletonStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.sm,
   padding: theme.space.lg,
   border: `1px solid ${theme.colors.border}`,
-  '& span': { height: '0.8rem', ...skeletonBlockStyles(theme) },
-  '& span:nth-of-type(1)': { width: '42%' },
-  '& span:nth-of-type(2)': { width: '78%', height: '1.45rem' },
-  '& span:nth-of-type(3)': { width: '56%' },
 });
 
 export const recentWorkStyles = (theme: Theme): CSSObject => ({
@@ -348,12 +334,11 @@ export const recentSkeletonStyles = (theme: Theme): CSSObject => ({
     ...recentRowGeometry(theme),
     borderBlockEnd: `1px solid ${theme.colors.divider}`,
   },
-  '& span': { height: '0.8rem', ...skeletonBlockStyles(theme) },
-  '& span:first-of-type': { width: '100%', height: '3.25rem' },
-  '& span:last-of-type': { width: '62%' },
+  '& [data-skeleton="poster"]': { width: '100%', aspectRatio: 'auto', height: '3.25rem' },
+  '& [data-skeleton="line"]:last-of-type': { width: '62%' },
   [media.up('tablet')]: {
     '& li': { gridTemplateColumns: '6rem minmax(0, 1fr) 5.5rem' },
-    '& span:first-of-type': { height: '3.75rem' },
+    '& [data-skeleton="poster"]': { height: '3.75rem' },
   },
 });
 

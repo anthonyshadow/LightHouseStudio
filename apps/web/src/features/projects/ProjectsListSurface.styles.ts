@@ -84,12 +84,6 @@ export const projectsLedgerSectionStyles = (theme: Theme): CSSObject => ({
     marginBlockStart: theme.space.md,
     borderRadius: 0,
   },
-  '& > [role="status"]': {
-    margin: 0,
-    paddingBlock: theme.space.lg,
-    borderBlockEnd: `1px solid ${theme.colors.divider}`,
-    color: theme.colors.textMuted,
-  },
   '&[data-project-ledger-section="archived"] [data-project-status]': {
     color: theme.colors.textFaint,
   },
@@ -106,6 +100,12 @@ export const projectsLedgerListStyles = (): CSSObject => ({
   margin: 0,
   padding: 0,
   listStyle: 'none',
+});
+
+/** The row placeholder borrows the real row's separator so the ledger keeps its rhythm mid-load. */
+export const projectsLedgerSkeletonStyles = (theme: Theme): CSSObject => ({
+  ...projectsLedgerListStyles(),
+  '& > li': { borderBlockEnd: `1px solid ${theme.colors.divider}` },
 });
 
 export const projectsLedgerRowStyles = (theme: Theme): CSSObject => ({

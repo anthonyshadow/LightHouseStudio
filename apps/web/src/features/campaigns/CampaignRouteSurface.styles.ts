@@ -72,6 +72,17 @@ export const campaignCardStyles = (theme: Theme): CSSObject => ({
   },
 });
 
+/**
+ * The card placeholder keeps the real card's box and cover geometry, so the grid does not reflow
+ * when the Campaigns land.
+ */
+export const campaignSkeletonCardStyles = (theme: Theme): CSSObject => ({
+  ...campaignCardStyles(theme),
+  alignContent: 'start',
+  gap: theme.space.md,
+  '& [data-skeleton="poster"]': { width: 'min(4.5rem, 20vw)' },
+});
+
 export const projectGroupStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gap: theme.space.md,

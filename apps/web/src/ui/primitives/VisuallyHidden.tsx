@@ -13,6 +13,13 @@ export const visuallyHiddenStyles = (): CSSObject => ({
   border: 0,
 });
 
-export const VisuallyHidden = ({ children }: PropsWithChildren) => (
-  <span css={visuallyHiddenStyles()}>{children}</span>
+/**
+ * `role` exists for the one case that needs it: a section whose loading state is drawn as a
+ * skeleton still owes assistive technology a sentence, and `role="status"` on the hidden text is
+ * that sentence without a visible duplicate of what the skeleton already shows.
+ */
+export const VisuallyHidden = ({ children, role }: PropsWithChildren<{ role?: 'status' }>) => (
+  <span css={visuallyHiddenStyles()} role={role}>
+    {children}
+  </span>
 );
