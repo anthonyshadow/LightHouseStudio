@@ -5,9 +5,9 @@ import type {
   SavedVideoSummary,
   VideoJobQueueItem,
 } from '@studio/contracts';
-import { formatDate, formatDateTime } from '@studio/domain';
+import { formatDateTime, formatDuration } from '@studio/domain';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { listSavedVideos, savedVideoThumbnailUrl } from '../../adapters/api-client/savedVideosApi';
 import {
   abandonVideoJob,
@@ -19,8 +19,11 @@ import {
   ConfirmationDialog,
   emptyExampleStyles,
   EmptyStatePreview,
+  SegmentedControl,
   StatusNotice,
+  VisuallyHidden,
 } from '../../ui';
+import { PageHeader, PageShell } from '../../ui/primitives/PageShell';
 import { useCampaignList } from '../campaigns/useCampaignsController';
 import { VIDEO_TRANSFORM_OPERATION_LABELS } from '../existing-video/videoTransformLabels';
 import { KIND_ICONS } from '../projects/ProjectAssetThumbnail';
@@ -35,21 +38,27 @@ import {
 import {
   allDestinationsStyles,
   continuePanelStyles,
+  continueSkeletonStyles,
   dashboardBodyStyles,
   dashboardHeaderStyles,
   dashboardShellStyles,
   dashboardStyles,
   emptyRecentStyles,
-  onboardingStyles,
-  processingQueueStyles,
+  firstRunStyles,
+  processingNoticeStyles,
+  processingPanelStyles,
+  processingStatusSkeletonStyles,
+  processingTriggerStyles,
+  recentCountStyles,
   recentFilterStyles,
   recentListStyles,
+  recentSkeletonStyles,
   recentWorkStyles,
   sectionEyebrowStyles,
 } from './DashboardRouteSurface.styles';
-import { PageHeader, PageShell } from '../../ui/primitives/PageShell';
 
 const RECENT_LIMIT = 4;
+const DASHBOARD_VIEW_STATE_KEY = 'lightframeDashboardView';
 
 const jobOperationLabel = (operation: VideoJobQueueItem['operation']): string =>
   VIDEO_TRANSFORM_OPERATION_LABELS[operation];
@@ -95,6 +104,59 @@ type RecentWorkItem = Readonly<{
   open: () => void;
 }>;
 
+type DashboardViewState = Readonly<{
+  ownerUserId: string;
+  recentKind: RecentKind;
+  scrollTop: number;
+}>;
+
+const RECENT_KIND_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'videos', label: 'Videos', shortLabel: 'Video' },
+  { value: 'projects', label: 'Projects', shortLabel: 'Projects' },
+  { value: 'campaigns', label: 'Campaigns', shortLabel: 'Campaigns' },
+] as const;
+
+const isRecentKind = (value: unknown): value is RecentKind =>
+  RECENT_KIND_OPTIONS.some((option) => option.value === value);
+
+/** Route memory belongs to this history entry, so Back restores the view without persistent data. */
+const readDashboardViewState = (ownerUserId: string): DashboardViewState | null => {
+  if (typeof window === 'undefined') return null;
+  const historyState: unknown = window.history.state;
+  if (!historyState || typeof historyState !== 'object') return null;
+  const candidate = (historyState as Record<string, unknown>)[DASHBOARD_VIEW_STATE_KEY];
+  if (!candidate || typeof candidate !== 'object') return null;
+  const state = candidate as Record<string, unknown>;
+  if (
+    state.ownerUserId !== ownerUserId ||
+    !isRecentKind(state.recentKind) ||
+    typeof state.scrollTop !== 'number' ||
+    !Number.isFinite(state.scrollTop) ||
+    state.scrollTop < 0
+  ) {
+    return null;
+  }
+  return {
+    ownerUserId,
+    recentKind: state.recentKind,
+    scrollTop: state.scrollTop,
+  };
+};
+
+const writeDashboardViewState = (state: DashboardViewState): void => {
+  if (typeof window === 'undefined') return;
+  const current =
+    window.history.state && typeof window.history.state === 'object'
+      ? (window.history.state as Record<string, unknown>)
+      : {};
+  try {
+    window.history.replaceState({ ...current, [DASHBOARD_VIEW_STATE_KEY]: state }, '');
+  } catch {
+    // Private or embedded browser contexts may reject history writes; the route still works.
+  }
+};
+
 const recentKindLabel: Record<ItemKind, string> = {
   projects: 'Project',
   videos: 'Video',
@@ -112,12 +174,7 @@ const recentKindIcon = (kind: ItemKind) => {
   }
 };
 
-/**
- * What a row says when it has no poster.
- *
- * A Campaign never has one — it organizes Projects rather than producing video — so saying "no
- * preview yet" there would describe a wait that is never coming.
- */
+/** Campaigns never produce a poster, so their empty tile must not imply one is still loading. */
 const recentEmptyCaption = (kind: ItemKind): string =>
   kind === 'campaigns' ? 'Campaign' : 'No preview yet';
 
@@ -137,13 +194,20 @@ export const DashboardRouteSurface = ({
 }: DashboardRouteSurfaceProps) => {
   const theme = useTheme();
   const queryClient = useQueryClient();
+  const routeRef = useRef<HTMLElement | null>(null);
+  const rememberedView = readDashboardViewState(ownerUserId);
   const [onboardingVisible, setOnboardingVisible] = useState(
     () => !loadDashboardOnboardingDismissed(ownerUserId),
   );
   const [onboardingStorageWarning, setOnboardingStorageWarning] = useState(false);
-  const [recentKind, setRecentKind] = useState<RecentKind>('all');
+  const [recentKind, setRecentKind] = useState<RecentKind>(
+    () => rememberedView?.recentKind ?? 'all',
+  );
   const [selectedJob, setSelectedJob] = useState<VideoJobQueueItem | null>(null);
+  const [expandedQueueKey, setExpandedQueueKey] = useState<string | null>(null);
   const [queueNotice, setQueueNotice] = useState<string | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
   const projectsQuery = useProjectList('active');
   const campaignsQuery = useCampaignList('active');
   const videosQuery = useInfiniteQuery({
@@ -167,10 +231,12 @@ export const DashboardRouteSurface = ({
     mutationFn: (jobId: string) => abandonVideoJob(jobId),
     onSuccess: async () => {
       setSelectedJob(null);
+      setExpandedQueueKey(null);
       setQueueNotice('The job was removed from Lightframe and the processing slot is available.');
       await queryClient.invalidateQueries({ queryKey: activeJobsQuery.queryKey });
     },
   });
+
   const projects = useMemo(
     () => (projectsQuery.data?.pages.flatMap((page) => page.projects) ?? []).slice(0, RECENT_LIMIT),
     [projectsQuery.data],
@@ -189,6 +255,10 @@ export const DashboardRouteSurface = ({
     () => projectPosterUrls(projectsQuery.data?.pages),
     [projectsQuery.data],
   );
+  const campaignNames = useMemo(
+    () => new Map(campaigns.map((campaign) => [campaign.id, campaign.name])),
+    [campaigns],
+  );
   const recentItems = useMemo<readonly RecentWorkItem[]>(
     () =>
       [
@@ -196,7 +266,10 @@ export const DashboardRouteSurface = ({
           id: project.id,
           kind: 'projects' as const,
           title: project.title,
-          meta: project.campaignId === null ? 'No Campaign' : 'Campaign Project',
+          meta:
+            project.campaignId === null
+              ? 'No Campaign'
+              : (campaignNames.get(project.campaignId) ?? 'Campaign Project'),
           updatedAt: project.updatedAt,
           posterUrl: projectPosters.get(project.id) ?? null,
           open: () => onOpenProject(project.id),
@@ -207,7 +280,6 @@ export const DashboardRouteSurface = ({
           title: video.title,
           meta: `${video.versionCount} Version${video.versionCount === 1 ? '' : 's'}`,
           updatedAt: video.updatedAt,
-          // The list response already says whether a poster exists, so no row asks for one blindly.
           posterUrl: video.thumbnailAvailable
             ? savedVideoThumbnailUrl(video.id, video.currentVersion.id)
             : null,
@@ -223,8 +295,18 @@ export const DashboardRouteSurface = ({
           open: () => onOpenCampaign(campaign.id),
         })),
       ].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
-    [campaigns, onOpenCampaign, onOpenProject, onOpenVideo, projectPosters, projects, videos],
+    [
+      campaignNames,
+      campaigns,
+      onOpenCampaign,
+      onOpenProject,
+      onOpenVideo,
+      projectPosters,
+      projects,
+      videos,
+    ],
   );
+
   const visibleItems = recentItems
     .filter((item) => recentKind === 'all' || item.kind === recentKind)
     .slice(0, RECENT_LIMIT);
@@ -249,8 +331,54 @@ export const DashboardRouteSurface = ({
   } as const;
   const visibleLoading = visibleKinds.some((kind) => queryState[kind].loading);
   const visibleErrors = visibleKinds.filter((kind) => queryState[kind].error);
+  const allQueriesReady =
+    !projectsQuery.isLoading &&
+    !projectsQuery.isError &&
+    !videosQuery.isLoading &&
+    !videosQuery.isError &&
+    !campaignsQuery.isLoading &&
+    !campaignsQuery.isError;
+  const firstRun =
+    allQueriesReady && projects.length === 0 && videos.length === 0 && campaigns.length === 0;
   const queueJobs = processingQueueQuery.data?.jobs ?? [];
   const queueActive = queueJobs.length > 0;
+  const queueKey = queueJobs
+    .map((job) => job.jobId)
+    .sort()
+    .join(':');
+  const queueExpanded = queueActive && expandedQueueKey === queueKey;
+  const earliestQueueStart = queueJobs.reduce<number | null>((earliest, job) => {
+    const createdAt = Date.parse(job.createdAt);
+    if (!Number.isFinite(createdAt)) return earliest;
+    return earliest === null ? createdAt : Math.min(earliest, createdAt);
+  }, null);
+  const queueElapsed = formatDuration(
+    earliestQueueStart === null ? 0 : Math.max(0, nowMs - earliestQueueStart),
+  );
+
+  useLayoutEffect(() => {
+    const restoredView = readDashboardViewState(ownerUserId);
+    if (routeRef.current) routeRef.current.scrollTop = restoredView?.scrollTop ?? 0;
+  }, [ownerUserId]);
+
+  useEffect(() => {
+    if (!queueActive) return;
+    const interval = window.setInterval(() => setNowMs(Date.now()), 1_000);
+    return () => window.clearInterval(interval);
+  }, [queueActive]);
+
+  const rememberView = (nextRecentKind = recentKind) => {
+    writeDashboardViewState({
+      ownerUserId,
+      recentKind: nextRecentKind,
+      scrollTop: routeRef.current?.scrollTop ?? 0,
+    });
+  };
+
+  const updateRecentKind = (kind: RecentKind) => {
+    setRecentKind(kind);
+    rememberView(kind);
+  };
 
   const dismissOnboarding = () => {
     const persisted = persistDashboardOnboardingDismissed(ownerUserId);
@@ -258,13 +386,19 @@ export const DashboardRouteSurface = ({
     setOnboardingStorageWarning(!persisted);
   };
 
-  // One entry per filter so a new kind cannot update its message without its example and action.
-  const emptyRecent = {
+  const emptyRecent: Record<
+    RecentKind,
+    Readonly<{
+      message: string;
+      example: string;
+      action: Readonly<{ label: string; run: () => void }> | null;
+    }>
+  > = {
     all: {
       message: 'No recent work yet. Start with a standalone video and organize it later if needed.',
       example:
         'Your latest Videos, Projects and Campaigns will line up here once you make something.',
-      action: { label: 'Create video', run: onCreateVideo },
+      action: null,
     },
     videos: {
       message: 'No saved Videos yet. Create or upload one when you are ready.',
@@ -282,11 +416,54 @@ export const DashboardRouteSurface = ({
       example: 'For example: a “Spring launch” Campaign holding one Project per ad placement.',
       action: { label: 'New Campaign', run: onCreateCampaign },
     },
-  }[recentKind];
+  };
+  const activeEmptyRecent = emptyRecent[recentKind];
+  const recentCountLabel = visibleLoading
+    ? 'Loading recent work'
+    : visibleErrors.length > 0
+      ? 'Recent work count unavailable'
+      : `${visibleItems.length} recent item${visibleItems.length === 1 ? '' : 's'}`;
+
+  const processingAction = processingQueueQuery.isLoading ? (
+    <span css={processingStatusSkeletonStyles(theme)} role="status">
+      Checking jobs
+    </span>
+  ) : processingQueueQuery.isError ? (
+    <Button
+      size="small"
+      variant="secondary"
+      css={processingTriggerStyles(theme, 'error')}
+      aria-label="Processing queue unavailable. Retry"
+      onClick={() => void processingQueueQuery.refetch()}
+    >
+      <AppIcon name="info" width="1rem" height="1rem" />
+      <span data-processing-label>Queue unavailable</span>
+    </Button>
+  ) : queueActive ? (
+    <Button
+      size="small"
+      variant="secondary"
+      css={processingTriggerStyles(theme, 'active')}
+      aria-label={`${queueJobs.length} processing job${queueJobs.length === 1 ? '' : 's'}, elapsed ${queueElapsed}`}
+      aria-expanded={queueExpanded}
+      aria-controls="processing-queue-panel"
+      onClick={() =>
+        setExpandedQueueKey((expandedKey) => (expandedKey === queueKey ? null : queueKey))
+      }
+    >
+      <span data-processing-count>{queueJobs.length}</span>
+      <span data-processing-label>Processing · {queueElapsed}</span>
+    </Button>
+  ) : null;
 
   return (
-    <section css={dashboardStyles(theme)} aria-labelledby="dashboard-heading">
-      <PageShell css={dashboardShellStyles()}>
+    <section
+      ref={routeRef}
+      css={dashboardStyles(theme)}
+      aria-labelledby="dashboard-heading"
+      onScroll={() => rememberView()}
+    >
+      <PageShell css={dashboardShellStyles(theme)}>
         <PageHeader
           css={dashboardHeaderStyles(theme)}
           eyebrow={`Welcome back, ${displayName}`}
@@ -295,219 +472,44 @@ export const DashboardRouteSurface = ({
           description="Resume focused Project work or start a standalone video."
           actions={
             <div data-dashboard-actions>
-              <Button variant="primary" onClick={onCreateVideo}>
+              <Button data-create-video variant="primary" onClick={onCreateVideo}>
+                <AppIcon name="plus" width="1rem" height="1rem" />
                 Create video
               </Button>
-              <Button variant="quiet" onClick={onOpenAssets}>
-                Browse Assets
+              <Button
+                data-browse-assets
+                variant="secondary"
+                aria-label="Browse Assets"
+                onClick={onOpenAssets}
+              >
+                <AppIcon name="assets" width="1rem" height="1rem" />
+                <span data-browse-label>Browse Assets</span>
               </Button>
+              {processingAction}
             </div>
           }
         />
 
-        {onboardingVisible ? (
-          <aside css={onboardingStyles(theme)} aria-labelledby="dashboard-getting-started-heading">
-            <h2 id="dashboard-getting-started-heading" data-onboarding-heading>
-              Start with the outcome you need
-            </h2>
-            <AppIcon name="info" data-onboarding-icon />
-            <p>
-              Organization is optional. Use <strong>Projects</strong> for focused workflows and{' '}
-              <strong>Campaigns</strong> to group initiatives.
-            </p>
-            <Button size="small" variant="quiet" onClick={dismissOnboarding}>
-              Got it
-            </Button>
-          </aside>
-        ) : null}
-        {onboardingStorageWarning ? (
-          <StatusNotice role="status" tone="warning" title="Preference not retained">
-            Lightframe could not save this account-scoped onboarding preference in this browser.
-          </StatusNotice>
-        ) : null}
-
-        <div css={dashboardBodyStyles(theme)}>
-          <div data-dashboard-primary-column>
-            <section aria-labelledby="continue-heading">
-              <h2 id="continue-heading" css={sectionEyebrowStyles(theme)}>
-                Continue Work
-              </h2>
-              {projectsQuery.isLoading ? <p role="status">Finding recent work…</p> : null}
-              {projectsQuery.isError ? (
-                <StatusNotice role="alert" tone="danger" title="Projects unavailable">
-                  <Button size="small" variant="quiet" onClick={() => void projectsQuery.refetch()}>
-                    Retry
-                  </Button>
-                </StatusNotice>
-              ) : null}
-              {continueProject ? (
-                <article css={continuePanelStyles(theme)}>
-                  <span data-project-context>
-                    {continueProject.campaignId === null ? 'No Campaign' : 'Campaign Project'}
-                  </span>
-                  <h3>{continueProject.title}</h3>
-                  <time dateTime={continueProject.updatedAt}>
-                    Updated {formatDate(continueProject.updatedAt)}
-                  </time>
-                  <Button
-                    variant="primary"
-                    aria-label={`Continue ${continueProject.title}`}
-                    onClick={() => onOpenProject(continueProject.id)}
-                  >
-                    Continue Project
-                    <AppIcon name="chevronRight" width="1rem" height="1rem" />
-                  </Button>
-                </article>
-              ) : !projectsQuery.isLoading && !projectsQuery.isError ? (
-                <div css={continuePanelStyles(theme)} data-empty="true">
-                  <h3>No active Project yet</h3>
-                  <p>Create one only when resumable context will help.</p>
-                  <Button variant="secondary" onClick={onCreateProject}>
-                    New Project
-                  </Button>
-                </div>
-              ) : null}
-            </section>
-          </div>
-
-          <section css={recentWorkStyles(theme)} aria-labelledby="recent-work-heading">
+        {queueExpanded && queueActive ? (
+          <section
+            id="processing-queue-panel"
+            css={processingPanelStyles(theme)}
+            aria-labelledby="processing-queue-heading"
+          >
             <header>
-              <h2 id="recent-work-heading" css={sectionEyebrowStyles(theme)}>
-                Recent Work
-              </h2>
-              <div role="group" aria-label="Filter recent work" css={recentFilterStyles(theme)}>
-                {(['all', 'videos', 'projects', 'campaigns'] as const).map((kind) => (
-                  <button
-                    key={kind}
-                    type="button"
-                    aria-pressed={recentKind === kind}
-                    onClick={() => setRecentKind(kind)}
-                  >
-                    {kind === 'all' ? 'All' : `${kind[0]?.toUpperCase()}${kind.slice(1)}`}
-                  </button>
-                ))}
+              <div>
+                <h2 id="processing-queue-heading">Processing Queue</h2>
+                <p>Provider video edits active for this account.</p>
               </div>
-            </header>
-
-            {visibleLoading ? <p role="status">Loading recent work…</p> : null}
-            {visibleErrors.map((kind) => (
-              <StatusNotice
-                key={kind}
-                role="alert"
-                tone="danger"
-                title={`${recentKindLabel[kind]}s unavailable`}
-              >
-                <Button size="small" variant="quiet" onClick={queryState[kind].retry}>
-                  Retry
-                </Button>
-              </StatusNotice>
-            ))}
-
-            {visibleItems.length > 0 ? (
-              <ul css={recentListStyles(theme)}>
-                {visibleItems.map((item) => (
-                  <li key={`${item.kind}-${item.id}`}>
-                    <button type="button" onClick={item.open}>
-                      <span data-recent-poster="">
-                        {/* Decorative: the button's own text already names the work. */}
-                        <WorkPosterTile
-                          decorative
-                          playBadge={item.kind !== 'campaigns'}
-                          icon={
-                            item.kind === 'campaigns' ? (
-                              <AppIcon name={recentKindIcon(item.kind)} />
-                            ) : (
-                              KIND_ICONS.video
-                            )
-                          }
-                          thumbnailUrl={item.posterUrl}
-                          emptyCaption={recentEmptyCaption(item.kind)}
-                          failedCaption="Preview didn’t load"
-                          label={item.title}
-                          kindNoun={recentKindLabel[item.kind]}
-                          unavailable={false}
-                        />
-                      </span>
-                      <span data-recent-title>
-                        <strong>{item.title}</strong>
-                        <span>
-                          {recentKindLabel[item.kind]} · {item.meta}
-                        </span>
-                      </span>
-                      <time dateTime={item.updatedAt}>{formatDate(item.updatedAt)}</time>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : !visibleLoading && visibleErrors.length === 0 ? (
-              <div css={emptyRecentStyles(theme)}>
-                <EmptyStatePreview variant="rows" />
-                <p>{emptyRecent.message}</p>
-                <p data-empty-example css={emptyExampleStyles(theme)}>
-                  {emptyRecent.example}
-                </p>
-                <Button size="small" variant="quiet" onClick={emptyRecent.action.run}>
-                  {emptyRecent.action.label}
-                </Button>
-              </div>
-            ) : null}
-
-            <footer css={allDestinationsStyles(theme)}>
-              <Button size="small" variant="quiet" onClick={onOpenProjects}>
-                All Projects
-              </Button>
-              <Button size="small" variant="quiet" onClick={onOpenVideos}>
-                All Videos
-              </Button>
-              <Button size="small" variant="quiet" onClick={onOpenCampaigns}>
-                All Campaigns
-              </Button>
-            </footer>
-          </section>
-        </div>
-
-        <section
-          css={processingQueueStyles(theme)}
-          data-queue-state={queueActive ? 'active' : 'idle'}
-          aria-labelledby="processing-queue-heading"
-        >
-          <header>
-            <div data-queue-summary>
-              <h2 id="processing-queue-heading">Processing Queue</h2>
-              {queueActive ? <p>Queued and active provider video edits for this account.</p> : null}
-              {processingQueueQuery.isLoading ? (
-                <p role="status">Checking processing jobs…</p>
-              ) : null}
-              {!queueActive && !processingQueueQuery.isLoading && !processingQueueQuery.isError ? (
-                <p data-empty-queue>No queued or active video jobs.</p>
-              ) : null}
-            </div>
-            <Button
-              size="small"
-              variant="quiet"
-              disabled={processingQueueQuery.isFetching}
-              onClick={() => void processingQueueQuery.refetch()}
-            >
-              Refresh
-            </Button>
-          </header>
-          {processingQueueQuery.isError ? (
-            <StatusNotice role="alert" tone="danger" title="Processing queue unavailable">
               <Button
                 size="small"
-                variant="quiet"
+                variant="link"
+                disabled={processingQueueQuery.isFetching}
                 onClick={() => void processingQueueQuery.refetch()}
               >
-                Retry
+                Refresh
               </Button>
-            </StatusNotice>
-          ) : null}
-          {queueNotice ? (
-            <StatusNotice role="status" tone="success" title="Processing slot released">
-              {queueNotice}
-            </StatusNotice>
-          ) : null}
-          {queueActive ? (
+            </header>
             <ul>
               {queueJobs.map((job) => (
                 <li key={job.jobId}>
@@ -532,8 +534,208 @@ export const DashboardRouteSurface = ({
                 </li>
               ))}
             </ul>
-          ) : null}
-        </section>
+          </section>
+        ) : null}
+
+        {queueNotice ? (
+          <div css={processingNoticeStyles(theme)}>
+            <StatusNotice role="status" tone="success" title="Processing slot released">
+              {queueNotice}
+            </StatusNotice>
+          </div>
+        ) : null}
+
+        {firstRun && onboardingVisible ? (
+          <aside css={firstRunStyles(theme)} aria-labelledby="dashboard-getting-started-heading">
+            <span data-first-run-icon>
+              <AppIcon name="wand" width="1.25rem" height="1.25rem" />
+            </span>
+            <div data-first-run-copy>
+              <h2 id="dashboard-getting-started-heading">Make your first reusable video</h2>
+              <p>
+                Record in Studio or upload a source, edit and save versions, then reuse the result.
+                Projects keep focused work together; Campaigns are optional organizers.
+              </p>
+            </div>
+            <Button size="small" variant="quiet" onClick={dismissOnboarding}>
+              Got it
+            </Button>
+          </aside>
+        ) : null}
+        {onboardingStorageWarning ? (
+          <StatusNotice role="status" tone="warning" title="Preference not retained">
+            Lightframe could not save this account-scoped onboarding preference in this browser.
+          </StatusNotice>
+        ) : null}
+
+        <div data-dashboard-body css={dashboardBodyStyles(theme)}>
+          <section data-continue-section aria-labelledby="continue-heading">
+            <h2 id="continue-heading" css={sectionEyebrowStyles(theme)}>
+              Continue Work
+            </h2>
+            {projectsQuery.isLoading ? (
+              <div css={continueSkeletonStyles(theme)} role="status">
+                <VisuallyHidden>Finding recent Project work…</VisuallyHidden>
+                <span />
+                <span />
+                <span />
+              </div>
+            ) : null}
+            {projectsQuery.isError ? (
+              <StatusNotice role="alert" tone="danger" title="Projects unavailable">
+                <Button size="small" variant="quiet" onClick={() => void projectsQuery.refetch()}>
+                  Retry
+                </Button>
+              </StatusNotice>
+            ) : null}
+            {continueProject ? (
+              <article css={continuePanelStyles(theme)}>
+                <div data-continue-copy>
+                  <span data-project-context>
+                    {continueProject.campaignId === null
+                      ? 'No Campaign'
+                      : (campaignNames.get(continueProject.campaignId) ?? 'Campaign Project')}
+                  </span>
+                  <h3>{continueProject.title}</h3>
+                  <time dateTime={continueProject.updatedAt}>
+                    Updated {formatDateTime(continueProject.updatedAt)}
+                  </time>
+                </div>
+                <Button
+                  variant="secondary"
+                  aria-label={`Continue ${continueProject.title}`}
+                  onClick={() => onOpenProject(continueProject.id)}
+                >
+                  Continue Project
+                  <AppIcon name="chevronRight" width="1rem" height="1rem" />
+                </Button>
+              </article>
+            ) : !projectsQuery.isLoading && !projectsQuery.isError ? (
+              <div css={continuePanelStyles(theme)} data-empty="true">
+                <div data-continue-copy>
+                  <h3>No active Project yet</h3>
+                  <p>Create one only when resumable context will help.</p>
+                </div>
+                <Button variant="secondary" onClick={onCreateProject}>
+                  New Project
+                </Button>
+              </div>
+            ) : null}
+          </section>
+
+          <section
+            data-recent-section
+            css={recentWorkStyles(theme)}
+            aria-labelledby="recent-work-heading"
+          >
+            <header>
+              <div>
+                <h2 id="recent-work-heading" css={sectionEyebrowStyles(theme)}>
+                  Recent Work
+                </h2>
+                <span css={recentCountStyles(theme)} role="status" aria-live="polite">
+                  {recentCountLabel}
+                </span>
+              </div>
+              <div css={recentFilterStyles()}>
+                <SegmentedControl
+                  label="Filter recent work"
+                  value={recentKind}
+                  options={RECENT_KIND_OPTIONS}
+                  onChange={updateRecentKind}
+                />
+              </div>
+            </header>
+
+            {visibleErrors.map((kind) => (
+              <StatusNotice
+                key={kind}
+                role="alert"
+                tone="danger"
+                title={`${recentKindLabel[kind]}s unavailable`}
+              >
+                <Button size="small" variant="quiet" onClick={queryState[kind].retry}>
+                  Retry
+                </Button>
+              </StatusNotice>
+            ))}
+
+            {visibleLoading ? (
+              <ul css={recentSkeletonStyles(theme)} aria-hidden="true">
+                {Array.from({ length: RECENT_LIMIT }, (_, index) => (
+                  <li key={index}>
+                    <span />
+                    <span />
+                    <span />
+                  </li>
+                ))}
+              </ul>
+            ) : visibleItems.length > 0 && visibleErrors.length === 0 ? (
+              <ul css={recentListStyles(theme)}>
+                {visibleItems.map((item) => (
+                  <li key={`${item.kind}-${item.id}`}>
+                    <button type="button" onClick={item.open}>
+                      <span data-recent-poster="">
+                        <WorkPosterTile
+                          decorative
+                          playBadge={item.kind !== 'campaigns'}
+                          icon={
+                            item.kind === 'campaigns' ? (
+                              <AppIcon name={recentKindIcon(item.kind)} />
+                            ) : (
+                              KIND_ICONS.video
+                            )
+                          }
+                          thumbnailUrl={item.posterUrl}
+                          emptyCaption={recentEmptyCaption(item.kind)}
+                          failedCaption="Preview didn’t load"
+                          label={item.title}
+                          kindNoun={recentKindLabel[item.kind]}
+                          unavailable={false}
+                        />
+                      </span>
+                      <span data-recent-title>
+                        <strong>{item.title}</strong>
+                        <span>
+                          {recentKindLabel[item.kind]} · {item.meta}
+                        </span>
+                      </span>
+                      <time dateTime={item.updatedAt}>{formatDateTime(item.updatedAt)}</time>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : !visibleLoading && visibleErrors.length === 0 ? (
+              <div css={emptyRecentStyles(theme)}>
+                <EmptyStatePreview variant="rows" />
+                <p>{activeEmptyRecent.message}</p>
+                <p data-empty-example css={emptyExampleStyles(theme)}>
+                  {activeEmptyRecent.example}
+                </p>
+                {activeEmptyRecent.action ? (
+                  <Button size="small" variant="link" onClick={activeEmptyRecent.action.run}>
+                    {activeEmptyRecent.action.label}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
+
+            <footer css={allDestinationsStyles(theme)} aria-label="Work collections">
+              <Button size="small" variant="link" onClick={onOpenProjects}>
+                <AppIcon name="projects" />
+                All Projects
+              </Button>
+              <Button size="small" variant="link" onClick={onOpenVideos}>
+                <AppIcon name="video" />
+                All Videos
+              </Button>
+              <Button size="small" variant="link" onClick={onOpenCampaigns}>
+                <AppIcon name="campaigns" />
+                All Campaigns
+              </Button>
+            </footer>
+          </section>
+        </div>
       </PageShell>
 
       <ConfirmationDialog

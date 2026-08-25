@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { CampaignContract, ProjectContract, SavedVideoSummary } from '@studio/contracts';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HttpResponse, http } from 'msw';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -95,6 +95,7 @@ describe('DashboardRouteSurface', () => {
   afterEach(() => {
     cleanup();
     window.localStorage.clear();
+    window.history.replaceState(null, '');
     vi.restoreAllMocks();
   });
 
@@ -136,6 +137,10 @@ describe('DashboardRouteSurface', () => {
     expect(await screen.findByRole('button', { name: 'Continue Launch cut' })).toBeVisible();
     expect(screen.getByText('Launch master')).toBeVisible();
     expect(screen.getByText('Summer launch')).toBeVisible();
+    expect(screen.getByText('3 recent items')).toBeVisible();
+    expect(
+      screen.queryByRole('heading', { name: 'Make your first reusable video' }),
+    ).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Continue Launch cut' }));
     expect(actions.onOpenProject).toHaveBeenCalledWith(project.id);
 
@@ -261,24 +266,31 @@ describe('DashboardRouteSurface', () => {
     );
     const user = userEvent.setup();
     const first = renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
-    const explainer = screen.getByRole('heading', { name: 'Start with the outcome you need' });
+    expect(
+      screen.queryByRole('heading', { name: 'Make your first reusable video' }),
+    ).not.toBeInTheDocument();
+    const explainer = await screen.findByRole('heading', {
+      name: 'Make your first reusable video',
+    });
     expect(explainer).toBeVisible();
     // The vocabulary is defined before the sections that use it: Recent Work shows "No Campaign"
     // and a Campaigns filter, so the explainer must not follow them.
     const recentWork = screen.getByRole('heading', { name: 'Recent Work' });
     expect(explainer.compareDocumentPosition(recentWork)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     await user.click(screen.getByRole('button', { name: 'Got it' }));
-    expect(screen.queryByRole('heading', { name: 'Start with the outcome you need' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Make your first reusable video' })).toBeNull();
     first.unmount();
 
     const sameAccount = renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
     await waitFor(() =>
-      expect(screen.queryByRole('heading', { name: 'Start with the outcome you need' })).toBeNull(),
+      expect(screen.queryByRole('heading', { name: 'Make your first reusable video' })).toBeNull(),
     );
     sameAccount.unmount();
 
     renderDashboard('312490eb-3e08-4f89-9246-fb2e917063ce');
-    expect(screen.getByRole('heading', { name: 'Start with the outcome you need' })).toBeVisible();
+    expect(
+      await screen.findByRole('heading', { name: 'Make your first reusable video' }),
+    ).toBeVisible();
   });
 
   it('turns an empty recent-work filter into the appropriate next action', async () => {
@@ -321,7 +333,96 @@ describe('DashboardRouteSurface', () => {
     expect(actions.onCreateCampaign).toHaveBeenCalledOnce();
   });
 
-  it('leads with the work and keeps an idle queue to one line without losing Refresh', async () => {
+  it('restores the recent-work filter and route scroll position on return', async () => {
+    mockApiServer.use(
+      http.get('*/api/projects', () =>
+        HttpResponse.json({
+          projects: [project],
+          nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
+        }),
+      ),
+      http.get('*/api/campaigns', () =>
+        HttpResponse.json({
+          campaigns: [campaign],
+          nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
+        }),
+      ),
+      http.get('*/api/videos', () =>
+        HttpResponse.json({
+          videos: [video],
+          nextCursor: null,
+          total: 1,
+          facets: { characterNames: [], formats: ['landscape'] },
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    const ownerUserId = '0ce89b50-55d7-4d7a-a370-c5e1df4fb197';
+    const first = renderDashboard(ownerUserId);
+
+    await user.click(await screen.findByRole('button', { name: 'Campaigns' }));
+    const route = screen.getByRole('region', { name: 'Dashboard' });
+    Object.defineProperty(route, 'scrollTop', { configurable: true, value: 240, writable: true });
+    fireEvent.scroll(route);
+    first.unmount();
+
+    renderDashboard(ownerUserId);
+    expect(await screen.findByRole('button', { name: 'Campaigns' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('region', { name: 'Dashboard' }).scrollTop).toBe(240);
+  });
+
+  it('keeps a processing-query failure compact and retryable in the masthead', async () => {
+    let queueReads = 0;
+    mockApiServer.use(
+      http.get('*/api/video-jobs', () => {
+        queueReads += 1;
+        return queueReads === 1
+          ? HttpResponse.json({ message: 'Unavailable' }, { status: 503 })
+          : HttpResponse.json({ jobs: [] });
+      }),
+      http.get('*/api/projects', () =>
+        HttpResponse.json({
+          projects: [project],
+          nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
+        }),
+      ),
+      http.get('*/api/campaigns', () =>
+        HttpResponse.json({
+          campaigns: [campaign],
+          nextCursor: null,
+          total: { count: 1, exceedsCeiling: false },
+        }),
+      ),
+      http.get('*/api/videos', () =>
+        HttpResponse.json({
+          videos: [video],
+          nextCursor: null,
+          total: 1,
+          facets: { characterNames: [], formats: ['landscape'] },
+        }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderDashboard('7d374693-a9dd-49d5-85d8-8b01b22520dc');
+
+    const retry = await screen.findByRole('button', {
+      name: 'Processing queue unavailable. Retry',
+    });
+    expect(screen.queryByRole('heading', { name: 'Processing Queue' })).not.toBeInTheDocument();
+    await user.click(retry);
+    await waitFor(() => expect(queueReads).toBe(2));
+    expect(
+      screen.queryByRole('button', { name: 'Processing queue unavailable. Retry' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('leads with the work and removes an idle processing queue from the page', async () => {
     mockApiServer.use(
       http.get('*/api/projects', () =>
         HttpResponse.json({
@@ -348,19 +449,11 @@ describe('DashboardRouteSurface', () => {
     );
     renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
 
-    // Idle: a status and Refresh, without the section description or a job list under them.
-    expect(await screen.findByText('No queued or active video jobs.')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Refresh' })).toBeVisible();
-    expect(
-      screen.queryByText('Queued and active provider video edits for this account.'),
-    ).not.toBeInTheDocument();
-
-    const queue = screen.getByRole('heading', { name: 'Processing Queue' });
-    const precedesQueue = (heading: HTMLElement) =>
-      Boolean(heading.compareDocumentPosition(queue) & Node.DOCUMENT_POSITION_FOLLOWING);
-    // What the operator has made comes before an engineering queue that is usually empty.
-    expect(precedesQueue(await screen.findByRole('heading', { name: 'Continue Work' }))).toBe(true);
-    expect(precedesQueue(screen.getByRole('heading', { name: 'Recent Work' }))).toBe(true);
+    expect(await screen.findByRole('heading', { name: 'Continue Work' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Recent Work' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Processing Queue' })).not.toBeInTheDocument();
+    expect(screen.queryByText('No queued or active video jobs.')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Refresh' })).not.toBeInTheDocument();
   });
 
   it('shows active processing and requires an upstream-cost warning before releasing its slot', async () => {
@@ -417,22 +510,22 @@ describe('DashboardRouteSurface', () => {
     const user = userEvent.setup();
     renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
 
+    const disclosure = await screen.findByRole('button', { name: /1 processing job/u });
+    expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('heading', { name: 'Processing Queue' })).not.toBeInTheDocument();
+    await user.click(disclosure);
     expect(await screen.findByRole('heading', { name: 'Processing Queue' })).toBeVisible();
     expect(await screen.findByText('Virtual Try-On')).toBeVisible();
-    // A job present expands the queue back into a full section, description and all.
-    expect(
-      screen.getByText('Queued and active provider video edits for this account.'),
-    ).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Remove from queue' }));
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText(/provider has no verified cancellation API/i)).toBeVisible();
     await user.click(within(dialog).getByRole('button', { name: 'Remove from queue' }));
 
     await waitFor(() => expect(abandonBody).toEqual({ acknowledgeProviderMayContinue: true }));
-    expect(await screen.findByText('No queued or active video jobs.')).toBeVisible();
-    expect(
-      screen.queryByText('Queued and active provider video edits for this account.'),
-    ).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /processing job/u })).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByRole('heading', { name: 'Processing Queue' })).not.toBeInTheDocument();
     expect(screen.getByText(/processing slot is available/i)).toBeVisible();
   });
 });

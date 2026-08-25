@@ -5,7 +5,7 @@ import type { AssetCountState } from '../../features/assets/AssetLibraryTabs';
 import { CreativeLibrarySyncNotice } from '../../features/creative-assets/CreativeLibrarySyncNotice';
 import { AssetCreationLauncher } from '../../studio/AssetCreationLauncher';
 import { HowLightframeWorksPanel } from '../../studio/HowLightframeWorksPanel';
-import { headerRegionStyles } from '../../studio/StudioApp.styles';
+import { creativeSyncNoticeRegionStyles, headerRegionStyles } from '../../studio/StudioApp.styles';
 import { StudioHeader } from '../../studio/StudioHeader';
 import { ShellCreativeBuilders } from './ShellCreativeBuilders';
 import type { useStudioLogoutController } from '../../studio/useStudioLogoutController';
@@ -92,12 +92,14 @@ export const ShellChrome = ({ services, user, session, logout }: ShellChromeProp
           }}
           onLogout={() => void logout.request()}
         />
-        {/*
-          One mount, in the chrome rather than on `/assets`. A paused library silently affects every
-          Character and Outfit save wherever the operator is, the Asset libraries are fullscreen
-          overlays that would hide a hub-level notice, and sitting outside the main grid keeps it
-          clear of the Studio stage.
-        */}
+      </div>
+      {/*
+        One mount, in the chrome rather than on `/assets`. A paused library silently affects every
+        Character and Outfit save wherever the operator is, the Asset libraries are fullscreen
+        overlays that would hide a hub-level notice, and the dedicated shell row keeps it clear of
+        both the navigation and the active surface.
+      */}
+      <div css={creativeSyncNoticeRegionStyles(theme)} data-creative-sync-notice-region="">
         <CreativeLibrarySyncNotice {...sync} />
       </div>
 

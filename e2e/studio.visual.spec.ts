@@ -379,11 +379,13 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await page.goto('/dashboard');
       await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
       await expect(
-        page.getByRole('heading', { name: 'Start with the outcome you need' }),
-      ).toBeVisible();
+        page.getByRole('heading', { name: 'Make your first reusable video' }),
+      ).toHaveCount(0);
       await expect(page.getByRole('heading', { name: 'Continue Work' })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Recent Work' })).toBeVisible();
+      await expect(page.getByText('3 recent items', { exact: true })).toBeVisible();
       await expect(page.getByRole('button', { name: 'All Campaigns' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Processing Queue' })).toHaveCount(0);
       await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
     },
   },

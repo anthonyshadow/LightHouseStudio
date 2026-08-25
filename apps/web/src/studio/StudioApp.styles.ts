@@ -24,7 +24,10 @@ export const shellStyles = (): CSSObject => ({
   height: '100%',
   display: 'grid',
   gridTemplateColumns: '11.5rem minmax(0, 1fr)',
-  gridTemplateRows: 'minmax(0, 1fr)',
+  // The optional account-library recovery notice owns the first content row. When absent its
+  // wrapper is empty and this row collapses to zero; when present it reduces the main viewport
+  // instead of overflowing the navigation rail or covering the active surface.
+  gridTemplateRows: 'auto minmax(0, 1fr)',
   gap: 0,
   minWidth: 0,
   minHeight: 0,
@@ -40,11 +43,13 @@ export const shellStyles = (): CSSObject => ({
   [media.down('compact')]: {
     '--studio-shell-rail-width': '0rem',
     gridTemplateColumns: 'minmax(0, 1fr)',
-    gridTemplateRows: '3.5rem minmax(0, 1fr)',
+    gridTemplateRows: '3.5rem auto minmax(0, 1fr)',
   },
 });
 
 export const headerRegionStyles = (theme: Theme): CSSObject => ({
+  gridColumn: 1,
+  gridRow: '1 / span 2',
   position: 'relative',
   zIndex: theme.layers.stageNotices + 1,
   minWidth: 0,
@@ -55,7 +60,43 @@ export const headerRegionStyles = (theme: Theme): CSSObject => ({
     borderInlineEnd: `1px solid ${theme.colors.divider}`,
   },
   [media.down('compact')]: {
+    gridColumn: 1,
+    gridRow: 1,
     borderBlockEnd: `1px solid ${theme.colors.divider}`,
+  },
+});
+
+/**
+ * A bounded shell row for the actionable creative-library recovery notice.
+ *
+ * The navigation header has a fixed responsive footprint. Keeping this notice inside that header
+ * made it start below a full-height desktop rail and overflow a 3.5rem mobile bar, so it was either
+ * unreachable or painted over the route masthead. Its own row stays visible without changing the
+ * active surface's scroll ownership; at extreme text sizes the notice scrolls instead of removing
+ * the main viewport entirely.
+ */
+export const creativeSyncNoticeRegionStyles = (theme: Theme): CSSObject => ({
+  gridColumn: 2,
+  gridRow: 1,
+  display: 'grid',
+  minWidth: 0,
+  minHeight: 0,
+  maxHeight: 'min(20rem, 45vh)',
+  overflowX: 'hidden',
+  overflowY: 'auto',
+  overscrollBehavior: 'contain',
+  background: theme.colors.canvas,
+  '& > [data-creative-sync-notice]': {
+    margin: `${theme.space.sm} clamp(${theme.space.sm}, 2vw, ${theme.space.lg})`,
+  },
+  '@supports (height: 100dvh)': { maxHeight: 'min(20rem, 45dvh)' },
+  [media.down('compact')]: {
+    gridColumn: 1,
+    gridRow: 2,
+    // Keeps the complete compact Dashboard masthead above the fixed mobile navigation at 320×568.
+    maxHeight: 'min(20rem, 44vh)',
+    '& > [data-creative-sync-notice]': { margin: `0 ${theme.space.xs}` },
+    '@supports (height: 100dvh)': { maxHeight: 'min(20rem, 44dvh)' },
   },
 });
 
@@ -489,6 +530,8 @@ export const mainGridStyles = (
   projectContextActive = false,
   dashboardRouteActive = false,
 ): CSSObject => ({
+  gridColumn: 2,
+  gridRow: 2,
   display: 'grid',
   gridTemplateColumns: projectContextActive
     ? 'minmax(0, 1.45fr) minmax(20rem, 25rem)'
@@ -505,6 +548,8 @@ export const mainGridStyles = (
     : {}),
   /** Clears the fixed bottom navigation the shell renders below 48rem. */
   [media.down('compact')]: {
+    gridColumn: 1,
+    gridRow: 3,
     paddingBlockEnd: `max(4.5rem, calc(env(safe-area-inset-bottom) + 4.5rem))`,
   },
   ...(projectContextActive

@@ -2,7 +2,7 @@ import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
 import { focusRingStyles } from '../theme';
 
-export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger';
+export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'link' | 'danger';
 export type ButtonSize = 'small' | 'regular';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -66,6 +66,19 @@ export const buttonVariantStyles = (theme: Theme, variant: ButtonVariant): CSSOb
       '&:hover:not(:disabled):not([aria-disabled="true"])': {
         color: theme.colors.text,
         background: theme.colors.surfaceStrong,
+      },
+    },
+    link: {
+      minWidth: 0,
+      paddingInline: 0,
+      color: theme.colors.accent,
+      background: 'transparent',
+      textDecoration: 'underline',
+      textDecorationColor: `color-mix(in srgb, ${theme.colors.accent} 48%, transparent)`,
+      textUnderlineOffset: '0.22em',
+      '&:hover:not(:disabled):not([aria-disabled="true"])': {
+        color: theme.colors.accentStrong,
+        textDecorationColor: 'currentColor',
       },
     },
     danger: {

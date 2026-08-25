@@ -10,7 +10,7 @@ Review → optional Virtual Try On, Character Swap, and/or Voice → Save to Ass
 fixed-viewport workspace with one media stage for as long as the operator is in Studio; tools are
 focus-managed overlays and must never remount the media while they are open. Leaving Studio releases
 the stage entirely — organization routes mount no media at all. Live AI camera transformation is an explicitly gated Beta flow.
-Character Builder creates a reusable Lucy 2.5 character from approachable visual choices, an
+Character Builder creates a reusable character from approachable visual choices, an
 optional upload, and an optional paid reference generation. The post-recording editor adopts a
 validated upload or normalized local recording as an immutable source, then allows zero or one
 visual edit (Character Swap or Virtual Try On) and an optional Voice edit before comparison and
@@ -41,9 +41,12 @@ download.
   action, availability, and Account.
 - Dashboard, Projects, Campaigns, Assets, and Project workspaces share the organization shell.
   Desktop and tablet use the existing left navigation rail. Mobile uses the existing compact top
-  bar and four-item bottom navigation for Dashboard, Projects, Campaigns, and Assets. Standalone
-  Create remains the separate context/exit workspace.
+  bar and five-item bottom navigation for Dashboard, Studio, Projects, Campaigns, and Assets.
+  Standalone Create remains the separate context/exit workspace.
 - Every page has one visible page-level `h1`; the brand is a Dashboard link rather than the heading.
+- Actionable shell-wide recovery notices occupy a bounded row above the active surface and collapse
+  completely when absent. They never share the navigation's stacking layer or cover route actions;
+  at 320×568 the notice, Dashboard masthead, and fixed mobile navigation remain separately usable.
 - Use one primary action per screen, consistent overflow menus for secondary actions, actionable
   empty states, section-scoped loading/retry, and explicit save destinations.
 
@@ -144,11 +147,29 @@ card/button language.
 - Preserve every existing dialog, route, API contract, focus behavior, live announcement, and
   empty/loading/error state. The redesign changes presentation and information hierarchy only.
 
+## Dashboard UX direction
+
+- `/dashboard` serves two truthful states in the same product composition: first-run explains what
+  can be made and offers one direct Create video path; returning use leads with the single most
+  resumable Project and a wider merged Recent Work list.
+- Keep exactly one mint page action: Create video. Continue Project is secondary and Browse Assets
+  remains visibly actionable without competing with Create video.
+- Show the account-scoped organization explainer only in a first-run-ish state, before any Project
+  or Campaign vocabulary. Its dismissal and Help rediscovery remain unchanged.
+- Treat processing as ambient status. Idle or failing queue reads must not own a page section;
+  active jobs expand on demand while retaining operation, provider, elapsed time, abandon, and the
+  honest warning that provider cost may continue.
+- Use the shared `PageShell` and `PageHeader`, the existing `SegmentedControl`, poster-led Recent
+  Work rows, teaching per-kind empty states, section-scoped retries, and layout-reserving skeletons.
+- At 80rem and above, Recent Work receives the larger column. At 40–64rem and below, use one
+  reading order with Continue Work as a full-width band. On mobile, keep Create video in the first
+  viewport, keep the masthead compact, and clear the fixed 4.5rem bottom navigation.
+
 ## Project workspace UX direction
 
 - `/projects/:projectId/workspace` uses the same organization shell as Dashboard, Projects, and
   Campaigns: the exact existing left navigation rail at widths of 48rem and above, and the exact
-  existing compact mobile header plus four-item bottom navigation below 48rem. Projects remains the
+  existing compact mobile header plus five-item bottom navigation below 48rem. Projects remains the
   active destination. Do not create a second or workspace-specific navigation system.
 - Keep the one media stage mounted and visibly framed at every supported viewport in Studio. The
   video must never collapse to zero height, disappear behind the Project panel, or be obscured by
