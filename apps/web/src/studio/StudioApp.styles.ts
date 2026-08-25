@@ -316,7 +316,10 @@ export const mobileNavigationStyles = (theme: Theme): CSSObject => ({
     insetBlockEnd: 0,
     minHeight: `calc(4.5rem + env(safe-area-inset-bottom))`,
     display: 'grid',
-    gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+    // Equal columns, however many destinations the bar carries; a count here would be one more
+    // thing to keep in step with the list that decides it.
+    gridAutoFlow: 'column',
+    gridAutoColumns: 'minmax(0, 1fr)',
     gap: theme.space.xxs,
     padding: `${theme.space.xxs} max(${theme.space.xs}, env(safe-area-inset-right)) max(${theme.space.xxs}, env(safe-area-inset-bottom)) max(${theme.space.xs}, env(safe-area-inset-left))`,
     borderBlockStart: `1px solid ${theme.colors.borderStrong}`,
