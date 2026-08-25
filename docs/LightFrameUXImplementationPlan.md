@@ -942,7 +942,7 @@ and 320×568 layouts are viewport-bound and preserve the pathname-keyed overlay 
 Linux Assets matrix **8/8**; and **100/100** curated platform baselines with zero missing or
 removable files.
 
-## 20. Dashboard recomposition
+## ~~20. Dashboard recomposition~~ · DONE
 
 **Audit IDs** LF-D02, LF-D03, LF-D05 · **P2** · **M** · **Superdesign**
 
@@ -956,6 +956,30 @@ Brief: [Superdesign prompts → Dashboard & First-Run](LightFrameSuperdesignProm
 **Validation** `vitest run apps/web/src/features/dashboard`, then `bun run test:visual`.
 **Risk** Low. Keep the merged Recent Work model and the per-kind empty states — they are among the
 product's best work.
+
+**Outcome.** The [Superdesign Dashboard canvas](https://superdesign.dev/teams/f9376128-4a55-4b38-9911-1a7296821fc5/projects/c0a41969-c270-4cda-bb9d-de33960c2862)
+now owns the explored baseline and final responsive direction. The implementation keeps one mint
+`Create video` primary, makes `Browse Assets` a bounded secondary control, gives the wider desktop
+column to the merged Recent Work list, and collapses to Continue → Recent below the `desktop`
+breakpoint. First-run guidance appears only after all three work queries honestly resolve empty;
+returning accounts do not see it. The processing queue is absent while idle, a compact retry while
+unavailable, and an elapsed-time disclosure while active; its provider/cost warning remains in the
+existing confirmation path. Continue and Recent use footprint-stable skeletons, the recent filter
+uses `SegmentedControl` with a live count, collection actions use the new `Button` `link` variant,
+and per-kind empty states remain intact. History-entry state restores the recent filter and route
+scroll position on return without adding persistent account data. The shell-wide account-library
+recovery notice now owns a bounded row above the active surface, so its controls remain reachable
+without covering the Dashboard masthead, header popovers, or fixed mobile navigation.
+
+**Validated** focused Dashboard suites **11/11**; full repository `bun run quality` (**262** files
+passed, **4** skipped; **2,014** tests passed, **9** skipped); built-production smoke **1/1**;
+functional browser journeys **86/86**, including returning, first-run and paused-sync Dashboard
+geometry, axe, overflow and 200%-text checks at 1440×960, 1280×720, 834×1112, 390×844 and 320×568; reviewed
+Dashboard visual cases **2/2** on Darwin and **2/2** on pinned Playwright Linux; and **100/100**
+curated platform baselines with zero missing or removable files. The complete Darwin visual sweep
+is **45/50**: five untouched Assets overview/filter baselines already disagree with their current
+rendering, so they were diagnosed on both reused and clean Vite servers and deliberately not
+regenerated as part of this Dashboard change.
 
 ## ~~21. Keep AI tools available below 64rem~~ · DONE
 

@@ -1,10 +1,12 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import type { CapabilitiesResponse } from '@studio/contracts';
+import type { CreativeAssetStore } from '@studio/domain';
 import { TEST_AUTH_SESSION } from './support/authFixture';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 import { CAMPAIGNS_PATH } from './support/studioRoutes';
 import {
+  CREATIVE_ASSET_STORAGE_KEY,
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
   readBrowserState,
@@ -200,13 +202,51 @@ const representativeViewports = [
   { name: 'small mobile', ...STUDIO_VIEWPORT_SIZES.smallMobile },
 ] as const;
 
-// The Dashboard layout has one breakpoint at 768. These three cover both sides of it plus the
-// tightest width on each: anything between them re-runs an identical assertion path.
+// Dashboard composition is a product contract at every canonical responsive level, not only at
+// the shell navigation switch.
 const dashboardViewports = [
   { name: 'full desktop', ...STUDIO_VIEWPORT_SIZES.fullDesktop },
+  { name: 'compact desktop', ...STUDIO_VIEWPORT_SIZES.compactDesktop },
   { name: 'tablet portrait', ...STUDIO_VIEWPORT_SIZES.tabletPortrait },
+  { name: 'mobile portrait', ...STUDIO_VIEWPORT_SIZES.mobilePortrait },
   { name: 'small mobile', ...STUDIO_VIEWPORT_SIZES.smallMobile },
 ] as const;
+
+const LOCAL_CREATIVE_STORE = {
+  schemaVersion: 7,
+  savedPrompts: [
+    {
+      id: 'local-dashboard-prompt',
+      title: 'Local Dashboard Prompt',
+      prompt: 'The preserved local creative-library prompt.',
+      modelModeId: 'lucy-latest',
+      source: 'manual',
+      referenceImageAssetId: null,
+      vtonInputKind: null,
+      enhancePrompt: false,
+      tags: ['local'],
+      createdAt: '2026-08-20T12:00:00.000Z',
+      updatedAt: '2026-08-20T12:00:00.000Z',
+      lastUsedAt: '2026-08-20T12:00:00.000Z',
+      useCount: 1,
+    },
+  ],
+  recentPrompts: [],
+  savedCharacterPrompts: [],
+  savedCharacterVariants: [],
+} satisfies CreativeAssetStore;
+
+const REMOTE_CREATIVE_STORE = {
+  ...LOCAL_CREATIVE_STORE,
+  savedPrompts: [
+    {
+      ...LOCAL_CREATIVE_STORE.savedPrompts[0]!,
+      id: 'remote-dashboard-prompt',
+      title: 'Remote Dashboard Prompt',
+      tags: ['remote'],
+    },
+  ],
+} satisfies CreativeAssetStore;
 
 for (const viewport of representativeViewports) {
   test(`${viewport.name} preparation is accessible and viewport-bound`, async ({ page }) => {
@@ -327,7 +367,39 @@ for (const viewport of dashboardViewports) {
     await expect(page.getByRole('button', { name: 'Create video' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Continue Work' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Recent Work' })).toBeVisible();
+    await expect(page.getByText('3 recent items', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Make your first reusable video' })).toHaveCount(
+      0,
+    );
+    await expect(page.getByRole('heading', { name: 'Processing Queue' })).toHaveCount(0);
     await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
+
+    const [createBox, dashboardHeaderBox, continueBox, recentBox, shellBox] = await Promise.all([
+      page.getByRole('button', { name: 'Create video' }).boundingBox(),
+      page
+        .getByRole('region', { name: 'Dashboard' })
+        .locator(':scope > div > header')
+        .boundingBox(),
+      page.locator('[data-continue-section]').boundingBox(),
+      page.locator('[data-recent-section]').boundingBox(),
+      page.getByRole('region', { name: 'Dashboard' }).locator(':scope > div').boundingBox(),
+    ]);
+    expect(createBox).not.toBeNull();
+    expect(dashboardHeaderBox).not.toBeNull();
+    expect(continueBox).not.toBeNull();
+    expect(recentBox).not.toBeNull();
+    expect(shellBox).not.toBeNull();
+    expect(createBox!.y + createBox!.height).toBeLessThanOrEqual(viewport.height);
+    if (viewport.width < 640) {
+      expect(dashboardHeaderBox!.height).toBeLessThanOrEqual(viewport.height / 3 + 16);
+    }
+    expect(shellBox!.width).toBeLessThanOrEqual(1_408 + 1);
+    if (viewport.width >= 1_280) {
+      expect(recentBox!.x).toBeGreaterThan(continueBox!.x + continueBox!.width);
+      expect(recentBox!.width).toBeGreaterThan(continueBox!.width);
+    } else {
+      expect(recentBox!.y).toBeGreaterThan(continueBox!.y + continueBox!.height);
+    }
 
     const desktopNavigation = page.getByRole('navigation', { name: 'Primary', exact: true });
     const mobileNavigation = page.getByRole('navigation', {
@@ -373,6 +445,126 @@ for (const viewport of dashboardViewports) {
     expectNoExternalProviderTraffic(network);
   });
 }
+
+for (const viewport of dashboardViewports) {
+  test(`${viewport.name} first-run Dashboard explains the first reusable-video flow`, async ({
+    page,
+  }) => {
+    const network = await installSuccessfulStudioHarness(page);
+    await installCampaignHarness(page);
+    await installProjectHarness(page);
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('/dashboard');
+
+    const createVideo = page.getByRole('button', { name: 'Create video' });
+    const firstRunHeading = page.getByRole('heading', {
+      name: 'Make your first reusable video',
+    });
+    await expect(createVideo).toBeVisible();
+    await expect(firstRunHeading).toBeVisible();
+    await expect(
+      page.getByText(/Record in Studio or upload a source, edit and save versions/u),
+    ).toBeVisible();
+    await expect(page.getByText('0 recent items', { exact: true })).toBeVisible();
+
+    const [createBox, firstRunBox, continueBox] = await Promise.all([
+      createVideo.boundingBox(),
+      firstRunHeading.locator('xpath=ancestor::aside').boundingBox(),
+      page.locator('[data-continue-section]').boundingBox(),
+    ]);
+    expect(createBox).not.toBeNull();
+    expect(firstRunBox).not.toBeNull();
+    expect(continueBox).not.toBeNull();
+    expect(createBox!.y + createBox!.height).toBeLessThanOrEqual(viewport.height);
+    expect(firstRunBox!.y + firstRunBox!.height).toBeLessThanOrEqual(viewport.height);
+    expect(continueBox!.y).toBeGreaterThanOrEqual(firstRunBox!.y + firstRunBox!.height);
+
+    await expectNoDocumentOverflow(page);
+    await expectNoAxeViolations(page);
+    expect((await readBrowserState(page)).cameraCalls).toBe(0);
+    expectNoExternalProviderTraffic(network);
+  });
+}
+
+test('paused account-library sync keeps the Dashboard and recovery controls unoccluded', async ({
+  page,
+}) => {
+  await page.addInitScript(
+    ({ storageKey, store }) => localStorage.setItem(storageKey, JSON.stringify(store)),
+    { storageKey: CREATIVE_ASSET_STORAGE_KEY, store: LOCAL_CREATIVE_STORE },
+  );
+  const network = await installSuccessfulStudioHarness(page, {
+    creativeLibraryRemoteState: { revision: 1, store: REMOTE_CREATIVE_STORE },
+  });
+  await installCampaignHarness(page, true);
+  await installProjectHarness(page, true, { includeUnassignedVideo: true });
+  await page.goto('/dashboard');
+
+  const notice = page.locator('[data-creative-sync-notice]');
+  const noticeRegion = page.locator('[data-creative-sync-notice-region]');
+  const main = page.getByRole('main');
+  const createVideo = page.getByRole('button', { name: 'Create video' });
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText('Account library sync paused');
+
+  for (const viewport of dashboardViewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+
+    const [noticeBox, noticeRegionBox, mainBox, createBox] = await Promise.all([
+      notice.boundingBox(),
+      noticeRegion.boundingBox(),
+      main.boundingBox(),
+      createVideo.boundingBox(),
+    ]);
+    expect(noticeBox).not.toBeNull();
+    expect(noticeRegionBox).not.toBeNull();
+    expect(mainBox).not.toBeNull();
+    expect(createBox).not.toBeNull();
+    expect(noticeBox!.x).toBeGreaterThanOrEqual(-1);
+    expect(noticeBox!.x + noticeBox!.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(noticeBox!.y).toBeGreaterThanOrEqual(noticeRegionBox!.y - 1);
+    expect(noticeBox!.y + noticeBox!.height).toBeLessThanOrEqual(
+      noticeRegionBox!.y + noticeRegionBox!.height + 1,
+    );
+    expect(mainBox!.y).toBeGreaterThanOrEqual(noticeRegionBox!.y + noticeRegionBox!.height - 1);
+    expect(createBox!.x).toBeGreaterThanOrEqual(-1);
+    expect(createBox!.x + createBox!.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(createBox!.y + createBox!.height).toBeLessThanOrEqual(viewport.height);
+
+    const regionScroll = await noticeRegion.evaluate((region) => ({
+      clientHeight: region.clientHeight,
+      scrollHeight: region.scrollHeight,
+    }));
+    expect(regionScroll.scrollHeight).toBeLessThanOrEqual(regionScroll.clientHeight + 1);
+
+    for (const action of await notice.getByRole('button').all()) {
+      const actionBox = await action.boundingBox();
+      expect(actionBox).not.toBeNull();
+      expect(actionBox!.x).toBeGreaterThanOrEqual(noticeBox!.x - 1);
+      expect(actionBox!.x + actionBox!.width).toBeLessThanOrEqual(
+        noticeBox!.x + noticeBox!.width + 1,
+      );
+      expect(actionBox!.y).toBeGreaterThanOrEqual(noticeRegionBox!.y - 1);
+      expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(
+        noticeRegionBox!.y + noticeRegionBox!.height + 1,
+      );
+    }
+
+    if (viewport.width < 768) {
+      const mobileNavigationBox = await page
+        .getByRole('navigation', { name: 'Mobile primary', exact: true })
+        .boundingBox();
+      expect(mobileNavigationBox).not.toBeNull();
+      expect(createBox!.y + createBox!.height).toBeLessThanOrEqual(mobileNavigationBox!.y - 1);
+    }
+
+    await expectNoDocumentOverflow(page);
+  }
+
+  await expectNoAxeViolations(page);
+  expect((await readBrowserState(page)).cameraCalls).toBe(0);
+  expectNoExternalProviderTraffic(network);
+});
 
 test('small-mobile Dashboard remains usable at 200% text', async ({ page }) => {
   const network = await installSuccessfulStudioHarness(page);

@@ -250,6 +250,71 @@
         }
       },
       "updatedAt": "2026-08-24T03:11:37Z"
+    },
+    "/dashboard": {
+      "targetKind": "existing-ui",
+      "projectId": "c0a41969-c270-4cda-bb9d-de33960c2862",
+      "baselineDraftId": "0a1c40f0-2458-4894-820d-7e8fc69a9084",
+      "activeDraftId": "0a1c40f0-2458-4894-820d-7e8fc69a9084",
+      "designSystemPath": ".superdesign/design-system.md",
+      "referenceIds": ["apps-web-public-favicon.svg"],
+      "brandAssets": {
+        "logo": {
+          "assetKey": "apps-web-public-favicon.svg",
+          "url": "https://vgbujcuwptvheqijyjbe.supabase.co/storage/v1/object/public/hmac-uploads/projects/c0a41969-c270-4cda-bb9d-de33960c2862/brand-assets/apps-web-public-favicon.svg/favicon.svg",
+          "sourcePath": "apps/web/public/favicon.svg"
+        }
+      },
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        ".superdesign/init/layouts.md",
+        "apps/web/src/ui/theme.ts",
+        "apps/web/src/ui/StudioDesignProvider.tsx",
+        "apps/web/src/ui/media.ts",
+        "apps/web/src/ui/primitives/Button.tsx",
+        "apps/web/src/ui/primitives/PageShell.tsx",
+        "apps/web/src/ui/primitives/PageShell.styles.ts",
+        "apps/web/src/ui/primitives/StatusNotice.tsx",
+        "apps/web/src/ui/primitives/EmptyStatePreview.tsx",
+        "apps/web/src/ui/primitives/AppIcon.tsx",
+        "apps/web/src/studio/StudioHeader.tsx",
+        "apps/web/src/studio/StudioApp.styles.ts",
+        "apps/web/src/app/shell/ShellChrome.tsx",
+        "apps/web/src/app/shell/ShellMain.tsx",
+        "apps/web/src/features/projects/WorkPosterTile.tsx",
+        "apps/web/src/features/projects/ProjectAssetThumbnail.tsx",
+        "apps/web/src/features/dashboard/DashboardRouteSurface.tsx",
+        "apps/web/src/features/dashboard/DashboardRouteSurface.styles.ts"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "dd5122f7eb0a26a656217a4e59d92dedf88a0d689cb5dd9fa538605a5c95bc2c",
+        ".superdesign/init/layouts.md": "6c6aaaafc0b30b75aa0565fe3a93aa47817f1debae5b4dcabf190f77d9972eb2",
+        "apps/web/src/ui/theme.ts": "626cbc3bef3b1df450f441545744b5a40173bfdabf6f061a6949ec28336ac1a5",
+        "apps/web/src/ui/StudioDesignProvider.tsx": "0d2743c24ff70c86cb81b8b2df57ce1d222f5a66131c1dd8b8746998a5ec8f9c",
+        "apps/web/src/ui/media.ts": "fab4f59c856d46dc81ae6854bdb2fb78b2ef608a9a38b629f32c645c71b9be6e",
+        "apps/web/src/ui/primitives/Button.tsx": "cfdb5a28fd127eb5ac2db03d6061e4c6d625f4ea08b4047eab2f8f119721c83d",
+        "apps/web/src/ui/primitives/PageShell.tsx": "ea58aa79826126afc5a1ac01d33c5edf298d9e8366f0f97f96095b69144a618f",
+        "apps/web/src/ui/primitives/PageShell.styles.ts": "7c4797de2a7b1bb063b1c6d38ba5f4c853dfac72d33a0a00e40ff293929979cc",
+        "apps/web/src/ui/primitives/StatusNotice.tsx": "9f31a9af1ec27276fe8673f60d7eb901777a2f597d96efc4d71a1f6ec5092d78",
+        "apps/web/src/ui/primitives/EmptyStatePreview.tsx": "503ef9750f4a31811771eee939e76a1e04aa984a04248ff613e14cb9aa1afb93",
+        "apps/web/src/ui/primitives/AppIcon.tsx": "ff5e222461affff020974c8ca778db2dc439fbdcc8cb8d7ca5ca138a9be3fffa",
+        "apps/web/src/studio/StudioHeader.tsx": "ea6cc7cb978769ca168e19d828e1d27c847e6ff42ba3082b319af686df38424c",
+        "apps/web/src/studio/StudioApp.styles.ts": "373613cdd3564e52e38a72352a508985b6ead7ac6bc8f9eb8163137ef437acdb",
+        "apps/web/src/app/shell/ShellChrome.tsx": "3e07e515dba62959e416c7520596574ad1e01978a831e20de25b7c063e18b7f0",
+        "apps/web/src/app/shell/ShellMain.tsx": "0b585c7e213b2e36d926fcc9ff32eb620f32debfb0beaa3256d804eb7f6afd2d",
+        "apps/web/src/features/projects/WorkPosterTile.tsx": "b23dffc23d49475b0a1f586705c6f1dbf3b6f78c39a9f9c5f23b68621d201117",
+        "apps/web/src/features/projects/ProjectAssetThumbnail.tsx": "e658f0a811b340191cb1e1a3a0fdb415360bfbd855dbf7755f30a0606cc38182",
+        "apps/web/src/features/dashboard/DashboardRouteSurface.tsx": "44d1386e58c4e6d3f096a11cef7e94dc01f062b252403b2dcd924dad79d2c1c8",
+        "apps/web/src/features/dashboard/DashboardRouteSurface.styles.ts": "21fa97cc5f6423a9e70cd65a127b7822158651ecadf3bb22c5129f8f6bad3ef7"
+      },
+      "drafts": {
+        "0a1c40f0-2458-4894-820d-7e8fc69a9084": {
+          "title": "Final Lightframe Dashboard",
+          "visualDirection": "v1 faithful baseline; v2 calm responsive first-run and returning composition with ambient processing",
+          "currentVersion": 2
+        }
+      },
+      "updatedAt": "2026-08-25T00:14:33Z"
     }
   }
 }

@@ -24,11 +24,11 @@ describe('Dashboard header styles', () => {
     });
 
     // The shell carries no rule for the slot, at any width, so it cannot compete from above.
-    expect(JSON.stringify(dashboardShellStyles())).not.toContain('data-page-actions');
+    expect(JSON.stringify(dashboardShellStyles(studioTheme))).not.toContain('data-page-actions');
   });
 
   it('leaves the shell owning only what the scroll region needs', () => {
-    const shell = dashboardShellStyles();
+    const shell = dashboardShellStyles(studioTheme);
     // The fixed bottom navigation would otherwise sit over the last rows of a scrolled Dashboard.
     expect(JSON.stringify(shell)).toContain('safe-area-inset-bottom');
     expect(JSON.stringify(shell)).not.toContain('data-dashboard-actions');

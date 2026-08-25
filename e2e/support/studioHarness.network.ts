@@ -410,7 +410,7 @@ export const installProviderNetworkDriver = async (
             addOutfitAvailable: options.wardrobeAddOutfitAvailable ?? false,
           },
           savedVideos: { directMultipartUpload: false },
-          creativeLibrary: { cloudMirror: false },
+          creativeLibrary: { cloudMirror: options.creativeLibraryRemoteState !== undefined },
         } satisfies CapabilitiesResponse),
       });
       return;
@@ -418,6 +418,14 @@ export const installProviderNetworkDriver = async (
 
     if (requestUrl.pathname === '/api/creative-library' && route.request().method() === 'GET') {
       network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      if (options.creativeLibraryRemoteState) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(options.creativeLibraryRemoteState),
+        });
+        return;
+      }
       await route.fulfill({
         status: 404,
         contentType: 'application/json',

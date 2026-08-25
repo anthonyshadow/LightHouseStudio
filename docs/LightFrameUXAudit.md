@@ -64,7 +64,12 @@ Tier 2 also removed a latent defect neither this audit nor the plan had found: *
 popover that sat inside an `OverlayPanel` closed the whole panel**, because `useDismissiblePopover`
 listened in the bubble phase behind the panel's own handler.
 
-Tiers 3–5 are open. Everything else in this document still describes the product as audited.
+Step 20 of Tier 3 is complete (2026-08-24). LF-D02, LF-D03 and LF-D05 are fixed by the
+Superdesign-led Dashboard recomposition; the adjacent Dashboard-only LF-D06/07 primitive drift was
+removed in the same coherent change. Responsive QA also moved the paused account-library recovery
+notice into its own bounded shell row so it no longer covers Dashboard content or header popovers.
+The remaining Tier 3–5 work is open. Everything else in this document still describes the product
+as audited.
 
 ---
 
@@ -98,7 +103,7 @@ defects — they are stale docs that will mislead the next person who reads them
 | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | "Nothing is marked active while in Studio" (IA1)                                                                                                  | `docs/product-audit/03-ui-ux-audit.md`                  | **Fixed.** `StudioHeader.tsx` now lists `studio` in `destinations`; `aria-current="page"` resolves.                                                               |
 | "Videos and Voices show no count" (IA2)                                                                                                           | same                                                    | **Fixed.** `AssetsRouteSurface.tsx` queries both, with a three-state `AssetCountState` and a real skeleton.                                                       |
-| Dashboard order is "greeting → onboarding → Processing Queue → Continue → Recent"                                                                 | same                                                    | **Changed.** Current order is header → Continue + Recent → onboarding → Processing Queue. The new order has its own problem (see LF-D04), but not that one.       |
+| Dashboard order is "greeting → onboarding → Processing Queue → Continue → Recent"                                                                 | same                                                    | **Changed by item 20.** Header → optional ambient processing detail → first-run-only guidance → Continue + Recent; an idle queue renders nothing.                 |
 | "Unassigned Content — These legacy or independently saved videos have no trustworthy producing Project…" is the first thing in the Videos library | same                                                    | **Fixed.** Now a single `No Project` chip (`VideoGallery.tsx:212`).                                                                                               |
 | Exposed jargon list: `Revision 5`, `working media`, `presented media`, `creative checkpoint`, `Save creative setup`, `Media Asset`                | same                                                    | **Mostly fixed.** Replaced with "current cut", "Creative setup", "Save progress". One raw string survives — see **LF-X04**, which is worse than any on that list. |
 | "Mobile uses … **four-item** bottom navigation for Dashboard, Projects, Campaigns, and Assets"                                                    | `.superdesign/design-system.md`                         | **Five items.** `StudioHeader.tsx` renders the same `destinations` array (incl. Studio) into `mobileNavigationStyles`, which is `repeat(5, …)`.                   |
@@ -184,23 +189,19 @@ turns them into pages breaks the "keep your place" behaviour deliberately built 
   (`DashboardRouteSurface.tsx`, the `emptyRecent` map). This is a strong pattern.
 - Errors are section-scoped with a Retry, not page-level.
 
-**Does not work.**
+**Fixed since the audit.**
 
-- **Layout is inverted against content.** `dashboardBodyStyles` gives the left column
-  `1.5fr` and the right `1fr`. The left column holds exactly one card ("Continue Work"); the
-  right holds the actual list. The baseline screenshot shows ~350px of dead space under the
-  Continue panel.
-- **No page max-width.** `dashboardStyles` sets `marginInline: 'auto'` with no `maxWidth`, so on
-  a 2560px display the header spans the full viewport while every sibling page is constrained.
-- **The explainer is below the content it explains.** The "Organization is optional. Use
-  Projects… and Campaigns…" line renders _after_ Recent Work. A user meets "No Campaign",
-  "Campaign Project" and a Campaigns filter tab before they are told what those mean.
-- **Processing Queue is an operations panel on a creative home.** Even idle it takes a bordered
-  section with a Refresh control. In the baseline it renders a full-width red error block.
-- **`Browse Assets` does not look like a control** — `paddingInline: 0` on a `quiet` button
-  makes it read as body text next to a filled primary.
-- The Recent filter is a **bespoke** toggle group (10px uppercase, `aria-pressed`, no container)
-  while the product owns `SegmentedControl`.
+- ~~**Layout is inverted against content.**~~ **Fixed** — Continue is the compact `0.72fr` column
+  and the merged list owns `1.75fr`; below `desktop` they follow one Continue → Recent reading order.
+- ~~**No page max-width.**~~ **Fixed by item 14** — `PageShell` caps the page at 88rem.
+- ~~**The explainer is below the content it explains.**~~ **Fixed by item 9, then refined by item
+  20** — outcome-led guidance precedes the work and renders only for a data-confirmed first run.
+- ~~**Processing Queue is an operations panel on a creative home.**~~ **Fixed** — idle is absent,
+  failure is a compact masthead retry, and active work is a collapsed elapsed-time disclosure.
+- ~~**`Browse Assets` does not look like a control.**~~ **Fixed** — it is a bordered secondary
+  button beside the sole mint primary and retains an icon-only accessible label at 320px.
+- ~~The Recent filter is a **bespoke** toggle group.~~ **Fixed for visual consistency** — it uses
+  the shared `SegmentedControl`, while the audit's separate semantics finding A4 remains open.
 
 ## 2.3 Studio `/studio/create`
 
@@ -868,7 +869,7 @@ with no page-level border or radius and no `borderRadius: 0` policy.
 | ------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------- | ----------- |
 | LF-E01       | `EntryPage.tsx:82`                           | First sentence uses "Project" and "Campaigns" as proper nouns before either is defined.                                              | Improve     | XS          |
 | ~~LF-E03~~   | `HowLightframeWorksPanel.tsx`                | ~~The concept explainer omits **Studio**.~~ **Fixed** — Studio is the first concept.                                                 | Improve     | XS          |
-| LF-D02       | `DashboardRouteSurface.styles.ts:236`        | `1.5fr / 1fr` gives the wide column to one card and the narrow one to the list.                                                      | Improve     | S           |
+| ~~LF-D02~~   | `DashboardRouteSurface.styles.ts`            | ~~`1.5fr / 1fr` gives the wide column to one card and the narrow one to the list.~~ **Fixed** — Recent owns the wider column.        | Improve     | S           |
 | ~~LF-D04~~   | `DashboardRouteSurface.tsx`                  | ~~The Projects/Campaigns explainer renders _below_ Recent Work.~~ **Fixed** — it now sits under the page header.                     | Improve     | XS          |
 | LF-N02       | `AssetsRouteSurface.tsx`                     | `/assets` is a menu page; every library is 2 clicks from the rail.                                                                   | Simplify    | M           |
 | LF-N03       | `StudioLibraryOverlays.tsx`                  | Libraries are fullscreen overlays with no breadcrumb or "Esc returns" hint.                                                          | Polish      | S           |
@@ -902,31 +903,31 @@ with no page-level border or radius and no `borderRadius: 0` policy.
 
 ## P3 — Polish
 
-| ID         | Where                            | Finding                                                                    | Class       |
-| ---------- | -------------------------------- | -------------------------------------------------------------------------- | ----------- |
-| LF-E02     | `EntryPage.tsx`                  | No product explanation or visual on the entry screen.                      | Improve     |
-| ~~LF-D01~~ | `dashboardStyles`                | ~~No page max-width.~~ **Fixed** — `PageShell` caps it at 88rem.           | Polish      |
-| LF-D03     | dashboard header                 | `Browse Assets` reads as text, not a control.                              | Polish      |
-| LF-D05     | dashboard                        | Processing Queue is an ops panel on a creative home.                       | Improve     |
-| LF-D06/07  | dashboard                        | Bespoke filter + footer link styles instead of primitives.                 | Consolidate |
-| LF-S05     | `CreativeWorkspace.tsx`          | Permanent privacy footnote occupies a tool slot.                           | Simplify    |
-| LF-V04     | editor                           | `Reset tool` orphaned far from its tool.                                   | Polish      |
-| LF-P05     | `ProjectWorkflowProgress.tsx`    | `History` shown as step 4 of 4.                                            | Improve     |
-| LF-C03     | campaigns                        | Empty `Archived` box always rendered.                                      | Polish      |
-| LF-C04     | campaigns                        | `Clear search` misaligned with its field.                                  | Polish      |
-| ~~LF-A05~~ | assets vs overlay                | ~~Two descriptions of the same library.~~ **Fixed** — one shared owner.    | Polish      |
-| LF-A06     | characters/outfits overlays      | Export/import block above the library.                                     | Polish      |
-| LF-A08     | `VideoGallery.tsx`               | Raw `version.origin` / `video.status` as chips.                            | Polish      |
-| LF-N04     | nav                              | Campaigns holds a permanent slot on mobile.                                | Investigate |
-| LF-N06     | mobile nav                       | 5 items; design doc says 4; labels crowd at 320px.                         | Investigate |
-| LF-DS05/07 | 6+ files                         | No link-styled button variant; `<a download>` restyled by hand.            | Consolidate |
-| LF-B01     | character builder                | `Save & Use Image Only` vs `Save Character`; parenthetical CTA qualifiers. | Improve     |
-| LF-B02     | character builder                | Five footer controls; ~25% of a 320px viewport.                            | Simplify    |
-| LF-R02     | tablet                           | Brand wordmark hidden only in the 48–64rem band.                           | Polish      |
-| LF-R03     | rail                             | Large dead space between nav and the bottom cluster.                       | Polish      |
-| LF-R06     | mobile capture bar               | Device summary truncates (`64×6…`).                                        | Polish      |
-| LF-W01     | `ProjectWorkingMediaSection.tsx` | Triple-negative confirmation copy.                                         | Polish      |
-| LF-W02     | `StudioExitGuard.tsx:409`        | Five-item comma list in the exit dialog.                                   | Polish      |
+| ID            | Where                            | Finding                                                                                                          | Class       |
+| ------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------- |
+| LF-E02        | `EntryPage.tsx`                  | No product explanation or visual on the entry screen.                                                            | Improve     |
+| ~~LF-D01~~    | `dashboardStyles`                | ~~No page max-width.~~ **Fixed** — `PageShell` caps it at 88rem.                                                 | Polish      |
+| ~~LF-D03~~    | dashboard header                 | ~~`Browse Assets` reads as text, not a control.~~ **Fixed** — bounded secondary button.                          | Polish      |
+| ~~LF-D05~~    | dashboard                        | ~~Processing Queue is an ops panel on a creative home.~~ **Fixed** — ambient disclosure.                         | Improve     |
+| ~~LF-D06/07~~ | dashboard                        | ~~Bespoke filter + footer link styles instead of primitives.~~ **Fixed** — shared segmented/link variants.       | Consolidate |
+| LF-S05        | `CreativeWorkspace.tsx`          | Permanent privacy footnote occupies a tool slot.                                                                 | Simplify    |
+| LF-V04        | editor                           | `Reset tool` orphaned far from its tool.                                                                         | Polish      |
+| LF-P05        | `ProjectWorkflowProgress.tsx`    | `History` shown as step 4 of 4.                                                                                  | Improve     |
+| LF-C03        | campaigns                        | Empty `Archived` box always rendered.                                                                            | Polish      |
+| LF-C04        | campaigns                        | `Clear search` misaligned with its field.                                                                        | Polish      |
+| ~~LF-A05~~    | assets vs overlay                | ~~Two descriptions of the same library.~~ **Fixed** — one shared owner.                                          | Polish      |
+| LF-A06        | characters/outfits overlays      | Export/import block above the library.                                                                           | Polish      |
+| LF-A08        | `VideoGallery.tsx`               | Raw `version.origin` / `video.status` as chips.                                                                  | Polish      |
+| LF-N04        | nav                              | Campaigns holds a permanent slot on mobile.                                                                      | Investigate |
+| LF-N06        | mobile nav                       | 5 items; design doc says 4; labels crowd at 320px.                                                               | Investigate |
+| LF-DS05/07    | 6+ files                         | `Button` now has a link variant and Dashboard uses it; `<a download>` parity and remaining migrations stay open. | Consolidate |
+| LF-B01        | character builder                | `Save & Use Image Only` vs `Save Character`; parenthetical CTA qualifiers.                                       | Improve     |
+| LF-B02        | character builder                | Five footer controls; ~25% of a 320px viewport.                                                                  | Simplify    |
+| LF-R02        | tablet                           | Brand wordmark hidden only in the 48–64rem band.                                                                 | Polish      |
+| LF-R03        | rail                             | Large dead space between nav and the bottom cluster.                                                             | Polish      |
+| LF-R06        | mobile capture bar               | Device summary truncates (`64×6…`).                                                                              | Polish      |
+| LF-W01        | `ProjectWorkingMediaSection.tsx` | Triple-negative confirmation copy.                                                                               | Polish      |
+| LF-W02        | `StudioExitGuard.tsx:409`        | Five-item comma list in the exit dialog.                                                                         | Polish      |
 
 ## Preserve — do not let a redesign remove these
 
@@ -1025,6 +1026,10 @@ becomes primary; the export/import block moves under a `…`.
 **Easier for users:** finding and downloading a finished video.
 
 ## 13.4 First-run / Dashboard composition — redesign (moderate)
+
+**Resolved by plan item 20.** Superdesign explored the returning and first-run split before the
+chosen responsive composition was implemented. The section below is retained as the decision
+rationale.
 
 **Why incremental fixes are insufficient.** Fixing the column ratio, moving the explainer and
 demoting the queue individually still leaves a page whose job is unclear. It is currently trying
@@ -1141,7 +1146,7 @@ the luminance. The old value survives as `divider` for separators, which carry n
 | 17     | **Video editor redesign** (Superdesign)                                      | LF-V01–V05, LF-R04         |
 | ~~18~~ | ~~**Project save-step redesign** (Superdesign)~~ **DONE**                    | LF-P04                     |
 | 19     | **Assets consolidation** (Superdesign)                                       | LF-N02, LF-A05–A08, LF-R05 |
-| 20     | **Dashboard recomposition** (Superdesign)                                    | LF-D02, LF-D03, LF-D05     |
+| ~~20~~ | ~~**Dashboard recomposition** (Superdesign)~~ **DONE**                       | LF-D02, LF-D03, LF-D05     |
 | ~~21~~ | ~~**Mobile AI-tool availability** — reorganise rather than remove~~ **DONE** | LF-S04, LF-A11Y3           |
 | 22     | **Skeleton loading** for lists, grids and the stage                          | LF-DS06                    |
 

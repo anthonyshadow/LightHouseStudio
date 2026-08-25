@@ -9,6 +9,7 @@ import type {
   OutfitTryOnRequest,
   UploadedReferenceImageAsset,
 } from '@studio/contracts';
+import type { CreativeAssetStore } from '@studio/domain';
 
 export type MockReferenceImageAsset =
   GeneratedReferenceImageAsset | UploadedReferenceImageAsset | DerivedReferenceImageAsset;
@@ -93,4 +94,9 @@ export type StudioHarnessOptions = {
   videoProcessingAvailable?: boolean;
   realtimeProvidesVideo?: boolean;
   capabilityFailuresBeforeSuccess?: number;
+  /** A configured cloud mirror and its current account copy; omitted for browser-only deployments. */
+  creativeLibraryRemoteState?: {
+    readonly revision: number;
+    readonly store: CreativeAssetStore;
+  };
 };
