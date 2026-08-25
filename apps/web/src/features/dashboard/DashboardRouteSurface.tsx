@@ -7,8 +7,9 @@ import type {
 } from '@studio/contracts';
 import { formatDateTime, formatDuration } from '@studio/domain';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { listSavedVideos, savedVideoThumbnailUrl } from '../../adapters/api-client/savedVideosApi';
+import { useRouteViewState } from '../../app/useRouteViewState';
 import {
   abandonVideoJob,
   activeVideoJobsQueryOptions,
@@ -19,6 +20,7 @@ import {
   ConfirmationDialog,
   emptyExampleStyles,
   EmptyStatePreview,
+  listTotalLabel,
   SegmentedControl,
   StatusNotice,
   VisuallyHidden,
@@ -59,7 +61,6 @@ import {
 
 const RECENT_LIMIT = 4;
 const DASHBOARD_VIEW_STATE_KEY = 'lightframeDashboardView';
-const SCROLL_MEMORY_DELAY_MS = 150;
 
 const jobOperationLabel = (operation: VideoJobQueueItem['operation']): string =>
   VIDEO_TRANSFORM_OPERATION_LABELS[operation];
@@ -148,12 +149,6 @@ type RecentWorkItem = Readonly<{
   open: () => void;
 }>;
 
-type DashboardViewState = Readonly<{
-  ownerUserId: string;
-  recentKind: RecentKind;
-  scrollTop: number;
-}>;
-
 const RECENT_KIND_OPTIONS = [
   { value: 'all', label: 'All' },
   { value: 'videos', label: 'Videos', shortLabel: 'Video' },
@@ -163,43 +158,6 @@ const RECENT_KIND_OPTIONS = [
 
 const isRecentKind = (value: unknown): value is RecentKind =>
   RECENT_KIND_OPTIONS.some((option) => option.value === value);
-
-/** Route memory belongs to this history entry, so Back restores the view without persistent data. */
-const readDashboardViewState = (ownerUserId: string): DashboardViewState | null => {
-  if (typeof window === 'undefined') return null;
-  const historyState: unknown = window.history.state;
-  if (!historyState || typeof historyState !== 'object') return null;
-  const candidate = (historyState as Record<string, unknown>)[DASHBOARD_VIEW_STATE_KEY];
-  if (!candidate || typeof candidate !== 'object') return null;
-  const state = candidate as Record<string, unknown>;
-  if (
-    state.ownerUserId !== ownerUserId ||
-    !isRecentKind(state.recentKind) ||
-    typeof state.scrollTop !== 'number' ||
-    !Number.isFinite(state.scrollTop) ||
-    state.scrollTop < 0
-  ) {
-    return null;
-  }
-  return {
-    ownerUserId,
-    recentKind: state.recentKind,
-    scrollTop: state.scrollTop,
-  };
-};
-
-const writeDashboardViewState = (state: DashboardViewState): void => {
-  if (typeof window === 'undefined') return;
-  const current =
-    window.history.state && typeof window.history.state === 'object'
-      ? (window.history.state as Record<string, unknown>)
-      : {};
-  try {
-    window.history.replaceState({ ...current, [DASHBOARD_VIEW_STATE_KEY]: state }, '');
-  } catch {
-    // Private or embedded browser contexts may reject history writes; the route still works.
-  }
-};
 
 const recentKindLabel: Record<ItemKind, string> = {
   projects: 'Project',
@@ -238,14 +196,19 @@ export const DashboardRouteSurface = ({
 }: DashboardRouteSurfaceProps) => {
   const theme = useTheme();
   const queryClient = useQueryClient();
-  const routeRef = useRef<HTMLElement | null>(null);
+  const { routeRef, initialView, rememberView, onScroll } = useRouteViewState<
+    HTMLElement,
+    RecentKind
+  >({
+    storageKey: DASHBOARD_VIEW_STATE_KEY,
+    owner: ownerUserId,
+    isView: isRecentKind,
+  });
   const [onboardingVisible, setOnboardingVisible] = useState(
     () => !loadDashboardOnboardingDismissed(ownerUserId),
   );
   const [onboardingStorageWarning, setOnboardingStorageWarning] = useState(false);
-  const [recentKind, setRecentKind] = useState<RecentKind>(
-    () => readDashboardViewState(ownerUserId)?.recentKind ?? 'all',
-  );
+  const [recentKind, setRecentKind] = useState<RecentKind>(initialView ?? 'all');
   const [selectedJob, setSelectedJob] = useState<VideoJobQueueItem | null>(null);
   const [expandedQueueKey, setExpandedQueueKey] = useState<string | null>(null);
   const [queueNotice, setQueueNotice] = useState<string | null>(null);
@@ -388,47 +351,6 @@ export const DashboardRouteSurface = ({
     return earliest === null ? createdAt : Math.min(earliest, createdAt);
   }, null);
 
-  useLayoutEffect(() => {
-    const restoredView = readDashboardViewState(ownerUserId);
-    if (routeRef.current) routeRef.current.scrollTop = restoredView?.scrollTop ?? 0;
-  }, [ownerUserId]);
-
-  const rememberView = (nextRecentKind = recentKind) => {
-    writeDashboardViewState({
-      ownerUserId,
-      recentKind: nextRecentKind,
-      scrollTop: routeRef.current?.scrollTop ?? 0,
-    });
-  };
-
-  /**
-   * Scroll fires once per frame and browsers rate-limit `replaceState`, so a burst is coalesced
-   * into one trailing write — flushed on unmount so leaving mid-scroll still records the position.
-   * The position is captured when it is observed, because the route ref is already detached by
-   * the time an unmount flush runs.
-   */
-  const pendingScrollWrite = useRef<number | null>(null);
-  const pendingView = useRef<DashboardViewState | null>(null);
-
-  const flushScrollWrite = () => {
-    if (pendingScrollWrite.current === null) return;
-    window.clearTimeout(pendingScrollWrite.current);
-    pendingScrollWrite.current = null;
-    if (pendingView.current) writeDashboardViewState(pendingView.current);
-  };
-
-  const rememberViewAfterScroll = () => {
-    pendingView.current = {
-      ownerUserId,
-      recentKind,
-      scrollTop: routeRef.current?.scrollTop ?? 0,
-    };
-    if (pendingScrollWrite.current !== null) window.clearTimeout(pendingScrollWrite.current);
-    pendingScrollWrite.current = window.setTimeout(flushScrollWrite, SCROLL_MEMORY_DELAY_MS);
-  };
-
-  useEffect(() => () => flushScrollWrite(), []);
-
   const updateRecentKind = (kind: RecentKind) => {
     setRecentKind(kind);
     rememberView(kind);
@@ -476,7 +398,11 @@ export const DashboardRouteSurface = ({
     ? 'Loading recent work'
     : visibleErrors.length > 0
       ? 'Recent work count unavailable'
-      : `${visibleItems.length} recent item${visibleItems.length === 1 ? '' : 's'}`;
+      : listTotalLabel(
+          { count: visibleItems.length, exceedsCeiling: recentItems.length > visibleItems.length },
+          'recent item',
+          'recent items',
+        );
 
   const processingAction = processingQueueQuery.isLoading ? (
     <span css={processingStatusSkeletonStyles(theme)} role="status">
@@ -509,7 +435,7 @@ export const DashboardRouteSurface = ({
       ref={routeRef}
       css={dashboardStyles(theme)}
       aria-labelledby="dashboard-heading"
-      onScroll={rememberViewAfterScroll}
+      onScroll={onScroll}
     >
       <PageShell css={dashboardShellStyles(theme)}>
         <PageHeader
@@ -519,7 +445,7 @@ export const DashboardRouteSurface = ({
           headingId="dashboard-heading"
           description="Resume focused Project work or start a standalone video."
           actions={
-            <div data-dashboard-actions>
+            <>
               <Button data-create-video variant="primary" onClick={onCreateVideo}>
                 <AppIcon name="plus" width="1rem" height="1rem" />
                 Create video
@@ -534,7 +460,7 @@ export const DashboardRouteSurface = ({
                 <span data-browse-label>Browse Assets</span>
               </Button>
               {processingAction}
-            </div>
+            </>
           }
         />
 
@@ -691,6 +617,7 @@ export const DashboardRouteSurface = ({
               </div>
               <div css={recentFilterStyles()}>
                 <SegmentedControl
+                  columns={RECENT_KIND_OPTIONS.length}
                   label="Filter recent work"
                   value={recentKind}
                   options={RECENT_KIND_OPTIONS}

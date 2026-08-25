@@ -10,27 +10,32 @@ const narrow = (styles: CSSObject): CSSObject => (styles[NARROW] ?? {}) as CSSOb
 
 describe('Dashboard header styles', () => {
   /**
-   * The Dashboard is the one surface whose actions slot holds two peer controls, so it opts out of
-   * the shared one-primary grid. That override has to be declared on the same element the shared
-   * rule targets: from an ancestor the two tie on specificity and are settled by stylesheet
-   * insertion order, which depends on whichever surface first mounted a `PageHeader`.
+   * The compact actions row has one owner. `PageHeader` lays it out for every surface — the
+   * leading control takes the free width and peers keep their own — so the Dashboard, which is
+   * the surface with the most peers, needs no rule of its own. Two owners tie on specificity and
+   * are settled by stylesheet insertion order, which depends on whichever surface mounted first.
    */
-  it('declares the actions-slot override beside the rule it overrides, not on the shell', () => {
-    expect(narrow(pageHeaderStyles(studioTheme))['& [data-page-actions]']).toMatchObject({
-      display: 'grid',
-    });
-    expect(narrow(dashboardHeaderStyles(studioTheme))['& [data-page-actions]']).toMatchObject({
-      display: 'flex',
-    });
+  it('leaves the compact actions row to the shared header', () => {
+    const shared = narrow(pageHeaderStyles(studioTheme));
+    expect(shared['& [data-page-actions]']).toMatchObject({ flexWrap: 'nowrap' });
+    expect(shared['& [data-page-actions] > *:first-child']).toMatchObject({ minWidth: 0 });
 
-    // The shell carries no rule for the slot, at any width, so it cannot compete from above.
-    expect(JSON.stringify(dashboardShellStyles(studioTheme))).not.toContain('data-page-actions');
+    expect(narrow(dashboardHeaderStyles(studioTheme))['& [data-page-actions]']).toBeUndefined();
+  });
+
+  it('keeps the Dashboard header to what is specific to its own controls', () => {
+    const header = JSON.stringify(dashboardHeaderStyles(studioTheme));
+    // The wrapper that used to restate the shared row is gone; only the controls remain.
+    expect(header).not.toContain('data-dashboard-actions');
+    expect(header).toContain('data-create-video');
   });
 
   it('leaves the shell owning only what the scroll region needs', () => {
-    const shell = dashboardShellStyles(studioTheme);
+    const shell = JSON.stringify(dashboardShellStyles(studioTheme));
     // The fixed bottom navigation would otherwise sit over the last rows of a scrolled Dashboard.
-    expect(JSON.stringify(shell)).toContain('safe-area-inset-bottom');
-    expect(JSON.stringify(shell)).not.toContain('data-dashboard-actions');
+    expect(shell).toContain('safe-area-inset-bottom');
+    // The shell carries no rule for the slot, at any width, so it cannot compete from above.
+    expect(shell).not.toContain('data-page-actions');
+    expect(shell).not.toContain('data-dashboard-actions');
   });
 });

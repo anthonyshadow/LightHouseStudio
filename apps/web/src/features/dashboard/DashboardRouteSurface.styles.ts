@@ -44,43 +44,23 @@ export const dashboardStyles = (theme: Theme): CSSObject => ({
 
 /** Keeps the fixed compact navigation from obscuring the final Dashboard rows. */
 export const dashboardShellStyles = (theme: Theme): CSSObject => ({
-  [media.down('tablet')]: { paddingBlockStart: theme.space.lg },
+  [media.downOrShort('tablet', '36rem')]: { paddingBlockStart: theme.space.lg },
   [media.down('compact')]: {
     paddingBlockEnd: `max(5rem, calc(env(safe-area-inset-bottom) + 4.5rem))`,
   },
 });
 
+/** Only what is specific to this masthead's controls; the row itself belongs to `PageHeader`. */
 export const dashboardHeaderStyles = (theme: Theme): CSSObject => ({
-  '& [data-dashboard-actions]': {
-    display: 'flex',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: theme.space.sm,
-  },
   '& [data-create-video]': {
     minWidth: '9.375rem',
     borderRadius: theme.radii.small,
     boxShadow: 'none',
   },
   '& [data-browse-assets]': { background: 'transparent' },
-  '@container (max-width: 64rem)': {
-    '& [data-dashboard-actions]': { justifyContent: 'flex-start' },
-  },
-  '@container (max-width: 30rem)': {
-    '& [data-page-identity]': { gap: theme.space.sm, paddingBlockEnd: theme.space.lg },
-    '& [data-page-description]': {
-      marginBlockStart: theme.space.sm,
-      fontSize: theme.fontSizes.metadata,
-      lineHeight: 1.45,
-    },
-    '& [data-page-actions]': { display: 'flex' },
-    '& [data-dashboard-actions]': { width: '100%', flexWrap: 'nowrap' },
-    '& [data-create-video]': { minWidth: 0, flex: '1 1 auto' },
-  },
   '@container (max-width: 22rem)': {
     '& [data-browse-label], & [data-processing-label]': { display: 'none' },
-    '& [data-dashboard-actions] > button:not([data-create-video])': {
+    '& [data-page-actions] > button:not([data-create-video])': {
       width: '2.85rem',
       minWidth: '2.85rem',
       paddingInline: 0,
@@ -324,7 +304,6 @@ export const recentFilterStyles = (): CSSObject => ({
   width: '100%',
   maxWidth: '29rem',
   justifySelf: 'end',
-  '& > [role="group"]': { gridTemplateColumns: 'repeat(4, minmax(0, 1fr))' },
   '@media (max-width: 42rem)': { maxWidth: 'none', justifySelf: 'stretch' },
 });
 

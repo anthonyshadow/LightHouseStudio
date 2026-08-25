@@ -1,10 +1,11 @@
 import { useTheme } from '@emotion/react';
 import type { CampaignContract, ProjectContract } from '@studio/contracts';
 import { formatDate } from '@studio/domain';
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { APP_PATHS, campaignIdFromPath, campaignPath, projectPath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
+import { useRouteViewState } from '../../app/useRouteViewState';
 import {
   AppIcon,
   Button,
@@ -693,12 +694,16 @@ export const CampaignRouteSurface = () => {
   const theme = useTheme();
   const location = useLocation();
   const campaignId = campaignIdFromPath(location.pathname);
-  const routeRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    if (routeRef.current) routeRef.current.scrollTop = 0;
-  }, [location.pathname]);
+  const { routeRef, onScroll } = useRouteViewState<HTMLDivElement>({
+    storageKey: 'lightframeCampaignRouteView',
+  });
   return (
-    <div ref={routeRef} css={pageScrollRegionStyles(theme)} data-campaign-route="">
+    <div
+      ref={routeRef}
+      onScroll={onScroll}
+      css={pageScrollRegionStyles(theme)}
+      data-campaign-route=""
+    >
       {campaignId === null ? <CampaignsWorkspace /> : <CampaignDetail campaignId={campaignId} />}
     </div>
   );

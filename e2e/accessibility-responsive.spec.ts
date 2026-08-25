@@ -505,7 +505,7 @@ test('paused account-library sync keeps the Dashboard and recovery controls unoc
   await page.goto('/dashboard');
 
   const notice = page.locator('[data-creative-sync-notice]');
-  const noticeRegion = page.locator('[data-creative-sync-notice-region]');
+  const noticeRegion = page.locator('[data-shell-notice-region]');
   const main = page.getByRole('main');
   const createVideo = page.getByRole('button', { name: 'Create video' });
   await expect(notice).toBeVisible();

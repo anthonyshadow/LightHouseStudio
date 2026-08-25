@@ -12,12 +12,20 @@ export interface SegmentedControlProps<T extends string> {
   value: T;
   options: readonly SegmentOption<T>[];
   disabled?: boolean;
+  /**
+   * `'auto'` fits as many equal segments as the width allows and wraps the rest. A number states
+   * that every segment shares one row, for a control whose width its parent decides.
+   */
+  columns?: number | 'auto';
   onChange: (value: T) => void;
 }
 
-const groupStyles = (theme: Theme): CSSObject => ({
+const groupStyles = (theme: Theme, columns: number | 'auto'): CSSObject => ({
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 5.5rem), 1fr))',
+  gridTemplateColumns:
+    columns === 'auto'
+      ? 'repeat(auto-fit, minmax(min(100%, 5.5rem), 1fr))'
+      : `repeat(${columns}, minmax(0, 1fr))`,
   gap: theme.space.xxs,
   padding: theme.space.xxs,
   border: `1px solid ${theme.colors.border}`,
@@ -64,6 +72,7 @@ export const SegmentedControl = <T extends string>({
   value,
   options,
   disabled = false,
+  columns = 'auto',
   onChange,
 }: SegmentedControlProps<T>) => {
   'use memo';
@@ -71,7 +80,7 @@ export const SegmentedControl = <T extends string>({
   const theme = useTheme();
 
   return (
-    <div role="group" aria-label={label} css={groupStyles(theme)}>
+    <div role="group" aria-label={label} css={groupStyles(theme, columns)}>
       {options.map((option) => (
         <button
           key={option.value}

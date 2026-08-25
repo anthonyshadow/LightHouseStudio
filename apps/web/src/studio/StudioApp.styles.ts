@@ -23,10 +23,12 @@ export const shellStyles = (): CSSObject => ({
   width: '100%',
   height: '100%',
   display: 'grid',
+  // The regions are named once, here, and each one states only which area it occupies. The
+  // optional shell notice owns the first content row: absent, its wrapper is empty and the row
+  // collapses to zero; present, it reduces the main viewport rather than overflowing the
+  // navigation rail or covering the active surface.
+  gridTemplateAreas: '"nav notice" "nav main"',
   gridTemplateColumns: '11.5rem minmax(0, 1fr)',
-  // The optional account-library recovery notice owns the first content row. When absent its
-  // wrapper is empty and this row collapses to zero; when present it reduces the main viewport
-  // instead of overflowing the navigation rail or covering the active surface.
   gridTemplateRows: 'auto minmax(0, 1fr)',
   gap: 0,
   minWidth: 0,
@@ -42,14 +44,14 @@ export const shellStyles = (): CSSObject => ({
   },
   [media.down('compact')]: {
     '--studio-shell-rail-width': '0rem',
+    gridTemplateAreas: '"nav" "notice" "main"',
     gridTemplateColumns: 'minmax(0, 1fr)',
     gridTemplateRows: '3.5rem auto minmax(0, 1fr)',
   },
 });
 
 export const headerRegionStyles = (theme: Theme): CSSObject => ({
-  gridColumn: 1,
-  gridRow: '1 / span 2',
+  gridArea: 'nav',
   position: 'relative',
   zIndex: theme.layers.stageNotices + 1,
   minWidth: 0,
@@ -60,43 +62,38 @@ export const headerRegionStyles = (theme: Theme): CSSObject => ({
     borderInlineEnd: `1px solid ${theme.colors.divider}`,
   },
   [media.down('compact')]: {
-    gridColumn: 1,
-    gridRow: 1,
     borderBlockEnd: `1px solid ${theme.colors.divider}`,
   },
 });
 
 /**
- * A bounded shell row for the actionable creative-library recovery notice.
+ * The bounded shell row for an actionable, shell-wide recovery notice.
  *
- * The navigation header has a fixed responsive footprint. Keeping this notice inside that header
+ * The navigation header has a fixed responsive footprint. Keeping such a notice inside that header
  * made it start below a full-height desktop rail and overflow a 3.5rem mobile bar, so it was either
  * unreachable or painted over the route masthead. Its own row stays visible without changing the
- * active surface's scroll ownership; at extreme text sizes the notice scrolls instead of removing
- * the main viewport entirely.
+ * active surface's scroll ownership.
+ *
+ * The cap is the notice's own content first and the viewport second, so a long message scrolls
+ * inside the row instead of consuming the surface below it. One bound serves both breakpoints:
+ * this row is shell chrome, and must not be tuned to whichever route happens to sit under it.
  */
-export const creativeSyncNoticeRegionStyles = (theme: Theme): CSSObject => ({
-  gridColumn: 2,
-  gridRow: 1,
+export const shellNoticeRegionStyles = (theme: Theme): CSSObject => ({
+  gridArea: 'notice',
   display: 'grid',
   minWidth: 0,
   minHeight: 0,
-  maxHeight: 'min(20rem, 45vh)',
+  maxHeight: 'min(20rem, 44vh)',
   overflowX: 'hidden',
   overflowY: 'auto',
   overscrollBehavior: 'contain',
   background: theme.colors.canvas,
-  '& > [data-creative-sync-notice]': {
+  '& > *': {
     margin: `${theme.space.sm} clamp(${theme.space.sm}, 2vw, ${theme.space.lg})`,
   },
-  '@supports (height: 100dvh)': { maxHeight: 'min(20rem, 45dvh)' },
+  '@supports (height: 100dvh)': { maxHeight: 'min(20rem, 44dvh)' },
   [media.down('compact')]: {
-    gridColumn: 1,
-    gridRow: 2,
-    // Keeps the complete compact Dashboard masthead above the fixed mobile navigation at 320×568.
-    maxHeight: 'min(20rem, 44vh)',
-    '& > [data-creative-sync-notice]': { margin: `0 ${theme.space.xs}` },
-    '@supports (height: 100dvh)': { maxHeight: 'min(20rem, 44dvh)' },
+    '& > *': { margin: `0 ${theme.space.xs}` },
   },
 });
 
@@ -530,8 +527,7 @@ export const mainGridStyles = (
   projectContextActive = false,
   dashboardRouteActive = false,
 ): CSSObject => ({
-  gridColumn: 2,
-  gridRow: 2,
+  gridArea: 'main',
   display: 'grid',
   gridTemplateColumns: projectContextActive
     ? 'minmax(0, 1.45fr) minmax(20rem, 25rem)'
@@ -548,8 +544,6 @@ export const mainGridStyles = (
     : {}),
   /** Clears the fixed bottom navigation the shell renders below 48rem. */
   [media.down('compact')]: {
-    gridColumn: 1,
-    gridRow: 3,
     paddingBlockEnd: `max(4.5rem, calc(env(safe-area-inset-bottom) + 4.5rem))`,
   },
   ...(projectContextActive
