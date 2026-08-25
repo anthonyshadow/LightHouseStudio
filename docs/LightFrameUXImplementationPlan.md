@@ -972,14 +972,17 @@ recovery notice now owns a bounded row above the active surface, so its controls
 without covering the Dashboard masthead, header popovers, or fixed mobile navigation.
 
 **Validated** focused Dashboard suites **11/11**; full repository `bun run quality` (**262** files
-passed, **4** skipped; **2,014** tests passed, **9** skipped); built-production smoke **1/1**;
+passed, **4** skipped; **2,014** tests passed, **9** skipped); built-production smoke **1/1**; and
 functional browser journeys **86/86**, including returning, first-run and paused-sync Dashboard
-geometry, axe, overflow and 200%-text checks at 1440×960, 1280×720, 834×1112, 390×844 and 320×568; reviewed
-Dashboard visual cases **2/2** on Darwin and **2/2** on pinned Playwright Linux; and **100/100**
-curated platform baselines with zero missing or removable files. The complete Darwin visual sweep
-is **45/50**: five untouched Assets overview/filter baselines already disagree with their current
-rendering, so they were diagnosed on both reused and clean Vite servers and deliberately not
-regenerated as part of this Dashboard change.
+geometry, axe, overflow and 200%-text checks at 1440×960, 1280×720, 834×1112, 390×844 and 320×568.
+A follow-up clean-renderer reconciliation showed the five reported Assets failures were a reused
+renderer-state artifact: the shared page and overlay scroll regions reserve the same stable
+scrollbar gutter, and the existing Assets baselines already match that contract. The responsive
+Assets journey now also brings every scrollable library tab fully into view and bounds the video
+card, Download/menu actions, every filter field and the sheet footer at all five canonical widths.
+The two anomalous Darwin Dashboard captures were re-recorded with that shared gutter honoured.
+The complete Darwin visual sweep is **50/50**, pinned Playwright Linux Dashboard + Assets is
+**10/10**, and the curated inventory remains **100/100** platform baselines.
 
 ## ~~21. Keep AI tools available below 64rem~~ · DONE
 
