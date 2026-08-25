@@ -53,7 +53,7 @@ export const deriveStudioContextualNotices = ({
     notices.push({
       id: 'saved-video-route-loading',
       severity: 'info',
-      title: 'Loading Saved Video',
+      title: 'Loading video',
       message: 'Validating the current Version before opening review.',
       priority: 250,
     });
@@ -61,7 +61,7 @@ export const deriveStudioContextualNotices = ({
     notices.push({
       id: 'saved-video-route-error',
       severity: 'error',
-      title: 'Saved Video unavailable',
+      title: 'Video unavailable',
       message: directVideoLoad.message,
       priority: 500,
       action: {

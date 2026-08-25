@@ -199,7 +199,7 @@ export const ProjectSourceSection = ({
             disabled={controlsDisabled || !runtime.available}
             onClick={() => setPickerOpen(true)}
           >
-            Use Saved Video
+            Use a saved video
           </Button>
           {controller.accepted ? (
             <Button

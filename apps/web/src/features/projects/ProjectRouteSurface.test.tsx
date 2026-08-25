@@ -1489,7 +1489,7 @@ describe('Project route surface', () => {
     );
     // The three ways back to a source are live again, and Remove is gone with the source.
     expect(screen.getByRole('button', { name: 'Upload' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Use Saved Video' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Use a saved video' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: 'Remove original video' })).not.toBeInTheDocument();
     expect(clear).toHaveBeenCalledWith(activeId);
   });
@@ -1725,20 +1725,20 @@ describe('Project route surface', () => {
       sourceRuntime: { available: true, present, clear },
     });
 
-    await user.click(await screen.findByRole('button', { name: 'Use Saved Video' }));
+    await user.click(await screen.findByRole('button', { name: 'Use a saved video' }));
     let dialog = screen.getByRole('dialog', { name: 'Choose the original video' });
     const unavailable = await within(dialog).findByRole('alert');
     await user.click(within(unavailable).getByRole('button', { name: 'Retry' }));
-    await user.click(await within(dialog).findByRole('button', { name: 'Load more Saved Videos' }));
+    await user.click(await within(dialog).findByRole('button', { name: 'Load more videos' }));
     await waitFor(() =>
       expect(
-        within(dialog).queryByRole('button', { name: 'Load more Saved Videos' }),
+        within(dialog).queryByRole('button', { name: 'Load more videos' }),
       ).not.toBeInTheDocument(),
     );
     await user.click(within(dialog).getByRole('button', { name: 'Close panel' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: 'Use Saved Video' }));
+    await user.click(screen.getByRole('button', { name: 'Use a saved video' }));
     dialog = screen.getByRole('dialog', { name: 'Choose the original video' });
     await user.click(within(dialog).getByRole('button', { name: /Library source/u }));
 

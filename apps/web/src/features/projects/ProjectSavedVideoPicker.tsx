@@ -91,9 +91,9 @@ export const ProjectSavedVideoList = ({
   busy,
   onSelect,
   selectedVideoId = null,
-  emptyTitle = 'No Saved Videos yet',
+  emptyTitle = 'No videos yet',
   emptyBody = 'Save a video in Studio first, or use Upload or Record for this Project.',
-  listLabel = 'Saved Videos available as a Project source',
+  listLabel = 'Videos available as a Project source',
 }: ProjectSavedVideoListProps) => {
   const theme = useTheme();
   // One preview at a time: every open player holds its own ranged request against the local API,
@@ -120,10 +120,10 @@ export const ProjectSavedVideoList = ({
 
   return (
     <>
-      {query.isPending ? <p role="status">Loading Saved Videos…</p> : null}
+      {query.isPending ? <p role="status">Loading videos…</p> : null}
       {query.isError ? (
-        <StatusNotice role="alert" tone="danger" title="Saved Videos unavailable">
-          <p>Saved Videos could not be loaded from the local API.</p>
+        <StatusNotice role="alert" tone="danger" title="Videos unavailable">
+          <p>Videos could not be loaded from the local API.</p>
           <Button size="small" onClick={() => void query.refetch()}>
             Retry
           </Button>
@@ -214,7 +214,7 @@ export const ProjectSavedVideoList = ({
           busy={query.isFetchingNextPage}
           onClick={() => void query.fetchNextPage()}
         >
-          Load more Saved Videos
+          Load more videos
         </Button>
       ) : null}
     </>
@@ -227,11 +227,11 @@ export const ProjectSavedVideoPicker = ({
   returnFocusRef,
   onClose,
   onSelect,
-  title = 'Use Saved Video',
+  title = 'Use a saved video',
   description = 'Choose one exact active Version. The stored bytes are referenced, not copied.',
-  emptyTitle = 'No Saved Videos yet',
+  emptyTitle = 'No videos yet',
   emptyBody = 'Save a video in Studio first, or use Upload or Record for this Project.',
-  listLabel = 'Saved Videos available as a Project source',
+  listLabel = 'Videos available as a Project source',
 }: {
   readonly open: boolean;
   readonly busy: boolean;
