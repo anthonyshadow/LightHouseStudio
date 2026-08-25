@@ -33,6 +33,7 @@ import {
   campaignGridStyles,
   campaignSearchRowStyles,
   campaignSkeletonCardStyles,
+  collapsedSectionStyles,
   detailHeaderStyles,
   emptyListStyles,
   listSectionStyles,
@@ -82,6 +83,25 @@ const CampaignListSection = ({
   );
   const archived = lifecycle === 'archived';
   const total = query.data?.pages.at(-1)?.total ?? null;
+  /*
+   * An empty archive is normal, not a state worth a bordered box and a paragraph. When nothing has
+   * been archived and nothing is being searched for, the whole section collapses to its heading
+   * and one word, so the page does not open with an empty container under the real work.
+   */
+  const collapsed = archived && search === undefined && !query.isPending && total?.count === 0;
+
+  if (collapsed) {
+    return (
+      <section
+        css={collapsedSectionStyles(theme)}
+        aria-labelledby={`${lifecycle}-campaigns-heading`}
+      >
+        <h3 id={`${lifecycle}-campaigns-heading`}>Archived</h3>
+        <span>None yet</span>
+      </section>
+    );
+  }
+
   return (
     <section css={listSectionStyles(theme)} aria-labelledby={`${lifecycle}-campaigns-heading`}>
       <header>

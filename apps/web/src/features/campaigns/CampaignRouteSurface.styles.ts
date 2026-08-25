@@ -144,6 +144,17 @@ export const listSectionStyles = (theme: Theme): CSSObject => ({
   '& header span': { color: theme.colors.textFaint, fontSize: theme.fontSizes.caption },
 });
 
+/** A section with nothing in it and nothing being looked for: a heading and one word. */
+export const collapsedSectionStyles = (theme: Theme): CSSObject => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'baseline',
+  gap: theme.space.sm,
+  paddingBlockStart: theme.space.lg,
+  '& h3': { margin: 0, fontSize: theme.fontSizes.section },
+  '& span': { color: theme.colors.textFaint, fontSize: theme.fontSizes.caption },
+});
+
 export const statusPillStyles = (theme: Theme, archived: boolean): CSSObject => ({
   display: 'inline-flex',
   alignItems: 'center',
