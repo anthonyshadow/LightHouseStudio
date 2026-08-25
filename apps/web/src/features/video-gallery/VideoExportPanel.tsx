@@ -3,7 +3,7 @@ import type { SavedVideoSummary, SavedVideoVersion } from '@studio/contracts';
 import type { ProjectExportSpecification } from '@studio/domain';
 import { useState, type RefObject } from 'react';
 import { downloadSavedVideoUrl } from '../../adapters/api-client/savedVideosApi';
-import { Button, OverlayPanel, StatusNotice } from '../../ui';
+import { Button, LinkButton, OverlayPanel, StatusNotice } from '../../ui';
 import {
   ExportPlacementChooser,
   ExportPlacementProgress,
@@ -70,13 +70,14 @@ export const VideoExportPanel = ({
               Download for {exportPlacementLabel(reframing.aspect).toLowerCase()}
             </Button>
           ) : (
-            <a
+            <LinkButton
+              variant="primary"
               href={downloadSavedVideoUrl(video.id, version.id)}
               download={version.filename}
               aria-label={`Download ${video.title}, Version ${version.ordinal}`}
             >
               Download
-            </a>
+            </LinkButton>
           )}
         </div>
       }

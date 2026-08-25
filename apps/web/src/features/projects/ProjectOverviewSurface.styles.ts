@@ -6,23 +6,12 @@ import type { CSSObject, Theme } from '@emotion/react';
  * actions slot come from the shared header.
  */
 export const projectOverviewHeaderStyles = (theme: Theme): CSSObject => ({
+  /* Placement only: `Button variant="link"` owns how a breadcrumb reads. */
   '& [data-detail-breadcrumb]': {
     justifySelf: 'start',
     minWidth: 0,
-    minHeight: '2.75rem',
     marginBlockEnd: theme.space.xl,
-    padding: `${theme.space.xs} 0`,
-    border: 0,
-    color: theme.colors.textMuted,
-    background: 'transparent',
-    boxShadow: 'none',
     fontSize: theme.fontSizes.body,
-    fontWeight: 600,
-    '&:hover:not(:disabled):not([aria-disabled="true"])': {
-      color: theme.colors.text,
-      background: 'transparent',
-      transform: 'none',
-    },
   },
   '& [data-detail-meta]': {
     display: 'flex',

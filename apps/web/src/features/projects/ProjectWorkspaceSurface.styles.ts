@@ -12,25 +12,14 @@ export const workspaceMastheadStyles = (theme: Theme): CSSObject => ({
   paddingInline: theme.space.md,
   borderBlockEnd: `1px solid ${theme.colors.borderStrong}`,
   background: theme.colors.canvas,
+  /* Placement only: `Button variant="link"` owns how a breadcrumb reads. */
   '& [data-detail-breadcrumb]': {
     minWidth: 0,
     minHeight: '2rem',
     flex: '0 0 auto',
     gap: theme.space.xxs,
-    padding: 0,
-    border: 0,
-    borderRadius: 0,
-    color: theme.colors.textMuted,
-    background: 'transparent',
-    boxShadow: 'none',
     fontSize: '0.6875rem',
-    fontWeight: 650,
     whiteSpace: 'nowrap',
-    '&:hover:not(:disabled):not([aria-disabled="true"])': {
-      color: theme.colors.text,
-      background: 'transparent',
-      transform: 'none',
-    },
   },
   '& [data-detail-breadcrumb] svg': { width: '0.9rem', height: '0.9rem' },
   '& [data-workspace-divider]': {

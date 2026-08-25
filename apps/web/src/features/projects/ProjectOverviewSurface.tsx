@@ -110,7 +110,7 @@ export const ProjectOverviewSurface = ({
         breadcrumb={
           <Button
             data-detail-breadcrumb
-            variant="quiet"
+            variant="link"
             onClick={() =>
               goBack(
                 project.campaignId === null ? APP_PATHS.projects : campaignPath(project.campaignId),
