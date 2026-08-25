@@ -59,6 +59,7 @@ import {
 
 const RECENT_LIMIT = 4;
 const DASHBOARD_VIEW_STATE_KEY = 'lightframeDashboardView';
+const SCROLL_MEMORY_DELAY_MS = 150;
 
 const jobOperationLabel = (operation: VideoJobQueueItem['operation']): string =>
   VIDEO_TRANSFORM_OPERATION_LABELS[operation];
@@ -73,6 +74,47 @@ const jobActionLabel = (status: VideoJobQueueItem['status']): string =>
   status === 'validating' || status === 'submitting' || status === 'queued'
     ? 'Remove from queue'
     : 'Stop tracking';
+
+/**
+ * Owns the one-second elapsed tick, so a live job re-renders this control rather than the whole
+ * route. Mounted only while work is active, which is also the interval's lifetime.
+ */
+const ProcessingQueueTrigger = ({
+  jobCount,
+  startedAtMs,
+  expanded,
+  onToggle,
+}: Readonly<{
+  jobCount: number;
+  startedAtMs: number | null;
+  expanded: boolean;
+  onToggle: () => void;
+}>) => {
+  const theme = useTheme();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNowMs(Date.now()), 1_000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const elapsed = formatDuration(startedAtMs === null ? 0 : Math.max(0, nowMs - startedAtMs));
+
+  return (
+    <Button
+      size="small"
+      variant="secondary"
+      css={processingTriggerStyles(theme, 'active')}
+      aria-label={`${jobCount} processing job${jobCount === 1 ? '' : 's'}, elapsed ${elapsed}`}
+      aria-expanded={expanded}
+      aria-controls="processing-queue-panel"
+      onClick={onToggle}
+    >
+      <span data-processing-count>{jobCount}</span>
+      <span data-processing-label>Processing · {elapsed}</span>
+    </Button>
+  );
+};
 
 type DashboardRouteSurfaceProps = Readonly<{
   ownerUserId: string;
@@ -92,6 +134,8 @@ type DashboardRouteSurfaceProps = Readonly<{
 
 type RecentKind = 'all' | 'projects' | 'videos' | 'campaigns';
 type ItemKind = Exclude<RecentKind, 'all'>;
+
+const ALL_ITEM_KINDS: readonly ItemKind[] = ['projects', 'videos', 'campaigns'];
 
 type RecentWorkItem = Readonly<{
   id: string;
@@ -113,8 +157,8 @@ type DashboardViewState = Readonly<{
 const RECENT_KIND_OPTIONS = [
   { value: 'all', label: 'All' },
   { value: 'videos', label: 'Videos', shortLabel: 'Video' },
-  { value: 'projects', label: 'Projects', shortLabel: 'Projects' },
-  { value: 'campaigns', label: 'Campaigns', shortLabel: 'Campaigns' },
+  { value: 'projects', label: 'Projects' },
+  { value: 'campaigns', label: 'Campaigns' },
 ] as const;
 
 const isRecentKind = (value: unknown): value is RecentKind =>
@@ -195,18 +239,16 @@ export const DashboardRouteSurface = ({
   const theme = useTheme();
   const queryClient = useQueryClient();
   const routeRef = useRef<HTMLElement | null>(null);
-  const rememberedView = readDashboardViewState(ownerUserId);
   const [onboardingVisible, setOnboardingVisible] = useState(
     () => !loadDashboardOnboardingDismissed(ownerUserId),
   );
   const [onboardingStorageWarning, setOnboardingStorageWarning] = useState(false);
   const [recentKind, setRecentKind] = useState<RecentKind>(
-    () => rememberedView?.recentKind ?? 'all',
+    () => readDashboardViewState(ownerUserId)?.recentKind ?? 'all',
   );
   const [selectedJob, setSelectedJob] = useState<VideoJobQueueItem | null>(null);
   const [expandedQueueKey, setExpandedQueueKey] = useState<string | null>(null);
   const [queueNotice, setQueueNotice] = useState<string | null>(null);
-  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const projectsQuery = useProjectList('active');
   const campaignsQuery = useCampaignList('active');
@@ -310,8 +352,7 @@ export const DashboardRouteSurface = ({
   const visibleItems = recentItems
     .filter((item) => recentKind === 'all' || item.kind === recentKind)
     .slice(0, RECENT_LIMIT);
-  const visibleKinds: readonly ItemKind[] =
-    recentKind === 'all' ? ['projects', 'videos', 'campaigns'] : [recentKind];
+  const visibleKinds: readonly ItemKind[] = recentKind === 'all' ? ALL_ITEM_KINDS : [recentKind];
   const queryState = {
     projects: {
       loading: projectsQuery.isLoading,
@@ -331,15 +372,9 @@ export const DashboardRouteSurface = ({
   } as const;
   const visibleLoading = visibleKinds.some((kind) => queryState[kind].loading);
   const visibleErrors = visibleKinds.filter((kind) => queryState[kind].error);
-  const allQueriesReady =
-    !projectsQuery.isLoading &&
-    !projectsQuery.isError &&
-    !videosQuery.isLoading &&
-    !videosQuery.isError &&
-    !campaignsQuery.isLoading &&
-    !campaignsQuery.isError;
   const firstRun =
-    allQueriesReady && projects.length === 0 && videos.length === 0 && campaigns.length === 0;
+    ALL_ITEM_KINDS.every((kind) => !queryState[kind].loading && !queryState[kind].error) &&
+    recentItems.length === 0;
   const queueJobs = processingQueueQuery.data?.jobs ?? [];
   const queueActive = queueJobs.length > 0;
   const queueKey = queueJobs
@@ -352,20 +387,11 @@ export const DashboardRouteSurface = ({
     if (!Number.isFinite(createdAt)) return earliest;
     return earliest === null ? createdAt : Math.min(earliest, createdAt);
   }, null);
-  const queueElapsed = formatDuration(
-    earliestQueueStart === null ? 0 : Math.max(0, nowMs - earliestQueueStart),
-  );
 
   useLayoutEffect(() => {
     const restoredView = readDashboardViewState(ownerUserId);
     if (routeRef.current) routeRef.current.scrollTop = restoredView?.scrollTop ?? 0;
   }, [ownerUserId]);
-
-  useEffect(() => {
-    if (!queueActive) return;
-    const interval = window.setInterval(() => setNowMs(Date.now()), 1_000);
-    return () => window.clearInterval(interval);
-  }, [queueActive]);
 
   const rememberView = (nextRecentKind = recentKind) => {
     writeDashboardViewState({
@@ -374,6 +400,34 @@ export const DashboardRouteSurface = ({
       scrollTop: routeRef.current?.scrollTop ?? 0,
     });
   };
+
+  /**
+   * Scroll fires once per frame and browsers rate-limit `replaceState`, so a burst is coalesced
+   * into one trailing write — flushed on unmount so leaving mid-scroll still records the position.
+   * The position is captured when it is observed, because the route ref is already detached by
+   * the time an unmount flush runs.
+   */
+  const pendingScrollWrite = useRef<number | null>(null);
+  const pendingView = useRef<DashboardViewState | null>(null);
+
+  const flushScrollWrite = () => {
+    if (pendingScrollWrite.current === null) return;
+    window.clearTimeout(pendingScrollWrite.current);
+    pendingScrollWrite.current = null;
+    if (pendingView.current) writeDashboardViewState(pendingView.current);
+  };
+
+  const rememberViewAfterScroll = () => {
+    pendingView.current = {
+      ownerUserId,
+      recentKind,
+      scrollTop: routeRef.current?.scrollTop ?? 0,
+    };
+    if (pendingScrollWrite.current !== null) window.clearTimeout(pendingScrollWrite.current);
+    pendingScrollWrite.current = window.setTimeout(flushScrollWrite, SCROLL_MEMORY_DELAY_MS);
+  };
+
+  useEffect(() => () => flushScrollWrite(), []);
 
   const updateRecentKind = (kind: RecentKind) => {
     setRecentKind(kind);
@@ -440,20 +494,14 @@ export const DashboardRouteSurface = ({
       <span data-processing-label>Queue unavailable</span>
     </Button>
   ) : queueActive ? (
-    <Button
-      size="small"
-      variant="secondary"
-      css={processingTriggerStyles(theme, 'active')}
-      aria-label={`${queueJobs.length} processing job${queueJobs.length === 1 ? '' : 's'}, elapsed ${queueElapsed}`}
-      aria-expanded={queueExpanded}
-      aria-controls="processing-queue-panel"
-      onClick={() =>
+    <ProcessingQueueTrigger
+      jobCount={queueJobs.length}
+      startedAtMs={earliestQueueStart}
+      expanded={queueExpanded}
+      onToggle={() =>
         setExpandedQueueKey((expandedKey) => (expandedKey === queueKey ? null : queueKey))
       }
-    >
-      <span data-processing-count>{queueJobs.length}</span>
-      <span data-processing-label>Processing · {queueElapsed}</span>
-    </Button>
+    />
   ) : null;
 
   return (
@@ -461,7 +509,7 @@ export const DashboardRouteSurface = ({
       ref={routeRef}
       css={dashboardStyles(theme)}
       aria-labelledby="dashboard-heading"
-      onScroll={() => rememberView()}
+      onScroll={rememberViewAfterScroll}
     >
       <PageShell css={dashboardShellStyles(theme)}>
         <PageHeader
@@ -490,7 +538,7 @@ export const DashboardRouteSurface = ({
           }
         />
 
-        {queueExpanded && queueActive ? (
+        {queueExpanded ? (
           <section
             id="processing-queue-panel"
             css={processingPanelStyles(theme)}
@@ -546,7 +594,11 @@ export const DashboardRouteSurface = ({
         ) : null}
 
         {firstRun && onboardingVisible ? (
-          <aside css={firstRunStyles(theme)} aria-labelledby="dashboard-getting-started-heading">
+          <aside
+            data-first-run
+            css={firstRunStyles(theme)}
+            aria-labelledby="dashboard-getting-started-heading"
+          >
             <span data-first-run-icon>
               <AppIcon name="wand" width="1.25rem" height="1.25rem" />
             </span>
@@ -611,7 +663,7 @@ export const DashboardRouteSurface = ({
                 </Button>
               </article>
             ) : !projectsQuery.isLoading && !projectsQuery.isError ? (
-              <div css={continuePanelStyles(theme)} data-empty="true">
+              <div css={continuePanelStyles(theme)}>
                 <div data-continue-copy>
                   <h3>No active Project yet</h3>
                   <p>Create one only when resumable context will help.</p>

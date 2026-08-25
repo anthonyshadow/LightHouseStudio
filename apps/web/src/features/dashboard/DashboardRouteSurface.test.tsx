@@ -87,6 +87,32 @@ const renderDashboard = (ownerUserId: string, actions = callbacks()) => {
   return { ...view, actions };
 };
 
+/** The three recent-work lists, either holding the fixtures above or empty. */
+const workListHandlers = (populated: boolean) => [
+  http.get('*/api/projects', () =>
+    HttpResponse.json({
+      projects: populated ? [project] : [],
+      nextCursor: null,
+      total: { count: populated ? 1 : 0, exceedsCeiling: false },
+    }),
+  ),
+  http.get('*/api/campaigns', () =>
+    HttpResponse.json({
+      campaigns: populated ? [campaign] : [],
+      nextCursor: null,
+      total: { count: populated ? 1 : 0, exceedsCeiling: false },
+    }),
+  ),
+  http.get('*/api/videos', () =>
+    HttpResponse.json({
+      videos: populated ? [video] : [],
+      nextCursor: null,
+      total: populated ? 1 : 0,
+      facets: { characterNames: [], formats: populated ? ['landscape'] : [] },
+    }),
+  ),
+];
+
 describe('DashboardRouteSurface', () => {
   beforeEach(() => {
     mockApiServer.use(http.get('*/api/video-jobs', () => HttpResponse.json({ jobs: [] })));
@@ -100,30 +126,7 @@ describe('DashboardRouteSurface', () => {
   });
 
   it('orients an established account with bounded recent work and direct actions', async () => {
-    mockApiServer.use(
-      http.get('*/api/projects', () =>
-        HttpResponse.json({
-          projects: [project],
-          nextCursor: null,
-          total: { count: 1, exceedsCeiling: false },
-        }),
-      ),
-      http.get('*/api/campaigns', () =>
-        HttpResponse.json({
-          campaigns: [campaign],
-          nextCursor: null,
-          total: { count: 1, exceedsCeiling: false },
-        }),
-      ),
-      http.get('*/api/videos', () =>
-        HttpResponse.json({
-          videos: [video],
-          nextCursor: null,
-          total: 1,
-          facets: { characterNames: [], formats: ['landscape'] },
-        }),
-      ),
-    );
+    mockApiServer.use(...workListHandlers(true));
     const user = userEvent.setup();
     const { actions } = renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
 
@@ -240,30 +243,7 @@ describe('DashboardRouteSurface', () => {
   });
 
   it('persists lightweight onboarding separately for each account', async () => {
-    mockApiServer.use(
-      http.get('*/api/projects', () =>
-        HttpResponse.json({
-          projects: [],
-          nextCursor: null,
-          total: { count: 0, exceedsCeiling: false },
-        }),
-      ),
-      http.get('*/api/campaigns', () =>
-        HttpResponse.json({
-          campaigns: [],
-          nextCursor: null,
-          total: { count: 0, exceedsCeiling: false },
-        }),
-      ),
-      http.get('*/api/videos', () =>
-        HttpResponse.json({
-          videos: [],
-          nextCursor: null,
-          total: 0,
-          facets: { characterNames: [], formats: [] },
-        }),
-      ),
-    );
+    mockApiServer.use(...workListHandlers(false));
     const user = userEvent.setup();
     const first = renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
     expect(
@@ -294,30 +274,7 @@ describe('DashboardRouteSurface', () => {
   });
 
   it('turns an empty recent-work filter into the appropriate next action', async () => {
-    mockApiServer.use(
-      http.get('*/api/projects', () =>
-        HttpResponse.json({
-          projects: [],
-          nextCursor: null,
-          total: { count: 0, exceedsCeiling: false },
-        }),
-      ),
-      http.get('*/api/campaigns', () =>
-        HttpResponse.json({
-          campaigns: [],
-          nextCursor: null,
-          total: { count: 0, exceedsCeiling: false },
-        }),
-      ),
-      http.get('*/api/videos', () =>
-        HttpResponse.json({
-          videos: [],
-          nextCursor: null,
-          total: 0,
-          facets: { characterNames: [], formats: [] },
-        }),
-      ),
-    );
+    mockApiServer.use(...workListHandlers(false));
     const user = userEvent.setup();
     const { actions } = renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
 
@@ -334,30 +291,7 @@ describe('DashboardRouteSurface', () => {
   });
 
   it('restores the recent-work filter and route scroll position on return', async () => {
-    mockApiServer.use(
-      http.get('*/api/projects', () =>
-        HttpResponse.json({
-          projects: [project],
-          nextCursor: null,
-          total: { count: 1, exceedsCeiling: false },
-        }),
-      ),
-      http.get('*/api/campaigns', () =>
-        HttpResponse.json({
-          campaigns: [campaign],
-          nextCursor: null,
-          total: { count: 1, exceedsCeiling: false },
-        }),
-      ),
-      http.get('*/api/videos', () =>
-        HttpResponse.json({
-          videos: [video],
-          nextCursor: null,
-          total: 1,
-          facets: { characterNames: [], formats: ['landscape'] },
-        }),
-      ),
-    );
+    mockApiServer.use(...workListHandlers(true));
     const user = userEvent.setup();
     const ownerUserId = '0ce89b50-55d7-4d7a-a370-c5e1df4fb197';
     const first = renderDashboard(ownerUserId);
@@ -385,28 +319,7 @@ describe('DashboardRouteSurface', () => {
           ? HttpResponse.json({ message: 'Unavailable' }, { status: 503 })
           : HttpResponse.json({ jobs: [] });
       }),
-      http.get('*/api/projects', () =>
-        HttpResponse.json({
-          projects: [project],
-          nextCursor: null,
-          total: { count: 1, exceedsCeiling: false },
-        }),
-      ),
-      http.get('*/api/campaigns', () =>
-        HttpResponse.json({
-          campaigns: [campaign],
-          nextCursor: null,
-          total: { count: 1, exceedsCeiling: false },
-        }),
-      ),
-      http.get('*/api/videos', () =>
-        HttpResponse.json({
-          videos: [video],
-          nextCursor: null,
-          total: 1,
-          facets: { characterNames: [], formats: ['landscape'] },
-        }),
-      ),
+      ...workListHandlers(true),
     );
     const user = userEvent.setup();
     renderDashboard('7d374693-a9dd-49d5-85d8-8b01b22520dc');
@@ -423,30 +336,7 @@ describe('DashboardRouteSurface', () => {
   });
 
   it('leads with the work and removes an idle processing queue from the page', async () => {
-    mockApiServer.use(
-      http.get('*/api/projects', () =>
-        HttpResponse.json({
-          projects: [project],
-          nextCursor: null,
-          total: { count: 1, exceedsCeiling: false },
-        }),
-      ),
-      http.get('*/api/campaigns', () =>
-        HttpResponse.json({
-          campaigns: [campaign],
-          nextCursor: null,
-          total: { count: 1, exceedsCeiling: false },
-        }),
-      ),
-      http.get('*/api/videos', () =>
-        HttpResponse.json({
-          videos: [video],
-          nextCursor: null,
-          total: 1,
-          facets: { characterNames: [], formats: ['landscape'] },
-        }),
-      ),
-    );
+    mockApiServer.use(...workListHandlers(true));
     renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');
 
     expect(await screen.findByRole('heading', { name: 'Continue Work' })).toBeVisible();
@@ -484,28 +374,7 @@ describe('DashboardRouteSurface', () => {
         active = false;
         return new HttpResponse(null, { status: 204 });
       }),
-      http.get('*/api/projects', () =>
-        HttpResponse.json({
-          projects: [],
-          nextCursor: null,
-          total: { count: 0, exceedsCeiling: false },
-        }),
-      ),
-      http.get('*/api/campaigns', () =>
-        HttpResponse.json({
-          campaigns: [],
-          nextCursor: null,
-          total: { count: 0, exceedsCeiling: false },
-        }),
-      ),
-      http.get('*/api/videos', () =>
-        HttpResponse.json({
-          videos: [],
-          nextCursor: null,
-          total: 0,
-          facets: { characterNames: [], formats: [] },
-        }),
-      ),
+      ...workListHandlers(false),
     );
     const user = userEvent.setup();
     renderDashboard('2d7914b2-f912-4b96-b17d-54100a2ffea3');

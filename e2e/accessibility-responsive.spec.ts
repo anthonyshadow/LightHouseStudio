@@ -446,45 +446,49 @@ for (const viewport of dashboardViewports) {
   });
 }
 
-for (const viewport of dashboardViewports) {
-  test(`${viewport.name} first-run Dashboard explains the first reusable-video flow`, async ({
-    page,
-  }) => {
-    const network = await installSuccessfulStudioHarness(page);
-    await installCampaignHarness(page);
-    await installProjectHarness(page);
-    await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await page.goto('/dashboard');
+test('first-run Dashboard explains the first reusable-video flow at every canonical width', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await installCampaignHarness(page);
+  await installProjectHarness(page);
+  await page.goto('/dashboard');
 
-    const createVideo = page.getByRole('button', { name: 'Create video' });
-    const firstRunHeading = page.getByRole('heading', {
-      name: 'Make your first reusable video',
-    });
-    await expect(createVideo).toBeVisible();
-    await expect(firstRunHeading).toBeVisible();
-    await expect(
-      page.getByText(/Record in Studio or upload a source, edit and save versions/u),
-    ).toBeVisible();
-    await expect(page.getByText('0 recent items', { exact: true })).toBeVisible();
+  const createVideo = page.getByRole('button', { name: 'Create video' });
+  const firstRun = page.locator('[data-first-run]');
+  await expect(createVideo).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Make your first reusable video' })).toBeVisible();
+  await expect(
+    page.getByText(/Record in Studio or upload a source, edit and save versions/u),
+  ).toBeVisible();
+  await expect(page.getByText('0 recent items', { exact: true })).toBeVisible();
+
+  for (const viewport of dashboardViewports) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
 
     const [createBox, firstRunBox, continueBox] = await Promise.all([
       createVideo.boundingBox(),
-      firstRunHeading.locator('xpath=ancestor::aside').boundingBox(),
+      firstRun.boundingBox(),
       page.locator('[data-continue-section]').boundingBox(),
     ]);
-    expect(createBox).not.toBeNull();
-    expect(firstRunBox).not.toBeNull();
-    expect(continueBox).not.toBeNull();
-    expect(createBox!.y + createBox!.height).toBeLessThanOrEqual(viewport.height);
-    expect(firstRunBox!.y + firstRunBox!.height).toBeLessThanOrEqual(viewport.height);
-    expect(continueBox!.y).toBeGreaterThanOrEqual(firstRunBox!.y + firstRunBox!.height);
+    expect(createBox, viewport.name).not.toBeNull();
+    expect(firstRunBox, viewport.name).not.toBeNull();
+    expect(continueBox, viewport.name).not.toBeNull();
+    expect(createBox!.y + createBox!.height, viewport.name).toBeLessThanOrEqual(viewport.height);
+    expect(firstRunBox!.y + firstRunBox!.height, viewport.name).toBeLessThanOrEqual(
+      viewport.height,
+    );
+    expect(continueBox!.y, viewport.name).toBeGreaterThanOrEqual(
+      firstRunBox!.y + firstRunBox!.height,
+    );
 
     await expectNoDocumentOverflow(page);
     await expectNoAxeViolations(page);
-    expect((await readBrowserState(page)).cameraCalls).toBe(0);
-    expectNoExternalProviderTraffic(network);
-  });
-}
+  }
+
+  expect((await readBrowserState(page)).cameraCalls).toBe(0);
+  expectNoExternalProviderTraffic(network);
+});
 
 test('paused account-library sync keeps the Dashboard and recovery controls unoccluded', async ({
   page,
