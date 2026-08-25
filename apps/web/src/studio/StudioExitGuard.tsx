@@ -406,7 +406,7 @@ export const StudioExitGuard = ({
       <ConfirmationDialog
         open={discardConfirmationOpen}
         title="Discard temporary work and leave?"
-        description="Leaving Studio discards the current temporary take, active Project source staging, active Voice work, unsaved video edits, and unsaved creative settings. Saved browser-local items remain available."
+        description="Anything you have not saved is discarded, including the current take. Everything you have already saved stays where it is."
         confirmLabel="Discard and leave"
         cancelLabel="Stay in Studio"
         danger

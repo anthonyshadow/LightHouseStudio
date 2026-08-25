@@ -77,7 +77,7 @@ export const ShellLifecycleDialogs = ({
             ? 'Cleanup and sign-out did not complete. Lightframe kept you in Studio so you can retry without silently abandoning the session.'
             : logout.hasProjectProposal
               ? 'Project saving did not complete. Logging out now explicitly discards the preserved local proposal plus any temporary media or library work. Autosaved Project changes remain available.'
-              : 'Logging out stops local media and discards the current temporary take, active source staging, active Voice work, unsaved video edits, and unsaved library changes. Saved account items remain available.'
+              : 'Logging out stops your camera and microphone and discards anything you have not saved, including the current take. Everything you have already saved stays in your account.'
         }
         alert={logout.failure ?? undefined}
         confirmLabel={

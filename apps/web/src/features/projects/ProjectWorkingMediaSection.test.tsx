@@ -328,7 +328,9 @@ describe('ProjectWorkingMediaSection', () => {
       revision: response.revision,
     });
     expect(screen.getByRole('status')).toHaveTextContent('Current cut ready');
-    expect(screen.getByRole('status')).toHaveTextContent('Nothing was copied');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Your original video and every saved version are exactly as they were.',
+    );
   });
 
   it('preserves a conflicting local proposal before making any adoption request', async () => {

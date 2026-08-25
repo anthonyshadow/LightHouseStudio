@@ -5,8 +5,11 @@ import { projectWorkflowProgressStyles } from './ProjectRouteSurface.styles';
 type Snapshot = ProjectCurrentResponse['revision']['snapshot'];
 
 /**
- * The single ordered definition of a Project's lifecycle. The workspace tablist derives its tasks
- * from this list so the progress a user reads and the tasks they can open cannot drift apart.
+ * The single ordered definition of a Project's tasks. The workspace tablist derives its tabs from
+ * this list so the tasks a user can open and the progress they read cannot drift apart.
+ *
+ * `history` is a task but not a step: it is the record of what happened, always available and
+ * never something a Project has to reach. Only the first three describe progress.
  */
 export const PROJECT_WORKFLOW_STEPS = [
   { id: 'source', label: 'Original' },
@@ -16,6 +19,9 @@ export const PROJECT_WORKFLOW_STEPS = [
 ] as const;
 
 export type ProjectWorkflowStepId = (typeof PROJECT_WORKFLOW_STEPS)[number]['id'];
+
+/** The steps a Project actually moves through, which is the whole list minus the record. */
+const PROGRESS_STEPS = PROJECT_WORKFLOW_STEPS.filter(({ id }) => id !== 'history');
 
 /**
  * The domain only ever writes `source`, `creative`, `review` and `complete`; `processing` and
@@ -55,7 +61,8 @@ export const ProjectWorkflowProgress = ({
 }: ProjectWorkflowProgressProps) => {
   const theme = useTheme();
   const activeStep = stepForSnapshot(snapshot);
-  const activeIndex = PROJECT_WORKFLOW_STEPS.findIndex(({ id }) => id === activeStep);
+  // A Project on `history` has been through every step, so none of them is current any more.
+  const activeIndex = PROGRESS_STEPS.findIndex(({ id }) => id === activeStep);
 
   return (
     <ol
@@ -64,11 +71,17 @@ export const ProjectWorkflowProgress = ({
       data-variant={variant}
       css={projectWorkflowProgressStyles(theme)}
     >
-      {PROJECT_WORKFLOW_STEPS.map((step, index) => (
+      {PROGRESS_STEPS.map((step, index) => (
         <li
           key={step.id}
-          aria-label={`Step ${index + 1} of ${PROJECT_WORKFLOW_STEPS.length}: ${step.label}`}
-          data-state={index < activeIndex ? 'done' : index === activeIndex ? 'current' : 'upcoming'}
+          aria-label={`Step ${index + 1} of ${PROGRESS_STEPS.length}: ${step.label}`}
+          data-state={
+            activeIndex === -1 || index < activeIndex
+              ? 'done'
+              : index === activeIndex
+                ? 'current'
+                : 'upcoming'
+          }
           {...(index === activeIndex ? { 'aria-current': 'step' as const } : {})}
         >
           <span data-step-ordinal aria-hidden="true">
