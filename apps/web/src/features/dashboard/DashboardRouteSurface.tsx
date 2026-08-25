@@ -536,7 +536,7 @@ export const DashboardRouteSurface = ({
                 Projects keep focused work together; Campaigns are optional organizers.
               </p>
             </div>
-            <Button size="small" variant="quiet" onClick={dismissOnboarding}>
+            <Button size="small" variant="link" onClick={dismissOnboarding}>
               Got it
             </Button>
           </aside>

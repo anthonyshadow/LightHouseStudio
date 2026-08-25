@@ -1,5 +1,5 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { forwardRef, type ButtonHTMLAttributes } from 'react';
+import { forwardRef, type AnchorHTMLAttributes, type ButtonHTMLAttributes } from 'react';
 import { focusRingStyles } from '../theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'link' | 'danger';
@@ -43,9 +43,8 @@ const buttonStyles = (theme: Theme, size: ButtonSize, variant: ButtonVariant): C
 });
 
 /**
- * The colour recipe for a button variant, exported so a control that cannot be a `Button` — an
- * `<a download>`, which has no anchor form yet — states the accent treatment once rather than
- * copying it. Metrics and focus ring stay with the caller; only the fill is shared.
+ * The colour recipe for a button variant. Exported beside `Button` and `LinkButton` so a control
+ * that is neither can still state the treatment once rather than copying it.
  */
 export const buttonVariantStyles = (theme: Theme, variant: ButtonVariant): CSSObject => {
   switch (variant) {
@@ -119,5 +118,39 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     >
       {children}
     </button>
+  );
+});
+
+export interface LinkButtonProps extends AnchorHTMLAttributes<HTMLAnchorElement> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+}
+
+/**
+ * `Button`'s anchor form, for the actions that must be a real link — every `<a download>` in the
+ * product, which cannot be a `<button>` because the browser has to own the save. It shares the
+ * metrics, the fill and the focus ring, so a Download beside a Save is the same control.
+ *
+ * The underline is cleared before the variant styles apply, so `variant="link"` still draws its
+ * own; every other variant reads as a button rather than as running text.
+ */
+export const LinkButton = forwardRef<HTMLAnchorElement, LinkButtonProps>(function LinkButton(
+  { variant = 'secondary', size = 'regular', children, ...props },
+  ref,
+) {
+  const theme = useTheme();
+
+  return (
+    <a
+      ref={ref}
+      css={[
+        buttonStyles(theme, size, variant),
+        { textDecoration: 'none' },
+        buttonVariantStyles(theme, variant),
+      ]}
+      {...props}
+    >
+      {children}
+    </a>
   );
 });

@@ -564,11 +564,7 @@ const CampaignDetail = ({ campaignId }: { readonly campaignId: string }) => {
         title={campaign.name}
         headingRef={headingRef}
         breadcrumb={
-          <Button
-            data-detail-breadcrumb
-            variant="quiet"
-            onClick={() => goBack(APP_PATHS.campaigns)}
-          >
+          <Button data-detail-breadcrumb variant="link" onClick={() => goBack(APP_PATHS.campaigns)}>
             ← All Campaigns
           </Button>
         }

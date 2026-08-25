@@ -236,7 +236,7 @@ export const ProjectWorkspaceSurface = ({
       <header css={workspaceMastheadStyles(theme)} data-project-workspace-masthead="">
         <Button
           data-detail-breadcrumb
-          variant="quiet"
+          variant="link"
           aria-label="← Project overview"
           onClick={() => goBack(projectPath(project.id))}
         >

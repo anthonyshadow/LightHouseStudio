@@ -1,5 +1,4 @@
 import type { CSSObject, Theme } from '@emotion/react';
-import { buttonVariantStyles } from '../../ui/primitives/Button';
 import { media } from '../../ui/media';
 
 export const galleryStyles = (theme: Theme): CSSObject => ({
@@ -265,31 +264,6 @@ export const noPreviewActionStyles = (theme: Theme): CSSObject => ({
   },
 });
 
-/**
- * The one definition of the library's `<a download>` treatment, shared by the card's lead action
- * and the version-preview footer. `Button` has no anchor form yet, so a download link cannot be a
- * `Button`; when one is added (design-system consolidation) both call sites collapse onto it.
- */
-export const downloadLinkStyles = (theme: Theme): CSSObject => ({
-  minHeight: '2.85rem',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0.7rem 1rem',
-  border: '1px solid transparent',
-  borderRadius: theme.radii.medium,
-  // The primary fill comes from the primitive, so the accent treatment keeps one owner.
-  ...buttonVariantStyles(theme, 'primary'),
-  fontWeight: 720,
-  lineHeight: 1.1,
-  textDecoration: 'none',
-  '&:hover': { borderColor: theme.colors.accent },
-  '&:focus-visible': {
-    outline: `2px solid ${theme.colors.focus}`,
-    outlineOffset: '2px',
-  },
-});
-
 export const actionsStyles = (theme: Theme): CSSObject => ({
   position: 'relative',
   display: 'flex',
@@ -297,7 +271,7 @@ export const actionsStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.xs,
   marginBlockStart: 'auto',
   // Retrieval leads: the download link takes the row, the rest live behind the overflow.
-  '& > a:first-of-type': { ...downloadLinkStyles(theme), flex: 1 },
+  '& > a:first-of-type': { flex: 1 },
 });
 
 export const paginationStyles = (theme: Theme): CSSObject => ({
@@ -355,7 +329,6 @@ export const previewFooterStyles = (theme: Theme): CSSObject => ({
   justifyContent: 'flex-end',
   gap: theme.space.xs,
   '& > *': { minWidth: '8.5rem' },
-  '& > a': downloadLinkStyles(theme),
   [media.down('tablet')]: {
     display: 'grid',
     gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',

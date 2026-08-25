@@ -31,6 +31,7 @@ import {
   Button,
   emptyExampleStyles,
   EmptyStatePreview,
+  LinkButton,
   ListSearchField,
   OverlayPanel,
   SelectField,
@@ -295,13 +296,14 @@ const VideoGalleryGrid = ({
                 </div>
               )}
               <div css={actionsStyles(theme)}>
-                <a
+                <LinkButton
+                  variant="primary"
                   href={downloadSavedVideoUrl(video.id, version.id)}
                   download={version.filename}
                   aria-label={`Download ${video.title}`}
                 >
                   Download
-                </a>
+                </LinkButton>
                 <ActionMenu
                   label={`More actions for ${video.title}`}
                   placement="above"
@@ -906,12 +908,13 @@ export const VideoGallery = ({
         footer={
           previewVideo && selectedVersion ? (
             <div css={previewFooterStyles(theme)}>
-              <a
+              <LinkButton
+                variant="primary"
                 href={downloadSavedVideoUrl(previewVideo.id, selectedVersion.id)}
                 download={selectedVersion.filename}
               >
                 Download
-              </a>
+              </LinkButton>
               <ActionMenu
                 label={`More actions for ${previewVideo.title}`}
                 placement="above"

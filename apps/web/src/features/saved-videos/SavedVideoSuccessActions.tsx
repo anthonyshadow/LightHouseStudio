@@ -2,7 +2,7 @@ import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import type { SavedVideoDetail } from '@studio/contracts';
 import type { ProjectExportSpecification } from '@studio/domain';
 import { downloadSavedVideoUrl } from '../../adapters/api-client/savedVideosApi';
-import { Button, StatusNotice } from '../../ui';
+import { Button, LinkButton, StatusNotice } from '../../ui';
 import { ExportPlacementProgress, exportPlacementLabel } from '../export-placements';
 import { useSavedVideoPlacementDownload } from './useSavedVideoPlacementDownload';
 
@@ -15,29 +15,6 @@ const actionRowStyles = (theme: Theme): CSSObject => ({
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr)',
     '& > *': { width: '100%' },
-  },
-});
-
-// Download is a server-served anchor rather than a Button so the browser owns the transfer, matching
-// the Videos gallery and Project history affordances.
-const downloadLinkStyles = (theme: Theme): CSSObject => ({
-  minWidth: '2.75rem',
-  minHeight: '2.75rem',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0.55rem 0.8rem',
-  border: `1px solid ${theme.colors.accent}`,
-  borderRadius: theme.radii.medium,
-  color: theme.colors.text,
-  background: theme.colors.surfaceStrong,
-  fontWeight: 720,
-  lineHeight: 1.1,
-  textDecoration: 'none',
-  '&:hover': { borderColor: theme.colors.accentStrong },
-  '&:focus-visible': {
-    outline: `2px solid ${theme.colors.focus}`,
-    outlineOffset: '2px',
   },
 });
 
@@ -83,14 +60,13 @@ export const SavedVideoSuccessActions = ({
             Download for {exportPlacementLabel(reframing.aspect).toLowerCase()}
           </Button>
         ) : (
-          <a
+          <LinkButton
             href={downloadSavedVideoUrl(video.id, video.currentVersion.id)}
             download={video.currentVersion.filename}
             aria-label={`Download ${video.title}, Version ${video.currentVersion.ordinal}`}
-            css={downloadLinkStyles(theme)}
           >
             Download
-          </a>
+          </LinkButton>
         )}
         <Button variant="secondary" onClick={onOpenInAssets}>
           View in Assets
@@ -119,14 +95,16 @@ export const SavedVideoSuccessActions = ({
         onCancel={render.cancel}
       />
       {reframing ? (
-        <a
+        <LinkButton
+          variant="link"
+          size="small"
           href={downloadSavedVideoUrl(video.id, video.currentVersion.id)}
           download={video.currentVersion.filename}
           aria-label={`Download ${video.title}, Version ${video.currentVersion.ordinal}, in its original shape`}
-          css={{ fontSize: '0.85rem', justifySelf: 'start' }}
+          css={{ justifySelf: 'start' }}
         >
           Download the original shape instead
-        </a>
+        </LinkButton>
       ) : null}
     </div>
   );
