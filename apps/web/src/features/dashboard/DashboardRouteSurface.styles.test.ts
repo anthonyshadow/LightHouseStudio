@@ -18,9 +18,18 @@ describe('Dashboard header styles', () => {
   it('leaves the compact actions row to the shared header', () => {
     const shared = narrow(pageHeaderStyles(studioTheme));
     expect(shared['& [data-page-actions]']).toMatchObject({ flexWrap: 'nowrap' });
-    expect(shared['& [data-page-actions] > *:first-child']).toMatchObject({ minWidth: 0 });
+    // Grows into free width, never shrinks below its own content: the peers are the slack.
+    expect(shared['& [data-page-actions] > *:first-child']).toMatchObject({ flex: '1 0 auto' });
 
-    expect(narrow(dashboardHeaderStyles(studioTheme))['& [data-page-actions]']).toBeUndefined();
+    const dashboard = dashboardHeaderStyles(studioTheme);
+    expect(narrow(dashboard)['& [data-page-actions]']).toBeUndefined();
+    /*
+     * Nor may the surface re-size the leading control once the row is compact. A rule here loses
+     * anyway — the shared `> *:first-child` selector is the more specific of the two — so it reads
+     * as a fix while doing nothing, which is worse than no rule at all.
+     */
+    const compact = (dashboard['@container (max-width: 22rem)'] ?? {}) as CSSObject;
+    expect(compact['& [data-create-video]']).toBeUndefined();
   });
 
   it('keeps the Dashboard header to what is specific to its own controls', () => {

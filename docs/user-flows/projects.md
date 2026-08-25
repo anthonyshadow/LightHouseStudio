@@ -412,7 +412,7 @@ what the whole Project is built from.
 - `/campaigns/{id}` via the breadcrumb when the project belongs to a campaign
 - `/projects` after deleting from the overview (replace)
 - `/studio/create?projectId=…` and back again after a save
-- Saved Videos library (outputs appear there)
+- The Videos library under Assets (outputs appear there)
 
 ## Unverified
 

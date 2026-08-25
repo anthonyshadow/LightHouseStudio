@@ -11,22 +11,10 @@ accessibility, physical-device, and live-provider behavior belongs to other test
 
 ## Matrix
 
-The current matrix has 35 Chromium cases:
-
-| Group             | States | Viewports                    | Cases |
-| ----------------- | -----: | ---------------------------- | ----: |
-| Entry             |      1 | small mobile                 |     1 |
-| Organization      |      2 | desktop and small mobile     |     4 |
-| Core Studio       |      2 | all five                     |    10 |
-| Studio idle       |      2 | desktop                      |     2 |
-| Focused high-risk |     10 | risk-selected viewport pairs |    12 |
-| Desktop-specific  |      2 | desktop                      |     2 |
-| Small-mobile risk |      2 | small mobile                 |     2 |
-| Projects          |      2 | desktop and small mobile     |     2 |
-
-Thirty-five is the review budget, not the definition of correctness. The current matrix uses all 35
-cases. The executable invariants require unique paths, all five viewport IDs, and every
-local-live/recording state/viewport pair.
+The curated matrix is **50 Chromium cases over 25 baselines**, against a budget of 50 asserted in
+`e2e/studioVisualMatrix.ts`. Fifty is the review budget, not the definition of correctness: the
+executable invariants require unique baseline paths, all five viewport IDs, and every
+local-live / recording-state / viewport pair.
 
 | Viewport ID    |       Size |
 | -------------- | ---------: |
@@ -38,39 +26,55 @@ local-live/recording state/viewport pair.
 
 ## Protected states
 
-| Scope                 | Baseline                                             |
-| --------------------- | ---------------------------------------------------- |
-| Small mobile          | `00-entry/initial.png`                               |
-| Desktop/small mobile  | `11-dashboard/overview.png`                          |
-| Desktop/small mobile  | `12-assets/overview.png`                             |
-| Desktop               | `01-studio/initial-closed.png`                       |
-| Desktop               | `01-studio/initial-portrait.png`                     |
-| All viewports         | `01-studio/local-camera-live.png`                    |
-| All viewports         | `01-studio/recording-active.png`                     |
-| Desktop               | `01-studio/selected-character-ai-live.png`           |
-| Small mobile          | `02-character-builder/combined-reference-ready.png`  |
-| Desktop               | `03-character-library/saved-character-selection.png` |
-| Small mobile          | `04-take-review/playback-review-settled.png`         |
-| Small mobile          | `07-existing-video/chooser.png`                      |
-| Compact/tablet/mobile | `07-existing-video/validated-setup.png`              |
-| Compact               | `07-existing-video/processing.png`                   |
-| Desktop               | `07-existing-video/result.png`                       |
-| Desktop               | `08-video-editor/lighting-dirty.png`                 |
-| Small mobile          | `08-video-editor/crop-dirty.png`                     |
-| Desktop               | `10-campaigns/workspace.png`                         |
-| Small mobile          | `09-projects/output-review.png`                      |
-| Desktop               | `05-virtual-try-on/prepared-with-reference.png`      |
-| Desktop               | `06-voice/voice-browser-loaded.png`                  |
-| Small mobile          | `01-studio/take-finalizing.png`                      |
-| Small mobile          | `01-studio/media-permission-error.png`               |
+Derived from the committed baselines; `bun run screenshots:prune` is the executable check that this
+list and the tree agree.
 
-The matrix intentionally emphasizes Dashboard orientation, Assets discovery, mobile organization
-navigation, the record/upload first impression, neutral Local Camera
-startup, provider-free live capture, dominant recording Stop, the densest Builder/review states,
-deterministic dirty Lighting/Crop editor layouts, the active/archived Campaigns workspace, the
-small-mobile Project output-review boundary, and representative loading/error states. The four
-organization cases protect the new information architecture and mobile bottom navigation directly;
-durable Campaign navigation and exact-Version output review remain protected composition contracts.
+| Viewports                  | Baseline                                             |
+| -------------------------- | ---------------------------------------------------- |
+| small-mobile               | `00-entry/initial.png`                               |
+| desktop                    | `01-studio/initial-closed.png`                       |
+| desktop                    | `01-studio/initial-portrait.png`                     |
+| All viewports              | `01-studio/local-camera-live.png`                    |
+| small-mobile               | `01-studio/media-permission-error.png`               |
+| All viewports              | `01-studio/recording-active.png`                     |
+| desktop                    | `01-studio/selected-character-ai-live.png`           |
+| small-mobile               | `01-studio/take-finalizing.png`                      |
+| small-mobile               | `02-character-builder/combined-reference-ready.png`  |
+| desktop                    | `03-character-library/saved-character-selection.png` |
+| small-mobile               | `04-take-review/playback-review-settled.png`         |
+| desktop                    | `05-virtual-try-on/prepared-with-reference.png`      |
+| desktop                    | `06-voice/voice-browser-loaded.png`                  |
+| small-mobile               | `07-existing-video/chooser.png`                      |
+| compact                    | `07-existing-video/processing.png`                   |
+| desktop                    | `07-existing-video/result.png`                       |
+| compact/tablet/mobile      | `07-existing-video/validated-setup.png`              |
+| mobile/small-mobile        | `08-video-editor/crop-dirty.png`                     |
+| desktop/compact/tablet     | `08-video-editor/lighting-dirty.png`                 |
+| desktop/small-mobile       | `09-projects/output-destination.png`                 |
+| All viewports              | `09-projects/output-review.png`                      |
+| desktop                    | `10-campaigns/workspace.png`                         |
+| desktop/small-mobile       | `11-dashboard/overview.png`                          |
+| tablet/mobile/small-mobile | `12-assets/filters.png`                              |
+| All viewports              | `12-assets/overview.png`                             |
+
+The matrix intentionally emphasizes Dashboard orientation, Assets discovery and its responsive
+filter sheet, the record/upload first impression, neutral Local Camera startup, provider-free live
+capture, dominant recording Stop, the densest Builder/review states, deterministic dirty
+Lighting/Crop editor layouts, the active/archived Campaigns workspace, the Project output-review
+and destination boundaries, and representative loading/error states.
+
+## Updating a baseline
+
+`bun run test:visual:update` passes `--update-snapshots=all`, which rewrites **every** baseline.
+Two things about that matter, and both have bitten this repository:
+
+- A change smaller than the 0.5% `maxDiffPixelRatio` leaves a **stale** baseline behind a green
+  suite. A relabelled control, a stroke-weight change and a swapped segmented control have each
+  done it. When a change is visible, re-capture the cases that show it even when the suite passes.
+- On at least one macOS host the capture is **not deterministic**: a re-capture with no code change
+  rewrites roughly 23 of the 50 images, all within tolerance. A blanket update therefore commits
+  noise. Prefer `--update-snapshots=all -g "<case>"` for the cases a change actually touches, and
+  compare the diff images rather than the file list.
 
 ## Determinism and readiness
 

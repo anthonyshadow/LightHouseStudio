@@ -48,7 +48,7 @@ future features current.
   explicit control-bar or upload-panel action acquires media; only an explicit AI Start contacts a
   provider.
 - Retired Guided repositories and presentation code are removed. Their records are not imported
-  into Saved Videos and cannot revive the retired Guided experience.
+  into Videos and cannot revive the retired Guided experience.
 - Browser navigation cannot abandon recording/finalization or an active video render. Leaving with
   a temporary take, active Voice process, dirty local video edit, or dirty configuration requires
   confirmed discard.
