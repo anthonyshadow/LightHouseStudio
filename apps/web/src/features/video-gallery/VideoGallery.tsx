@@ -33,13 +33,13 @@ import {
   EmptyStatePreview,
   LinkButton,
   ListSearchField,
+  LoadingPlaceholder,
   OverlayPanel,
   SelectField,
   Skeleton,
   StatusNotice,
   TextField,
   useListSearch,
-  VisuallyHidden,
 } from '../../ui';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { VideoPlayer } from '../video-player/VideoPlayer';
@@ -121,12 +121,9 @@ const VideoGallerySkeleton = () => {
   const theme = useTheme();
   return (
     <div css={galleryStyles(theme)} aria-busy="true">
-      <VisuallyHidden role="status">Loading saved videos…</VisuallyHidden>
-      <div css={gridStyles(theme)} aria-hidden="true">
-        {Array.from({ length: 6 }, (_, index) => (
-          <Skeleton key={index} variant="card" />
-        ))}
-      </div>
+      <LoadingPlaceholder css={gridStyles(theme)} label="Loading saved videos…" count={6}>
+        {() => <Skeleton variant="card" />}
+      </LoadingPlaceholder>
     </div>
   );
 };

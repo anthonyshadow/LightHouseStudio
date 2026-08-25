@@ -6,15 +6,16 @@ import { useLocation, useNavigate } from 'react-router';
 import { projectPath, projectWorkspacePath } from '../../app/paths';
 import {
   Button,
+  CollapsedListSection,
   emptyExampleStyles,
   EmptyStatePreview,
   ListSearchField,
+  LoadingPlaceholder,
   SearchEmptyState,
   SegmentedControl,
   Skeleton,
   StatusNotice,
   useListSearch,
-  VisuallyHidden,
 } from '../../ui';
 import {
   NewProjectDialog,
@@ -99,14 +100,11 @@ const ProjectListSection = ({
 
   if (collapsed) {
     return (
-      <section
+      <CollapsedListSection
         css={projectsLedgerCollapsedStyles(theme)}
-        aria-labelledby={`${lifecycle}-${campaignId ?? 'all'}-projects-heading`}
-        data-project-ledger-section={lifecycle}
-      >
-        <h3 id={`${lifecycle}-${campaignId ?? 'all'}-projects-heading`}>{heading ?? 'Archived'}</h3>
-        <span>None yet</span>
-      </section>
+        headingId={`${lifecycle}-${campaignId ?? 'all'}-projects-heading`}
+        heading={heading ?? 'Archived'}
+      />
     );
   }
 
@@ -126,16 +124,13 @@ const ProjectListSection = ({
         </span>
       </header>
       {query.isPending ? (
-        <>
-          <VisuallyHidden role="status">Loading {lifecycle} Projects…</VisuallyHidden>
-          <ul css={projectsLedgerSkeletonStyles(theme)} aria-hidden="true">
-            {Array.from({ length: 3 }, (_, index) => (
-              <li key={index}>
-                <Skeleton variant="row" />
-              </li>
-            ))}
-          </ul>
-        </>
+        <LoadingPlaceholder
+          css={projectsLedgerSkeletonStyles(theme)}
+          label={`Loading ${lifecycle} Projects…`}
+          count={3}
+        >
+          {() => <Skeleton variant="row" />}
+        </LoadingPlaceholder>
       ) : null}
       {query.isError ? (
         <StatusNotice role="alert" tone="danger" title="Projects unavailable">
@@ -147,23 +142,19 @@ const ProjectListSection = ({
       ) : null}
       {!query.isPending && !query.isError && projects.length === 0 ? (
         <div css={projectsLedgerEmptyStyles(theme)}>
+          {/* An empty archive returned above, so an unsearched empty list here is always active. */}
           {search === undefined ? (
             <>
-              {archived ? null : <EmptyStatePreview />}
-              <strong>{archived ? 'No archived Projects' : 'No active Projects yet'}</strong>
+              <EmptyStatePreview />
+              <strong>No active Projects yet</strong>
               <p>
-                {archived
-                  ? campaignId === 'none'
-                    ? 'Archived Projects with no Campaign appear here and can be restored.'
-                    : 'Archived work appears here and can be restored.'
-                  : 'Start a Project to keep one video and all the work you do on it together. Naming it is optional — you can rename it later.'}
+                Start a Project to keep one video and all the work you do on it together. Naming it
+                is optional — you can rename it later.
               </p>
-              {archived ? null : (
-                <p data-empty-example css={emptyExampleStyles(theme)}>
-                  For example: a “Product demo” Project holding one original video, its Character
-                  Swap runs, and every saved cut.
-                </p>
-              )}
+              <p data-empty-example css={emptyExampleStyles(theme)}>
+                For example: a “Product demo” Project holding one original video, its Character Swap
+                runs, and every saved cut.
+              </p>
             </>
           ) : (
             <SearchEmptyState

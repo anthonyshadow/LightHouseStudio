@@ -1,3 +1,4 @@
+import { useTheme } from '@emotion/react';
 import { ASSET_NAME_MAX_LENGTH, containsMeaningfulText, normalizeWhitespace } from '@studio/domain';
 import { useId, useRef, useState, type FormEvent, type RefObject } from 'react';
 import { Button, OverlayPanel, SegmentedControl, StatusNotice, TextField } from '../../ui';
@@ -39,6 +40,7 @@ export const CharacterNameDialog = ({
   onCancel,
   onSubmit,
 }: CharacterNameDialogProps) => {
+  const theme = useTheme();
   const formId = useId();
   const fieldRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(initialName);
@@ -59,7 +61,6 @@ export const CharacterNameDialog = ({
 
   const cancel = () => {
     setAttempted(false);
-    setMode('default');
     onCancel();
   };
 
@@ -97,7 +98,7 @@ export const CharacterNameDialog = ({
       }
     >
       {canSaveUploadedImageOnly && !locked ? (
-        <div css={{ display: 'grid', gap: '0.5rem', marginBlockEnd: '1rem' }}>
+        <div css={{ display: 'grid', gap: theme.space.xs, marginBlockEnd: theme.space.md }}>
           <SegmentedControl
             columns={SAVE_MODE_OPTIONS.length}
             label="What to save"

@@ -70,15 +70,10 @@ export const projectsLedgerListStyles = (): CSSObject => ({
   listStyle: 'none',
 });
 
-/** A section with nothing in it and nothing being looked for: a heading and one word. */
+/** The collapsed archive's own spacing and type; `CollapsedListSection` owns its arrangement. */
 export const projectsLedgerCollapsedStyles = (theme: Theme): CSSObject => ({
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'baseline',
-  gap: theme.space.sm,
   paddingBlockStart: `clamp(${theme.space.xl}, 4vw, ${theme.space.xxl})`,
   '& h3': {
-    margin: 0,
     fontFamily: theme.type.display,
     fontSize: 'clamp(1.2rem, 2.2cqi, 1.55rem)',
     letterSpacing: '-0.025em',

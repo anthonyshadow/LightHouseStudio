@@ -1197,7 +1197,7 @@ describe('StudioApp composition lifecycle', () => {
     fireEvent(window, new Event('lightframe:authentication-required'));
 
     const notice = await screen.findByRole('region', { name: 'Your session ended' });
-    expect(notice).toHaveTextContent('The current temporary take');
+    expect(notice).toHaveTextContent('Anything you have not saved is discarded');
     expect(harness.session.stopCamera).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Log in again' }));

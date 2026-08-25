@@ -15,7 +15,7 @@ type DirectVideoLoadResult =
 
 const safeDirectVideoLoadMessage = (error: unknown): string =>
   error instanceof ApiClientError && [403, 404, 410].includes(error.status)
-    ? 'This Saved Video is unavailable or has been removed.'
+    ? 'That video is unavailable or has been removed.'
     : 'That video could not be loaded safely. Your Assets are unchanged.';
 
 interface UseDirectSavedVideoRouteOptions {

@@ -42,11 +42,8 @@ const buttonStyles = (theme: Theme, size: ButtonSize, variant: ButtonVariant): C
   },
 });
 
-/**
- * The colour recipe for a button variant. Exported beside `Button` and `LinkButton` so a control
- * that is neither can still state the treatment once rather than copying it.
- */
-export const buttonVariantStyles = (theme: Theme, variant: ButtonVariant): CSSObject => {
+/** The colour recipe for a button variant, shared by `Button` and its anchor form. */
+const buttonVariantStyles = (theme: Theme, variant: ButtonVariant): CSSObject => {
   switch (variant) {
     case 'primary':
       return {

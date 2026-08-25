@@ -40,9 +40,10 @@ const entryStyles = (theme: Theme): CSSObject => ({
     textTransform: 'uppercase',
   },
   /*
-   * A drawing of the idle stage, not a screenshot of one: the same gradient and corner brackets
-   * the Studio stage uses, so the first thing a newcomer sees is what they are about to open.
-   * It is the first thing to go on a short viewport, where the words matter more than the picture.
+   * A drawing of the stage, not a screenshot of one: it borrows the stage's own `stageIdle`
+   * gradient and echoes its framing marks, so the first thing a newcomer sees resembles what they
+   * are about to open. It is the first thing to go on a short viewport, where the words matter
+   * more than the picture — `36rem` being the height the rest of the product treats as short.
    */
   '& [data-entry-stage]': {
     position: 'relative',
@@ -72,7 +73,7 @@ const entryStyles = (theme: Theme): CSSObject => ({
       borderBlockEnd: `2px solid ${theme.colors.accent}`,
       borderInlineEnd: `2px solid ${theme.colors.accent}`,
     },
-    '@media (max-height: 38rem)': { display: 'none' },
+    '@media (max-height: 36rem)': { display: 'none' },
   },
   '& [data-entry-capabilities]': {
     display: 'grid',

@@ -5,6 +5,7 @@ import type { ProjectSessionPort } from '../features/projects/useProjectSession'
 import { Button } from '../ui/primitives/Button';
 import { ConfirmationDialog } from '../ui/primitives/ConfirmationDialog';
 import { OverlayPanel } from '../ui/primitives/OverlayPanel';
+import { UNSAVED_WORK_DISCARD_NOTICE } from './sessionNotices';
 
 export interface StudioExitGuardProps {
   readonly recordingOrFinalizing: boolean;
@@ -406,7 +407,7 @@ export const StudioExitGuard = ({
       <ConfirmationDialog
         open={discardConfirmationOpen}
         title="Discard temporary work and leave?"
-        description="Anything you have not saved is discarded, including the current take. Everything you have already saved stays where it is."
+        description={UNSAVED_WORK_DISCARD_NOTICE}
         confirmLabel="Discard and leave"
         cancelLabel="Stay in Studio"
         danger

@@ -55,7 +55,7 @@ export const ActionMenu = ({
   if (items.length === 0) return null;
 
   return (
-    <div ref={rootRef} data-action-menu="" css={actionMenuStyles(theme)}>
+    <div ref={rootRef} css={actionMenuStyles(theme)}>
       <Button
         ref={triggerRef}
         type="button"

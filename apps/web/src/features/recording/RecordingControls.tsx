@@ -6,6 +6,7 @@ import { formatDuration } from './recordingHelpers';
 import type { RecordingController, RecordingSource } from './types';
 import type { StudioMode } from '../media-session';
 import { media } from '../../ui/media';
+import { LOCAL_RETENTION_NOTICE } from '../../studio/sessionNotices';
 
 export const DESKTOP_CAPTURE_SETTINGS_PANEL_ID = 'desktop-capture-settings-panel';
 
@@ -209,9 +210,9 @@ const compactDeviceSummaryStyles = (theme: Theme): CSSObject => ({
   [media.up('laptop')]: { display: 'none' },
 });
 /**
- * The one place the product states what a session keeps. It only fits the wide session column, so
- * on a compact layout the same sentence stays where it has always been reachable: the Help panel's
- * privacy section and the idle stage's own line about the camera.
+ * The session column's copy of the retention sentence, which only fits a wide layout. The Help
+ * panel carries the same sentence from the same owner, and is reachable at every width — so a
+ * compact layout loses the convenience of having it here, not the statement itself.
  */
 const retentionNoteStyles = (theme: Theme): CSSObject => ({
   display: 'none',
@@ -392,10 +393,7 @@ export const RecordingControls = ({
         */}
         <p css={retentionNoteStyles(theme)}>
           <AppIcon name="privacy" />
-          <span>
-            Prompts and generated references persist locally. Manual uploads and takes stay
-            temporary until you save them.
-          </span>
+          <span>{LOCAL_RETENTION_NOTICE}</span>
         </p>
       </div>
       {desktopSettings ? (

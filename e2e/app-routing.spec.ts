@@ -1045,7 +1045,7 @@ test('an expiring session explains what an unsaved take loses before returning t
 
   const expiry = page.getByRole('dialog', { name: 'Your session ended' });
   await expect(expiry).toBeVisible();
-  await expect(expiry).toContainText('The current temporary take');
+  await expect(expiry).toContainText('Anything you have not saved is discarded');
   // Holding the redirect is the whole point: the work is still in memory while this is open.
   await expect(page).toHaveURL(new RegExp(`${STUDIO_PATH}$`, 'u'));
 

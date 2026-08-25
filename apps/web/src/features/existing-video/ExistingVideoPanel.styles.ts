@@ -318,12 +318,6 @@ export const metadataStyles = (theme: Theme): CSSObject => ({
   '@media (max-width: 22rem)': { gridTemplateColumns: 'minmax(0, 1fr)' },
 });
 
-/** Layout only: the two segments are `SegmentedControl`'s, not this panel's. */
-export const comparisonStyles = (): CSSObject => ({
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr)',
-});
-
 export const editorColumnStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   minHeight: 0,
@@ -625,24 +619,26 @@ export const actionSummaryStyles = (theme: Theme): CSSObject => ({
   '& strong': { color: theme.colors.text, fontSize: theme.fontSizes.metadata },
 });
 
+/*
+ * Only the row's own buttons are stretched. An overflow trigger is a fixed square that
+ * `actionMenuStyles` already sizes, so a blanket `& > *` here would clobber the primitive and
+ * force this file to restate the trigger's footprint in every breakpoint.
+ */
 export const actionButtonsStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
   flexWrap: 'wrap',
   gap: theme.space.xs,
   alignItems: 'stretch',
-  '& > *': { flex: '1 1 9rem', minWidth: 0, minHeight: '2.85rem' },
-  /* An overflow trigger is a fixed square: stretching it would make it read as a fourth action. */
-  '& > [data-action-menu]': { flex: '0 0 auto', width: '2.85rem' },
+  '& > button': { flex: '1 1 9rem', minWidth: 0, minHeight: '2.85rem' },
   '@media (max-width: 32rem)': {
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr) auto',
-    '& > *': { width: '100%' },
-    '& > *:not([data-action-menu])': { gridColumn: 1 },
-    '& > [data-action-menu]': { gridColumn: 2, gridRow: 1, width: '2.85rem' },
+    '& > button': { width: '100%', gridColumn: 1 },
+    '& > div': { gridColumn: 2, gridRow: 1 },
   },
   [media.up('laptop')]: {
     minWidth: '15rem',
-    '& > *': { width: '100%', flex: 'none' },
-    '& > [data-action-menu]': { width: '2.85rem', justifySelf: 'start' },
+    '& > button': { width: '100%', flex: 'none' },
+    '& > div': { justifySelf: 'start' },
   },
 });

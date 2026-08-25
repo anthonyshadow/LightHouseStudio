@@ -1,6 +1,8 @@
 import { useTheme } from '@emotion/react';
 import type { RefObject } from 'react';
+import { AppIcon } from '../ui/primitives/AppIcon';
 import { OverlayPanel } from '../ui/primitives/OverlayPanel';
+import { LOCAL_RETENTION_NOTICE } from './sessionNotices';
 
 const CONCEPTS = [
   {
@@ -108,6 +110,29 @@ export const HowLightframeWorksPanel = ({
           </div>
         ))}
       </dl>
+      {/*
+        Reachable from the navigation at every width, which the session and device column is not:
+        that column only exists on a wide layout, so this is where the retention sentence is
+        guaranteed to be findable.
+      */}
+      <p
+        css={{
+          display: 'grid',
+          gridTemplateColumns: 'auto minmax(0, 1fr)',
+          alignItems: 'start',
+          gap: theme.space.xs,
+          margin: `${theme.space.lg} 0 0`,
+          paddingBlockStart: theme.space.md,
+          borderBlockStart: `1px solid ${theme.colors.divider}`,
+          color: theme.colors.textFaint,
+          fontSize: theme.fontSizes.metadata,
+          lineHeight: 1.5,
+          '& svg': { width: '1rem', height: '1rem', color: theme.colors.accent },
+        }}
+      >
+        <AppIcon name="privacy" />
+        <span>{LOCAL_RETENTION_NOTICE}</span>
+      </p>
     </OverlayPanel>
   );
 };
