@@ -5,6 +5,7 @@ import { fetchSavedVoiceCount } from '../../adapters/api-client/voicesApi';
 import { type AssetDestination } from '../../app/paths';
 import { media } from '../../ui/media';
 import { VisuallyHidden } from '../../ui';
+import { skeletonSurfaceStyles } from '../../ui/primitives/Skeleton';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 
 /** A tab never mistakes an unread library for an empty one. */
@@ -87,9 +88,11 @@ const tabListStyles = (theme: Theme): CSSObject => ({
     color: theme.colors.accentStrong,
     background: theme.colors.canvas,
   },
+  /* The pill's shape is this tab list's; only the placeholder material comes from `Skeleton`. */
   '& [data-asset-tab-count="loading"]': {
+    ...skeletonSurfaceStyles(theme),
+    borderRadius: theme.radii.round,
     color: 'transparent',
-    background: theme.colors.borderStrong,
   },
   [media.down('tablet')]: {
     display: 'flex',

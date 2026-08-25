@@ -10,8 +10,10 @@ import {
   EmptyStatePreview,
   ListSearchField,
   SearchEmptyState,
+  Skeleton,
   StatusNotice,
   useListSearch,
+  VisuallyHidden,
 } from '../../ui';
 import {
   NewProjectDialog,
@@ -30,6 +32,7 @@ import {
   projectsLedgerListStyles,
   projectsLedgerRowStyles,
   projectsLedgerSectionStyles,
+  projectsLedgerSkeletonStyles,
 } from './ProjectsListSurface.styles';
 import { projectPosterUrls } from './projectPosterPresentation';
 import { stepForSnapshot } from './ProjectWorkflowProgress';
@@ -94,7 +97,18 @@ const ProjectListSection = ({
           {total === null ? null : projectCountLabel(total, archived, search)}
         </span>
       </header>
-      {query.isPending ? <p role="status">Loading {lifecycle} Projects…</p> : null}
+      {query.isPending ? (
+        <>
+          <VisuallyHidden role="status">Loading {lifecycle} Projects…</VisuallyHidden>
+          <ul css={projectsLedgerSkeletonStyles(theme)} aria-hidden="true">
+            {Array.from({ length: 3 }, (_, index) => (
+              <li key={index}>
+                <Skeleton variant="row" />
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
       {query.isError ? (
         <StatusNotice role="alert" tone="danger" title="Projects unavailable">
           <p>{safeProjectError(query.error)}</p>

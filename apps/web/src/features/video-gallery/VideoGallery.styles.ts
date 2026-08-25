@@ -107,32 +107,6 @@ export const cardStyles = (theme: Theme): CSSObject => ({
   '& h3, & p': { margin: 0 },
 });
 
-export const skeletonCardStyles = (theme: Theme): CSSObject => ({
-  minWidth: 0,
-  overflow: 'hidden',
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: theme.radii.large,
-  background: theme.colors.surfaceSoft,
-  '& [data-skeleton-poster]': {
-    display: 'block',
-    aspectRatio: '16 / 9',
-    background: theme.colors.surfaceStrong,
-  },
-  '& [data-skeleton-copy]': {
-    display: 'grid',
-    gap: theme.space.sm,
-    padding: theme.space.md,
-  },
-  '& [data-skeleton-line]': {
-    display: 'block',
-    width: '72%',
-    height: '0.8rem',
-    borderRadius: theme.radii.small,
-    background: theme.colors.border,
-  },
-  '& [data-skeleton-line="short"]': { width: '44%' },
-});
-
 export const posterButtonStyles = (theme: Theme): CSSObject => ({
   position: 'relative',
   width: '100%',

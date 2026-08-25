@@ -14,8 +14,10 @@ import {
   ListSearchField,
   listTotalLabel,
   SearchEmptyState,
+  Skeleton,
   StatusNotice,
   useListSearch,
+  VisuallyHidden,
 } from '../../ui';
 import { pageScrollRegionStyles } from '../../ui/primitives/PageShell.styles';
 import { NewProjectDialog } from '../projects/ProjectDialogs';
@@ -30,6 +32,7 @@ import {
   campaignCardStyles,
   campaignGridStyles,
   campaignSearchRowStyles,
+  campaignSkeletonCardStyles,
   detailHeaderStyles,
   emptyListStyles,
   listSectionStyles,
@@ -95,7 +98,25 @@ const CampaignListSection = ({
               )}
         </span>
       </header>
-      {query.isPending ? <p role="status">Loading {lifecycle} Campaigns…</p> : null}
+      {query.isPending ? (
+        <>
+          <VisuallyHidden role="status">Loading {lifecycle} Campaigns…</VisuallyHidden>
+          <ul css={campaignGridStyles(theme)} aria-hidden="true">
+            {Array.from({ length: 3 }, (_, index) => (
+              <li key={index}>
+                <div css={campaignSkeletonCardStyles(theme)}>
+                  <div data-campaign-identity>
+                    <Skeleton variant="poster" />
+                    <Skeleton height="1.1rem" width="72%" />
+                  </div>
+                  <Skeleton width="92%" />
+                  <Skeleton width="48%" />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
       {query.isError ? (
         <StatusNotice role="alert" tone="danger" title="Campaigns unavailable">
           <p>{safeError(query.error)}</p>
@@ -403,7 +424,23 @@ const CampaignProjectGroup = ({
             : projectCountLabel(projectGroupTotal, lifecycle === 'archived')}
         </span>
       </header>
-      {query.isPending ? <p role="status">Loading {lifecycle} Projects…</p> : null}
+      {query.isPending ? (
+        <>
+          <VisuallyHidden role="status">Loading {lifecycle} Projects…</VisuallyHidden>
+          <ul aria-hidden="true">
+            {Array.from({ length: 2 }, (_, index) => (
+              <li key={index}>
+                <article>
+                  <div data-project-identity>
+                    <Skeleton variant="poster" width="min(5rem, 22vw)" />
+                    <Skeleton height="1.1rem" width="62%" />
+                  </div>
+                </article>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
       {query.isError ? (
         <StatusNotice role="alert" tone="danger" title="Projects unavailable">
           {safeError(query.error)}

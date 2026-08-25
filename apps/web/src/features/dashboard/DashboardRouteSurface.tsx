@@ -22,6 +22,7 @@ import {
   EmptyStatePreview,
   listTotalLabel,
   SegmentedControl,
+  Skeleton,
   StatusNotice,
   VisuallyHidden,
 } from '../../ui';
@@ -554,9 +555,9 @@ export const DashboardRouteSurface = ({
             {projectsQuery.isLoading ? (
               <div css={continueSkeletonStyles(theme)} role="status">
                 <VisuallyHidden>Finding recent Project work…</VisuallyHidden>
-                <span />
-                <span />
-                <span />
+                <Skeleton width="42%" />
+                <Skeleton width="78%" height="1.45rem" />
+                <Skeleton width="56%" />
               </div>
             ) : null}
             {projectsQuery.isError ? (
@@ -643,9 +644,9 @@ export const DashboardRouteSurface = ({
               <ul css={recentSkeletonStyles(theme)} aria-hidden="true">
                 {Array.from({ length: RECENT_LIMIT }, (_, index) => (
                   <li key={index}>
-                    <span />
-                    <span />
-                    <span />
+                    <Skeleton variant="poster" />
+                    <Skeleton />
+                    <Skeleton />
                   </li>
                 ))}
               </ul>
