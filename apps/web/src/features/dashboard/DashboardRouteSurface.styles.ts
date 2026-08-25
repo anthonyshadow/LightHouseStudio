@@ -1,24 +1,42 @@
-import type { CSSObject, Theme } from '@emotion/react';
+import { keyframes, type CSSObject, type Theme } from '@emotion/react';
 import { media } from '../../ui/media';
 import { pageScrollRegionStyles } from '../../ui/primitives/PageShell.styles';
 
-const skeletonPulse = {
-  '@keyframes dashboard-skeleton-pulse': {
-    '0%, 100%': { opacity: 0.48 },
-    '50%': { opacity: 0.82 },
-  },
-} satisfies CSSObject;
+const skeletonPulse = keyframes({
+  '0%, 100%': { opacity: 0.48 },
+  '50%': { opacity: 0.82 },
+});
 
 const skeletonBlockStyles = (theme: Theme): CSSObject => ({
   borderRadius: theme.radii.small,
   background: theme.colors.surfaceStrong,
-  animation: 'dashboard-skeleton-pulse 1.4s ease-in-out infinite',
+  animation: `${skeletonPulse} 1.4s ease-in-out infinite`,
+});
+
+/** The recent list and everything that stands in for it reserve one box, so the region never jumps. */
+const RECENT_REGION_MIN_HEIGHT = '20rem';
+
+/** Row metrics shared by the real list and its skeleton; drift here is a visible layout shift. */
+const recentRowGeometry = (theme: Theme): CSSObject => ({
+  minHeight: '5rem',
+  display: 'grid',
+  gridTemplateColumns: '5rem minmax(0, 1fr)',
+  alignItems: 'center',
+  gap: theme.space.md,
+  padding: `${theme.space.sm} ${theme.space.xs}`,
+});
+
+const recentRegionStyles = (theme: Theme): CSSObject => ({
+  minHeight: RECENT_REGION_MIN_HEIGHT,
+  margin: 0,
+  padding: 0,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
+  listStyle: 'none',
 });
 
 /** The scroll region and query container; `PageShell` inside it owns width and padding. */
 export const dashboardStyles = (theme: Theme): CSSObject => ({
   ...pageScrollRegionStyles(theme),
-  ...skeletonPulse,
   width: '100%',
   '& h2, & h3': { fontFamily: theme.type.display },
   '& p': { margin: 0 },
@@ -45,10 +63,7 @@ export const dashboardHeaderStyles = (theme: Theme): CSSObject => ({
     borderRadius: theme.radii.small,
     boxShadow: 'none',
   },
-  '& [data-browse-assets]': {
-    borderColor: theme.colors.borderStrong,
-    background: 'transparent',
-  },
+  '& [data-browse-assets]': { background: 'transparent' },
   '@container (max-width: 64rem)': {
     '& [data-dashboard-actions]': { justifyContent: 'flex-start' },
   },
@@ -157,7 +172,6 @@ export const processingPanelStyles = (theme: Theme): CSSObject => ({
     color: theme.colors.textMuted,
     fontSize: theme.fontSizes.metadata,
   },
-  '& > header > button': { paddingInline: 0 },
   '& > ul': {
     display: 'grid',
     margin: 0,
@@ -315,20 +329,11 @@ export const recentFilterStyles = (): CSSObject => ({
 });
 
 export const recentListStyles = (theme: Theme): CSSObject => ({
-  minHeight: '20rem',
-  margin: 0,
-  padding: 0,
-  borderBlockStart: `1px solid ${theme.colors.divider}`,
-  listStyle: 'none',
+  ...recentRegionStyles(theme),
   '& li': { minWidth: 0, borderBlockEnd: `1px solid ${theme.colors.divider}` },
   '& li > button': {
     width: '100%',
-    minHeight: '5rem',
-    display: 'grid',
-    gridTemplateColumns: '5rem minmax(0, 1fr)',
-    alignItems: 'center',
-    gap: theme.space.md,
-    padding: `${theme.space.sm} ${theme.space.xs}`,
+    ...recentRowGeometry(theme),
     border: 0,
     color: theme.colors.text,
     background: 'transparent',
@@ -359,18 +364,9 @@ export const recentListStyles = (theme: Theme): CSSObject => ({
 });
 
 export const recentSkeletonStyles = (theme: Theme): CSSObject => ({
-  minHeight: '20rem',
-  margin: 0,
-  padding: 0,
-  borderBlockStart: `1px solid ${theme.colors.divider}`,
-  listStyle: 'none',
+  ...recentRegionStyles(theme),
   '& li': {
-    minHeight: '5rem',
-    display: 'grid',
-    gridTemplateColumns: '5rem minmax(0, 1fr)',
-    alignItems: 'center',
-    gap: theme.space.md,
-    padding: `${theme.space.sm} ${theme.space.xs}`,
+    ...recentRowGeometry(theme),
     borderBlockEnd: `1px solid ${theme.colors.divider}`,
   },
   '& span': { height: '0.8rem', ...skeletonBlockStyles(theme) },
@@ -383,7 +379,7 @@ export const recentSkeletonStyles = (theme: Theme): CSSObject => ({
 });
 
 export const emptyRecentStyles = (theme: Theme): CSSObject => ({
-  minHeight: '20rem',
+  minHeight: RECENT_REGION_MIN_HEIGHT,
   display: 'grid',
   alignContent: 'center',
   justifyItems: 'start',
@@ -402,6 +398,5 @@ export const allDestinationsStyles = (theme: Theme): CSSObject => ({
   alignItems: 'center',
   gap: theme.space.lg,
   marginBlockStart: theme.space.lg,
-  '& button': { gap: theme.space.xs },
   '& svg': { width: '1rem', height: '1rem' },
 });

@@ -11,10 +11,12 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   busy?: boolean;
 }
 
-const buttonStyles = (theme: Theme, size: ButtonSize): CSSObject => ({
+const buttonStyles = (theme: Theme, size: ButtonSize, variant: ButtonVariant): CSSObject => ({
   minHeight: size === 'small' ? '2.75rem' : '2.85rem',
   minWidth: size === 'small' ? '2.75rem' : '3rem',
   padding: size === 'small' ? '0.55rem 0.8rem' : '0.7rem 1rem',
+  // A link reads as running text, so it keeps the block metrics but claims no box of its own.
+  ...(variant === 'link' ? { minWidth: 0, paddingInline: 0 } : {}),
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -46,49 +48,50 @@ const buttonStyles = (theme: Theme, size: ButtonSize): CSSObject => ({
  * copying it. Metrics and focus ring stay with the caller; only the fill is shared.
  */
 export const buttonVariantStyles = (theme: Theme, variant: ButtonVariant): CSSObject => {
-  const variants: Record<ButtonVariant, CSSObject> = {
-    primary: {
-      color: theme.colors.onAccent,
-      background: `linear-gradient(135deg, ${theme.colors.accentStrong}, ${theme.colors.accent})`,
-      boxShadow: theme.shadows.soft,
-    },
-    secondary: {
-      color: theme.colors.text,
-      background: theme.colors.surfaceStrong,
-      borderColor: theme.colors.borderStrong,
-      '&:hover:not(:disabled):not([aria-disabled="true"])': {
-        borderColor: theme.colors.accent,
-      },
-    },
-    quiet: {
-      color: theme.colors.textMuted,
-      background: 'transparent',
-      '&:hover:not(:disabled):not([aria-disabled="true"])': {
+  switch (variant) {
+    case 'primary':
+      return {
+        color: theme.colors.onAccent,
+        background: `linear-gradient(135deg, ${theme.colors.accentStrong}, ${theme.colors.accent})`,
+        boxShadow: theme.shadows.soft,
+      };
+    case 'secondary':
+      return {
         color: theme.colors.text,
         background: theme.colors.surfaceStrong,
-      },
-    },
-    link: {
-      minWidth: 0,
-      paddingInline: 0,
-      color: theme.colors.accent,
-      background: 'transparent',
-      textDecoration: 'underline',
-      textDecorationColor: `color-mix(in srgb, ${theme.colors.accent} 48%, transparent)`,
-      textUnderlineOffset: '0.22em',
-      '&:hover:not(:disabled):not([aria-disabled="true"])': {
-        color: theme.colors.accentStrong,
-        textDecorationColor: 'currentColor',
-      },
-    },
-    danger: {
-      color: theme.colors.danger,
-      background: theme.colors.dangerSoft,
-      borderColor: theme.colors.danger,
-    },
-  };
-
-  return variants[variant];
+        borderColor: theme.colors.borderStrong,
+        '&:hover:not(:disabled):not([aria-disabled="true"])': {
+          borderColor: theme.colors.accent,
+        },
+      };
+    case 'quiet':
+      return {
+        color: theme.colors.textMuted,
+        background: 'transparent',
+        '&:hover:not(:disabled):not([aria-disabled="true"])': {
+          color: theme.colors.text,
+          background: theme.colors.surfaceStrong,
+        },
+      };
+    case 'link':
+      return {
+        color: theme.colors.accent,
+        background: 'transparent',
+        textDecoration: 'underline',
+        textDecorationColor: `color-mix(in srgb, ${theme.colors.accent} 48%, transparent)`,
+        textUnderlineOffset: '0.22em',
+        '&:hover:not(:disabled):not([aria-disabled="true"])': {
+          color: theme.colors.accentStrong,
+          textDecorationColor: 'currentColor',
+        },
+      };
+    case 'danger':
+      return {
+        color: theme.colors.danger,
+        background: theme.colors.dangerSoft,
+        borderColor: theme.colors.danger,
+      };
+  }
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
@@ -109,7 +112,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     <button
       ref={ref}
       type={type}
-      css={[buttonStyles(theme, size), buttonVariantStyles(theme, variant)]}
+      css={[buttonStyles(theme, size, variant), buttonVariantStyles(theme, variant)]}
       disabled={disabled || busy}
       aria-busy={busy || undefined}
       {...props}
