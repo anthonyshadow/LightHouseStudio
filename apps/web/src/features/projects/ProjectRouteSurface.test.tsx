@@ -1235,7 +1235,10 @@ describe('Project route surface', () => {
 
     expect(requestBody).toEqual({ expectedVersion: 1, confirmation: 'permanent-delete' });
     expect(await screen.findByText('Archived concept deleted.')).toBeVisible();
-    expect(await screen.findByText('No archived Projects')).toBeVisible();
+    // An emptied archive collapses to its heading and one word rather than an empty box.
+    expect(await screen.findByRole('heading', { name: 'Archived' })).toBeVisible();
+    expect(screen.getByText('None yet')).toBeVisible();
+    expect(screen.queryByText('No archived Projects')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Archived concept' })).not.toBeInTheDocument();
   });
 
@@ -1330,11 +1333,8 @@ describe('Project route surface', () => {
     // The filter owns the whole screen: the archived section must not keep listing every Campaign.
     expect(await screen.findByRole('heading', { name: 'Archived · No Campaign' })).toBeVisible();
     await waitFor(() => expect(archivedCampaignFilters).toContain('none'));
-    expect(
-      await screen.findByText(
-        'Archived Projects with no Campaign appear here and can be restored.',
-      ),
-    ).toBeVisible();
+    // Empty and unsearched, so it collapses rather than drawing a box under the active list.
+    expect(await screen.findByText('None yet')).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'All Active' }));
     expect(await screen.findByRole('heading', { name: 'Archived' })).toBeVisible();

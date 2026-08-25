@@ -70,6 +70,28 @@ export const projectsLedgerListStyles = (): CSSObject => ({
   listStyle: 'none',
 });
 
+/** A section with nothing in it and nothing being looked for: a heading and one word. */
+export const projectsLedgerCollapsedStyles = (theme: Theme): CSSObject => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'baseline',
+  gap: theme.space.sm,
+  paddingBlockStart: `clamp(${theme.space.xl}, 4vw, ${theme.space.xxl})`,
+  '& h3': {
+    margin: 0,
+    fontFamily: theme.type.display,
+    fontSize: 'clamp(1.2rem, 2.2cqi, 1.55rem)',
+    letterSpacing: '-0.025em',
+  },
+  '& span': {
+    color: theme.colors.textFaint,
+    fontFamily: theme.type.mono,
+    fontSize: theme.fontSizes.caption,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  },
+});
+
 /** The row placeholder borrows the real row's separator so the ledger keeps its rhythm mid-load. */
 export const projectsLedgerSkeletonStyles = (theme: Theme): CSSObject => ({
   ...projectsLedgerListStyles(),

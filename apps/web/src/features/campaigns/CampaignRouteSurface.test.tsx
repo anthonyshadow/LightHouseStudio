@@ -382,7 +382,10 @@ describe('Campaign route surface', () => {
 
     expect(requestBody).toEqual({ expectedVersion: 2, confirmation: 'tombstone' });
     expect(await screen.findByText('Archived organizer deleted.')).toBeVisible();
-    expect(await screen.findByText('No archived Campaigns')).toBeVisible();
+    // An emptied archive collapses to its heading and one word rather than an empty box.
+    expect(await screen.findByRole('heading', { name: 'Archived' })).toBeVisible();
+    expect(screen.getByText('None yet')).toBeVisible();
+    expect(screen.queryByText('No archived Campaigns')).not.toBeInTheDocument();
   });
 
   it('edits and archives a Campaign from the list without opening it first', async () => {

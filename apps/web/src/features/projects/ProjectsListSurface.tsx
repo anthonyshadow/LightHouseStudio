@@ -32,6 +32,7 @@ import {
   projectsLedgerLayoutStyles,
   projectsLedgerListStyles,
   projectsLedgerRowStyles,
+  projectsLedgerCollapsedStyles,
   projectsLedgerSectionStyles,
   projectsLedgerSkeletonStyles,
 } from './ProjectsListSurface.styles';
@@ -89,6 +90,25 @@ const ProjectListSection = ({
   const posters = useMemo(() => projectPosterUrls(query.data?.pages), [query.data]);
   const archived = lifecycle === 'archived';
   const total = query.data?.pages.at(-1)?.total ?? null;
+  /*
+   * An empty archive is normal, not a state worth a bordered box and a paragraph. When nothing has
+   * been archived and nothing is being searched for, the whole section collapses to its heading
+   * and one word, so the ledger does not end in an empty container.
+   */
+  const collapsed = archived && search === undefined && !query.isPending && total?.count === 0;
+
+  if (collapsed) {
+    return (
+      <section
+        css={projectsLedgerCollapsedStyles(theme)}
+        aria-labelledby={`${lifecycle}-${campaignId ?? 'all'}-projects-heading`}
+        data-project-ledger-section={lifecycle}
+      >
+        <h3 id={`${lifecycle}-${campaignId ?? 'all'}-projects-heading`}>{heading ?? 'Archived'}</h3>
+        <span>None yet</span>
+      </section>
+    );
+  }
 
   return (
     <section
