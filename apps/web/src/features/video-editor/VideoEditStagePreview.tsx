@@ -6,8 +6,7 @@ import {
   rotatedVideoEditDimensions,
 } from '@studio/domain';
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
-import { Button } from '../../ui';
-import { VideoEditIcon } from './VideoEditIcon';
+import { AppIcon, Button } from '../../ui';
 import type { VideoEditStagePreviewContract } from './types';
 import { createVideoEditFrameRenderer } from './videoEditShader';
 import {
@@ -318,7 +317,7 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
             aria-label="Rotate left 90 degrees"
             onClick={() => rotate(-90)}
           >
-            <VideoEditIcon name="undo" width="1rem" height="1rem" />
+            <AppIcon name="undo" width="1rem" height="1rem" />
             −90°
           </Button>
           <output>{contract.spec.rotation}°</output>
@@ -329,7 +328,7 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
             onClick={() => rotate(90)}
           >
             +90°
-            <VideoEditIcon name="redo" width="1rem" height="1rem" />
+            <AppIcon name="redo" width="1rem" height="1rem" />
           </Button>
         </div>
       ) : null}

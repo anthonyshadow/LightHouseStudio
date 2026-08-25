@@ -9,16 +9,11 @@ import {
   noticeStyles,
 } from './MediaStage.styles';
 import { deriveStageNotices, type StageNotice } from './stageNotices';
+import { AppIcon } from '../../ui';
 
 export type StageNoticeLayerProps = {
   notices: readonly StageNotice[];
 };
-
-const CloseIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-    <path d="m7 7 10 10M17 7 7 17" stroke="currentColor" strokeLinecap="round" />
-  </svg>
-);
 
 export const StageNoticeLayer = ({ notices }: StageNoticeLayerProps) => {
   'use memo';
@@ -71,7 +66,7 @@ export const StageNoticeLayer = ({ notices }: StageNoticeLayerProps) => {
               aria-label={`Dismiss ${notice.title}`}
               onClick={notice.onDismiss}
             >
-              <CloseIcon />
+              <AppIcon name="close" />
             </button>
           ) : null}
         </section>

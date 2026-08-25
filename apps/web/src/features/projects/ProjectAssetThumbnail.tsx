@@ -1,36 +1,19 @@
 import type { ProjectAssetKindContract } from '@studio/contracts';
 import type { ReactElement, ReactNode } from 'react';
+import { AppIcon } from '../../ui';
 import { WorkPosterTile } from './WorkPosterTile';
 
 export const kindLabel = (kind: ProjectAssetKindContract): string =>
   kind === 'video' ? 'Video' : kind.charAt(0).toUpperCase() + kind.slice(1);
 
 // Keyed rather than an if-chain so a new Asset kind fails to compile instead of silently
-// rendering the voice icon.
+// rendering the voice icon. Every glyph comes from `AppIcon`, so a Character looks the same here
+// as it does in the Studio rail.
 export const KIND_ICONS: Record<ProjectAssetKindContract, ReactElement> = {
-  video: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-      <rect x="3" y="5" width="18" height="14" rx="2" />
-      <path d="m10 9 5 3-5 3Z" fill="currentColor" stroke="none" />
-    </svg>
-  ),
-  character: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-      <circle cx="12" cy="8" r="3.25" />
-      <path d="M5.5 20c.6-4 2.8-6 6.5-6s5.9 2 6.5 6" />
-    </svg>
-  ),
-  outfit: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-      <path d="m8.5 3-5 2.5L5 10l3-1.2V21h8V8.8l3 1.2 1.5-4.5-5-2.5a4 4 0 0 1-7 0Z" />
-    </svg>
-  ),
-  voice: (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-      <rect x="9" y="3" width="6" height="11" rx="3" />
-      <path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7" />
-    </svg>
-  ),
+  video: <AppIcon name="video" />,
+  character: <AppIcon name="character" />,
+  outfit: <AppIcon name="outfit" />,
+  voice: <AppIcon name="microphone" />,
 };
 
 /**

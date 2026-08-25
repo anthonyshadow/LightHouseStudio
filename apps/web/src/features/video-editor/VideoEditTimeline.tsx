@@ -1,7 +1,6 @@
 import { useTheme } from '@emotion/react';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { Button } from '../../ui';
-import { VideoEditIcon } from './VideoEditIcon';
+import { AppIcon, Button } from '../../ui';
 import type { VideoEditSession } from './useVideoEditSession';
 import { formatVideoEditTimelineTime } from './types';
 import {
@@ -135,7 +134,7 @@ export const VideoEditTimeline = ({ session, videoRef }: VideoEditTimelineProps)
           aria-label={playing ? 'Pause edited preview' : 'Play edited preview'}
           onClick={togglePlayback}
         >
-          <VideoEditIcon name={playing ? 'pause' : 'play'} width="1rem" height="1rem" />
+          <AppIcon name={playing ? 'pause' : 'play'} width="1rem" height="1rem" />
         </Button>
         <div>
           <div css={timelineLabelsStyles(theme)}>

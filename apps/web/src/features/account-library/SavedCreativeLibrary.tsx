@@ -6,7 +6,13 @@ import type {
   SavedPrompt,
 } from '../creative-assets/types';
 import { useRef, useState } from 'react';
-import { Button, ConfirmationDialog, emptyExampleStyles, EmptyStatePreview } from '../../ui';
+import {
+  AppIcon,
+  Button,
+  ConfirmationDialog,
+  emptyExampleStyles,
+  EmptyStatePreview,
+} from '../../ui';
 import { media } from '../../ui/media';
 
 const compactGrid = (theme: Theme): CSSObject => ({
@@ -163,43 +169,6 @@ const characterActionsStyles = (theme: Theme): CSSObject => ({
   },
 });
 
-type CharacterActionIconName = 'wardrobe' | 'copy' | 'delete';
-
-const CharacterActionIcon = ({ name }: { name: CharacterActionIconName }) => {
-  if (name === 'wardrobe') {
-    return (
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      >
-        <path d="m8.5 3-5 2.5L5 10l3-1.2V21h8V8.8l3 1.2 1.5-4.5-5-2.5a4 4 0 0 1-7 0Z" />
-      </svg>
-    );
-  }
-  if (name === 'copy') {
-    return (
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      >
-        <rect x="8" y="8" width="12" height="12" rx="2" />
-        <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
-      </svg>
-    );
-  }
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 5v5m4-5v5" />
-    </svg>
-  );
-};
-
 const emptyLibraryStyles = (theme: Theme): CSSObject => ({
   minHeight: 'clamp(12rem, 38vh, 24rem)',
   display: 'grid',
@@ -304,7 +273,7 @@ export const SavedCharacterLibrary = ({
                         title="Wardrobe"
                         onClick={() => onOpenWardrobe(item)}
                       >
-                        <CharacterActionIcon name="wardrobe" />
+                        <AppIcon name="outfit" />
                       </Button>
                       <Button
                         variant="secondary"
@@ -312,7 +281,7 @@ export const SavedCharacterLibrary = ({
                         title="Create new from this character"
                         onClick={() => onCreateFrom(item)}
                       >
-                        <CharacterActionIcon name="copy" />
+                        <AppIcon name="copy" />
                       </Button>
                       <Button
                         variant="quiet"
@@ -331,7 +300,7 @@ export const SavedCharacterLibrary = ({
                           setDeleteTarget(item);
                         }}
                       >
-                        <CharacterActionIcon name="delete" />
+                        <AppIcon name="trash" />
                       </Button>
                     </div>
                   </div>
