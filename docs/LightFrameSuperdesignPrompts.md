@@ -7,6 +7,11 @@ Four briefs, one per area where the [UI/UX audit](LightFrameUXAudit.md) conclude
 layout** is needed rather than a fix. Every other finding in that audit is implemented directly
 against the existing design system; see the [implementation plan](LightFrameUXImplementationPlan.md).
 
+**All four briefs have shipped**, as items 17–20 of that plan, and every tier of it is now
+complete. These pages remain the record of what each redesign was asked to achieve; the plan
+records what each one became. A brief is not a description of the product — read the
+[feature-behaviour documents](user-flows/feature-behavior/README.md) for that.
+
 ## Why only four
 
 | Area                          | Verdict         | Reason                                                                                             |
@@ -16,7 +21,7 @@ against the existing design system; see the [implementation plan](LightFrameUXIm
 | Assets and media libraries    | **Recommended** | Structural: tabs, rail sub-navigation, or one filtered surface — real alternatives                 |
 | Project workspace save step   | **Recommended** | Redesigning a mental model, with visible layout consequences                                       |
 | Studio create                 | Optional        | The CTA pair is right; the rest are direct fixes                                                   |
-| Navigation rail               | Optional        | Resolves once Assets is consolidated and Settings is decided                                       |
+| Navigation rail               | ~~Optional~~    | **Resolved without exploration** — Settings added no slot and Assets left the compact bar          |
 | Take review                   | Optional        | Fewer actions, disclosed details, a mobile sheet — specifiable directly                            |
 | Upload and AI transform panel | Not necessary   | Strongest flow already; needs footer hierarchy and one player                                      |
 | Page shell and breakpoints    | Not necessary   | Consolidation onto an existing pattern; exploration would add a fifth variant                      |

@@ -7,7 +7,7 @@ import type {
 } from '@studio/contracts';
 import { formatDateTime, formatDuration } from '@studio/domain';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { listSavedVideos, savedVideoThumbnailUrl } from '../../adapters/api-client/savedVideosApi';
 import { useRouteViewState } from '../../app/useRouteViewState';
 import {
@@ -35,9 +35,9 @@ import { useProjectList } from '../projects/useProjectsController';
 import { WorkPosterTile } from '../projects/WorkPosterTile';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import {
-  loadDashboardOnboardingDismissed,
+  ONBOARDING_PREFERENCE_NOT_RETAINED,
   persistDashboardOnboardingDismissed,
-  subscribeDashboardOnboarding,
+  useDashboardOnboardingDismissed,
 } from './dashboardOnboarding';
 import {
   allDestinationsStyles,
@@ -208,11 +208,7 @@ export const DashboardRouteSurface = ({
   });
   // Read through the store rather than copied into state: Settings can restore the guidance while
   // this surface is mounted underneath it, and the Dashboard has to notice.
-  const onboardingVisible = !useSyncExternalStore(
-    subscribeDashboardOnboarding,
-    () => loadDashboardOnboardingDismissed(ownerUserId),
-    () => true,
-  );
+  const onboardingVisible = !useDashboardOnboardingDismissed(ownerUserId);
   const [onboardingStorageWarning, setOnboardingStorageWarning] = useState(false);
   const [recentKind, setRecentKind] = useState<RecentKind>(initialView ?? 'all');
   const [selectedJob, setSelectedJob] = useState<VideoJobQueueItem | null>(null);
@@ -466,8 +462,12 @@ export const DashboardRouteSurface = ({
                   not — the pattern the Studio tool rail already uses. The accessible name is
                   "Browse Assets" either way.
                 */}
-                <span data-browse-label="long">Browse Assets</span>
-                <span data-browse-label="short">Assets</span>
+                <span aria-hidden="true" data-browse-label="full">
+                  Browse Assets
+                </span>
+                <span aria-hidden="true" data-browse-label="short">
+                  Assets
+                </span>
               </Button>
               {processingAction}
             </>
@@ -552,7 +552,7 @@ export const DashboardRouteSurface = ({
         ) : null}
         {onboardingStorageWarning ? (
           <StatusNotice role="status" tone="warning" title="Preference not retained">
-            Lightframe could not save this account-scoped onboarding preference in this browser.
+            {ONBOARDING_PREFERENCE_NOT_RETAINED}
           </StatusNotice>
         ) : null}
 

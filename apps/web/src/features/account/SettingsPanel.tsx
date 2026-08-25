@@ -1,14 +1,14 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { useState, useSyncExternalStore, type RefObject } from 'react';
+import { useState, type RefObject } from 'react';
 import { loadCapturePreferences } from '../../orchestration/session/capturePreferencesStorage';
 import { LOCAL_RETENTION_NOTICE } from '../../studio/sessionNotices';
 import { Button, OverlayPanel, StatusNotice } from '../../ui';
 import {
   clearDashboardOnboardingDismissed,
-  loadDashboardOnboardingDismissed,
-  subscribeDashboardOnboarding,
+  ONBOARDING_PREFERENCE_NOT_RETAINED,
+  useDashboardOnboardingDismissed,
 } from '../dashboard/dashboardOnboarding';
-import { aspectRatioLabels, profileLabels } from '../recording/CaptureSettingsPanel';
+import { aspectRatioLabels, profileLabels } from '../recording/captureLabels';
 
 const settingsStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
@@ -74,14 +74,11 @@ export const SettingsPanel = ({
   /*
    * Both values are read through their owners rather than copied into state. The guidance is a
    * subscription because this panel changes it and has to show the result immediately; the capture
-   * record is a plain read because only Studio writes it, and Studio is not open behind this.
+   * record is a plain read because only Studio writes it, and Studio is not open behind this. The
+   * read is unconditional so the panel's content does not change under the exit animation.
    */
-  const guidanceDismissed = useSyncExternalStore(
-    subscribeDashboardOnboarding,
-    () => loadDashboardOnboardingDismissed(ownerUserId),
-    () => false,
-  );
-  const capture = open ? loadCapturePreferences(ownerUserId) : null;
+  const guidanceDismissed = useDashboardOnboardingDismissed(ownerUserId);
+  const capture = loadCapturePreferences(ownerUserId);
 
   return (
     <OverlayPanel
@@ -109,13 +106,12 @@ export const SettingsPanel = ({
               Show the guide again
             </Button>
           ) : (
-            <p data-settings-guidance-state>
-              The guide is available. It appears on the Dashboard once your work is empty.
-            </p>
+            <p>The guide is available. It appears on the Dashboard once your work is empty.</p>
           )}
-          {restoreFailed ? (
+          {/* Only while the failure is still true: a success clears the state it described. */}
+          {restoreFailed && guidanceDismissed ? (
             <StatusNotice role="alert" tone="warning" title="Preference not retained">
-              This browser would not store the change, so the guide stays dismissed.
+              {ONBOARDING_PREFERENCE_NOT_RETAINED}
             </StatusNotice>
           ) : null}
         </section>

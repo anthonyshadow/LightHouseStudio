@@ -49,28 +49,17 @@ export const dashboardHeaderStyles = (theme: Theme): CSSObject => ({
   },
   '& [data-browse-assets]': { background: 'transparent' },
   '& [data-browse-label="short"]': { display: 'none' },
-  /*
-   * The processing control is a transient status light and can shed its label; Browse Assets
-   * cannot. Below the rail breakpoint this is the only way into the asset libraries — the bottom
-   * bar carries the four surfaces you stand on, not the shelf you open over them — so an
-   * unlabelled icon here would be the whole entry point, unnamed.
-   */
   '@container (max-width: 22rem)': {
     /*
-     * Browse Assets keeps a visible name here even though the row is tight: below the rail
-     * breakpoint it is the only way into the asset libraries, and an unlabelled icon would be the
-     * whole entry point, unnamed. It trades the verb for the destination so all three controls
-     * still fit one row, which the masthead's height budget on a phone needs them to.
+     * The processing control is a transient status light and can shed its label; Browse Assets
+     * cannot. Below the rail breakpoint it is the only way into the asset libraries, so an
+     * unlabelled icon would be the whole entry point, unnamed. It trades the verb for the
+     * destination instead, which keeps all three controls on one row — which the masthead's
+     * height budget on a phone needs them to be.
      */
-    '& [data-browse-label="long"]': { display: 'none' },
+    '& [data-browse-label="full"]': { display: 'none' },
     '& [data-browse-label="short"]': { display: 'inline' },
     '& [data-processing-label]': { display: 'none' },
-    /*
-     * The shared header lets its leading control shrink, which here wraps "Create video" onto two
-     * lines and grows the masthead into the fixed bottom navigation. The primary keeps its line;
-     * the control beside it is the one with slack.
-     */
-    '& [data-create-video]': { minWidth: 'max-content', whiteSpace: 'nowrap' },
     '& [data-page-actions] > button:not([data-create-video]):not([data-browse-assets])': {
       width: '2.85rem',
       minWidth: '2.85rem',

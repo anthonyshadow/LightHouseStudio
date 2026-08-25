@@ -27,13 +27,13 @@ Visual baselines under `screenshots/` are asserted by `bun run test:visual`. Any
 
 ## Order at a glance
 
-| Tier                          | Items | Theme                                                            | Rough effort |
-| ----------------------------- | ----- | ---------------------------------------------------------------- | ------------ |
-| ~~1 — Fix immediately~~       | 1–10  | **DONE** — the product no longer tells the user untrue things    | 1–2 days     |
-| ~~2 — Work on next~~          | 11–16 | **DONE** — one vocabulary, one action model, one page shell      | 1–2 weeks    |
-| ~~3 — Important, can follow~~ | 17–22 | **DONE** — the four redesigns, mobile capability, loading states | 2–4 weeks    |
-| ~~4 — Polish later~~          | 23–34 | **DONE** — one design system, one vocabulary, one tone           | ongoing      |
-| 5 — Defer until decided       | 35–36 | Needs a product decision before any design work                  | —            |
+| Tier                          | Items | Theme                                                                | Rough effort |
+| ----------------------------- | ----- | -------------------------------------------------------------------- | ------------ |
+| ~~1 — Fix immediately~~       | 1–10  | **DONE** — the product no longer tells the user untrue things        | 1–2 days     |
+| ~~2 — Work on next~~          | 11–16 | **DONE** — one vocabulary, one action model, one page shell          | 1–2 weeks    |
+| ~~3 — Important, can follow~~ | 17–22 | **DONE** — the four redesigns, mobile capability, loading states     | 2–4 weeks    |
+| ~~4 — Polish later~~          | 23–34 | **DONE** — one design system, one vocabulary, one tone               | ongoing      |
+| ~~5 — Defer until decided~~   | 35–36 | **DONE** — both decisions made; Settings sits under the profile card | —            |
 
 **Why this order.** Tier 1 removes _wrong information_ — a button that lies about what it does,
 copy that promises a feature that does not exist, a control that is permanently dead. No amount of
@@ -41,10 +41,11 @@ layout work compensates for those, and every one is a copy or token change with 
 risk. Tier 2 establishes the vocabulary and the shell that Tier 3's redesigns then build on;
 running Tier 3 first would mean designing against a system that is about to change underneath it.
 
-**Tiers 3 and 4 are complete.** Items 17–22 built on Tier 2's vocabulary (item 11), `ActionMenu`
+**Every tier is complete.** Items 17–22 built on Tier 2's vocabulary (item 11), `ActionMenu`
 (item 12), `media.up/down` (item 13), `PageShell`/`PageHeader` (item 14) and the raised boundary
-tokens (item 16); items 23–34 then consolidated what those items had each solved locally. Tier 5
-still needs a product decision before any design work.
+tokens (item 16); items 23–34 then consolidated what those items had each solved locally; and Tier
+5's two items were unblocked by the product decisions they were waiting on — Settings belongs under
+the profile card, and Assets leaves the compact navigation for a home on the Dashboard.
 
 ---
 
@@ -1184,11 +1185,16 @@ icon system.
 
 ---
 
-# Tier 5 — Defer until decided
+# ~~Tier 5 — Defer until decided~~ · COMPLETE
 
-## 35. Settings
+**Shipped 2026-08-25 on `develop`.** Both items were blocked on a product decision rather than on
+design or engineering, and both decisions were made: Settings is an option under the profile card,
+and Assets leaves the mobile navigation for a home on the Dashboard. The prompts are kept below as
+the record of what was asked.
 
-**Audit ID** LF-N05 · **needs a product decision**
+## ~~35. Settings~~ · DONE
+
+**Audit ID** LF-N05 · **decided: an option under the profile card, not a route**
 
 There is no Settings destination. The account panel is read-only — identity, plan, configured
 integrations and AI activity. There is nowhere to set a default placement, default resolution,
@@ -1198,9 +1204,30 @@ autosave behaviour, download location or anything else.
 product, and whether it belongs in a route, in the account panel, or per-surface. Do not add a
 Settings route to hold three toggles.
 
-## 36. Navigation slot count
+**Outcome.** `SettingsPanel` opens from the profile menu beside `Account details`, so nothing is
+added to the rail or the route table. Working through the four settings this item imagined, three
+turned out not to be settings: the browser owns where a download lands, Project autosave is a
+correctness mechanism rather than a preference, and capture resolution already lives with the
+camera, beside the device list that constrains it. What the panel holds is what is real —
 
-**Audit IDs** LF-N04, LF-N06 · **revisit after item 19**
+- **Getting started.** Dismissing the Dashboard's guide used to be permanent; it can now be
+  brought back. This is the one preference the product could set but never unset.
+- **Capture defaults.** A read-only account of the shape, quality and devices Studio remembers,
+  with a pointer to where they are chosen. Shown rather than edited on purpose: the Studio runtime
+  reads that record once when it mounts and writes it back as the operator applies changes, so a
+  second editor would quietly lose to it.
+- **What this browser keeps.** The retention sentence, from the constant that already owns it.
+
+The guidance preference gained subscribers, so it has one owner and two readers: Settings can
+restore it while the Dashboard is mounted underneath, and both settle on the same answer at once.
+
+**Validated** the full `apps/web/src` unit suite (**153** files, **1,099** tests), a new browser
+journey covering the dismiss-and-restore round trip across the two surfaces, `accessibility-responsive`
+and `app-routing` **37/37**, the Darwin visual matrix **50/50**, and the static checks.
+
+## ~~36. Navigation slot count~~ · DONE
+
+**Audit IDs** LF-N04, LF-N06 · **decided: Assets leaves the compact bar; the Dashboard carries it**
 
 Five top-level destinations for four kinds of thing — Dashboard is a view, Studio is a verb,
 Projects and Campaigns are containers, Assets is a menu. Campaigns holds a permanent slot on mobile
@@ -1209,6 +1236,27 @@ document specifies four.
 
 Consolidating Assets (item 19) changes the slot count, and Settings (item 35) may add one. Decide
 the rail once, after both.
+
+**Outcome.** Settings added no slot, and Assets gave one back. Below the rail breakpoint the bar
+carries the four surfaces an operator stands on — Dashboard, Studio, Projects, Campaigns — because
+the asset libraries are `OverlayPanel`s opened over the current surface and closed back to it, not
+places to be. The rail keeps all five, where there is room for a shelf beside the rooms. Campaigns
+keeps its slot (LF-N04): with Assets gone the bar is no longer crowded, and a container you can
+open is a place in a way a shelf is not.
+
+The Dashboard's `Browse Assets` is now the way in rather than one of several, so it stops
+collapsing to an unlabelled icon at 22rem — it trades the verb for the destination's own name
+instead, the pattern the Studio tool rail already uses, and keeps `Browse Assets` as its
+accessible name.
+
+Two latent defects surfaced and were fixed at their own level: the bar's column count was a literal
+that had to be kept in step with the list that decides it, and `Button` let an icon shrink to zero
+width beside a label it could not shrink, so in a tight row the glyph vanished and the control read
+as plain text. The second was hidden only because the labels used to disappear first.
+
+**Validated** the full unit suite, `accessibility-responsive`, `app-routing` and
+`successful-studio-journeys` **52/52**, and the Darwin visual matrix **50/50** with the mobile and
+small-mobile baselines re-captured and reviewed.
 
 ---
 

@@ -40,7 +40,7 @@ source, then edit either base, save, start over, or discard.
    workspace around the same stage and video node. Trim, crop, 90° rotation, flips,
    lighting, filters, Before, reset, and grouped undo/redo remain draft-only until a dedicated
    worker renders and validates an H.264/AAC MP4. The final dialog can cancel, **Replace Without
-   Saving**, or **Replace and Save** the pinned pre-edit artifact to Saved Videos before replacing
+   Saving**, or **Replace and Save** the pinned pre-edit artifact to Videos before replacing
    it. A failed Save leaves the source unchanged. A successful edit becomes the immutable source
    with parent lineage and an updated audio sidecar.
 6. The creator may use confirmed **Replace source video** or **Discard source video**, then choose
@@ -129,7 +129,7 @@ source, then edit either base, save, start over, or discard.
     visual Result.
 11. Every source/result has a UUID, app-owned name, timestamp, kind, and parent lineage. Uploaded
     originals remain unchanged; recorded and all generated results pass the local H.264/AAC MP4
-    gate before publication. Downloads are available only after Save, from Saved Videos.
+    gate before publication. Downloads are available only after Save, from Videos.
 12. **Start over from original** revokes generated visual and voice URLs, retains and presents the uploaded
     original, clears the selected transformation and voice selection, and returns to **Choose your
     edits**. The creator can choose either operation and make another explicit submission.

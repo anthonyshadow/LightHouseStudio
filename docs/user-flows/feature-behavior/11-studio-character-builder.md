@@ -29,12 +29,15 @@ handoff from an unsubmitted edited-video Character Swap step.
      is no background chooser. The chooser supports keyboard/typeahead and pointer input on an
      anchored listbox, then adapts to a safe-area-aware touch sheet on phones without adding another
      Builder scroll owner.
-3. Choose one save path:
-   - prompt-only;
-   - prompt plus the uploaded image;
-   - **Save & Use Image Only**; or
-   - a current generated/combined preview.
-4. Name and save. Edit updates the existing character ID and preserves unrelated creative-library metadata.
+3. Press **Save Character**. There is one save control; what a save produces is a choice inside
+   naming, not a second button:
+   - a **described character** — the prompt, its guided design, and a current
+     generated/combined preview when one is attached; or
+   - the **uploaded image only**, offered when an upload exists, which keeps the image and no
+     description.
+4. Name and save. The name dialog explains what each choice keeps, and its suggested name follows
+   the choice. Edit updates the existing character ID and preserves unrelated creative-library
+   metadata.
 5. Builder closes and returns to its originating context:
    - general Studio entry selects the Character in Lucy 2.5 and keeps it available in Characters; or
    - uploaded-video entry reopens the upload panel with the new character selected. With an

@@ -29,8 +29,8 @@ resources, and browse reusable Assets without activating media or a provider.
    source into the Project. Navigation never creates a second stage, media
    owner, overlay system, or global store.
 5. Every protected route at `48rem` and above — including Project workspaces and focused Create —
-   uses the same left rail
-   for Dashboard, Projects, Campaigns, and Assets. **Quick Create** retains New Video, New Project,
+   uses the same left rail for Dashboard, Studio, Projects, Campaigns, and Assets. **Quick Create**
+   retains New Video, New Project,
    New Campaign, and gated Live AI, and adds **Create Asset**. The shared chooser offers Video,
    Character, Outfit, and **Add Voice** only. Project context is propagated when creation starts
    from a Project.
@@ -40,14 +40,20 @@ resources, and browse reusable Assets without activating media or a provider.
    lists can each be searched by name, and state a real total — a floor once past the counting
    ceiling — rather than the number currently loaded.
 7. The header carries a quiet **How Lightframe works** control on every protected route. It opens a
-   static explainer covering when a Project helps, when a Campaign helps and what each Asset
-   library holds, and it remains reachable after the Dashboard getting-started card is dismissed.
-   It starts no request and stores nothing. The account menu's **Account details** panel is its
-   sibling: the status, account and help panels are mutually exclusive.
-8. The four-item mobile navigation mirrors Dashboard, Projects, Campaigns, and
-   Assets with safe-area padding. Quick Create stays in the header. Project workspaces and focused
-   Create retain this shared mobile shell, and each surface reserves bottom padding so the fixed bar
-   never covers its content.
+   static explainer covering when a Project helps, when a Campaign helps, what each Asset library
+   holds, and what this browser keeps between sessions. It remains reachable after the Dashboard
+   getting-started card is dismissed, starts no request and stores nothing. The account menu's
+   **Account details** and **Settings** panels are its siblings: the status, account, settings and
+   help panels are mutually exclusive. **Settings** holds only what is genuinely configurable —
+   restoring the dismissed getting-started guide, a read-only account of the capture defaults
+   Studio remembers, and the retention statement. It is not a route and adds no navigation slot.
+8. Below `48rem` the bottom navigation carries the four surfaces an operator stands on — Dashboard,
+   Studio, Projects, and Campaigns — with safe-area padding. Assets is not among them: the
+   libraries are overlays opened over the current surface and closed back to it, so the Dashboard's
+   **Browse Assets** control is the way in, and it keeps a visible name at every width rather than
+   collapsing to an icon. Quick Create stays in the header. Project workspaces and focused Create
+   retain this shared mobile shell, and each surface reserves bottom padding so the fixed bar never
+   covers its content.
 9. Dashboard, library listing, Project membership listing, pickers, and preview metadata start no
    paid provider work. Camera, microphone, byte fetching, and provider submissions remain explicit.
 10. Dashboard lists the signed-in owner's queued and active Character Swap and Virtual Try-On jobs.

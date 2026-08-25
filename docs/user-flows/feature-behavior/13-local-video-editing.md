@@ -42,7 +42,7 @@ a provider, and replace the immutable source only after a validated export and e
    pinned source, atomically makes it the immutable source, installs its matching audio sidecar,
    clears superseded visual/voice layers, and returns to **Use existing video**.
 10. **Save Video** can then save the edited artifact as a new gallery record after the same optional
-    naming prompt. If the source was loaded from Saved Videos, the secondary confirmed Replace
+    naming prompt. If the source was loaded from Videos, the secondary confirmed Replace
     Existing action appends an immutable version using the captured saved video/version lineage.
 
 ### Project working-media path

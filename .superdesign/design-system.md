@@ -41,7 +41,9 @@ download.
   action, availability, and Account.
 - Dashboard, Projects, Campaigns, Assets, and Project workspaces share the organization shell.
   Desktop and tablet use the existing left navigation rail. Mobile uses the existing compact top
-  bar and five-item bottom navigation for Dashboard, Studio, Projects, Campaigns, and Assets.
+  bar and four-item bottom navigation for Dashboard, Studio, Projects, and Campaigns. Assets stays
+  on the rail: the libraries are overlays opened over the current surface, and below the rail
+  breakpoint the Dashboard's Browse Assets control is the way in.
   Standalone Create remains the separate context/exit workspace.
 - Every page has one visible page-level `h1`; the brand is a Dashboard link rather than the heading.
 - Actionable shell-wide recovery notices occupy a bounded row above the active surface and collapse

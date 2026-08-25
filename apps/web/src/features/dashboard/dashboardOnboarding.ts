@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from 'react';
 import { environmentScopedPersistenceName } from '../../persistence/environmentScope';
 
 const STORAGE_BASE = 'lightframe.dashboard-onboarding.v1';
@@ -10,7 +11,14 @@ type OnboardingEnvelope = Readonly<{
 export const dashboardOnboardingStorageKey = (ownerUserId: string): string =>
   environmentScopedPersistenceName(STORAGE_BASE, ownerUserId);
 
-export const loadDashboardOnboardingDismissed = (ownerUserId: string): boolean => {
+/*
+ * Two surfaces read this — the Dashboard, which shows the guidance, and Settings, which brings it
+ * back — and Settings can be open over the Dashboard while it does. One owner keeps them in step:
+ * subscribers so every reader hears a change at the same moment, and a cached snapshot so
+ * `useSyncExternalStore` can compare identities without parsing storage on every render of a shell
+ * that lives for the whole session.
+ */
+const readDismissed = (ownerUserId: string): boolean => {
   try {
     const raw = window.localStorage.getItem(dashboardOnboardingStorageKey(ownerUserId));
     if (raw === null) return false;
@@ -28,45 +36,56 @@ export const loadDashboardOnboardingDismissed = (ownerUserId: string): boolean =
   }
 };
 
-/*
- * Two surfaces read this now — the Dashboard, which shows the guidance, and Settings, which brings
- * it back — and Settings can be open over the Dashboard while it does. Subscribers exist so the
- * preference has one owner and every reader sees the same answer at the same moment, rather than
- * the Dashboard holding a copy that only refreshes when it happens to remount.
- */
 const listeners = new Set<() => void>();
+const snapshots = new Map<string, boolean>();
 
-const notify = (): void => {
-  for (const listener of listeners) listener();
-};
-
-export const subscribeDashboardOnboarding = (listener: () => void): (() => void) => {
+const subscribe = (listener: () => void): (() => void) => {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
   };
 };
 
-const write = (ownerUserId: string, envelope: OnboardingEnvelope | null): boolean => {
+const snapshot = (ownerUserId: string): boolean => {
+  const cached = snapshots.get(ownerUserId);
+  if (cached !== undefined) return cached;
+  const value = readDismissed(ownerUserId);
+  snapshots.set(ownerUserId, value);
+  return value;
+};
+
+const write = (ownerUserId: string, dismissed: boolean): boolean => {
   try {
-    if (envelope === null)
-      window.localStorage.removeItem(dashboardOnboardingStorageKey(ownerUserId));
-    else
+    if (dismissed)
       window.localStorage.setItem(
         dashboardOnboardingStorageKey(ownerUserId),
-        JSON.stringify(envelope),
+        JSON.stringify({ version: 1, dismissed: true } satisfies OnboardingEnvelope),
       );
+    else window.localStorage.removeItem(dashboardOnboardingStorageKey(ownerUserId));
     return true;
   } catch {
     return false;
   } finally {
-    notify();
+    snapshots.delete(ownerUserId);
+    for (const listener of listeners) listener();
   }
 };
 
 export const persistDashboardOnboardingDismissed = (ownerUserId: string): boolean =>
-  write(ownerUserId, { version: 1, dismissed: true });
+  write(ownerUserId, true);
 
 /** Brings the guidance back. Whether it then *shows* is still the Dashboard's own first-run test. */
 export const clearDashboardOnboardingDismissed = (ownerUserId: string): boolean =>
-  write(ownerUserId, null);
+  write(ownerUserId, false);
+
+/** What both readers use, so neither restates the store's wiring or its pre-hydration default. */
+export const useDashboardOnboardingDismissed = (ownerUserId: string): boolean =>
+  useSyncExternalStore(
+    subscribe,
+    () => snapshot(ownerUserId),
+    () => snapshot(ownerUserId),
+  );
+
+/** The one message for a browser that refuses to keep the preference, wherever it is changed. */
+export const ONBOARDING_PREFERENCE_NOT_RETAINED =
+  'Lightframe could not save this account-scoped onboarding preference in this browser.';

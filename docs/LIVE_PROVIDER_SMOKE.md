@@ -286,7 +286,8 @@ Common checks:
 1. Generate a harmless prompt-only preview. Confirm explicit action, optimize-before-image
    ordering when optimization is available, and one immutable stored result.
 2. Upload JPEG/PNG/WebP and confirm local persistence without external provider contact. Verify
-   direct prompt+upload save and **Save & Use Image Only** are provider-free.
+   direct prompt+upload save and the naming dialog's **Uploaded image only** choice are
+   provider-free.
 3. Generate a combined preview from the upload; the server must resolve the owner-scoped source.
 4. Regenerate blank (compose from original upload) and with written feedback (new immutable edit
    child); never mutate the source.

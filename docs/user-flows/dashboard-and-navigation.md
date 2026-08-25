@@ -28,11 +28,21 @@ Header regions:
 | Quick Create | New video · New Project · New Campaign · Create Asset · Live AI · Beta (only when live is enabled)                                                       |
 | Help         | A quiet "How Lightframe works" button opening a static explainer panel — when to use Studio, Projects, Campaigns and each Asset library, with an example |
 | Status menu  | "Core Studio ready" / "Studio limited" / "Checking integrations" with a breakdown of Local capture, Existing-video AI, Live AI Beta, Voice cloud         |
-| Account menu | Display name, login, **Account details**, **Log out**                                                                                                    |
+| Account menu | Display name, login, **Account details**, **Settings**, **Log out**                                                                                      |
 
 `isCampaignsPath` matches both `/campaigns` and `/campaigns/{id}`, so both highlight "Campaigns"
 correctly. The Studio routes fall through to `'studio'`, which the rail and the mobile bottom nav
 both render, so the create surface marks its own destination like every other one.
+
+The rail carries all five destinations. The compact bottom bar below `48rem` carries four —
+Dashboard, Studio, Projects, Campaigns — because the asset libraries are overlays opened over the
+current surface rather than places to stand; the Dashboard's **Browse Assets** is the way in there,
+and it keeps a visible name at every width.
+
+**Settings** opens from the account menu, not from a route. It holds the dismissed
+getting-started guide (restorable), a read-only account of the capture defaults Studio remembers,
+and the retention statement. Capture defaults are shown rather than edited: the Studio runtime
+reads that record once when it mounts, so a second editor would lose to it.
 
 ## Dashboard anatomy
 

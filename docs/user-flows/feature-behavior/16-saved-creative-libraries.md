@@ -3,7 +3,7 @@
 ## Story
 
 As the authenticated operator, I can browse dedicated Character, Outfit, and Voice libraries
-alongside Saved Videos, reuse or remove supported records, and return to creation without losing
+alongside Videos, reuse or remove supported records, and return to creation without losing
 the shared Studio runtime.
 
 ## Observable behavior

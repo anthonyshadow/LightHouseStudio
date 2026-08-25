@@ -112,10 +112,16 @@ export const pageHeaderStyles = (theme: Theme): CSSObject => ({
       fontSize: theme.fontSizes.metadata,
       lineHeight: 1.45,
     },
-    // The actions become one row: the leading control takes the free width and the rest keep
-    // their own, which is what a primary plus an overflow menu and a primary plus peers both
-    // need. Stated here rather than per surface, or the row gets a second owner.
+    /*
+     * The actions become one row: the leading control takes the free width and the rest keep their
+     * own, which is what a primary plus an overflow menu and a primary plus peers both need.
+     * Stated here rather than per surface, or the row gets a second owner.
+     *
+     * It grows but does not shrink. Letting the leading control give way first wrapped a primary's
+     * label onto two lines while a secondary beside it kept a comfortable width — and grew the
+     * masthead into the fixed bottom navigation. The controls after it are the ones with slack.
+     */
     '& [data-page-actions]': { width: '100%', flexWrap: 'nowrap' },
-    '& [data-page-actions] > *:first-child': { minWidth: 0, flex: '1 1 auto' },
+    '& [data-page-actions] > *:first-child': { flex: '1 0 auto' },
   },
 });
