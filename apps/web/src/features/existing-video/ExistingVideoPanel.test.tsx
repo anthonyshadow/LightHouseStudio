@@ -1848,14 +1848,19 @@ describe('ExistingVideoPanel', () => {
 
     expect(screen.getByRole('button', { name: 'Original' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Result' })).toHaveAttribute('aria-pressed', 'true');
-    fireEvent.click(screen.getByRole('button', { name: 'Edit result' }));
+    // Saving leads and discarding stays visible; the two ways of continuing to edit are disclosed.
+    const openResultMenu = () =>
+      fireEvent.click(screen.getByRole('button', { name: 'More actions for this result' }));
+    openResultMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Edit result' }));
     expect(editSelected).toHaveBeenCalledOnce();
     fireEvent.click(screen.getByRole('button', { name: 'Save to Assets' }));
     expect(saveVideo).toHaveBeenCalledOnce();
     expect(screen.queryByRole('link', { name: /Download/u })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Review Voice/u })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Start over from original' }));
+    openResultMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Start over from original' }));
     expect(startOver).toHaveBeenCalledOnce();
 
     fireEvent.click(screen.getByRole('button', { name: 'Discard video and result' }));

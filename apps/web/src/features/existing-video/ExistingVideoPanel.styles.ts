@@ -631,13 +631,18 @@ export const actionButtonsStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.xs,
   alignItems: 'stretch',
   '& > *': { flex: '1 1 9rem', minWidth: 0, minHeight: '2.85rem' },
+  /* An overflow trigger is a fixed square: stretching it would make it read as a fourth action. */
+  '& > [data-action-menu]': { flex: '0 0 auto', width: '2.85rem' },
   '@media (max-width: 32rem)': {
     display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1fr)',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
     '& > *': { width: '100%' },
+    '& > *:not([data-action-menu])': { gridColumn: 1 },
+    '& > [data-action-menu]': { gridColumn: 2, gridRow: 1, width: '2.85rem' },
   },
   [media.up('laptop')]: {
     minWidth: '15rem',
     '& > *': { width: '100%', flex: 'none' },
+    '& > [data-action-menu]': { width: '2.85rem', justifySelf: 'start' },
   },
 });

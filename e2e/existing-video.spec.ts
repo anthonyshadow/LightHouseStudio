@@ -576,7 +576,7 @@ for (const operation of ['character-swap', 'virtual-try-on'] as const) {
           dialog.getByRole('button', { name: 'Original', exact: true }),
           dialog.getByRole('button', { name: 'Result', exact: true }),
           dialog.getByRole('button', { name: 'Saved' }),
-          dialog.getByRole('button', { name: 'Start over from original' }),
+          dialog.getByRole('button', { name: 'More actions for this result' }),
           dialog.getByRole('button', { name: 'Discard video and result' }),
         ]) {
           const box = await control.boundingBox();
@@ -586,7 +586,8 @@ for (const operation of ['character-swap', 'virtual-try-on'] as const) {
         }
       }
 
-      await dialog.getByRole('button', { name: 'Start over from original' }).click();
+      await dialog.getByRole('button', { name: 'More actions for this result' }).click();
+      await dialog.getByRole('menuitem', { name: 'Start over from original' }).click();
       await expect(dialog.getByRole('heading', { name: 'Choose your edits' })).toBeVisible();
       await expect(dialog.getByTitle('creator-source.mp4').first()).toHaveText(
         'creator-source.mp4',
