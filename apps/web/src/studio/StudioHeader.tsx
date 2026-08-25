@@ -218,20 +218,42 @@ export const StudioHeader = ({
   const setMenuOpen = useCallback((menu: HeaderMenu, open: boolean) => {
     setOpenMenu(open ? menu : null);
   }, []);
-  // Studio is a destination like any other: without it the create surface — the product's main
-  // one — is the only place the rail can never mark, so the operator loses their location there.
+  /*
+   * Studio is a destination like any other: without it the create surface — the product's main
+   * one — is the only place the rail can never mark, so the operator loses their location there.
+   *
+   * Assets is the exception, and only on a compact layout. It is not a place you work; it is a
+   * shelf you open over the place you are working, and it closes back to it. A phone's bottom bar
+   * has room for the four surfaces you actually stand on, and the Dashboard carries the way in to
+   * the shelf — which is where you already are when you go looking for saved work.
+   */
   const destinations = [
-    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', open: onOpenDashboard },
-    { id: 'studio', label: 'Studio', icon: 'video', open: onOpenStudio },
-    { id: 'projects', label: 'Projects', icon: 'projects', open: onOpenProjects },
-    { id: 'campaigns', label: 'Campaigns', icon: 'campaigns', open: onOpenCampaigns },
-    { id: 'assets', label: 'Assets', icon: 'assets', open: onOpenAssets },
+    {
+      id: 'dashboard',
+      label: 'Dashboard',
+      icon: 'dashboard',
+      open: onOpenDashboard,
+      compact: true,
+    },
+    { id: 'studio', label: 'Studio', icon: 'video', open: onOpenStudio, compact: true },
+    { id: 'projects', label: 'Projects', icon: 'projects', open: onOpenProjects, compact: true },
+    {
+      id: 'campaigns',
+      label: 'Campaigns',
+      icon: 'campaigns',
+      open: onOpenCampaigns,
+      compact: true,
+    },
+    { id: 'assets', label: 'Assets', icon: 'assets', open: onOpenAssets, compact: false },
   ] as const satisfies readonly {
     id: StudioHeaderDestination;
     label: string;
     icon: AppIconName;
     open: () => void;
+    /** Whether the compact bottom bar carries it, or only the rail does. */
+    compact: boolean;
   }[];
+  const compactDestinations = destinations.filter(({ compact }) => compact);
 
   return (
     <>
@@ -320,7 +342,7 @@ export const StudioHeader = ({
         </div>
       </header>
       <nav aria-label="Mobile primary" css={mobileNavigationStyles(theme)}>
-        {destinations.map(({ id, label, icon, open }) => (
+        {compactDestinations.map(({ id, label, icon, open }) => (
           <Button
             key={id}
             size="small"

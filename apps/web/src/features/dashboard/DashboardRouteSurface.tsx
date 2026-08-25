@@ -458,7 +458,13 @@ export const DashboardRouteSurface = ({
                 onClick={onOpenAssets}
               >
                 <AppIcon name="assets" width="1rem" height="1rem" />
-                <span data-browse-label>Browse Assets</span>
+                {/*
+                  The verb form where there is room, the destination's own name where there is
+                  not — the pattern the Studio tool rail already uses. The accessible name is
+                  "Browse Assets" either way.
+                */}
+                <span data-browse-label="long">Browse Assets</span>
+                <span data-browse-label="short">Assets</span>
               </Button>
               {processingAction}
             </>

@@ -96,7 +96,7 @@ describe('StudioHeader', () => {
     expect(headerProps.onOpenAssets).toHaveBeenCalledOnce();
   });
 
-  it('uses one shared organization rail with a mirrored mobile navigation', () => {
+  it('carries the four surfaces in the compact bar and keeps Assets on the rail', () => {
     const { container } = renderHeader({ activeDestination: 'dashboard' });
     const header = screen.getByRole('banner');
     const desktopNavigation = screen.getByRole('navigation', { name: 'Primary' });
@@ -109,11 +109,14 @@ describe('StudioHeader', () => {
       'page',
     );
     expect(mobileNavigation).not.toBeNull();
+    // Assets is a shelf opened over the surface you are on, not a surface: the compact bar keeps
+    // the four you stand on, and the Dashboard carries the way into the shelf.
     expect(
       within(mobileNavigation!)
         .getAllByRole('button', { hidden: true })
         .map((button) => button.textContent),
-    ).toEqual(['Dashboard', 'Studio', 'Projects', 'Campaigns', 'Assets']);
+    ).toEqual(['Dashboard', 'Studio', 'Projects', 'Campaigns']);
+    expect(within(desktopNavigation).getByRole('button', { name: 'Assets' })).toBeVisible();
     expect(within(header).getByRole('button', { name: 'Quick Create' })).toBeVisible();
     expect(within(header).getByRole('button', { name: 'Core Studio ready' })).toBeVisible();
     expect(within(header).getByRole('button', { name: 'Demo Creator account menu' })).toBeVisible();

@@ -21,6 +21,12 @@ const buttonStyles = (theme: Theme, size: ButtonSize, variant: ButtonVariant): C
   alignItems: 'center',
   justifyContent: 'center',
   gap: theme.space.xs,
+  /*
+   * An icon beside a label is a flex item, and a flex item shrinks: in a tight row the glyph
+   * collapsed to zero width while the label it belongs to stayed, leaving a button that reads as
+   * text. The label is the part with slack.
+   */
+  '& > svg': { flex: '0 0 auto' },
   border: '1px solid transparent',
   borderRadius: theme.radii.medium,
   color: theme.colors.text,
