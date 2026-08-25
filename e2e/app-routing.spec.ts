@@ -279,12 +279,33 @@ test('Assets matches the responsive design matrix without clipping controls', as
     expect(tabsBox).not.toBeNull();
     expect(tabsBox!.x).toBeGreaterThanOrEqual(0);
     expect(tabsBox!.x + tabsBox!.width).toBeLessThanOrEqual(viewport.width + 1);
+    for (const tab of await tabs.getByRole('button').all()) {
+      await tab.scrollIntoViewIfNeeded();
+      const tabBox = await tab.boundingBox();
+      expect(tabBox).not.toBeNull();
+      expect(tabBox!.x).toBeGreaterThanOrEqual(tabsBox!.x - 1);
+      expect(tabBox!.x + tabBox!.width).toBeLessThanOrEqual(tabsBox!.x + tabsBox!.width + 1);
+    }
+    await tabs.evaluate((element) => {
+      element.scrollLeft = 0;
+    });
 
     const search = dialog.getByRole('searchbox', { name: 'Search videos by title' });
     await search.fill('Legacy');
     await dialog.getByRole('button', { name: 'Clear search' }).click();
     await expect(search).toHaveValue('');
     await expect(dialog.getByRole('button', { name: 'Clear search' })).toHaveCount(0);
+
+    const [cardBox, downloadBox, cardMenuBox] = await Promise.all([
+      dialog.locator('article').filter({ hasText: 'Legacy unassigned' }).boundingBox(),
+      dialog.getByRole('link', { name: 'Download Legacy unassigned' }).boundingBox(),
+      dialog.getByRole('button', { name: 'More actions for Legacy unassigned' }).boundingBox(),
+    ]);
+    for (const box of [cardBox, downloadBox, cardMenuBox]) {
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 1);
+    }
 
     const mobileFilters = dialog.getByRole('button', { name: 'Filters', exact: true });
     if (viewport.width >= 1_024) {
@@ -305,21 +326,29 @@ test('Assets matches the responsive design matrix without clipping controls', as
     const filters = page.getByRole('dialog', { name: 'Filters' });
     const clear = filters.getByRole('button', { name: 'Clear filters' });
     const show = filters.getByRole('button', { name: 'Show 1 video' });
+    const character = filters.getByRole('combobox', { name: 'Character used' });
+    const format = filters.getByRole('combobox', { name: 'Video format' });
     const sort = filters.getByRole('combobox', { name: 'Sort by' });
     const footer = filters.locator('[data-filter-sheet-actions]').locator('..');
-    const [clearBox, showBox, sortBox, footerBox] = await Promise.all([
+    const [clearBox, showBox, characterBox, formatBox, sortBox, footerBox] = await Promise.all([
       clear.boundingBox(),
       show.boundingBox(),
+      character.boundingBox(),
+      format.boundingBox(),
       sort.boundingBox(),
       footer.boundingBox(),
     ]);
     expect(clearBox).not.toBeNull();
     expect(showBox).not.toBeNull();
+    expect(characterBox).not.toBeNull();
+    expect(formatBox).not.toBeNull();
     expect(sortBox).not.toBeNull();
     expect(footerBox).not.toBeNull();
     expect(Math.abs(clearBox!.y - showBox!.y)).toBeLessThanOrEqual(1);
-    expect(clearBox!.x).toBeGreaterThanOrEqual(0);
-    expect(showBox!.x + showBox!.width).toBeLessThanOrEqual(viewport.width + 1);
+    for (const box of [clearBox, showBox, characterBox, formatBox, sortBox]) {
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width + 1);
+    }
     expect(sortBox!.y + sortBox!.height).toBeLessThanOrEqual(footerBox!.y + 1);
     await show.click();
     await expect(filters).toHaveCount(0);
