@@ -32,7 +32,7 @@ Visual baselines under `screenshots/` are asserted by `bun run test:visual`. Any
 | ~~1 — Fix immediately~~       | 1–10  | **DONE** — the product no longer tells the user untrue things    | 1–2 days     |
 | ~~2 — Work on next~~          | 11–16 | **DONE** — one vocabulary, one action model, one page shell      | 1–2 weeks    |
 | ~~3 — Important, can follow~~ | 17–22 | **DONE** — the four redesigns, mobile capability, loading states | 2–4 weeks    |
-| 4 — Polish later              | 23–34 | Design-system consolidation and copy tone                        | ongoing      |
+| ~~4 — Polish later~~          | 23–34 | **DONE** — one design system, one vocabulary, one tone           | ongoing      |
 | 5 — Defer until decided       | 35–36 | Needs a product decision before any design work                  | —            |
 
 **Why this order.** Tier 1 removes _wrong information_ — a button that lies about what it does,
@@ -41,9 +41,10 @@ layout work compensates for those, and every one is a copy or token change with 
 risk. Tier 2 establishes the vocabulary and the shell that Tier 3's redesigns then build on;
 running Tier 3 first would mean designing against a system that is about to change underneath it.
 
-**Tier 3 can now start.** Items 17–22 were written to build on Tier 2's vocabulary (item 11),
-`ActionMenu` (item 12), `media.up/down` (item 13), `PageShell`/`PageHeader` (item 14) and the
-raised boundary tokens (item 16). All five exist.
+**Tiers 3 and 4 are complete.** Items 17–22 built on Tier 2's vocabulary (item 11), `ActionMenu`
+(item 12), `media.up/down` (item 13), `PageShell`/`PageHeader` (item 14) and the raised boundary
+tokens (item 16); items 23–34 then consolidated what those items had each solved locally. Tier 5
+still needs a product decision before any design work.
 
 ---
 
@@ -1099,24 +1100,43 @@ transient and no captured screen shows one.
 
 ---
 
-# Tier 4 — Polish later
+# ~~Tier 4 — Polish later~~ · COMPLETE
 
-Batch these; none is individually worth a dedicated cycle.
+**Shipped 2026-08-24/25 on `develop`**, one commit per item, each validated with the scoped command
+below before the next began. The table records what each item turned out to be; the prompts are
+kept verbatim underneath as the record of what was asked.
 
-| #   | Item                                                                                                         | Audit IDs              | Scope |
-| --- | ------------------------------------------------------------------------------------------------------------ | ---------------------- | ----- |
-| 23  | Consolidate the six "choose one of N" patterns onto `SegmentedControl`, `role="tablist"` and the step `<ol>` | LF-DS03                | M     |
-| 24  | Unify icons: extend `AppIcon`, delete the local SVG sets, settle on one stroke weight                        | LF-DS04                | S     |
-| 25  | Add link and anchor button variants; delete the three hand-restyled `<a download>` copies                    | LF-DS05, LF-DS07       | S     |
-| 26  | One video player component; retire the native `<video controls>` surfaces                                    | LF-X01                 | M     |
-| 27  | Give the upload result footer a hierarchy — one primary, the rest secondary                                  | LF-X02                 | S     |
-| 28  | Naming pass: one name for the saved-video destination across all surfaces                                    | LF-X03                 | S     |
-| 29  | Entry screen: outcome-first copy and one honest visual                                                       | LF-E01, LF-E02         | S     |
-| 30  | Character builder: resolve the two save buttons; lighten the five-control footer                             | LF-B01, LF-B02         | S     |
-| 31  | Studio stage sizing; move the privacy footnote out of the tool rail                                          | LF-S03, LF-S05         | M     |
-| 32  | Collapse empty sections to one line; fix `Clear search` alignment                                            | LF-C03, LF-C04         | XS    |
-| 33  | Rail dead space at tablet; brand visibility band; mobile device-summary truncation                           | LF-R02, LF-R03, LF-R06 | S     |
-| 34  | Copy tone: remove triple negatives; shorten the exit-guard list; stop presenting History as step 4 of 4      | LF-W01, LF-W02, LF-P05 | S     |
+| #      | Item                                           | Audit IDs              | What it turned out to be                                                                                                                                   |
+| ------ | ---------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ~~23~~ | Settle "choose one of N" on `SegmentedControl` | LF-DS03                | Three surfaces still hand-rolled it: the Projects group filter, the Project assets filter, the Original/Result switch. The tablist and step `<ol>` stayed. |
+| ~~24~~ | One icon set at one weight                     | LF-DS04                | 26 inline `<svg>` in five sets at three weights became one `AppIcon`; two non-iconic marks stay local and say why.                                         |
+| ~~25~~ | Link and anchor button variants                | LF-DS05, LF-DS07       | `LinkButton` replaced three hand-restyled `<a download>` copies; `variant="link"` took the breadcrumbs and the first-run dismissal.                        |
+| ~~26~~ | One video player                               | LF-X01                 | The Project transport became `features/video-player`; the upload panel and the Videos preview dropped their native `<video controls>`.                     |
+| ~~27~~ | Upload result footer hierarchy                 | LF-X02                 | Save leads, discard stays visible, the two ways to keep editing move into an `ActionMenu` — take review's shape.                                           |
+| ~~28~~ | One name for the saved-video destination       | LF-X03                 | `Assets` and `Videos` stayed as destination and library; every user-facing `Saved Video(s)` is gone.                                                       |
+| ~~29~~ | Entry screen                                   | LF-E01, LF-E02         | Outcome-first lead, three plain capability lines naming no container, and a drawing of the idle stage that yields on a short viewport.                     |
+| ~~30~~ | Character builder saves and footer             | LF-B01, LF-B02         | One `Save Character`; what a save produces became a choice inside naming. The footer went from five controls to three.                                     |
+| ~~31~~ | Studio stage sizing and the rail footnote      | LF-S03, LF-S05         | The privacy line moved to the session column as a visible sentence; narrower side columns grew the 1440px frame from 661×372 to 718×404.                   |
+| ~~32~~ | Collapse empty sections                        | LF-C03, LF-C04         | An empty archive is a heading and one word. `Clear search` needed no work — `ListSearchField` had already fixed it.                                        |
+| ~~33~~ | Three responsive edges                         | LF-R02, LF-R03, LF-R06 | The wordmark stops vanishing mid-band, the rail's `1fr` gap is capped, and the compact device line wraps instead of eating the resolution.                 |
+| ~~34~~ | Copy tone                                      | LF-W01, LF-W02, LF-P05 | One positive statement instead of three negations, one sentence instead of two five-item lists, and History as a record rather than step 4.                |
+
+**Validated per item** `bun run typecheck`, `lint`, `format:check`, `check:dead-code`,
+`check:modules`, the full `apps/web/src` unit suite (**153** files, **1,098** tests) and the Darwin
+visual matrix **50/50**, plus the targeted browser journeys each item touched —
+`existing-video` **9/9**, `app-routing` **18/18**, `accessibility-responsive` **18/18**,
+`successful-studio-journeys` and `studio-character-builder` **14/14**.
+
+**Two things worth carrying forward.**
+
+- `bun run test:visual:update` is **not deterministic on this host**: a re-capture with no code
+  change at all rewrites roughly 23 of the 50 images, all within the 0.5% `maxDiffPixelRatio`. A
+  blanket update therefore commits noise. Prefer `--update-snapshots=all -g "<case>"` for the cases
+  an item actually changes, and read the diff images before committing.
+- The complement of that trap is the one the cross-cutting notes already describe: a change smaller
+  than 0.5% leaves a **stale** baseline while the suite stays green. Item 23's comparison control
+  was exactly that, and item 24's icon weights were too. When an item changes something visible,
+  re-capture the cases that show it even when the suite passes.
 
 **Batch prompt for items 23–25 (design-system consolidation)**
 

@@ -64,12 +64,42 @@ Tier 2 also removed a latent defect neither this audit nor the plan had found: *
 popover that sat inside an `OverlayPanel` closed the whole panel**, because `useDismissiblePopover`
 listened in the bubble phase behind the panel's own handler.
 
-Step 20 of Tier 3 is complete (2026-08-24). LF-D02, LF-D03 and LF-D05 are fixed by the
-Superdesign-led Dashboard recomposition; the adjacent Dashboard-only LF-D06/07 primitive drift was
-removed in the same coherent change. Responsive QA also moved the paused account-library recovery
-notice into its own bounded shell row so it no longer covers Dashboard content or header popovers.
-The remaining Tier 3–5 work is open. Everything else in this document still describes the product
-as audited.
+**Tier 3 of the plan is complete.** Items 17–19 landed as Superdesign-led redesigns (the local
+video editor, the Project save step, and the Assets consolidation), item 20 recomposed the
+Dashboard, item 21 kept the AI tools available below 64rem, and item 22 gave loading a reserved
+shape. The plan records each item's outcome and validation.
+
+**Tier 4 of the plan is also complete** (2026-08-24/25, branch `develop`). These findings are fixed
+in the product and struck through below:
+
+| ID         | Finding                                               | Fixed by                                                                       |
+| ---------- | ----------------------------------------------------- | ------------------------------------------------------------------------------ |
+| LF-DS03    | Six visual answers to "choose one of N"               | `SegmentedControl` for filters and mode switches; tablist and step `<ol>` kept |
+| LF-DS04    | Five icon sets at three stroke weights                | One `AppIcon` on one grid at one weight; the local sets deleted                |
+| LF-DS05/07 | Hand-restyled `<a download>` and link-shaped buttons  | `LinkButton`, plus `variant="link"` on the breadcrumbs and the dismissal       |
+| LF-X01     | Two video-player chromes for one object               | One `VideoPlayer`; the native `<video controls>` surfaces retired              |
+| LF-X02     | Four identical full-width result buttons              | One primary, one danger, the rest in an `ActionMenu`                           |
+| LF-X03     | Three names for the saved-video destination           | `Assets` and `Videos` only; user-facing `Saved Video(s)` removed               |
+| LF-E01/E02 | Data-model copy, and nothing else on the entry screen | Outcome-first lead, three capability lines, and a drawing of the idle stage    |
+| LF-B01/B02 | Two unclear saves and a five-control builder footer   | One `Save Character`; the choice moved inside naming; three controls left      |
+| LF-S03     | The stage does not fill its column                    | Narrower side columns; the 1440px frame grows from 661×372 to 718×404          |
+| LF-S05     | A privacy footnote occupying a tool slot              | Moved to the session column as a visible sentence                              |
+| LF-C03     | An empty `Archived` box on every visit                | A heading and one word when nothing is archived and nothing is searched        |
+| LF-C04     | `Clear search` misaligned with its field              | Already fixed by `ListSearchField`'s end adornment; verified, no change        |
+| LF-R02     | The wordmark hidden only in the 48–64rem band         | The band rule deleted; mark-only stays below 22rem                             |
+| LF-R03     | Rail dead space between nav and the bottom cluster    | The `1fr` gap row is capped                                                    |
+| LF-R06     | `64×6…` — the device summary ate the resolution       | It wraps to two lines                                                          |
+| LF-W01     | Three negations in one confirmation                   | One positive statement of what is true                                         |
+| LF-W02     | Five-item comma lists in the exit and logout dialogs  | One sentence each: unsaved is discarded, saved stays                           |
+| LF-P05     | `History` presented as step 4 of 4                    | Three progress steps; the tablist keeps History as a task                      |
+
+Tier 4 also produced a validation finding neither document had recorded: on this capture host
+`bun run test:visual:update` is **not deterministic**, rewriting roughly 23 of 50 baselines with no
+code change at all — within the 0.5% tolerance, so the suite stays green either way. The plan now
+carries the guidance that follows from it.
+
+Only Tier 5 remains, and it needs a product decision before any design work. Everything else in
+this document still describes the product as audited.
 
 ---
 
@@ -108,7 +138,7 @@ defects — they are stale docs that will mislead the next person who reads them
 | Exposed jargon list: `Revision 5`, `working media`, `presented media`, `creative checkpoint`, `Save creative setup`, `Media Asset`                | same                                                    | **Mostly fixed.** Replaced with "current cut", "Creative setup", "Save progress". One raw string survives — see **LF-X04**, which is worse than any on that list. |
 | "Mobile uses … **four-item** bottom navigation for Dashboard, Projects, Campaigns, and Assets"                                                    | `.superdesign/design-system.md`                         | **Five items.** `StudioHeader.tsx` renders the same `destinations` array (incl. Studio) into `mobileNavigationStyles`, which is `repeat(5, …)`.                   |
 | "standalone **Quick Start** remains available in Projects"                                                                                        | rendered in the product, `CampaignRouteSurface.tsx:292` | **Quick Start does not exist.** Zero UI occurrences outside this sentence; the control is called `New Project`. This is a live copy defect, logged as **LF-C01**. |
-| "Use one primary action per screen, consistent overflow menus for secondary actions"                                                              | `.superdesign/design-system.md`                         | **Not upheld.** Project overview shows 5 peer buttons, take review up to 6, the upload result 4 full-width buttons.                                               |
+| "Use one primary action per screen, consistent overflow menus for secondary actions"                                                              | `.superdesign/design-system.md`                         | **Now upheld.** Project overview, Projects rows, take review, the upload result and the character builder each lead with one action and disclose the rest.        |
 
 ---
 
@@ -168,11 +198,10 @@ turns them into pages breaks the "keep your place" behaviour deliberately built 
 
 **Does not work.**
 
-- The single explanatory sentence — _"Create a video quickly, resume focused **Project** work,
-  or organize **Projects** in **Campaigns**"_ — introduces two proprietary nouns before the user
-  has seen anything. It describes the data model, not the outcome.
-- There is nothing else: no screenshot, no example, no capability list. A first-time user cannot
-  tell whether this is a screen recorder, an editor, or an AI tool.
+- ~~The single explanatory sentence introduces two proprietary nouns before the user has seen
+  anything.~~ **Fixed by item 29** — it leads with the outcome and names no container.
+- ~~There is nothing else: no screenshot, no example, no capability list.~~ **Fixed by item 29** —
+  three plain capability lines and a drawing of the idle stage, which yields on a short viewport.
 - No "what happens if I log in" affordance and no way to look before committing.
 
 ## 2.2 Dashboard `/dashboard`
@@ -227,13 +256,14 @@ turns them into pages breaks the "keep your place" behaviour deliberately built 
 - **`Record` and `Close` are both red.** `recordActionStyles` uses `colors.recording` on
   `recordingSoft`; `Close` uses `variant="danger"`. At 390px they are visually indistinguishable
   (see the mobile baseline). Primary and destructive share a colour.
-- **The stage does not fill its space.** In `initial-closed.png` the 16:9 frame occupies roughly
-  45% of the column height; the rest is empty canvas.
+- ~~**The stage does not fill its space.**~~ **Improved by item 31** — the frame is width-bound,
+  so the side columns were sized to their content and the 1440px frame grew from 661×372 to
+  718×404. A 16:9 frame in a column taller than 16:9 of itself still leaves slack.
 - **AI tools vanish below 64rem.** `showDesktopAiTools` removes Select Character and Select
   Outfit entirely on tablet/mobile, with no message. On mobile the tool rail is one button.
-- The rail's permanent footnote — _"Local-first workspace · generated references persist
-  locally"_ — consumes a tool slot with an unactionable statement, and its full text is only in
-  a `title` attribute.
+- ~~The rail's permanent footnote consumes a tool slot with an unactionable statement, and its
+  full text is only in a `title` attribute.~~ **Fixed by item 31** — it is a visible sentence in
+  the session column, beside the other facts about this session.
 - The right column is titled **"Session and device information"**, a systems label on a creative
   surface.
 
@@ -293,12 +323,12 @@ gives a before/after. `Reset all` plus per-tool reset. Terminal actions are expl
 
 **Does not work.**
 
-- **Two video-player languages.** This panel uses the browser's native `<video controls>`;
-  Studio and the editor use a custom player. Same product, two chromes.
-- **Four full-width, identically-sized footer buttons** — Save to Assets, Edit result, Start over
-  from original, Discard video and result. Nothing indicates the expected next step.
-- **Three names for one destination**: `Save to Assets` (here), `Saved Videos` (empty-state
-  copy), `Videos` (nav and overlay title).
+- ~~**Two video-player languages.**~~ **Fixed by item 26** — one `VideoPlayer` on every surface
+  that shows a finished or borrowed video. The live capture stage keeps its own chrome.
+- ~~**Four full-width, identically-sized footer buttons.**~~ **Fixed by item 27** — saving leads,
+  discarding stays visible, the two ways of continuing to edit are disclosed.
+- ~~**Three names for one destination.**~~ **Fixed by item 28** — `Assets` is the destination,
+  `Videos` the library inside it, and the third name is gone.
 - A large empty region between the source card and the footer at 1440px.
 
 ## 2.7 Projects `/projects`
@@ -365,12 +395,13 @@ intact"_, and a search field with a result count.
 
 **Does not work.**
 
-- **Live copy references a feature that does not exist**: _"standalone Quick Start remains
-  available in Projects."_ There is no Quick Start anywhere in the UI.
+- ~~**Live copy references a feature that does not exist.**~~ **Fixed** — see LF-C01.
 - **Boxes inside boxes inside boxes**: page container (bordered, `radii.large`) → `Active
 Campaigns` section card → campaign card. Three nested surfaces for one item.
-- The `Archived` section renders a large empty box even with zero archived campaigns.
-- `Clear search` sits ~30px below the field's baseline in the baseline screenshot.
+- ~~The `Archived` section renders a large empty box even with zero archived campaigns.~~
+  **Fixed by item 32** — a heading and one word when there is nothing to show.
+- ~~`Clear search` sits ~30px below the field's baseline.~~ **Fixed** by `ListSearchField`, whose
+  end adornment is centred on the input.
 - One campaign fills a `minHeight: 12rem` card with three peer actions (Open · Edit · Archive).
 
 ## 2.11 Assets `/assets` + the four library overlays
@@ -411,11 +442,12 @@ before commit.
 
 **Does not work.**
 
-- **Two save buttons with an unclear difference**: `Save & Use Image Only` and `Save Character`.
-- The primary CTA can become `Save Character (prompt only)` or `Save Character (uploaded image)`
-  — a technical qualifier inside the button.
-- Up to **five** footer controls plus a status line; on a 320px screen the footer takes ~25% of
-  the viewport.
+- ~~**Two save buttons with an unclear difference.**~~ **Fixed by item 30** — one `Save
+Character`; what a save produces is a choice inside naming, where each option is explained.
+- ~~The primary CTA can become `Save Character (prompt only)` or `(uploaded image)`.~~ **Fixed by
+  item 30** — the stale-preview explanation stays in the footer's status line, not in the button.
+- ~~Up to **five** footer controls plus a status line.~~ **Fixed by item 30** — three controls,
+  and no permanently disabled one.
 - The eyebrow reads `✎ Interactive Design · Jump to any step` — decoration, not information.
 
 ## 2.13 Global chrome
@@ -552,18 +584,18 @@ margin-inline: auto`, on `canvas`, with no page-level border — plus one shared
 
 ## Other consistency defects
 
-| #   | Where               | What differs                                                                                                                                                                                                                                                         | Why it matters                                                                    | Canonical                                                                                                         |
-| --- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| 1   | Everywhere          | `theme.breakpoints` is used **once** (`ProjectVideoPreviewPlayer.tsx:125`). The codebase hard-codes **29 distinct `max-width` values** and 10 `min-width` values.                                                                                                    | Components reflow at unrelated widths, so intermediate sizes look half-collapsed. | Four theme breakpoints; everything else derived.                                                                  |
-| 2   | Choose-one controls | `SegmentedControl` (export placement) vs bespoke `aria-pressed` toggles (Dashboard filter) vs `Button variant="quiet" aria-pressed` (Projects groups) vs `role="tablist"` (Project tasks) vs `<ol>` steps (upload phases) vs `SegmentedControl` again (Voices tabs). | Six visual answers to one interaction.                                            | `SegmentedControl` for filters; `role="tablist"` only for real tab panels; the `<ol>` step indicator for wizards. |
-| 3   | Icons               | `AppIcon` (13 names, `strokeWidth 1.8`) vs `CreativeWorkspace.ToolIcon` (`1.6`) vs `StudioLibraryOverlays` inline plus (`2`) vs 10 more files with local SVG. 26 inline `<svg>` across 13 files.                                                                     | Different weights side by side in the same rail.                                  | Extend `AppIcon`; delete local sets.                                                                              |
-| 4   | Download links      | `<a download>` hand-restyled to mimic `Button variant="secondary"` in `VideoGallery.styles.ts:357`, `ProjectHistorySection`, `SavedVideoSuccessActions`.                                                                                                             | Three copies of the button's look that will drift.                                | A `Button as="a"` / `LinkButton` variant.                                                                         |
-| 5   | Text-link buttons   | `Button variant="quiet"` + `paddingInline: 0` used as a link in Dashboard actions/footer, onboarding, queue Refresh, breadcrumbs.                                                                                                                                    | Buttons that look like text, inconsistently.                                      | A real `link` variant.                                                                                            |
-| 6   | Loading             | 37 `role="status"` fallbacks, **25 distinct strings**, one skeleton in the whole app.                                                                                                                                                                                | Layout shift; a "cheap" feel on a media product.                                  | Skeletons for lists/grids; text only for whole-route suspense.                                                    |
-| 7   | Video players       | Native `<video controls>` in the upload panel and Videos preview vs custom transport in Studio and the editor.                                                                                                                                                       | Two chromes for the same object.                                                  | One player component.                                                                                             |
-| 8   | Overflow menus      | Header uses `useDismissiblePopover` + `useMenuKeyboardNavigation` + `role="menu"`. `VideoGallery` uses raw `<details>`.                                                                                                                                              | The second does not close on outside click or Escape.                             | The header pattern.                                                                                               |
-| 9   | Brand at tablet     | Wordmark hidden 48–64rem, shown below 48rem and above 64rem.                                                                                                                                                                                                         | The brand disappears only in the middle.                                          | Show or hide consistently.                                                                                        |
-| 10  | Empty sections      | Campaigns always renders an empty `Archived` box; Projects renders one too; Dashboard hides its empties.                                                                                                                                                             | Empty boxes read as broken.                                                       | Collapse to one line when zero.                                                                                   |
+| #   | Where               | What differs                                                                                                                                                                                                              | Why it matters                                                                    | Canonical                                                                                                         |
+| --- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 1   | Everywhere          | `theme.breakpoints` is used **once** (`ProjectVideoPreviewPlayer.tsx:125`). The codebase hard-codes **29 distinct `max-width` values** and 10 `min-width` values.                                                         | Components reflow at unrelated widths, so intermediate sizes look half-collapsed. | Four theme breakpoints; everything else derived.                                                                  |
+| 2   | Choose-one controls | ~~Six patterns answered "pick one of N".~~ **Fixed by item 23** — `SegmentedControl` for filters and mode switches, `role="tablist"` only for real tab panels, and the `<ol>` step indicator for wizards.                 | Six visual answers to one interaction.                                            | `SegmentedControl` for filters; `role="tablist"` only for real tab panels; the `<ol>` step indicator for wizards. |
+| 3   | Icons               | ~~26 inline `<svg>` across 13 files, in five sets at three stroke weights.~~ **Fixed by item 24** — one `AppIcon` on one grid at one weight; two non-iconic marks stay local and say why.                                 | Different weights side by side in the same rail.                                  | Extend `AppIcon`; delete local sets.                                                                              |
+| 4   | Download links      | ~~Three hand-restyled copies of the button's look.~~ **Fixed by item 25** — `LinkButton` is `Button`'s anchor form and the copies are deleted.                                                                            | Three copies of the button's look that will drift.                                | A `Button as="a"` / `LinkButton` variant.                                                                         |
+| 5   | Text-link buttons   | ~~Quiet buttons with zeroed padding standing in for links.~~ **Fixed by items 20 and 25** — a real `link` variant, used by the Dashboard, the breadcrumbs and the first-run dismissal.                                    | Buttons that look like text, inconsistently.                                      | A real `link` variant.                                                                                            |
+| 6   | Loading             | ~~37 `role="status"` fallbacks, 25 distinct strings, one skeleton in the whole app.~~ **Fixed by item 22** — one `Skeleton` primitive; lists and grids reserve their real layout and whole-route suspense keeps its text. | Layout shift; a "cheap" feel on a media product.                                  | Skeletons for lists/grids; text only for whole-route suspense.                                                    |
+| 7   | Video players       | ~~Native `<video controls>` in the upload panel and Videos preview vs a custom transport elsewhere.~~ **Fixed by item 26** — one `VideoPlayer`; the capture stage keeps its own chrome because it owns a camera.          | Two chromes for the same object.                                                  | One player component.                                                                                             |
+| 8   | Overflow menus      | Header uses `useDismissiblePopover` + `useMenuKeyboardNavigation` + `role="menu"`. `VideoGallery` uses raw `<details>`.                                                                                                   | The second does not close on outside click or Escape.                             | The header pattern.                                                                                               |
+| 9   | Brand at tablet     | ~~Wordmark hidden 48–64rem, shown below 48rem and above 64rem.~~ **Fixed by item 33** — the band rule is deleted; mark-only stays below 22rem.                                                                            | The brand disappears only in the middle.                                          | Show or hide consistently.                                                                                        |
+| 10  | Empty sections      | ~~Campaigns and Projects always render an empty `Archived` box.~~ **Fixed by item 32** — a heading and one word when nothing is archived and nothing is being searched for.                                               | Empty boxes read as broken.                                                       | Collapse to one line when zero.                                                                                   |
 
 ---
 
@@ -587,7 +619,7 @@ is a small dark rectangle. Exactly backwards.
 **Project overview.** Eye lands on the title, then on the **red Archive button**, because it is
 the only coloured element in a row of five.
 
-**Upload result.** Four identical full-width buttons — no first read.
+~~**Upload result.** Four identical full-width buttons — no first read.~~ **Fixed by item 27.**
 
 **Progressive-disclosure opportunities**
 
@@ -639,8 +671,8 @@ in_. Four competing save concepts, one auto and three manual, with a shipped dis
 | **Wide (≥1920px)** | Dashboard and Projects stretch edge to edge (no page max-width) while Project overview caps at 88rem. Studio's stage does not grow into the space.                                                                     |
 | **Desktop (1440)** | Best supported. Dead space under the Continue panel; the editor's preview does not scale up.                                                                                                                           |
 | **Laptop (1280)**  | Fine. Note the Dashboard collapses to one column at 71.99rem while the rail changes at 64rem — unrelated thresholds.                                                                                                   |
-| **Tablet (834)**   | Rail stays but the wordmark disappears (48–64rem rule) while the account name truncates to `Lightframe…`. Large rail dead space. (AI tools no longer vanish — LF-S04 fixed.)                                           |
-| **Mobile (390)**   | Solid bottom nav, good stage. Capture summary truncates (`64×6…`). (Two red buttons and absent AI tools both fixed — LF-S02, LF-S04.)                                                                                  |
+| **Tablet (834)**   | The account name still truncates to `Lightframe…`. (The wordmark, the rail dead space and the AI tools are all fixed — LF-R02, LF-R03, LF-S04.)                                                                        |
+| **Mobile (390)**   | Solid bottom nav, good stage. (The capture summary, the two red buttons and the absent AI tools are all fixed — LF-R06, LF-S02, LF-S04.)                                                                               |
 | **Small (320)**    | **Broken.** The brand wordmark wraps to three lines: `Ligh / tfra / me`. Bottom-nav labels crowd. Assets needs ~5 screens of scroll for 4 navigation cards. The editor preview is ~120px tall with a clipped tool row. |
 
 Technically responsive at every size; the _experience_ degrades sharply below 64rem because
@@ -865,69 +897,69 @@ with no page-level border or radius and no `borderRadius: 0` policy.
 
 ## P2 — Important
 
-| ID           | Where                                        | Finding                                                                                                                              | Class       | Scope       |
-| ------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ----------- | ----------- |
-| LF-E01       | `EntryPage.tsx:82`                           | First sentence uses "Project" and "Campaigns" as proper nouns before either is defined.                                              | Improve     | XS          |
-| ~~LF-E03~~   | `HowLightframeWorksPanel.tsx`                | ~~The concept explainer omits **Studio**.~~ **Fixed** — Studio is the first concept.                                                 | Improve     | XS          |
-| ~~LF-D02~~   | `DashboardRouteSurface.styles.ts`            | ~~`1.5fr / 1fr` gives the wide column to one card and the narrow one to the list.~~ **Fixed** — Recent owns the wider column.        | Improve     | S           |
-| ~~LF-D04~~   | `DashboardRouteSurface.tsx`                  | ~~The Projects/Campaigns explainer renders _below_ Recent Work.~~ **Fixed** — it now sits under the page header.                     | Improve     | XS          |
-| LF-N02       | `AssetsRouteSurface.tsx`                     | `/assets` is a menu page; every library is 2 clicks from the rail.                                                                   | Simplify    | M           |
-| LF-N03       | `StudioLibraryOverlays.tsx`                  | Libraries are fullscreen overlays with no breadcrumb or "Esc returns" hint.                                                          | Polish      | S           |
-| LF-N05       | —                                            | **No Settings destination exists.** Account is read-only.                                                                            | Investigate | M           |
-| LF-S03       | `stageColumnStyles`                          | Stage does not fill its column; large dead space around it.                                                                          | Improve     | M           |
-| ~~LF-S04~~   | `CreativeWorkspace.tsx`                      | ~~Character/Outfit tools disappear below 64rem, unexplained.~~ **Fixed** — the rail carries all three tools at every width.          | Improve     | M           |
-| ~~LF-S07~~   | `StudioTakeOverlays.tsx`                     | ~~8 technical chips (fps, KiB, mime) above the decision.~~ **Fixed** — duration and resolution inline, the rest behind `Details`.    | Simplify    | S           |
-| ~~LF-S08~~   | `TakeReviewActions.tsx`                      | ~~"Close and release" / "release the temporary in-memory take".~~ **Fixed** — `Close without saving`, and its neighbours to match.   | Polish      | XS          |
-| ~~LF-S09~~   | `TakeReviewActions.tsx`                      | ~~Up to six peer actions at the moment of highest decision pressure.~~ **Fixed** — one primary, one danger, four in an `ActionMenu`. | Simplify    | S           |
-| LF-V02       | `VideoEditWorkspace.tsx`                     | No timeline; trim has no visual reference.                                                                                           | Redesign    | L           |
-| LF-V03       | editor settings header                       | Unlabelled low-contrast undo/redo glyphs.                                                                                            | Polish      | XS          |
-| LF-V05       | mobile editor                                | Tool row truncates (`Lig`) with no scroll affordance.                                                                                | Polish      | S           |
-| LF-X01       | `ExistingVideoSourcePreview`, `VideoGallery` | Native `<video controls>` vs custom player elsewhere.                                                                                | Consolidate | M           |
-| LF-X02       | `ExistingVideoActionBar.tsx`                 | Four identical full-width result buttons.                                                                                            | Improve     | S           |
-| LF-X03       | multiple                                     | `Save to Assets` / `Saved Videos` / `Videos` — three names, one place.                                                               | Polish      | S           |
-| ~~LF-P01~~   | `ProjectOverviewSurface.tsx`                 | ~~Five peer actions with a red `Archive` in the default row.~~ **Fixed** — one primary plus `ActionMenu`; danger lives inside it.    | Simplify    | S           |
-| ~~LF-P02~~   | `ProjectsListSurface.tsx`                    | ~~4–5 inline actions per row.~~ **Fixed** — `Open` leads, the rest move into the row's `ActionMenu`.                                 | Simplify    | S           |
-| ~~LF-P06~~   | `ProjectsListSurface.styles.ts`              | ~~`h1` to 4rem and `borderRadius: 0` on all buttons.~~ **Fixed** — one shared title scale; the blanket radius rule is deleted.       | Improve     | S           |
-| ~~LF-C01~~   | `CampaignRouteSurface.tsx:292`               | ~~Copy promises **"Quick Start"**, which does not exist.~~ **Fixed** — rewritten to name only real controls.                         | Polish      | XS          |
-| ~~LF-C02~~   | `CampaignRouteSurface.styles.ts`             | ~~Three levels of nested bordered/rounded surfaces.~~ **Fixed** — exactly one, the campaign card.                                    | Simplify    | S           |
-| ~~LF-A03~~   | `VideoGallery.tsx`                           | ~~`<details>` overflow menu: no Escape, no outside-click, no menu semantics.~~ **Fixed** — one `ActionMenu` primitive.               | Improve     | S           |
-| ~~LF-A04~~   | `StudioLibraryOverlays.tsx:113`              | ~~_"Manage your **Lucy 2.5** cast"_ — provider model name in the UI.~~ **Fixed** — see `assetLibraryDescriptions.ts`.                | Polish      | XS          |
-| LF-A07       | `VideoGallery.tsx:583`                       | Empty state uses internal flow names.                                                                                                | Polish      | XS          |
-| LF-DS03      | 6 locations                                  | Six visual answers to "choose one of N".                                                                                             | Consolidate | M           |
-| LF-DS04      | 13 files                                     | Icon sets with three stroke weights.                                                                                                 | Consolidate | S           |
-| LF-DS06      | 37 sites                                     | Bare-text loading everywhere; one skeleton total.                                                                                    | Improve     | M           |
-| ~~LF-A11Y1~~ | `theme.ts`                                   | ~~`border` 1.58:1, `borderStrong` 2.44:1 — WCAG 1.4.11 needs 3:1.~~ **Fixed** — 3.08:1 and 3.59:1; separators become `divider`.      | Improve     | S           |
-| ~~LF-A11Y3~~ | `toolRailStyles` mobile                      | ~~Blocked reason survives only in `title=`.~~ **Fixed** — a blocked tool keeps its reason on mobile, clamped to two lines.           | Improve     | XS          |
-| LF-R04       | mobile editor                                | Media/chrome ratio inverted.                                                                                                         | Redesign    | (in LF-V01) |
-| LF-R05       | `/assets` at 320px                           | ~5 screens of scroll for four navigation cards.                                                                                      | Simplify    | (in LF-N02) |
+| ID           | Where                                        | Finding                                                                                                                                 | Class       | Scope       |
+| ------------ | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ----------- |
+| ~~LF-E01~~   | `EntryPage.tsx`                              | ~~First sentence uses "Project" and "Campaigns" as proper nouns before either is defined.~~ **Fixed** — outcome-first, no containers.   | Improve     | XS          |
+| ~~LF-E03~~   | `HowLightframeWorksPanel.tsx`                | ~~The concept explainer omits **Studio**.~~ **Fixed** — Studio is the first concept.                                                    | Improve     | XS          |
+| ~~LF-D02~~   | `DashboardRouteSurface.styles.ts`            | ~~`1.5fr / 1fr` gives the wide column to one card and the narrow one to the list.~~ **Fixed** — Recent owns the wider column.           | Improve     | S           |
+| ~~LF-D04~~   | `DashboardRouteSurface.tsx`                  | ~~The Projects/Campaigns explainer renders _below_ Recent Work.~~ **Fixed** — it now sits under the page header.                        | Improve     | XS          |
+| LF-N02       | `AssetsRouteSurface.tsx`                     | `/assets` is a menu page; every library is 2 clicks from the rail.                                                                      | Simplify    | M           |
+| LF-N03       | `StudioLibraryOverlays.tsx`                  | Libraries are fullscreen overlays with no breadcrumb or "Esc returns" hint.                                                             | Polish      | S           |
+| LF-N05       | —                                            | **No Settings destination exists.** Account is read-only.                                                                               | Investigate | M           |
+| ~~LF-S03~~   | `stageColumnStyles`                          | ~~Stage does not fill its column; large dead space around it.~~ **Fixed** — narrower side columns; the 1440px frame grows 661→718 wide. | Improve     | M           |
+| ~~LF-S04~~   | `CreativeWorkspace.tsx`                      | ~~Character/Outfit tools disappear below 64rem, unexplained.~~ **Fixed** — the rail carries all three tools at every width.             | Improve     | M           |
+| ~~LF-S07~~   | `StudioTakeOverlays.tsx`                     | ~~8 technical chips (fps, KiB, mime) above the decision.~~ **Fixed** — duration and resolution inline, the rest behind `Details`.       | Simplify    | S           |
+| ~~LF-S08~~   | `TakeReviewActions.tsx`                      | ~~"Close and release" / "release the temporary in-memory take".~~ **Fixed** — `Close without saving`, and its neighbours to match.      | Polish      | XS          |
+| ~~LF-S09~~   | `TakeReviewActions.tsx`                      | ~~Up to six peer actions at the moment of highest decision pressure.~~ **Fixed** — one primary, one danger, four in an `ActionMenu`.    | Simplify    | S           |
+| LF-V02       | `VideoEditWorkspace.tsx`                     | No timeline; trim has no visual reference.                                                                                              | Redesign    | L           |
+| LF-V03       | editor settings header                       | Unlabelled low-contrast undo/redo glyphs.                                                                                               | Polish      | XS          |
+| LF-V05       | mobile editor                                | Tool row truncates (`Lig`) with no scroll affordance.                                                                                   | Polish      | S           |
+| ~~LF-X01~~   | `ExistingVideoSourcePreview`, `VideoGallery` | ~~Native `<video controls>` vs custom player elsewhere.~~ **Fixed** — one `VideoPlayer` on every finished-video surface.                | Consolidate | M           |
+| ~~LF-X02~~   | `ExistingVideoActionBar.tsx`                 | ~~Four identical full-width result buttons.~~ **Fixed** — one primary, one danger, the rest in an `ActionMenu`.                         | Improve     | S           |
+| ~~LF-X03~~   | multiple                                     | ~~`Save to Assets` / `Saved Videos` / `Videos` — three names, one place.~~ **Fixed** — `Assets` holds `Videos`; the third name is gone. | Polish      | S           |
+| ~~LF-P01~~   | `ProjectOverviewSurface.tsx`                 | ~~Five peer actions with a red `Archive` in the default row.~~ **Fixed** — one primary plus `ActionMenu`; danger lives inside it.       | Simplify    | S           |
+| ~~LF-P02~~   | `ProjectsListSurface.tsx`                    | ~~4–5 inline actions per row.~~ **Fixed** — `Open` leads, the rest move into the row's `ActionMenu`.                                    | Simplify    | S           |
+| ~~LF-P06~~   | `ProjectsListSurface.styles.ts`              | ~~`h1` to 4rem and `borderRadius: 0` on all buttons.~~ **Fixed** — one shared title scale; the blanket radius rule is deleted.          | Improve     | S           |
+| ~~LF-C01~~   | `CampaignRouteSurface.tsx:292`               | ~~Copy promises **"Quick Start"**, which does not exist.~~ **Fixed** — rewritten to name only real controls.                            | Polish      | XS          |
+| ~~LF-C02~~   | `CampaignRouteSurface.styles.ts`             | ~~Three levels of nested bordered/rounded surfaces.~~ **Fixed** — exactly one, the campaign card.                                       | Simplify    | S           |
+| ~~LF-A03~~   | `VideoGallery.tsx`                           | ~~`<details>` overflow menu: no Escape, no outside-click, no menu semantics.~~ **Fixed** — one `ActionMenu` primitive.                  | Improve     | S           |
+| ~~LF-A04~~   | `StudioLibraryOverlays.tsx:113`              | ~~_"Manage your **Lucy 2.5** cast"_ — provider model name in the UI.~~ **Fixed** — see `assetLibraryDescriptions.ts`.                   | Polish      | XS          |
+| LF-A07       | `VideoGallery.tsx:583`                       | Empty state uses internal flow names.                                                                                                   | Polish      | XS          |
+| ~~LF-DS03~~  | 6 locations                                  | ~~Six visual answers to "choose one of N".~~ **Fixed** — `SegmentedControl` for filters and modes; tablist and step `<ol>` kept.        | Consolidate | M           |
+| ~~LF-DS04~~  | 13 files                                     | ~~Icon sets with three stroke weights.~~ **Fixed** — one `AppIcon` at one weight on one grid.                                           | Consolidate | S           |
+| ~~LF-DS06~~  | 37 sites                                     | ~~Bare-text loading everywhere; one skeleton total.~~ **Fixed** — one `Skeleton` primitive; lists and grids reserve their layout.       | Improve     | M           |
+| ~~LF-A11Y1~~ | `theme.ts`                                   | ~~`border` 1.58:1, `borderStrong` 2.44:1 — WCAG 1.4.11 needs 3:1.~~ **Fixed** — 3.08:1 and 3.59:1; separators become `divider`.         | Improve     | S           |
+| ~~LF-A11Y3~~ | `toolRailStyles` mobile                      | ~~Blocked reason survives only in `title=`.~~ **Fixed** — a blocked tool keeps its reason on mobile, clamped to two lines.              | Improve     | XS          |
+| LF-R04       | mobile editor                                | Media/chrome ratio inverted.                                                                                                            | Redesign    | (in LF-V01) |
+| LF-R05       | `/assets` at 320px                           | ~5 screens of scroll for four navigation cards.                                                                                         | Simplify    | (in LF-N02) |
 
 ## P3 — Polish
 
-| ID            | Where                            | Finding                                                                                                          | Class       |
-| ------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------- |
-| LF-E02        | `EntryPage.tsx`                  | No product explanation or visual on the entry screen.                                                            | Improve     |
-| ~~LF-D01~~    | `dashboardStyles`                | ~~No page max-width.~~ **Fixed** — `PageShell` caps it at 88rem.                                                 | Polish      |
-| ~~LF-D03~~    | dashboard header                 | ~~`Browse Assets` reads as text, not a control.~~ **Fixed** — bounded secondary button.                          | Polish      |
-| ~~LF-D05~~    | dashboard                        | ~~Processing Queue is an ops panel on a creative home.~~ **Fixed** — ambient disclosure.                         | Improve     |
-| ~~LF-D06/07~~ | dashboard                        | ~~Bespoke filter + footer link styles instead of primitives.~~ **Fixed** — shared segmented/link variants.       | Consolidate |
-| LF-S05        | `CreativeWorkspace.tsx`          | Permanent privacy footnote occupies a tool slot.                                                                 | Simplify    |
-| LF-V04        | editor                           | `Reset tool` orphaned far from its tool.                                                                         | Polish      |
-| LF-P05        | `ProjectWorkflowProgress.tsx`    | `History` shown as step 4 of 4.                                                                                  | Improve     |
-| LF-C03        | campaigns                        | Empty `Archived` box always rendered.                                                                            | Polish      |
-| LF-C04        | campaigns                        | `Clear search` misaligned with its field.                                                                        | Polish      |
-| ~~LF-A05~~    | assets vs overlay                | ~~Two descriptions of the same library.~~ **Fixed** — one shared owner.                                          | Polish      |
-| LF-A06        | characters/outfits overlays      | Export/import block above the library.                                                                           | Polish      |
-| LF-A08        | `VideoGallery.tsx`               | Raw `version.origin` / `video.status` as chips.                                                                  | Polish      |
-| LF-N04        | nav                              | Campaigns holds a permanent slot on mobile.                                                                      | Investigate |
-| LF-N06        | mobile nav                       | 5 items; design doc says 4; labels crowd at 320px.                                                               | Investigate |
-| LF-DS05/07    | 6+ files                         | `Button` now has a link variant and Dashboard uses it; `<a download>` parity and remaining migrations stay open. | Consolidate |
-| LF-B01        | character builder                | `Save & Use Image Only` vs `Save Character`; parenthetical CTA qualifiers.                                       | Improve     |
-| LF-B02        | character builder                | Five footer controls; ~25% of a 320px viewport.                                                                  | Simplify    |
-| LF-R02        | tablet                           | Brand wordmark hidden only in the 48–64rem band.                                                                 | Polish      |
-| LF-R03        | rail                             | Large dead space between nav and the bottom cluster.                                                             | Polish      |
-| LF-R06        | mobile capture bar               | Device summary truncates (`64×6…`).                                                                              | Polish      |
-| LF-W01        | `ProjectWorkingMediaSection.tsx` | Triple-negative confirmation copy.                                                                               | Polish      |
-| LF-W02        | `StudioExitGuard.tsx:409`        | Five-item comma list in the exit dialog.                                                                         | Polish      |
+| ID             | Where                            | Finding                                                                                                                                | Class       |
+| -------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| ~~LF-E02~~     | `EntryPage.tsx`                  | ~~No product explanation or visual on the entry screen.~~ **Fixed** — three capability lines and a drawn stage.                        | Improve     |
+| ~~LF-D01~~     | `dashboardStyles`                | ~~No page max-width.~~ **Fixed** — `PageShell` caps it at 88rem.                                                                       | Polish      |
+| ~~LF-D03~~     | dashboard header                 | ~~`Browse Assets` reads as text, not a control.~~ **Fixed** — bounded secondary button.                                                | Polish      |
+| ~~LF-D05~~     | dashboard                        | ~~Processing Queue is an ops panel on a creative home.~~ **Fixed** — ambient disclosure.                                               | Improve     |
+| ~~LF-D06/07~~  | dashboard                        | ~~Bespoke filter + footer link styles instead of primitives.~~ **Fixed** — shared segmented/link variants.                             | Consolidate |
+| ~~LF-S05~~     | `CreativeWorkspace.tsx`          | ~~Permanent privacy footnote occupies a tool slot.~~ **Fixed** — it is a visible line in the session column.                           | Simplify    |
+| LF-V04         | editor                           | `Reset tool` orphaned far from its tool.                                                                                               | Polish      |
+| ~~LF-P05~~     | `ProjectWorkflowProgress.tsx`    | ~~`History` shown as step 4 of 4.~~ **Fixed** — three progress steps; History stays a task in the tablist.                             | Improve     |
+| ~~LF-C03~~     | campaigns                        | ~~Empty `Archived` box always rendered.~~ **Fixed** — a heading and one word when there is nothing to show.                            | Polish      |
+| ~~LF-C04~~     | campaigns                        | ~~`Clear search` misaligned with its field.~~ **Fixed** by `ListSearchField`'s end adornment; re-verified.                             | Polish      |
+| ~~LF-A05~~     | assets vs overlay                | ~~Two descriptions of the same library.~~ **Fixed** — one shared owner.                                                                | Polish      |
+| LF-A06         | characters/outfits overlays      | Export/import block above the library.                                                                                                 | Polish      |
+| LF-A08         | `VideoGallery.tsx`               | Raw `version.origin` / `video.status` as chips.                                                                                        | Polish      |
+| LF-N04         | nav                              | Campaigns holds a permanent slot on mobile.                                                                                            | Investigate |
+| LF-N06         | mobile nav                       | 5 items; design doc says 4; labels crowd at 320px.                                                                                     | Investigate |
+| ~~LF-DS05/07~~ | 6+ files                         | ~~`<a download>` parity and the remaining link-shaped buttons.~~ **Fixed** — `LinkButton`, and `variant="link"` everywhere it belongs. | Consolidate |
+| ~~LF-B01~~     | character builder                | ~~Two saves and parenthetical CTA qualifiers.~~ **Fixed** — one `Save Character`; the choice moved into naming.                        | Improve     |
+| ~~LF-B02~~     | character builder                | ~~Five footer controls; ~25% of a 320px viewport.~~ **Fixed** — three controls, and no permanently disabled one.                       | Simplify    |
+| ~~LF-R02~~     | tablet                           | ~~Brand wordmark hidden only in the 48–64rem band.~~ **Fixed** — the band rule is deleted.                                             | Polish      |
+| ~~LF-R03~~     | rail                             | ~~Large dead space between nav and the bottom cluster.~~ **Fixed** — the `1fr` gap row is capped.                                      | Polish      |
+| ~~LF-R06~~     | mobile capture bar               | ~~Device summary truncates (`64×6…`).~~ **Fixed** — it wraps to two lines.                                                             | Polish      |
+| ~~LF-W01~~     | `ProjectWorkingMediaSection.tsx` | ~~Triple-negative confirmation copy.~~ **Fixed** — one positive statement of what is true.                                             | Polish      |
+| ~~LF-W02~~     | `StudioExitGuard.tsx`            | ~~Five-item comma list in the exit dialog.~~ **Fixed** — one sentence, in the exit and logout dialogs alike.                           | Polish      |
 
 ## Preserve — do not let a redesign remove these
 
