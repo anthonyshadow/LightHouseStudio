@@ -1,6 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { RefObject } from 'react';
-import { Button } from '../../ui';
+import { Button, SegmentedControl } from '../../ui';
 import { formatBytes, formatDuration } from '../recording';
 import {
   comparisonStyles,
@@ -15,6 +15,11 @@ import {
 } from './ExistingVideoPanel.styles';
 import { ExistingVideoSourcePreview } from './ExistingVideoSourcePreview';
 import type { ExistingVideoWorkflow } from './useExistingVideoWorkflow';
+
+const COMPARISON_OPTIONS = [
+  { value: 'original', label: 'Original' },
+  { value: 'result', label: 'Result' },
+] as const;
 
 const orientation = (width: number, height: number): string => {
   if (width === height) return 'Square';
@@ -63,21 +68,16 @@ export const ExistingVideoSourceCard = ({
       </header>
 
       {workflow.result ? (
-        <div css={comparisonStyles(theme)} role="group" aria-label="Compare original and result">
-          <Button
-            variant={workflow.comparison === 'original' ? 'primary' : 'secondary'}
-            aria-pressed={workflow.comparison === 'original'}
-            onClick={workflow.showOriginal}
-          >
-            Original
-          </Button>
-          <Button
-            variant={workflow.comparison === 'result' ? 'primary' : 'secondary'}
-            aria-pressed={workflow.comparison === 'result'}
-            onClick={workflow.showResult}
-          >
-            Result
-          </Button>
+        <div css={comparisonStyles()}>
+          <SegmentedControl
+            columns={COMPARISON_OPTIONS.length}
+            label="Compare original and result"
+            value={workflow.comparison}
+            options={COMPARISON_OPTIONS}
+            onChange={(next) =>
+              next === 'original' ? workflow.showOriginal() : workflow.showResult()
+            }
+          />
         </div>
       ) : null}
 

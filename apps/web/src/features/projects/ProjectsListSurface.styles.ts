@@ -4,45 +4,13 @@ export const projectsSearchRowStyles = (theme: Theme): CSSObject => ({
   paddingBlockStart: theme.space.lg,
 });
 
+/** Layout only: the segments themselves are `SegmentedControl`'s, not this surface's. */
 export const projectsGroupFilterStyles = (theme: Theme): CSSObject => ({
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'end',
-  gap: theme.space.lg,
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 24rem)',
   paddingBlock: theme.space.lg,
   borderBlockEnd: `1px solid ${theme.colors.divider}`,
-  '& > button': {
-    position: 'relative',
-    minWidth: 0,
-    minHeight: '2.75rem',
-    padding: `${theme.space.xs} 0`,
-    border: 0,
-    borderRadius: 0,
-    color: theme.colors.textMuted,
-    background: 'transparent',
-    boxShadow: 'none',
-    '&::after': {
-      position: 'absolute',
-      insetInline: 0,
-      insetBlockEnd: `calc(-1 * ${theme.space.lg} - 1px)`,
-      height: '2px',
-      background: 'transparent',
-      content: '""',
-    },
-    '&[aria-pressed="true"]': { color: theme.colors.text },
-    '&[aria-pressed="true"]::after': { background: theme.colors.accent },
-    '&:hover:not(:disabled):not([aria-disabled="true"])': {
-      color: theme.colors.text,
-      background: 'transparent',
-      transform: 'none',
-    },
-  },
-  '@container (max-width: 28rem)': {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    gap: theme.space.md,
-    '& > button': { width: '100%' },
-  },
+  '@container (max-width: 28rem)': { gridTemplateColumns: 'minmax(0, 1fr)' },
 });
 
 export const projectsLedgerLayoutStyles = (theme: Theme): CSSObject => ({

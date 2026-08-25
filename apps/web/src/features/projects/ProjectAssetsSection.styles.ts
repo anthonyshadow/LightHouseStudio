@@ -65,44 +65,10 @@ export const addAssetActionStyles = (theme: Theme): CSSObject => ({
   },
 });
 
+/** Layout only: the segments themselves are `SegmentedControl`'s, not this section's. */
 export const projectAssetFiltersStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
-  display: 'flex',
-  alignItems: 'end',
-  gap: theme.space.xl,
   marginBlockEnd: `clamp(${theme.space.xl}, 4cqi, 2.5rem)`,
-  overflowX: 'auto',
-  overscrollBehaviorInline: 'contain',
-  borderBlockEnd: `1px solid ${theme.colors.divider}`,
-  scrollbarWidth: 'thin',
-  '& > button': {
-    position: 'relative',
-    minWidth: 'max-content',
-    minHeight: '2.75rem',
-    padding: `0 0 ${theme.space.md}`,
-    border: 0,
-    borderRadius: 0,
-    color: theme.colors.textMuted,
-    background: 'transparent',
-    boxShadow: 'none',
-    fontSize: theme.fontSizes.body,
-    fontWeight: 600,
-    '&::after': {
-      position: 'absolute',
-      insetInline: 0,
-      insetBlockEnd: '-1px',
-      height: '2px',
-      background: 'transparent',
-      content: '""',
-    },
-    '&[aria-pressed="true"]': { color: theme.colors.text },
-    '&[aria-pressed="true"]::after': { background: theme.colors.accent },
-    '&:hover:not(:disabled):not([aria-disabled="true"])': {
-      color: theme.colors.text,
-      background: 'transparent',
-      transform: 'none',
-    },
-  },
 });
 
 export const projectAssetGridStyles = (theme: Theme): CSSObject => ({

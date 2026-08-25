@@ -16,7 +16,14 @@ import {
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
 import { studioCreatePath } from '../../app/paths';
-import { AppIcon, Button, ConfirmationDialog, OverlayPanel, StatusNotice } from '../../ui';
+import {
+  AppIcon,
+  Button,
+  ConfirmationDialog,
+  OverlayPanel,
+  SegmentedControl,
+  StatusNotice,
+} from '../../ui';
 import { kindLabel, ProjectAssetThumbnail } from './ProjectAssetThumbnail';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
 import { safeProjectError } from './ProjectDialogs';
@@ -347,22 +354,14 @@ export const ProjectAssetsSection = ({
         Saved items you use in this Project. None of them is its original video.
       </p>
 
-      <div
-        role="group"
-        aria-label="Filter items used in this Project"
-        css={projectAssetFiltersStyles(theme)}
-      >
-        {FILTERS.map(({ value, label }) => (
-          <Button
-            key={value}
-            size="small"
-            variant="quiet"
-            aria-pressed={filter === value}
-            onClick={() => setFilter(value)}
-          >
-            {label}
-          </Button>
-        ))}
+      <div css={projectAssetFiltersStyles(theme)}>
+        <SegmentedControl
+          columns={FILTERS.length}
+          label="Filter items used in this Project"
+          value={filter}
+          options={FILTERS}
+          onChange={setFilter}
+        />
       </div>
 
       {notice ? (

@@ -30,15 +30,11 @@ describe('Project Assets Single Flow styles', () => {
   });
 
   it('uses the approved underline filters without rounded button boxes', () => {
+    // The filter row owns spacing only; `SegmentedControl` owns how a chosen filter looks.
     expect(projectAssetFiltersStyles(studioTheme)).toMatchObject({
-      overflowX: 'auto',
-      borderBlockEnd: `1px solid ${studioTheme.colors.divider}`,
-      '& > button': {
-        border: 0,
-        borderRadius: 0,
-        background: 'transparent',
-        '&[aria-pressed="true"]::after': { background: studioTheme.colors.accent },
-      },
+      minWidth: 0,
+      marginBlockEnd: `clamp(${studioTheme.space.xl}, 4cqi, 2.5rem)`,
     });
+    expect(projectAssetFiltersStyles(studioTheme)).not.toHaveProperty('& > button');
   });
 });
