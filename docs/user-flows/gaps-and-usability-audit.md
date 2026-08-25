@@ -12,12 +12,24 @@ consequence of G6. Each entry below records what shipped. Everything else remain
 has since landed as well**, closing four findings this document had left open: **G5** and **M9**
 (step 14, the account panel), **G8** and **M7** (step 15, the persistent explainer) and **M3**
 (step 15, the Outfits empty state). **M10** was closed separately — `isChunkLoadError` now tells a
-stale lazy chunk apart from a crash. Still open: **M5**, **M8**, **M12**, **R2**, **R6**, **B4**,
-**B5**, **B7**, **B9** and **B10**.
+stale lazy chunk apart from a crash. Still open at that point: **M5**, **M8**, **M12**, **R2**,
+**R6**, **B4**, **B5**, **B7**, **B9** and **B10** — see the note below for what has closed since.
 
 **Two Tier 4 findings were already closed before the tier ran** — N7/T7 and G8's dead guide — by
 refactors that landed for other reasons. Their entries below record that correction rather than new
 work; verifying a finding still holds before acting on it is part of the job.
+
+**The [UI/UX plan](../LightFrameUXImplementationPlan.md) has since run to completion** — all five
+tiers — and closed or invalidated four more of the findings left open here:
+
+| Finding | What happened                                                                                                                                                                           |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **M5**  | **Closed.** Every asset library overlay carries an `Assets / <Library>` eyebrow and a labelled Close, so the containing context is stated (item 19).                                    |
+| **M12** | **Premise gone.** There is no hub to be an overlay over: the libraries are a tab strip, `/assets` resolves to the last one used, and Close consumes the entry that opened it (item 19). |
+| **R2**  | **Partly closed.** `AssetsRouteSurface` no longer exists, so the "Assets ▸ Upload video" path is gone. The remaining three still land on `/studio/create` with different intents.       |
+| **P4**  | **Closed with M5.** Fullscreen placement stays — it is right on a phone — but the context is no longer lost.                                                                            |
+
+Still open after that: **M8**, **R6**, **B4**, **B5**, **B7**, **B9** and **B10**.
 
 **Not a finding, but shipped alongside Tier 4:** the **Prompt Workshop was removed** as a product
 decision. It was _not_ dead code — it had four live entry points and four E2E specs that drove it —
