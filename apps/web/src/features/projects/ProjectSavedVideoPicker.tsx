@@ -13,7 +13,7 @@ import { media } from '../../ui/media';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { durationBadgeStyles as galleryDurationBadgeStyles } from '../video-gallery/VideoGallery.styles';
 import { ProjectAssetThumbnail } from './ProjectAssetThumbnail';
-import { ProjectVideoPreviewPlayer } from './ProjectVideoPreviewPlayer';
+import { VideoPlayer } from '../video-player/VideoPlayer';
 
 const rowStyles = (theme: Theme) => ({
   display: 'grid',
@@ -196,7 +196,7 @@ export const ProjectSavedVideoList = ({
                 </div>
                 {previewOpen ? (
                   <div id={`saved-video-preview-${video.id}`} css={previewCss}>
-                    <ProjectVideoPreviewPlayer
+                    <VideoPlayer
                       src={savedVideoContentUrl(video.id, video.currentVersion.id)}
                       title={video.title}
                       poster={thumbnailUrl ?? undefined}
