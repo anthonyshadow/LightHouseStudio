@@ -1,6 +1,6 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import type { ReactNode } from 'react';
-import { Button, StatusNotice, Surface } from '../../ui';
+import { AppIcon, Button, StatusNotice, Surface } from '../../ui';
 import type { CameraAvailabilityNotice } from './cameraAvailability';
 import { formatDuration } from './recordingHelpers';
 import type { RecordingController, RecordingSource } from './types';
@@ -255,22 +255,6 @@ const captureResolutionLabel = (
   return `${settings.width}×${settings.height}${frameRate}`;
 };
 
-const DeviceIcon = ({ type }: { type: 'camera' | 'microphone' }) => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-    {type === 'camera' ? (
-      <>
-        <rect x="3.5" y="6.5" width="12" height="11" rx="2" stroke="currentColor" />
-        <path d="m15.5 10 4-2v8l-4-2" stroke="currentColor" strokeLinejoin="round" />
-      </>
-    ) : (
-      <>
-        <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" />
-        <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v4M9 21h6" stroke="currentColor" />
-      </>
-    )}
-  </svg>
-);
-
 export const RecordingControls = ({
   recording,
   source,
@@ -330,7 +314,7 @@ export const RecordingControls = ({
                 title={videoTrack?.label || source.videoSource}
               >
                 <span>
-                  <DeviceIcon type="camera" />
+                  <AppIcon name="camera" />
                 </span>
                 <span>
                   <strong>{videoTrack?.label || source.videoSource}</strong>
@@ -342,7 +326,7 @@ export const RecordingControls = ({
                 title={audioTrack?.label || source.audioSource}
               >
                 <span>
-                  <DeviceIcon type="microphone" />
+                  <AppIcon name="microphone" />
                 </span>
                 <span>
                   <strong>{audioTrack?.label || source.audioSource}</strong>

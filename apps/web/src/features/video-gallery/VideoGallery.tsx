@@ -27,6 +27,7 @@ import {
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
 import {
+  AppIcon,
   Button,
   emptyExampleStyles,
   EmptyStatePreview,
@@ -71,19 +72,6 @@ import {
   thumbnailStyles,
 } from './VideoGallery.styles';
 import { ActionMenu } from '../../ui/primitives/ActionMenu';
-
-const PlayIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M8 5.4v13.2L18.5 12 8 5.4Z" />
-  </svg>
-);
-
-const VideoPlaceholderIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-    <rect x="3" y="5" width="18" height="14" rx="3" />
-    <path d="m10 9 5 3-5 3Z" />
-  </svg>
-);
 
 const duration = (milliseconds: number): string => {
   const seconds = Math.round(milliseconds / 1_000);
@@ -252,14 +240,14 @@ const VideoGalleryGrid = ({
                       video.thumbnailAvailable ? 'Preview could not load' : 'No preview yet'
                     }
                   >
-                    <VideoPlaceholderIcon />
+                    <AppIcon name="video" />
                     <span>
                       {video.thumbnailAvailable ? 'Preview didn’t load' : 'No preview yet'}
                     </span>
                   </span>
                 )}
                 <span data-gallery-play="" css={playBadgeStyles(theme)}>
-                  <PlayIcon />
+                  <AppIcon name="play" />
                 </span>
                 <span css={durationBadgeStyles(theme)}>{duration(version.durationMs)}</span>
               </span>

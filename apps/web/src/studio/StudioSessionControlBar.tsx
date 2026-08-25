@@ -1,7 +1,7 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import type { RefObject } from 'react';
 import { referenceImageContentUrl } from '../adapters/api-client/referenceImageRoutes';
-import { Button } from '../ui';
+import { AppIcon, Button } from '../ui';
 import { fadingVisibilityAnimationStyles } from '../ui/animationStyles';
 import type { StudioMode, StudioSessionController } from '../features/media-session';
 import {
@@ -41,52 +41,6 @@ type StudioSessionControlBarProps = {
   onReplaceSavedVideo?: () => void;
   hasUnsavedChanges?: boolean;
 };
-
-const MicrophoneIcon = ({ muted }: { muted: boolean }) => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-    <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" />
-    <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v4M9 21h6" stroke="currentColor" />
-    {muted ? <path d="m4 4 16 16" stroke="currentColor" strokeWidth="1.8" /> : null}
-  </svg>
-);
-
-const CameraIcon = ({ off }: { off: boolean }) => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-    <rect x="3.5" y="6.5" width="12" height="11" rx="2" stroke="currentColor" />
-    <path d="m15.5 10 4-2v8l-4-2" stroke="currentColor" strokeLinejoin="round" />
-    {off ? <path d="m4 4 16 16" stroke="currentColor" strokeWidth="1.8" /> : null}
-  </svg>
-);
-
-const SwitchCameraIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-    <path d="M7 7h10l-2.5-2.5M17 17H7l2.5 2.5" stroke="currentColor" />
-    <path d="m17 7 2.5 2.5M7 17l-2.5-2.5" stroke="currentColor" />
-  </svg>
-);
-
-const SparkIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-    <path
-      d="M12 3c.55 4.05 2.95 6.45 7 7-4.05.55-6.45 2.95-7 7-.55-4.05-2.95-6.45-7-7 4.05-.55 6.45-2.95 7-7Z"
-      stroke="currentColor"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
-
-const UploadIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-    <path d="M12 15V3m0 0L7.5 7.5M12 3l4.5 4.5" stroke="currentColor" />
-    <path d="M4 14v4a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-4" stroke="currentColor" />
-  </svg>
-);
-
-const StopIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-    <rect x="6.5" y="6.5" width="11" height="11" rx="1.5" stroke="currentColor" />
-  </svg>
-);
 
 const barStyles = (theme: Theme, visible: boolean): CSSObject => ({
   position: 'relative',
@@ -417,7 +371,7 @@ export const StudioSessionControlBar = ({
                   title={switchCameraLabel}
                   onClick={() => void cameraControls.switchCamera()}
                 >
-                  <SwitchCameraIcon />
+                  <AppIcon name="switchCamera" />
                   <span data-switch-camera-label>Switch camera</span>
                 </Button>
               ) : null}
@@ -473,7 +427,7 @@ export const StudioSessionControlBar = ({
                   else void session.startLocal();
                 }}
               >
-                <CameraIcon off={false} />
+                <AppIcon name="camera" />
                 {transition ?? 'Start camera'}
               </Button>
               <Button
@@ -483,7 +437,7 @@ export const StudioSessionControlBar = ({
                 disabled={controlsLocked || Boolean(transition)}
                 onClick={onUploadVideo}
               >
-                <UploadIcon />
+                <AppIcon name="upload" />
                 <span data-upload-label>Upload Video</span>
               </Button>
             </div>
@@ -513,7 +467,7 @@ export const StudioSessionControlBar = ({
                   title={recordingActive ? 'Stop recording before stopping AI.' : undefined}
                   onClick={() => void session.stopModel()}
                 >
-                  <StopIcon />
+                  <AppIcon name="stop" />
                   Stop AI
                 </Button>
               ) : !localRecordingPrimary ? (
@@ -522,7 +476,7 @@ export const StudioSessionControlBar = ({
                   disabled={controlsLocked || recordingActive}
                   onClick={onChooseAiExperience}
                 >
-                  <SparkIcon />
+                  <AppIcon name="spark" />
                   <span data-ai-label-long>Start AI</span>
                   <span data-ai-label-short aria-hidden="true">
                     AI
@@ -541,7 +495,7 @@ export const StudioSessionControlBar = ({
                 disabled={controlsLocked}
                 onClick={session.toggleMicrophone}
               >
-                <MicrophoneIcon muted={!session.microphoneEnabled} />
+                <AppIcon name={session.microphoneEnabled ? 'microphone' : 'microphoneOff'} />
               </Button>
               <Button
                 data-icon-only-control="true"
@@ -552,7 +506,7 @@ export const StudioSessionControlBar = ({
                 disabled={controlsLocked}
                 onClick={session.toggleCamera}
               >
-                <CameraIcon off={!session.cameraEnabled} />
+                <AppIcon name={session.cameraEnabled ? 'camera' : 'cameraOff'} />
               </Button>
 
               {!localRecordingPrimary ? recordingAction : null}
@@ -568,7 +522,7 @@ export const StudioSessionControlBar = ({
                   title={recordingActive ? 'Stop recording before closing the session.' : undefined}
                   onClick={() => void session.stopCamera()}
                 >
-                  <StopIcon />
+                  <AppIcon name="stop" />
                   Close
                 </Button>
               )}

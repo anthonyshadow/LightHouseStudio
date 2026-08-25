@@ -601,6 +601,7 @@ vi.mock('./StudioHeader', () => ({
 vi.mock('../ui', async () => {
   const { useEffect, useRef } = await import('react');
   const { StudioDesignProvider } = await import('../ui/StudioDesignProvider');
+  const { AppIcon } = await import('../ui/primitives/AppIcon');
   const { Button } = await import('../ui/primitives/Button');
   const { VisuallyHidden } = await import('../ui/primitives/VisuallyHidden');
   // The confirmation mechanism is plain state with no styling, so the real one is used here: a
@@ -642,6 +643,7 @@ vi.mock('../ui', async () => {
   };
   return {
     StudioDesignProvider,
+    AppIcon,
     Button,
     VisuallyHidden,
     useConfirmationRequest,

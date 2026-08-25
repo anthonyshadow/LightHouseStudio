@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import type { RealtimeSessionTiming } from '../media-session';
 import { formatDuration } from '../recording/recordingHelpers';
 import type { RecordingProcessingOperation } from '../recording/types';
-import { VisuallyHidden } from '../../ui';
+import { AppIcon, VisuallyHidden } from '../../ui';
 import {
   activityIndicatorStyles,
   badgeStyles,
@@ -20,37 +20,6 @@ import {
 
 type StatusTone = 'neutral' | 'accent' | 'recording' | 'warning';
 
-const StageIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-    <path
-      d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3m13 5h3a2 2 0 0 0 2-2v-3"
-      stroke="currentColor"
-      strokeLinecap="round"
-    />
-    <rect x="8" y="8" width="8" height="8" rx="2.5" stroke="currentColor" />
-  </svg>
-);
-
-const FullscreenIcon = ({ active }: { active: boolean }) => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-    {active ? (
-      <path
-        d="M9 4v3a2 2 0 0 1-2 2H4m11-5v3a2 2 0 0 0 2 2h3M9 20v-3a2 2 0 0 0-2-2H4m11 5v-3a2 2 0 0 1 2-2h3"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    ) : (
-      <path
-        d="M9 4H4v5m11-5h5v5M9 20H4v-5m11 5h5v-5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    )}
-  </svg>
-);
-
 export const MediaStageEmpty = ({
   title,
   description,
@@ -64,7 +33,7 @@ export const MediaStageEmpty = ({
   return (
     <div css={emptyStyles(theme)}>
       <span css={emptyIconStyles(theme)}>
-        <StageIcon />
+        <AppIcon name="pictureInPicture" />
       </span>
       <strong>{title}</strong>
       <p>{description}</p>
@@ -154,7 +123,7 @@ export const MediaStageToolbar = ({
             aria-pressed={fullscreen}
             onClick={onToggleFullscreen}
           >
-            <FullscreenIcon active={fullscreen} />
+            <AppIcon name={fullscreen ? 'fullscreenExit' : 'fullscreen'} />
           </button>
         ) : null}
       </div>

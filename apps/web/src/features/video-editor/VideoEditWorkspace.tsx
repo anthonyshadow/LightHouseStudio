@@ -10,8 +10,7 @@ import {
   type VideoEditSpec,
 } from '@studio/domain';
 import { useEffect, useState, type ReactNode, type RefObject } from 'react';
-import { Button, StatusNotice } from '../../ui';
-import { VideoEditIcon, type VideoEditIconName } from './VideoEditIcon';
+import { AppIcon, type AppIconName, Button, StatusNotice } from '../../ui';
 import type { VideoEditSession } from './useVideoEditSession';
 import { VideoEditTimeline } from './VideoEditTimeline';
 import { formatVideoEditTime, isVideoEditBusy, type VideoEditTool } from './types';
@@ -34,7 +33,7 @@ import {
 const TOOLS: readonly Readonly<{
   id: VideoEditTool;
   label: string;
-  icon: VideoEditIconName;
+  icon: AppIconName;
   description: string;
 }>[] = [
   {
@@ -423,14 +422,14 @@ export const VideoEditWorkspace = ({
               disabled={busy}
               onClick={() => session.setActiveTool(tool.id)}
             >
-              <VideoEditIcon name={tool.icon} width="1rem" height="1rem" />
+              <AppIcon name={tool.icon} width="1rem" height="1rem" />
               {tool.label}
             </button>
           ))}
         </nav>
         <span data-tool-overflow-cue="" aria-hidden="true">
-          <VideoEditIcon name="chevronRight" width="0.9rem" height="0.9rem" />
-          <VideoEditIcon name="chevronRight" width="0.9rem" height="0.9rem" />
+          <AppIcon name="chevronRight" width="0.9rem" height="0.9rem" />
+          <AppIcon name="chevronRight" width="0.9rem" height="0.9rem" />
         </span>
       </div>
 
@@ -450,7 +449,7 @@ export const VideoEditWorkspace = ({
             disabled={!session.canUndo || busy}
             onClick={session.undo}
           >
-            <VideoEditIcon name="undo" width="1rem" height="1rem" />
+            <AppIcon name="undo" width="1rem" height="1rem" />
             Undo
           </Button>
           <Button
@@ -459,7 +458,7 @@ export const VideoEditWorkspace = ({
             disabled={!session.canRedo || busy}
             onClick={session.redo}
           >
-            <VideoEditIcon name="redo" width="1rem" height="1rem" />
+            <AppIcon name="redo" width="1rem" height="1rem" />
             Redo
           </Button>
           <Button
@@ -468,7 +467,7 @@ export const VideoEditWorkspace = ({
             disabled={!session.dirty || busy}
             onClick={session.resetTool}
           >
-            <VideoEditIcon name="reset" width="1rem" height="1rem" />
+            <AppIcon name="reset" width="1rem" height="1rem" />
             Reset tool
           </Button>
           <Button
@@ -477,7 +476,7 @@ export const VideoEditWorkspace = ({
             disabled={!session.dirty || busy}
             onClick={session.resetAll}
           >
-            <VideoEditIcon name="history" width="1rem" height="1rem" />
+            <AppIcon name="history" width="1rem" height="1rem" />
             Reset all
           </Button>
           <Button
@@ -500,7 +499,7 @@ export const VideoEditWorkspace = ({
             }}
             onBlur={() => session.setShowingBefore(false)}
           >
-            <VideoEditIcon name="compare" width="1rem" height="1rem" />
+            <AppIcon name="compare" width="1rem" height="1rem" />
             Hold Compare
             <kbd>C</kbd>
           </Button>
@@ -514,7 +513,7 @@ export const VideoEditWorkspace = ({
               session.setSplitComparison(!session.splitComparison);
             }}
           >
-            <VideoEditIcon name="split" width="1rem" height="1rem" />
+            <AppIcon name="split" width="1rem" height="1rem" />
             Split
           </Button>
         </div>
@@ -533,7 +532,7 @@ export const VideoEditWorkspace = ({
           <div>
             <span data-inspector-drag-handle="" aria-hidden="true" />
             <span data-inspector-title="">
-              <VideoEditIcon name={activeTool.icon} width="1rem" height="1rem" />
+              <AppIcon name={activeTool.icon} width="1rem" height="1rem" />
               <h2>{activeTool.label} settings</h2>
               {session.dirty ? <strong>Edited</strong> : null}
             </span>
@@ -546,14 +545,14 @@ export const VideoEditWorkspace = ({
             onClick={() => setInspectorExpanded((expanded) => !expanded)}
           >
             <span data-desktop-inspector-icon="">
-              <VideoEditIcon
+              <AppIcon
                 name={inspectorExpanded ? 'collapse' : 'chevronLeft'}
                 width="1.1rem"
                 height="1.1rem"
               />
             </span>
             <span data-mobile-inspector-icon="">
-              <VideoEditIcon name="chevronDown" width="1.1rem" height="1.1rem" />
+              <AppIcon name="chevronDown" width="1.1rem" height="1.1rem" />
             </span>
           </Button>
         </header>
@@ -573,7 +572,7 @@ export const VideoEditWorkspace = ({
               disabled={!session.dirty || busy}
               onClick={session.resetTool}
             >
-              <VideoEditIcon name="reset" width="1rem" height="1rem" />
+              <AppIcon name="reset" width="1rem" height="1rem" />
               Reset
             </Button>
           </div>
@@ -625,7 +624,7 @@ export const VideoEditWorkspace = ({
           disabled={!session.dirty || !session.supported || busy}
           onClick={() => void session.startRender()}
         >
-          <VideoEditIcon name="save" width="1.1rem" height="1.1rem" />
+          <AppIcon name="save" width="1.1rem" height="1.1rem" />
           {outcome.commitLabel}
         </Button>
         <Button
@@ -635,7 +634,7 @@ export const VideoEditWorkspace = ({
           data-editor-discard=""
           onClick={onRequestDiscard}
         >
-          <VideoEditIcon name="trash" width="1.1rem" height="1.1rem" />
+          <AppIcon name="trash" width="1.1rem" height="1.1rem" />
           <span>Discard</span>
         </Button>
       </footer>

@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
+import { AppIcon } from './AppIcon';
 import { fieldRootStyles, labelStyles, messageStyles } from './FormControl.styles';
 import {
   chevronStyles,
@@ -370,21 +371,7 @@ export const SelectField = forwardRef<HTMLButtonElement, SelectFieldProps>(funct
           }}
         >
           <span css={triggerValueStyles()}>{selectedOption?.label ?? placeholder}</span>
-          <svg
-            viewBox="0 0 20 20"
-            aria-hidden="true"
-            focusable="false"
-            css={chevronStyles(theme, open)}
-          >
-            <path
-              d="m5.5 7.5 4.5 4.5 4.5-4.5"
-              fill="none"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.75"
-            />
-          </svg>
+          <AppIcon name="chevronDown" css={chevronStyles(theme, open)} />
         </button>
         {name ? <input type="hidden" name={name} value={value} /> : null}
       </div>
