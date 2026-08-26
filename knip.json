@@ -8,6 +8,7 @@
         "@studio/contracts": ["packages/contracts/src/index.ts"]
       },
       "entry": [
+        "playwright.visual.linux.config.ts",
         "stories/**/*.stories.{ts,tsx}",
         "stories/**/*.mdx",
         "e2e/**/*.{spec,screenshots}.ts",

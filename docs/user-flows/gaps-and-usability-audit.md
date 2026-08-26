@@ -895,8 +895,12 @@ suite. Recorded honestly:
   machine's rendering — exactly what `docs/TESTING.md` forbids. Both regenerated images were
   inspected. `node scripts/prune-visual-baselines.mjs --check` reports 35 curated baselines across
   2 platforms and nothing to prune.
-- **The two `chromium-linux` `11-dashboard/overview.png` baselines are still stale** and cannot be
-  produced on macOS. They must be regenerated where Linux images are made.
+- ~~**The two `chromium-linux` `11-dashboard/overview.png` baselines are still stale** and cannot be
+  produced on macOS.~~ **Resolved.** They can: `bun run test:visual:linux:update` drives the pinned
+  Playwright container from a Mac. The whole Linux set is current again. What genuinely cannot be
+  produced there is narrower and now measured — the nine scenarios whose media needs H.264, which
+  Playwright's Linux Chromium cannot encode. Those are skipped rather than failed, and no Linux
+  baseline is kept for them. See [screenshot coverage](../screenshot-test-coverage.md).
 - **The Workshop removal deleted three screenshot scenarios** (`03-character-workshop`) from
   `capture-screenshots.screenshots.ts`. No _visual baseline_ was affected: the visual matrix never
   contained a Workshop scenario, and `screenshots/` has no such directory.

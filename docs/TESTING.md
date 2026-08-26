@@ -39,6 +39,8 @@ opens those stories.
 | `bun run test:production`               | Built loopback static-serving smoke; run `bun run build` first                    |
 | `bun run test:visual`                   | Explicit curated visual regression suite                                          |
 | `bun run test:visual:update`            | Intentionally regenerate curated baselines for an approved visual change          |
+| `bun run test:visual:linux`             | Check the `chromium-linux` baselines from a Mac, via the pinned Playwright image  |
+| `bun run test:visual:linux:update`      | Regenerate them the same way                                                      |
 | `bun run screenshots:capture`           | Broad non-baseline screenshot artifact for manual design review                   |
 | `bun run test:all`                      | Vitest, build, production smoke, functional E2E, and visual regression            |
 | `bun run quality`                       | Normal implementation gate: types, lint, format, architecture, Vitest, and builds |
