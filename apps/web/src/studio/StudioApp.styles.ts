@@ -94,6 +94,15 @@ export const shellNoticeRegionStyles = (theme: Theme): CSSObject => ({
   '@supports (height: 100dvh)': { maxHeight: 'min(20rem, 44dvh)' },
   [media.down('compact')]: {
     '& > *': { margin: `0 ${theme.space.xs}` },
+    /*
+     * A phone needs more of the screen for this, not less. The recovery notice carries a title, a
+     * sentence and up to three stacked buttons, which on a 320px screen is taller than 44vh — so
+     * the cap that exists to stop a notice eating the viewport was instead hiding the buttons it
+     * exists to offer, behind a scroll inside a region nothing invites you to scroll. Still
+     * bounded, because an unbounded notice would push the surface off the screen entirely.
+     */
+    maxHeight: 'min(26rem, 70vh)',
+    '@supports (height: 100dvh)': { maxHeight: 'min(26rem, 70dvh)' },
   },
 });
 

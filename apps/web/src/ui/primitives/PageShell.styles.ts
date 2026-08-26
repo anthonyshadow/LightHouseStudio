@@ -124,4 +124,28 @@ export const pageHeaderStyles = (theme: Theme): CSSObject => ({
     '& [data-page-actions]': { width: '100%', flexWrap: 'nowrap' },
     '& [data-page-actions] > *:first-child': { flex: '1 0 auto' },
   },
+  /*
+   * The smallest supported phone, where the masthead competes with the content for a 568px screen.
+   *
+   * Every value here is the same idea one step tighter — it says nothing new, it just stops the
+   * heading block spending a third of the viewport before the first row of work. The margin
+   * matters more than it looks: how many lines the eyebrow and description take is decided by the
+   * font the host happens to have, so a masthead that only just fits on one machine overflows on
+   * another. This leaves room for a wrapped line that was not there when it was measured.
+   */
+  '@container (max-width: 22rem)': {
+    '& [data-page-identity]': { gap: theme.space.xs, paddingBlockEnd: theme.space.md },
+    /*
+     * The row is one line and cannot wrap, so at this width the space between the controls is
+     * space the controls themselves need: a surface with three of them wants every pixel back
+     * before any of their labels start overrunning each other.
+     */
+    '& [data-page-actions]': { gap: theme.space.xs },
+    '& [data-page-eyebrow]': {
+      marginBlockEnd: theme.space.xxs,
+      fontSize: theme.fontSizes.metadata,
+    },
+    '& h1': { fontSize: 'clamp(1.5rem, 9cqi, 2rem)' },
+    '& [data-page-description]': { marginBlockStart: theme.space.xs },
+  },
 });

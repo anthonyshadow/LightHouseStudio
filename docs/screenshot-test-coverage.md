@@ -70,12 +70,14 @@ not rasterise identically on two operating systems. Two platforms are curated: `
 and `chromium-linux`.
 
 They do not hold the same set, and that is deliberate. This product gates every published file on a
-local H.264/AAC MP4 conversion — a recording that cannot be transcoded is refused rather than
-published. Playwright's Linux Chromium is an open-source build with **no H.264**:
-`VideoEncoder.isConfigSupported({ codec: 'avc1.42001f' })` answers `false` there and `true` on the
-branded browsers this product targets. Nine scenarios reach their state through that gate, so on
-Linux they cannot be produced at all — not in the capture container, and not on the CI runner, which
-installs the same build.
+local H.264/AAC MP4 conversion, which is why these scenarios have media at all. Playwright's
+Chromium is the open-source build, and on Linux it cannot **decode** H.264:
+`video.canPlayType('video/mp4; codecs="avc1.42E01E"')` answers `''` and `MediaSource.isTypeSupported`
+answers `false`, against `'probably'` and `true` on the same Playwright build on macOS. Nine
+scenarios reach their state through that gate, and on Linux the upload panel refuses the file — "The
+browser could not decode the selected video" — so the state is never reached. Playwright downloads
+the same browser binary on every Linux host, so this holds in the capture container and on the CI
+runner alike.
 
 Those cases are therefore **skipped** on a platform without H.264, and no `chromium-linux` baseline
 is kept for them. One declaration in `e2e/studioVisualMatrix.ts` decides both — the scenarios in

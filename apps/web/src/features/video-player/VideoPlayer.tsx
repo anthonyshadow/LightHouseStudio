@@ -55,8 +55,15 @@ export const VideoPlayer = ({
     video.pause();
     if (src === null) video.removeAttribute('src');
     else video.src = src;
+    /*
+     * Muting is a decision about the clip in front of you, not about the player: the upload panel
+     * keeps one player mounted while its Compare control swaps original for result, and carrying a
+     * mute across that swap silences the very check the operator opened it to make.
+     */
+    video.muted = false;
     video.load();
     setPlaying(false);
+    setMuted(false);
     setCurrentTime(0);
     return () => {
       video.pause();

@@ -356,7 +356,12 @@ export const ProjectAssetsSection = ({
 
       <div css={projectAssetFiltersStyles(theme)}>
         <SegmentedControl
-          columns={FILTERS.length}
+          /*
+           * Wraps rather than sharing one row. Five labels across a 320px column leave about 26px
+           * of content box each, and `overflowWrap: anywhere` then breaks "Characters" mid-word
+           * across three lines. None of these five carries a `shortLabel` to fall back to.
+           */
+          columns="auto"
           label="Filter items used in this Project"
           value={filter}
           options={FILTERS}

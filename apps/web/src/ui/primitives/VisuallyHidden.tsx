@@ -14,11 +14,15 @@ export const visuallyHiddenStyles = (): CSSObject => ({
 });
 
 /**
- * `role` exists for the one case that needs it: a section whose loading state is drawn as a
- * skeleton still owes assistive technology a sentence, and `role="status"` on the hidden text is
- * that sentence without a visible duplicate of what the skeleton already shows.
+ * `role` exists for the cases that need a live region without a second visible copy of what the
+ * surface already draws: `status` for a section whose loading state is a skeleton, `alert` for a
+ * failure whose visible form is a colour and a glyph — a control's `aria-label` names it, but
+ * naming is not announcing, so nothing reaches a screen reader without this.
  */
-export const VisuallyHidden = ({ children, role }: PropsWithChildren<{ role?: 'status' }>) => (
+export const VisuallyHidden = ({
+  children,
+  role,
+}: PropsWithChildren<{ role?: 'status' | 'alert' }>) => (
   <span css={visuallyHiddenStyles()} role={role}>
     {children}
   </span>

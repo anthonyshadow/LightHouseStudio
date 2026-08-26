@@ -3,16 +3,19 @@ import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports.ts';
 /**
  * Scenarios whose media only exists where the browser can handle H.264.
  *
- * This product gates every published file on a local H.264/AAC MP4 conversion — a recording that
- * cannot be transcoded is refused rather than published, which is the right product behaviour and
- * the reason these scenarios have media at all. Playwright's Linux Chromium is an open-source build
- * with no H.264: `VideoEncoder.isConfigSupported({ codec: 'avc1.42001f' })` answers `false` there
- * and `true` on the branded browsers this product targets. Measured, not assumed.
+ * This product gates every published file on a local H.264/AAC MP4 conversion, which is why these
+ * scenarios have media at all. Playwright's Chromium is the open-source build, and on Linux it
+ * cannot *decode* H.264: `video.canPlayType('video/mp4; codecs="avc1.42E01E"')` answers `''` and
+ * `MediaSource.isTypeSupported` answers `false` there, against `'probably'` and `true` on the same
+ * Playwright build on macOS. Measured on the pinned browser, both platforms.
  *
- * So these cases cannot be captured or compared on that browser — not in the capture container and
- * not on the CI runner, which installs the same build. They are skipped there rather than left to
- * time out, and no `chromium-linux` baseline is kept for them, because a baseline nothing can ever
- * compare is worse than an absent one: it looks like coverage.
+ * The failure it produces is not a timeout but a refusal — the upload panel reports "The browser
+ * could not decode the selected video" and the scenario never reaches the state being captured.
+ * Playwright downloads the same browser binary on every Linux host, so this is true of the capture
+ * container and the CI runner alike; the `chromium-linux` baselines that once existed for these
+ * cases could not have come from that browser, and the visual job is `workflow_dispatch`-only, so
+ * nothing ever compared them. They are skipped rather than left to fail, and no baseline is kept,
+ * because a baseline nothing can ever compare is worse than an absent one: it looks like coverage.
  */
 export const H264_DEPENDENT_SCENARIO_IDS = new Set<VisualScenarioId>([
   'take-playback-review-settled',

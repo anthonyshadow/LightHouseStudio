@@ -315,6 +315,21 @@ Coverage, curated visual regression, and broad screenshot capture run only throu
 `workflow_dispatch`. Exact-candidate release work still runs the full release command list in the
 project README, including coverage and visual regression.
 
+### When a functional job fails only on CI
+
+CI runs Linux; a workstation usually does not. Layout assertions are the ones this separates: how
+many lines a heading or a notice takes is decided by the fonts the host has, so a masthead or a
+recovery panel that fits locally can overflow on the runner by a line. A bounded box that only just
+contains its content is the shape to distrust — give it room rather than matching the number CI
+reported.
+
+The suite can be run against a Linux browser from a Mac, the same way `bun run test:visual:linux`
+does it: start the dev server bound to `0.0.0.0`, then run Playwright inside the pinned container
+with `scripts/loopback-forward.mjs` republishing the host's origin on the container's loopback (the
+e2e harness aborts any request whose host is not `127.0.0.1` or `localhost`). That reproduces the
+runner's browser build, though not its font set — so it will confirm a codec or engine difference
+and will not reproduce a text-metric one.
+
 ## Adding or retaining a test
 
 Before adding a test, identify the regression and choose the lowest layer that observes it.

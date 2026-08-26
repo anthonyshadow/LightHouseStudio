@@ -17,10 +17,7 @@ test('serves the built entry, direct Studio, and local health endpoint from one 
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
   // Scoped to the header action: an account with no recent work also renders a 'Create video'
   // button in the empty Recent Work panel, and the production demo account starts empty.
-  await page
-    .locator('[data-dashboard-actions]')
-    .getByRole('button', { name: 'Create video' })
-    .click();
+  await page.locator('[data-page-actions]').getByRole('button', { name: 'Create video' }).click();
   await expect(page.getByRole('button', { name: 'Start camera' })).toBeVisible();
 
   await page.goto('/studio/create');

@@ -17,13 +17,16 @@ const skeletonPulse = keyframes({
  * owned by their surface — the Assets tab count sits inside a pill the tab list draws — so those
  * cannot drift away from the primitive's colour, radius and pulse.
  *
- * The pulse needs no reduced-motion branch of its own: the global reset in `StudioDesignProvider`
- * already collapses every animation to a single 0.01ms pass.
+ * The pulse states its own reduced-motion branch. The global reset in `StudioDesignProvider` sets
+ * `animation-duration` on `*`, which loses to this rule's class on specificity no matter what
+ * order they are inserted in — so a reader who assumes the reset covers it is wrong, and every
+ * placeholder in the product would pulse for someone who asked motion to stop.
  */
 export const skeletonSurfaceStyles = (theme: Theme): CSSObject => ({
   borderRadius: theme.radii.small,
   background: theme.colors.surfaceStrong,
   animation: `${skeletonPulse} 1.4s ease-in-out infinite`,
+  '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
 });
 
 const lineStyles = (theme: Theme): CSSObject => ({
