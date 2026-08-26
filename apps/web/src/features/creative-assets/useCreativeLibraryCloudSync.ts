@@ -30,14 +30,20 @@ const itemCount = (store: CreativeAssetStore): number =>
   store.savedCharacterPrompts.length +
   store.savedCharacterVariants.length;
 
+/*
+ * The pause itself is the notice's title, so these say only what the title cannot: which of the two
+ * copies diverged, and what happened to the one in front of the operator. Repeating "Account
+ * library sync paused" here spent a whole wrapped line of a 320px phone restating the heading
+ * directly above it.
+ */
 const DIVERGED_MESSAGE =
-  'Account library sync paused because this session and the account both contain changes. Your current copy was preserved.';
+  'This session and the account both contain changes. Your current copy was preserved.';
 const CONFLICT_MESSAGE =
-  'Account library sync paused because another signed-in session changed it. Your current copy was preserved.';
+  'Another signed-in session changed the account copy. Your current copy was preserved.';
 const INITIALIZED_ELSEWHERE_MESSAGE =
-  'Account library sync paused because another signed-in session initialized it first.';
+  'Another signed-in session initialized the account copy first.';
 const UNAVAILABLE_MESSAGE =
-  'Account library sync is unavailable. Your current copy remains available, but changes will not reach another device until sync resumes.';
+  'The account could not be reached. Your current copy remains available, but changes will not reach another device until sync resumes.';
 
 /**
  * How the operator answered a divergence, carried into the next attempt.
