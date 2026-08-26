@@ -22,6 +22,7 @@ import {
 import { REFERENCE_PNG } from './support/mediaFixtures';
 import {
   H264_DEPENDENT_SCENARIO_IDS,
+  PLATFORMS_WITHOUT_H264,
   VISUAL_CASE_MATRIX,
   type VisualScenarioId,
 } from './studioVisualMatrix';
@@ -761,46 +762,27 @@ const VISUAL_CASES: readonly VisualCase[] = VISUAL_CASE_MATRIX.map(({ viewport, 
   baseline: scenario.baseline,
 }));
 
-const supportsH264Encoding = async (page: Page): Promise<boolean> =>
-  page.evaluate(async () => {
-    const encoder = (
-      globalThis as {
-        VideoEncoder?: { isConfigSupported: (config: unknown) => Promise<{ supported?: boolean }> };
-      }
-    ).VideoEncoder;
-    if (!encoder) return false;
-    try {
-      const support = await encoder.isConfigSupported({
-        codec: 'avc1.42001f',
-        width: 1_280,
-        height: 720,
-        bitrate: 2_000_000,
-        framerate: 30,
-      });
-      return support.supported === true;
-    } catch {
-      return false;
-    }
-  });
-
 test.describe('curated Studio visual regression', () => {
   for (const visualCase of VISUAL_CASES) {
     const { viewport, scenario, baseline } = visualCase;
-    test(`${viewport.id} / ${scenario.id}`, async ({ page }) => {
+    test(`${viewport.id} / ${scenario.id}`, async ({ page }, testInfo) => {
+      /*
+       * Every scenario with media reaches it through this product's H.264/AAC MP4 gate, so a
+       * browser without an H.264 encoder cannot produce the state at all — it refuses the file,
+       * correctly, and the case would sit in a readiness wait until it timed out.
+       *
+       * Decided before the page boots, and from the same declaration the baseline inventory reads
+       * (the project name is the baseline folder). Asking the browser instead would boot a page
+       * per case only to throw it away, and would leave the suite and the inventory free to
+       * disagree about which baselines can exist.
+       */
+      test.skip(
+        PLATFORMS_WITHOUT_H264.has(testInfo.project.name) &&
+          H264_DEPENDENT_SCENARIO_IDS.has(scenario.id),
+        "This browser cannot encode H.264, which this scenario's media needs.",
+      );
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       const network = await prepareVisualPage(page, scenario.id === 'entry-initial');
-      /*
-       * Asked of the running browser rather than assumed from its name. Every scenario below with
-       * media reaches it through this product's H.264/AAC MP4 gate, so a browser without H.264
-       * cannot produce the state at all — it refuses the file, correctly, and the case would sit
-       * in a readiness wait until it timed out. Skipping says which capability is missing.
-       */
-      if (H264_DEPENDENT_SCENARIO_IDS.has(scenario.id)) {
-        test.skip(
-          !(await supportsH264Encoding(page)),
-          "This browser cannot encode H.264, which this scenario's media needs.",
-        );
-      }
       await scenario.setup(page);
       await settleVisualPage(page);
       await stabilizeActiveStageVideo(page);

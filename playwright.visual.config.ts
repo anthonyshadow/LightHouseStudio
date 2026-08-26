@@ -4,6 +4,15 @@ import { env, platform } from 'node:process';
 const runningInCi = Boolean((env as unknown as Readonly<Record<string, string | undefined>>).CI);
 const snapshotPlatform = `chromium-${platform}`;
 
+/**
+ * Where the suite expects the app, owned once.
+ *
+ * The dev server, the readiness probe and the harness's own "no provider traffic" guard all have to
+ * agree on this origin, and the Linux capture adds a container forwarder that has to publish it.
+ * Read it, do not restate it.
+ */
+export const VISUAL_BASE_URL = 'http://127.0.0.1:4173';
+
 export default defineConfig({
   testDir: './e2e',
   testMatch: /[/\\]studio\.visual\.spec\.ts$/,
@@ -22,7 +31,7 @@ export default defineConfig({
   },
   use: {
     ...devices['Desktop Chrome'],
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: VISUAL_BASE_URL,
     colorScheme: 'dark',
     deviceScaleFactor: 1,
     locale: 'en-US',
@@ -43,7 +52,7 @@ export default defineConfig({
   projects: [{ name: snapshotPlatform }],
   webServer: {
     command: 'bun run build:packages && bun run --filter @studio/web dev -- --strictPort',
-    url: 'http://127.0.0.1:4173',
+    url: VISUAL_BASE_URL,
     reuseExistingServer: !runningInCi,
     timeout: 120_000,
   },

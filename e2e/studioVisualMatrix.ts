@@ -14,7 +14,7 @@ import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports.ts';
  * time out, and no `chromium-linux` baseline is kept for them, because a baseline nothing can ever
  * compare is worse than an absent one: it looks like coverage.
  */
-export const H264_DEPENDENT_SCENARIO_IDS = new Set([
+export const H264_DEPENDENT_SCENARIO_IDS = new Set<VisualScenarioId>([
   'take-playback-review-settled',
   'voice-browser-loaded',
   'upload-validated-setup',
@@ -236,9 +236,11 @@ export const VISUAL_CASE_MATRIX = [
   })),
 ] as const;
 
-export const VISUAL_BASELINE_PATHS = VISUAL_CASE_MATRIX.map(
-  ({ viewport, scenario }) => `${viewport.folder}/${scenario.baseline}`,
-);
+/** Where one case's baseline lives under a platform folder. Both lists below are built from it. */
+const baselinePath = ({ viewport, scenario }: (typeof VISUAL_CASE_MATRIX)[number]): string =>
+  `${viewport.folder}/${scenario.baseline}`;
+
+export const VISUAL_BASELINE_PATHS = VISUAL_CASE_MATRIX.map(baselinePath);
 
 /**
  * The baselines a given platform folder is expected to hold — every curated one, minus the cases
@@ -249,7 +251,7 @@ export const platformBaselinePaths = (platformFolder: string): readonly string[]
   VISUAL_CASE_MATRIX.filter(
     ({ scenario }) =>
       !PLATFORMS_WITHOUT_H264.has(platformFolder) || !H264_DEPENDENT_SCENARIO_IDS.has(scenario.id),
-  ).map(({ viewport, scenario }) => `${viewport.folder}/${scenario.baseline}`);
+  ).map(baselinePath);
 
 const VISUAL_CASE_BUDGET = 50;
 const coveredViewportIds = new Set(VISUAL_CASE_MATRIX.map(({ viewport }) => viewport.id));

@@ -27,12 +27,16 @@ describe('visual baseline pruning inventory', () => {
   it('expects a platform to hold only the baselines its browser can produce', () => {
     // Darwin's browser has H.264, so it is expected to hold the whole matrix.
     expect(platformBaselinePaths('chromium-darwin')).toHaveLength(50);
-    // Linux's pinned browser does not, so the H.264 cases are expected to be absent there.
-    const linux = platformBaselinePaths('chromium-linux');
-    expect(linux.length).toBeLessThan(50);
-    expect(
-      VISUAL_CASE_MATRIX.filter(({ scenario }) => H264_DEPENDENT_SCENARIO_IDS.has(scenario.id)),
-    ).toHaveLength(50 - linux.length);
+    // Linux's pinned browser does not, so the 19 cases behind that gate are expected to be absent.
+    expect(platformBaselinePaths('chromium-linux')).toHaveLength(31);
+    /*
+     * Written out rather than derived from the same filter the subject uses: a stale id moves both
+     * sides of a derived comparison together and proves nothing. Every named scenario has to still
+     * be in the matrix, or the suite stops skipping a case Linux cannot run while the inventory
+     * starts expecting a baseline nothing there can produce.
+     */
+    const matrixIds = new Set(VISUAL_CASE_MATRIX.map(({ scenario }) => scenario.id));
+    expect([...H264_DEPENDENT_SCENARIO_IDS].filter((id) => !matrixIds.has(id))).toEqual([]);
   });
 
   it('reports retained, missing, and removable files without pruning', async () => {

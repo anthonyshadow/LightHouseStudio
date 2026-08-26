@@ -77,9 +77,10 @@ branded browsers this product targets. Nine scenarios reach their state through 
 Linux they cannot be produced at all — not in the capture container, and not on the CI runner, which
 installs the same build.
 
-Those cases are therefore **skipped** on a browser without H.264, named in
-`H264_DEPENDENT_SCENARIO_IDS` in `e2e/studioVisualMatrix.ts`, and no `chromium-linux` baseline is
-kept for them. A baseline nothing can ever compare is worse than an absent one, because it looks
+Those cases are therefore **skipped** on a platform without H.264, and no `chromium-linux` baseline
+is kept for them. One declaration in `e2e/studioVisualMatrix.ts` decides both — the scenarios in
+`H264_DEPENDENT_SCENARIO_IDS`, the platforms in `PLATFORMS_WITHOUT_H264` — so the suite and the
+baseline inventory cannot disagree about which files are expected to exist. A baseline nothing can ever compare is worse than an absent one, because it looks
 like coverage. `bun run screenshots:prune` enforces the split: it expects each platform to hold only
 what its browser can produce.
 
@@ -91,12 +92,13 @@ what its browser can produce.
 ### Capturing the Linux set from a Mac
 
 `bun run test:visual:linux:update` regenerates them, and `bun run test:visual:linux` checks them.
-The script starts the dev server here on the host, then runs the suite inside the pinned
-`mcr.microsoft.com/playwright:v1.62.1-noble` container against it — the runner has to be on Linux
-too, because the baseline folder is chosen by the _runner's_ platform, not the browser's. Inside the
-container the server is republished on loopback, because the e2e harness blocks any request whose
-host is not `127.0.0.1` or `localhost`; that guard is how the suite proves it contacts no provider,
-so it is worked around rather than widened.
+The script starts the dev server here on the host, then runs the suite inside the Playwright
+container against it — the runner has to be on Linux too, because the baseline folder is chosen by
+the _runner's_ platform, not the browser's. The image tag is read from the installed
+`@playwright/test`, so the container's browser is always the one the mounted `node_modules` drives.
+Inside the container the server is republished on loopback, because the e2e harness blocks any
+request whose host is not `127.0.0.1` or `localhost`; that guard is how the suite proves it contacts
+no provider, so it is worked around rather than widened.
 
 ## Updating a baseline
 

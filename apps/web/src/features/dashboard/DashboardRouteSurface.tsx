@@ -551,8 +551,12 @@ export const DashboardRouteSurface = ({
           </aside>
         ) : null}
         {onboardingStorageWarning ? (
-          <StatusNotice role="status" tone="warning" title="Preference not retained">
-            {ONBOARDING_PREFERENCE_NOT_RETAINED}
+          <StatusNotice
+            role="status"
+            tone="warning"
+            title={ONBOARDING_PREFERENCE_NOT_RETAINED.title}
+          >
+            {ONBOARDING_PREFERENCE_NOT_RETAINED.body}
           </StatusNotice>
         ) : null}
 

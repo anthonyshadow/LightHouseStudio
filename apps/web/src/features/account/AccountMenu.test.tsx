@@ -197,8 +197,9 @@ describe('AccountMenu', () => {
     await userInput.click(trigger);
     await userInput.click(screen.getByRole('menuitem', { name: 'Settings' }));
 
+    // The panel opens straight away; its contents are a lazy chunk that arrives a tick later.
     const panel = await screen.findByRole('dialog', { name: 'Settings' });
-    expect(within(panel).getByRole('heading', { name: 'Getting started' })).toBeVisible();
+    expect(await within(panel).findByRole('heading', { name: 'Getting started' })).toBeVisible();
     expect(within(panel).getByRole('heading', { name: 'Capture defaults' })).toBeVisible();
     expect(within(panel).getByRole('heading', { name: 'What this browser keeps' })).toBeVisible();
 
