@@ -35,12 +35,25 @@ const readStoredView = (storageKey: string, owner: string): StoredRouteView | nu
   return { owner, scrollTop: stored.scrollTop, view: stored.view };
 };
 
-const writeStoredView = (storageKey: string, state: StoredRouteView): void => {
+/**
+ * Records the view on the entry it belongs to, or not at all.
+ *
+ * `replaceState` always targets whichever entry is active *now*, and react-router pushes the next
+ * entry synchronously inside `navigate()` — before React unmounts the surface being left. So a
+ * write that arrives late (a debounced scroll, an unmount flush) would stamp the departing
+ * surface's position onto the entry the operator just arrived at: Back would restore nothing, and
+ * the destination would jump to a position from another route. `entryKey` is the router's key for
+ * the entry the value was captured on; when the live entry has moved past it the write is dropped,
+ * because a wrong memory is worse than a missing one.
+ */
+const writeStoredView = (storageKey: string, state: StoredRouteView, entryKey: string): void => {
   if (typeof window === 'undefined') return;
   const current =
     window.history.state && typeof window.history.state === 'object'
       ? (window.history.state as Record<string, unknown>)
       : {};
+  const liveKey = current['key'];
+  if (typeof liveKey === 'string' && liveKey !== entryKey) return;
   try {
     window.history.replaceState({ ...current, [storageKey]: state }, '');
   } catch {
@@ -99,12 +112,19 @@ export const useRouteViewState = <TElement extends HTMLElement = HTMLElement, TV
     if (routeRef.current) routeRef.current.scrollTop = stored?.scrollTop ?? 0;
   }, [storageKey, scopedOwner, location.key]);
 
-  const flushScrollWrite = useCallback(() => {
+  const entryKey = location.key;
+
+  const cancelScrollWrite = useCallback(() => {
     if (pendingWrite.current === null) return;
     window.clearTimeout(pendingWrite.current);
     pendingWrite.current = null;
-    if (pendingState.current) writeStoredView(storageKey, pendingState.current);
-  }, [storageKey]);
+  }, []);
+
+  const flushScrollWrite = useCallback(() => {
+    if (pendingWrite.current === null) return;
+    cancelScrollWrite();
+    if (pendingState.current) writeStoredView(storageKey, pendingState.current, entryKey);
+  }, [cancelScrollWrite, storageKey, entryKey]);
 
   // Flushed on unmount so leaving mid-scroll still records the position, and the position is
   // captured when observed because the route ref is already detached by the time that runs.
@@ -115,19 +135,32 @@ export const useRouteViewState = <TElement extends HTMLElement = HTMLElement, TV
     initialView,
     rememberView: (view: TView) => {
       currentView.current = view;
-      writeStoredView(storageKey, {
-        owner: scopedOwner,
-        view,
-        scrollTop: routeRef.current?.scrollTop ?? 0,
-      });
+      /*
+       * The pending scroll write holds the view as it was when the scroll happened. Left running,
+       * it lands 150ms later and puts the old filter back — reachable by changing a filter just
+       * after a momentum scroll settles, which on a phone is where the filter usually is.
+       */
+      cancelScrollWrite();
+      writeStoredView(
+        storageKey,
+        { owner: scopedOwner, view, scrollTop: routeRef.current?.scrollTop ?? 0 },
+        entryKey,
+      );
     },
     onScroll: () => {
-      pendingState.current = {
+      const snapshot = {
         owner: scopedOwner,
         view: currentView.current,
         scrollTop: routeRef.current?.scrollTop ?? 0,
       };
-      if (pendingWrite.current !== null) window.clearTimeout(pendingWrite.current);
+      pendingState.current = snapshot;
+      /*
+       * The first scroll of a burst is written straight away, so leaving mid-burst still records
+       * something on the entry being left: the trailing write may never get the chance, because
+       * navigation retires this entry before the timer fires.
+       */
+      if (pendingWrite.current === null) writeStoredView(storageKey, snapshot, entryKey);
+      else window.clearTimeout(pendingWrite.current);
       pendingWrite.current = window.setTimeout(flushScrollWrite, SCROLL_WRITE_DELAY_MS);
     },
   };

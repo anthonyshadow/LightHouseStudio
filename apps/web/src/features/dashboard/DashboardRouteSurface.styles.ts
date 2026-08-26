@@ -42,13 +42,19 @@ export const dashboardShellStyles = (theme: Theme): CSSObject => ({
 
 /** Only what is specific to this masthead's controls; the row itself belongs to `PageHeader`. */
 export const dashboardHeaderStyles = (theme: Theme): CSSObject => ({
+  /*
+   * No width floor. It used to hold the primary at 9.375rem, which its own label already exceeds
+   * on every layout that has room — so it bought nothing there, and on a 320px screen it was the
+   * reason the control beside it had to give up pixels it did not have. The shared row decides
+   * widths; this only says how the control looks.
+   */
   '& [data-create-video]': {
-    minWidth: '9.375rem',
     borderRadius: theme.radii.small,
     boxShadow: 'none',
   },
   '& [data-browse-assets]': { background: 'transparent' },
   '& [data-browse-label="short"]': { display: 'none' },
+  '& [data-create-label="short"]': { display: 'none' },
   '@container (max-width: 22rem)': {
     /*
      * The processing control is a transient status light and can shed its label; Browse Assets
@@ -59,6 +65,8 @@ export const dashboardHeaderStyles = (theme: Theme): CSSObject => ({
      */
     '& [data-browse-label="full"]': { display: 'none' },
     '& [data-browse-label="short"]': { display: 'inline' },
+    '& [data-create-label="full"]': { display: 'none' },
+    '& [data-create-label="short"]': { display: 'inline' },
     '& [data-processing-label]': { display: 'none' },
     '& [data-page-actions] > button:not([data-create-video]):not([data-browse-assets])': {
       width: '2.85rem',

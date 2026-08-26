@@ -171,7 +171,7 @@ card/button language.
 
 - `/projects/:projectId/workspace` uses the same organization shell as Dashboard, Projects, and
   Campaigns: the exact existing left navigation rail at widths of 48rem and above, and the exact
-  existing compact mobile header plus five-item bottom navigation below 48rem. Projects remains the
+  existing compact mobile header plus four-item bottom navigation below 48rem. Projects remains the
   active destination. Do not create a second or workspace-specific navigation system.
 - Keep the one media stage mounted and visibly framed at every supported viewport in Studio. The
   video must never collapse to zero height, disappear behind the Project panel, or be obscured by

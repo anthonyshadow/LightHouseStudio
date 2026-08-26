@@ -11,7 +11,20 @@ type OnboardingEnvelope = Readonly<{
 export const dashboardOnboardingStorageKey = (ownerUserId: string): string =>
   environmentScopedPersistenceName(STORAGE_BASE, ownerUserId);
 
+/*
+ * What this browser decided, whether or not it could write it down.
+ *
+ * A refused write — private browsing, a partitioned embed, an exhausted quota — must still honour
+ * the choice for as long as the tab lives. Deriving visibility from storage alone made "Got it"
+ * a no-op there: the write threw, the read still said "not dismissed", and the guidance came
+ * straight back with the same button under it, forever. Storage is the durable copy; this is the
+ * one that always answers.
+ */
+const sessionDismissals = new Map<string, boolean>();
+
 const readDismissed = (ownerUserId: string): boolean => {
+  const decided = sessionDismissals.get(ownerUserId);
+  if (decided !== undefined) return decided;
   try {
     const raw = window.localStorage.getItem(dashboardOnboardingStorageKey(ownerUserId));
     if (raw === null) return false;
@@ -43,7 +56,7 @@ const subscribe = (listener: () => void): (() => void) => {
   };
 };
 
-const write = (ownerUserId: string, dismissed: boolean): boolean => {
+const persist = (ownerUserId: string, dismissed: boolean): boolean => {
   try {
     if (dismissed)
       window.localStorage.setItem(
@@ -54,9 +67,21 @@ const write = (ownerUserId: string, dismissed: boolean): boolean => {
     return true;
   } catch {
     return false;
-  } finally {
-    for (const listener of listeners) listener();
   }
+};
+
+/**
+ * Applies the choice, then reports whether it will outlive the tab.
+ *
+ * The result is computed before subscribers run: notifying inside a `finally` let a throw from any
+ * listener's render replace the return value, so the caller that asked "was this retained?" got an
+ * exception instead of an answer.
+ */
+const write = (ownerUserId: string, dismissed: boolean): boolean => {
+  sessionDismissals.set(ownerUserId, dismissed);
+  const persisted = persist(ownerUserId, dismissed);
+  for (const listener of listeners) listener();
+  return persisted;
 };
 
 export const persistDashboardOnboardingDismissed = (ownerUserId: string): boolean =>

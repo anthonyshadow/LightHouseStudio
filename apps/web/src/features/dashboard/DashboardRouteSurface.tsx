@@ -212,7 +212,7 @@ export const DashboardRouteSurface = ({
   const [onboardingStorageWarning, setOnboardingStorageWarning] = useState(false);
   const [recentKind, setRecentKind] = useState<RecentKind>(initialView ?? 'all');
   const [selectedJob, setSelectedJob] = useState<VideoJobQueueItem | null>(null);
-  const [expandedQueueKey, setExpandedQueueKey] = useState<string | null>(null);
+  const [queueOpen, setQueueOpen] = useState(false);
   const [queueNotice, setQueueNotice] = useState<string | null>(null);
 
   const projectsQuery = useProjectList('active');
@@ -233,12 +233,18 @@ export const DashboardRouteSurface = ({
   const processingQueueQuery = useQuery({
     ...activeJobsQuery,
     refetchInterval: (query) => (query.state.data?.jobs.length ? 3_000 : false),
+    /*
+     * Polling stops at zero jobs, so without this an idle queue could never be re-checked: work
+     * submitted from another tab or device — or landing a moment after the last read — would stay
+     * invisible until the route remounted. Returning to the tab is the moment to ask again.
+     */
+    refetchOnWindowFocus: true,
   });
   const abandonMutation = useMutation({
     mutationFn: (jobId: string) => abandonVideoJob(jobId),
     onSuccess: async () => {
       setSelectedJob(null);
-      setExpandedQueueKey(null);
+      setQueueOpen(false);
       setQueueNotice('The job was removed from Lightframe and the processing slot is available.');
       await queryClient.invalidateQueries({ queryKey: activeJobsQuery.queryKey });
     },
@@ -262,9 +268,20 @@ export const DashboardRouteSurface = ({
     () => projectPosterUrls(projectsQuery.data?.pages),
     [projectsQuery.data],
   );
+  /*
+   * Built from every campaign the query loaded, not from the four the Recent list shows: a Project
+   * whose campaign fell outside that slice would otherwise be labelled the generic "Campaign
+   * Project" beside a sibling showing the real name, for the same kind of relationship.
+   */
   const campaignNames = useMemo(
-    () => new Map(campaigns.map((campaign) => [campaign.id, campaign.name])),
-    [campaigns],
+    () =>
+      new Map(
+        (campaignsQuery.data?.pages.flatMap((page) => page.campaigns) ?? []).map((campaign) => [
+          campaign.id,
+          campaign.name,
+        ]),
+      ),
+    [campaignsQuery.data],
   );
   const recentItems = useMemo<readonly RecentWorkItem[]>(
     () =>
@@ -314,9 +331,15 @@ export const DashboardRouteSurface = ({
     ],
   );
 
-  const visibleItems = recentItems
-    .filter((item) => recentKind === 'all' || item.kind === recentKind)
-    .slice(0, RECENT_LIMIT);
+  /*
+   * Kept apart from the slice: "more than N" is a statement about the filter the operator is
+   * looking at. Comparing against the unfiltered list announced a ceiling for any filtered view
+   * that happened to be smaller — "More than 1 recent items" for a complete list of one.
+   */
+  const filteredRecentItems = recentItems.filter(
+    (item) => recentKind === 'all' || item.kind === recentKind,
+  );
+  const visibleItems = filteredRecentItems.slice(0, RECENT_LIMIT);
   const visibleKinds: readonly ItemKind[] = recentKind === 'all' ? ALL_ITEM_KINDS : [recentKind];
   const queryState = {
     projects: {
@@ -342,11 +365,13 @@ export const DashboardRouteSurface = ({
     recentItems.length === 0;
   const queueJobs = processingQueueQuery.data?.jobs ?? [];
   const queueActive = queueJobs.length > 0;
-  const queueKey = queueJobs
-    .map((job) => job.jobId)
-    .sort()
-    .join(':');
-  const queueExpanded = queueActive && expandedQueueKey === queueKey;
+  /*
+   * "The operator asked for this open" — not "these exact jobs are open". Keying the disclosure on
+   * the polled job set closed the panel from under whoever was reading it every time a job
+   * finished or arrived, three seconds at a time, and left `aria-controls` pointing at a node that
+   * had just unmounted. An empty queue collapses it; nothing else does.
+   */
+  const queueExpanded = queueActive && queueOpen;
   const earliestQueueStart = queueJobs.reduce<number | null>((earliest, job) => {
     const createdAt = Date.parse(job.createdAt);
     if (!Number.isFinite(createdAt)) return earliest;
@@ -399,7 +424,10 @@ export const DashboardRouteSurface = ({
     : visibleErrors.length > 0
       ? 'Recent work count unavailable'
       : listTotalLabel(
-          { count: visibleItems.length, exceedsCeiling: recentItems.length > visibleItems.length },
+          {
+            count: visibleItems.length,
+            exceedsCeiling: filteredRecentItems.length > visibleItems.length,
+          },
           'recent item',
           'recent items',
         );
@@ -409,24 +437,31 @@ export const DashboardRouteSurface = ({
       Checking jobs
     </span>
   ) : processingQueueQuery.isError ? (
-    <Button
-      size="small"
-      variant="secondary"
-      css={processingTriggerStyles(theme, 'error')}
-      aria-label="Processing queue unavailable. Retry"
-      onClick={() => void processingQueueQuery.refetch()}
-    >
-      <AppIcon name="info" width="1rem" height="1rem" />
-      <span data-processing-label>Queue unavailable</span>
-    </Button>
+    <>
+      {/*
+        Announced, not just shown. Below 22rem the label is hidden and the control is an unlabelled
+        glyph, so without this the only cue that provider work is unaccounted for is a colour.
+      */}
+      <VisuallyHidden role="alert">
+        Processing queue unavailable. Retry from the Dashboard header.
+      </VisuallyHidden>
+      <Button
+        size="small"
+        variant="secondary"
+        css={processingTriggerStyles(theme, 'error')}
+        aria-label="Processing queue unavailable. Retry"
+        onClick={() => void processingQueueQuery.refetch()}
+      >
+        <AppIcon name="info" width="1rem" height="1rem" />
+        <span data-processing-label>Queue unavailable</span>
+      </Button>
+    </>
   ) : queueActive ? (
     <ProcessingQueueTrigger
       jobCount={queueJobs.length}
       startedAtMs={earliestQueueStart}
       expanded={queueExpanded}
-      onToggle={() =>
-        setExpandedQueueKey((expandedKey) => (expandedKey === queueKey ? null : queueKey))
-      }
+      onToggle={() => setQueueOpen((open) => !open)}
     />
   ) : null;
 
@@ -446,9 +481,25 @@ export const DashboardRouteSurface = ({
           description="Resume focused Project work or start a standalone video."
           actions={
             <>
-              <Button data-create-video variant="primary" onClick={onCreateVideo}>
+              <Button
+                data-create-video
+                variant="primary"
+                aria-label="Create video"
+                onClick={onCreateVideo}
+              >
                 <AppIcon name="plus" width="1rem" height="1rem" />
-                Create video
+                {/*
+                  The same trade Browse Assets makes beside it, and for the same reason: three
+                  controls need 284px of content on a 320px screen, and this is the one that can
+                  give up a word without losing what it does. The accessible name stays "Create
+                  video" at every width.
+                */}
+                <span aria-hidden="true" data-create-label="full">
+                  Create video
+                </span>
+                <span aria-hidden="true" data-create-label="short">
+                  Create
+                </span>
               </Button>
               <Button
                 data-browse-assets
@@ -668,7 +719,12 @@ export const DashboardRouteSurface = ({
                   </li>
                 ))}
               </ul>
-            ) : visibleItems.length > 0 && visibleErrors.length === 0 ? (
+            ) : /*
+              Whatever loaded is still worth showing. Requiring zero errors here meant one failing
+              query erased the rows the other two returned: the operator's Projects and Videos
+              vanished because Campaigns 500'd, with the error notice beside them the only clue.
+            */
+            visibleItems.length > 0 ? (
               <ul css={recentListStyles(theme)}>
                 {visibleItems.map((item) => (
                   <li key={`${item.kind}-${item.id}`}>
@@ -703,7 +759,7 @@ export const DashboardRouteSurface = ({
                   </li>
                 ))}
               </ul>
-            ) : !visibleLoading && visibleErrors.length === 0 ? (
+            ) : visibleErrors.length === 0 ? (
               <div css={emptyRecentStyles(theme)}>
                 <EmptyStatePreview variant="rows" />
                 <p>{activeEmptyRecent.message}</p>
