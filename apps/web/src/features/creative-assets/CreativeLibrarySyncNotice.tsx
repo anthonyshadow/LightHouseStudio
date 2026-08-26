@@ -1,6 +1,7 @@
-import { useTheme } from '@emotion/react';
+import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { useRef, type MouseEvent } from 'react';
 import { Button, ConfirmationRequestDialog, StatusNotice, useConfirmationRequest } from '../../ui';
+import { media } from '../../ui/media';
 import type { CreativeLibraryCloudSync } from './useCreativeLibraryCloudSync';
 
 /** The recovery actions only. Where the library is stored is a different question, asked elsewhere. */
@@ -8,6 +9,27 @@ export type CreativeLibrarySyncNoticeProps = Pick<
   CreativeLibraryCloudSync,
   'status' | 'retry' | 'keepLocal' | 'keepCloud'
 >;
+
+/**
+ * The recovery actions, laid out so their height does not depend on how wide the labels render.
+ *
+ * A wrapping row made the row count a function of the font: the same three buttons took two rows
+ * on one platform and three on another, and on a short phone that extra row pushed the surface
+ * below this notice under the fixed bottom navigation. Two equal columns is the same layout on
+ * every font stack — a label too long for its column wraps inside its own button instead of
+ * displacing the surface — and an odd last action takes the full width rather than leaving a gap
+ * beside it.
+ */
+const actionStyles = (theme: Theme): CSSObject => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: theme.space.sm,
+  [media.down('compact')]: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    '& > button:last-child:nth-child(odd)': { gridColumn: '1 / -1' },
+  },
+});
 
 const KEEP_LOCAL = {
   title: 'Save the current creative library to your account?',
@@ -65,7 +87,7 @@ export const CreativeLibrarySyncNotice = ({
         data-creative-sync-notice=""
       >
         <p>{status.message}</p>
-        <div css={{ display: 'flex', flexWrap: 'wrap', gap: theme.space.sm }}>
+        <div css={actionStyles(theme)}>
           <Button size="small" onClick={retry}>
             Try again
           </Button>
