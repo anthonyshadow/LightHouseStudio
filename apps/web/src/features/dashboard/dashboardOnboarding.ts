@@ -11,13 +11,6 @@ type OnboardingEnvelope = Readonly<{
 export const dashboardOnboardingStorageKey = (ownerUserId: string): string =>
   environmentScopedPersistenceName(STORAGE_BASE, ownerUserId);
 
-/*
- * Two surfaces read this — the Dashboard, which shows the guidance, and Settings, which brings it
- * back — and Settings can be open over the Dashboard while it does. One owner keeps them in step:
- * subscribers so every reader hears a change at the same moment, and a cached snapshot so
- * `useSyncExternalStore` can compare identities without parsing storage on every render of a shell
- * that lives for the whole session.
- */
 const readDismissed = (ownerUserId: string): boolean => {
   try {
     const raw = window.localStorage.getItem(dashboardOnboardingStorageKey(ownerUserId));
@@ -36,22 +29,18 @@ const readDismissed = (ownerUserId: string): boolean => {
   }
 };
 
+/*
+ * Two surfaces read this — the Dashboard, which shows the guidance, and Settings, which brings it
+ * back — and Settings can be open over the Dashboard while it does. The subscriber set is what
+ * keeps them in step: every reader hears a change at the same moment, from the one writer.
+ */
 const listeners = new Set<() => void>();
-const snapshots = new Map<string, boolean>();
 
 const subscribe = (listener: () => void): (() => void) => {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
   };
-};
-
-const snapshot = (ownerUserId: string): boolean => {
-  const cached = snapshots.get(ownerUserId);
-  if (cached !== undefined) return cached;
-  const value = readDismissed(ownerUserId);
-  snapshots.set(ownerUserId, value);
-  return value;
 };
 
 const write = (ownerUserId: string, dismissed: boolean): boolean => {
@@ -66,7 +55,6 @@ const write = (ownerUserId: string, dismissed: boolean): boolean => {
   } catch {
     return false;
   } finally {
-    snapshots.delete(ownerUserId);
     for (const listener of listeners) listener();
   }
 };
@@ -82,10 +70,12 @@ export const clearDashboardOnboardingDismissed = (ownerUserId: string): boolean 
 export const useDashboardOnboardingDismissed = (ownerUserId: string): boolean =>
   useSyncExternalStore(
     subscribe,
-    () => snapshot(ownerUserId),
-    () => snapshot(ownerUserId),
+    () => readDismissed(ownerUserId),
+    () => readDismissed(ownerUserId),
   );
 
-/** The one message for a browser that refuses to keep the preference, wherever it is changed. */
-export const ONBOARDING_PREFERENCE_NOT_RETAINED =
-  'Lightframe could not save this account-scoped onboarding preference in this browser.';
+/** The one notice for a browser that refuses to keep the preference, wherever it is changed. */
+export const ONBOARDING_PREFERENCE_NOT_RETAINED = {
+  title: 'Preference not retained',
+  body: 'Lightframe could not save this account-scoped onboarding preference in this browser.',
+} as const;

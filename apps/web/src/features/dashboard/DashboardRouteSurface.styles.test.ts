@@ -24,9 +24,9 @@ describe('Dashboard header styles', () => {
     const dashboard = dashboardHeaderStyles(studioTheme);
     expect(narrow(dashboard)['& [data-page-actions]']).toBeUndefined();
     /*
-     * Nor may the surface re-size the leading control once the row is compact. A rule here loses
-     * anyway — the shared `> *:first-child` selector is the more specific of the two — so it reads
-     * as a fix while doing nothing, which is worse than no rule at all.
+     * Nor may the surface re-size the leading control once the row is compact. The shared rule sets
+     * flex, not width, so a rule here would not lose on specificity — it would quietly win, and the
+     * compact row would have two owners disagreeing at the width where there is least room.
      */
     const compact = (dashboard['@container (max-width: 22rem)'] ?? {}) as CSSObject;
     expect(compact['& [data-create-video]']).toBeUndefined();

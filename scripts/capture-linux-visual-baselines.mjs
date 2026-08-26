@@ -1,7 +1,8 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { once } from 'node:events';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
+import { VISUAL_BASE_URL } from '../playwright.visual.config.ts';
 
 /**
  * Regenerate the `chromium-linux` visual baselines from a macOS (or any non-Linux) workstation.
@@ -15,30 +16,43 @@ import process from 'node:process';
  *
  * - The dev server binds `0.0.0.0` so the container can reach it. The committed `dev` script binds
  *   loopback, which is right for everyday use and unreachable from a container.
- * - Inside the container the app is served on *its* loopback by `loopback-forward.mjs`, because the
- *   e2e harness blocks every request whose host is not `127.0.0.1` or `localhost`. That guard is
- *   how the suite proves it contacts no provider, so it is worked around here rather than widened.
+ * - Inside the container the app is served on *its* loopback by `loopback-forward.mjs`, which the
+ *   Linux config starts and waits for. The e2e harness blocks every request whose host is not
+ *   `127.0.0.1` or `localhost`; that guard is how the suite proves it contacts no provider, so it
+ *   is worked around rather than widened.
  */
-const PORT = 4173;
-const IMAGE = 'mcr.microsoft.com/playwright:v1.62.1-noble';
+const PORT = new URL(VISUAL_BASE_URL).port;
+
+/*
+ * The container's browser has to be the one the mounted `node_modules` drives, so the image tag is
+ * read from the installed Playwright rather than written down beside it. A version bump that left
+ * the two out of step would capture baselines from a different Chromium than CI compares them
+ * with — silently, and only visible as a diff nobody can reproduce.
+ */
+const playwrightVersion = createRequire(import.meta.url)('@playwright/test/package.json').version;
+const IMAGE = `mcr.microsoft.com/playwright:v${playwrightVersion}-noble`;
 
 const run = (command, args, options = {}) =>
   spawnSync(command, args, { stdio: 'inherit', ...options });
 
-const waitForServer = async (url, attempts = 60) => {
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
+/** Resolves once the server answers, or rejects as soon as there is nothing left to wait for. */
+const waitForServer = async (url, server) => {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    if (server.exitCode !== null || server.signalCode !== null) {
+      throw new Error(`The dev server exited before it answered on port ${PORT}.`);
+    }
     try {
-      const response = await fetch(url);
-      if (response.ok) return true;
+      const response = await fetch(url, { signal: AbortSignal.timeout(2_000) });
+      if (response.ok) return;
     } catch {
       // Not listening yet.
     }
     await new Promise((resolve) => setTimeout(resolve, 1_000));
   }
-  return false;
+  throw new Error(`The dev server did not answer on port ${PORT}.`);
 };
 
-export const captureLinuxVisualBaselines = async (passthrough = []) => {
+const captureLinuxVisualBaselines = async (passthrough) => {
   const root = path.resolve(import.meta.dirname, '..');
 
   if (run('docker', ['info'], { stdio: 'ignore' }).status !== 0) {
@@ -51,21 +65,16 @@ export const captureLinuxVisualBaselines = async (passthrough = []) => {
 
   const server = spawn(
     'bunx',
-    ['--bun', 'vite', '--host', '0.0.0.0', '--port', String(PORT), '--strictPort'],
-    { cwd: path.join(root, 'apps', 'web'), stdio: 'ignore', detached: true },
+    ['--bun', 'vite', '--host', '0.0.0.0', '--port', PORT, '--strictPort'],
+    {
+      cwd: path.join(root, 'apps', 'web'),
+      stdio: 'ignore',
+      detached: true,
+    },
   );
 
   try {
-    if (!(await waitForServer(`http://127.0.0.1:${PORT}/`))) {
-      throw new Error(`The dev server did not answer on port ${PORT}.`);
-    }
-
-    const containerCommand = [
-      'node scripts/loopback-forward.mjs &',
-      'sleep 1;',
-      'npx playwright test --config playwright.visual.linux.config.ts',
-      ...passthrough.map((argument) => JSON.stringify(argument)),
-    ].join(' ');
+    await waitForServer(`http://127.0.0.1:${PORT}/`, server);
 
     const result = run('docker', [
       'run',
@@ -79,12 +88,13 @@ export const captureLinuxVisualBaselines = async (passthrough = []) => {
       'CI=1',
       '-e',
       'HOME=/tmp',
-      '-e',
-      `VISUAL_BASE_URL=http://127.0.0.1:${PORT}`,
       IMAGE,
-      'bash',
-      '-lc',
-      containerCommand,
+      'npx',
+      'playwright',
+      'test',
+      '--config',
+      'playwright.visual.linux.config.ts',
+      ...passthrough,
     ]);
 
     if (result.status !== 0) throw new Error('The Linux visual run reported failures.');
@@ -96,16 +106,10 @@ export const captureLinuxVisualBaselines = async (passthrough = []) => {
         server.kill();
       }
     }
-    await Promise.race([
-      once(server, 'close'),
-      new Promise((resolve) => setTimeout(resolve, 5_000)),
-    ]);
   }
 };
 
-if (import.meta.filename === process.argv[1]) {
-  captureLinuxVisualBaselines(process.argv.slice(2)).catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
-    process.exitCode = 1;
-  });
-}
+captureLinuxVisualBaselines(process.argv.slice(2)).catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exitCode = 1;
+});
