@@ -63,6 +63,41 @@ capture, dominant recording Stop, the densest Builder/review states, determinist
 Lighting/Crop editor layouts, the active/archived Campaigns workspace, the Project output-review
 and destination boundaries, and representative loading/error states.
 
+## Platform baselines and the H.264 boundary
+
+Baselines are kept per platform, in `screenshots/chromium-<platform>/`, because the same page does
+not rasterise identically on two operating systems. Two platforms are curated: `chromium-darwin`
+and `chromium-linux`.
+
+They do not hold the same set, and that is deliberate. This product gates every published file on a
+local H.264/AAC MP4 conversion — a recording that cannot be transcoded is refused rather than
+published. Playwright's Linux Chromium is an open-source build with **no H.264**:
+`VideoEncoder.isConfigSupported({ codec: 'avc1.42001f' })` answers `false` there and `true` on the
+branded browsers this product targets. Nine scenarios reach their state through that gate, so on
+Linux they cannot be produced at all — not in the capture container, and not on the CI runner, which
+installs the same build.
+
+Those cases are therefore **skipped** on a browser without H.264, named in
+`H264_DEPENDENT_SCENARIO_IDS` in `e2e/studioVisualMatrix.ts`, and no `chromium-linux` baseline is
+kept for them. A baseline nothing can ever compare is worse than an absent one, because it looks
+like coverage. `bun run screenshots:prune` enforces the split: it expects each platform to hold only
+what its browser can produce.
+
+| Platform          | Cases | Missing                                            |
+| ----------------- | ----: | -------------------------------------------------- |
+| `chromium-darwin` |    50 | —                                                  |
+| `chromium-linux`  |    31 | The 19 cases whose media needs H.264 (9 scenarios) |
+
+### Capturing the Linux set from a Mac
+
+`bun run test:visual:linux:update` regenerates them, and `bun run test:visual:linux` checks them.
+The script starts the dev server here on the host, then runs the suite inside the pinned
+`mcr.microsoft.com/playwright:v1.62.1-noble` container against it — the runner has to be on Linux
+too, because the baseline folder is chosen by the _runner's_ platform, not the browser's. Inside the
+container the server is republished on loopback, because the e2e harness blocks any request whose
+host is not `127.0.0.1` or `localhost`; that guard is how the suite proves it contacts no provider,
+so it is worked around rather than widened.
+
 ## Updating a baseline
 
 `bun run test:visual:update` passes `--update-snapshots=all`, which rewrites **every** baseline.

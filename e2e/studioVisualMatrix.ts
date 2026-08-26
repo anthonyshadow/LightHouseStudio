@@ -1,5 +1,34 @@
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports.ts';
 
+/**
+ * Scenarios whose media only exists where the browser can handle H.264.
+ *
+ * This product gates every published file on a local H.264/AAC MP4 conversion — a recording that
+ * cannot be transcoded is refused rather than published, which is the right product behaviour and
+ * the reason these scenarios have media at all. Playwright's Linux Chromium is an open-source build
+ * with no H.264: `VideoEncoder.isConfigSupported({ codec: 'avc1.42001f' })` answers `false` there
+ * and `true` on the branded browsers this product targets. Measured, not assumed.
+ *
+ * So these cases cannot be captured or compared on that browser — not in the capture container and
+ * not on the CI runner, which installs the same build. They are skipped there rather than left to
+ * time out, and no `chromium-linux` baseline is kept for them, because a baseline nothing can ever
+ * compare is worse than an absent one: it looks like coverage.
+ */
+export const H264_DEPENDENT_SCENARIO_IDS = new Set([
+  'take-playback-review-settled',
+  'voice-browser-loaded',
+  'upload-validated-setup',
+  'upload-processing',
+  'upload-result',
+  'video-edit-lighting-dirty',
+  'video-edit-crop-dirty',
+  'project-output-review',
+  'project-output-destination',
+]);
+
+/** Baseline platforms whose pinned browser has no H.264. */
+export const PLATFORMS_WITHOUT_H264 = new Set(['chromium-linux']);
+
 export const VISUAL_VIEWPORTS = [
   {
     id: 'desktop',
@@ -210,6 +239,17 @@ export const VISUAL_CASE_MATRIX = [
 export const VISUAL_BASELINE_PATHS = VISUAL_CASE_MATRIX.map(
   ({ viewport, scenario }) => `${viewport.folder}/${scenario.baseline}`,
 );
+
+/**
+ * The baselines a given platform folder is expected to hold — every curated one, minus the cases
+ * its browser cannot produce. The inventory check reads this so an absent H.264 baseline on Linux
+ * is the expected state rather than a missing file.
+ */
+export const platformBaselinePaths = (platformFolder: string): readonly string[] =>
+  VISUAL_CASE_MATRIX.filter(
+    ({ scenario }) =>
+      !PLATFORMS_WITHOUT_H264.has(platformFolder) || !H264_DEPENDENT_SCENARIO_IDS.has(scenario.id),
+  ).map(({ viewport, scenario }) => `${viewport.folder}/${scenario.baseline}`);
 
 const VISUAL_CASE_BUDGET = 50;
 const coveredViewportIds = new Set(VISUAL_CASE_MATRIX.map(({ viewport }) => viewport.id));

@@ -1,7 +1,7 @@
 import { readdir, rm, rmdir } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { VISUAL_BASELINE_PATHS } from '../e2e/studioVisualMatrix.ts';
+import { VISUAL_BASELINE_PATHS, platformBaselinePaths } from '../e2e/studioVisualMatrix.ts';
 
 const DEFAULT_SCREENSHOTS_ROOT = path.resolve('screenshots');
 
@@ -37,9 +37,14 @@ export const inspectVisualBaselines = async (screenshotsRoot = DEFAULT_SCREENSHO
     throw new Error('No platform-specific visual baselines found.');
   }
 
+  /*
+   * Per platform, not one list for all of them: a platform whose pinned browser cannot produce a
+   * scenario's media is not expected to hold that baseline. Keeping one would look like coverage
+   * of a case nothing can ever compare there.
+   */
   const retained = new Set(
     platformFolders.flatMap((platformFolder) =>
-      [...curatedBaselines].map((baseline) => `${platformFolder}/${baseline}`),
+      platformBaselinePaths(platformFolder).map((baseline) => `${platformFolder}/${baseline}`),
     ),
   );
   const { directories, files } = await collectFiles(screenshotsRoot);

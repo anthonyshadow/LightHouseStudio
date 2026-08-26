@@ -20,7 +20,11 @@ import {
   type NetworkJourneyState,
 } from './support/studioHarness';
 import { REFERENCE_PNG } from './support/mediaFixtures';
-import { VISUAL_CASE_MATRIX, type VisualScenarioId } from './studioVisualMatrix';
+import {
+  H264_DEPENDENT_SCENARIO_IDS,
+  VISUAL_CASE_MATRIX,
+  type VisualScenarioId,
+} from './studioVisualMatrix';
 import { installProjectHarness, TEST_PROJECT_ID } from './support/projectHarness';
 import { installCampaignHarness } from './support/campaignHarness';
 
@@ -757,12 +761,46 @@ const VISUAL_CASES: readonly VisualCase[] = VISUAL_CASE_MATRIX.map(({ viewport, 
   baseline: scenario.baseline,
 }));
 
+const supportsH264Encoding = async (page: Page): Promise<boolean> =>
+  page.evaluate(async () => {
+    const encoder = (
+      globalThis as {
+        VideoEncoder?: { isConfigSupported: (config: unknown) => Promise<{ supported?: boolean }> };
+      }
+    ).VideoEncoder;
+    if (!encoder) return false;
+    try {
+      const support = await encoder.isConfigSupported({
+        codec: 'avc1.42001f',
+        width: 1_280,
+        height: 720,
+        bitrate: 2_000_000,
+        framerate: 30,
+      });
+      return support.supported === true;
+    } catch {
+      return false;
+    }
+  });
+
 test.describe('curated Studio visual regression', () => {
   for (const visualCase of VISUAL_CASES) {
     const { viewport, scenario, baseline } = visualCase;
     test(`${viewport.id} / ${scenario.id}`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       const network = await prepareVisualPage(page, scenario.id === 'entry-initial');
+      /*
+       * Asked of the running browser rather than assumed from its name. Every scenario below with
+       * media reaches it through this product's H.264/AAC MP4 gate, so a browser without H.264
+       * cannot produce the state at all — it refuses the file, correctly, and the case would sit
+       * in a readiness wait until it timed out. Skipping says which capability is missing.
+       */
+      if (H264_DEPENDENT_SCENARIO_IDS.has(scenario.id)) {
+        test.skip(
+          !(await supportsH264Encoding(page)),
+          "This browser cannot encode H.264, which this scenario's media needs.",
+        );
+      }
       await scenario.setup(page);
       await settleVisualPage(page);
       await stabilizeActiveStageVideo(page);
