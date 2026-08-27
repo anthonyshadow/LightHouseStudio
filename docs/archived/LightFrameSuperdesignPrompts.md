@@ -10,7 +10,7 @@ against the existing design system; see the [implementation plan](LightFrameUXIm
 **All four briefs have shipped**, as items 17–20 of that plan, and every tier of it is now
 complete. These pages remain the record of what each redesign was asked to achieve; the plan
 records what each one became. A brief is not a description of the product — read the
-[feature-behaviour documents](user-flows/feature-behavior/README.md) for that.
+[feature-behaviour documents](../user-flows/feature-behavior/README.md) for that.
 
 ## Why only four
 

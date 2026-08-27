@@ -19,7 +19,7 @@ Two rules apply to every item and are not repeated in each prompt:
   Do not remove a capability, alter an HTTP contract, or drop `expectedVersion`,
   `expectedRevisionNumber` or `Idempotency-Key`.
 - **Validate the smallest surface that proves the change**, per the table in
-  [`../CLAUDE.md`](../CLAUDE.md). Do not run the full suite by default.
+  [`../../CLAUDE.md`](../../CLAUDE.md). Do not run the full suite by default.
 
 Visual baselines under `screenshots/` are asserted by `bun run test:visual`. Any item marked
 **touches baselines** will fail it until the baselines are re-captured with

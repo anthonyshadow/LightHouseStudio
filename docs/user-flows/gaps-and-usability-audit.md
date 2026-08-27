@@ -8,7 +8,7 @@ Severities are **Critical / High / Medium / Low / Observation**.
 B2, N10, N1, G6) and **Tier 4** (N7/T7, N5, G8, N8, N9, B6, B8/T6, R1, R4, R5). **R3** closed as a
 consequence of G6. Each entry below records what shipped. Everything else remains an open finding.
 
-**The fifteen-step roadmap in [`../product-audit/10-implementation-roadmap.md`](../product-audit/10-implementation-roadmap.md)
+**The fifteen-step roadmap in [`../archived/10-implementation-roadmap.md`](../archived/10-implementation-roadmap.md)
 has since landed as well**, closing four findings this document had left open: **G5** and **M9**
 (step 14, the account panel), **G8** and **M7** (step 15, the persistent explainer) and **M3**
 (step 15, the Outfits empty state). **M10** was closed separately — `isChunkLoadError` now tells a
@@ -19,7 +19,7 @@ stale lazy chunk apart from a crash. Still open at that point: **M5**, **M8**, *
 refactors that landed for other reasons. Their entries below record that correction rather than new
 work; verifying a finding still holds before acting on it is part of the job.
 
-**The [UI/UX plan](../LightFrameUXImplementationPlan.md) has since run to completion** — all five
+**The [UI/UX plan](../archived/LightFrameUXImplementationPlan.md) has since run to completion** — all five
 tiers — and closed or invalidated four more of the findings left open here:
 
 | Finding | What happened                                                                                                                                                                           |

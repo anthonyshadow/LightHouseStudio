@@ -18,26 +18,26 @@ implemented behaviour and constraints.
 
 ## Where to find things
 
-| I need…                                                                     | Read                                                                               |
-| --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| What the product does, and how a user moves through it                      | [`user-flows/README.md`](user-flows/README.md)                                     |
-| The complete route table and redirects                                      | [`user-flows/navigation-map.md`](user-flows/navigation-map.md)                     |
-| Known usability problems, gaps and likely bugs                              | [`user-flows/gaps-and-usability-audit.md`](user-flows/gaps-and-usability-audit.md) |
-| A cross-functional product assessment, and which of its findings are closed | [`product-audit/README.md`](product-audit/README.md)                               |
-| The current cross-functional product assessment and its roadmap             | [`product-audit/2026-08-26/README.md`](product-audit/2026-08-26/README.md)         |
-| A UI/UX assessment of the interface as implemented                          | [`LightFrameUXAudit.md`](LightFrameUXAudit.md)                                     |
-| The order UX work should be done in, and a prompt for each item             | [`LightFrameUXImplementationPlan.md`](LightFrameUXImplementationPlan.md)           |
-| A design brief for an area that needs a new layout                          | [`LightFrameSuperdesignPrompts.md`](LightFrameSuperdesignPrompts.md)               |
-| The observable contract for one capability                                  | [`user-flows/feature-behavior/README.md`](user-flows/feature-behavior/README.md)   |
-| Module boundaries, ownership, lifecycle, API and deployment                 | [`ARCHITECTURE.md`](ARCHITECTURE.md)                                               |
-| Setup, scripts, configuration and release posture                           | [`../README.md`](../README.md)                                                     |
-| How to work in this repository as an agent                                  | [`../CLAUDE.md`](../CLAUDE.md), then [`../AGENTS.md`](../AGENTS.md)                |
-| Which tests to run for a change                                             | [`TESTING.md`](TESTING.md)                                                         |
-| Data location, provider contact, retention, cost boundaries                 | [`PRIVACY_AND_TEMPORARY_DATA.md`](PRIVACY_AND_TEMPORARY_DATA.md)                   |
-| Database and object-storage modes, migrations, rollback                     | [`CLOUD_PERSISTENCE.md`](CLOUD_PERSISTENCE.md)                                     |
-| Reference-image generation and provider selection                           | [`Image_Generation.md`](Image_Generation.md)                                       |
-| An expensive-to-reverse decision and its rationale                          | [`decisions/README.md`](decisions/README.md)                                       |
-| Why something is the way it is, historically                                | [`archived/README.md`](archived/README.md)                                         |
+| I need…                                                                     | Read                                                                                       |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| What the product does, and how a user moves through it                      | [`user-flows/README.md`](user-flows/README.md)                                             |
+| The complete route table and redirects                                      | [`user-flows/navigation-map.md`](user-flows/navigation-map.md)                             |
+| Known usability problems, gaps and likely bugs                              | [`user-flows/gaps-and-usability-audit.md`](user-flows/gaps-and-usability-audit.md)         |
+| The first-pass product assessment and its closed findings — **archived**    | [`archived/00-executive-summary.md`](archived/00-executive-summary.md)                     |
+| The current cross-functional product assessment and its roadmap             | [`product-audit/2026-08-26/README.md`](product-audit/2026-08-26/README.md)                 |
+| A UI/UX assessment of the interface as it was in August 2026 — **archived** | [`archived/LightFrameUXAudit.md`](archived/LightFrameUXAudit.md)                           |
+| The order that completed UX work was done in — **archived**                 | [`archived/LightFrameUXImplementationPlan.md`](archived/LightFrameUXImplementationPlan.md) |
+| The design briefs behind four shipped layouts — **archived**                | [`archived/LightFrameSuperdesignPrompts.md`](archived/LightFrameSuperdesignPrompts.md)     |
+| The observable contract for one capability                                  | [`user-flows/feature-behavior/README.md`](user-flows/feature-behavior/README.md)           |
+| Module boundaries, ownership, lifecycle, API and deployment                 | [`ARCHITECTURE.md`](ARCHITECTURE.md)                                                       |
+| Setup, scripts, configuration and release posture                           | [`../README.md`](../README.md)                                                             |
+| How to work in this repository as an agent                                  | [`../CLAUDE.md`](../CLAUDE.md), then [`../AGENTS.md`](../AGENTS.md)                        |
+| Which tests to run for a change                                             | [`TESTING.md`](TESTING.md)                                                                 |
+| Data location, provider contact, retention, cost boundaries                 | [`PRIVACY_AND_TEMPORARY_DATA.md`](PRIVACY_AND_TEMPORARY_DATA.md)                           |
+| Database and object-storage modes, migrations, rollback                     | [`CLOUD_PERSISTENCE.md`](CLOUD_PERSISTENCE.md)                                             |
+| Reference-image generation and provider selection                           | [`Image_Generation.md`](Image_Generation.md)                                               |
+| An expensive-to-reverse decision and its rationale                          | [`decisions/README.md`](decisions/README.md)                                               |
+| Why something is the way it is, historically                                | [`archived/README.md`](archived/README.md)                                                 |
 
 ## Current system
 
@@ -54,19 +54,19 @@ implemented behaviour and constraints.
 
 ## Product and user flows
 
-| Document                                                                        | Owner               | Source of truth for                                                                                                                                                                                                 |
-| ------------------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [User flows](user-flows/README.md)                                              | Product/engineering | Current route-level journeys, entry points, system behaviour, exit points                                                                                                                                           |
-| [Navigation map](user-flows/navigation-map.md)                                  | Engineering         | Routes, redirects, route-driven side effects, reachability                                                                                                                                                          |
-| [Gaps and usability audit](user-flows/gaps-and-usability-audit.md)              | Product/engineering | Known flow gaps, missing/redundant UI, likely bugs, prioritised remediation                                                                                                                                         |
-| [Product audit — second pass (26 Aug 2026)](product-audit/2026-08-26/README.md) | Product/engineering | The current assessment: what the product does, what is wrong with it, and a thirteen-step roadmap with a prompt per step. **Not implemented** — an assessment and a proposal                                        |
-| [Product audit — first pass (21 Aug 2026)](product-audit/README.md)             | Product/engineering | Cross-functional assessment and prioritised findings. Its fifteen-step roadmap is fully implemented; the findings describe the product as audited, not as it stands                                                 |
-| [Feature behaviour](user-flows/feature-behavior/README.md)                      | Product/QA          | Per-capability observable behaviour and manual validation limits                                                                                                                                                    |
-| [UI/UX audit](LightFrameUXAudit.md)                                             | Product/design      | The interface as implemented on 2026-08-22: classified findings, cross-page consistency, first-run experience. An assessment, not implementation authority. Its plan is complete; fixed findings are struck through |
-| [UX implementation plan](LightFrameUXImplementationPlan.md)                     | Product/engineering | Execution order for the UI/UX audit, with one ready-to-run prompt and its scoped validation per item. **All five tiers complete**; each item records what it became                                                 |
-| [Superdesign prompts](LightFrameSuperdesignPrompts.md)                          | Product/design      | The four areas the UI/UX audit judged to need a new layout rather than a fix, and the brief for each. All four have shipped                                                                                         |
-| [Product Vision](PRODUCT_VISION.md)                                             | Product             | Positioning, audiences, hierarchy, principles, terminology                                                                                                                                                          |
-| [Campaign and Project MVP definition](MVP_DEFINITION.md)                        | Product/engineering | Bounded Campaign/Project/video MVP model and completion criteria                                                                                                                                                    |
+| Document                                                                        | Owner               | Source of truth for                                                                                                                                                                                                               |
+| ------------------------------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [User flows](user-flows/README.md)                                              | Product/engineering | Current route-level journeys, entry points, system behaviour, exit points                                                                                                                                                         |
+| [Navigation map](user-flows/navigation-map.md)                                  | Engineering         | Routes, redirects, route-driven side effects, reachability                                                                                                                                                                        |
+| [Gaps and usability audit](user-flows/gaps-and-usability-audit.md)              | Product/engineering | Known flow gaps, missing/redundant UI, likely bugs, prioritised remediation                                                                                                                                                       |
+| [Product audit — second pass (26 Aug 2026)](product-audit/2026-08-26/README.md) | Product/engineering | The current assessment: what the product does, what is wrong with it, and a thirteen-step roadmap with a prompt per step. **Not implemented** — an assessment and a proposal                                                      |
+| [Product audit — first pass (21 Aug 2026)](archived/README.md)                  | Product/engineering | **Archived.** Cross-functional assessment and prioritised findings. Its fifteen-step roadmap is fully implemented; the findings describe the product as audited, not as it stands                                                 |
+| [Feature behaviour](user-flows/feature-behavior/README.md)                      | Product/QA          | Per-capability observable behaviour and manual validation limits                                                                                                                                                                  |
+| [UI/UX audit](archived/LightFrameUXAudit.md)                                    | Product/design      | **Archived.** The interface as implemented on 2026-08-22: classified findings, cross-page consistency, first-run experience. An assessment, not implementation authority. Its plan is complete; fixed findings are struck through |
+| [UX implementation plan](archived/LightFrameUXImplementationPlan.md)            | Product/engineering | **Archived.** Execution order for the UI/UX audit, with one ready-to-run prompt and its scoped validation per item. **All five tiers complete**; each item records what it became                                                 |
+| [Superdesign prompts](archived/LightFrameSuperdesignPrompts.md)                 | Product/design      | **Archived.** The four areas the UI/UX audit judged to need a new layout rather than a fix, and the brief for each. All four have shipped                                                                                         |
+| [Product Vision](PRODUCT_VISION.md)                                             | Product             | Positioning, audiences, hierarchy, principles, terminology                                                                                                                                                                        |
+| [Campaign and Project MVP definition](MVP_DEFINITION.md)                        | Product/engineering | Bounded Campaign/Project/video MVP model and completion criteria                                                                                                                                                                  |
 
 ## Development guidance
 
