@@ -113,7 +113,7 @@ runbook records every required automated gate.
 **Status: partially delivered ahead of the phase; the rest remains future direction.** The
 fifteen-step product-audit roadmap took the two cheapest items below — search, and variation by
 placement and by Project copy — because they were blocking everyday use, not because the phase
-opened. See [`product-audit/10-implementation-roadmap.md`](product-audit/10-implementation-roadmap.md).
+opened. See [`archived/10-implementation-roadmap.md`](archived/10-implementation-roadmap.md).
 
 - Enrich Campaign briefs only with demonstrated needs such as goals, audiences, channels,
   placements, timing, or shared context.

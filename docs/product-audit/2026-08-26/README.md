@@ -1,7 +1,7 @@
 # Product audit — second pass, 26 August 2026
 
 An independent, code-first, cross-functional audit of Lightframe Studio, carried out five days
-after the [first pass](../README.md) and after its fifteen-step roadmap and the five-tier UX
+after the [first pass](../../archived/README.md) and after its fifteen-step roadmap and the five-tier UX
 programme had both landed on `develop`.
 
 This is a **new assessment of the product as it stands**, not an update to the earlier one. The
@@ -47,7 +47,7 @@ artifact it stores is not the artifact it promises**.
 
 ## Relationship to the rest of the documentation
 
-- [`../README.md`](../README.md) — the first-pass audit. Historical.
+- [`../../archived/README.md`](../../archived/README.md) — the first-pass audit. Historical.
 - [`../../user-flows/gaps-and-usability-audit.md`](../../user-flows/gaps-and-usability-audit.md) —
   the finding-by-finding remediation programme. Its open items were re-verified here; those that
   have shipped are not repeated.
