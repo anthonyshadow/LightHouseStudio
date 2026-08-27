@@ -1,5 +1,10 @@
 # Product audit — August 2026
 
+> **Superseded.** A [second-pass audit of the current product](2026-08-26/README.md) was carried out
+> on 26 August 2026, after this audit's fifteen-step roadmap and the five-tier UX programme had both
+> landed. It is the current assessment. This document is the earlier record: its findings describe a
+> product that no longer exists, and its roadmap is complete.
+
 A code-first, cross-functional audit of Lightframe Studio: what exists, what works, what does not,
 and what to build next. Every finding cites the code or the observed running product.
 
