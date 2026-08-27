@@ -6,13 +6,14 @@ import {
   createEmptyProjectSnapshot,
   createSavedPrompt,
 } from '@studio/domain';
-import { Pool, type PoolClient } from 'pg';
+import type { PoolClient } from 'pg';
 import { describe, expect, it } from 'vitest';
 import { createPostgresDatabase } from './client.js';
 import { DrizzleCreativeLibraryRepository } from './creative-library-repository.js';
 import { DrizzleProjectRepository } from './project-repository.js';
 import { DrizzleSavedVideoRepository } from './saved-video-repository.js';
 import { DrizzleSavedVoiceRepository } from './saved-voice-repository.js';
+import { withTemporaryPostgresDatabase } from './temporary-postgres.test-support.js';
 
 const databaseUrl =
   process.env.LIGHTFRAME_PROJECT_TEST_DATABASE_URL ??
@@ -39,20 +40,10 @@ describe.runIf(databaseUrl !== undefined)(
   'Project correction migration PostgreSQL preflight',
   () => {
     it('reconstructs only truthful Prompt 01 lineage without fabricating provenance', async () => {
-      const baseUrl = new URL(databaseUrl!);
-      const databaseName = `lightframe_prompt02_${randomUUID().replaceAll('-', '')}`;
-      const adminUrl = new URL(baseUrl);
-      adminUrl.pathname = '/postgres';
-      const admin = new Pool({ connectionString: adminUrl.toString(), max: 1 });
-      let created = false;
-      try {
-        await admin.query(`create database ${databaseName}`);
-        created = true;
-        const targetUrl = new URL(baseUrl);
-        targetUrl.pathname = `/${databaseName}`;
-        const target = new Pool({ connectionString: targetUrl.toString(), max: 1 });
-        const client = await target.connect();
-        try {
+      await withTemporaryPostgresDatabase(
+        databaseUrl!,
+        'lightframe_prompt02',
+        async ({ url, client }) => {
           const migrationFiles = (await readdir(migrationsDirectory))
             .filter((filename) => /^\d{4}_.+\.sql$/u.test(filename))
             .sort();
@@ -351,7 +342,7 @@ describe.runIf(databaseUrl !== undefined)(
           expect(remainingMigrations).toContain('0021_slow_krista_starr.sql');
           for (const filename of remainingMigrations) await applyMigration(client, filename);
 
-          const compatibility = createPostgresDatabase(targetUrl.toString());
+          const compatibility = createPostgresDatabase(url);
           try {
             const projects = new DrizzleProjectRepository(compatibility.db);
             const savedVideos = new DrizzleSavedVideoRepository(compatibility.db);
@@ -443,14 +434,8 @@ describe.runIf(databaseUrl !== undefined)(
           await expect(
             client.query('select id from project_asset_memberships'),
           ).resolves.toMatchObject({ rows: [] });
-        } finally {
-          client.release();
-          await target.end();
-        }
-      } finally {
-        if (created) await admin.query(`drop database ${databaseName} with (force)`);
-        await admin.end();
-      }
+        },
+      );
     }, 45_000);
   },
 );
