@@ -119,6 +119,7 @@ describe('health and capabilities contracts', () => {
         wardrobe: { addOutfitAvailable: true },
         savedVideos: { directMultipartUpload: true },
         creativeLibrary: { cloudMirror: true },
+        mediaPersistence: 'browser-only',
       }),
     ).toEqual({
       realtimeVideo: { available: true, betaEnabled: true },
@@ -170,6 +171,7 @@ describe('health and capabilities contracts', () => {
       wardrobe: { addOutfitAvailable: true },
       savedVideos: { directMultipartUpload: true },
       creativeLibrary: { cloudMirror: true },
+      mediaPersistence: 'browser-only',
     });
     expect(
       capabilitiesResponseSchema.safeParse({

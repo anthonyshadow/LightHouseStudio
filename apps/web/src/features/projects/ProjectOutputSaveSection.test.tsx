@@ -20,6 +20,7 @@ import { downloadSavedVideoUrl } from '../../adapters/api-client/savedVideosApi'
 import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import { mockApiServer } from '../../test/msw/server';
 import { StudioDesignProvider } from '../../ui';
+import { renderVideoEdit } from '../video-editor/renderVideoEdit';
 import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
 import { projectOutputOperationStorageKey } from './projectOutputOperationStorage';
 import type { ProjectSessionPort } from './useProjectSession';
@@ -132,6 +133,7 @@ const savedSummary = (): SavedVideoSummary => ({
     durationMs: 10_000,
     width: 1_280,
     height: 720,
+    exportSpecification: null,
     createdAt: now,
   },
   sourceVideoId: null,
@@ -362,6 +364,7 @@ describe('Project output save UI', () => {
       expectedRevisionNumber: 2,
       media: { kind: 'asset', assetId: sourceAssetId },
       target: { kind: 'new', title: 'Launch master' },
+      renditions: [],
     });
     expect(acceptCurrent).toHaveBeenCalledWith({
       project: outputResponse(operationId).project,
@@ -415,6 +418,7 @@ describe('Project output save UI', () => {
           savedVideoId,
           expectedVersionId: versionId,
         },
+        renditions: [],
       }),
     );
   });
@@ -800,6 +804,186 @@ describe('ProjectOutputSaveSection placement', () => {
     expect(download).toHaveAttribute('href', downloadSavedVideoUrl(savedVideoId, versionId));
     expect(screen.queryByRole('button', { name: /Download .* for /u })).not.toBeInTheDocument();
   });
+  const phoneSpecification = {
+    container: 'video/mp4' as const,
+    aspect: '9:16' as const,
+    resolution: { width: 1_080, height: 1_920 },
+    includeAudio: true,
+  };
+  const renditionAssetId = 'f5d1a6ce-1a5e-4a2f-9df0-6f2b6b0f3d21';
+
+  const placedCurrent = (): ProjectCurrentResponse => {
+    const placed = current();
+    return {
+      ...placed,
+      revision: {
+        ...placed.revision,
+        snapshot: { ...placed.revision.snapshot, exportSpecification: phoneSpecification },
+      },
+    };
+  };
+
+  /** The working-media read, the render and the rendition upload the placement path depends on. */
+  const installPlacementProduction = () => {
+    vi.mocked(renderVideoEdit).mockClear();
+    const uploads: unknown[] = [];
+    mockApiServer.use(
+      // `begin` re-reads the Project before producing anything, so the placement has to be on the
+      // authoritative copy, not only on the rendered prop.
+      http.get(`*/api/projects/${projectId}`, () => HttpResponse.json(placedCurrent())),
+      // The ordinary flow has a source and no working-media adoption, so that is what is offered.
+      http.get(`*/api/projects/${projectId}/source`, () =>
+        HttpResponse.json({
+          ...placedCurrent(),
+          source: {
+            kind: 'uploaded',
+            savedVideoId: null,
+            videoVersionId: null,
+            mimeType: 'video/mp4',
+            filename: 'cut.mp4',
+            sizeBytes: 8,
+            container: 'mp4',
+            videoCodec: 'avc',
+            audioCodec: 'aac',
+            durationMs: 8_000,
+            width: 1_280,
+            height: 720,
+            hasAudio: true,
+            acceptedAt: now,
+            contentUrl: `/api/projects/${projectId}/source/content`,
+          },
+        }),
+      ),
+      http.get(`*/api/projects/${projectId}/source/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4' },
+        }),
+      ),
+      http.get(`*/api/projects/${projectId}/working-media`, () =>
+        HttpResponse.json({
+          ...placedCurrent(),
+          isCurrent: true,
+          media: {
+            kind: 'media-asset',
+            reference: { kind: 'asset', assetId: sourceAssetId },
+            assetId: sourceAssetId,
+            savedVideoId: null,
+            videoVersionId: null,
+            mimeType: 'video/mp4',
+            filename: 'cut.mp4',
+            sizeBytes: 8,
+            checksumSha256: 'a'.repeat(64),
+            container: 'mp4',
+            videoCodec: 'avc',
+            audioCodec: 'aac',
+            durationMs: 8_000,
+            width: 1_280,
+            height: 720,
+            hasAudio: true,
+            adoptedRevisionId: producingRevisionId,
+            adoptedRevisionNumber: 2,
+            adoptedAt: now,
+            contentUrl: `/api/projects/${projectId}/working-media/${producingRevisionId}/content`,
+          },
+        }),
+      ),
+      http.get(`*/api/projects/${projectId}/working-media/${producingRevisionId}/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4' },
+        }),
+      ),
+      http.post(`*/api/projects/${projectId}/outputs/renditions`, async ({ request }) => {
+        uploads.push(request.headers.get('x-lightframe-project-rendition'));
+        return HttpResponse.json(
+          {
+            media: { kind: 'asset', assetId: renditionAssetId },
+            assetId: renditionAssetId,
+            specification: phoneSpecification,
+            filename: 'cut-phone.mp4',
+            sizeBytes: 12,
+            checksumSha256: 'b'.repeat(64),
+            durationMs: 8_000,
+            width: 1_080,
+            height: 1_920,
+            hasAudio: true,
+          },
+          { status: 201 },
+        );
+      }),
+    );
+    vi.mocked(renderVideoEdit).mockResolvedValue({
+      blob: new Blob([new Uint8Array(12)], { type: 'video/mp4' }),
+      width: 1_080,
+      height: 1_920,
+      durationMs: 8_000,
+    } as unknown as Awaited<ReturnType<typeof renderVideoEdit>>);
+    return uploads;
+  };
+
+  it('re-frames and stores the placement before the save request names it', async () => {
+    const user = userEvent.setup();
+    const uploads = installPlacementProduction();
+    let posted: unknown = null;
+    mockApiServer.use(
+      http.post(`*/api/projects/${projectId}/outputs`, async ({ request }) => {
+        posted = await request.json();
+        return HttpResponse.json(outputResponse(crypto.randomUUID()), { status: 201 });
+      }),
+    );
+    renderSection(session(), { currentValue: placedCurrent() });
+
+    await submitNewVideo(user);
+
+    await waitFor(() => expect(posted).not.toBeNull());
+    expect(vi.mocked(renderVideoEdit)).toHaveBeenCalledTimes(1);
+    expect(uploads).toHaveLength(1);
+    expect(posted).toMatchObject({
+      renditions: [
+        { media: { kind: 'asset', assetId: renditionAssetId }, specification: phoneSpecification },
+      ],
+    });
+  });
+
+  it('replays a recovered save without re-framing or storing a second rendition', async () => {
+    const uploads = installPlacementProduction();
+    let saves = 0;
+    mockApiServer.use(
+      http.post(`*/api/projects/${projectId}/outputs`, () => {
+        saves += 1;
+        return HttpResponse.json(outputResponse(crypto.randomUUID()), { status: 201 });
+      }),
+    );
+    // A receipt written after the bytes were produced is exactly what a reload leaves behind.
+    window.localStorage.setItem(
+      projectOutputOperationStorageKey(ownerUserId, projectId),
+      JSON.stringify({
+        schemaVersion: 1,
+        ownerUserId,
+        projectId,
+        operationId: crypto.randomUUID(),
+        createdAt: now,
+        request: {
+          expectedVersion: 2,
+          expectedRevisionNumber: 2,
+          media: { kind: 'asset', assetId: sourceAssetId },
+          target: { kind: 'new', title: 'Launch master' },
+          renditions: [
+            {
+              media: { kind: 'asset', assetId: renditionAssetId },
+              specification: phoneSpecification,
+            },
+          ],
+        },
+      }),
+    );
+
+    renderSection(session(), { currentValue: placedCurrent() });
+
+    await waitFor(() => expect(saves).toBe(1));
+    expect(vi.mocked(renderVideoEdit)).not.toHaveBeenCalled();
+    expect(uploads).toHaveLength(0);
+  });
+
   it('degrades to the original shape when the browser cannot re-frame, and still saves', async () => {
     const user = userEvent.setup();
     renderCapable.mockReturnValue(false);

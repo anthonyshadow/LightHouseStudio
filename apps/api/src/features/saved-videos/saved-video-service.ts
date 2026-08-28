@@ -60,6 +60,7 @@ export const publicSavedVideoVersion = (version: StoredVideoVersion) => ({
   durationMs: version.durationMs,
   width: version.width,
   height: version.height,
+  exportSpecification: version.exportSpecification,
   createdAt: version.createdAt,
 });
 
@@ -255,6 +256,12 @@ export class SavedVideoService {
       durationMs: Math.max(1, Math.round(inspected.durationMs)),
       width: inspected.width,
       height: inspected.height,
+      /*
+       * Left unstated rather than claimed: a direct upload arrives as bytes with no placement
+       * attached, and the Studio save path re-frames before uploading without telling this service
+       * what for. Recording that is the Assets-side work, not this one.
+       */
+      exportSpecification: null,
       createdAt,
     };
   }

@@ -31,6 +31,7 @@ const summary = (overrides: Partial<SavedVideoSummary> = {}): SavedVideoSummary 
     durationMs: 90_000,
     width: 1_920,
     height: 1_080,
+    exportSpecification: null,
     createdAt: now,
   },
   sourceVideoId: null,

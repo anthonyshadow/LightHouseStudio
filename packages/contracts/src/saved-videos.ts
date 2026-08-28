@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { projectExportSpecificationValueSchema } from './export-placements';
 import { listSearchSchema } from './common';
 import { videoInputMimeTypeSchema, VIDEO_RESULT_MAX_BYTES } from './video-jobs';
 
@@ -60,6 +61,11 @@ export const savedVideoVersionSchema = z
     durationMs: z.number().finite().positive().max(300_000),
     width: z.number().int().positive(),
     height: z.number().int().positive(),
+    /**
+     * The placement these bytes were produced for, or `null` when the cut was stored in the shape
+     * it already had — including where the browser could not re-frame it.
+     */
+    exportSpecification: projectExportSpecificationValueSchema.nullable(),
     createdAt: z.iso.datetime(),
   })
   .strict()

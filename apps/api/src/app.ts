@@ -60,6 +60,7 @@ import { registerProjectRoutes } from './features/projects/routes.js';
 import { ProjectSourceService } from './features/projects/project-source-service.js';
 import { ProjectWorkingMediaService } from './features/projects/project-working-media-service.js';
 import { ProjectOutputService } from './features/projects/project-output-service.js';
+import { ProjectRenditionService } from './features/projects/project-rendition-service.js';
 import { ProjectHistoryService } from './features/projects/project-history-service.js';
 import { ProjectAssetService } from './features/projects/project-asset-service.js';
 import {
@@ -394,6 +395,12 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
           savedVideoRepository,
           assetBytes,
         );
+  const projectRenditionService =
+    projectRepository === undefined
+      ? undefined
+      : new ProjectRenditionService(projectRepository, assetBytes, {
+          ...(projectRetention === undefined ? {} : { projectRetention }),
+        });
   const projectHistoryService =
     projectRepository === undefined
       ? undefined
@@ -473,6 +480,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
     projectOutputService,
     projectHistoryService,
     projectAssetService,
+    projectRenditionService,
   );
   registerProjectProcessingRoutes(app, projectProcessingService);
   registerCampaignRoutes(app, campaignService);

@@ -587,6 +587,7 @@ describe('useProjectSourceController', () => {
         durationMs: 1_000,
         width: 640,
         height: 360,
+        exportSpecification: null,
         createdAt: now,
       },
       sourceVideoId: null,

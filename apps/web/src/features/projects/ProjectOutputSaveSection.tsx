@@ -8,6 +8,8 @@ import {
 } from '@studio/contracts';
 import {
   defaultProjectOutputTitle,
+  isProjectExportPlacementAspect,
+  projectExportFilename,
   projectMediaReferencesEqual,
   type ProjectExportSpecification,
 } from '@studio/domain';
@@ -27,9 +29,11 @@ import { savedVideoLibraryPath } from '../../app/paths';
 import { AppIcon, Button, OverlayPanel, StatusNotice, TextField } from '../../ui';
 import {
   ExportPlacementChooser,
+  ExportPlacementProgress,
   exportPlacementLabel,
   exportPlacementShortLabel,
   exportPlacementRenderSupported,
+  useExportPlacementRender,
 } from '../export-placements';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { SavedVideoSuccessActions } from '../saved-videos/SavedVideoSuccessActions';
@@ -53,8 +57,17 @@ import {
   storePendingProjectOutput,
   type PendingProjectOutputOperation,
 } from './projectOutputOperationStorage';
-import { getProject, ProjectApiConflictError, saveProjectOutput } from './projectsApi';
+import {
+  getProject,
+  getProjectSource,
+  getProjectWorkingMedia,
+  ProjectApiConflictError,
+  readProjectWorkingMediaContent,
+  saveProjectOutput,
+  uploadProjectRendition,
+} from './projectsApi';
 import type { ProjectSessionPort } from './useProjectSession';
+import { useStableOperationKey } from './useStableOperationKey';
 import { projectQueryKeys } from './useProjectsController';
 
 type OutputPhase = 'idle' | 'saving' | 'reconciling' | 'saved' | 'conflict' | 'error';
@@ -89,6 +102,61 @@ const useMobileDestinationSheet = (): boolean => {
   }, []);
   return mobile;
 };
+
+type CurrentCutBytes = Readonly<{
+  media: Blob;
+  filename: string;
+  width: number;
+  height: number;
+  durationMs: number;
+  hasAudio: boolean;
+}>;
+
+/**
+ * Reads the bytes of the cut the stage is showing, from wherever this Project keeps them.
+ *
+ * Only an edit or a previous save writes a working-media adoption, so the ordinary path — upload a
+ * source, choose a placement, save — has none and asking for one 404s. The snapshot says which it
+ * is, so this asks the matching surface rather than assuming the edited case.
+ */
+const readCurrentCut = async (
+  latest: ProjectCurrentResponse,
+  signal: AbortSignal,
+): Promise<CurrentCutBytes> => {
+  const { workingMedia } = latest.revision.snapshot;
+  const source = await getProjectSource(latest.project.id, signal);
+  const sourceReference =
+    source.source.savedVideoId !== null && source.source.videoVersionId !== null
+      ? {
+          kind: 'saved-video-version' as const,
+          savedVideoId: source.source.savedVideoId,
+          videoVersionId: source.source.videoVersionId,
+        }
+      : { kind: 'asset' as const, assetId: latest.revision.snapshot.sourceAssetId ?? '' };
+  const cut = projectMediaReferencesEqual(workingMedia, sourceReference)
+    ? source.source
+    : (await getProjectWorkingMedia(latest.project.id, signal)).media;
+  return {
+    media: await readProjectWorkingMediaContent({
+      contentUrl: cut.contentUrl,
+      mimeType: cut.mimeType,
+      signal,
+    }),
+    filename: cut.filename,
+    width: cut.width,
+    height: cut.height,
+    durationMs: cut.durationMs,
+    hasAudio: cut.hasAudio,
+  };
+};
+
+/** The placement a save has to produce bytes for; `source` and an unset placement produce none. */
+const renditionPlacement = (
+  specification: ProjectExportSpecification | null,
+): ProjectExportSpecification | null =>
+  specification !== null && isProjectExportPlacementAspect(specification.aspect)
+    ? specification
+    : null;
 
 const readyMediaFor = (
   current: ProjectCurrentResponse,
@@ -128,13 +196,16 @@ export const ProjectOutputSaveSection = ({
   const [phase, setPhase] = useState<OutputPhase>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const [savedVideo, setSavedVideo] = useState<SavedVideoDetail | null>(null);
-  const [savedPlacement, setSavedPlacement] = useState<ProjectExportSpecification | null>(null);
   const [pendingAvailable, setPendingAvailable] = useState(false);
+  const placementRender = useExportPlacementRender();
+  const renditionOperation = useStableOperationKey();
+  const renditionFetchRef = useRef<AbortController | null>(null);
   const readyMedia = readyMediaFor(current);
   // The chosen placement lives on the revision, so the snapshot is the value the control shows.
   const placement = current.revision.snapshot.exportSpecification;
   // A browser capability, measured once per mount rather than on every keystroke.
-  const placementSupported = useMemo(() => exportPlacementRenderSupported(), []);
+  // The render hook already measured this; probing again would cost a second WebGL context.
+  const placementSupported = placementRender.supported;
   const busy = phase === 'saving' || phase === 'reconciling';
   const processing = current.project.status === 'processing';
   const notice = outputPhaseNotice[phase];
@@ -169,12 +240,16 @@ export const ProjectOutputSaveSection = ({
           queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.lists }),
         ]);
         setSavedVideo(response.savedVideo);
-        setSavedPlacement(response.revision.snapshot.exportSpecification);
         setPhase('saved');
+        // Named only when one was actually applied: a video stored in the shape it already had has
+        // no placement to report, and saying "Keep as it is" would be noise rather than news.
+        const applied = response.savedVideo.currentVersion.exportSpecification;
+        const shape =
+          applied === null ? '' : ` Re-framed for ${exportPlacementLabel(applied.aspect)}.`;
         setMessage(
           pending.request.target.kind === 'new'
-            ? `Saved “${response.savedVideo.title}” as Version ${response.savedVideo.currentVersion.ordinal}.`
-            : `Added Version ${response.savedVideo.currentVersion.ordinal} to “${response.savedVideo.title}”.`,
+            ? `Saved “${response.savedVideo.title}” as Version ${response.savedVideo.currentVersion.ordinal}.${shape}`
+            : `Added Version ${response.savedVideo.currentVersion.ordinal} to “${response.savedVideo.title}”.${shape}`,
         );
       } catch (error) {
         const finalClientFailure =
@@ -218,6 +293,9 @@ export const ProjectOutputSaveSection = ({
     },
     [queryClient, session],
   );
+
+  // A read started for a placement must not outlive the surface that started it.
+  useEffect(() => () => renditionFetchRef.current?.abort('unmount'), []);
 
   useEffect(() => {
     if (ownerUserId === undefined || archived) return;
@@ -263,6 +341,103 @@ export const ProjectOutputSaveSection = ({
     setDestinationOpen(true);
   };
 
+  /**
+   * Produces the chosen placement and stores its bytes, returning the reference a save can carry.
+   *
+   * This runs before the save receipt is written, and that ordering is the whole idempotency
+   * argument: nothing durable exists until the bytes do, so a save recovered after a reload
+   * replays a request that already names them and never renders again. `null` means the cut is
+   * stored in the shape it already has; `'stopped'` means the operator cancelled or it failed, and
+   * the message they need is already on screen.
+   */
+  const produceRendition = async (
+    latest: ProjectCurrentResponse,
+    specification: ProjectExportSpecification,
+  ): Promise<SaveProjectOutputRequest['renditions'] | 'stopped'> => {
+    const controller = new AbortController();
+    renditionFetchRef.current = controller;
+    const fail = (fallback: string, error: unknown) => {
+      setPhase('error');
+      setMessage(error instanceof ApiClientError ? error.message : fallback);
+      return 'stopped' as const;
+    };
+    setPhase('saving');
+    setMessage('Reading this cut to re-frame it for the placement.');
+
+    let cut: CurrentCutBytes;
+    try {
+      cut = await readCurrentCut(latest, controller.signal);
+    } catch (error) {
+      if (controller.signal.aborted) return 'stopped';
+      return fail('This cut could not be read to re-frame it. Nothing was saved.', error);
+    }
+
+    setMessage(null);
+    // Released as soon as the render has consumed it: the rendered file is about to be uploaded,
+    // and holding both across a network-bound minute is the difference between one large Blob
+    // alive and two.
+    let media: Blob | null = cut.media;
+    const rendered = await placementRender.render({
+      media,
+      specification,
+      source: { width: cut.width, height: cut.height, durationMs: cut.durationMs },
+      hasAudio: cut.hasAudio,
+      filename: cut.filename,
+    });
+    media = null;
+    if (rendered === null) {
+      // The render hook owns the reason, and `ExportPlacementProgress` is already showing it —
+      // including the size ceiling, which `VideoEditChunkAccumulator` refuses at the 300 MB it
+      // names, before there is a blob to upload at all. Nothing to re-check here.
+      setPhase('idle');
+      setMessage(null);
+      return 'stopped';
+    }
+
+    setMessage('Storing the re-framed video before saving it.');
+    try {
+      const uploaded = await uploadProjectRendition({
+        projectId: latest.project.id,
+        file: new File([rendered.blob], projectExportFilename(cut.filename, specification), {
+          type: rendered.blob.type,
+        }),
+        /*
+         * Stable across retries of the same attempt: the asset id *is* this key on the server, so
+         * pressing Save again after a failure re-uses the bytes already stored instead of leaving
+         * another copy behind. It rotates when the cut, the placement or the Project moves on.
+         */
+        operationKey: renditionOperation.keyFor(
+          JSON.stringify({
+            projectId: latest.project.id,
+            expectedVersion: latest.project.version,
+            expectedRevisionNumber: latest.project.currentRevisionNumber,
+            media: latest.revision.snapshot.workingMedia,
+            specification,
+          }),
+        ),
+        specification,
+        signal: controller.signal,
+      });
+      if (controller.signal.aborted) return 'stopped';
+      // Durably stored, so the next attempt is a new operation even at an identical signature.
+      renditionOperation.reset();
+      return [{ media: uploaded.media, specification }];
+    } catch (error) {
+      if (controller.signal.aborted) return 'stopped';
+      return fail('The re-framed video could not be stored. Nothing was saved.', error);
+    } finally {
+      if (renditionFetchRef.current === controller) renditionFetchRef.current = null;
+    }
+  };
+
+  const cancelPreparation = () => {
+    renditionFetchRef.current?.abort('cancelled');
+    renditionFetchRef.current = null;
+    placementRender.cancel();
+    setPhase('idle');
+    setMessage(null);
+  };
+
   const begin = async (target: SaveProjectOutputRequest['target']) => {
     restoreFocusRef.current = true;
     setDestinationOpen(false);
@@ -301,6 +476,16 @@ export const ProjectOutputSaveSection = ({
       setMessage('The Project no longer has the media this save was for.');
       return;
     }
+    // Produced before the receipt exists, so a recovered save replays bytes rather than making
+    // them. Where the browser cannot render, the cut is stored in its own shape and the Version
+    // records that no placement was applied — the notice above the control said so beforehand.
+    const specification = renditionPlacement(latest.revision.snapshot.exportSpecification);
+    let renditions: SaveProjectOutputRequest['renditions'] = [];
+    if (specification !== null && placementSupported) {
+      const produced = await produceRendition(latest, specification);
+      if (produced === 'stopped') return;
+      renditions = produced;
+    }
     const pending: PendingProjectOutputOperation = {
       schemaVersion: 1,
       ownerUserId,
@@ -311,6 +496,7 @@ export const ProjectOutputSaveSection = ({
         expectedRevisionNumber: latest.project.currentRevisionNumber,
         media,
         target,
+        renditions,
       },
       createdAt: new Date().toISOString(),
     };
@@ -545,7 +731,9 @@ export const ProjectOutputSaveSection = ({
               {phase === 'saved' && savedVideo !== null ? (
                 <SavedVideoSuccessActions
                   video={savedVideo}
-                  exportSpecification={savedPlacement}
+                  exportSpecification={
+                    savedVideo.currentVersion.exportSpecification === null ? placement : null
+                  }
                   onOpenInAssets={() => void navigate(savedVideoLibraryPath(savedVideo.id))}
                 />
               ) : null}
@@ -573,6 +761,18 @@ export const ProjectOutputSaveSection = ({
               />
             </div>
           )}
+
+          {/*
+            An incapable browser is already told so by the chooser, which also disables every
+            placement that would need a render — before this control is ever pressed.
+            Re-framing states its own progress; storing states itself in the notice above.
+          */}
+          <ExportPlacementProgress
+            phase={placementRender.phase}
+            progress={placementRender.progress}
+            error={placementRender.error}
+            onCancel={cancelPreparation}
+          />
 
           {inlineDestinationOpen ? renderDestinationForm(true, false) : null}
 
