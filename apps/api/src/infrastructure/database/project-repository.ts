@@ -3442,6 +3442,31 @@ export class DrizzleProjectRepository
       };
       const output = input.output;
       const nextProject = input.projectRevision.nextProject;
+      /*
+       * The record hydrates whatever the post-save revision presents, which is the produced Version
+       * only when that Version is the cut itself. A save that re-framed for a placement keeps
+       * presenting the cut it came from, so the record describes that instead — and either way
+       * every field it states has to describe the same bytes its reference names. Kept
+       * behaviourally identical to the file repository's copy of this rule.
+       */
+      const presentsOutput =
+        input.media.mediaReference.kind === 'saved-video-version' &&
+        input.media.mediaReference.savedVideoId === savedVideoId &&
+        input.media.mediaReference.videoVersionId === version.id;
+      const hydratesPresentedMedia = presentsOutput
+        ? input.media.kind === 'saved-video-version' &&
+          input.media.assetId === version.assetId &&
+          input.media.savedVideoId === savedVideoId &&
+          input.media.videoVersionId === version.id
+        : input.media.videoVersionId !== version.id &&
+          (input.media.mediaReference.kind === 'saved-video-version'
+            ? input.media.kind === 'saved-video-version' &&
+              input.media.savedVideoId === input.media.mediaReference.savedVideoId &&
+              input.media.videoVersionId === input.media.mediaReference.videoVersionId
+            : input.media.kind !== 'saved-video-version' &&
+              input.media.savedVideoId === null &&
+              input.media.videoVersionId === null &&
+              input.media.assetId === input.media.mediaReference.assetId);
       const validNextState =
         current.archivedAt === null &&
         receipt.projectId === current.id &&
@@ -3473,10 +3498,7 @@ export class DrizzleProjectRepository
         output.producingRevisionNumber === current.currentRevisionNumber &&
         input.media.projectId === current.id &&
         input.media.ownerUserId === current.ownerUserId &&
-        input.media.kind === 'saved-video-version' &&
-        input.media.assetId === version.assetId &&
-        input.media.savedVideoId === savedVideoId &&
-        input.media.videoVersionId === version.id &&
+        hydratesPresentedMedia &&
         input.media.adoptedRevisionId === revision.id &&
         input.media.adoptedRevisionNumber === revision.revisionNumber &&
         input.media.operationKey === receipt.operationId &&
@@ -3513,14 +3535,17 @@ export class DrizzleProjectRepository
         asset.mimeType !== version.mimeType ||
         asset.filename !== version.filename ||
         asset.sizeBytes !== version.sizeBytes ||
-        input.media.assetId !== version.assetId ||
-        input.media.mimeType !== version.mimeType ||
-        input.media.filename !== version.filename ||
-        input.media.sizeBytes !== version.sizeBytes ||
-        input.media.checksumSha256 !== asset.checksumSha256 ||
-        input.media.durationMs !== version.durationMs ||
-        input.media.width !== version.width ||
-        input.media.height !== version.height
+        // Only the record that presents the Version describes the Version's bytes. One presenting
+        // the cut it came from names a different asset, and its own row is checked instead.
+        (presentsOutput &&
+          (input.media.assetId !== version.assetId ||
+            input.media.mimeType !== version.mimeType ||
+            input.media.filename !== version.filename ||
+            input.media.sizeBytes !== version.sizeBytes ||
+            input.media.checksumSha256 !== asset.checksumSha256 ||
+            input.media.durationMs !== version.durationMs ||
+            input.media.width !== version.width ||
+            input.media.height !== version.height))
       ) {
         throw new ProjectPersistenceError(
           'asset-not-ready',

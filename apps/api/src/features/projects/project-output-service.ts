@@ -349,6 +349,12 @@ export class ProjectOutputService {
       inspected: media.inspected,
       specification: null,
     };
+    /*
+     * A re-framed file is a deliverable, not the next thing to work from. Presenting it would make
+     * the stage show the crop and make every later save re-frame an already-re-framed video, while
+     * the Project still holds the untouched cut it came from.
+     */
+    const presentsOutput = rendition === null;
     const now = this.#now().toISOString();
     const savedVideoId =
       request.target.kind === 'new'
@@ -422,6 +428,7 @@ export class ProjectOutputService {
           expectedRevisionNumber: request.expectedRevisionNumber,
           savedVideoId,
           videoVersionId: version.id,
+          presentsOutput,
           author: { kind: 'user', authorId: ownerUserId },
         },
         {
@@ -456,35 +463,70 @@ export class ProjectOutputService {
       result,
       createdAt: now,
     };
-    const outputMedia: ProjectWorkingMediaRecord = {
-      projectId,
-      ownerUserId,
-      kind: 'saved-video-version',
-      mediaReference: {
-        kind: 'saved-video-version',
-        savedVideoId,
-        videoVersionId: version.id,
-      },
-      assetId: version.assetId,
-      savedVideoId,
-      videoVersionId: version.id,
-      adoptedRevisionId: revision.id,
-      adoptedRevisionNumber: revision.revisionNumber,
-      operationKey: operationId,
-      requestFingerprint,
-      mimeType: version.mimeType,
-      filename: version.filename,
-      sizeBytes: version.sizeBytes,
-      checksumSha256: stored.asset.manifest.checksumSha256,
-      container: stored.inspected.container,
-      videoCodec: stored.inspected.videoCodec,
-      audioCodec: stored.inspected.audioCodec,
-      durationMs: version.durationMs,
-      width: version.width,
-      height: version.height,
-      hasAudio: stored.inspected.hasAudio,
-      adoptedAt: now,
-    };
+    /*
+     * The record hydrates whatever the post-save revision presents — the Version when it is the
+     * cut, otherwise the cut it was produced from. Every field describes the same bytes the
+     * reference names: taking geometry or a checksum from the other one would leave the next save
+     * failing `assertRecordedMediaMatches` against media that never changed.
+     */
+    const outputMedia: ProjectWorkingMediaRecord = presentsOutput
+      ? {
+          projectId,
+          ownerUserId,
+          kind: 'saved-video-version',
+          mediaReference: {
+            kind: 'saved-video-version',
+            savedVideoId,
+            videoVersionId: version.id,
+          },
+          assetId: version.assetId,
+          savedVideoId,
+          videoVersionId: version.id,
+          adoptedRevisionId: revision.id,
+          adoptedRevisionNumber: revision.revisionNumber,
+          operationKey: operationId,
+          requestFingerprint,
+          mimeType: version.mimeType,
+          filename: version.filename,
+          sizeBytes: version.sizeBytes,
+          checksumSha256: stored.asset.manifest.checksumSha256,
+          container: stored.inspected.container,
+          videoCodec: stored.inspected.videoCodec,
+          audioCodec: stored.inspected.audioCodec,
+          durationMs: version.durationMs,
+          width: version.width,
+          height: version.height,
+          hasAudio: stored.inspected.hasAudio,
+          adoptedAt: now,
+        }
+      : {
+          projectId,
+          ownerUserId,
+          kind:
+            media.reference.kind === 'saved-video-version' ? 'saved-video-version' : 'media-asset',
+          mediaReference: media.reference,
+          assetId: media.asset.manifest.assetId,
+          savedVideoId:
+            media.reference.kind === 'saved-video-version' ? media.reference.savedVideoId : null,
+          videoVersionId:
+            media.reference.kind === 'saved-video-version' ? media.reference.videoVersionId : null,
+          adoptedRevisionId: revision.id,
+          adoptedRevisionNumber: revision.revisionNumber,
+          operationKey: operationId,
+          requestFingerprint,
+          mimeType: media.inspected.mimeType,
+          filename: media.asset.manifest.filename,
+          sizeBytes: media.inspected.sizeBytes,
+          checksumSha256: media.asset.manifest.checksumSha256,
+          container: media.inspected.container,
+          videoCodec: media.inspected.videoCodec,
+          audioCodec: media.inspected.audioCodec,
+          durationMs: Math.max(1, Math.round(media.inspected.durationMs)),
+          width: media.inspected.width,
+          height: media.inspected.height,
+          hasAudio: media.inspected.hasAudio,
+          adoptedAt: now,
+        };
     const committed = await this.metadata.commit({
       ownerUserId,
       receipt,
