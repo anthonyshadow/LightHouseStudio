@@ -1002,20 +1002,26 @@ export const projectOutputSaveResultSchema = z
       reference?.savedVideoId !== value.output.savedVideoId ||
       reference.videoVersionId !== value.output.videoVersionId ||
       /*
-       * The post-save revision no longer always presents the Version it produced: a save that
-       * re-framed for a placement keeps presenting the cut it was produced from, because that file
-       * is a deliverable rather than the next thing to work from. What stays true either way is
-       * that the output is named by `lastSuccessfulOutput`, and that the revision presents one
-       * exact ready pair — the same equality the domain enforces before allowing the save at all.
+       * Whether the revision presents what it produced is decided by whether the bytes were
+       * re-framed, and the Version says so itself: a placement is recorded exactly when a rendition
+       * was stored. So this asserts the matching rule rather than the weaker one common to both —
+       * a stored cut must be presented, and a deliverable must provably not be, which is the point
+       * of the distinction. Either way the pair must be present and exact, as the domain requires.
        */
       working === null ||
       presented === null ||
-      JSON.stringify(working) !== JSON.stringify(presented)
+      JSON.stringify(working) !== JSON.stringify(presented) ||
+      (value.savedVideo.currentVersion.exportSpecification === null
+        ? working.kind !== 'saved-video-version' ||
+          working.savedVideoId !== value.output.savedVideoId ||
+          working.videoVersionId !== value.output.videoVersionId
+        : working.kind === 'saved-video-version' &&
+          working.videoVersionId === value.output.videoVersionId)
     ) {
       context.addIssue({
         code: 'custom',
         message:
-          'A Project output result must preserve producing-revision provenance, name the completed Version, and present one exact ready media pair.',
+          'A Project output result must preserve producing-revision provenance, name the completed Version, and present the cut it stored — the Version when that Version is the cut, and never a re-framed deliverable.',
       });
     }
   });

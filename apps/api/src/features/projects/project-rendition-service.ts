@@ -85,8 +85,8 @@ export class ProjectRenditionService {
         now: this.#now().toISOString(),
         conflictMessage:
           'That rendition operation was already used for a different re-framed video.',
-        commit: async (manifest) =>
-          ({
+        commit: (manifest) =>
+          Promise.resolve({
             ok: true as const,
             response: projectRenditionUploadResponseSchema.parse({
               media: { kind: 'asset', assetId: manifest.assetId },
@@ -100,7 +100,7 @@ export class ProjectRenditionService {
               height: inspected.height,
               hasAudio: inspected.hasAudio,
             }),
-          }) satisfies { ok: true; response: ProjectRenditionUploadResponse },
+          } satisfies { ok: true; response: ProjectRenditionUploadResponse }),
         discard: async (assetId) => {
           if (await this.options.projectRetention?.retainsAsset(input.ownerUserId, assetId)) return;
           await this.bytes.delete(input.ownerUserId, assetId).catch(() => undefined);

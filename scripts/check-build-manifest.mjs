@@ -18,7 +18,14 @@ export const BUILD_CLOSURE_BUDGETS = {
   // loading-placeholder primitives left the `ui` barrel for deep imports, because only lazy routes
   // use them and the shell imports that barrel. Those two together gave back 5_836 bytes.
   // `FORBIDDEN_CLOSURE_DEPENDENCIES` is the half that must never be relaxed, and was not.
-  'src/app/shell/AuthenticatedShell.tsx': 726_000,
+  //
+  // Raised again from 726_000 on 2026-08-28, by 1_000. Every text field in the product now declines
+  // browser and password-manager suggestions by default, which is three properties on one object in
+  // `FormControls` — 53 bytes over the previous ceiling. Nothing was recoverable this time: the
+  // field primitives are what the shell renders, so the constant is in this closure by definition,
+  // and the two `data-*` attributes are the half that actually stops a manager offering what was
+  // typed into another Project. `FORBIDDEN_CLOSURE_DEPENDENCIES` again untouched.
+  'src/app/shell/AuthenticatedShell.tsx': 727_000,
   // Shell plus capture graph, which is what a Studio route costs. Looser, because a Studio route is
   // where media code belongs; `FORBIDDEN_CLOSURE_DEPENDENCIES` is what keeps it from leaking out.
   'src/studio/StudioApp.tsx': 910_000,

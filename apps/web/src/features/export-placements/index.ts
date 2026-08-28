@@ -9,4 +9,5 @@ export {
   exportPlacementRenderSupported,
   useExportPlacementRender,
   type ExportPlacementRenderPhase,
+  type ExportPlacementRenderResult,
 } from './useExportPlacementRender';
