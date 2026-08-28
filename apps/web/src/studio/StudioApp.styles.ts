@@ -1,4 +1,8 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import {
+  SAVE_ACTION_CLEARANCE,
+  SAVE_ACTION_CLEARANCE_COMPACT,
+} from '../features/projects/saveActionMetrics';
 import { media } from '../ui/media';
 
 export const pageStyles = (theme: Theme): CSSObject => ({
@@ -574,6 +578,23 @@ export const mainGridStyles = (
           overflowX: 'hidden',
           overflowY: 'auto',
           overscrollBehavior: 'contain',
+          /*
+           * The Save task pins its action to the viewport, and a scrollport reaches its own padding
+           * edge — so content scrolled through that strip is painted over at every position except
+           * the very bottom. Ending the box above the action is what makes the reservation real.
+           * Scoped to the visible panel: no other task pins anything, and all four stay mounted.
+           * Matched on the panel's own styling hook rather than its id, which is assembled from
+           * the workflow step list and would take the reservation with it if a step were renamed.
+           */
+          '&:has([data-project-save-task-panel]:not([hidden]))': {
+            marginBlockEnd: SAVE_ACTION_CLEARANCE,
+            // Below `compact` the bar steps up over the mobile navigation, so the reservation
+            // absorbs that clearance too and the shell's own bottom padding would double-count it.
+            [media.down('compact')]: {
+              paddingBlockEnd: 0,
+              marginBlockEnd: SAVE_ACTION_CLEARANCE_COMPACT,
+            },
+          },
         },
       }
     : {}),
@@ -811,6 +832,8 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     textAlign: 'start',
   },
   '& [data-tool-label] strong': {
+    minWidth: 0,
+    maxWidth: '100%',
     fontSize: 'inherit',
     fontWeight: 'inherit',
   },
@@ -828,7 +851,7 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     textOverflow: 'ellipsis',
   },
   // A blocked tool trades its description for the condition it is waiting on, which is a sentence
-  // rather than a label: two clamped lines fit the button, and `title` carries the rest.
+  // rather than a label, and `title` carries it for a pointer as well.
   '& [data-tool-label] small[data-tool-blocked]': { opacity: 0.9 },
   [media.downOrShort('desktop', '48rem')]: {
     '& > button': { flex: '1 1 0', justifyContent: 'center' },
@@ -843,18 +866,32 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
       gap: '0.28rem',
     },
     '& [data-tool-label]': { justifyItems: 'center' },
-    '& [data-tool-label] strong': { fontSize: '0.72rem' },
+    // A chosen character or outfit carries the operator's own name for it, which has no short form
+    // to fall back on. Two wrapped lines break it where the words already break; the button's
+    // `nowrap` would otherwise cut it mid-glyph, with no ellipsis to show that it had.
+    '& [data-tool-label] strong': {
+      display: '-webkit-box',
+      overflow: 'hidden',
+      WebkitBoxOrient: 'vertical',
+      WebkitLineClamp: 2,
+      fontSize: '0.72rem',
+      lineHeight: 1.25,
+      overflowWrap: 'break-word',
+      textAlign: 'center',
+      whiteSpace: 'normal',
+    },
     '& [data-tool-label-long]': { display: 'none' },
     '& [data-tool-label-short]': { display: 'inline' },
     // The description is a label a compact rail can do without. The blocked reason is not: it is
     // the only thing that explains a dead control, and `title` never reaches a touch user. It
-    // stays, clamped to two lines, so the `aria-describedby` target is visible rather than hidden.
+    // stays, in the three lines its longest sentence needs, so the `aria-describedby` target is
+    // read in full rather than cut short.
     '& [data-tool-label] small': { display: 'none' },
     '& [data-tool-label] small[data-tool-blocked]': {
       display: '-webkit-box',
       maxWidth: '100%',
       WebkitBoxOrient: 'vertical',
-      WebkitLineClamp: 2,
+      WebkitLineClamp: 3,
       fontSize: '0.6rem',
       lineHeight: 1.25,
       whiteSpace: 'normal',

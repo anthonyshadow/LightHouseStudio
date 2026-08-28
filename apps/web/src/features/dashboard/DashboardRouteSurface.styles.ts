@@ -309,6 +309,16 @@ export const recentFilterStyles = (): CSSObject => ({
   maxWidth: '29rem',
   justifySelf: 'end',
   '@media (max-width: 42rem)': { maxWidth: 'none', justifySelf: 'stretch' },
+  /*
+   * Layout only: the segments themselves are SegmentedControl's, not this surface's. Three across
+   * is what `'auto'` fits on most phones and it reads well, but on the narrowest ones it leaves
+   * each segment a pixel short of the word "Campaign" — so they pair up rather than break a word
+   * in half. Its own label breakpoint is deliberately not reused here: this is where these four
+   * options stop fitting, which is a fact about them and not about the control.
+   */
+  '@media (max-width: 22rem)': {
+    '& > [data-segmented-control]': { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
+  },
 });
 
 export const recentListStyles = (theme: Theme): CSSObject => ({
