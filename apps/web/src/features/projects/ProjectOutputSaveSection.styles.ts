@@ -1,12 +1,20 @@
 import type { CSSObject, Theme } from '@emotion/react';
 import { media } from '../../ui/media';
+import {
+  SAVE_ACTION_BAR_INSET,
+  SAVE_ACTION_BAR_INSET_COMPACT,
+  SAVE_ACTION_BAR_INSET_NARROW,
+} from './saveActionMetrics';
+
+/** The action's own height below `laptop`: one primary control plus the bar's padding. */
+const SAVE_ACTION_BAR_HEIGHT = '4.5rem';
 
 /**
  * The Save panel is the one task whose final action must remain available while its supporting
  * choices scroll. At laptop sizes the inspector owns the scroll region; below that breakpoint the
  * whole Project workspace scrolls and the action is fixed to the viewport instead.
  */
-export const saveTaskPanelStyles = (_theme: Theme): CSSObject => ({
+export const saveTaskPanelStyles = (theme: Theme): CSSObject => ({
   [media.up('laptop')]: {
     height: '100%',
     maxHeight: '100%',
@@ -15,8 +23,10 @@ export const saveTaskPanelStyles = (_theme: Theme): CSSObject => ({
     paddingBlockEnd: 0,
     overflow: 'hidden',
   },
+  // The room for the action is reserved by the scroll container, not here: this padding sat inside
+  // the scrollport and only ever cleared the bar at the very end of the scroll.
   [media.down('laptop')]: {
-    paddingBlockEnd: `calc(6.5rem + env(safe-area-inset-bottom))`,
+    paddingBlockEnd: theme.space.lg,
   },
 });
 
@@ -224,7 +234,7 @@ export const saveActionBarStyles = (theme: Theme): CSSObject => ({
     position: 'fixed',
     insetInlineStart: `calc(var(--studio-shell-rail-width) + ${theme.space.lg})`,
     insetInlineEnd: theme.space.lg,
-    insetBlockEnd: theme.space.md,
+    insetBlockEnd: SAVE_ACTION_BAR_INSET,
     padding: theme.space.sm,
     border: `1px solid ${theme.colors.borderStrong}`,
     borderRadius: theme.radii.large,
@@ -234,7 +244,7 @@ export const saveActionBarStyles = (theme: Theme): CSSObject => ({
   [media.down('compact')]: {
     insetInlineStart: `max(${theme.space.md}, env(safe-area-inset-left))`,
     insetInlineEnd: `max(${theme.space.md}, env(safe-area-inset-right))`,
-    insetBlockEnd: `calc(4.5rem + env(safe-area-inset-bottom) + ${theme.space.sm})`,
+    insetBlockEnd: SAVE_ACTION_BAR_INSET_COMPACT,
   },
   [media.down('tablet')]: {
     '& [data-placement-label="full"]': { display: 'none' },
@@ -245,7 +255,7 @@ export const saveActionBarStyles = (theme: Theme): CSSObject => ({
   '@media (max-width: 22rem)': {
     insetInlineStart: theme.space.sm,
     insetInlineEnd: theme.space.sm,
-    insetBlockEnd: `calc(4.5rem + env(safe-area-inset-bottom) + ${theme.space.xxs})`,
+    insetBlockEnd: SAVE_ACTION_BAR_INSET_NARROW,
     padding: 0,
     border: 0,
     background: 'transparent',

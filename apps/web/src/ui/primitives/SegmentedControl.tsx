@@ -80,7 +80,12 @@ export const SegmentedControl = <T extends string>({
   const theme = useTheme();
 
   return (
-    <div role="group" aria-label={label} css={groupStyles(theme, columns)}>
+    <div
+      role="group"
+      aria-label={label}
+      data-segmented-control=""
+      css={groupStyles(theme, columns)}
+    >
       {options.map((option) => (
         <button
           key={option.value}
