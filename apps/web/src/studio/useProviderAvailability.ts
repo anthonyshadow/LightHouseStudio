@@ -43,6 +43,9 @@ const unavailableProviders: ProviderAvailability = {
   // Deliberately absent rather than `false`: before the read resolves, and after it fails, whether
   // this deployment keeps a cloud copy is unknown, and a surface must not claim either answer.
   creativeLibraryCloudMirror: undefined,
+  // Same reasoning: an unread capability is not a promise that media stays on this machine, so the
+  // stage falls back to the wording that claims less rather than to `browser-only`.
+  mediaPersistence: undefined,
 };
 
 /**

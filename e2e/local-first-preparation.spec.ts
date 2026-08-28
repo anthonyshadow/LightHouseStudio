@@ -106,6 +106,7 @@ test.beforeEach(async ({ page, request, baseURL }) => {
         wardrobe: { addOutfitAvailable: false },
         savedVideos: { directMultipartUpload: false },
         creativeLibrary: { cloudMirror: false },
+        mediaPersistence: 'browser-only',
       } satisfies CapabilitiesResponse),
     });
   });

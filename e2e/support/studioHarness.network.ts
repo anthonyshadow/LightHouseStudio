@@ -362,6 +362,9 @@ export const installProviderNetworkDriver = async (
         });
         return;
       }
+      // One deployment posture, spelled once: a harness that mirrored the library to the account
+      // while claiming media never left the browser would describe no real configuration.
+      const cloudMirrored = options.creativeLibraryRemoteState !== undefined;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -410,7 +413,8 @@ export const installProviderNetworkDriver = async (
             addOutfitAvailable: options.wardrobeAddOutfitAvailable ?? false,
           },
           savedVideos: { directMultipartUpload: false },
-          creativeLibrary: { cloudMirror: options.creativeLibraryRemoteState !== undefined },
+          creativeLibrary: { cloudMirror: cloudMirrored },
+          mediaPersistence: cloudMirrored ? 'account' : 'browser-only',
         } satisfies CapabilitiesResponse),
       });
       return;

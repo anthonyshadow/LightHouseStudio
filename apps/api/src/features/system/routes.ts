@@ -2,6 +2,7 @@ import {
   capabilitiesResponseSchema,
   healthResponseSchema,
   REFERENCE_IMAGE_SIZES,
+  type MediaPersistence,
   type VideoCharacterSwapProviderId,
 } from '@studio/contracts';
 import type { ApplicationRuntime } from '../../application/application-runtime.js';
@@ -30,6 +31,7 @@ export interface CapabilityAvailability {
   readonly wardrobeAddOutfitAvailable: boolean;
   readonly directSavedVideoUploadAvailable: boolean;
   readonly creativeLibraryCloudMirrorAvailable: boolean;
+  readonly mediaPersistence: MediaPersistence;
 }
 
 export const registerSystemRoutes = (
@@ -113,6 +115,7 @@ export const registerSystemRoutes = (
       creativeLibrary: {
         cloudMirror: availability.creativeLibraryCloudMirrorAvailable,
       },
+      mediaPersistence: availability.mediaPersistence,
     }),
   );
 };

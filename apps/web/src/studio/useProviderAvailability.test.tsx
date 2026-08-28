@@ -52,6 +52,7 @@ const capabilityPayload: CapabilitiesResponse = {
   wardrobe: { addOutfitAvailable: true },
   savedVideos: { directMultipartUpload: true },
   creativeLibrary: { cloudMirror: true },
+  mediaPersistence: 'account',
 };
 
 const availableProviders: ProviderAvailability = {
@@ -72,6 +73,7 @@ const availableProviders: ProviderAvailability = {
   wardrobeAddOutfitAvailable: true,
   directSavedVideoUploadAvailable: true,
   creativeLibraryCloudMirror: true,
+  mediaPersistence: 'account',
 };
 
 const flushPromises = async (): Promise<void> => {
