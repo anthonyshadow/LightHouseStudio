@@ -59,12 +59,20 @@ const segmentStyles = (theme: Theme, selected: boolean): CSSObject => ({
   },
 });
 
+/**
+ * Where a segment stops having room for a long label. Exported because a consumer that has to give
+ * its own options more room needs to step at the same width, and two hand-written copies of this
+ * number would drift into showing short labels in wide segments, or long ones in narrow.
+ */
+export const SEGMENTED_CONTROL_SHORT_LABEL_MAX_WIDTH = '31rem';
+const ABOVE_SHORT_LABEL_WIDTH = '31.001rem';
+
 const fullLabelStyles = (): CSSObject => ({
-  '@media (max-width: 31rem)': { display: 'none' },
+  [`@media (max-width: ${SEGMENTED_CONTROL_SHORT_LABEL_MAX_WIDTH})`]: { display: 'none' },
 });
 
 const shortLabelStyles = (): CSSObject => ({
-  '@media (min-width: 31.001rem)': { display: 'none' },
+  [`@media (min-width: ${ABOVE_SHORT_LABEL_WIDTH})`]: { display: 'none' },
 });
 
 export const SegmentedControl = <T extends string>({

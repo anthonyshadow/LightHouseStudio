@@ -1,4 +1,5 @@
 import { type CSSObject, type Theme } from '@emotion/react';
+import { SEGMENTED_CONTROL_SHORT_LABEL_MAX_WIDTH } from '../../ui/primitives/SegmentedControl';
 import { media } from '../../ui/media';
 import { pageScrollRegionStyles } from '../../ui/primitives/PageShell.styles';
 import { skeletonSurfaceStyles } from '../../ui/primitives/Skeleton';
@@ -310,13 +311,12 @@ export const recentFilterStyles = (): CSSObject => ({
   justifySelf: 'end',
   '@media (max-width: 42rem)': { maxWidth: 'none', justifySelf: 'stretch' },
   /*
-   * Layout only: the segments themselves are SegmentedControl's, not this surface's. Three across
-   * is what `'auto'` fits on most phones and it reads well, but on the narrowest ones it leaves
-   * each segment a pixel short of the word "Campaign" — so they pair up rather than break a word
-   * in half. Its own label breakpoint is deliberately not reused here: this is where these four
-   * options stop fitting, which is a fact about them and not about the control.
+   * Layout only: the segments themselves are SegmentedControl's, not this surface's. Four across a
+   * phone leaves each segment 56px of text, and no honest word for a campaign is that short — so
+   * below the width where the control swaps to short labels, these four pair up instead. Stepped at
+   * the control's own breakpoint so the row count and the label length always change together.
    */
-  '@media (max-width: 22rem)': {
+  [`@media (max-width: ${SEGMENTED_CONTROL_SHORT_LABEL_MAX_WIDTH})`]: {
     '& > [data-segmented-control]': { gridTemplateColumns: 'repeat(2, minmax(0, 1fr))' },
   },
 });

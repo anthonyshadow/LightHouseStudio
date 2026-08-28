@@ -682,13 +682,7 @@ export const DashboardRouteSurface = ({
               </div>
               <div css={recentFilterStyles()}>
                 <SegmentedControl
-                  /*
-                   * Left to wrap rather than pinned to one row: four segments across a phone leave
-                   * each 56px of text, and no honest word for a campaign is that short. `'auto'`
-                   * is the primitive's own answer to that, and it keeps the row full where there
-                   * is room for one.
-                   */
-                  columns="auto"
+                  columns={RECENT_KIND_OPTIONS.length}
                   label="Filter recent work"
                   value={recentKind}
                   options={RECENT_KIND_OPTIONS}
