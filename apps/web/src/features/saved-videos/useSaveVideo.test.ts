@@ -89,6 +89,7 @@ const savedVideo: SavedVideoDetail = {
     durationMs: 1_000,
     width: 1_280,
     height: 720,
+    exportSpecification: null,
     createdAt: '2026-08-05T12:00:00.000Z',
   },
   sourceVideoId: null,

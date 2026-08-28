@@ -3,6 +3,7 @@ import { chmod, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import {
+  projectExportSpecificationValueSchema,
   savedVideoCharacterNameSchema,
   savedVideoCharacterVariantNameSchema,
   savedVideoOriginSchema,
@@ -41,6 +42,12 @@ const versionSchema = versionV2Schema.extend({
 });
 export const storedVideoVersionSchema = versionSchema.extend({
   characterVariantName: savedVideoCharacterVariantNameSchema.nullable(),
+  /**
+   * The placement these bytes were produced for. Defaulted rather than versioned: every Version
+   * stored before a save could re-frame was stored in the shape it already had, which is exactly
+   * what `null` says.
+   */
+  exportSpecification: projectExportSpecificationValueSchema.nullable().default(null),
 });
 
 const videoSchema = z

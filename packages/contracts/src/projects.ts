@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { listSearchSchema, listTotalSchema, opaquePageTokenSchema } from './common';
+import { projectExportSpecificationValueSchema } from './export-placements';
 import {
   savedVideoDetailSchema,
   savedVideoSummarySchema,
@@ -177,21 +178,7 @@ export const projectVideoEditSpecSchema = z
     }
   });
 
-const projectExportSpecificationSchema = z
-  .object({
-    container: z.literal('video/mp4'),
-    aspect: z.enum(['source', '16:9', '9:16', '1:1', '4:5']),
-    resolution: z
-      .object({
-        width: z.number().int().positive().max(16_384),
-        height: z.number().int().positive().max(16_384),
-      })
-      .strict()
-      .nullable(),
-    includeAudio: z.boolean(),
-  })
-  .strict()
-  .nullable();
+const projectExportSpecificationSchema = projectExportSpecificationValueSchema.nullable();
 
 const projectSnapshotSharedShape = {
   sourceAssetId: z.uuid().nullable(),
@@ -846,12 +833,55 @@ export const projectOutputSaveTargetSchema = z.discriminatedUnion('kind', [
     .strict(),
 ]);
 
+/**
+ * Re-framed bytes already uploaded for this save, and the placement they were produced for.
+ *
+ * The reference is separate from `media` on purpose: `media` still names the exact cut that was on
+ * the stage and is still checked against it, while this names bytes that exist only to be stored.
+ */
+export const projectOutputRenditionSchema = z
+  .object({
+    /** Always freshly uploaded bytes; a rendition is never a reference to something retained. */
+    media: z.object({ kind: z.literal('asset'), assetId: z.uuid() }).strict(),
+    specification: projectExportSpecificationValueSchema,
+  })
+  .strict();
+
 export const saveProjectOutputRequestSchema = z
   .object({
     expectedVersion: z.number().int().positive(),
     expectedRevisionNumber: z.number().int().positive(),
     media: projectMediaReferenceSchema,
     target: projectOutputSaveTargetSchema,
+    /**
+     * A list because a save is one day expected to produce several placements at once. Exactly one
+     * is produced today, and an empty list means the cut is stored in the shape it already has.
+     * Defaulted so a save receipt written before this field existed still replays.
+     */
+    renditions: z.array(projectOutputRenditionSchema).max(1).default([]),
+  })
+  .strict();
+
+/** Metadata for a rendition upload, carried in a header beside the bytes. */
+export const projectRenditionUploadMetadataSchema = z
+  .object({
+    filename: z.string().trim().min(1).max(180),
+    specification: projectExportSpecificationValueSchema,
+  })
+  .strict();
+
+export const projectRenditionUploadResponseSchema = z
+  .object({
+    media: z.object({ kind: z.literal('asset'), assetId: z.uuid() }).strict(),
+    assetId: z.uuid(),
+    specification: projectExportSpecificationValueSchema,
+    filename: z.string().trim().min(1).max(180),
+    sizeBytes: z.number().int().positive().max(300_000_000),
+    checksumSha256: z.string().regex(/^[a-f0-9]{64}$/u),
+    durationMs: z.number().int().positive().max(300_000),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    hasAudio: z.boolean(),
   })
   .strict();
 
@@ -1085,3 +1115,7 @@ export type DuplicateProjectRequest = z.infer<typeof duplicateProjectRequestSche
 export type SaveProjectOutputRequest = z.infer<typeof saveProjectOutputRequestSchema>;
 export type ProjectOutputSaveResult = z.infer<typeof projectOutputSaveResultSchema>;
 export type SaveProjectOutputResponse = z.infer<typeof saveProjectOutputResponseSchema>;
+
+export type ProjectOutputRendition = z.infer<typeof projectOutputRenditionSchema>;
+export type ProjectRenditionUploadMetadata = z.infer<typeof projectRenditionUploadMetadataSchema>;
+export type ProjectRenditionUploadResponse = z.infer<typeof projectRenditionUploadResponseSchema>;

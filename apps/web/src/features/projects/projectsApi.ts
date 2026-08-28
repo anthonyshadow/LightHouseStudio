@@ -6,6 +6,7 @@ import {
   projectHistoryResponseSchema,
   projectAssetsResponseSchema,
   projectOutputHistoryResponseSchema,
+  projectRenditionUploadResponseSchema,
   projectSourceResponseSchema,
   saveProjectOutputResponseSchema,
   projectWorkingMediaResponseSchema,
@@ -19,6 +20,8 @@ import {
   type ProjectHistoryResponse,
   type ProjectOutputHistoryResponse,
   type ProjectPreviewContract,
+  type ProjectExportSpecificationValue,
+  type ProjectRenditionUploadResponse,
   type ProjectSourceResponse,
   type SaveProjectOutputRequest,
   type SaveProjectOutputResponse,
@@ -26,12 +29,15 @@ import {
   type ProjectsQuery,
   type ListTotal,
 } from '@studio/contracts';
+import { VIDEO_RESULT_MAX_BYTES } from '@studio/contracts';
 import {
   ApiClientError,
   invalidApiResponse,
   requestJson,
   type ApiErrorPayloadParser,
 } from '../../adapters/api-client/apiClient';
+import { apiFetch } from '../../adapters/api-client/transport';
+import { readBoundedBlob } from '../../adapters/api-client/readBoundedBlob';
 
 export interface ProjectsPage {
   readonly projects: ProjectCurrentResponse['project'][];
@@ -569,3 +575,74 @@ export const projectOutputContentUrl = (
   const url = `/api/projects/${encodeURIComponent(projectId)}/outputs/${encodeURIComponent(videoVersionId)}/content`;
   return download ? `${url}?download=true` : url;
 };
+
+/**
+ * The bytes of the cut currently on the stage, for re-framing before a save.
+ *
+ * Bounded by the same 300 MB ceiling the upload contract states, so a response that could not be
+ * stored again is refused on the way in rather than after a render has already been paid for.
+ */
+export const readProjectWorkingMediaContent = async ({
+  contentUrl,
+  mimeType,
+  signal,
+}: Readonly<{
+  contentUrl: string;
+  mimeType: string;
+  signal: AbortSignal;
+}>): Promise<Blob> => {
+  const response = await apiFetch(contentUrl, {
+    cache: 'no-store',
+    headers: { Accept: mimeType },
+    signal,
+  });
+  return readBoundedBlob(response, {
+    maximumBytes: VIDEO_RESULT_MAX_BYTES,
+    signal,
+    acceptsContentType: (contentType) => contentType === mimeType,
+    createError: (failure) =>
+      new ApiClientError(
+        failure === 'too-large'
+          ? 'This video exceeded the app-owned 300 MB safety limit.'
+          : 'This video could not be read.',
+        502,
+        failure === 'too-large' ? 'result_too_large' : 'result_invalid',
+      ),
+    abortMessage: 'Preparing the placement was cancelled.',
+  });
+};
+
+/**
+ * Stores re-framed bytes for a placement and hands back the reference a save can carry.
+ *
+ * Not the working-media path: a rendition is a deliverable, not the Project's current cut, and
+ * adopting it would move the stage and bump the revision. The operation key is the asset id on the
+ * server, so replaying this upload returns the same bytes rather than storing a second copy.
+ */
+export const uploadProjectRendition = (input: {
+  readonly projectId: string;
+  readonly file: File;
+  readonly operationKey: string;
+  readonly specification: ProjectExportSpecificationValue;
+  readonly signal?: AbortSignal;
+}): Promise<ProjectRenditionUploadResponse> =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(input.projectId)}/outputs/renditions`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': input.file.type,
+        'Idempotency-Key': input.operationKey,
+        'X-Lightframe-Project-Rendition': encodeURIComponent(
+          JSON.stringify({ filename: input.file.name, specification: input.specification }),
+        ),
+      },
+      body: input.file,
+      ...(input.signal ? { signal: input.signal } : {}),
+    },
+    projectRenditionUploadResponseSchema,
+    invalidProjectResponse,
+    parseProjectConflict,
+  );

@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { unionAll } from 'drizzle-orm/pg-core';
 import {
+  projectExportSpecificationValueSchema,
   SAVED_VIDEO_FORMATS,
   videoInputMimeTypeSchema,
   type SavedVideoFormat,
@@ -43,6 +44,10 @@ const toVersion = (row: VersionRow): StoredVideoVersion => ({
   durationMs: row.durationMs,
   width: row.width,
   height: row.height,
+  exportSpecification:
+    row.exportSpecification === null
+      ? null
+      : projectExportSpecificationValueSchema.parse(row.exportSpecification),
   createdAt: toIsoTimestamp(row.createdAt),
 });
 
@@ -86,6 +91,7 @@ export const savedVideoVersionValues = (
   durationMs: Math.max(1, Math.round(version.durationMs)),
   width: version.width,
   height: version.height,
+  exportSpecification: version.exportSpecification,
   createdAt: toIsoTimestamp(version.createdAt),
 });
 

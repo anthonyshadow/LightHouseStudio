@@ -20,6 +20,7 @@ import {
   projectSourceUploadMetadataSchema,
   projectWorkingMediaParamsSchema,
   projectWorkingMediaResponseSchema,
+  projectRenditionUploadMetadataSchema,
   projectWorkingMediaUploadMetadataSchema,
   saveProjectOutputRequestSchema,
   saveProjectOutputResponseSchema,
@@ -53,6 +54,7 @@ import type {
   ProjectWorkingMediaMutationResult,
   ProjectWorkingMediaService,
 } from './project-working-media-service.js';
+import type { ProjectRenditionService } from './project-rendition-service.js';
 import type {
   ProjectOutputSaveMutationResult,
   ProjectOutputService,
@@ -164,6 +166,14 @@ const workingMediaUploadMetadata = (request: HttpRequest) =>
     'Provide valid Project working-media metadata.',
   );
 
+const renditionUploadMetadata = (request: HttpRequest) =>
+  parseUploadMetadata(
+    request,
+    'x-lightframe-project-rendition',
+    projectRenditionUploadMetadataSchema,
+    'Provide a valid Project rendition placement.',
+  );
+
 export const registerProjectRoutes = (
   app: ApplicationRuntime,
   service: ProjectService | undefined,
@@ -172,6 +182,7 @@ export const registerProjectRoutes = (
   outputService?: ProjectOutputService,
   historyService?: ProjectHistoryService,
   assetService?: ProjectAssetService,
+  renditionService?: ProjectRenditionService,
 ): void => {
   app.get('/api/projects', async (request) => {
     const query = projectsQuerySchema.safeParse(request.query);
@@ -496,6 +507,51 @@ export const registerProjectRoutes = (
   }
 
   if (outputService !== undefined) {
+    if (renditionService !== undefined) {
+      app.post(
+        '/api/projects/:projectId/outputs/renditions',
+        {
+          bodyLimit: VIDEO_RESULT_MAX_BYTES,
+          bodyParser: 'spooled',
+          acceptedContentTypes: VIDEO_INPUT_MIME_TYPES,
+          unsupportedMediaType: {
+            statusCode: 400,
+            message: 'Upload an MP4, QuickTime, or WebM re-framed video.',
+          },
+          payloadTooLargeMessage: 'A re-framed video must be 300 MB or smaller.',
+        },
+        async (request, reply) => {
+          const params = projectParamsSchema.safeParse(request.params);
+          const operationKey = projectOperationKeySchema.safeParse(
+            requestHeader(request, 'idempotency-key'),
+          );
+          const upload = isSpooledAudioUpload(request.body) ? request.body : null;
+          try {
+            const metadata = renditionUploadMetadata(request);
+            if (!params.success || !operationKey.success || upload === null) {
+              throw new AppError(
+                400,
+                'validation_error',
+                'Provide a valid re-framed video and Idempotency-Key.',
+              );
+            }
+            reply.status(201);
+            return await renditionService.upload({
+              ownerUserId: ownerUserIdForRequest(request),
+              projectId: params.data.projectId,
+              operationKey: operationKey.data,
+              sourcePath: upload.path,
+              checksumSha256: upload.checksumSha256,
+              filename: metadata.filename,
+              specification: metadata.specification,
+            });
+          } finally {
+            await upload?.cleanup().catch(() => undefined);
+          }
+        },
+      );
+    }
+
     app.post('/api/projects/:projectId/outputs', async (request, reply) => {
       const params = projectParamsSchema.safeParse(request.params);
       const operationId = projectOperationKeySchema.safeParse(

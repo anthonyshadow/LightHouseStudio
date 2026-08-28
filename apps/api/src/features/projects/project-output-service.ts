@@ -2,12 +2,14 @@ import {
   projectOutputSaveResultSchema,
   saveProjectOutputResponseSchema,
   type InspectedVideo,
+  type ProjectExportSpecificationValue,
   type SaveProjectOutputRequest,
   type SaveProjectOutputResponse,
   type SavedVideoOrigin,
 } from '@studio/contracts';
 import {
   normalizeSavedVideoTitle,
+  projectExportMatchesFrame,
   ProjectRuleError,
   saveProjectOutput,
   type ProjectConflict,
@@ -246,6 +248,51 @@ export class ProjectOutputService {
     return { reference, asset, inspected, savedVersion, source };
   }
 
+  /**
+   * The bytes a Version is actually made of.
+   *
+   * With no rendition the stored cut is used unchanged, which is what "Keep as it is" means and
+   * what every save did before placements were produced. With one, its asset supplies the bytes —
+   * the stage's own media is still resolved and checked first, because the save is still a
+   * statement about that exact cut.
+   */
+  async #resolveRendition(
+    ownerUserId: string,
+    current: ProjectCurrentRead,
+    request: SaveProjectOutputRequest,
+  ): Promise<{
+    asset: AssetReadHandle;
+    inspected: InspectedVideo;
+    specification: ProjectExportSpecificationValue;
+  } | null> {
+    const rendition = request.renditions.at(0);
+    if (rendition === undefined) return null;
+    // A save states what the revision chose. Bytes produced for some other placement would put a
+    // shape on the Version that Project History never records, so the two are held together here.
+    const chosen = current.revision.snapshot.exportSpecification;
+    if (chosen === null || JSON.stringify(chosen) !== JSON.stringify(rendition.specification)) {
+      throw new AppError(
+        409,
+        'conflict',
+        'The re-framed video was made for a different placement than this Project has chosen.',
+      );
+    }
+    const asset = await this.bytes.open(ownerUserId, rendition.media.assetId);
+    if (asset === null) {
+      throw new AppError(404, 'asset_missing', 'The re-framed video for this save is unavailable.');
+    }
+    const inspected = await inspectStoredProjectMedia(asset, this.#inspect);
+    assertManifestMatchesInspection(asset, inspected);
+    if (!projectExportMatchesFrame(rendition.specification, inspected)) {
+      throw new AppError(
+        409,
+        'conflict',
+        'The re-framed video no longer matches the placement it was saved for.',
+      );
+    }
+    return { asset, inspected, specification: rendition.specification };
+  }
+
   async save(
     ownerUserId: string,
     projectId: string,
@@ -289,7 +336,19 @@ export class ProjectOutputService {
         'Save the exact current ready Project media after all pending changes finish.',
       );
     }
-    const media = await this.#resolveReadyMedia(ownerUserId, current, request.media);
+    // Independent reads, each of which streams a whole asset out of storage to inspect it. Run
+    // together so a placement save costs one asset read's wall-clock rather than two.
+    const [media, rendition] = await Promise.all([
+      this.#resolveReadyMedia(ownerUserId, current, request.media),
+      this.#resolveRendition(ownerUserId, current, request),
+    ]);
+    // What the operator receives: the re-framed file when one was produced, the cut itself when
+    // not — and, either way, the placement that describes it.
+    const stored = rendition ?? {
+      asset: media.asset,
+      inspected: media.inspected,
+      specification: null,
+    };
     const now = this.#now().toISOString();
     const savedVideoId =
       request.target.kind === 'new'
@@ -317,14 +376,17 @@ export class ProjectOutputService {
           : media.reference.kind === 'saved-video-version'
             ? media.reference.videoVersionId
             : null,
-      assetId: media.asset.manifest.assetId,
+      assetId: stored.asset.manifest.assetId,
       thumbnailAssetId: null,
-      mimeType: media.inspected.mimeType,
-      filename: media.asset.manifest.filename,
-      sizeBytes: media.inspected.sizeBytes,
-      durationMs: Math.max(1, Math.round(media.inspected.durationMs)),
-      width: media.inspected.width,
-      height: media.inspected.height,
+      mimeType: stored.inspected.mimeType,
+      filename: stored.asset.manifest.filename,
+      sizeBytes: stored.inspected.sizeBytes,
+      durationMs: Math.max(1, Math.round(stored.inspected.durationMs)),
+      width: stored.inspected.width,
+      height: stored.inspected.height,
+      // The placement these bytes were produced for, so the Version states its own shape rather
+      // than borrowing the intent recorded on the revision, which the two can outlive separately.
+      exportSpecification: stored.specification,
       createdAt: now,
     };
     const nextSavedVideo: StoredSavedVideoAggregate =
@@ -413,14 +475,14 @@ export class ProjectOutputService {
       mimeType: version.mimeType,
       filename: version.filename,
       sizeBytes: version.sizeBytes,
-      checksumSha256: media.asset.manifest.checksumSha256,
-      container: media.inspected.container,
-      videoCodec: media.inspected.videoCodec,
-      audioCodec: media.inspected.audioCodec,
+      checksumSha256: stored.asset.manifest.checksumSha256,
+      container: stored.inspected.container,
+      videoCodec: stored.inspected.videoCodec,
+      audioCodec: stored.inspected.audioCodec,
       durationMs: version.durationMs,
       width: version.width,
       height: version.height,
-      hasAudio: media.inspected.hasAudio,
+      hasAudio: stored.inspected.hasAudio,
       adoptedAt: now,
     };
     const committed = await this.metadata.commit({

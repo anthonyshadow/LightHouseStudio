@@ -1,4 +1,5 @@
 export * from './capabilities';
+export * from './export-placements';
 export * from './campaigns';
 export * from './auth';
 export * from './common';

@@ -1049,6 +1049,7 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
         expectedRevisionNumber: 2,
         media: { kind: 'asset', assetId: sourceAssetId },
         target: { kind: 'new', title: 'Relational master' },
+        renditions: [],
       });
       expect(first).toMatchObject({
         ok: true,
@@ -1066,6 +1067,7 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
           expectedRevisionNumber: 2,
           media: { kind: 'asset', assetId: sourceAssetId },
           target: { kind: 'new', title: 'Relational master' },
+          renditions: [],
         }),
       ).resolves.toMatchObject({ ok: true, response: { replayed: true } });
 
@@ -1078,6 +1080,7 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
           savedVideoId: first.response.savedVideo.id,
           expectedVersionId: first.response.savedVideo.currentVersion.id,
         },
+        renditions: [],
       };
       const concurrent = await Promise.all([
         outputService.save(ownerUserId, projectId, appendOperationId, appendRequest),
@@ -1104,6 +1107,7 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
             savedVideoId: first.response.savedVideo.id,
             expectedVersionId: first.response.savedVideo.currentVersion.id,
           },
+          renditions: [],
         }),
       ).resolves.toMatchObject({
         ok: false,

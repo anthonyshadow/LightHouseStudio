@@ -96,6 +96,7 @@ const projectSourceRoutes: readonly Route[] = [
   'POST /api/projects/:projectId/working-media',
   'POST /api/projects/:projectId/working-media/reuse',
   'POST /api/projects/:projectId/outputs',
+  'POST /api/projects/:projectId/outputs/renditions',
   'GET /api/projects/:projectId/history',
   'GET /api/projects/:projectId/outputs',
   'GET /api/projects/:projectId/outputs/:videoVersionId',
