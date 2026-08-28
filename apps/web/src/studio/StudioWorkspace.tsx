@@ -1,4 +1,5 @@
 import { useTheme } from '@emotion/react';
+import type { MediaPersistence } from '@studio/contracts';
 import type { CreativeAssetStore } from '@studio/domain';
 import { lazy, Suspense, useRef, type ReactNode, type RefObject } from 'react';
 import type { BrowserCapabilities } from '../application/types';
@@ -55,6 +56,8 @@ interface StudioWorkspaceProps {
   };
   readonly environment: {
     readonly browser: BrowserCapabilities;
+    /** Undefined until capabilities resolve; the stage then describes storage conservatively. */
+    readonly mediaPersistence: MediaPersistence | undefined;
     readonly desktopLayout: boolean;
     /** Whether the docked desktop capture settings are open. They rest collapsed. */
     readonly captureSettingsExpanded: boolean;
@@ -117,6 +120,7 @@ export const StudioWorkspace = ({
   const { session, takeReview, videoEditor, savedVideo, project, projectProcessing } = controllers;
   const {
     browser,
+    mediaPersistence,
     desktopLayout: desktopStudioLayout,
     captureSettingsExpanded,
     ownerUserId,
@@ -177,6 +181,7 @@ export const StudioWorkspace = ({
           videoRef={editorVideoRef}
           presentation={stagePresentation}
           mode={session.draft.mode}
+          mediaPersistence={mediaPersistence}
           lifecycle={session.lifecycle}
           recording={recording.lifecycle === 'recording'}
           recordingSeconds={recording.elapsedSeconds}

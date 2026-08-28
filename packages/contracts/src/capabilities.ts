@@ -2,6 +2,13 @@ import { z } from 'zod';
 import { REFERENCE_IMAGE_SIZES } from './reference-images';
 import { videoCharacterSwapProviderIdSchema, videoOutputResolutionSchema } from './video-jobs';
 
+/**
+ * Where captured and saved media comes to rest in this deployment. `browser-only` is the local
+ * configuration, in which nothing is written past the machine; `account` covers every configuration
+ * that stores work server-side, whether in the database, on the server's disk, or in object storage.
+ */
+export const mediaPersistenceSchema = z.enum(['browser-only', 'account']);
+
 export const videoInputPreparationSchema = z.enum(['none', 'h264-mp4']);
 export const videoReferencePolicySchema = z.enum(['optional', 'required']);
 export const videoPromptInputSchema = z.enum(['editable', 'server-default']);
@@ -87,10 +94,18 @@ export const capabilitiesResponseSchema = z
         cloudMirror: z.boolean(),
       })
       .strict(),
+    /**
+     * Stated by the server rather than inferred from the two fields above. A `shadow` deployment
+     * backed by R2 reports `cloudMirror: false` and `directMultipartUpload: false` while still
+     * copying video bytes off the machine, so a surface that tells the operator where their media
+     * goes cannot be built from those two without being wrong in that configuration.
+     */
+    mediaPersistence: mediaPersistenceSchema,
   })
   .strict();
 
 export type CapabilitiesResponse = z.infer<typeof capabilitiesResponseSchema>;
+export type MediaPersistence = z.infer<typeof mediaPersistenceSchema>;
 export type VideoInputPreparation = z.infer<typeof videoInputPreparationSchema>;
 export type VideoReferencePolicy = z.infer<typeof videoReferencePolicySchema>;
 export type VideoPromptInput = z.infer<typeof videoPromptInputSchema>;

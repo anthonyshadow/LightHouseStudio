@@ -71,6 +71,7 @@ describe('API shell', () => {
       wardrobe: { addOutfitAvailable: false },
       savedVideos: { directMultipartUpload: false },
       creativeLibrary: { cloudMirror: false },
+      mediaPersistence: 'browser-only',
     });
     expect(capabilities.body).not.toContain('apiKey');
   });

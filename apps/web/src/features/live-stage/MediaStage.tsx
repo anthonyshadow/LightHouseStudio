@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useTheme } from '@emotion/react';
+import type { MediaPersistence } from '@studio/contracts';
 import { getRecordingDurationTiming } from '@studio/domain';
 import type { LocalCaptureAspectRatio } from '../../application/types';
 import { formatDuration } from '../recording/recordingHelpers';
@@ -33,6 +34,8 @@ export type { StagePresentation } from './stagePresentation';
 export type MediaStageProps = {
   presentation: StagePresentation;
   mode: StudioMode;
+  /** Omitted until the capability read resolves; the idle stage then uses the wording that claims less. */
+  mediaPersistence?: MediaPersistence | undefined;
   lifecycle: SessionLifecycle;
   recording: boolean;
   recordingSeconds: number;
@@ -150,7 +153,20 @@ const formatRealtimeTiming = (timing: RealtimeSessionTiming | null): string | nu
   )} left`;
 };
 
-const emptyCopy = (mode: StudioMode): { title: string; description: string } => {
+/**
+ * The second half of the idle description states where the operator's work comes to rest, so it
+ * follows the deployment rather than the creative mode. Both wordings live here, keyed by the
+ * capability value, so neither can drift from the other or from what the server reports.
+ */
+const MEDIA_PERSISTENCE_COPY: Readonly<Record<MediaPersistence, string>> = {
+  'browser-only': 'Nothing leaves this browser in Local mode.',
+  account: 'Work you save is stored in your account.',
+};
+
+const emptyCopy = (
+  mode: StudioMode,
+  mediaPersistence: MediaPersistence | undefined,
+): { title: string; description: string } => {
   if (mode === 'lucy-latest') {
     return {
       title: 'Your character, your story.',
@@ -167,8 +183,11 @@ const emptyCopy = (mode: StudioMode): { title: string; description: string } => 
   }
   return {
     title: 'Your private creative stage.',
-    description:
-      'Camera and microphone remain off until you select Start camera. Nothing leaves this browser in Local mode.',
+    // The camera assurance holds in every deployment; only the storage sentence varies. An
+    // unresolved capability falls to `account`, which claims nothing about staying local.
+    description: `Camera and microphone remain off until you select Start camera. ${
+      MEDIA_PERSISTENCE_COPY[mediaPersistence ?? 'account']
+    }`,
   };
 };
 
@@ -215,6 +234,7 @@ const useTrackRevision = (stream: MediaStream | null): void => {
 export const MediaStage = ({
   presentation,
   mode,
+  mediaPersistence,
   lifecycle,
   recording,
   recordingSeconds,
@@ -260,7 +280,7 @@ export const MediaStage = ({
   const transformed = livePresentation?.origin === 'provider';
   const details = describeStageMedia(presentation, stream, transformed);
   const stageMode = presentation.kind === 'idle' ? presentation.mode : mode;
-  const copy = emptyCopy(stageMode);
+  const copy = emptyCopy(stageMode, mediaPersistence);
   const statusTone = presentation.kind === 'playback' ? 'accent' : lifecycleTone(lifecycle);
   const playbackLocked = presentation.kind === 'playback' && presentation.controlsLocked;
   const editingPlayback = presentation.kind === 'playback' && editPreview !== undefined;
