@@ -169,6 +169,83 @@ describe('ProjectOutputService local composite authority', () => {
     });
   });
 
+  it('keeps presenting the cut a placement was produced from, so a second save re-frames the original', async () => {
+    const created = await createReadyProject();
+    const current = await choosePhonePlacement(created.current);
+    const before = current.revision.snapshot.workingMedia;
+    const rendition = await storeRendition();
+
+    const saved = await outputServiceWithRenditions().save(
+      ownerUserId,
+      current.project.id,
+      randomUUID(),
+      {
+        expectedVersion: current.project.version,
+        expectedRevisionNumber: current.revision.revisionNumber,
+        media: before!,
+        target: { kind: 'new', title: 'Phone master' },
+        renditions: [{ media: rendition.media, specification: phonePlacement }],
+      },
+    );
+
+    if (!saved.ok) throw new Error('Expected the save to succeed.');
+    // The deliverable is 1080x1920, and the Project still works from the 1280x720 cut.
+    expect(saved.response.savedVideo.currentVersion).toMatchObject({ width: 1_080, height: 1_920 });
+    expect(saved.response.revision.snapshot).toMatchObject({
+      workingMedia: before,
+      presentedMedia: before,
+      lastSuccessfulOutput: {
+        savedVideoId: saved.response.savedVideo.id,
+        videoVersionId: saved.response.savedVideo.currentVersion.id,
+      },
+      workflowPhase: 'complete',
+    });
+    expect(saved.response.project.status).toBe('completed');
+
+    // The record hydrating that revision describes the cut, not the re-framed file, so the next
+    // save resolves the original bytes rather than failing on changed metadata.
+    const hydrated = await new ProjectWorkingMediaService(projects, savedVideos, bytes, {
+      inspect: inspectByContent,
+    }).get(ownerUserId, current.project.id);
+    expect(hydrated).toMatchObject({
+      isCurrent: true,
+      media: {
+        reference: before,
+        adoptedRevisionId: saved.response.revision.id,
+        width: inspected.width,
+        height: inspected.height,
+      },
+    });
+  });
+
+  it('still presents the Version when the stored bytes are the cut itself', async () => {
+    const { current } = await createReadyProject();
+
+    const saved = await outputServiceWithRenditions().save(
+      ownerUserId,
+      current.project.id,
+      randomUUID(),
+      {
+        expectedVersion: current.project.version,
+        expectedRevisionNumber: current.revision.revisionNumber,
+        media: current.revision.snapshot.workingMedia!,
+        target: { kind: 'new', title: 'As it is' },
+        renditions: [],
+      },
+    );
+
+    if (!saved.ok) throw new Error('Expected the save to succeed.');
+    const reference = {
+      kind: 'saved-video-version',
+      savedVideoId: saved.response.savedVideo.id,
+      videoVersionId: saved.response.savedVideo.currentVersion.id,
+    };
+    expect(saved.response.revision.snapshot).toMatchObject({
+      workingMedia: reference,
+      presentedMedia: reference,
+    });
+  });
+
   it('stores the cut unchanged, and records no placement, when none was produced', async () => {
     const { current } = await createReadyProject();
 

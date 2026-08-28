@@ -1001,17 +1001,21 @@ export const projectOutputSaveResultSchema = z
       value.savedVideo.currentVersion.id !== value.output.videoVersionId ||
       reference?.savedVideoId !== value.output.savedVideoId ||
       reference.videoVersionId !== value.output.videoVersionId ||
-      working?.kind !== 'saved-video-version' ||
-      working.savedVideoId !== value.output.savedVideoId ||
-      working.videoVersionId !== value.output.videoVersionId ||
-      presented?.kind !== 'saved-video-version' ||
-      presented.savedVideoId !== value.output.savedVideoId ||
-      presented.videoVersionId !== value.output.videoVersionId
+      /*
+       * The post-save revision no longer always presents the Version it produced: a save that
+       * re-framed for a placement keeps presenting the cut it was produced from, because that file
+       * is a deliverable rather than the next thing to work from. What stays true either way is
+       * that the output is named by `lastSuccessfulOutput`, and that the revision presents one
+       * exact ready pair — the same equality the domain enforces before allowing the save at all.
+       */
+      working === null ||
+      presented === null ||
+      JSON.stringify(working) !== JSON.stringify(presented)
     ) {
       context.addIssue({
         code: 'custom',
         message:
-          'A Project output result must preserve producing-revision provenance and name the exact completed post-save Version.',
+          'A Project output result must preserve producing-revision provenance, name the completed Version, and present one exact ready media pair.',
       });
     }
   });
