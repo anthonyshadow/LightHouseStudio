@@ -451,6 +451,16 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
     // The same condition `registerCreativeLibraryRoutes` registers on, so the advertised capability
     // and the routes that back it cannot disagree.
     creativeLibraryCloudMirrorAvailable: dependencies.persistence?.creativeLibraries !== undefined,
+    // Both halves of the deployment are named here rather than relying on the environment rule that
+    // currently forbids R2 under `local`: this is the product's strongest privacy claim, and it
+    // should stay true on its own terms if that rule is ever relaxed. Every other combination puts
+    // work server-side — a relational mode writes records to the database even when its bytes stay
+    // on local disk, as `shadow` does.
+    mediaPersistence:
+      dependencies.config.databaseMode === 'local' &&
+      dependencies.config.assetStoreProvider === 'local'
+        ? 'browser-only'
+        : 'account',
   });
   registerRealtimeRoutes(app, decartProvider, dependencies.config.realtimeVideoBetaEnabled);
   registerVideoJobRoutes(app, videoJobService);

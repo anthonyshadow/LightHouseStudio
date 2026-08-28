@@ -612,6 +612,36 @@ describe('MediaStage', () => {
     expect(screen.getByText(/provider session remain off until you start/)).toBeInTheDocument();
   });
 
+  it('describes where capture is stored from the deployment, not from the creative mode', () => {
+    const view = render(stage({ mediaPersistence: 'browser-only' }));
+
+    expect(
+      screen.getByText(
+        'Camera and microphone remain off until you select Start camera. Nothing leaves this browser in Local mode.',
+      ),
+    ).toBeInTheDocument();
+
+    view.rerender(stage({ mediaPersistence: 'account' }));
+    expect(
+      screen.getByText(
+        'Camera and microphone remain off until you select Start camera. Work you save is stored in your account.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing leaves this browser/)).not.toBeInTheDocument();
+  });
+
+  it('claims no local guarantee while the capability read is unresolved', () => {
+    render(stage());
+
+    expect(screen.getByText('Your private creative stage.')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Camera and microphone remain off until you select Start camera. Work you save is stored in your account.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Nothing leaves this browser/)).not.toBeInTheDocument();
+  });
+
   it('prioritizes at most two stage notices and wires their actions', () => {
     const retry = vi.fn();
     const dismiss = vi.fn();

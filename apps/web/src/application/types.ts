@@ -1,5 +1,6 @@
 import type {
   CapabilitiesResponse,
+  MediaPersistence,
   ReferenceImageSize,
   SharedVoiceSummary,
   SharedVoicesResponse,
@@ -45,6 +46,8 @@ export type ProviderAvailability = {
   directSavedVideoUploadAvailable?: boolean;
   /** `undefined` until the capability read resolves — not the same answer as `false`. */
   creativeLibraryCloudMirror?: boolean | undefined;
+  /** `undefined` until the capability read resolves; a surface must fall back to the safer claim. */
+  mediaPersistence?: MediaPersistence | undefined;
 };
 
 export type BrowserCapabilities = {

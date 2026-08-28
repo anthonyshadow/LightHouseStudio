@@ -265,6 +265,7 @@ describe('reference image API client', () => {
           wardrobe: { addOutfitAvailable: true },
           savedVideos: { directMultipartUpload: true },
           creativeLibrary: { cloudMirror: true },
+          mediaPersistence: 'account',
         },
       }),
     );
@@ -291,6 +292,7 @@ describe('reference image API client', () => {
       referenceImageOptimizerVersion: 'lucy-character-reference-v1',
       wardrobeAddOutfitAvailable: true,
       directSavedVideoUploadAvailable: true,
+      mediaPersistence: 'account',
     });
   });
 
