@@ -154,8 +154,8 @@ type RecentWorkItem = Readonly<{
 const RECENT_KIND_OPTIONS = [
   { value: 'all', label: 'All' },
   { value: 'videos', label: 'Videos', shortLabel: 'Video' },
-  { value: 'projects', label: 'Projects' },
-  { value: 'campaigns', label: 'Campaigns' },
+  { value: 'projects', label: 'Projects', shortLabel: 'Project' },
+  { value: 'campaigns', label: 'Campaigns', shortLabel: 'Campaign' },
 ] as const;
 
 const isRecentKind = (value: unknown): value is RecentKind =>
@@ -682,7 +682,13 @@ export const DashboardRouteSurface = ({
               </div>
               <div css={recentFilterStyles()}>
                 <SegmentedControl
-                  columns={RECENT_KIND_OPTIONS.length}
+                  /*
+                   * Left to wrap rather than pinned to one row: four segments across a phone leave
+                   * each 56px of text, and no honest word for a campaign is that short. `'auto'`
+                   * is the primitive's own answer to that, and it keeps the row full where there
+                   * is room for one.
+                   */
+                  columns="auto"
                   label="Filter recent work"
                   value={recentKind}
                   options={RECENT_KIND_OPTIONS}
