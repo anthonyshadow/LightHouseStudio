@@ -65,14 +65,16 @@ const segmentStyles = (theme: Theme, selected: boolean): CSSObject => ({
  * number would drift into showing short labels in wide segments, or long ones in narrow.
  */
 export const SEGMENTED_CONTROL_SHORT_LABEL_MAX_WIDTH = '31rem';
-const ABOVE_SHORT_LABEL_WIDTH = '31.001rem';
 
 const fullLabelStyles = (): CSSObject => ({
   [`@media (max-width: ${SEGMENTED_CONTROL_SHORT_LABEL_MAX_WIDTH})`]: { display: 'none' },
 });
 
+/** Stated as the complement rather than a second number, so one edit moves the whole boundary. */
 const shortLabelStyles = (): CSSObject => ({
-  [`@media (min-width: ${ABOVE_SHORT_LABEL_WIDTH})`]: { display: 'none' },
+  [`@media not all and (max-width: ${SEGMENTED_CONTROL_SHORT_LABEL_MAX_WIDTH})`]: {
+    display: 'none',
+  },
 });
 
 export const SegmentedControl = <T extends string>({

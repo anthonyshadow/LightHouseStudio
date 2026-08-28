@@ -2,7 +2,7 @@ export { StudioDesignProvider } from './StudioDesignProvider';
 export { studioTheme } from './theme';
 export { Button, LinkButton } from './primitives/Button';
 export { Surface } from './primitives/Surface';
-export { TextAreaField, TextField } from './primitives/FormControls';
+export { TextAreaField, TextField, NO_BROWSER_SUGGESTIONS } from './primitives/FormControls';
 export { ListSearchField } from './primitives/ListSearchField';
 export { SearchEmptyState } from './primitives/SearchEmptyState';
 export { useListSearch } from './primitives/useListSearch';

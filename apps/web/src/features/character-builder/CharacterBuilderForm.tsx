@@ -6,7 +6,7 @@ import type {
   VisualProfile,
 } from '@studio/domain';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, VisuallyHidden } from '../../ui';
+import { Button, VisuallyHidden, NO_BROWSER_SUGGESTIONS } from '../../ui';
 import {
   CHARACTER_STARTERS,
   CUSTOM_OPTION_ID,
@@ -359,6 +359,7 @@ export const CharacterBuilderForm = ({
                         Describe presentation in your own words
                       </label>
                       <input
+                        {...NO_BROWSER_SUGGESTIONS}
                         id="character-gender-custom"
                         value={presentationCustomValue}
                         disabled={disabled}
@@ -425,6 +426,7 @@ export const CharacterBuilderForm = ({
                   <div css={customFieldStyles(theme)}>
                     <label htmlFor="character-constraints">Optional Custom Constraints</label>
                     <textarea
+                      {...NO_BROWSER_SUGGESTIONS}
                       id="character-constraints"
                       value={draft.customDetails}
                       disabled={disabled}
@@ -436,6 +438,7 @@ export const CharacterBuilderForm = ({
                     />
                     <label htmlFor="character-preserve">Keep Unchanged</label>
                     <input
+                      {...NO_BROWSER_SUGGESTIONS}
                       id="character-preserve"
                       value={draft.preserve}
                       disabled={disabled}
@@ -459,6 +462,7 @@ export const CharacterBuilderForm = ({
                     }}
                   >
                     <input
+                      {...NO_BROWSER_SUGGESTIONS}
                       id="character-match-reference"
                       type="checkbox"
                       disabled={disabled}

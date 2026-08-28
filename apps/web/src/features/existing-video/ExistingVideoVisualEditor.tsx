@@ -5,7 +5,7 @@ import type {
   VideoProcessingOperationCapability,
   VideoPromptInput,
 } from '@studio/contracts';
-import { Button, SelectField, Surface } from '../../ui';
+import { Button, SelectField, Surface, NO_BROWSER_SUGGESTIONS } from '../../ui';
 import {
   advancedStyles,
   configCardStyles,
@@ -235,6 +235,7 @@ export const ExistingVideoVisualEditor = ({
           <label>
             Prompt
             <textarea
+              {...NO_BROWSER_SUGGESTIONS}
               value={step.prompt}
               maxLength={1_200}
               disabled={recipeLocked}

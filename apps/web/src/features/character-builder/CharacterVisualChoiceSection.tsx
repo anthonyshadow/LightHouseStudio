@@ -1,6 +1,6 @@
 import { useTheme, type CSSObject } from '@emotion/react';
 import { useState } from 'react';
-import { Button } from '../../ui';
+import { Button, NO_BROWSER_SUGGESTIONS } from '../../ui';
 import {
   CUSTOM_OPTION_ID,
   createCustomGuidedChoice,
@@ -190,6 +190,7 @@ export const CharacterVisualChoiceSection = ({
         <div id={`character-${category}-custom-field`} css={customFieldStyles(theme)}>
           <label htmlFor={`character-${category}-custom`}>{customLabel}</label>
           <input
+            {...NO_BROWSER_SUGGESTIONS}
             id={`character-${category}-custom`}
             value={customValue}
             disabled={disabled}

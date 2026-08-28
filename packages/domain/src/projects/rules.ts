@@ -1081,17 +1081,18 @@ export const saveProjectOutput = (
   const revisionId = requireId(context.createId(), 'Project revision');
   const revisionNumber = producingRevision.revisionNumber + 1;
   const outputReference = { savedVideoId, videoVersionId };
+  // The output is presented only when it is the cut; otherwise the producing revision's own media
+  // carries forward, so the next save starts from the same place this one did.
+  const nextPresentedMedia = input.presentsOutput
+    ? ({ kind: 'saved-video-version', ...outputReference } as const)
+    : workingMedia;
   const snapshot = validateProjectSnapshot({
     ...producingRevision.snapshot,
     ...clearedProjectCreativeConfiguration(producingRevision.snapshot),
-    // The output is presented only when it is the cut; otherwise the producing revision's own
-    // media carries forward, so the next save starts from the same place this one did.
-    workingMedia: input.presentsOutput
-      ? { kind: 'saved-video-version', ...outputReference }
-      : workingMedia,
-    presentedMedia: input.presentsOutput
-      ? { kind: 'saved-video-version', ...outputReference }
-      : presentedMedia,
+    // One value for both, because the readiness check above already proved the producing pair is
+    // exact — and the pair the save writes has to stay exact for the same reason.
+    workingMedia: nextPresentedMedia,
+    presentedMedia: nextPresentedMedia,
     lastSuccessfulOutput: outputReference,
     workflowPhase: 'complete',
     updatedAt: now,

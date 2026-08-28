@@ -464,69 +464,42 @@ export class ProjectOutputService {
       createdAt: now,
     };
     /*
-     * The record hydrates whatever the post-save revision presents — the Version when it is the
-     * cut, otherwise the cut it was produced from. Every field describes the same bytes the
-     * reference names: taking geometry or a checksum from the other one would leave the next save
-     * failing `assertRecordedMediaMatches` against media that never changed.
+     * The record hydrates whatever the post-save revision presents: the Version when that Version
+     * is the cut, otherwise the cut it was produced from. Only the identity differs — the bytes are
+     * the same either way, because a presented Version is made of exactly the media resolved above.
+     * Sourcing every byte field from that one place is what keeps the record describing the bytes
+     * its reference names, rather than two literals that agree by coincidence.
      */
-    const outputMedia: ProjectWorkingMediaRecord = presentsOutput
-      ? {
-          projectId,
-          ownerUserId,
-          kind: 'saved-video-version',
-          mediaReference: {
-            kind: 'saved-video-version',
-            savedVideoId,
-            videoVersionId: version.id,
-          },
-          assetId: version.assetId,
-          savedVideoId,
-          videoVersionId: version.id,
-          adoptedRevisionId: revision.id,
-          adoptedRevisionNumber: revision.revisionNumber,
-          operationKey: operationId,
-          requestFingerprint,
-          mimeType: version.mimeType,
-          filename: version.filename,
-          sizeBytes: version.sizeBytes,
-          checksumSha256: stored.asset.manifest.checksumSha256,
-          container: stored.inspected.container,
-          videoCodec: stored.inspected.videoCodec,
-          audioCodec: stored.inspected.audioCodec,
-          durationMs: version.durationMs,
-          width: version.width,
-          height: version.height,
-          hasAudio: stored.inspected.hasAudio,
-          adoptedAt: now,
-        }
-      : {
-          projectId,
-          ownerUserId,
-          kind:
-            media.reference.kind === 'saved-video-version' ? 'saved-video-version' : 'media-asset',
-          mediaReference: media.reference,
-          assetId: media.asset.manifest.assetId,
-          savedVideoId:
-            media.reference.kind === 'saved-video-version' ? media.reference.savedVideoId : null,
-          videoVersionId:
-            media.reference.kind === 'saved-video-version' ? media.reference.videoVersionId : null,
-          adoptedRevisionId: revision.id,
-          adoptedRevisionNumber: revision.revisionNumber,
-          operationKey: operationId,
-          requestFingerprint,
-          mimeType: media.inspected.mimeType,
-          filename: media.asset.manifest.filename,
-          sizeBytes: media.inspected.sizeBytes,
-          checksumSha256: media.asset.manifest.checksumSha256,
-          container: media.inspected.container,
-          videoCodec: media.inspected.videoCodec,
-          audioCodec: media.inspected.audioCodec,
-          durationMs: Math.max(1, Math.round(media.inspected.durationMs)),
-          width: media.inspected.width,
-          height: media.inspected.height,
-          hasAudio: media.inspected.hasAudio,
-          adoptedAt: now,
-        };
+    const presentedReference: ProjectMediaReference = presentsOutput
+      ? { kind: 'saved-video-version', savedVideoId, videoVersionId: version.id }
+      : media.reference;
+    const presentedVersion =
+      presentedReference.kind === 'saved-video-version' ? presentedReference : null;
+    const outputMedia: ProjectWorkingMediaRecord = {
+      projectId,
+      ownerUserId,
+      kind: presentedVersion === null ? 'media-asset' : 'saved-video-version',
+      mediaReference: presentedReference,
+      assetId: media.asset.manifest.assetId,
+      savedVideoId: presentedVersion?.savedVideoId ?? null,
+      videoVersionId: presentedVersion?.videoVersionId ?? null,
+      adoptedRevisionId: revision.id,
+      adoptedRevisionNumber: revision.revisionNumber,
+      operationKey: operationId,
+      requestFingerprint,
+      mimeType: media.inspected.mimeType,
+      filename: media.asset.manifest.filename,
+      sizeBytes: media.inspected.sizeBytes,
+      checksumSha256: media.asset.manifest.checksumSha256,
+      container: media.inspected.container,
+      videoCodec: media.inspected.videoCodec,
+      audioCodec: media.inspected.audioCodec,
+      durationMs: Math.max(1, Math.round(media.inspected.durationMs)),
+      width: media.inspected.width,
+      height: media.inspected.height,
+      hasAudio: media.inspected.hasAudio,
+      adoptedAt: now,
+    };
     const committed = await this.metadata.commit({
       ownerUserId,
       receipt,

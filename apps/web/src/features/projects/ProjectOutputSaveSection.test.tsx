@@ -892,7 +892,7 @@ describe('ProjectOutputSaveSection placement', () => {
           headers: { 'Content-Type': 'video/mp4' },
         }),
       ),
-      http.post(`*/api/projects/${projectId}/outputs/renditions`, async ({ request }) => {
+      http.post(`*/api/projects/${projectId}/outputs/renditions`, ({ request }) => {
         uploads.push(request.headers.get('x-lightframe-project-rendition'));
         return HttpResponse.json(
           {
