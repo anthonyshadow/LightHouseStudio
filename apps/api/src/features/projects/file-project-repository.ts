@@ -2287,6 +2287,38 @@ export class FileProjectRepository
           ? input.savedVideo.aggregate.video.id
           : input.savedVideo.videoId;
       const videoVersionId = committedVersion.id;
+      /*
+       * The record hydrates whatever the post-save revision presents, which is the produced Version
+       * only when that Version is the cut itself. A save that re-framed for a placement keeps
+       * presenting the cut it came from, so the record describes that instead — and either way
+       * every field it states has to describe the same bytes its reference names.
+       */
+      const presentsOutput =
+        input.media.mediaReference.kind === 'saved-video-version' &&
+        input.media.mediaReference.savedVideoId === savedVideoId &&
+        input.media.mediaReference.videoVersionId === videoVersionId;
+      const hydratesPresentedMedia = presentsOutput
+        ? input.media.kind === 'saved-video-version' &&
+          input.media.assetId === committedVersion.assetId &&
+          input.media.savedVideoId === savedVideoId &&
+          input.media.videoVersionId === videoVersionId &&
+          input.media.mimeType === committedVersion.mimeType &&
+          input.media.filename === committedVersion.filename &&
+          input.media.sizeBytes === committedVersion.sizeBytes &&
+          input.media.durationMs === committedVersion.durationMs &&
+          input.media.width === committedVersion.width &&
+          input.media.height === committedVersion.height
+        : // Not the output: it must not claim the output's identity, and its lineage columns have
+          // to agree with the reference it does name.
+          input.media.videoVersionId !== videoVersionId &&
+          (input.media.mediaReference.kind === 'saved-video-version'
+            ? input.media.kind === 'saved-video-version' &&
+              input.media.savedVideoId === input.media.mediaReference.savedVideoId &&
+              input.media.videoVersionId === input.media.mediaReference.videoVersionId
+            : input.media.kind !== 'saved-video-version' &&
+              input.media.savedVideoId === null &&
+              input.media.videoVersionId === null &&
+              input.media.assetId === input.media.mediaReference.assetId);
       const valid =
         input.receipt.projectId === aggregate.project.id &&
         input.receipt.savedVideoId === savedVideoId &&
@@ -2310,22 +2342,13 @@ export class FileProjectRepository
         output.producingRevisionNumber === aggregate.project.currentRevisionNumber &&
         input.media.projectId === aggregate.project.id &&
         input.media.ownerUserId === input.ownerUserId &&
-        input.media.kind === 'saved-video-version' &&
-        input.media.assetId === committedVersion.assetId &&
-        input.media.savedVideoId === savedVideoId &&
-        input.media.videoVersionId === videoVersionId &&
         input.media.adoptedRevisionId === revision.id &&
         input.media.adoptedRevisionNumber === revision.revisionNumber &&
         input.media.operationKey === input.receipt.operationId &&
         input.media.requestFingerprint === input.receipt.requestFingerprint &&
         projectMediaReferencesEqual(input.media.mediaReference, revision.snapshot.workingMedia) &&
         projectMediaReferencesEqual(input.media.mediaReference, revision.snapshot.presentedMedia) &&
-        input.media.mimeType === committedVersion.mimeType &&
-        input.media.filename === committedVersion.filename &&
-        input.media.sizeBytes === committedVersion.sizeBytes &&
-        input.media.durationMs === committedVersion.durationMs &&
-        input.media.width === committedVersion.width &&
-        input.media.height === committedVersion.height &&
+        hydratesPresentedMedia &&
         revision.snapshot.lastSuccessfulOutput?.savedVideoId === savedVideoId &&
         revision.snapshot.lastSuccessfulOutput.videoVersionId === videoVersionId;
       if (!valid) throw new Error('The local Project output transaction is inconsistent.');

@@ -994,11 +994,22 @@ export interface SaveProjectOutputInput {
   readonly savedVideoId: string;
   readonly videoVersionId: string;
   readonly author: ProjectRevisionAuthor;
+  /**
+   * Whether the produced Version is the cut itself, and so becomes what the Project presents.
+   *
+   * True when the bytes stored are the ones that were on the stage. False when they were produced
+   * from it — re-framed for a placement — because that file is a deliverable rather than the next
+   * thing to work from, and adopting it would make every later save re-frame an already-re-framed
+   * video while the Project still holds the untouched source.
+   */
+  readonly presentsOutput: boolean;
 }
 
 /**
  * Records immutable producer provenance on the pre-save revision, then advances the Project to a
- * distinct post-save revision that presents the exact retained Version. This is intentionally a
+ * distinct post-save revision. That revision presents the retained Version when the Version is the
+ * cut itself, and keeps the producing revision's own media when the Version was produced from it —
+ * see `presentsOutput`. This is intentionally a
  * dedicated transition: changing an ordinary revision's media clears a stale output pointer,
  * while this command proves the replacement reference names the same newly retained output.
  *
@@ -1073,8 +1084,14 @@ export const saveProjectOutput = (
   const snapshot = validateProjectSnapshot({
     ...producingRevision.snapshot,
     ...clearedProjectCreativeConfiguration(producingRevision.snapshot),
-    workingMedia: { kind: 'saved-video-version', ...outputReference },
-    presentedMedia: { kind: 'saved-video-version', ...outputReference },
+    // The output is presented only when it is the cut; otherwise the producing revision's own
+    // media carries forward, so the next save starts from the same place this one did.
+    workingMedia: input.presentsOutput
+      ? { kind: 'saved-video-version', ...outputReference }
+      : workingMedia,
+    presentedMedia: input.presentsOutput
+      ? { kind: 'saved-video-version', ...outputReference }
+      : presentedMedia,
     lastSuccessfulOutput: outputReference,
     workflowPhase: 'complete',
     updatedAt: now,

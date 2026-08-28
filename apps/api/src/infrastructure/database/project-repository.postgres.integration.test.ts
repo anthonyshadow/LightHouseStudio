@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
@@ -908,6 +908,15 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
     const outputAt = '2026-08-13T18:02:00.000Z';
     const media = Buffer.from('postgres-project-output-media');
     const checksumSha256 = createHash('sha256').update(media).digest('hex');
+    const renditionAssetId = randomUUID();
+    const renditionMedia = Buffer.from('postgres-project-reframed-media');
+    const renditionChecksum = createHash('sha256').update(renditionMedia).digest('hex');
+    const phonePlacement = {
+      container: 'video/mp4' as const,
+      aspect: '9:16' as const,
+      resolution: { width: 1_080, height: 1_920 },
+      includeAudio: true,
+    };
     const inspected = {
       mimeType: 'video/mp4' as const,
       container: 'mp4' as const,
@@ -922,29 +931,42 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
     const bytes: AssetByteStore = {
       storeFile: () => Promise.reject(new Error('not used')),
       storeBytes: () => Promise.reject(new Error('not used')),
-      open: (readOwnerUserId, assetId) =>
-        Promise.resolve(
-          readOwnerUserId === ownerUserId && assetId === sourceAssetId
-            ? {
-                manifest: {
-                  schemaVersion: 1,
-                  assetId: sourceAssetId,
-                  ownerUserId,
-                  mimeType: inspected.mimeType,
-                  filename: 'project-output.mp4',
-                  sizeBytes: media.byteLength,
-                  checksumSha256,
-                  createdAt: acceptedAt,
-                },
-                createReadStream: (range) =>
-                  Readable.from(
-                    range === undefined ? media : media.subarray(range.start, range.end + 1),
-                  ),
-              }
-            : null,
-        ),
+      open: (readOwnerUserId, assetId) => {
+        if (readOwnerUserId !== ownerUserId) return Promise.resolve(null);
+        const [bytesValue, id, filename, checksum] =
+          assetId === renditionAssetId
+            ? ([
+                renditionMedia,
+                renditionAssetId,
+                'project-output-phone.mp4',
+                renditionChecksum,
+              ] as const)
+            : assetId === sourceAssetId
+              ? ([media, sourceAssetId, 'project-output.mp4', checksumSha256] as const)
+              : ([null, '', '', ''] as const);
+        if (bytesValue === null) return Promise.resolve(null);
+        return Promise.resolve({
+          manifest: {
+            schemaVersion: 1 as const,
+            assetId: id,
+            ownerUserId,
+            mimeType: inspected.mimeType,
+            filename,
+            sizeBytes: bytesValue.byteLength,
+            checksumSha256: checksum,
+            createdAt: acceptedAt,
+          },
+          createReadStream: (range?: { start: number; end: number }) =>
+            Readable.from(
+              range === undefined ? bytesValue : bytesValue.subarray(range.start, range.end + 1),
+            ),
+        });
+      },
       exists: (readOwnerUserId, assetId) =>
-        Promise.resolve(readOwnerUserId === ownerUserId && assetId === sourceAssetId),
+        Promise.resolve(
+          readOwnerUserId === ownerUserId &&
+            (assetId === sourceAssetId || assetId === renditionAssetId),
+        ),
       delete: () => Promise.resolve(),
     };
     const repository = new DrizzleProjectRepository(connection.db);
@@ -959,17 +981,31 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
         email: `${ownerUserId}@project-output.test`,
         displayName: 'Project Output Integration',
       });
-      await connection.db.insert(mediaAssets).values({
-        id: sourceAssetId,
-        ownerUserId,
-        storageProvider: 'local',
-        storageKey: sourceAssetId,
-        status: 'ready',
-        mimeType: inspected.mimeType,
-        filename: 'project-output.mp4',
-        sizeBytes: media.byteLength,
-        checksumSha256,
-      });
+      await connection.db.insert(mediaAssets).values([
+        {
+          id: sourceAssetId,
+          ownerUserId,
+          storageProvider: 'local',
+          storageKey: sourceAssetId,
+          status: 'ready',
+          mimeType: inspected.mimeType,
+          filename: 'project-output.mp4',
+          sizeBytes: media.byteLength,
+          checksumSha256,
+        },
+        // The re-framed bytes a placement save stores; uploaded before the save, as in production.
+        {
+          id: renditionAssetId,
+          ownerUserId,
+          storageProvider: 'local',
+          storageKey: renditionAssetId,
+          status: 'ready',
+          mimeType: inspected.mimeType,
+          filename: 'project-output-phone.mp4',
+          sizeBytes: renditionMedia.byteLength,
+          checksumSha256: renditionChecksum,
+        },
+      ]);
       const created = createProject(
         {
           id: projectId,
@@ -1134,6 +1170,74 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
           .from(projectWorkingMediaAdoptions)
           .where(eq(projectWorkingMediaAdoptions.projectId, projectId)),
       ).resolves.toHaveLength(2);
+
+      /*
+       * A save that stores re-framed bytes keeps presenting the cut it came from, so the relational
+       * invariant has to accept a hydration record that is not the Version it just wrote. This is
+       * the branch the file repository covers in `project-output-service.test.ts`; both must agree.
+       */
+      const beforeRendition = (await repository.getCurrent(ownerUserId, projectId))!;
+      const placed = await new ProjectService(repository, {
+        now: () => new Date(outputAt),
+      }).checkpoint(ownerUserId, projectId, {
+        expectedVersion: beforeRendition.project.version,
+        expectedRevisionNumber: beforeRendition.revision.revisionNumber,
+        proposal: {
+          ...beforeRendition.revision.snapshot,
+          exportSpecification: phonePlacement,
+        },
+      });
+      if (!placed.ok) throw new Error('Expected the placement checkpoint to be accepted.');
+      const presentedBefore = placed.current.revision.snapshot.workingMedia;
+
+      const reframed = await new ProjectOutputService(
+        repository,
+        repository,
+        savedVideoRepository,
+        bytes,
+        {
+          now: () => new Date(outputAt),
+          inspect: (filePath) =>
+            readFile(filePath).then((contents) =>
+              contents.equals(renditionMedia)
+                ? {
+                    ...inspected,
+                    sizeBytes: renditionMedia.byteLength,
+                    width: 1_080,
+                    height: 1_920,
+                  }
+                : inspected,
+            ),
+        },
+      ).save(ownerUserId, projectId, randomUUID(), {
+        expectedVersion: placed.current.project.version,
+        expectedRevisionNumber: placed.current.revision.revisionNumber,
+        media: presentedBefore!,
+        target: { kind: 'new', title: 'Relational phone master' },
+        renditions: [
+          { media: { kind: 'asset', assetId: renditionAssetId }, specification: phonePlacement },
+        ],
+      });
+
+      if (!reframed.ok) throw new Error('Expected the re-framed save to succeed.');
+      expect(reframed.response.savedVideo.currentVersion).toMatchObject({
+        width: 1_080,
+        height: 1_920,
+        exportSpecification: phonePlacement,
+      });
+      expect(reframed.response.revision.snapshot).toMatchObject({
+        workingMedia: presentedBefore,
+        presentedMedia: presentedBefore,
+        workflowPhase: 'complete',
+      });
+      // The adoption row hydrating that revision names the cut, not the Version just written.
+      const hydrated = (await repository.getWorkingMedia(ownerUserId, projectId))!;
+      expect(hydrated.media).toMatchObject({
+        mediaReference: presentedBefore,
+        adoptedRevisionId: reframed.response.revision.id,
+        width: inspected.width,
+        height: inspected.height,
+      });
     } finally {
       await connection.db
         .delete(projectOutputOperationReceipts)
@@ -1155,7 +1259,7 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
       await connection.db.delete(projects).where(eq(projects.id, projectId));
       await connection.db.delete(videoVersions).where(eq(videoVersions.ownerUserId, ownerUserId));
       await connection.db.delete(savedVideos).where(eq(savedVideos.ownerUserId, ownerUserId));
-      await connection.db.delete(mediaAssets).where(eq(mediaAssets.id, sourceAssetId));
+      await connection.db.delete(mediaAssets).where(eq(mediaAssets.ownerUserId, ownerUserId));
       await connection.db.delete(users).where(eq(users.id, ownerUserId));
     }
   }, 30_000);

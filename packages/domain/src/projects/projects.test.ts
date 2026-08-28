@@ -195,6 +195,7 @@ describe('Project aggregate rules', () => {
         expectedRevisionNumber: 2,
         savedVideoId,
         videoVersionId,
+        presentsOutput: true,
         author: { kind: 'user', authorId: ownerUserId },
       },
       { now: latest, createId: () => outputRevisionId },
@@ -226,6 +227,63 @@ describe('Project aggregate rules', () => {
         workflowPhase: 'complete',
       },
     });
+  });
+
+  it('keeps the cut it produced from when the output is not the cut itself', () => {
+    const accepted = acceptProjectSource(
+      emptyProject(),
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        assetId: sourceAssetId,
+        mediaReference: { kind: 'asset', assetId: sourceAssetId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    expect(accepted.ok).toBe(true);
+    if (!accepted.ok) return;
+    const producing = accepted.value.revisions.at(-1)!.snapshot;
+    const outputRevisionId = '5354b1d3-4022-4c85-a7b6-b230b58ba10b';
+    const savedVideoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
+    const videoVersionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
+
+    const saved = saveProjectOutput(
+      accepted.value,
+      {
+        expectedProjectVersion: 2,
+        expectedRevisionNumber: 2,
+        savedVideoId,
+        videoVersionId,
+        // Re-framed for a placement: a deliverable, not the next thing to work from.
+        presentsOutput: false,
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => outputRevisionId },
+    );
+
+    expect(saved.ok).toBe(true);
+    if (!saved.ok) return;
+    // The operator keeps working from what they had, so a second placement cannot crop a crop.
+    expect(saved.value.revisions.at(-1)).toMatchObject({
+      id: outputRevisionId,
+      source: 'output-save',
+      snapshot: {
+        workingMedia: producing.workingMedia,
+        presentedMedia: producing.presentedMedia,
+        lastSuccessfulOutput: { savedVideoId, videoVersionId },
+        workflowPhase: 'complete',
+      },
+    });
+    // Everything that says the save happened is unchanged by not presenting its result.
+    expect(saved.value.project).toMatchObject({
+      status: 'completed',
+      currentRevisionId: outputRevisionId,
+      currentRevisionNumber: 3,
+    });
+    expect(saved.value.outputLinks).toContainEqual(
+      expect.objectContaining({ savedVideoId, videoVersionId, producingRevisionNumber: 2 }),
+    );
   });
 
   it('frees the creative configuration for the next round on the post-save revision', () => {
@@ -286,6 +344,7 @@ describe('Project aggregate rules', () => {
         expectedRevisionNumber: 3,
         savedVideoId: 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338',
         videoVersionId: 'b276694b-58c4-40d3-8fb6-315e32b66fd0',
+        presentsOutput: true,
         author: { kind: 'user', authorId: ownerUserId },
       },
       { now: latest, createId: () => outputRevisionId },
@@ -377,6 +436,7 @@ describe('Project aggregate rules', () => {
         expectedRevisionNumber: 3,
         savedVideoId: 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338',
         videoVersionId: 'b276694b-58c4-40d3-8fb6-315e32b66fd0',
+        presentsOutput: true,
         author: { kind: 'user', authorId: ownerUserId },
       },
       { now: latest, createId: () => outputRevisionId },
