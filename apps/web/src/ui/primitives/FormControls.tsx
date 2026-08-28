@@ -92,6 +92,24 @@ const FieldFrame = ({
   );
 };
 
+/**
+ * What a field says when it wants no history of its own offered back.
+ *
+ * These hold one Project's working text — a title, a prompt, a character's name — and a dropdown of
+ * what was typed into a different Project is noise at best and someone else's content at worst.
+ * Signing in is the exception and states its own `autoComplete`, which wins because these are
+ * spread first.
+ *
+ * The two data attributes are here because the major password managers fill on their own
+ * heuristics and ignore `autocomplete="off"`; spelling and capitalisation are deliberately left
+ * alone, being help with what is being typed rather than a record of what was typed before.
+ */
+export const NO_BROWSER_SUGGESTIONS = {
+  autoComplete: 'off',
+  'data-1p-ignore': '',
+  'data-lpignore': 'true',
+} as const;
+
 export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
   { id: providedId, label, hint, error, required, endAdornment, ...props },
   ref,
@@ -115,6 +133,9 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
             aria-invalid={invalid}
             aria-describedby={messageId}
             css={controlCss}
+            // Spread last, so a field that genuinely wants a browser suggestion — signing in — says
+            // so and wins. See `NO_BROWSER_SUGGESTIONS`.
+            {...NO_BROWSER_SUGGESTIONS}
             {...props}
           />
         );
@@ -148,6 +169,7 @@ export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>
             aria-invalid={invalid}
             aria-describedby={messageId}
             css={[controlCss, textareaStyles()]}
+            {...NO_BROWSER_SUGGESTIONS}
             {...props}
           />
         )}

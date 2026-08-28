@@ -14,15 +14,7 @@ import {
   type ProjectExportSpecification,
 } from '@studio/domain';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-} from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { ApiClientError } from '../../adapters/api-client/apiClient';
 import { savedVideoLibraryPath } from '../../app/paths';
@@ -32,8 +24,8 @@ import {
   ExportPlacementProgress,
   exportPlacementLabel,
   exportPlacementShortLabel,
-  exportPlacementRenderSupported,
   useExportPlacementRender,
+  type ExportPlacementRenderResult,
 } from '../export-placements';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { SavedVideoSuccessActions } from '../saved-videos/SavedVideoSuccessActions';
@@ -103,8 +95,9 @@ const useMobileDestinationSheet = (): boolean => {
   return mobile;
 };
 
-type CurrentCutBytes = Readonly<{
-  media: Blob;
+type CurrentCut = Readonly<{
+  contentUrl: string;
+  mimeType: string;
   filename: string;
   width: number;
   height: number;
@@ -113,16 +106,18 @@ type CurrentCutBytes = Readonly<{
 }>;
 
 /**
- * Reads the bytes of the cut the stage is showing, from wherever this Project keeps them.
+ * Describes the cut the stage is showing, wherever this Project keeps it.
  *
  * Only an edit or a previous save writes a working-media adoption, so the ordinary path — upload a
  * source, choose a placement, save — has none and asking for one 404s. The snapshot says which it
- * is, so this asks the matching surface rather than assuming the edited case.
+ * is, so this asks the matching surface rather than assuming the edited case. It returns where the
+ * bytes are rather than the bytes: the caller reads them where it consumes them, so nothing here
+ * keeps a large Blob alive.
  */
-const readCurrentCut = async (
+const describeCurrentCut = async (
   latest: ProjectCurrentResponse,
   signal: AbortSignal,
-): Promise<CurrentCutBytes> => {
+): Promise<CurrentCut> => {
   const { workingMedia } = latest.revision.snapshot;
   const source = await getProjectSource(latest.project.id, signal);
   const sourceReference =
@@ -137,11 +132,8 @@ const readCurrentCut = async (
     ? source.source
     : (await getProjectWorkingMedia(latest.project.id, signal)).media;
   return {
-    media: await readProjectWorkingMediaContent({
-      contentUrl: cut.contentUrl,
-      mimeType: cut.mimeType,
-      signal,
-    }),
+    contentUrl: cut.contentUrl,
+    mimeType: cut.mimeType,
     filename: cut.filename,
     width: cut.width,
     height: cut.height,
@@ -364,27 +356,33 @@ export const ProjectOutputSaveSection = ({
     setPhase('saving');
     setMessage('Reading this cut to re-frame it for the placement.');
 
-    let cut: CurrentCutBytes;
+    let cut: CurrentCut;
+    let rendered: ExportPlacementRenderResult | null;
     try {
-      cut = await readCurrentCut(latest, controller.signal);
+      cut = await describeCurrentCut(latest, controller.signal);
+      /*
+       * Scoped to this block deliberately. The render consumes the source and the block ends, so
+       * the only large Blob still reachable while the result uploads is the result — holding both
+       * across a network-bound minute is the difference between one and two.
+       */
+      const media = await readProjectWorkingMediaContent({
+        contentUrl: cut.contentUrl,
+        mimeType: cut.mimeType,
+        signal: controller.signal,
+      });
+      setMessage(null);
+      rendered = await placementRender.render({
+        media,
+        specification,
+        source: { width: cut.width, height: cut.height, durationMs: cut.durationMs },
+        hasAudio: cut.hasAudio,
+        filename: cut.filename,
+      });
     } catch (error) {
+      // `render` reports its own failures by returning null; only the reads throw.
       if (controller.signal.aborted) return 'stopped';
       return fail('This cut could not be read to re-frame it. Nothing was saved.', error);
     }
-
-    setMessage(null);
-    // Released as soon as the render has consumed it: the rendered file is about to be uploaded,
-    // and holding both across a network-bound minute is the difference between one large Blob
-    // alive and two.
-    let media: Blob | null = cut.media;
-    const rendered = await placementRender.render({
-      media,
-      specification,
-      source: { width: cut.width, height: cut.height, durationMs: cut.durationMs },
-      hasAudio: cut.hasAudio,
-      filename: cut.filename,
-    });
-    media = null;
     if (rendered === null) {
       // The render hook owns the reason, and `ExportPlacementProgress` is already showing it —
       // including the size ceiling, which `VideoEditChunkAccumulator` refuses at the 300 MB it

@@ -335,7 +335,11 @@ export interface ProjectOutputMetadataUnitOfWork {
         };
     readonly projectRevision: AppendProjectRevisionPersistenceInput;
     readonly output: ProjectOutputLink;
-    /** Hydration record for the post-save revision's exact presented Saved Video Version. */
+    /**
+     * Hydration record for whatever the post-save revision presents: the Saved Video Version when
+     * that Version is the cut itself, and the cut it was produced from when the Version holds bytes
+     * re-framed for a placement. Its fields describe the bytes its reference names, either way.
+     */
     readonly media: ProjectWorkingMediaRecord;
   }): Promise<ProjectOutputMetadataCommitResult>;
 }

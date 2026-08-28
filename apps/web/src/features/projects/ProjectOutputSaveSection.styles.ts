@@ -6,9 +6,6 @@ import {
   SAVE_ACTION_BAR_INSET_NARROW,
 } from './saveActionMetrics';
 
-/** The action's own height below `laptop`: one primary control plus the bar's padding. */
-const SAVE_ACTION_BAR_HEIGHT = '4.5rem';
-
 /**
  * The Save panel is the one task whose final action must remain available while its supporting
  * choices scroll. At laptop sizes the inspector owns the scroll region; below that breakpoint the
