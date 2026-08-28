@@ -256,6 +256,8 @@ export const videoVersions = pgTable(
     durationMs: integer('duration_ms').notNull(),
     width: integer('width').notNull(),
     height: integer('height').notNull(),
+    /** The placement these bytes were produced for; null where the cut was stored as it was. */
+    exportSpecification: jsonb('export_specification'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
       .notNull()
       .defaultNow(),

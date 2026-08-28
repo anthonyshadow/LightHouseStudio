@@ -134,6 +134,7 @@ export const installProjectHarness = async (
       durationMs: 1_000,
       width: 1_280,
       height: 720,
+      exportSpecification: null,
       createdAt: '2029-12-31T23:59:00.000Z',
     };
     outputSavedVideos.set(videoId, {
@@ -416,6 +417,7 @@ export const installProjectHarness = async (
         durationMs: source.source.durationMs,
         width: source.source.width,
         height: source.source.height,
+        exportSpecification: null,
         createdAt,
       };
       const savedVideo: SavedVideoDetail =

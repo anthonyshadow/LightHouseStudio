@@ -152,6 +152,20 @@ export const isProjectExportPlacementAspect = (
   aspect: ProjectExportAspect,
 ): aspect is ProjectExportPlacementAspect => aspect !== 'source';
 
+/**
+ * Whether a produced frame is the one a placement asked for.
+ *
+ * Stated here because it is the agreement between a placement and the bytes made for it, and both
+ * the gate that accepts those bytes and the gate that stores them have to mean the same thing by it.
+ */
+export const projectExportMatchesFrame = (
+  specification: ProjectExportSpecification,
+  frame: { readonly width: number; readonly height: number },
+): boolean =>
+  specification.resolution !== null &&
+  specification.resolution.width === frame.width &&
+  specification.resolution.height === frame.height;
+
 export const defaultProjectExportResolution = (
   aspect: ProjectExportAspect,
 ): { readonly width: number; readonly height: number } | null =>

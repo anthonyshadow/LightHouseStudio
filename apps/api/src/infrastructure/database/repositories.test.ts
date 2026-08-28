@@ -267,6 +267,7 @@ describe('DrizzleSavedVideoRepository', () => {
     durationMs: 12_000,
     width: 1_280,
     height: 720,
+    exportSpecification: null,
     createdAt: now,
   };
   const nextVersion = {

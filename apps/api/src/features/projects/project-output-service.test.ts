@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -10,6 +10,7 @@ import { FileSavedVideoRepository } from '../saved-videos/saved-video-repository
 import { SavedVideoService } from '../saved-videos/saved-video-service.js';
 import { FileProjectRepository } from './file-project-repository.js';
 import { ProjectOutputService } from './project-output-service.js';
+import { ProjectRenditionService } from './project-rendition-service.js';
 import { ProjectService } from './project-service.js';
 import { ProjectSourceService } from './project-source-service.js';
 import { ProjectWorkingMediaService } from './project-working-media-service.js';
@@ -30,7 +31,17 @@ const inspected = {
   hasAudio: true,
 };
 
+const renditionBytes = Buffer.from('synthetic-reframed-phone-video');
+const renditionChecksum = createHash('sha256').update(renditionBytes).digest('hex');
+const phonePlacement = {
+  container: 'video/mp4' as const,
+  aspect: '9:16' as const,
+  resolution: { width: 1_080, height: 1_920 },
+  includeAudio: true,
+};
+
 describe('ProjectOutputService local composite authority', () => {
+  let currentProjectId: string;
   let directory: string;
   let sourcePath: string;
   let ownerLock: KeyedLock;
@@ -74,6 +85,7 @@ describe('ProjectOutputService local composite authority', () => {
       filename: 'source.mp4',
     });
     if (!accepted.ok) throw new Error('Expected Project source acceptance.');
+    currentProjectId = created.current.project.id;
     return { current: accepted.response, assetId: operationKey };
   };
 
@@ -82,6 +94,160 @@ describe('ProjectOutputService local composite authority', () => {
       now: () => new Date('2026-08-13T12:02:00.000Z'),
       inspect: () => Promise.resolve(inspected),
     });
+
+  /** Distinguishes the two assets by their bytes, because both are inspected through a temp copy. */
+  const inspectByContent = async (filePath: string) =>
+    (await readFile(filePath)).equals(renditionBytes)
+      ? { ...inspected, sizeBytes: renditionBytes.byteLength, width: 1_080, height: 1_920 }
+      : inspected;
+
+  const outputServiceWithRenditions = () =>
+    new ProjectOutputService(projects, projects, savedVideos, bytes, {
+      now: () => new Date('2026-08-13T12:02:00.000Z'),
+      inspect: inspectByContent,
+    });
+
+  const choosePhonePlacement = async (
+    current: Awaited<ReturnType<typeof createReadyProject>>['current'],
+  ) => {
+    const checkpoint = await new ProjectService(projects, {
+      now: () => new Date('2026-08-13T12:01:20.000Z'),
+    }).checkpoint(ownerUserId, current.project.id, {
+      expectedVersion: current.project.version,
+      expectedRevisionNumber: current.revision.revisionNumber,
+      proposal: {
+        ...current.revision.snapshot,
+        exportSpecification: phonePlacement,
+      },
+    });
+    if (!checkpoint.ok) throw new Error('Expected the placement checkpoint to be accepted.');
+    return checkpoint.current;
+  };
+
+  const storeRendition = async () => {
+    const renditionPath = path.join(directory, 'rendition.mp4');
+    await writeFile(renditionPath, renditionBytes);
+    return new ProjectRenditionService(projects, bytes, {
+      now: () => new Date('2026-08-13T12:01:30.000Z'),
+      inspect: inspectByContent,
+      projectRetention: projects,
+    }).upload({
+      ownerUserId,
+      projectId: (await projects.getCurrent(ownerUserId, currentProjectId))!.project.id,
+      operationKey: randomUUID(),
+      sourcePath: renditionPath,
+      checksumSha256: renditionChecksum,
+      filename: 'reframed.mp4',
+      specification: phonePlacement,
+    });
+  };
+
+  it('stores the re-framed bytes and records the placement they were produced for', async () => {
+    const created = await createReadyProject();
+    const current = await choosePhonePlacement(created.current);
+    const rendition = await storeRendition();
+
+    const saved = await outputServiceWithRenditions().save(
+      ownerUserId,
+      current.project.id,
+      randomUUID(),
+      {
+        expectedVersion: current.project.version,
+        expectedRevisionNumber: current.revision.revisionNumber,
+        media: current.revision.snapshot.workingMedia!,
+        target: { kind: 'new', title: 'Phone master' },
+        renditions: [{ media: rendition.media, specification: phonePlacement }],
+      },
+    );
+
+    if (!saved.ok) throw new Error('Expected the save to succeed.');
+    expect(saved.response.savedVideo.currentVersion).toMatchObject({
+      width: 1_080,
+      height: 1_920,
+      sizeBytes: renditionBytes.byteLength,
+      exportSpecification: phonePlacement,
+    });
+  });
+
+  it('stores the cut unchanged, and records no placement, when none was produced', async () => {
+    const { current } = await createReadyProject();
+
+    const saved = await outputServiceWithRenditions().save(
+      ownerUserId,
+      current.project.id,
+      randomUUID(),
+      {
+        expectedVersion: current.project.version,
+        expectedRevisionNumber: current.revision.revisionNumber,
+        media: current.revision.snapshot.workingMedia!,
+        target: { kind: 'new', title: 'As it is' },
+        renditions: [],
+      },
+    );
+
+    if (!saved.ok) throw new Error('Expected the save to succeed.');
+    expect(saved.response.savedVideo.currentVersion).toMatchObject({
+      width: inspected.width,
+      height: inspected.height,
+      sizeBytes: inspected.sizeBytes,
+      exportSpecification: null,
+    });
+  });
+
+  it('replays a save that already stored a rendition without producing a second Version', async () => {
+    const created = await createReadyProject();
+    const current = await choosePhonePlacement(created.current);
+    const rendition = await storeRendition();
+    const operationId = randomUUID();
+    const request = {
+      expectedVersion: current.project.version,
+      expectedRevisionNumber: current.revision.revisionNumber,
+      media: current.revision.snapshot.workingMedia!,
+      target: { kind: 'new' as const, title: 'Phone master' },
+      renditions: [{ media: rendition.media, specification: phonePlacement }],
+    };
+
+    const first = await outputServiceWithRenditions().save(
+      ownerUserId,
+      current.project.id,
+      operationId,
+      request,
+    );
+    const replay = await outputServiceWithRenditions().save(
+      ownerUserId,
+      current.project.id,
+      operationId,
+      request,
+    );
+
+    if (!first.ok || !replay.ok) throw new Error('Expected both saves to succeed.');
+    expect(replay.response).toEqual({ ...first.response, replayed: true });
+    expect(replay.response.savedVideo.versionCount).toBe(1);
+    expect(replay.response.savedVideo.currentVersion.id).toBe(
+      first.response.savedVideo.currentVersion.id,
+    );
+  });
+
+  it('refuses a rendition made for a placement the Project has not chosen', async () => {
+    const created = await createReadyProject();
+    const current = await choosePhonePlacement(created.current);
+    const rendition = await storeRendition();
+
+    await expect(
+      outputServiceWithRenditions().save(ownerUserId, current.project.id, randomUUID(), {
+        expectedVersion: current.project.version,
+        expectedRevisionNumber: current.revision.revisionNumber,
+        media: current.revision.snapshot.workingMedia!,
+        target: { kind: 'new', title: 'Mismatched' },
+        renditions: [
+          {
+            media: rendition.media,
+            specification: { ...phonePlacement, resolution: { width: 1_920, height: 1_080 } },
+          },
+        ],
+      }),
+    ).rejects.toThrow(/made for a different placement/u);
+  });
 
   it('saves new and appended immutable Versions with distinct producer and post-save revisions', async () => {
     const { current, assetId } = await createReadyProject();
@@ -92,6 +258,7 @@ describe('ProjectOutputService local composite authority', () => {
       expectedRevisionNumber: current.revision.revisionNumber,
       media: current.revision.snapshot.workingMedia!,
       target: { kind: 'new' as const, title: 'Launch master' },
+      renditions: [],
     };
     const first = await outputService().save(ownerUserId, projectId, firstOperation, firstRequest);
     expect(first).toMatchObject({
@@ -142,6 +309,7 @@ describe('ProjectOutputService local composite authority', () => {
       outputService().save(ownerUserId, projectId, firstOperation, {
         ...firstRequest,
         target: { kind: 'new', title: 'Changed title' },
+        renditions: [],
       }),
     ).resolves.toEqual({
       ok: false,
@@ -158,6 +326,7 @@ describe('ProjectOutputService local composite authority', () => {
         savedVideoId: first.response.savedVideo.id,
         expectedVersionId: first.response.savedVideo.currentVersion.id,
       },
+      renditions: [],
     });
     expect(second).toMatchObject({
       ok: true,
@@ -213,6 +382,7 @@ describe('ProjectOutputService local composite authority', () => {
         expectedRevisionNumber: current.revision.revisionNumber,
         media: current.revision.snapshot.workingMedia!,
         target: { kind: 'new' as const, title: `Recovered ${hook}` },
+        renditions: [],
       };
       const interruptedSavedVideos = new FileSavedVideoRepository(directory, { ownerLock });
       const interruptedProjects = new FileProjectRepository(directory, {
@@ -311,6 +481,7 @@ describe('ProjectOutputService local composite authority', () => {
       expectedRevisionNumber: checkpointed.current.revision.revisionNumber,
       media: checkpointed.current.revision.snapshot.workingMedia!,
       target: { kind: 'new', title: 'Rendered cut' },
+      renditions: [],
     });
     expect(saved).toMatchObject({
       ok: true,
