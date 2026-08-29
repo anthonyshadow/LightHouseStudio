@@ -2,6 +2,7 @@ import { useTheme } from '@emotion/react';
 import type { ProjectCurrentResponse, SavedVideoSummary } from '@studio/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, StatusNotice } from '../../ui';
+import { projectCurrentCutNotice, type ProjectCurrentCutPhase } from './projectCreatePresentation';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
 import {
   getProjectWorkingMedia,
@@ -10,23 +11,6 @@ import {
 } from './projectsApi';
 import type { ProjectSessionPort } from './useProjectSession';
 import { useStableOperationKey } from './useStableOperationKey';
-
-type AdoptionPhase = 'idle' | 'saving' | 'saved' | 'conflict' | 'error';
-
-const adoptionPhaseNotice = {
-  idle: { role: 'status', tone: 'success', title: 'Current cut ready' },
-  saving: { role: 'status', tone: 'neutral', title: 'Saving current cut' },
-  saved: { role: 'status', tone: 'success', title: 'Current cut ready' },
-  conflict: { role: 'alert', tone: 'warning', title: 'Conflict' },
-  error: { role: 'alert', tone: 'danger', title: 'Current cut not changed' },
-} as const satisfies Record<
-  AdoptionPhase,
-  {
-    readonly role: 'alert' | 'status';
-    readonly tone: 'neutral' | 'success' | 'warning' | 'danger';
-    readonly title: string;
-  }
->;
 
 export interface ProjectWorkingMediaActivity {
   readonly projectId: string;
@@ -48,10 +32,11 @@ export const ProjectWorkingMediaSection = ({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const operation = useStableOperationKey();
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [phase, setPhase] = useState<AdoptionPhase>('idle');
+  const [phase, setPhase] = useState<ProjectCurrentCutPhase>('idle');
   const [message, setMessage] = useState<string | null>(null);
   const snapshot = current.revision.snapshot;
   const busy = phase === 'saving';
+  const notice = projectCurrentCutNotice('saved-version', phase);
 
   useEffect(() => {
     onActivityChange?.({ projectId: current.project.id, busy });
@@ -133,45 +118,55 @@ export const ProjectWorkingMediaSection = ({
     <>
       <section
         aria-labelledby="project-working-media-heading"
+        data-project-current-cut=""
         css={{
-          display: 'grid',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
           gap: theme.space.sm,
-          padding: theme.space.md,
-          border: `1px solid ${theme.colors.border}`,
-          borderRadius: theme.radii.large,
-          background: theme.colors.surfaceSoft,
+          minWidth: 0,
+          '& h3': {
+            margin: 0,
+            color: theme.colors.textMuted,
+            fontSize: theme.fontSizes.caption,
+            fontWeight: 800,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+          },
+          '& p': {
+            minWidth: 0,
+            flex: '1 1 12rem',
+            margin: 0,
+            color: theme.colors.textMuted,
+            fontSize: theme.fontSizes.metadata,
+            overflowWrap: 'anywhere',
+          },
+          '& [data-current-cut-notice]': { flexBasis: '100%' },
         }}
       >
-        <div>
-          <h3 id="project-working-media-heading">Current cut</h3>
-          <p>
-            The stage shows what you’re viewing now. Your original video is kept separately and
-            never changes.
-          </p>
-        </div>
+        <h3 id="project-working-media-heading">Current cut</h3>
+        <p>The stage shows what you’re viewing. Your original video is kept separately.</p>
+        <Button
+          ref={triggerRef}
+          size="small"
+          variant="quiet"
+          busy={phase === 'saving'}
+          disabled={archived || phase === 'saving'}
+          title="Picks one exact version of one of your own videos, and never sets a target for Add Version."
+          onClick={() => setPickerOpen(true)}
+        >
+          Use a saved video instead
+        </Button>
         {message ? (
           <StatusNotice
-            role={adoptionPhaseNotice[phase].role}
-            tone={adoptionPhaseNotice[phase].tone}
-            title={adoptionPhaseNotice[phase].title}
+            data-current-cut-notice=""
+            role={notice.role}
+            tone={notice.tone}
+            title={notice.title}
           >
             {message}
           </StatusNotice>
         ) : null}
-        <div>
-          <Button
-            ref={triggerRef}
-            busy={phase === 'saving'}
-            disabled={archived || phase === 'saving'}
-            onClick={() => setPickerOpen(true)}
-          >
-            Use a saved video as the current cut
-          </Button>
-          <small>
-            Picks one exact version of one of your own videos, and never sets a target for Add
-            Version.
-          </small>
-        </div>
       </section>
       <ProjectSavedVideoPicker
         open={pickerOpen}

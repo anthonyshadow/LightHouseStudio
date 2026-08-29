@@ -16,6 +16,7 @@ import {
   resolveProjectCreativeResourceIssues,
   resolveProjectSavedVoiceResourceIssue,
 } from './projectCreativeSessionAdapter';
+import { effectiveCreativeSnapshot, localVoiceName } from './projectCreatePresentation';
 import type { ProjectSessionPort } from './useProjectSession';
 
 export type ProjectCreativeCheckpointPhase = 'idle' | 'saving' | 'saved' | 'error';
@@ -31,11 +32,28 @@ type ProjectCreativeCheckpointState = Readonly<{
   message: string | null;
 }>;
 
-const localVoiceName = (effectId: 'warm-studio' | 'clear-presenter' | 'robot'): string => {
-  if (effectId === 'warm-studio') return 'Warm studio';
-  if (effectId === 'clear-presenter') return 'Clear presenter';
-  return 'Robot';
-};
+/**
+ * The creative fields an operator actually picks.
+ *
+ * Deliberately not the whole proposal: `liveMode` and `workflowPhase` are context that
+ * `createProjectCreativeProposal` always restates — a fresh Project has no `liveMode` at all — so
+ * comparing on them would make merely opening a Project look like a change. They still ride along
+ * with a real one.
+ */
+const creativeChoices = (value: {
+  readonly selectedCharacter: unknown;
+  readonly selectedOutfit: unknown;
+  readonly selectedVoice: unknown;
+  readonly visualTreatment: unknown;
+  readonly creativeIntent: unknown;
+}): string =>
+  JSON.stringify([
+    value.selectedCharacter,
+    value.selectedOutfit,
+    value.selectedVoice,
+    value.visualTreatment,
+    value.creativeIntent,
+  ]);
 
 const creativeHydrationKey = (projectId: string, snapshot: ProjectSessionPort['current']) =>
   snapshot === null
@@ -81,6 +99,11 @@ export const useProjectCreativeSessionAdapter = ({
   const existingVideoConfigurationKeyRef = useRef<string | null>(null);
   const freedOutputRevisionRef = useRef<string | null>(null);
 
+  // Read off the port rather than through it: the port is rebuilt on every autosave phase change,
+  // so an effect depending on the whole thing re-enters three more times for each pick it caused.
+  // `propose` is a controller method, stable for the life of one Project.
+  const proposeCreative = projectSession?.propose ?? null;
+  const pendingProposal = projectSession?.proposal ?? null;
   const current = projectSession?.current ?? null;
   const snapshot = current?.revision.snapshot ?? null;
   const savedVoice =
@@ -351,7 +374,10 @@ export const useProjectCreativeSessionAdapter = ({
     existingVideo.updateStep(step.id, {
       savedRecipeId:
         visual.kind === 'character-swap'
-          ? (snapshot.selectedCharacter?.characterId ?? null)
+          ? // A variant is its own saved recipe; sending the parent id would silently drop it.
+            (snapshot.selectedCharacter?.variantId ??
+            snapshot.selectedCharacter?.characterId ??
+            null)
           : (snapshot.selectedOutfit?.outfitId ?? null),
       prompt: snapshot.creativeIntent.appliedPrompt ?? snapshot.creativeIntent.userIntent,
       enhancePrompt: visual.kind === 'virtual-try-on' ? (visual.enhancePrompt ?? false) : false,
@@ -375,6 +401,69 @@ export const useProjectCreativeSessionAdapter = ({
     savedVoiceRelationship,
     snapshot,
     studioSession.draft.referenceImage,
+  ]);
+
+  /**
+   * Carries a creative selection out to the Project the moment it is made.
+   *
+   * Every other effect here runs inbound — snapshot to Studio — so before this one a character
+   * chosen on the rail reached nothing: the Create task read "Not chosen" and the editor opened on
+   * an empty step. Picking is an explicit selection boundary, which is exactly what
+   * `createProjectCreativeProposal` is documented to be called from.
+   *
+   * Two guards keep it from fighting the inbound hydration that reads what it writes. Proposing
+   * only when the derived proposal differs from the snapshot stops a hydration from echoing
+   * straight back, and remembering what was last sent stops a re-render from re-proposing while
+   * the autosave is still pending. `propose` alone is deliberate: it rides the existing coalescing
+   * autosave, so a burst of picks writes one revision.
+   */
+  useEffect(() => {
+    if (projectId === null || proposeCreative === null || current === null || snapshot === null) {
+      return;
+    }
+    // An ephemeral reference cannot be persisted; `checkpoint` refuses it too, with an explanation.
+    if (studioSession.draft.referenceImage?.kind === 'ephemeral') return;
+    // Nothing is chosen here, so there is nothing to carry out. Without this, reopening a Project
+    // would propose the empty Studio over the setup the Project already holds and erase it —
+    // hydration stamps its key before the recipe it restores has actually landed. Clearing a
+    // selection is a product decision (a saved output does it); it is not this effect's to make.
+    if (handoff.state.activeRecipe === null && existingVideo.voiceSelection === null) return;
+    // Hydration runs the other way and settles the Studio into the Project's own capture format and
+    // creative selection. Proposing before it lands would write a revision for merely opening a
+    // Project whose format differs from the one the Studio happens to be set to. Checked after the
+    // two free guards above, because building this key is the expensive part of the effect.
+    if (hydrationKeyRef.current !== creativeHydrationKey(projectId, current)) return;
+    const proposal = createProjectCreativeProposal({
+      current,
+      draft: studioSession.draft,
+      capturePreferences: studioSession.capturePreferences.applied,
+      activeRecipe: handoff.state.activeRecipe,
+      store: repository.getSnapshot().store,
+      // Deliberately not the editor's step. The configuration effect above writes that step *from*
+      // the snapshot, so reading it back here would let the Project write to itself: every inbound
+      // update would provoke an outbound one, re-rendering the editor under the operator's cursor.
+      // The step's own settings reach the Project through the checkpoint taken before a submission,
+      // which is where they belong. This edge carries what the operator picked.
+      visualStep: null,
+      voiceSelection: existingVideo.voiceSelection,
+    });
+    // Compared against the pending write laid over the settled one, which is the session's own
+    // record of what it is about to save. That covers both "the Project already agrees" and "this
+    // was proposed a moment ago and has not landed yet" without a second copy of either fact.
+    const pending = effectiveCreativeSnapshot(snapshot, pendingProposal);
+    if (creativeChoices(pending) === creativeChoices(proposal)) return;
+    proposeCreative(proposal);
+  }, [
+    current,
+    existingVideo.voiceSelection,
+    handoff.state.activeRecipe,
+    pendingProposal,
+    projectId,
+    proposeCreative,
+    repository,
+    snapshot,
+    studioSession.capturePreferences.applied,
+    studioSession.draft,
   ]);
 
   useEffect(

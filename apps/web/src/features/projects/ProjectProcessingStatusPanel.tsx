@@ -15,10 +15,10 @@ export const ProjectProcessingStatusPanel = ({
 
   if (unverifiedOperationId !== null) {
     return (
-      <StatusNotice role="alert" tone="warning" title="Submission status is unverified">
+      <StatusNotice role="alert" tone="warning" title="Your last start could not be confirmed">
         <p>
-          The exact app-owned operation is preserved, but its response could not be verified. Check
-          status without starting another potentially billable submission.
+          The run was recorded here, but the reply never arrived. Check that same run — starting
+          another one could be charged twice.
         </p>
         <Button size="small" onClick={() => void controller.refresh()}>
           Check same operation
@@ -73,16 +73,15 @@ export const ProjectProcessingStatusPanel = ({
 
   if (phase === 'loading' || phase === 'refreshing') {
     return (
-      <StatusNotice role="status" tone="neutral" title="Checking Project processing">
-        Looking for a durable current or accepted earlier-revision operation. This check never
-        submits provider work.
+      <StatusNotice role="status" tone="neutral" title="Checking this Project’s AI runs">
+        Looking for a run that is still going. Checking never starts one.
       </StatusNotice>
     );
   }
 
   if (phase === 'error') {
     return (
-      <StatusNotice role="alert" tone="warning" title="Processing status unavailable">
+      <StatusNotice role="alert" tone="warning" title="Could not check AI runs">
         <p>{message}</p>
         <Button size="small" onClick={() => void controller.refresh()}>
           Retry status check
@@ -91,11 +90,7 @@ export const ProjectProcessingStatusPanel = ({
     );
   }
 
-  return (
-    <StatusNotice role="status" tone="neutral" title="Recoverable Project processing ready">
-      Character Swap and Virtual Try-On start only from the explicit Project edit action. The exact
-      revision is linked before provider contact. Project provider Voice and live starts remain
-      unavailable because they cannot reconnect through this authority.
-    </StatusNotice>
-  );
+  // Nothing running, nothing pending, nothing wrong. A standing notice saying so is the state this
+  // Project is in almost always, and a panel that is always there stops being read.
+  return null;
 };

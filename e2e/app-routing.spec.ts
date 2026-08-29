@@ -627,15 +627,22 @@ test('an accepted Project operation reconnects after refresh and presents its re
     .getByRole('button', { name: 'Use in Studio' })
     .click();
   await openProjectTask(page, 'Create');
-  await page.getByRole('button', { name: 'Keep this setup' }).click();
+  // No save step: choosing the character reached the Project on its own, and the card that uses it
+  // names it. Pressing a button to make a choice real is exactly what this replaced.
   await expect(
-    page.getByText('Progress saved. Saving on its own starts no paid AI work.'),
+    page.getByRole('tabpanel', { name: 'Create', exact: true }).getByText('Project Field Host'),
   ).toBeVisible();
+  await expect.poll(() => projects.checkpointRequests.length).toBeGreaterThanOrEqual(1);
+  // Launch from the Create task rather than the stage rail: the editor must arrive already on the
+  // operation that was asked for. The rail's own path is covered by existing-video.spec.ts.
   await page
-    .getByRole('navigation', { name: 'Creative workspace tools' })
-    .getByRole('button', { name: 'Edit Video', exact: true })
+    .getByRole('tabpanel', { name: 'Create', exact: true })
+    .getByRole('button', { name: 'Open Character Swap' })
     .click();
   const existingVideo = page.getByRole('dialog', { name: 'Use existing video' });
+  await expect(
+    existingVideo.getByRole('button', { name: 'Character Swap', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
   await expect(
     existingVideo.getByRole('button', { name: 'Start Project Character Swap' }),
   ).toBeEnabled();
@@ -657,7 +664,12 @@ test('an accepted Project operation reconnects after refresh and presents its re
   await page.reload();
 
   await openProjectTask(page, 'Create');
-  await expect(page.getByText('Character Swap accepted / queued', { exact: true })).toBeVisible();
+  // Reconnected to the same run: which phase it is caught in is a race with the provider, so this
+  // asserts that the run is reported at all, then that it settles. The phases themselves are
+  // covered where they are deterministic, in ProjectProcessingStatusPanel and ProjectRunOverlay.
+  await expect(
+    page.getByText(/^Character Swap (accepted \/ queued|processing)$|^Result ready$/u).first(),
+  ).toBeVisible();
   await expect(page.getByText('Result ready', { exact: true })).toBeVisible({ timeout: 15_000 });
   // After a refresh the retained result is streamed from its content route, not re-downloaded.
   await expect(page.getByLabel('Studio media stage').locator('video')).toHaveAttribute(
@@ -665,8 +677,10 @@ test('an accepted Project operation reconnects after refresh and presents its re
     /\/content$/u,
   );
   await openProjectTask(page, 'History');
+  // One change more than the manual flow recorded. Choosing the character now writes its own
+  // change as it is made, where before it rode along with the save the operator had to press.
   await expect(
-    page.getByRole('tabpanel', { name: 'History' }).getByText(/^Change 5 ·/u),
+    page.getByRole('tabpanel', { name: 'History' }).getByText(/^Change 6 ·/u),
   ).toBeVisible();
   expect(projects.processingOperationKeys).toHaveLength(1);
   expect(projects.processingReconcileCount).toBeGreaterThanOrEqual(1);
@@ -707,11 +721,10 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
     (character) => character.id === 'project-field-host',
   );
   expect(selectedCharacter).toBeDefined();
-  await page.getByRole('button', { name: 'Keep this setup' }).click();
   await expect(
-    page.getByText('Progress saved. Saving on its own starts no paid AI work.'),
+    page.getByRole('tabpanel', { name: 'Create', exact: true }).getByText('Project Field Host'),
   ).toBeVisible();
-  expect(projects.checkpointRequests).toHaveLength(1);
+  await expect.poll(() => projects.checkpointRequests.length).toBe(1);
   expect(projects.checkpointRequests[0]?.proposal.selectedCharacter).toMatchObject({
     characterId: 'project-field-host',
     characterLabel: 'Project Field Host',
@@ -760,22 +773,22 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
   await expect(adoption).toBeVisible({ timeout: 60_000 });
   await adoption.getByRole('button', { name: 'Use as the current cut' }).click();
   await expect(adoption).toBeHidden({ timeout: 30_000 });
-  await expect(page.getByText('Current cut ready', { exact: true })).toBeVisible();
+  await expect(page.getByText('Edit is now the current cut', { exact: true })).toBeVisible();
   await expect(page.getByText('No video or version was saved')).toBeVisible();
   expect(projects.workingMediaOperationKeys).toHaveLength(1);
   expect(projects.workingMediaOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
 
-  await page.getByRole('button', { name: 'Keep this setup' }).click();
-  expect(projects.checkpointRequests).toHaveLength(2);
   await openProjectTask(page, 'History');
+  // One change fewer than this journey used to record: the save the operator had to press is gone,
+  // and with it the revision it wrote. The character reached the Project when it was chosen.
   await expect(
-    page.getByRole('tabpanel', { name: 'History' }).getByText(/^Change 5 ·/u),
+    page.getByRole('tabpanel', { name: 'History' }).getByText(/^Change 4 ·/u),
   ).toBeVisible();
 
   await page.reload();
   await openProjectTask(page, 'History');
   await expect(
-    page.getByRole('tabpanel', { name: 'History' }).getByText(/^Change 5 ·/u),
+    page.getByRole('tabpanel', { name: 'History' }).getByText(/^Change 4 ·/u),
   ).toBeVisible();
   await openProjectTask(page, 'Original');
   await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
@@ -784,7 +797,9 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
     'src',
     /\/content$/u,
   );
-  expect(projects.checkpointRequests).toHaveLength(2);
+  // One checkpoint, carrying the chosen character. The second used to be the operator pressing
+  // save; adopting a render writes its own revision through the working-media command instead.
+  expect(projects.checkpointRequests).toHaveLength(1);
   expect(projects.workingMediaOperationKeys).toHaveLength(1);
   expectNoExternalProviderTraffic(network);
 });
@@ -882,11 +897,10 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
     .getByRole('button', { name: 'Use in Studio' })
     .click();
   await openProjectTask(page, 'Create');
-  await page.getByRole('button', { name: 'Keep this setup' }).click();
   await expect(
-    page.getByText('Progress saved. Saving on its own starts no paid AI work.'),
+    page.getByRole('tabpanel', { name: 'Create', exact: true }).getByText('Project Field Host'),
   ).toBeVisible();
-  expect(projects.checkpointRequests).toHaveLength(1);
+  await expect.poll(() => projects.checkpointRequests.length).toBe(1);
   expect(projects.checkpointRequests[0]?.proposal.selectedCharacter).toMatchObject({
     characterId: 'project-field-host',
     characterLabel: 'Project Field Host',
@@ -905,7 +919,12 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
 
   await page.reload();
   await openProjectTask(page, 'Create');
-  await expect(page.getByText('Character Swap accepted / queued', { exact: true })).toBeVisible();
+  // Reconnected to the same run: which phase it is caught in is a race with the provider, so this
+  // asserts that the run is reported at all, then that it settles. The phases themselves are
+  // covered where they are deterministic, in ProjectProcessingStatusPanel and ProjectRunOverlay.
+  await expect(
+    page.getByText(/^Character Swap (accepted \/ queued|processing)$|^Result ready$/u).first(),
+  ).toBeVisible();
   await expect(page.getByText('Result ready', { exact: true })).toBeVisible({ timeout: 15_000 });
   expect(projects.processingOperationKeys).toHaveLength(1);
   expect(projects.processingReconcileCount).toBeGreaterThanOrEqual(1);

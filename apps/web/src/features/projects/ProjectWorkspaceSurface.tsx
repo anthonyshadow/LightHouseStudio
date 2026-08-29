@@ -1,15 +1,16 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectCurrentResponse } from '@studio/contracts';
-import { useCallback, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useState, type KeyboardEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { projectPath, projectWorkspacePath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
 import { AppIcon, Button, StatusNotice } from '../../ui';
+import { ProjectCreateTaskPanel, type ProjectCreateRuntime } from './ProjectCreateTaskPanel';
+import { ProjectRunOverlay, projectRunInFlight } from './ProjectRunOverlay';
 import { projectProcessingBlockedReason } from './projectProcessingPresentation';
 import { ProjectHistorySection } from './ProjectHistorySection';
 import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
 import { saveTaskPanelStyles } from './ProjectOutputSaveSection.styles';
-import { ProjectProcessingStatusPanel } from './ProjectProcessingStatusPanel';
 import { dialogActionsStyles } from './ProjectRouteSurface.styles';
 import { ProjectSourceSection, type ProjectRecordingCandidate } from './ProjectSourceSection';
 import { projectStatusLabel } from './projectStatusPresentation';
@@ -20,7 +21,6 @@ import {
   taskPanelStyles,
   workspaceMastheadStyles,
 } from './ProjectWorkspaceSurface.styles';
-import { ProjectWorkingMediaSection } from './ProjectWorkingMediaSection';
 import type { ProjectWorkingMediaActivity } from './ProjectWorkingMediaSection';
 import {
   PROJECT_WORKFLOW_STEPS,
@@ -131,7 +131,7 @@ interface ProjectWorkspaceSurfaceProps {
   readonly recordingCandidate?: ProjectRecordingCandidate | null | undefined;
   readonly recordingActive?: boolean | undefined;
   readonly onStartRecording?: (() => void) | undefined;
-  readonly creativeCheckpoint?: ReactNode;
+  readonly createRuntime?: ProjectCreateRuntime | undefined;
   readonly processing?: ProjectProcessingController | undefined;
   readonly ownerUserId?: string | undefined;
 }
@@ -145,7 +145,7 @@ export const ProjectWorkspaceSurface = ({
   recordingCandidate,
   recordingActive,
   onStartRecording,
-  creativeCheckpoint,
+  createRuntime,
   processing,
   ownerUserId,
 }: ProjectWorkspaceSurfaceProps) => {
@@ -180,6 +180,14 @@ export const ProjectWorkspaceSurface = ({
     },
     [navigate, project.id],
   );
+  // Leaving Create for Original unmounts the button that was pressed, so focus has to be placed
+  // deliberately — the same move the tablist's own arrow keys make.
+  const openSourceTask = useCallback(() => {
+    selectWorkspaceTask('source');
+    window.requestAnimationFrame(() => {
+      document.getElementById('project-task-source-tab')?.focus();
+    });
+  }, [selectWorkspaceTask]);
   const requestedWorkspaceTask = new URLSearchParams(location.search).get('task');
   const pinnedWorkspaceTask = isProjectWorkspaceTask(requestedWorkspaceTask)
     ? requestedWorkspaceTask
@@ -325,22 +333,19 @@ export const ProjectWorkspaceSurface = ({
           >
             <header>
               <h2>Create</h2>
-              <p>Build from the original video and manage the current cut.</p>
+              <p>Start an edit from the original video, or reuse a video you already made.</p>
             </header>
-            {creativeCheckpoint}
-            <ProjectWorkingMediaSection
+            <ProjectCreateTaskPanel
               current={current}
               session={session.port}
               archived={archived}
-              onActivityChange={handleWorkingMediaActivity}
+              processing={processing}
+              runtime={createRuntime}
+              sourceBusy={sourceActivity?.busy ?? false}
+              workingMediaBusy={workingMediaActivity?.busy ?? false}
+              onOpenSource={openSourceTask}
+              onWorkingMediaActivityChange={handleWorkingMediaActivity}
             />
-            {processing ? (
-              <ProjectProcessingStatusPanel controller={processing} />
-            ) : (
-              <StatusNotice role="status" tone="neutral" title="Processing unavailable">
-                No provider work can be submitted from this workspace.
-              </StatusNotice>
-            )}
           </section>
 
           <section
@@ -383,6 +388,15 @@ export const ProjectWorkspaceSurface = ({
           </section>
         </div>
       </aside>
+
+      {/*
+        Last in the tree so it paints over everything the workspace stacks inside itself. It covers
+        this surface only — the app's own navigation stays live, because an accepted run survives
+        leaving and reconnects when the Project is reopened.
+      */}
+      {processing && projectRunInFlight(processing) ? (
+        <ProjectRunOverlay controller={processing} />
+      ) : null}
     </>
   );
 };

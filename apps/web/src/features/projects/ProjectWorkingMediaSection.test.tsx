@@ -248,7 +248,7 @@ const renderSection = (
 
 const selectSavedVideo = async () => {
   const user = userEvent.setup();
-  await user.click(screen.getByRole('button', { name: 'Use a saved video as the current cut' }));
+  await user.click(screen.getByRole('button', { name: 'Use a saved video instead' }));
   const choice = await screen.findByRole('button', { name: /Retained master/u });
   await user.click(choice);
   await waitFor(() =>
@@ -281,9 +281,7 @@ describe('ProjectWorkingMediaSection', () => {
     renderSection(createSession(), { archived: true });
 
     expect(screen.getByRole('heading', { name: 'Current cut' })).toBeVisible();
-    expect(
-      screen.getByRole('button', { name: 'Use a saved video as the current cut' }),
-    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Use a saved video instead' })).toBeDisabled();
   });
 
   it('adopts one exact retained Version and announces durable non-copy semantics', async () => {
@@ -314,7 +312,7 @@ describe('ProjectWorkingMediaSection', () => {
         localEdit: null,
       }),
     );
-    expect(screen.getByRole('status')).toHaveTextContent('Saving current cut');
+    expect(screen.getByRole('status')).toHaveTextContent('Using that saved version');
     expect(onActivityChange).toHaveBeenCalledWith({ projectId: ids.project, busy: true });
 
     act(() => resolveAdoption(response));
@@ -328,7 +326,7 @@ describe('ProjectWorkingMediaSection', () => {
       project: response.project,
       revision: response.revision,
     });
-    expect(screen.getByRole('status')).toHaveTextContent('Current cut ready');
+    expect(screen.getByRole('status')).toHaveTextContent('Current cut updated');
     expect(screen.getByRole('status')).toHaveTextContent(
       'Your original video and every saved version are exactly as they were.',
     );
@@ -345,7 +343,7 @@ describe('ProjectWorkingMediaSection', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Save or discard your pending Project changes',
     );
-    expect(screen.getByRole('alert')).toHaveTextContent('Conflict');
+    expect(screen.getByRole('alert')).toHaveTextContent('Saved version needs a retry');
   });
 
   it('reconciles response loss only when the same retained Version is already current', async () => {
@@ -363,7 +361,7 @@ describe('ProjectWorkingMediaSection', () => {
       project: response.project,
       revision: response.revision,
     });
-    expect(screen.getByRole('status')).toHaveTextContent('Current cut ready');
+    expect(screen.getByRole('status')).toHaveTextContent('Current cut updated');
   });
 
   it('does not treat unrelated reconciliation state as proof of adoption', async () => {
@@ -387,7 +385,7 @@ describe('ProjectWorkingMediaSection', () => {
     await selectSavedVideo();
 
     expect(session.acceptCurrent).not.toHaveBeenCalled();
-    expect(screen.getByRole('alert')).toHaveTextContent('Current cut not changed');
+    expect(screen.getByRole('alert')).toHaveTextContent('Saved version not used');
     expect(screen.getByRole('alert')).toHaveTextContent('could not be used safely');
   });
 

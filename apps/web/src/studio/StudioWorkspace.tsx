@@ -14,6 +14,7 @@ import type {
 import { MediaStage, type MediaStageProps, type StagePresentation } from '../features/live-stage';
 import type { StudioMode } from '../features/media-session';
 import type { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
+import type { ProjectCreateRuntime } from '../features/projects/ProjectRouteSurface';
 import type { ProjectProcessingController } from '../features/projects/useProjectProcessingController';
 import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 import type { useStudioSession } from '../orchestration/session';
@@ -85,7 +86,7 @@ interface StudioWorkspaceProps {
   /** Reports the workspace's Project session to the shell, which owns the one active slot. */
   readonly onProjectSessionChange: (session: ProjectSessionPort | null) => void;
   readonly creativeWorkspace: ReactNode;
-  readonly projectCreativeCheckpoint: ReactNode;
+  readonly projectCreateRuntime: ProjectCreateRuntime | null;
   readonly saveVideoState: SaveVideoState;
   readonly actions: {
     readonly startLocalRecording: () => void;
@@ -109,7 +110,7 @@ export const StudioWorkspace = ({
   activity,
   onProjectSessionChange,
   creativeWorkspace,
-  projectCreativeCheckpoint,
+  projectCreateRuntime,
   saveVideoState,
   actions,
 }: StudioWorkspaceProps) => {
@@ -322,7 +323,7 @@ export const StudioWorkspace = ({
             creativeStore={environment.creativeStore}
             onCreateProjectCharacter={environment.onCreateProjectCharacter}
             onCreateProjectOutfit={environment.onCreateProjectOutfit}
-            creativeCheckpoint={projectCreativeCheckpoint}
+            {...(projectCreateRuntime ? { createRuntime: projectCreateRuntime } : {})}
             processing={projectProcessing}
             sourceRuntime={project.sourceRuntime}
             recordingCandidate={project.recordingCandidate}

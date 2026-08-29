@@ -10,6 +10,11 @@ import {
 import { ProjectsListSurface } from './ProjectsListSurface';
 import { pageScrollRegionStyles } from '../../ui/primitives/PageShell.styles';
 
+export type {
+  ProjectCreateOperationId,
+  ProjectCreateRuntime,
+  ProjectCreativeResourceKind,
+} from './ProjectCreateTaskPanel';
 export type { ProjectRecordingCandidate } from './ProjectSourceSection';
 export type { ProjectRouteSurfaceProps } from './ProjectDetailSurface';
 

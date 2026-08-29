@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import type { ProjectCurrentResponse } from '@studio/contracts';
+import type { ProjectCurrentResponse, ProjectSessionProposalContract } from '@studio/contracts';
 import { renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { fetchWorkspaceVoiceRelationship } from '../../adapters/api-client/voicesApi';
 import type { CreativeAssetStore } from '../creative-assets/types';
 import { useProjectCreativeSessionAdapter } from './useProjectCreativeSessionAdapter';
@@ -245,5 +245,84 @@ describe('useProjectCreativeSessionAdapter saved Voice hydration', () => {
       ),
     );
     expect(selectVoice).not.toHaveBeenCalled();
+  });
+});
+
+describe('useProjectCreativeSessionAdapter selection propagation', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const character = {
+    id: 'character-one',
+    name: 'Ada',
+    prompt: 'Ada presenting',
+    modelModeId: 'lucy-latest' as const,
+    updatedAt: now,
+  };
+
+  /** The store and active recipe a rail character pick leaves behind. */
+  const withChosenCharacter = (
+    dependencies: Parameters<typeof useProjectCreativeSessionAdapter>[0],
+  ) => {
+    Object.assign(dependencies.repository as object, {
+      getSnapshot: () => ({
+        store: { ...store, savedCharacterPrompts: [character] },
+        health: 'ready',
+        notice: null,
+      }),
+    });
+    Object.assign(dependencies.handoff as object, {
+      state: { activeRecipe: { origin: 'character-prompt', assetId: character.id } },
+      actions: { useRecipe: vi.fn() },
+    });
+  };
+
+  it('carries a rail selection out to the Project without waiting to be asked', async () => {
+    // The whole defect: before this, a character chosen on the rail reached nothing, so the Create
+    // task read "Not chosen" and the editor opened on an empty step.
+    const { dependencies } = setup({ snapshot: { selectedVoice: null } });
+    const session = dependencies.projectSession as unknown as {
+      propose: Mock<(proposal: ProjectSessionProposalContract) => boolean>;
+    };
+    withChosenCharacter(dependencies);
+
+    renderHook(() => useProjectCreativeSessionAdapter(dependencies));
+
+    await waitFor(() => expect(session.propose).toHaveBeenCalled());
+    expect(session.propose.mock.calls[0]?.[0].selectedCharacter?.characterId).toBe(character.id);
+  });
+
+  it('proposes once for one selection, so writing what it reads cannot loop', async () => {
+    const { dependencies } = setup({ snapshot: { selectedVoice: null } });
+    const session = dependencies.projectSession as unknown as {
+      propose: Mock<(proposal: ProjectSessionProposalContract) => boolean>;
+    };
+    withChosenCharacter(dependencies);
+
+    const { rerender } = renderHook(() => useProjectCreativeSessionAdapter(dependencies));
+    await waitFor(() => expect(session.propose).toHaveBeenCalledTimes(1));
+    rerender();
+    rerender();
+    rerender();
+    expect(session.propose).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays silent when the Project already holds what the Studio is showing', async () => {
+    const { dependencies, restoreAspectRatio } = setup({ snapshot: { selectedVoice: null } });
+    const session = dependencies.projectSession as unknown as {
+      propose: Mock<(proposal: ProjectSessionProposalContract) => boolean>;
+    };
+    // Hydration's own job is to bring the Studio into line with the Project; standing in for it
+    // here is what makes "already agrees" a real state rather than a mocked one.
+    (
+      dependencies.studioSession as unknown as {
+        capturePreferences: { applied: { aspectRatio: string } };
+      }
+    ).capturePreferences.applied.aspectRatio = '9:16';
+
+    renderHook(() => useProjectCreativeSessionAdapter(dependencies));
+
+    // Hydration settling proves the effects ran; an unchanged setup writes no revision.
+    await waitFor(() => expect(restoreAspectRatio).toHaveBeenCalled());
+    expect(session.propose).not.toHaveBeenCalled();
   });
 });

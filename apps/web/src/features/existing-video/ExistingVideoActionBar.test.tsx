@@ -170,7 +170,7 @@ describe('ExistingVideoActionBar Project gate', () => {
     renderBar(value, controller);
 
     expect(screen.getByRole('button', { name: 'Start Project Character Swap' })).toBeDisabled();
-    expect(screen.getByText(/Start stays unavailable until that is known/u)).toBeInTheDocument();
+    expect(screen.getByText(/Starting stays unavailable until that is known/u)).toBeInTheDocument();
     expect(controller.start).not.toHaveBeenCalled();
   });
 

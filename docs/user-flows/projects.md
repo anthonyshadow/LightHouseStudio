@@ -245,18 +245,59 @@ with a progress notice and a cancel on the stage (`useOwnedMediaAcquisition.ts`)
 
 ### Task 2 — Create
 
-Contains three stacked blocks:
+`ProjectCreateTaskPanel` — where work on the video starts. With no source it renders an empty state
+("Nothing to create from yet") and a **Go to Original** button that switches task and moves focus to
+that tab; an archived Project gets a single read-only notice. Otherwise:
 
-1. **`ProjectCreativeCheckpointPanel`** — the bridge between the local Studio creative state and
-   the durable Project. Local configuration (character, outfit, voice, prompt, reference) is _not_
-   persisted until **Keep this setup**, which posts `/api/projects/{id}/revisions`. If a
-   referenced creative resource has disappeared, a per-issue warning with **Choose another** is
-   shown (`ProjectCreativeCheckpointPanel.tsx:52-59`).
-2. **`ProjectWorkingMediaSection`** — adopt a locally rendered edit (`POST …/working-media`) or
-   reuse retained media (`POST …/working-media/reuse`).
-3. **`ProjectProcessingStatusPanel`** — the recoverable provider operation surface, or a neutral
-   "Recoverable Project processing ready" explainer. When no processing service is configured the
-   panel is replaced by "Processing unavailable" (`ProjectWorkspaceSurface.tsx:313-319`).
+1. **`ProjectCreateLaunchers`** — three cards: **Character Swap**, **Virtual Try-On** and **Adjust
+   video**. Each opens the existing editor through `openPlaybackEditor`, the same handler the stage
+   rail's Edit Video button uses, and the two visual ones arrive with their tool already set.
+   **No launcher calls `ProjectProcessingController.start`** — the one cost-acknowledged Start stays
+   in `ExistingVideoProjectProcessingActions.tsx`. Each AI card **carries the creative choice it
+   consumes** — Character on one, Outfit on the other, each with a **Change** action routed through
+   `chooseAnotherProjectResource`. Stating it beside the operation that uses it is why there is no
+   separate creative-setup section: that arrangement said everything twice. When a card cannot act
+   it shows the first true reason, from `projectCreateLaunchers` in `projectCreatePresentation.ts`:
+   archived → unresolved provider run → authority not yet established → provider unconfigured →
+   this video incompatible → source still loading → editor blocked → current cut busy. **Adjust
+   video** is exempt from the provider rows — the local editor is free, so a queued remote run does
+   not block it.
+2. **Resource-issue notices**, when a saved character, outfit or voice has since disappeared. These
+   are Project-level rather than per-card, with **Choose another**.
+3. **`ProjectWorkingMediaSection`** — one line naming what the stage is showing, plus a quiet **Use
+   a saved video instead**. The mechanism is unchanged: `reuseProjectWorkingMedia`, its conflict and
+   reconcile handling, and the `onActivityChange` contract the Studio session lifecycle consumes.
+   Both adoptions read their notice titles from `projectCurrentCutNotice`, discriminated by origin,
+   so the two can never be confused when both report at once.
+4. **`ProjectProcessingStatusPanel`** — rendered only when there is something to report. Idle is the
+   state a Project sits in almost always, and a standing notice saying so stopped being read.
+
+**A selection reaches the Project as it is made.** An outbound effect in
+`useProjectCreativeSessionAdapter` derives `createProjectCreativeProposal` from the live Studio
+state and calls `session.propose()` whenever it differs from what the Project holds. It is guarded
+twice — it waits for inbound hydration to settle, so merely opening a Project writes nothing, and it
+remembers what it last sent, so a re-render cannot re-propose. `propose` rides the ordinary 750 ms
+autosave, so a burst of picks writes one revision. Because `propose` records a change without moving
+`current`, the panel reads `effectiveCreativeSnapshot(snapshot, session.proposal)` — the pending
+write laid over the settled one — and so never lags behind a choice. Launching an edit additionally
+awaits a checkpoint first, because the editor's prefill runs off the saved snapshot.
+
+**While a run is in flight** the workspace is covered by `ProjectRunOverlay` — a scrim, a turning
+ring and the phase copy from `projectProcessingTitle`/`projectProcessingDetail`, plus **Remove from
+processing queue** when the provider allows it. `projectRunInFlight` is `busy || (active &&
+attempt.isCurrent)`: `busy` alone misses the accepted-and-polling window, `active` alone misses the
+submission window before an attempt exists. A run belonging to an earlier change does not block —
+it cannot replace the current media — and neither does an unverified submission, which needs the
+operator to resolve it. It covers this surface only; the app's own navigation stays live, because an
+accepted run survives leaving and reconnects on return.
+
+Everything the panel needs from the Studio runtime arrives as one `ProjectCreateRuntime` value,
+supplied by `StudioApp`. `features/projects` imports nothing from `studio/`.
+
+Both the launcher section and each card declare their own `containerType: 'inline-size'`, because
+the workspace route is `display: contents` and the Studio grid only opens a container below
+`laptop`. Every reflow here is a container query: the same panel is about 20rem wide beside the
+stage and about 47rem stacked under it.
 
 ### Task 3 — Save
 

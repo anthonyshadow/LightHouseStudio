@@ -29,6 +29,7 @@ export const StudioExistingVideoOverlay = ({
   onOpenSavedVideosLibrary,
   editVideoToggleRef,
   uploadToggleRef,
+  launchTriggerRef,
   onClose,
   onFinish,
   onStartRecording,
@@ -47,6 +48,8 @@ export const StudioExistingVideoOverlay = ({
   readonly onOpenSavedVideosLibrary: () => void;
   readonly editVideoToggleRef: RefObject<HTMLButtonElement | null>;
   readonly uploadToggleRef: RefObject<HTMLButtonElement | null>;
+  /** The control that opened this, supplied only while a Create launch owns the editor. */
+  readonly launchTriggerRef?: RefObject<HTMLButtonElement | null>;
   readonly onClose: () => void;
   readonly onFinish: () => void;
   readonly onStartRecording: () => void;
@@ -67,7 +70,11 @@ export const StudioExistingVideoOverlay = ({
       bodyMode="contained"
       closeDisabled={existingVideo.providerActive}
       closeOnBackdrop={!existingVideo.selection}
-      returnFocusRef={recording.presented ? editVideoToggleRef : uploadToggleRef}
+      // A Create launcher lives in the inspector column, so returning focus to the stage rail
+      // would move the operator across the layout for a panel they never opened from there.
+      returnFocusRef={
+        launchTriggerRef ?? (recording.presented ? editVideoToggleRef : uploadToggleRef)
+      }
     >
       <Suspense fallback={<p role="status">Loading studio tool…</p>}>
         <ExistingVideoPanel

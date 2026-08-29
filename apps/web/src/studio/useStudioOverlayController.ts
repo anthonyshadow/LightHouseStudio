@@ -5,6 +5,7 @@ export type ActiveOverlay =
   | 'capture-settings'
   | 'take-review'
   | 'voice-treatments'
+  | 'voice-selector'
   | 'character-builder'
   | 'character-selector'
   | 'saved-characters'

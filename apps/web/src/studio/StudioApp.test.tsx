@@ -205,6 +205,7 @@ const harness = vi.hoisted(() => {
     },
     active: false,
     providerActive: false,
+    visualProviderCompatibility: { compatible: true as const, aspect: '16:9', reason: null },
     phase: 'idle' as 'idle' | 'ready',
     completedStepCount: 0,
     selectFile: vi.fn((file: File) => {

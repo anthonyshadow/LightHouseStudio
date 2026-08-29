@@ -67,6 +67,7 @@ export const useShellServices = ({
   const mainRef = useRef<HTMLElement>(null);
   const characterSelectorRef = useRef<HTMLButtonElement>(null);
   const outfitToggleRef = useRef<HTMLButtonElement>(null);
+  const voiceToggleRef = useRef<HTMLButtonElement>(null);
   const editVideoToggleRef = useRef<HTMLButtonElement>(null);
 
   const readPorts = handoff.readPorts;
@@ -168,6 +169,7 @@ export const useShellServices = ({
         mainRef,
         characterSelectorRef,
         outfitToggleRef,
+        voiceToggleRef,
         editVideoToggleRef,
       }) as const,
     [

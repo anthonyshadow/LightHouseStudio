@@ -4,6 +4,7 @@ import {
   SAVE_ACTION_CLEARANCE_COMPACT,
 } from '../features/projects/saveActionMetrics';
 import { media } from '../ui/media';
+import { visuallyHiddenStyles } from '../ui/primitives/VisuallyHidden';
 
 export const pageStyles = (theme: Theme): CSSObject => ({
   width: '100%',
@@ -554,7 +555,11 @@ export const mainGridStyles = (
   gridTemplateColumns: projectContextActive
     ? 'minmax(0, 1.45fr) minmax(20rem, 25rem)'
     : 'minmax(0, 1fr)',
-  gridTemplateRows: projectContextActive ? '3rem minmax(0, 1fr)' : 'minmax(0, 1fr)',
+  // The masthead, then everything a blocked Project run has to cover. Named so the overlay can ask
+  // for the area rather than count tracks in a file it cannot see — the two row lists below differ.
+  gridTemplateRows: projectContextActive
+    ? '3rem [project-workspace-start] minmax(0, 1fr) [project-workspace-end]'
+    : 'minmax(0, 1fr)',
   gap: 0,
   alignItems: 'stretch',
   minWidth: 0,
@@ -572,7 +577,7 @@ export const mainGridStyles = (
     ? {
         [media.down('laptop')]: {
           gridTemplateColumns: 'minmax(0, 1fr)',
-          gridTemplateRows: '3rem auto auto',
+          gridTemplateRows: '3rem [project-workspace-start] auto auto [project-workspace-end]',
           alignContent: 'start',
           containerType: 'inline-size',
           overflowX: 'hidden',
@@ -837,10 +842,6 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     fontSize: 'inherit',
     fontWeight: 'inherit',
   },
-  // The rail carries three tools at every width now, so the narrowest layouts trade the verb for
-  // the noun rather than truncating it. Each control states its full name in `aria-label`, so
-  // only the visible text changes.
-  '& [data-tool-label-short]': { display: 'none' },
   '& [data-tool-label] small': {
     maxWidth: '8rem',
     overflow: 'hidden',
@@ -856,56 +857,32 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
   [media.downOrShort('desktop', '48rem')]: {
     '& > button': { flex: '1 1 0', justifyContent: 'center' },
   },
+  // Four tools do not fit a phone as words. They fit comfortably as icons, so below this tier the
+  // rail keeps the glyph and drops the prose — the same trade the header's status and Quick Create
+  // controls already make.
+  //
+  // `visuallyHidden` rather than `display: none` is the whole point: every button names itself in
+  // `aria-label` and describes itself through `aria-describedby`, and a removed element takes its
+  // description out of the accessibility tree with it. The blocked reason in particular has to
+  // survive — it is the only thing that explains a dead control, and `title` never reaches a touch
+  // user. Hidden, it is still announced; the Create task states the same reason in full in print.
   [media.downOrShort('tablet', '36rem')]: {
     gap: '0.3rem',
     padding: theme.space.xxs,
     '& > button': {
       flex: '1 1 0',
       minWidth: 0,
-      paddingInline: theme.space.xxs,
-      gap: '0.28rem',
+      minHeight: '2.75rem',
+      justifyContent: 'center',
+      paddingInline: 0,
+      gap: 0,
     },
-    '& [data-tool-label]': { justifyItems: 'center' },
-    // A chosen character or outfit carries the operator's own name for it, which has no short form
-    // to fall back on. Two wrapped lines break it where the words already break; the button's
-    // `nowrap` would otherwise cut it mid-glyph, with no ellipsis to show that it had.
-    '& [data-tool-label] strong': {
-      display: '-webkit-box',
-      overflow: 'hidden',
-      WebkitBoxOrient: 'vertical',
-      WebkitLineClamp: 2,
-      fontSize: '0.72rem',
-      lineHeight: 1.25,
-      overflowWrap: 'break-word',
-      textAlign: 'center',
-      whiteSpace: 'normal',
-    },
-    '& [data-tool-label-long]': { display: 'none' },
-    '& [data-tool-label-short]': { display: 'inline' },
-    // The description is a label a compact rail can do without. The blocked reason is not: it is
-    // the only thing that explains a dead control, and `title` never reaches a touch user. It
-    // stays, in the three lines its longest sentence needs, so the `aria-describedby` target is
-    // read in full rather than cut short.
-    '& [data-tool-label] small': { display: 'none' },
-    '& [data-tool-label] small[data-tool-blocked]': {
-      display: '-webkit-box',
-      maxWidth: '100%',
-      WebkitBoxOrient: 'vertical',
-      WebkitLineClamp: 3,
-      fontSize: '0.6rem',
-      lineHeight: 1.25,
-      whiteSpace: 'normal',
-      textAlign: 'center',
-    },
-    '& [data-tool-icon]': { width: '0.95rem', height: '0.95rem' },
+    '& [data-tool-label]': visuallyHiddenStyles(),
+    '& [data-tool-icon]': { width: '1.15rem', height: '1.15rem' },
   },
   '@media (max-width: 20rem), (max-height: 36rem)': {
-    '& > button': {
-      gap: '0.2rem',
-      fontSize: '0.66rem',
-    },
-    '& [data-tool-label] strong': { fontSize: '0.66rem' },
-    '& [data-tool-icon]': { width: '0.82rem', height: '0.82rem' },
+    '& > button': { gap: '0.2rem' },
+    '& [data-tool-icon]': { width: '1rem', height: '1rem' },
   },
   [media.up('laptop')]: {
     flexDirection: 'column',
