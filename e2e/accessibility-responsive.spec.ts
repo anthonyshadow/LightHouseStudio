@@ -817,7 +817,7 @@ test('phone and tablet expose supported creative tools without Recipe UI', async
         .locator('button')
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
     )
-    .toEqual(['Edit Video', 'Select Character', 'Select Outfit']);
+    .toEqual(['Edit Video', 'Select Character', 'Select Outfit', 'Select Voice']);
   await expect(page.getByRole('button', { name: /Open Select AI options/u })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Recipe|Shelf|Dock/u })).toHaveCount(0);
 
@@ -828,22 +828,24 @@ test('phone and tablet expose supported creative tools without Recipe UI', async
     await page.setViewportSize(viewport);
     await page.goto('/studio/create');
     const rail = page.getByRole('navigation', { name: 'Creative workspace tools' });
-    // The same three tools at every width. They used to vanish below 64rem with no entry point
+    // The same four tools at every width. They used to vanish below 64rem with no entry point
     // and no explanation, so a phone or tablet operator concluded the AI tools did not exist.
-    // The visible labels shorten on a compact rail; the accessible names do not.
+    // A compact rail draws them as icons; the accessible names do not change.
     await expect
       .poll(() =>
         rail
           .locator('button')
           .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
       )
-      .toEqual(['Edit Video', 'Select Character', 'Select Outfit']);
+      .toEqual(['Edit Video', 'Select Character', 'Select Outfit', 'Select Voice']);
     await expect(page.getByRole('button', { name: /Select AI/u })).toHaveCount(0);
 
-    // A blocked tool still states its condition here, rather than hiding it in `title` where a
-    // touch user can never reach it.
-    await expect(rail.getByRole('button', { name: 'Edit Video' })).toBeDisabled();
-    await expect(rail.locator('[data-tool-blocked]').first()).toBeVisible();
+    // Four tools do not fit a phone as words, so the labels go visually hidden rather than being
+    // removed: a blocked tool still describes itself to a screen reader, which `title` never does.
+    const editVideo = rail.getByRole('button', { name: 'Edit Video' });
+    await expect(editVideo).toBeDisabled();
+    await expect(rail.locator('[data-tool-blocked]').first()).toBeAttached();
+    await expect(editVideo).toHaveAccessibleDescription(/./u);
 
     await expect(rail.getByRole('button', { name: /Recipe|Shelf|Dock/u })).toHaveCount(0);
     const quickCreate = page.getByRole('button', { name: 'Quick Create' });

@@ -1,10 +1,12 @@
 import { useTheme } from '@emotion/react';
 import { type RefObject } from 'react';
-import { AppIcon, Button } from '../ui';
+import { AppIcon, Button, type AppIconName } from '../ui';
 import { toolRailStyles } from './StudioApp.styles';
 
+export type CreativeWorkspaceTool = 'edit-video' | 'character' | 'outfit' | 'voice';
+
 export type CreativeWorkspaceState = {
-  activeTool: 'edit-video' | 'character' | 'outfit' | null;
+  activeTool: CreativeWorkspaceTool | null;
   /**
    * Whether a loaded playback video still leaves the live tools usable. Surfaces that own their
    * own media lifecycle set this; standalone capture, where the playback video *is* the work in
@@ -13,6 +15,9 @@ export type CreativeWorkspaceState = {
   liveToolsAvailableDuringPlayback?: boolean;
   activeCharacterLabel?: string | undefined;
   activeOutfitLabel?: string | undefined;
+  activeVoiceLabel?: string | undefined;
+  /** Why Voice cannot be chosen here — a Project refuses it, or the source has no usable audio. */
+  voiceBlockedReason?: string | undefined;
   recordingActive: boolean;
   hasPlaybackVideo: boolean;
   /**
@@ -27,12 +32,14 @@ export type CreativeWorkspaceActions = {
   onOpenEditVideo: () => void;
   onOpenCharacter: () => void;
   onOpenOutfit: () => void;
+  onOpenVoice: () => void;
 };
 
 export type CreativeWorkspaceRefs = {
   editVideoToggleRef: RefObject<HTMLButtonElement | null>;
   characterToggleRef: RefObject<HTMLButtonElement | null>;
   outfitToggleRef: RefObject<HTMLButtonElement | null>;
+  voiceToggleRef: RefObject<HTMLButtonElement | null>;
 };
 
 export type CreativeWorkspaceProps = {
@@ -41,19 +48,38 @@ export type CreativeWorkspaceProps = {
   refs: CreativeWorkspaceRefs;
 };
 
+/**
+ * One rail entry. The four differ only in these values, so they are data rather than four copies of
+ * the same markup — which is what let the accessible-name contract drift out of step before.
+ */
+type ToolRailEntry = {
+  readonly id: CreativeWorkspaceTool;
+  readonly icon: AppIconName;
+  /** The control's name when nothing is chosen for it. */
+  readonly name: string;
+  /** What the operator picked, which replaces the name and is spoken alongside it. */
+  readonly selected: string | undefined;
+  /** How a selection reads to a screen reader: "Selected character: Ada. Open character options". */
+  readonly selectedNoun: string;
+  readonly hint: string;
+  readonly blockedReason: string | undefined;
+  readonly ref: RefObject<HTMLButtonElement | null>;
+  readonly onOpen: () => void;
+};
+
 export const CreativeWorkspace = ({ state, actions, refs }: CreativeWorkspaceProps) => {
   const {
     activeTool,
     liveToolsAvailableDuringPlayback = false,
     activeCharacterLabel,
     activeOutfitLabel,
+    activeVoiceLabel,
+    voiceBlockedReason,
     recordingActive,
     hasPlaybackVideo,
     editVideoBlockedReason,
     liveToolBlockedReason,
   } = state;
-  const { onOpenEditVideo, onOpenCharacter, onOpenOutfit } = actions;
-  const { editVideoToggleRef, characterToggleRef, outfitToggleRef } = refs;
   const theme = useTheme();
   const playbackBlocksLiveTools = hasPlaybackVideo && !liveToolsAvailableDuringPlayback;
   const liveVideoToolBlocked = playbackBlocksLiveTools || recordingActive;
@@ -61,102 +87,92 @@ export const CreativeWorkspace = ({ state, actions, refs }: CreativeWorkspacePro
   const editVideoReason = editVideoBlocked ? editVideoBlockedReason : undefined;
   const liveToolReason = liveVideoToolBlocked ? liveToolBlockedReason : undefined;
 
+  const entries: readonly ToolRailEntry[] = [
+    {
+      id: 'edit-video',
+      icon: 'editVideo',
+      name: 'Edit Video',
+      selected: undefined,
+      selectedNoun: 'edit',
+      hint: 'Open the video editor',
+      blockedReason: editVideoReason,
+      ref: refs.editVideoToggleRef,
+      onOpen: actions.onOpenEditVideo,
+    },
+    {
+      id: 'character',
+      icon: 'character',
+      name: 'Select Character',
+      selected: activeCharacterLabel,
+      selectedNoun: 'character',
+      hint: 'Choose or build an AI character',
+      blockedReason: liveToolReason,
+      ref: refs.characterToggleRef,
+      onOpen: actions.onOpenCharacter,
+    },
+    {
+      id: 'outfit',
+      icon: 'outfit',
+      name: 'Select Outfit',
+      selected: activeOutfitLabel,
+      selectedNoun: 'outfit',
+      hint: 'Choose or build a try-on outfit',
+      blockedReason: liveToolReason,
+      ref: refs.outfitToggleRef,
+      onOpen: actions.onOpenOutfit,
+    },
+    {
+      id: 'voice',
+      icon: 'microphone',
+      name: 'Select Voice',
+      selected: activeVoiceLabel,
+      selectedNoun: 'voice',
+      hint: 'Choose a voice for this video',
+      // A Project refuses any voice outright, and that outranks simply having no media yet.
+      blockedReason: voiceBlockedReason ?? editVideoReason,
+      ref: refs.voiceToggleRef,
+      onOpen: actions.onOpenVoice,
+    },
+  ];
+
+  const blocked = (entry: ToolRailEntry): boolean =>
+    entry.id === 'edit-video'
+      ? editVideoBlocked
+      : entry.id === 'voice'
+        ? editVideoBlocked || voiceBlockedReason !== undefined
+        : liveVideoToolBlocked;
+
   return (
     <nav data-studio-tool-rail="" css={toolRailStyles(theme)} aria-label="Creative workspace tools">
-      <Button
-        ref={editVideoToggleRef}
-        variant={activeTool === 'edit-video' ? 'primary' : 'secondary'}
-        disabled={editVideoBlocked}
-        aria-label="Edit Video"
-        aria-describedby="edit-video-tool-description"
-        aria-current={activeTool === 'edit-video' ? 'page' : undefined}
-        aria-haspopup="dialog"
-        {...(editVideoReason ? { title: editVideoReason } : {})}
-        onClick={onOpenEditVideo}
-      >
-        <AppIcon data-tool-icon name="editVideo" />
-        <span data-tool-label>
-          <strong>
-            <span data-tool-label-long>Edit Video</span>
-            <span data-tool-label-short aria-hidden="true">
-              Edit
+      {entries.map((entry) => {
+        const descriptionId = `${entry.id}-tool-description`;
+        return (
+          <Button
+            key={entry.id}
+            ref={entry.ref}
+            variant={activeTool === entry.id ? 'primary' : 'secondary'}
+            disabled={blocked(entry)}
+            aria-label={
+              entry.selected
+                ? `Selected ${entry.selectedNoun}: ${entry.selected}. Open ${entry.selectedNoun} options`
+                : entry.name
+            }
+            aria-describedby={descriptionId}
+            aria-current={activeTool === entry.id ? 'page' : undefined}
+            aria-haspopup="dialog"
+            {...(entry.blockedReason ? { title: entry.blockedReason } : {})}
+            onClick={entry.onOpen}
+          >
+            <AppIcon data-tool-icon name={entry.icon} />
+            <span data-tool-label>
+              <strong>{entry.selected ?? entry.name}</strong>
+              <small id={descriptionId} data-tool-blocked={entry.blockedReason ? '' : undefined}>
+                {entry.blockedReason ?? entry.hint}
+              </small>
             </span>
-          </strong>
-          <small
-            id="edit-video-tool-description"
-            data-tool-blocked={editVideoReason ? '' : undefined}
-          >
-            {editVideoReason ?? 'Open the video editor'}
-          </small>
-        </span>
-      </Button>
-      <Button
-        ref={characterToggleRef}
-        variant={activeTool === 'character' ? 'primary' : 'secondary'}
-        disabled={liveVideoToolBlocked}
-        aria-label={
-          activeCharacterLabel
-            ? `Selected character: ${activeCharacterLabel}. Open character options`
-            : 'Select Character'
-        }
-        aria-describedby="character-tool-description"
-        aria-current={activeTool === 'character' ? 'page' : undefined}
-        aria-haspopup="dialog"
-        {...(liveToolReason ? { title: liveToolReason } : {})}
-        onClick={onOpenCharacter}
-      >
-        <AppIcon data-tool-icon name="character" />
-        <span data-tool-label>
-          <strong>
-            {activeCharacterLabel ?? (
-              <>
-                <span data-tool-label-long>Select Character</span>
-                <span data-tool-label-short aria-hidden="true">
-                  Character
-                </span>
-              </>
-            )}
-          </strong>
-          <small
-            id="character-tool-description"
-            data-tool-blocked={liveToolReason ? '' : undefined}
-          >
-            {liveToolReason ?? 'Choose or build an AI character'}
-          </small>
-        </span>
-      </Button>
-      <Button
-        ref={outfitToggleRef}
-        variant={activeTool === 'outfit' ? 'primary' : 'secondary'}
-        disabled={liveVideoToolBlocked}
-        aria-label={
-          activeOutfitLabel
-            ? `Selected outfit: ${activeOutfitLabel}. Open outfit options`
-            : 'Select Outfit'
-        }
-        aria-describedby="outfit-tool-description"
-        aria-current={activeTool === 'outfit' ? 'page' : undefined}
-        aria-haspopup="dialog"
-        {...(liveToolReason ? { title: liveToolReason } : {})}
-        onClick={onOpenOutfit}
-      >
-        <AppIcon data-tool-icon name="outfit" />
-        <span data-tool-label>
-          <strong>
-            {activeOutfitLabel ?? (
-              <>
-                <span data-tool-label-long>Select Outfit</span>
-                <span data-tool-label-short aria-hidden="true">
-                  Outfit
-                </span>
-              </>
-            )}
-          </strong>
-          <small id="outfit-tool-description" data-tool-blocked={liveToolReason ? '' : undefined}>
-            {liveToolReason ?? 'Choose or build a try-on outfit'}
-          </small>
-        </span>
-      </Button>
+          </Button>
+        );
+      })}
     </nav>
   );
 };

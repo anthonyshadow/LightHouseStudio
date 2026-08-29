@@ -74,8 +74,8 @@ describe('ProjectProcessingStatusPanel', () => {
     const user = userEvent.setup();
 
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('Submission status is unverified');
-    expect(alert).toHaveTextContent('without starting another potentially billable submission');
+    expect(alert).toHaveTextContent('Your last start could not be confirmed');
+    expect(alert).toHaveTextContent('starting another one could be charged twice');
     await user.click(screen.getByRole('button', { name: 'Check same operation' }));
     expect(refresh).toHaveBeenCalledOnce();
   });
@@ -172,8 +172,8 @@ describe('ProjectProcessingStatusPanel', () => {
     const refresh = vi.fn(() => Promise.resolve(true));
     const { rerender } = renderPanel(processingController({ phase: 'loading', busy: true }));
 
-    expect(screen.getByRole('status')).toHaveTextContent('Checking Project processing');
-    expect(screen.getByRole('status')).toHaveTextContent('never submits provider work');
+    expect(screen.getByRole('status')).toHaveTextContent('Checking this Project’s AI runs');
+    expect(screen.getByRole('status')).toHaveTextContent('Checking never starts one');
 
     rerender(
       <ProjectProcessingStatusPanel
@@ -184,14 +184,16 @@ describe('ProjectProcessingStatusPanel', () => {
         })}
       />,
     );
-    expect(screen.getByRole('alert')).toHaveTextContent('Processing status unavailable');
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not check AI runs');
     await userEvent.click(screen.getByRole('button', { name: 'Retry status check' }));
     expect(refresh).toHaveBeenCalledOnce();
 
-    rerender(<ProjectProcessingStatusPanel controller={processingController()} />);
-    expect(screen.getByRole('status')).toHaveTextContent('Recoverable Project processing ready');
-    expect(screen.getByRole('status')).toHaveTextContent(
-      'Voice and live starts remain unavailable',
+    // Nothing running and nothing wrong is the state a Project sits in almost always, so the panel
+    // says nothing at all rather than standing there being ignored.
+    const { container } = render(
+      <ProjectProcessingStatusPanel controller={processingController()} />,
+      { wrapper: StudioDesignProvider },
     );
+    expect(container).toBeEmptyDOMElement();
   });
 });

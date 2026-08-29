@@ -114,6 +114,7 @@ export interface StudioTheme {
     stageChrome: number;
     stageBlocking: number;
     stageNotices: number;
+    workspaceBlocking: number;
     skipLink: number;
     overlay: number;
   };
@@ -275,6 +276,10 @@ export const studioTheme: StudioTheme = {
     stageChrome: 5,
     stageBlocking: 6,
     stageNotices: 7,
+    // Above everything a surface stacks inside itself — the inspector's sticky tablist, the stage's
+    // own isolated layers — and deliberately far below `overlay`, so a confirmation raised while
+    // work is blocked still reaches the operator instead of being buried by it.
+    workspaceBlocking: 20,
     skipLink: 100,
     overlay: 1_000,
   },

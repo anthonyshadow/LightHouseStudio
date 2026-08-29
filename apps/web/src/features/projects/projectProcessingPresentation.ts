@@ -62,12 +62,45 @@ export const projectProcessingTone = (
   return 'neutral';
 };
 
+/**
+ * Live AI cannot reconnect through the durable Project operation authority, so a Project offers the
+ * two recoverable visual capabilities only. Stated once, read by the Studio workspace and by the
+ * Create task.
+ */
+export const PROJECT_PROVIDER_START_BLOCKED_REASON =
+  "Live AI isn't available inside a Project yet. You can still run Character Swap and Virtual Try-On on this Project's video.";
+
+/**
+ * Why starting is unavailable while the controller is still establishing whether this Project
+ * already has an accepted operation. Both the Create launchers and the editor's action bar refuse
+ * for exactly this reason, so they say it in one voice.
+ */
+export const PROJECT_PROCESSING_AUTHORITY_PENDING_REASON =
+  'Checking whether this Project already has an accepted operation. Starting stays unavailable until that is known, so a second potentially billable submission cannot be created.';
+
+/**
+ * Why Voice is refused inside a Project, stated where the choice is offered rather than only after
+ * it has been made. Any voice selection blocks the visual Start outright, so a rail entry that let
+ * one be set would quietly disable Character Swap.
+ */
+export const PROJECT_VOICE_UNAVAILABLE_REASON =
+  'Voice is not available inside a Project yet. Choosing one would stop Character Swap and Virtual Try-On from starting.';
+
+/** The standing cost warning on any control that leads to a provider submission. */
+export const PROJECT_PROCESSING_START_COST_NOTE = 'Starting this can cost money at the provider.';
+
 const BLOCKED_REASON_COPY = {
   archive: {
     ambiguous:
       'Archive is blocked while it is unclear whether the provider accepted this run. Another attempt may be charged twice; use the retry decision first.',
     accepted:
       'Archive is blocked while accepted provider work is running. Leaving or switching does not stop that work or its cost; reopen this Project to reconnect.',
+  },
+  'create-start': {
+    ambiguous:
+      'Starting another edit is blocked while it is unclear whether the provider accepted the last run. Resolve that run first, or a second one may be charged too.',
+    accepted:
+      'Starting another edit is blocked while accepted provider work is running. Let it finish, or remove it from the queue first.',
   },
   'source-removal': {
     ambiguous:

@@ -374,6 +374,31 @@ describe('Project route surface', () => {
     );
   });
 
+  it('sends a sourceless Create task back to Original, and offers no edit it cannot start', async () => {
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(currentProject(activeId))),
+    );
+    const user = userEvent.setup();
+    renderProjects(`/projects/${activeId}/workspace?task=create`);
+
+    const panel = await screen.findByRole('tabpanel', { name: 'Create' });
+    expect(
+      within(panel).getByRole('heading', { name: 'Nothing to create from yet' }),
+    ).toBeVisible();
+    // No Studio runtime is mounted here, so nothing may claim it can start provider work.
+    expect(within(panel).queryAllByRole('button', { name: /^Open /u })).toEqual([]);
+
+    await user.click(within(panel).getByRole('button', { name: 'Go to Original' }));
+
+    const tabs = screen.getByRole('tablist', { name: 'Project tasks' });
+    expect(within(tabs).getByRole('tab', { name: 'Original' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    // The Original task owns this heading; the Create empty state deliberately does not reuse it.
+    expect(screen.getByRole('heading', { name: 'No original video yet' })).toBeVisible();
+  });
+
   it('opens the workspace on the step the Project is up to and marks it in the masthead', async () => {
     mockApiServer.use(
       http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(acceptedProject())),

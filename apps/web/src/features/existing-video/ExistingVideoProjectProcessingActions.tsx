@@ -2,6 +2,8 @@ import { useTheme } from '@emotion/react';
 import { useState, type RefObject } from 'react';
 import { Button, ConfirmationDialog } from '../../ui';
 import {
+  PROJECT_PROCESSING_AUTHORITY_PENDING_REASON,
+  PROJECT_VOICE_UNAVAILABLE_REASON,
   projectProcessingCapabilityLabel,
   projectProcessingDetail,
   projectProcessingTitle,
@@ -56,18 +58,14 @@ const projectProcessingBlockedDetail = ({
   if (workflow.voiceSelection?.kind === 'local') {
     return 'Remove Voice before starting visual work in this Project. Local Voice can run separately, but its result cannot yet become the current cut.';
   }
-  if (projectCapability === null) {
-    return 'Project provider Voice remains unavailable. Character Swap and Virtual Try-On are the recoverable Project capabilities in this release.';
-  }
+  if (projectCapability === null) return PROJECT_VOICE_UNAVAILABLE_REASON;
   if (visualUnavailable) {
     return 'This visual capability is unavailable in the current server configuration.';
   }
   if (stepIncomplete) {
     return `Finish configuring ${projectProcessingCapabilityLabel(projectCapability)} before Start.`;
   }
-  if (!authorityReady) {
-    return 'Checking whether this Project already has an accepted operation. Start stays unavailable until that is known, so a second potentially billable submission cannot be created.';
-  }
+  if (!authorityReady) return PROJECT_PROCESSING_AUTHORITY_PENDING_REASON;
   return 'Start creates one explicit potentially billable operation after the exact Project setup is saved.';
 };
 
