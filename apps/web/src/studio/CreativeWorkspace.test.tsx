@@ -18,11 +18,13 @@ const createProps = (stateOverrides: Partial<CreativeWorkspaceProps['state']> = 
       onOpenEditVideo: vi.fn(),
       onOpenCharacter: vi.fn(),
       onOpenOutfit: vi.fn(),
+      onOpenVoice: vi.fn(),
     },
     refs: {
       editVideoToggleRef: createRef<HTMLButtonElement>(),
       characterToggleRef: createRef<HTMLButtonElement>(),
       outfitToggleRef: createRef<HTMLButtonElement>(),
+      voiceToggleRef: createRef<HTMLButtonElement>(),
     },
   }) satisfies CreativeWorkspaceProps;
 
@@ -32,7 +34,7 @@ describe('CreativeWorkspace responsive tools', () => {
   // The rail offers the same capability at every width. It used to drop Character and Outfit
   // below 64rem with no entry point and no explanation, which is how a mobile operator concluded
   // the product had no AI tools at all.
-  it('places Character and Outfit after Edit Video, at every width', () => {
+  it('places Character, Outfit and Voice after Edit Video, at every width', () => {
     render(
       <StudioDesignProvider>
         <CreativeWorkspace {...createProps()} />
@@ -43,7 +45,39 @@ describe('CreativeWorkspace responsive tools', () => {
       within(rail)
         .getAllByRole('button')
         .map((button) => button.getAttribute('aria-label')),
-    ).toEqual(['Edit Video', 'Select Character', 'Select Outfit']);
+    ).toEqual(['Edit Video', 'Select Character', 'Select Outfit', 'Select Voice']);
+  });
+
+  it('opens the voice chooser, and names the chosen voice in the control that owns it', () => {
+    const props = createProps({ activeVoiceLabel: 'Warm studio' });
+    render(
+      <StudioDesignProvider>
+        <CreativeWorkspace {...props} />
+      </StudioDesignProvider>,
+    );
+
+    const voice = screen.getByRole('button', {
+      name: 'Selected voice: Warm studio. Open voice options',
+    });
+    fireEvent.click(voice);
+    expect(props.actions.onOpenVoice).toHaveBeenCalledOnce();
+  });
+
+  // A Project refuses any voice outright — setting one disables the visual Start. The rail has to
+  // say so where the choice is offered, not leave the operator to discover it in the editor.
+  it('refuses Voice with its reason wherever a Project cannot accept one', () => {
+    render(
+      <StudioDesignProvider>
+        <CreativeWorkspace
+          {...createProps({ voiceBlockedReason: 'Voice is not available inside a Project yet.' })}
+        />
+      </StudioDesignProvider>,
+    );
+
+    const voice = screen.getByRole('button', { name: 'Select Voice' });
+    expect(voice).toBeDisabled();
+    // Hidden from the compact rail, never from the accessibility tree it describes.
+    expect(voice).toHaveAccessibleDescription('Voice is not available inside a Project yet.');
   });
 
   it('enables Edit Video only for inactive playback and invokes the editor action', () => {

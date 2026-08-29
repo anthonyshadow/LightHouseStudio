@@ -12,7 +12,12 @@ import {
   type ExistingVideoToolId,
 } from './existingVideoPresentation';
 import type { ExistingVideoWorkflow } from './useExistingVideoWorkflow';
-import { VIDEO_TRANSFORM_OPERATION_LABELS } from './videoTransformLabels';
+import {
+  VIDEO_TRANSFORM_INCOMPATIBLE_REASON,
+  VIDEO_TRANSFORM_OPERATION_DESCRIPTIONS,
+  VIDEO_TRANSFORM_OPERATION_LABELS,
+  VIDEO_TRANSFORM_UNAVAILABLE_REASON,
+} from './videoTransformLabels';
 
 type ToolDefinition = Readonly<{
   id: ExistingVideoToolId;
@@ -24,12 +29,12 @@ const tools: readonly ToolDefinition[] = [
   {
     id: 'character',
     label: VIDEO_TRANSFORM_OPERATION_LABELS['character-swap'],
-    description: 'Replace the visible person or character.',
+    description: VIDEO_TRANSFORM_OPERATION_DESCRIPTIONS['character-swap'],
   },
   {
     id: 'vton',
     label: VIDEO_TRANSFORM_OPERATION_LABELS['virtual-try-on'],
-    description: 'Change the subject’s clothing with one garment.',
+    description: VIDEO_TRANSFORM_OPERATION_DESCRIPTIONS['virtual-try-on'],
   },
   {
     id: 'voice',
@@ -80,9 +85,8 @@ export const ExistingVideoToolCards = ({
       ? tool.id === 'voice'
         ? 'The source has no usable audio.'
         : !workflow.visualProviderCompatibility.compatible
-          ? (workflow.visualProviderCompatibility.reason ??
-            'This aspect ratio is unavailable for visual AI.')
-          : 'This visual operation is unavailable in the current server configuration.'
+          ? (workflow.visualProviderCompatibility.reason ?? VIDEO_TRANSFORM_INCOMPATIBLE_REASON)
+          : VIDEO_TRANSFORM_UNAVAILABLE_REASON
       : tool.id !== 'voice' &&
           configuredVisualTool &&
           configuredVisualTool !== tool.id &&

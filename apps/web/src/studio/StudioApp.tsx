@@ -11,14 +11,19 @@ import {
   savedCharacterStepInput,
   useExistingVideoWorkflow,
 } from '../features/existing-video/useExistingVideoWorkflow';
+import { VIDEO_TRANSFORM_INCOMPATIBLE_REASON } from '../features/existing-video/videoTransformLabels';
 import { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
 import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 import { useProjectCreativeSessionAdapter } from '../features/projects/useProjectCreativeSessionAdapter';
 import {
-  ProjectCreativeCheckpointPanel,
   PROJECT_PROVIDER_START_BLOCKED_REASON,
-} from '../features/projects/ProjectCreativeCheckpointPanel';
+  PROJECT_VOICE_UNAVAILABLE_REASON,
+} from '../features/projects/projectProcessingPresentation';
+import type {
+  ProjectCreateOperationId,
+  ProjectCreateRuntime,
+} from '../features/projects/ProjectRouteSurface';
 import { hasDraftContent } from '../features/media-session';
 import { persistedReferenceAssetId } from '../features/media-session/types';
 import { useStudioSession } from '../orchestration/session';
@@ -67,6 +72,8 @@ const creativeToolForOverlay = (
     case 'outfit-selector':
     case 'outfit-builder':
       return 'outfit';
+    case 'voice-selector':
+      return 'voice';
     default:
       return null;
   }
@@ -110,6 +117,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     mainRef,
     characterSelectorRef,
     outfitToggleRef,
+    voiceToggleRef,
     editVideoToggleRef,
   } = services;
   // Runtime-local: nothing outside the capture graph reads these.
@@ -241,6 +249,9 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
       : {}),
   });
   const videoEditor = useVideoEditSession();
+  // "Adjust video" is asked for before the workflow holds the Project's video, so the request waits
+  // here until it does — the same one-shot shape the gallery's edit intent uses.
+  const adjustRequestedRef = useRef(false);
   const projectWorkingMedia = useProjectWorkingMediaController(
     activeProjectId,
     activeProjectSession,
@@ -254,6 +265,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     openExistingVideo,
     clearExistingVideoIntent,
     discardPendingAdoption,
+    launchingOperation,
   } = useStudioRecordingLaunch({
     browser,
     session,
@@ -418,6 +430,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   const openCharacterSelector = useCallback(() => openOverlay('character-selector'), [openOverlay]);
   const openSavedCharacters = useCallback(() => openOverlay('saved-characters'), [openOverlay]);
   const openOutfitSelector = useCallback(() => openOverlay('outfit-selector'), [openOverlay]);
+  const openVoiceSelector = useCallback(() => openOverlay('voice-selector'), [openOverlay]);
 
   const activeCreativeTool = creativeToolForOverlay(activeOverlay, videoEditing);
   const activeRecordingSource = recordingActive
@@ -473,6 +486,20 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     focusStudio,
     focusEditVideo,
   });
+  // Spends the "Adjust video" launch. It lives here rather than in the launch hook because only
+  // this controller can open the editor, and only once it has been rebuilt around the new media.
+  const { openVideoAdjust } = savedVideo;
+  useEffect(() => {
+    if (
+      !adjustRequestedRef.current ||
+      !existingVideo.selection ||
+      existingVideo.phase !== 'ready'
+    ) {
+      return;
+    }
+    adjustRequestedRef.current = false;
+    openVideoAdjust();
+  }, [existingVideo.phase, existingVideo.selection, openVideoAdjust]);
   // Published for the surfaces that outlive this runtime. Registered in a layout effect so a
   // selection made on the route that mounted us is applied before first paint, and withdrawn on
   // unmount so the shell holds a selection instead of calling into a torn-down session.
@@ -638,6 +665,16 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     existingVideo.showResult();
     openOverlay('take-review');
   }, [existingVideo, openOverlay]);
+  // A Create launch opens the editor from the inspector column, so focus must come back to the card
+  // that was pressed rather than to the stage rail on the other side of the layout. Every other way
+  // in clears it, or closing a rail-opened editor would jump to a card nobody touched.
+  const createLaunchTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [createLaunchActive, setCreateLaunchActive] = useState(false);
+  const openEditorFromRail = useCallback(() => {
+    createLaunchTriggerRef.current = null;
+    setCreateLaunchActive(false);
+    openPlaybackEditor();
+  }, [openPlaybackEditor]);
   const closeExistingVideo = useCallback(() => {
     if (existingVideo.providerActive) return;
     if (existingVideo.active) existingVideo.cancelBeforeAcceptance();
@@ -653,7 +690,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
         return;
       }
       if (kind === 'voice') {
-        openPlaybackEditor();
+        openEditorFromRail();
         return;
       }
       if (kind === 'prompt' || kind === 'recipe' || kind === 'reference') {
@@ -662,7 +699,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
       }
       openCharacterSelector();
     },
-    [openCharacterSelector, openOutfitSelector, openOverlay, openPlaybackEditor],
+    [openCharacterSelector, openEditorFromRail, openOutfitSelector, openOverlay],
   );
   const creativeWorkspace = (
     <>
@@ -675,6 +712,12 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
             session.draft.mode === 'lucy-vton-latest' && hasDraftContent(session.draft)
               ? (activeRecipeLabel ?? 'Configured VTO')
               : undefined,
+          ...(existingVideo.voiceSelection
+            ? { activeVoiceLabel: existingVideo.voiceSelection.voiceName }
+            : {}),
+          // A Project refuses any voice outright: setting one would disable the visual Start with
+          // no explanation on this rail. Said here, at the point of choice, rather than after.
+          ...(projectContextActive ? { voiceBlockedReason: PROJECT_VOICE_UNAVAILABLE_REASON } : {}),
           recordingActive,
           hasPlaybackVideo: Boolean(recording.presented),
           editVideoBlockedReason: creativeToolBlockedReasons.editVideo,
@@ -684,11 +727,13 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
           editVideoToggleRef,
           characterToggleRef: characterSelectorRef,
           outfitToggleRef,
+          voiceToggleRef,
         }}
         actions={{
-          onOpenEditVideo: openPlaybackEditor,
+          onOpenEditVideo: openEditorFromRail,
           onOpenCharacter: openCharacterSelector,
           onOpenOutfit: openOutfitSelector,
+          onOpenVoice: openVoiceSelector,
         }}
       />
       <ReferenceUseFailureNotice
@@ -706,13 +751,52 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
       />
     </>
   );
-  const projectCreativeCheckpoint = projectContextActive ? (
-    <ProjectCreativeCheckpointPanel
-      controller={projectCreative}
-      workingMedia={projectWorkingMedia}
-      onChooseAnother={chooseAnotherProjectResource}
-    />
-  ) : null;
+  const handleCreateLaunch = useCallback(
+    (operation: ProjectCreateOperationId, trigger: HTMLButtonElement) => {
+      createLaunchTriggerRef.current = trigger;
+      setCreateLaunchActive(true);
+      if (operation === 'adjust') adjustRequestedRef.current = true;
+      // No checkpoint here on purpose. The selection is already on its way to the Project through
+      // the ordinary autosave, and the editor's prefill is reactive — it configures the step when
+      // the revision lands. Forcing a write first re-presented the stage artifact underneath the
+      // media acquisition this launch had just started, and the editor never opened.
+      openPlaybackEditor(operation);
+    },
+    [openPlaybackEditor],
+  );
+  const projectCreateRuntime = useMemo<ProjectCreateRuntime | null>(
+    () =>
+      projectContextActive
+        ? {
+            creative: projectCreative,
+            workingMedia: projectWorkingMedia,
+            onLaunch: handleCreateLaunch,
+            onChooseAnother: chooseAnotherProjectResource,
+            launchingOperation:
+              activeOverlay === 'video-upload' || videoEditing ? null : launchingOperation,
+            characterSwapAvailable: availability.videoProcessing?.characterSwap.available ?? false,
+            virtualTryOnAvailable: availability.videoProcessing?.virtualTryOn.available ?? false,
+            visualIncompatibilityReason: existingVideo.visualProviderCompatibility.compatible
+              ? null
+              : (existingVideo.visualProviderCompatibility.reason ??
+                VIDEO_TRANSFORM_INCOMPATIBLE_REASON),
+            editorBlockedReason: creativeToolBlockedReasons.editVideo,
+          }
+        : null,
+    [
+      activeOverlay,
+      availability.videoProcessing,
+      chooseAnotherProjectResource,
+      creativeToolBlockedReasons.editVideo,
+      existingVideo.visualProviderCompatibility,
+      handleCreateLaunch,
+      launchingOperation,
+      projectContextActive,
+      projectCreative,
+      projectWorkingMedia,
+      videoEditing,
+    ],
+  );
   const projectRecordingAvailable =
     activeProjectId !== null &&
     activeProjectSourceActivity !== null &&
@@ -749,7 +833,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
         activity={{ captureBlockedReason, captureSettingsDisabledReason, aiSessionActive }}
         onProjectSessionChange={handleProjectSession}
         creativeWorkspace={creativeWorkspace}
-        projectCreativeCheckpoint={projectCreativeCheckpoint}
+        projectCreateRuntime={projectCreateRuntime}
         saveVideoState={savedVideoSave.state}
         actions={{
           startLocalRecording,
@@ -819,8 +903,10 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
         mainRef={mainRef}
         characterSelectorRef={characterSelectorRef}
         outfitToggleRef={outfitToggleRef}
+        voiceToggleRef={voiceToggleRef}
         editVideoToggleRef={editVideoToggleRef}
         uploadToggleRef={uploadToggleRef}
+        {...(createLaunchActive ? { launchTriggerRef: createLaunchTriggerRef } : {})}
         onOpenOverlay={openOverlay}
         onCloseOverlay={closeOverlay}
         onCloseExistingVideo={closeExistingVideo}

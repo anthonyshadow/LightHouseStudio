@@ -1,4 +1,5 @@
 import { useTheme } from '@emotion/react';
+import { BlockingOverlay } from '../../ui/primitives/BlockingOverlay';
 import type { RecordingDurationTiming } from '@studio/domain';
 import type { ReactNode } from 'react';
 import type { RealtimeSessionTiming } from '../media-session';
@@ -6,10 +7,7 @@ import { formatDuration } from '../recording/recordingHelpers';
 import type { RecordingProcessingOperation } from '../recording/types';
 import { AppIcon, VisuallyHidden } from '../../ui';
 import {
-  activityIndicatorStyles,
   badgeStyles,
-  blockingCardStyles,
-  blockingOverlayStyles,
   emptyIconStyles,
   emptyStyles,
   iconButtonStyles,
@@ -146,56 +144,31 @@ export const MediaStageBlockingLayers = ({
 }) => {
   'use memo';
 
-  const theme = useTheme();
   return (
     <>
       {finalizingStartedAt !== null ? (
-        <div
-          css={blockingOverlayStyles(theme, 'finalizing')}
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          data-finalizing-started-at={finalizingStartedAt}
-        >
-          <span css={blockingCardStyles(theme)}>
-            <span css={activityIndicatorStyles(theme)} aria-hidden="true" />
-            <strong>Finalizing take…</strong>
-            <span>Securing the final recording data before camera and AI resources close.</span>
-          </span>
-        </div>
+        <BlockingOverlay
+          tone="heavy"
+          title="Finalizing take…"
+          detail="Securing the final recording data before camera and AI resources close."
+        />
       ) : null}
 
       {playbackLocked ? (
-        <div
-          css={blockingOverlayStyles(theme, 'processing')}
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          <span css={blockingCardStyles(theme)}>
-            <span css={activityIndicatorStyles(theme)} aria-hidden="true" />
-            <strong>{playbackOperation?.title ?? 'Processing video…'}</strong>
-            <span>
-              {playbackOperation?.detail ??
-                'Playback is paused until the current operation is ready.'}
-            </span>
-          </span>
-        </div>
+        <BlockingOverlay
+          title={playbackOperation?.title ?? 'Processing video…'}
+          detail={
+            playbackOperation?.detail ?? 'Playback is paused until the current operation is ready.'
+          }
+        />
       ) : null}
 
       {aiStarting ? (
-        <div
-          css={[blockingOverlayStyles(theme, 'processing'), { pointerEvents: 'none' }]}
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-        >
-          <span css={blockingCardStyles(theme)}>
-            <span css={activityIndicatorStyles(theme)} aria-hidden="true" />
-            <strong>Connecting to AI…</strong>
-            <span>Preparing {experienceLabel ?? 'your selected experience'}</span>
-          </span>
-        </div>
+        <BlockingOverlay
+          passthrough
+          title="Connecting to AI…"
+          detail={`Preparing ${experienceLabel ?? 'your selected experience'}`}
+        />
       ) : null}
     </>
   );

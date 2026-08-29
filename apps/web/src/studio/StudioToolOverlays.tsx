@@ -7,12 +7,13 @@ import type {
 } from '../features/creative-assets/types';
 import { ownedRecordingArtifact } from '../features/recording/types';
 import type { ExistingVideoSavedRecipe } from '../features/existing-video/ExistingVideoRecipeChooser';
+import { ExistingVideoVoiceEditor } from '../features/existing-video/ExistingVideoVoiceEditor';
 import type { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import { hasDraftContent, SessionComposer } from '../features/media-session';
 import { CaptureSettingsPanel } from '../features/recording';
 import type { SaveVideoState } from '../features/saved-videos/useSaveVideo';
 import type { useStudioSession } from '../orchestration/session';
-import { OverlayPanel } from '../ui';
+import { OverlayPanel, StatusNotice } from '../ui';
 import { AIExperienceChooser } from './AIExperienceChooser';
 import { StudioCharacterOverlays } from './StudioCharacterOverlays';
 import { StudioExistingVideoOverlay } from './StudioExistingVideoOverlay';
@@ -57,6 +58,8 @@ interface StudioToolOverlaysProps {
   readonly outfitToggleRef: RefObject<HTMLButtonElement | null>;
   readonly editVideoToggleRef: RefObject<HTMLButtonElement | null>;
   readonly uploadToggleRef: RefObject<HTMLButtonElement | null>;
+  readonly launchTriggerRef?: RefObject<HTMLButtonElement | null>;
+  readonly voiceToggleRef: RefObject<HTMLButtonElement | null>;
   readonly onOpenOverlay: (overlay: Exclude<ActiveOverlay, null>) => void;
   readonly onCloseOverlay: () => void;
   readonly onCloseExistingVideo: () => void;
@@ -102,6 +105,8 @@ export const StudioToolOverlays = ({
   outfitToggleRef,
   editVideoToggleRef,
   uploadToggleRef,
+  launchTriggerRef,
+  voiceToggleRef,
   onOpenOverlay,
   onCloseOverlay,
   onCloseExistingVideo,
@@ -136,6 +141,7 @@ export const StudioToolOverlays = ({
         onOpenSavedVideosLibrary={onOpenSavedVideosLibrary}
         editVideoToggleRef={editVideoToggleRef}
         uploadToggleRef={uploadToggleRef}
+        {...(launchTriggerRef ? { launchTriggerRef } : {})}
         onClose={onCloseExistingVideo}
         onFinish={onFinishExistingVideo}
         onStartRecording={onStartExistingVideoRecording}
@@ -239,6 +245,33 @@ export const StudioToolOverlays = ({
               : {})}
           />
         ) : null}
+      </OverlayPanel>
+
+      {/*
+        The same chooser the editor mounts, reached directly from the rail. One owner, two entry
+        points: a second voice surface would be a second thing to keep true.
+      */}
+      <OverlayPanel
+        open={activeOverlay === 'voice-selector'}
+        onClose={onCloseOverlay}
+        title="Select Voice"
+        description="Choose how this video sounds. Nothing is sent until you start an edit."
+        placement="right"
+        returnFocusRef={voiceToggleRef}
+      >
+        {existingVideo.selection ? (
+          <ExistingVideoVoiceEditor
+            workflow={existingVideo}
+            durationMs={existingVideo.selection.metadata.durationMs}
+            elevenLabsAvailable={availability.elevenLabs}
+            elevenLabsModel={availability.elevenLabsModel}
+            locked={existingVideo.providerActive}
+          />
+        ) : (
+          <StatusNotice role="status" tone="neutral" title="No video yet">
+            Record or upload a video first — a voice replaces the audio of a video you already have.
+          </StatusNotice>
+        )}
       </OverlayPanel>
 
       <StudioTakeOverlays

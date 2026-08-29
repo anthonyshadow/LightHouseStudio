@@ -1,9 +1,10 @@
 import { useTheme } from '@emotion/react';
 import type { CreativeAssetStore } from '@studio/domain';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect } from 'react';
 import { APP_PATHS } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
 import { Button, StatusNotice } from '../../ui';
+import type { ProjectCreateRuntime } from './ProjectCreateTaskPanel';
 import { projectProcessingBlockedReason } from './projectProcessingPresentation';
 import { ProjectOverviewSurface } from './ProjectOverviewSurface';
 import { dialogActionsStyles, workspaceInnerStyles } from './ProjectRouteSurface.styles';
@@ -18,7 +19,7 @@ import { pageShellStyles } from '../../ui/primitives/PageShell.styles';
 export interface ProjectRouteSurfaceProps {
   readonly workspaceMode?: boolean;
   readonly ownerUserId?: string;
-  readonly creativeCheckpoint?: ReactNode;
+  readonly createRuntime?: ProjectCreateRuntime;
   readonly sourceRuntime?: ProjectSourceRuntime;
   readonly recordingCandidate?: ProjectRecordingCandidate | null;
   readonly recordingActive?: boolean;
@@ -46,7 +47,7 @@ export const ProjectDetailSurface = ({
   onSourceActivityChange,
   onWorkingMediaActivityChange,
   onSessionChange,
-  creativeCheckpoint,
+  createRuntime,
   processing,
   ownerUserId,
   creativeStore,
@@ -105,7 +106,7 @@ export const ProjectDetailSurface = ({
         recordingCandidate={recordingCandidate}
         recordingActive={recordingActive}
         onStartRecording={onStartRecording}
-        creativeCheckpoint={creativeCheckpoint}
+        createRuntime={createRuntime}
         processing={processing}
         ownerUserId={ownerUserId}
       />

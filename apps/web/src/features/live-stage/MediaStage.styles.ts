@@ -1,5 +1,4 @@
 import type { CSSObject, Theme } from '@emotion/react';
-import { rotatingSpinnerAnimationStyles } from '../../ui/animationStyles';
 import { media } from '../../ui/media';
 
 export const stageStyles = (theme: Theme): CSSObject => ({
@@ -384,59 +383,6 @@ export const statusDotStyles = (
         : tone === 'warning'
           ? `0 0 0 0.18rem ${theme.colors.warningSoft}`
           : 'none',
-});
-
-export const blockingOverlayStyles = (
-  theme: Theme,
-  tone: 'finalizing' | 'processing',
-): CSSObject => ({
-  position: 'absolute',
-  zIndex: theme.layers.stageBlocking,
-  inset: 0,
-  display: 'grid',
-  placeItems: 'center',
-  padding: theme.space.lg,
-  color: theme.colors.text,
-  background:
-    tone === 'finalizing'
-      ? 'linear-gradient(180deg, rgba(5, 9, 14, 0.42), rgba(5, 9, 14, 0.72))'
-      : 'linear-gradient(180deg, rgba(5, 9, 14, 0.2), rgba(5, 9, 14, 0.58))',
-  backdropFilter: 'blur(2px)',
-  pointerEvents: 'auto',
-});
-
-export const blockingCardStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  justifyItems: 'center',
-  width: 'min(25rem, calc(100% - 2rem))',
-  gap: theme.space.xs,
-  padding: `${theme.space.md} ${theme.space.lg}`,
-  border: `1px solid ${theme.colors.borderStrong}`,
-  borderRadius: theme.radii.large,
-  color: theme.colors.textMuted,
-  background: theme.colors.overlaySurface,
-  boxShadow: theme.shadows.lifted,
-  textAlign: 'center',
-  '& strong': {
-    color: theme.colors.text,
-    fontFamily: theme.type.display,
-    fontSize: theme.fontSizes.label,
-  },
-  '& span': {
-    fontSize: theme.fontSizes.metadata,
-    lineHeight: 1.45,
-  },
-});
-
-export const activityIndicatorStyles = (theme: Theme): CSSObject => ({
-  width: '1.45rem',
-  height: '1.45rem',
-  border: `2px solid ${theme.colors.borderStrong}`,
-  borderBlockStartColor: theme.colors.accent,
-  borderRadius: '50%',
-  ...rotatingSpinnerAnimationStyles('780ms', {
-    borderColor: theme.colors.accent,
-  }),
 });
 
 export const noticeLayerStyles = (theme: Theme): CSSObject => ({
