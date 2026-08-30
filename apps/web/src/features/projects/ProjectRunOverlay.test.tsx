@@ -57,7 +57,7 @@ afterEach(cleanup);
 
 describe('projectRunInFlight', () => {
   it('covers the submission window that has no attempt yet', () => {
-    expect(projectRunInFlight(controller({ phase: 'submitting', busy: true }))).toBe(true);
+    expect(projectRunInFlight(controller({ phase: 'submitting' }))).toBe(true);
   });
 
   it('covers the accepted run a background poll deliberately reports as idle', () => {
@@ -72,10 +72,22 @@ describe('projectRunInFlight', () => {
     ).toBe(false);
   });
 
+  it('leaves the workspace alone while the status is merely being read', () => {
+    // `loading` is where this controller starts on mount and returns on every revision change, and
+    // `refreshing` is what the check-status controls set. Neither has sent anything, so a scrim
+    // over an ordinary Project — every time it is opened, and after every autosave — was a claim
+    // the app could not support, and it covered the control that asked for the read.
+    expect(projectRunInFlight(controller({ phase: 'loading', busy: true }))).toBe(false);
+    expect(projectRunInFlight(controller({ phase: 'refreshing', busy: true }))).toBe(false);
+  });
+
   it('never blocks an unverified submission, which needs the operator to resolve it', () => {
     expect(
       projectRunInFlight(
-        controller({ busy: true, unverifiedOperationId: '2efcc6c3-e82c-419a-8807-c0026170fb75' }),
+        controller({
+          phase: 'submitting',
+          unverifiedOperationId: '2efcc6c3-e82c-419a-8807-c0026170fb75',
+        }),
       ),
     ).toBe(false);
   });
@@ -98,7 +110,7 @@ describe('ProjectRunOverlay', () => {
   });
 
   it('names the submission window before an attempt exists', () => {
-    render(<ProjectRunOverlay controller={controller({ phase: 'submitting', busy: true })} />, {
+    render(<ProjectRunOverlay controller={controller({ phase: 'submitting' })} />, {
       wrapper: StudioDesignProvider,
     });
 

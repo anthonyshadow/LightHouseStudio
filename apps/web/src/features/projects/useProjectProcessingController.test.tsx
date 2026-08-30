@@ -186,6 +186,70 @@ const currentPath = `/api/projects/${ids.project}/processing/current`;
 afterEach(() => vi.restoreAllMocks());
 
 describe('useProjectProcessingController', () => {
+  it('keeps a submission in flight when the checkpoint it takes lands a new revision', async () => {
+    // The checkpoint a Start takes appends a revision, and the revision is a dependency of the
+    // hydration effect. That effect used to reset `phase` and `attempt` underneath the command and
+    // then decline to read, because a command was active — so a submission that was mid-POST
+    // reported itself as an idle status read, `authorityReady` went false, and every surface that
+    // asks whether a run owns this Project was told it does not.
+    // The shared port freezes `current`, and the rest of this suite depends on that — a live
+    // revision re-enters the hydration effect, and those cases pin one authority response. Only
+    // this one needs the revision to move. Spread rather than rebuilt, so a new member on
+    // `ProjectSessionPort` still has to type-check here.
+    const { session: settled } = createSession();
+    let current = currentProject(ids.revision, 2, 3);
+    const session: ProjectSessionPort = {
+      ...settled,
+      get current() {
+        return current;
+      },
+      getCurrent: () => current,
+    };
+
+    let releaseSubmit: () => void = () => undefined;
+    const submitReleased = new Promise<void>((resolve) => {
+      releaseSubmit = resolve;
+    });
+    mockApiServer.use(
+      jsonScenario('GET', currentPath, { body: currentResponse(null) }),
+      jsonScenario('GET', historyPath, { body: { attempts: [], nextCursor: null } }),
+      http.post(`*/api/projects/${ids.project}/processing/submit`, async () => {
+        await submitReleased;
+        return HttpResponse.json({ replayed: false, attempt: attempt() }, { status: 200 });
+      }),
+    );
+
+    const hook = renderHook(() =>
+      useProjectProcessingController({
+        projectId: ids.project,
+        session,
+        // What a real checkpoint does: writes the staged creative pick, which appends a revision.
+        checkpointCreative: vi.fn(() => {
+          current = currentProject(ids.resultRevision, 3, 4);
+          return Promise.resolve(true);
+        }),
+      }),
+    );
+    await waitFor(() => expect(hook.result.current.phase).toBe('idle'));
+
+    let submitting: Promise<boolean> | null = null;
+    await act(async () => {
+      submitting = hook.result.current.start('character-swap');
+      // Long enough for the checkpoint to resolve, the new revision to reach a render, and the
+      // effect that render schedules to run. The provider has still not answered.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(hook.result.current.phase).toBe('submitting');
+    expect(hook.result.current.busy).toBe(true);
+
+    releaseSubmit();
+    await act(async () => {
+      await submitting;
+    });
+    expect(hook.result.current.attempt?.operationId).toBe(ids.operation);
+  });
+
   it('reconnects a queued operation on hydrate without creating another submission', async () => {
     const { session } = createSession();
     let submitCount = 0;
