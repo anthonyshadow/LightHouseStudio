@@ -12,7 +12,10 @@ export interface ProjectSessionPort {
   readonly proposal: ProjectSessionProposalContract | null;
   readonly hasLocalProposal: boolean;
   readonly message: string | null;
-  readonly propose: (proposal: Partial<ProjectSessionProposalContract>) => boolean;
+  readonly propose: (
+    proposal: Partial<ProjectSessionProposalContract>,
+    options?: { readonly autosave?: boolean },
+  ) => boolean;
   readonly flush: () => Promise<boolean>;
   readonly retry: () => Promise<boolean>;
   readonly discard: () => boolean;

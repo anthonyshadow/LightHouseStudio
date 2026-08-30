@@ -102,7 +102,18 @@ export class ProjectSessionController {
     }
   };
 
-  readonly propose = (proposal: Partial<ProjectSessionProposalContract>): boolean => {
+  /**
+   * Stages a change, and by default schedules the write.
+   *
+   * `autosave: false` stages without scheduling: the proposal is visible to everything that reads
+   * the session, and `flush` will still write it, but nothing is appended on its own. That is what
+   * a derived selection wants — a Project revision is a record of a change the operator made, not
+   * of the Studio settling — so those callers stage and let a real boundary do the writing.
+   */
+  readonly propose = (
+    proposal: Partial<ProjectSessionProposalContract>,
+    options: { readonly autosave?: boolean } = {},
+  ): boolean => {
     const current = this.#snapshot.current;
     if (current === null || this.#disposed) return false;
     const desired = projectSessionProposalSchema.parse({
@@ -117,7 +128,7 @@ export class ProjectSessionController {
     }
     if (this.#snapshot.phase !== 'saving') {
       this.#update({ phase: 'dirty', message: null });
-      this.#scheduleAutosave();
+      if (options.autosave !== false) this.#scheduleAutosave();
     } else {
       this.#update({});
     }

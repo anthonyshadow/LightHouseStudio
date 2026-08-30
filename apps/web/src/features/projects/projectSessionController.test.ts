@@ -150,6 +150,38 @@ describe('ProjectSessionController', () => {
     expect(controller.getSnapshot()).toMatchObject({ phase: 'saved', hasLocalProposal: false });
   });
 
+  it('stages a derived change without writing, and lets a boundary write it', async () => {
+    vi.useFakeTimers();
+    let authority = currentProject();
+    const save = vi.fn(
+      (_id: string, current: ProjectCurrentResponse, proposal: ProjectSessionProposalContract) => {
+        authority = withProposal(current, proposal);
+        return Promise.resolve(authority);
+      },
+    );
+    const controller = new ProjectSessionController(projectId, {
+      load: () => Promise.resolve(authority),
+      save,
+      autosaveMs: 50,
+    });
+    await controller.hydrate();
+
+    controller.propose({ workflowPhase: 'creative' }, { autosave: false });
+
+    // Visible to every reader, so the Studio can be driven from it, but nothing is scheduled: a
+    // Project revision records a change the operator made, not the Studio settling into one.
+    expect(controller.getSnapshot()).toMatchObject({ phase: 'dirty', hasLocalProposal: true });
+    expect(controller.getSnapshot().proposal).toMatchObject({ workflowPhase: 'creative' });
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(save).not.toHaveBeenCalled();
+
+    // A boundary — starting an edit, saving an output, leaving the workspace — still writes it.
+    await controller.flush();
+    expect(save).toHaveBeenCalledOnce();
+    expect(controller.getSnapshot()).toMatchObject({ phase: 'saved', hasLocalProposal: false });
+    vi.useRealTimers();
+  });
+
   it('reconciles a lost response when server authority already contains the exact proposal', async () => {
     let authority = currentProject();
     const controller = new ProjectSessionController(projectId, {
