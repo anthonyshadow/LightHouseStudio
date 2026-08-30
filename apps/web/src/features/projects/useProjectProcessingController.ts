@@ -1,8 +1,10 @@
 import type {
+  ProjectCurrentResponse,
   ProjectProcessingAttempt,
   ProjectProcessingCapability,
   ProjectProcessingMutationResponse,
 } from '@studio/contracts';
+import { projectMediaReferencesEqual } from '@studio/domain';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ApiClientError, apiErrorMessage } from '../../adapters/api-client/apiClient';
 import {
@@ -57,6 +59,34 @@ const BACKGROUND_POLL_RETRY_MS = 4_000;
 const isRecoverableHistoricalAttempt = (attempt: ProjectProcessingAttempt): boolean =>
   attempt.nextPollAfterMs !== null ||
   (attempt.phase === 'needs-attention' && attempt.blocksArchive);
+
+/**
+ * A finished result the operator has not dealt with yet — and only that.
+ *
+ * A result that was applied belongs in History, not in the live panel: resurfacing every applied
+ * run made an ordinary save look like a failure on every subsequent load. This surfaces the one
+ * case that still wants a decision, and retires itself three ways — a newer attempt replaces it,
+ * adopting it puts its asset on the Project, and anything else leaves it in History.
+ */
+const undecidedRetainedResult = (
+  candidate: ProjectProcessingAttempt | undefined,
+  current: ProjectCurrentResponse | null,
+): ProjectProcessingAttempt | null => {
+  if (
+    candidate === undefined ||
+    candidate.phase !== 'complete' ||
+    candidate.result?.state !== 'unapplied'
+  ) {
+    return null;
+  }
+  const held = { kind: 'asset', assetId: candidate.result.assetId } as const;
+  const snapshot = current?.revision.snapshot;
+  return [snapshot?.workingMedia, snapshot?.presentedMedia].some((reference) =>
+    projectMediaReferencesEqual(reference ?? null, held),
+  )
+    ? null
+    : candidate;
+};
 
 const attemptNeedsProjectRefresh = (attempt: ProjectProcessingAttempt): boolean =>
   attempt.phase === 'complete' ||
@@ -171,7 +201,7 @@ export const useProjectProcessingController = ({
           if (!signal.aborted) {
             patchState({
               message:
-                attempt.phase === 'complete' && attempt.result?.historical === false
+                attempt.phase === 'complete' && attempt.result?.state === 'current'
                   ? 'The result is retained, but the current Project media could not be refreshed yet. Reopen or check status to present it.'
                   : 'Processing status changed, but the current Project summary could not be refreshed yet. Reopen or check status again.',
             });
@@ -200,18 +230,17 @@ export const useProjectProcessingController = ({
         let attempt = current.attempt;
         if (attempt === null) {
           const history = await getProjectProcessingHistory(activeProjectId, undefined, signal);
+          // Newest-first from both repositories, so a later run retires an older notice on its own.
           attempt =
             history.attempts.find(isRecoverableHistoricalAttempt) ??
-            history.attempts.find((candidate) => candidate.result?.historical === true) ??
-            null;
+            undecidedRetainedResult(history.attempts[0], activeSession.getCurrent());
         }
         const prior = stateRef.current;
         if (
           attempt === null &&
           prior.projectId === activeProjectId &&
           prior.attempt !== null &&
-          (prior.attempt.nextPollAfterMs !== null ||
-            (prior.attempt.phase === 'complete' && prior.attempt.result?.historical === true))
+          isRecoverableHistoricalAttempt(prior.attempt)
         ) {
           attempt = prior.attempt;
         }

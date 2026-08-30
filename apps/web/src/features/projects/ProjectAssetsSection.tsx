@@ -516,7 +516,7 @@ export const ProjectAssetsSection = ({
         returnFocusRef={addTriggerRef}
         onClose={() => setPicker(null)}
         onSelect={(video) => void attach('video', video.id)}
-        title="Import a saved video"
+        title="Add a saved video"
         description="Adds this video to the Project without replacing its original video."
         listLabel="Videos available to attach to this Project"
       />
@@ -578,12 +578,12 @@ export const ProjectAssetsSection = ({
       <OverlayPanel
         open={picker === 'video-options'}
         onClose={() => setPicker(null)}
-        title="Create Video for Project"
+        title="Add a video to this Project"
         description="Recording or uploading stays separate until you save the video to Assets."
         placement="right"
         returnFocusRef={addTriggerRef}
       >
-        <Button onClick={() => setPicker('video-existing')}>Import a saved video</Button>
+        <Button onClick={() => setPicker('video-existing')}>Add a saved video</Button>
         <Button onClick={() => void navigate(studioCreatePath({ intent: 'record', projectId }))}>
           Record Video
         </Button>

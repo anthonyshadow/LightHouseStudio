@@ -9,6 +9,7 @@ import { safeProjectError } from './ProjectDialogs';
 import { getProject, reuseSavedVideoAsProjectSource } from './projectsApi';
 import { reconcileProject, useProjectList } from './useProjectsController';
 import { useStableOperationKey } from './useStableOperationKey';
+import { PROJECT_SET_ORIGINAL_VIDEO_ACTION_LABEL } from './projectProcessingPresentation';
 
 /** Raised locally so its operator-facing copy is distinguishable from transport-vetted errors. */
 class ProjectSourceOccupiedError extends Error {}
@@ -97,7 +98,7 @@ export const AddVideoToProjectDialog = ({
     <OverlayPanel
       open
       onClose={onClose}
-      title="Use as Project source"
+      title={PROJECT_SET_ORIGINAL_VIDEO_ACTION_LABEL}
       description={`Make the current Version of “${video.title}” the source of a Project that does not have one yet. This is not an attachment: it becomes the video the Project is built from. The Asset stays reusable everywhere.`}
       placement="bottom"
       size="wide"

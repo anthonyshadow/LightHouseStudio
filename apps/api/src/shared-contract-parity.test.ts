@@ -5,6 +5,7 @@ import {
   PROJECT_REVISION_SOURCES as CONTRACT_PROJECT_REVISION_SOURCES,
   PROJECT_STATUSES as CONTRACT_PROJECT_STATUSES,
   PROJECT_WORKFLOW_PHASES as CONTRACT_PROJECT_WORKFLOW_PHASES,
+  PROJECT_PROCESSING_RESULT_STATES as WIRE_PROJECT_PROCESSING_RESULT_STATES,
   REFERENCE_IMAGE_MAX_BYTES,
   REFERENCE_IMAGE_PROMPT_MAX_LENGTH,
   REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
@@ -21,12 +22,19 @@ import {
   PROJECT_REVISION_SOURCES,
   PROJECT_STATUSES,
   PROJECT_WORKFLOW_PHASES,
+  PROJECT_PROCESSING_RESULT_STATES,
   RECOMMENDED_IMAGE_BYTES,
 } from '@studio/domain';
 
 describe('independent domain and wire value sets', () => {
   it('keeps realtime model identifiers in parity', () => {
     expect(MODEL_MODE_IDS).toEqual(SUPPORTED_MODEL_IDS);
+  });
+
+  it('keeps Project processing result states in parity', () => {
+    // The contract mirrors this list by hand because contracts cannot import the domain. The
+    // mirror is what the comment beside it promises; this is the promise.
+    expect(PROJECT_PROCESSING_RESULT_STATES).toEqual(WIRE_PROJECT_PROCESSING_RESULT_STATES);
   });
 
   it('keeps reference framing identifiers in parity', () => {

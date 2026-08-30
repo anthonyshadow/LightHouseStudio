@@ -62,7 +62,7 @@ provider work.
    exact Version verification, server inspection, checksum/owner validation, and atomic source
    revision acceptance. A failed/unaccepted staging attempt can be replaced.
 10. A Project's source is immutable _while it is attached_: a second acceptance conflicts rather
-    than overwriting it. **Remove original video** detaches it explicitly, returning the Project to the
+    than overwriting it. **Replace the original video** detaches it explicitly, returning the Project to the
     Source step as a `draft` with its creative setup — Character, Outfit, Voice, prompt, treatment,
     local edit — intact, and clearing only the derived working and presented media. Removal is
     refused while a provider attempt is unresolved and on an archived or deleted Project, and the
@@ -196,7 +196,7 @@ provider work.
     newest-first cursor pages and idempotent by Project/kind/resource. Membership alone does not
     create a source, working media, output, or retention claim. Archived Projects show the
     collection read-only. Missing underlying records remain visible as unavailable until explicitly
-    detached. Adopting an attached Video is named for its consequence: **Use as Project source** on
+    detached. Adopting an attached Video is named for its consequence: **Use as the original video** on
     a Project without one, confirmed because it changes what the whole Project is built from, and
     **Use as working media** once a source exists. Either adopts the exact current Version before
     navigating to `/projects/:projectId/workspace`, and the working-media path never changes the

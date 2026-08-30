@@ -84,6 +84,7 @@ export const ProjectSourceSection = ({
   recordingActive = false,
   removalBlockedReason,
   onStartRecording,
+  startRecordingLabel,
   onActivityChange,
   onCurrentChange,
 }: {
@@ -93,6 +94,8 @@ export const ProjectSourceSection = ({
   readonly recordingActive?: boolean | undefined;
   readonly removalBlockedReason?: string | undefined;
   readonly onStartRecording?: (() => void) | undefined;
+  /** Names what Record does where there is no stage — on the overview it opens the workspace. */
+  readonly startRecordingLabel?: string | undefined;
   readonly onActivityChange?: ((activity: ProjectSourceActivity) => void) | undefined;
   readonly onCurrentChange?: ((current: ProjectCurrentResponse) => void) | undefined;
 }) => {
@@ -185,18 +188,15 @@ export const ProjectSourceSection = ({
               busy={recordingActive}
               onClick={onStartRecording}
             >
-              Record
+              {startRecordingLabel ?? 'Record'}
             </Button>
           )}
-          <Button
-            disabled={controlsDisabled || !runtime.available}
-            onClick={() => inputRef.current?.click()}
-          >
+          <Button disabled={controlsDisabled} onClick={() => inputRef.current?.click()}>
             Upload
           </Button>
           <Button
             ref={savedVideoTriggerRef}
-            disabled={controlsDisabled || !runtime.available}
+            disabled={controlsDisabled}
             onClick={() => setPickerOpen(true)}
           >
             Use a saved video
@@ -209,16 +209,19 @@ export const ProjectSourceSection = ({
               disabled={archived || controller.busy}
               onClick={() => setRemoveDialogOpen(true)}
             >
-              Remove original video
+              Replace the original video
             </Button>
           ) : null}
+          {runtime.available ? null : (
+            <small>Choosing here opens the workspace, where you can watch it.</small>
+          )}
           <small>Choosing, recording, or reopening a video never starts paid AI work.</small>
         </div>
       </section>
       {removeDialogOpen ? (
         <ConfirmationDialog
           open
-          title="Remove original video"
+          title="Replace the original video"
           description="This Project goes back to choosing a video."
           body={
             <>
@@ -230,13 +233,13 @@ export const ProjectSourceSection = ({
               {removalBlockedReason === undefined ? null : <p>{removalBlockedReason}</p>}
             </>
           }
-          confirmLabel="Remove original video"
+          confirmLabel="Remove and choose another"
           cancelLabel="Cancel"
           danger
           busy={controller.busy}
           confirmDisabled={removalBlockedReason !== undefined}
           alert={removalFailure}
-          alertTitle="Original video not removed"
+          alertTitle="Original video not replaced"
           returnFocusRef={removeTriggerRef}
           onCancel={() => setRemoveDialogOpen(false)}
           onConfirm={() => {

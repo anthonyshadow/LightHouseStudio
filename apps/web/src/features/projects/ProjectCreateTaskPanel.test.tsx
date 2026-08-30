@@ -164,6 +164,7 @@ const renderPanel = (props: Partial<Parameters<typeof ProjectCreateTaskPanel>[0]
         sourceBusy={false}
         workingMediaBusy={false}
         onOpenSource={onOpenSource}
+        onOpenTask={vi.fn()}
         {...props}
       />
     </RemoteStateTestProvider>,
@@ -285,7 +286,9 @@ describe('ProjectCreateTaskPanel', () => {
       expect(action).toBeDisabled();
       expect(action).toHaveAttribute('title', 'This Project is archived.');
     }
-    expect(screen.getByRole('button', { name: 'Use a saved video instead' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Make a saved video the current cut' }),
+    ).toBeDisabled();
   });
 
   it('holds back only the billable edits while a provider run is unresolved', () => {
