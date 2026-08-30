@@ -171,20 +171,33 @@ describe('single visual policy', () => {
     ).toBe(false);
   });
 
-  it('separates a result that was never applied from one the Project moved past', () => {
-    // The head moves for ordinary reasons — saving a Version moves it — so `isCurrent` alone
-    // reported a successful, displayed result as though it had been discarded.
-    expect(projectProcessingResultState({ resultRevisionId: 'revision-2', isCurrent: true })).toBe(
+  it('reads the media the Project holds as the answer to whether a result was applied', () => {
+    const held = {
+      resultAssetId: 'asset-9',
+      heldMedia: [{ kind: 'asset', assetId: 'asset-9' }],
+    } as const;
+    // Promotion writes `resultRevisionId`; adoption from History does not, and neither did any
+    // promotion older than the column. The media is what both of them have in common.
+    expect(projectProcessingResultState({ ...held, resultRevisionId: 'revision-2' })).toBe(
       'current',
     );
-    expect(projectProcessingResultState({ resultRevisionId: 'revision-2', isCurrent: false })).toBe(
+    expect(projectProcessingResultState({ ...held, resultRevisionId: null })).toBe('current');
+  });
+
+  it('separates a result the Project moved past from one that never became the cut', () => {
+    // Saving a re-framed Version moves the head without touching the cut, so "is this the head's
+    // attempt" is not the question — whether the Project still holds the result is.
+    const notHeld = {
+      resultAssetId: 'asset-9',
+      heldMedia: [
+        { kind: 'asset', assetId: 'asset-1' },
+        { kind: 'saved-video-version', savedVideoId: 'video-1', videoVersionId: 'version-1' },
+      ],
+    } as const;
+    expect(projectProcessingResultState({ ...notHeld, resultRevisionId: 'revision-2' })).toBe(
       'superseded',
     );
-    // Only a promotion writes `resultRevisionId`, so a null one is the single honest signal that
-    // the result never became the cut.
-    expect(projectProcessingResultState({ resultRevisionId: null, isCurrent: false })).toBe(
-      'unapplied',
-    );
+    expect(projectProcessingResultState({ ...notHeld, resultRevisionId: null })).toBe('unapplied');
   });
 
   it('releases only historical ambiguity after a later durable Project attempt exists', () => {

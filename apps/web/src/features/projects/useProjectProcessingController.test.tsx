@@ -118,6 +118,35 @@ const attempt = (overrides: Partial<ProjectProcessingAttempt> = {}): ProjectProc
   ...overrides,
 });
 
+const retainedAttempt = (
+  state: NonNullable<ProjectProcessingAttempt['result']>['state'],
+  overrides: Partial<ProjectProcessingAttempt> = {},
+): ProjectProcessingAttempt =>
+  attempt({
+    phase: 'complete',
+    blocksArchive: false,
+    nextPollAfterMs: null,
+    completedAt: now,
+    result: {
+      assetId: ids.asset,
+      retainedAt: now,
+      state,
+      contentUrl: `/api/projects/${ids.project}/processing/${ids.operation}/result/content`,
+      media: {
+        mimeType: 'video/mp4',
+        container: 'mp4',
+        videoCodec: 'avc',
+        audioCodec: 'aac',
+        durationMs: 1_000,
+        width: 1280,
+        height: 720,
+        sizeBytes: 10_000,
+        hasAudio: true,
+      },
+    },
+    ...overrides,
+  });
+
 const currentResponse = (
   processingAttempt: ProjectProcessingAttempt | null,
   projectId = ids.project,
@@ -421,29 +450,7 @@ describe('useProjectProcessingController', () => {
 
   it('refreshes Project authority after a current result is retained', async () => {
     const { session, acceptCurrent } = createSession();
-    const retained = attempt({
-      phase: 'complete',
-      blocksArchive: false,
-      nextPollAfterMs: null,
-      completedAt: now,
-      result: {
-        assetId: ids.asset,
-        retainedAt: now,
-        state: 'current' as const,
-        contentUrl: `/api/projects/${ids.project}/processing/${ids.operation}/result/content`,
-        media: {
-          mimeType: 'video/mp4',
-          container: 'mp4',
-          videoCodec: 'avc',
-          audioCodec: 'aac',
-          durationMs: 1_000,
-          width: 1280,
-          height: 720,
-          sizeBytes: 10_000,
-          hasAudio: true,
-        },
-      },
-    });
+    const retained = retainedAttempt('current');
     mockApiServer.use(
       jsonScenario('GET', currentPath, { body: currentResponse(attempt()) }),
       jsonScenario('POST', `/api/projects/${ids.project}/processing/reconcile`, {
@@ -476,6 +483,56 @@ describe('useProjectProcessingController', () => {
     expect(acceptedCurrent?.project.currentRevisionId).toBe(ids.resultRevision);
     expect(acceptedCurrent?.project.status).toBe('ready');
     expect(acceptedCurrent?.revision.source).toBe('job-result');
+  });
+
+  it('lifts an undecided retained result out of History so it can still be used', async () => {
+    const { session } = createSession();
+    mockApiServer.use(
+      jsonScenario('GET', currentPath, { body: currentResponse(null) }),
+      jsonScenario('GET', historyPath, {
+        body: { attempts: [retainedAttempt('unapplied', { isCurrent: false })], nextCursor: null },
+      }),
+      jsonScenario('GET', `/api/projects/${ids.project}`, { body: currentProject() }),
+    );
+
+    const hook = renderHook(() =>
+      useProjectProcessingController({
+        projectId: ids.project,
+        session,
+        checkpointCreative: vi.fn(() => Promise.resolve(true)),
+      }),
+    );
+
+    await waitFor(() => expect(hook.result.current.phase).toBe('idle'));
+    expect(hook.result.current.attempt).toMatchObject({
+      phase: 'complete',
+      result: { state: 'unapplied' as const },
+    });
+    expect(hook.result.current.active).toBe(false);
+  });
+
+  it('leaves an applied result in History rather than warning about the cut on screen', async () => {
+    // `state` is the server's whole answer, adoption included, so an adopted result arrives as
+    // `current` with `isCurrent` false. Resurfacing it made every ordinary save look like a failure.
+    const { session } = createSession();
+    mockApiServer.use(
+      jsonScenario('GET', currentPath, { body: currentResponse(null) }),
+      jsonScenario('GET', historyPath, {
+        body: { attempts: [retainedAttempt('current', { isCurrent: false })], nextCursor: null },
+      }),
+      jsonScenario('GET', `/api/projects/${ids.project}`, { body: currentProject() }),
+    );
+
+    const hook = renderHook(() =>
+      useProjectProcessingController({
+        projectId: ids.project,
+        session,
+        checkpointCreative: vi.fn(() => Promise.resolve(true)),
+      }),
+    );
+
+    await waitFor(() => expect(hook.result.current.phase).toBe('idle'));
+    expect(hook.result.current.attempt).toBeNull();
   });
 
   it('isolates a late submission response after Project context switches', async () => {

@@ -353,10 +353,7 @@ export class ProjectProcessingService {
       ) {
         throw new AppError(409, 'conflict', 'Refresh the Project before starting processing.');
       }
-      const currentAttempt = await this.processing.getCurrentProjectAttempt(
-        input.ownerUserId,
-        input.projectId,
-      );
+      const currentAttempt = await this.#currentAttempt(input.ownerUserId, input.projectId);
       if (input.retryOfOperationId === undefined && currentAttempt !== null) {
         throw new AppError(
           409,
@@ -574,7 +571,7 @@ export class ProjectProcessingService {
   }
 
   async current(ownerUserId: string, projectId: string): Promise<ProjectProcessingCurrentResponse> {
-    const attempt = await this.processing.getCurrentProjectAttempt(ownerUserId, projectId);
+    const attempt = await this.#currentAttempt(ownerUserId, projectId);
     const reconciled =
       attempt === null ? null : await this.#reconcile(ownerUserId, projectId, attempt.operationId);
     const latest = await this.#requireCurrent(ownerUserId, projectId);
@@ -677,10 +674,7 @@ export class ProjectProcessingService {
       }
       const retainedAt = this.#now().toISOString();
       const current = await this.#requireCurrent(attempt.ownerUserId, attempt.projectId);
-      const currentAttempt = await this.processing.getCurrentProjectAttempt(
-        attempt.ownerUserId,
-        attempt.projectId,
-      );
+      const currentAttempt = await this.#currentAttempt(attempt.ownerUserId, attempt.projectId);
       const promotion = promoteProjectJobResult(
         projectAggregateForCurrent(current),
         {
@@ -843,6 +837,7 @@ export class ProjectProcessingService {
           attempt,
           page.currentOperationId,
           supersededOperationIds.has(attempt.operationId),
+          page.heldMedia,
         ),
       ),
       nextCursor:
@@ -868,12 +863,22 @@ export class ProjectProcessingService {
     return asset;
   }
 
+  /** The head revision's attempt, for the callers that do not also need what the Project holds. */
+  async #currentAttempt(
+    ownerUserId: string,
+    projectId: string,
+  ): Promise<ProjectProcessingAttemptRecord | null> {
+    return (
+      (await this.processing.getCurrentProjectAuthority(ownerUserId, projectId))?.attempt ?? null
+    );
+  }
+
   async #publicAttempt(
     ownerUserId: string,
     projectId: string,
     attempt: ProjectProcessingAttemptRecord,
   ): Promise<ProjectProcessingAttempt> {
-    const currentAttempt = await this.processing.getCurrentProjectAttempt(ownerUserId, projectId);
+    const authority = await this.processing.getCurrentProjectAuthority(ownerUserId, projectId);
     const ambiguitySuperseded =
       attempt.status === 'ambiguous' &&
       (await this.processing.isProjectAttemptSuperseded(
@@ -884,8 +889,9 @@ export class ProjectProcessingService {
     return this.#formatPublicAttempt(
       projectId,
       attempt,
-      currentAttempt?.operationId ?? null,
+      authority?.attempt?.operationId ?? null,
       ambiguitySuperseded,
+      authority?.heldMedia ?? [],
     );
   }
 
@@ -894,6 +900,7 @@ export class ProjectProcessingService {
     attempt: ProjectProcessingAttemptRecord,
     currentOperationId: string | null,
     ambiguitySuperseded: boolean,
+    heldMedia: readonly ProjectMediaReference[],
   ): ProjectProcessingAttempt {
     const isCurrent = currentOperationId === attempt.operationId;
     const phase = projectProcessingPhase(attempt);
@@ -942,7 +949,8 @@ export class ProjectProcessingService {
               retainedAt: attempt.completedAt ?? attempt.updatedAt,
               state: projectProcessingResultState({
                 resultRevisionId: attempt.resultRevisionId,
-                isCurrent,
+                resultAssetId: attempt.outputAssetId,
+                heldMedia,
               }),
               media: attempt.result,
               contentUrl: `/api/projects/${encodeURIComponent(projectId)}/processing/${encodeURIComponent(attempt.operationId)}/result/content`,

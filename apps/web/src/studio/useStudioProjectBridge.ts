@@ -8,7 +8,7 @@ import type { ProjectRecordingCandidate } from '../features/projects/ProjectRout
 import type { ProjectWorkingMediaActivity } from '../features/projects/ProjectWorkingMediaSection';
 import type {
   ProjectSourceActivity,
-  ProjectSourceRuntime,
+  ProjectStageSourceRuntime,
 } from '../features/projects/useProjectSourceController';
 import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 
@@ -16,7 +16,7 @@ interface UseStudioProjectBridgeOptions {
   readonly projectId: string | null;
   readonly recordingLifecycle: RecordingLifecycle;
   readonly recordingOriginal: PresentedRecordingArtifact | null;
-  readonly presentSource: (input: Parameters<ProjectSourceRuntime['present']>[1]) => void;
+  readonly presentSource: (input: Parameters<ProjectStageSourceRuntime['present']>[1]) => void;
   readonly clearSource: () => void;
 }
 
@@ -46,9 +46,9 @@ export const useStudioProjectBridge = ({
     clearSourceRef.current = clearSource;
   }, [clearSource, presentSource]);
 
-  const sourceRuntime = useMemo<ProjectSourceRuntime>(
+  const sourceRuntime = useMemo<ProjectStageSourceRuntime>(
     () => ({
-      available: true,
+      kind: 'stage',
       present: (candidateProjectId, input) => {
         if (projectIdRef.current !== candidateProjectId) return;
         presentedProjectIdRef.current = candidateProjectId;

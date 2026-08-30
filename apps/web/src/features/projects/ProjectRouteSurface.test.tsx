@@ -19,7 +19,7 @@ import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import { chooseMenuAction } from '../../test/actionMenu';
 import { mockApiServer } from '../../test/msw/server';
 import { ProjectRouteSurface, type ProjectRouteSurfaceProps } from './ProjectRouteSurface';
-import type { ProjectSourceRuntime } from './useProjectSourceController';
+import type { ProjectStageSourceRuntime } from './useProjectSourceController';
 import type { ProjectSessionPort } from './useProjectSession';
 
 /**
@@ -684,7 +684,7 @@ describe('Project route surface', () => {
       },
     };
     let authority = currentProject(activeId);
-    const present = vi.fn<ProjectSourceRuntime['present']>();
+    const present = vi.fn<ProjectStageSourceRuntime['present']>();
     projectAssetsResponse = {
       assets: [
         {
@@ -718,7 +718,7 @@ describe('Project route surface', () => {
       ),
     );
     const { router } = renderProjects(`/projects/${activeId}`, {
-      sourceRuntime: { available: true, present, clear: vi.fn() },
+      sourceRuntime: { kind: 'stage', present, clear: vi.fn() },
     });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Use as the original video' }));
@@ -798,7 +798,7 @@ describe('Project route surface', () => {
       revision: adopted.revision,
     };
     let authority: ProjectCurrentResponse = initial;
-    const present = vi.fn<ProjectSourceRuntime['present']>();
+    const present = vi.fn<ProjectStageSourceRuntime['present']>();
     projectAssetsResponse = {
       assets: [
         {
@@ -833,7 +833,7 @@ describe('Project route surface', () => {
       ),
     );
     const { router } = renderProjects(`/projects/${activeId}`, {
-      sourceRuntime: { available: true, present, clear: vi.fn() },
+      sourceRuntime: { kind: 'stage', present, clear: vi.fn() },
     });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Use as the current cut' }));
@@ -1465,8 +1465,8 @@ describe('Project route surface', () => {
   it('reopens an accepted immutable source without starting provider work', async () => {
     const durable = acceptedProject();
     const source = acceptedSourceResponse();
-    const present = vi.fn<ProjectSourceRuntime['present']>();
-    const clear = vi.fn<ProjectSourceRuntime['clear']>();
+    const present = vi.fn<ProjectStageSourceRuntime['present']>();
+    const clear = vi.fn<ProjectStageSourceRuntime['clear']>();
     mockApiServer.use(
       http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(durable)),
       http.get(`*/api/projects/${activeId}/source`, async () => {
@@ -1480,7 +1480,7 @@ describe('Project route surface', () => {
       ),
     );
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { available: true, present, clear },
+      sourceRuntime: { kind: 'stage', present, clear },
     });
 
     expect(await screen.findByText(/Loading this Project.s original video/u)).toBeVisible();
@@ -1504,8 +1504,8 @@ describe('Project route surface', () => {
       currentRevisionId: secondActiveId,
       currentRevisionNumber: 3,
     });
-    const present = vi.fn<ProjectSourceRuntime['present']>();
-    const clear = vi.fn<ProjectSourceRuntime['clear']>();
+    const present = vi.fn<ProjectStageSourceRuntime['present']>();
+    const clear = vi.fn<ProjectStageSourceRuntime['clear']>();
     let removeBody: unknown = null;
     let hasSource = true;
     mockApiServer.use(
@@ -1533,7 +1533,7 @@ describe('Project route surface', () => {
     );
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { available: true, present, clear },
+      sourceRuntime: { kind: 'stage', present, clear },
     });
 
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
@@ -1585,7 +1585,7 @@ describe('Project route surface', () => {
     );
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { available: true, present: vi.fn(), clear: vi.fn() },
+      sourceRuntime: { kind: 'stage', present: vi.fn(), clear: vi.fn() },
     });
 
     await user.click(await screen.findByRole('button', { name: 'Replace the original video' }));
@@ -1625,8 +1625,8 @@ describe('Project route surface', () => {
     const file = new File([new Uint8Array([1, 2, 3, 4])], 'recording.mp4', {
       type: 'video/mp4',
     });
-    const present = vi.fn<ProjectSourceRuntime['present']>();
-    const clear = vi.fn<ProjectSourceRuntime['clear']>();
+    const present = vi.fn<ProjectStageSourceRuntime['present']>();
+    const clear = vi.fn<ProjectStageSourceRuntime['clear']>();
     const activities: Parameters<
       NonNullable<ProjectRouteSurfaceProps['onSourceActivityChange']>
     >[0][] = [];
@@ -1640,7 +1640,7 @@ describe('Project route surface', () => {
     );
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { available: true, present, clear },
+      sourceRuntime: { kind: 'stage', present, clear },
       recordingCandidate: { file, ready: true },
       onSourceActivityChange: (activity) => activities.push(activity),
     });
@@ -1665,8 +1665,8 @@ describe('Project route surface', () => {
     const file = new File([new Uint8Array([1, 2, 3, 4])], 'upload.mp4', {
       type: 'video/mp4',
     });
-    const present = vi.fn<ProjectSourceRuntime['present']>();
-    const clear = vi.fn<ProjectSourceRuntime['clear']>();
+    const present = vi.fn<ProjectStageSourceRuntime['present']>();
+    const clear = vi.fn<ProjectStageSourceRuntime['clear']>();
     const operationKeys: string[] = [];
     let attempts = 0;
     mockApiServer.use(
@@ -1701,7 +1701,7 @@ describe('Project route surface', () => {
     );
     const inputClick = vi.spyOn(HTMLInputElement.prototype, 'click');
     const view = renderProjects(`/projects/${activeId}/workspace`, {
-      sourceRuntime: { available: true, present, clear },
+      sourceRuntime: { kind: 'stage', present, clear },
     });
     const user = userEvent.setup();
 
@@ -1747,8 +1747,8 @@ describe('Project route surface', () => {
         filename: 'library-source.mp4',
       },
     };
-    const present = vi.fn<ProjectSourceRuntime['present']>();
-    const clear = vi.fn<ProjectSourceRuntime['clear']>();
+    const present = vi.fn<ProjectStageSourceRuntime['present']>();
+    const clear = vi.fn<ProjectStageSourceRuntime['clear']>();
     let firstPageReads = 0;
     mockApiServer.use(
       http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(currentProject(activeId))),
@@ -1792,7 +1792,7 @@ describe('Project route surface', () => {
     );
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { available: true, present, clear },
+      sourceRuntime: { kind: 'stage', present, clear },
     });
 
     await user.click(await screen.findByRole('button', { name: 'Use a saved video' }));

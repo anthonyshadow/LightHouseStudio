@@ -4,7 +4,12 @@ import type {
   VideoJobErrorCode,
   VideoOutputResolution,
 } from '@studio/contracts';
-import type { ProjectAssetLink, ProjectConflict, ProjectJobLink } from '@studio/domain';
+import type {
+  ProjectAssetLink,
+  ProjectConflict,
+  ProjectJobLink,
+  ProjectMediaReference,
+} from '@studio/domain';
 import type {
   ResumableVideoProcessingJob,
   VideoProcessingJobTrace,
@@ -78,7 +83,18 @@ export interface ProjectProcessingHistoryPage {
   readonly attempts: readonly ProjectProcessingAttemptRecord[];
   readonly currentOperationId: string | null;
   readonly supersededOperationIds: readonly string[];
+  readonly heldMedia: readonly ProjectMediaReference[];
   readonly nextCursor: { readonly createdAt: string; readonly operationId: string } | null;
+}
+
+/**
+ * What the head revision says, for the two questions a public attempt has to answer: which attempt
+ * the Project is on, and what media it actually holds. Both come from one read of the current
+ * revision, so they are returned together rather than able to disagree.
+ */
+export interface ProjectProcessingCurrentAuthority {
+  readonly attempt: ProjectProcessingAttemptRecord | null;
+  readonly heldMedia: readonly ProjectMediaReference[];
 }
 
 export type ProjectProcessingResultRetentionResult =
@@ -106,10 +122,10 @@ export interface ProjectProcessingRepository {
     projectId: string,
     operationId: string,
   ): Promise<ProjectProcessingAttemptRecord | null>;
-  getCurrentProjectAttempt(
+  getCurrentProjectAuthority(
     ownerUserId: string,
     projectId: string,
-  ): Promise<ProjectProcessingAttemptRecord | null>;
+  ): Promise<ProjectProcessingCurrentAuthority | null>;
   isProjectAttemptSuperseded(
     ownerUserId: string,
     projectId: string,
