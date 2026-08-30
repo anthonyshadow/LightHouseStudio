@@ -294,7 +294,7 @@ describe('Project processing route authority', () => {
         operationId,
         phase: 'complete',
         isCurrent: true,
-        result: { historical: false },
+        result: { state: 'current' as const },
       },
     });
 
@@ -492,7 +492,7 @@ describe('Project processing route authority', () => {
       await new Promise((resolve) => setTimeout(resolve, 5));
     }
     expect(retained).toMatchObject({
-      attempt: { phase: 'complete', result: { historical: true } },
+      attempt: { phase: 'complete', result: { state: 'unapplied' as const } },
     });
     const currentProject = await repository.getCurrent(ownerUserId, projectId);
     expect(currentProject).toMatchObject({

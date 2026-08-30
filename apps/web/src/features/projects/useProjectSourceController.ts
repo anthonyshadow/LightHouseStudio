@@ -496,7 +496,12 @@ export const useProjectSourceController = (
     [current.project.currentRevisionNumber, current.project.version, projectId, runAcceptance],
   );
 
-  const upload = useCallback((file: File) => runUpload(file, 'uploaded', true), [runUpload]);
+  // Previewing before acceptance means calling `runtime.present`. Where there is no stage — the
+  // Project overview — that is a no-op, so ask for it only where it can happen.
+  const upload = useCallback(
+    (file: File) => runUpload(file, 'uploaded', runtime.available),
+    [runUpload, runtime.available],
+  );
 
   const acceptRecording = useCallback(
     (file: File) => runUpload(file, 'recorded', false),

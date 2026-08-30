@@ -58,11 +58,23 @@ export const projectProcessingRetryPolicySchema = z.enum([
   'explicit-cost-confirmation',
 ]);
 
+/**
+ * Mirrors `PROJECT_PROCESSING_RESULT_STATES` in the domain, which owns the rule that derives it.
+ * Contracts cannot import the domain, so the two lists are kept identical by hand and by test.
+ */
+export const PROJECT_PROCESSING_RESULT_STATES = ['current', 'superseded', 'unapplied'] as const;
+
+export const projectProcessingResultStateSchema = z.enum(PROJECT_PROCESSING_RESULT_STATES);
+
 export const projectProcessingResultSchema = z
   .object({
     assetId: z.uuid(),
     retainedAt: z.iso.datetime(),
-    historical: z.boolean(),
+    /**
+     * What became of this result. Replaces a boolean that meant only "not attached to the head",
+     * which read as failure for a result the operator was looking at.
+     */
+    state: projectProcessingResultStateSchema,
     media: inspectedVideoSchema,
     contentUrl: z.string().startsWith('/api/projects/').max(500),
   })
@@ -108,7 +120,11 @@ export const projectProcessingAttemptSchema = z
         message: 'Completed Project processing needs a retained result.',
       });
     }
-    if (attempt.phase !== 'complete' && attempt.result !== null && !attempt.result.historical) {
+    if (
+      attempt.phase !== 'complete' &&
+      attempt.result !== null &&
+      attempt.result.state === 'current'
+    ) {
       context.addIssue({
         code: 'custom',
         path: ['result'],

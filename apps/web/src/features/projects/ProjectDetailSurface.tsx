@@ -121,7 +121,6 @@ export const ProjectDetailSurface = ({
       sourceRuntime={sourceRuntime}
       recordingCandidate={recordingCandidate}
       recordingActive={recordingActive}
-      onStartRecording={onStartRecording}
       onSourceActivityChange={onSourceActivityChange}
       creativeStore={creativeStore}
       onCreateProjectCharacter={onCreateProjectCharacter}

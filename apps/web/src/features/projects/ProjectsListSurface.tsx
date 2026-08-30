@@ -38,7 +38,7 @@ import {
   projectsLedgerSkeletonStyles,
 } from './ProjectsListSurface.styles';
 import { projectPosterUrls } from './projectPosterPresentation';
-import { stepForSnapshot } from './ProjectWorkflowProgress';
+import { entryTaskForSnapshot } from './ProjectWorkflowProgress';
 import { projectCountLabel, projectStatusLabel } from './projectStatusPresentation';
 import { useProjectList } from './useProjectsController';
 import { WorkPosterTile } from './WorkPosterTile';
@@ -426,7 +426,10 @@ export const ProjectsListSurface = () => {
             // Opened on the step the copy is actually ready for, matching how the workspace itself
             // decides where a Project stands.
             void navigate(
-              projectWorkspacePath(current.project.id, stepForSnapshot(current.revision.snapshot)),
+              projectWorkspacePath(
+                current.project.id,
+                entryTaskForSnapshot(current.revision.snapshot),
+              ),
             );
           }}
         />

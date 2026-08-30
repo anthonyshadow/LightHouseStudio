@@ -1,17 +1,120 @@
 import { Button, StatusNotice } from '../../ui';
 import {
+  PROJECT_RESULT_ADOPT_ACTION_LABEL,
+  projectProcessingCapabilityLabel,
   projectProcessingDetail,
   projectProcessingTitle,
   projectProcessingTone,
 } from './projectProcessingPresentation';
+import type { ProjectWorkflowStepId } from './ProjectWorkflowProgress';
 import type { ProjectProcessingController } from './useProjectProcessingController';
+import { useProjectRetainedResultAdoption } from './useProjectRetainedResultAdoption';
+import type { ProjectSessionPort } from './useProjectSession';
 
+type AdoptionState = ReturnType<typeof useProjectRetainedResultAdoption>;
+
+/**
+ * The control for whatever state the attempt is in.
+ *
+ * Deliberately no retry here. `controller.retry` carries `acknowledgePossibleDuplicateCost` and is a
+ * paid submission; the paid start lives in the Create launchers, beside the cost note and the
+ * capability gates. Everything offered here is free: reconcile, refresh, adopt, or a move to
+ * another task.
+ */
+const ProjectProcessingActions = ({
+  attempt,
+  controller,
+  adoption,
+  onOpenTask,
+}: {
+  readonly attempt: NonNullable<ProjectProcessingController['attempt']>;
+  readonly controller: ProjectProcessingController;
+  readonly adoption: AdoptionState;
+  readonly onOpenTask: (task: ProjectWorkflowStepId) => void;
+}) => {
+  // A failed or ambiguous run always has a free way to re-establish the truth. Previously this
+  // appeared only when the controller's own command had errored, so an attempt surfaced from
+  // history arrived as a danger notice with nothing to press.
+  if (controller.phase === 'error' || attempt.phase === 'needs-attention') {
+    return (
+      <Button size="small" onClick={() => void controller.reconcile()}>
+        Check same operation
+      </Button>
+    );
+  }
+  if (attempt.phase === 'cancelled') {
+    return (
+      <Button size="small" onClick={() => onOpenTask('create')}>
+        Start again in Create
+      </Button>
+    );
+  }
+  if (attempt.phase !== 'complete') return null;
+
+  const history = (
+    <Button size="small" variant="secondary" onClick={() => onOpenTask('history')}>
+      See it in History
+    </Button>
+  );
+
+  if (attempt.result?.state === 'unapplied') {
+    return (
+      <div>
+        <Button
+          size="small"
+          variant="primary"
+          busy={adoption.busyItemKey === attempt.result.assetId}
+          disabled={adoption.busyItemKey !== null}
+          onClick={() =>
+            void adoption.adoptMedia(
+              { kind: 'asset', assetId: attempt.result!.assetId },
+              `${projectProcessingCapabilityLabel(attempt.capability)} retained result`,
+              attempt.result!.assetId,
+            )
+          }
+        >
+          {PROJECT_RESULT_ADOPT_ACTION_LABEL}
+        </Button>
+        {history}
+      </div>
+    );
+  }
+  if (attempt.result?.state === 'superseded') return history;
+  return (
+    <div>
+      <Button size="small" onClick={() => onOpenTask('save')}>
+        Save this as a video
+      </Button>
+      {/* The result landed but the Project summary did not; re-reading it is free and is the only
+       * way back to presenting it. */}
+      {controller.message ? (
+        <Button size="small" variant="secondary" onClick={() => void controller.refresh()}>
+          Refresh retained result
+        </Button>
+      ) : null}
+    </div>
+  );
+};
+
+/**
+ * What is running, what came of it, and what to do about it.
+ *
+ * The rule this panel is held to: **every state that persists without further input carries a
+ * control.** A warning with nothing to press is what made a working Project read as broken — the
+ * operator concluded they were stuck while every launcher beside them was live. Only genuinely
+ * transient states (loading, refreshing) are exempt, and "nothing is happening" renders nothing.
+ */
 export const ProjectProcessingStatusPanel = ({
   controller,
+  session,
+  onOpenTask,
 }: {
   readonly controller: ProjectProcessingController;
+  readonly session: ProjectSessionPort;
+  readonly onOpenTask: (task: ProjectWorkflowStepId) => void;
 }) => {
   const { attempt, message, phase, unverifiedOperationId } = controller;
+  const adoption = useProjectRetainedResultAdoption(session);
 
   if (unverifiedOperationId !== null) {
     return (
@@ -58,15 +161,13 @@ export const ProjectProcessingStatusPanel = ({
             </Button>
           </div>
         ) : null}
-        {phase === 'error' ? (
-          <Button size="small" onClick={() => void controller.reconcile()}>
-            Check same operation
-          </Button>
-        ) : message && attempt.phase === 'complete' && attempt.isCurrent ? (
-          <Button size="small" onClick={() => void controller.refresh()}>
-            Refresh retained result
-          </Button>
-        ) : null}
+        {adoption.error ? <p role="alert">{adoption.error}</p> : null}
+        <ProjectProcessingActions
+          attempt={attempt}
+          controller={controller}
+          adoption={adoption}
+          onOpenTask={onOpenTask}
+        />
       </StatusNotice>
     );
   }

@@ -3,6 +3,7 @@ import {
   canPromoteProjectProcessingResult,
   canonicalVideoTransformInputGeometry,
   currentProjectProcessingAttempt,
+  projectProcessingResultState,
   projectProcessingAmbiguityIsSuperseded,
   projectProcessingAttemptBlocksArchive,
   projectProcessingBlocksArchive,
@@ -168,6 +169,22 @@ describe('single visual policy', () => {
         operationId: 'op-1',
       }),
     ).toBe(false);
+  });
+
+  it('separates a result that was never applied from one the Project moved past', () => {
+    // The head moves for ordinary reasons — saving a Version moves it — so `isCurrent` alone
+    // reported a successful, displayed result as though it had been discarded.
+    expect(projectProcessingResultState({ resultRevisionId: 'revision-2', isCurrent: true })).toBe(
+      'current',
+    );
+    expect(projectProcessingResultState({ resultRevisionId: 'revision-2', isCurrent: false })).toBe(
+      'superseded',
+    );
+    // Only a promotion writes `resultRevisionId`, so a null one is the single honest signal that
+    // the result never became the cut.
+    expect(projectProcessingResultState({ resultRevisionId: null, isCurrent: false })).toBe(
+      'unapplied',
+    );
   });
 
   it('releases only historical ambiguity after a later durable Project attempt exists', () => {

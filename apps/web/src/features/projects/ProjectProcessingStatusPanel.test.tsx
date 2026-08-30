@@ -3,10 +3,13 @@
 import type { ProjectProcessingAttempt } from '@studio/contracts';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import { StudioDesignProvider } from '../../ui';
 import { ProjectProcessingStatusPanel } from './ProjectProcessingStatusPanel';
 import type { ProjectProcessingController } from './useProjectProcessingController';
+import type { ProjectSessionPort } from './useProjectSession';
 
 const now = '2026-08-14T12:00:00.000Z';
 
@@ -53,10 +56,34 @@ const processingController = (
   ...overrides,
 });
 
-const renderPanel = (controller: ProjectProcessingController) =>
-  render(<ProjectProcessingStatusPanel controller={controller} />, {
-    wrapper: StudioDesignProvider,
-  });
+const Providers = ({ children }: { readonly children: ReactNode }) => (
+  <StudioDesignProvider>
+    <RemoteStateTestProvider>{children}</RemoteStateTestProvider>
+  </StudioDesignProvider>
+);
+
+const session = () =>
+  ({
+    projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
+    flush: vi.fn(() => Promise.resolve(true)),
+    getCurrent: vi.fn(() => null),
+    acceptCurrent: vi.fn(),
+  }) as unknown as ProjectSessionPort;
+
+const renderPanel = (
+  controller: ProjectProcessingController,
+  overrides: {
+    readonly onOpenTask?: (task: 'source' | 'create' | 'save' | 'history') => void;
+  } = {},
+) =>
+  render(
+    <ProjectProcessingStatusPanel
+      controller={controller}
+      session={session()}
+      onOpenTask={overrides.onOpenTask ?? vi.fn()}
+    />,
+    { wrapper: Providers },
+  );
 
 afterEach(cleanup);
 
@@ -105,10 +132,42 @@ describe('ProjectProcessingStatusPanel', () => {
         controller={processingController({
           attempt: attempt({ isCurrent: false, nextPollAfterMs: 5_000 }),
         })}
+        session={session()}
+        onOpenTask={vi.fn()}
       />,
     );
     expect(screen.getByRole('status')).toHaveTextContent('earlier Project revision');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('never leaves a settled result stated without something to do about it', async () => {
+    const onOpenTask = vi.fn();
+    const settled = (state: 'current' | 'superseded' | 'unapplied') =>
+      attempt({
+        phase: 'complete',
+        isCurrent: state === 'current',
+        nextPollAfterMs: null,
+        result: {
+          assetId: '0f5a2fe1-9d6b-4b52-9d4a-7c2d1b6e4a31',
+          retainedAt: now,
+          state,
+          media: {} as never,
+          contentUrl: `/api/projects/x/processing/y/result/content`,
+        },
+      });
+
+    // A result the operator moved past is a fact, not a fault — and it still says where it went.
+    const { unmount } = renderPanel(processingController({ attempt: settled('superseded') }), {
+      onOpenTask,
+    });
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'See it in History' }));
+    expect(onOpenTask).toHaveBeenCalledWith('history');
+    unmount();
+
+    // A result that never became the cut is the one case that still wants a decision.
+    renderPanel(processingController({ attempt: settled('unapplied') }), { onOpenTask });
+    expect(screen.getByRole('button', { name: 'Use this result now' })).toBeEnabled();
   });
 
   it('offers an explicit local queue removal for an active Project attempt', async () => {
@@ -141,7 +200,7 @@ describe('ProjectProcessingStatusPanel', () => {
           result: {
             assetId: '5efcc6c3-e82c-419a-8807-c0026170fb75',
             retainedAt: now,
-            historical: false,
+            state: 'current' as const,
             media: {
               mimeType: 'video/mp4',
               container: 'mp4',
@@ -182,6 +241,8 @@ describe('ProjectProcessingStatusPanel', () => {
           message: 'The local status API is unavailable.',
           refresh,
         })}
+        session={session()}
+        onOpenTask={vi.fn()}
       />,
     );
     expect(screen.getByRole('alert')).toHaveTextContent('Could not check AI runs');
@@ -191,8 +252,12 @@ describe('ProjectProcessingStatusPanel', () => {
     // Nothing running and nothing wrong is the state a Project sits in almost always, so the panel
     // says nothing at all rather than standing there being ignored.
     const { container } = render(
-      <ProjectProcessingStatusPanel controller={processingController()} />,
-      { wrapper: StudioDesignProvider },
+      <ProjectProcessingStatusPanel
+        controller={processingController()}
+        session={session()}
+        onOpenTask={vi.fn()}
+      />,
+      { wrapper: Providers },
     );
     expect(container).toBeEmptyDOMElement();
   });

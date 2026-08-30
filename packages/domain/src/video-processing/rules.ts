@@ -1,6 +1,7 @@
 import type {
   ProjectProcessingAttemptFacts,
   ProjectProcessingPublicPhase,
+  ProjectProcessingResultState,
   ProjectProcessingRestartTransition,
   ProjectProcessingRetryPolicy,
   UploadedVideoFacts,
@@ -139,6 +140,28 @@ export const projectProcessingRestartTransition = (
   }
   return null;
 };
+
+/**
+ * Which of the three things happened to a retained result.
+ *
+ * `resultRevisionId` is written only when a result is promoted onto a revision, and left null when
+ * one is retained without being applied. It is therefore the only fact that separates "never became
+ * the cut" from "became the cut, and the Project has since moved on" — `isCurrent` cannot, because
+ * the operator's own output-save revision moves the head.
+ *
+ * One caveat, deliberately tolerated: `result_revision_id` was added without a backfill, so an
+ * attempt promoted before that migration reads as `unapplied`. The worst that follows is offering a
+ * free, non-destructive re-adopt of a result the Project already holds — never a paid action, and
+ * never a claim that something failed.
+ */
+export const projectProcessingResultState = ({
+  resultRevisionId,
+  isCurrent,
+}: Readonly<{
+  resultRevisionId: string | null;
+  isCurrent: boolean;
+}>): ProjectProcessingResultState =>
+  resultRevisionId === null ? 'unapplied' : isCurrent ? 'current' : 'superseded';
 
 export const currentProjectProcessingAttempt = <Attempt extends ProjectProcessingAttemptFacts>(
   currentRevision: Readonly<{ id: string; revisionNumber: number }>,

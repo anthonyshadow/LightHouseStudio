@@ -77,6 +77,17 @@ export type ProjectProcessingPublicPhase =
   | 'needs-attention'
   | 'cancelled';
 
+/**
+ * What became of a retained provider result, which the boolean it replaces could not express.
+ *
+ * `historical` used to mean only "not attached to the head revision", and the head moves for
+ * ordinary reasons — saving a Version moves it. So a successful result the operator was looking at
+ * read as though it had been discarded. These three are the causes that actually exist.
+ */
+export const PROJECT_PROCESSING_RESULT_STATES = ['current', 'superseded', 'unapplied'] as const;
+
+export type ProjectProcessingResultState = (typeof PROJECT_PROCESSING_RESULT_STATES)[number];
+
 export type ProjectProcessingRetryPolicy =
   'not-allowed' | 'explicit' | 'explicit-cost-confirmation';
 

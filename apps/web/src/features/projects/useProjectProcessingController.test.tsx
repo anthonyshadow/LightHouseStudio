@@ -429,7 +429,7 @@ describe('useProjectProcessingController', () => {
       result: {
         assetId: ids.asset,
         retainedAt: now,
-        historical: false,
+        state: 'current' as const,
         contentUrl: `/api/projects/${ids.project}/processing/${ids.operation}/result/content`,
         media: {
           mimeType: 'video/mp4',
@@ -469,7 +469,7 @@ describe('useProjectProcessingController', () => {
 
     expect(hook.result.current.attempt).toMatchObject({
       phase: 'complete',
-      result: { historical: false },
+      result: { state: 'current' as const },
     });
     expect(hook.result.current.message).toBeNull();
     const acceptedCurrent = acceptCurrent.mock.calls.at(-1)?.[0];

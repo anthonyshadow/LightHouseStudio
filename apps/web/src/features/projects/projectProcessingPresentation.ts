@@ -1,4 +1,5 @@
 import type { ProjectProcessingAttempt } from '@studio/contracts';
+import type { ProjectProcessingResultState } from '@studio/domain';
 import { VIDEO_TRANSFORM_OPERATION_LABELS } from '../existing-video/videoTransformLabels';
 
 export const projectProcessingCapabilityLabel = (
@@ -7,6 +8,41 @@ export const projectProcessingCapabilityLabel = (
   capability === 'character-swap' || capability === 'virtual-try-on'
     ? VIDEO_TRANSFORM_OPERATION_LABELS[capability]
     : 'Voice';
+
+/**
+ * How each result state reads. One record rather than three parallel switches, so the three strings
+ * that describe one state sit together — and `satisfies` makes a fourth state a compile error
+ * instead of three `default` clauses quietly describing it as the applied current cut.
+ *
+ * `superseded` is neutral, not a fault: the operator's own save is the usual way a result gets
+ * there, and warning about it is what made a working Project read as broken.
+ */
+const RESULT_COPY = {
+  current: {
+    title: () => 'Result ready',
+    detail: 'This result is now the current cut. Saving it as a version is a separate step.',
+    tone: 'success',
+  },
+  superseded: {
+    title: (capability: string) => `${capability} is in this Project`,
+    detail:
+      'This run was applied to the Project. Your later work has moved past it, and it is kept in History.',
+    tone: 'neutral',
+  },
+  unapplied: {
+    title: (capability: string) => `${capability} result kept, not applied`,
+    detail:
+      'The Project changed while this run was going, so it was kept instead of replacing what you’re viewing. You can still use it.',
+    tone: 'warning',
+  },
+} as const satisfies Record<
+  ProjectProcessingResultState,
+  {
+    readonly title: (capability: string) => string;
+    readonly detail: string;
+    readonly tone: 'neutral' | 'success' | 'warning' | 'danger';
+  }
+>;
 
 export const projectProcessingTitle = (attempt: ProjectProcessingAttempt): string => {
   const capability = projectProcessingCapabilityLabel(attempt.capability);
@@ -22,7 +58,7 @@ export const projectProcessingTitle = (attempt: ProjectProcessingAttempt): strin
     case 'saving-result':
       return `Saving ${capability} result`;
     case 'complete':
-      return attempt.result?.historical ? 'Kept in this Project' : 'Result ready';
+      return RESULT_COPY[attempt.result?.state ?? 'current'].title(capability);
     case 'needs-attention':
       return attempt.ambiguous ? 'Submission needs attention' : `${capability} failed`;
     case 'cancelled':
@@ -43,9 +79,7 @@ export const projectProcessingDetail = (attempt: ProjectProcessingAttempt): stri
     case 'saving-result':
       return 'The result is being stored and checked before it becomes the current cut.';
     case 'complete':
-      return attempt.result?.historical
-        ? 'This result is for an earlier change. It was kept, but it did not replace what you’re viewing and no version was saved.'
-        : 'This result is now the current cut. Saving it as a version is a separate step.';
+      return RESULT_COPY[attempt.result?.state ?? 'current'].detail;
     case 'needs-attention':
       return attempt.error?.message ?? 'This run needs you to decide what happens next.';
     case 'cancelled':
@@ -56,7 +90,7 @@ export const projectProcessingDetail = (attempt: ProjectProcessingAttempt): stri
 export const projectProcessingTone = (
   attempt: ProjectProcessingAttempt,
 ): 'neutral' | 'success' | 'warning' | 'danger' => {
-  if (attempt.phase === 'complete') return attempt.result?.historical ? 'warning' : 'success';
+  if (attempt.phase === 'complete') return RESULT_COPY[attempt.result?.state ?? 'current'].tone;
   if (attempt.phase === 'needs-attention') return attempt.ambiguous ? 'warning' : 'danger';
   if (attempt.phase === 'cancelled') return 'neutral';
   return 'neutral';
@@ -85,6 +119,15 @@ export const PROJECT_PROCESSING_AUTHORITY_PENDING_REASON =
  */
 export const PROJECT_VOICE_UNAVAILABLE_REASON =
   'Voice is not available inside a Project yet. Choosing one would stop Character Swap and Virtual Try-On from starting.';
+
+/** One word for pointing a Project at a video it does not yet have, wherever it is offered. */
+export const PROJECT_SET_ORIGINAL_VIDEO_ACTION_LABEL = 'Set as a Project’s original video';
+
+/** One word for adopting a retained result, wherever it is offered. */
+export const PROJECT_RESULT_ADOPT_ACTION_LABEL = 'Use this result now';
+
+/** One word for re-adopting a result the Project has already moved past. */
+export const PROJECT_RESULT_READOPT_ACTION_LABEL = 'Make this the current cut again';
 
 /** The standing cost warning on any control that leads to a provider submission. */
 export const PROJECT_PROCESSING_START_COST_NOTE = 'Starting this can cost money at the provider.';

@@ -117,7 +117,7 @@ describe('Project processing contracts', () => {
         result: {
           assetId: ids.asset,
           retainedAt: timestamp,
-          historical: false,
+          state: 'current' as const,
           contentUrl: `/api/projects/${ids.project}/processing/${ids.operation}/result/content`,
           media: {
             mimeType: 'video/mp4',

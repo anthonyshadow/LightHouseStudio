@@ -22,7 +22,7 @@ import {
 } from './ProjectOverviewSurface.styles';
 import { ProjectSourceSection, type ProjectRecordingCandidate } from './ProjectSourceSection';
 import { projectStatusLabel } from './projectStatusPresentation';
-import { ProjectWorkflowProgress, stepForSnapshot } from './ProjectWorkflowProgress';
+import { entryTaskForSnapshot, ProjectWorkflowProgress } from './ProjectWorkflowProgress';
 import type { useProjectSession } from './useProjectSession';
 import type { ProjectSourceActivity, ProjectSourceRuntime } from './useProjectSourceController';
 import { ActionMenu } from '../../ui/primitives/ActionMenu';
@@ -44,7 +44,6 @@ interface ProjectOverviewSurfaceProps {
   readonly sourceRuntime: ProjectSourceRuntime;
   readonly recordingCandidate?: ProjectRecordingCandidate | null | undefined;
   readonly recordingActive?: boolean | undefined;
-  readonly onStartRecording?: (() => void) | undefined;
   readonly onSourceActivityChange?: ((activity: ProjectSourceActivity) => void) | undefined;
   readonly creativeStore?: CreativeAssetStore | undefined;
   readonly onCreateProjectCharacter?: ((projectId: string) => void) | undefined;
@@ -58,7 +57,6 @@ export const ProjectOverviewSurface = ({
   sourceRuntime,
   recordingCandidate,
   recordingActive,
-  onStartRecording,
   onSourceActivityChange,
   creativeStore,
   onCreateProjectCharacter,
@@ -245,7 +243,10 @@ export const ProjectOverviewSurface = ({
             runtime={sourceRuntime}
             recordingCandidate={recordingCandidate}
             recordingActive={recordingActive}
-            {...(onStartRecording ? { onStartRecording } : {})}
+            // Record needs the capture graph, which only mounts on a Studio route. Navigating is
+            // honest and keeps the control live; the alternative was a permanently greyed button.
+            onStartRecording={() => void navigate(projectWorkspacePath(project.id, 'source'))}
+            startRecordingLabel="Record in the workspace"
             {...(onSourceActivityChange ? { onActivityChange: onSourceActivityChange } : {})}
             onCurrentChange={acceptOverviewSource}
           />
@@ -284,7 +285,10 @@ export const ProjectOverviewSurface = ({
             // Opened on the step the copy is actually ready for, using the same derivation the
             // workspace itself uses to decide where a Project stands.
             void navigate(
-              projectWorkspacePath(created.project.id, stepForSnapshot(created.revision.snapshot)),
+              projectWorkspacePath(
+                created.project.id,
+                entryTaskForSnapshot(created.revision.snapshot),
+              ),
             );
           }}
         />

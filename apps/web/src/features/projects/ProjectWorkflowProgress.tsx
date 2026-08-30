@@ -41,6 +41,19 @@ export const stepForSnapshot = (snapshot: Snapshot): ProjectWorkflowStepId => {
   }
 };
 
+/**
+ * Which task to *open*, which is not the same question as how far the Project has come.
+ *
+ * A saved Project has finished its lifecycle — `stepForSnapshot` says so, and the progress strip
+ * needs that to render every step done. But finishing a round is not finishing the Project: the
+ * saved Version is on the stage and every launcher is live, so landing the operator on History
+ * told them the opposite of the truth. They come back to make the next edit.
+ */
+export const entryTaskForSnapshot = (snapshot: Snapshot): ProjectWorkflowStepId => {
+  const step = stepForSnapshot(snapshot);
+  return step === 'history' ? 'create' : step;
+};
+
 interface ProjectWorkflowProgressProps {
   readonly snapshot: Snapshot;
   /**

@@ -1,28 +1,22 @@
 import { useTheme } from '@emotion/react';
-import type {
-  AdoptProjectWorkingMediaRequest,
-  ProjectCurrentResponse,
-  ProjectOutputHistoryItem,
-} from '@studio/contracts';
+import type { ProjectCurrentResponse, ProjectOutputHistoryItem } from '@studio/contracts';
 import { formatDateTime } from '@studio/domain';
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { Button, LinkButton, OverlayPanel, StatusNotice } from '../../ui';
 import { LoadingPlaceholder } from '../../ui/primitives/LoadingPlaceholder';
 import { Skeleton } from '../../ui/primitives/Skeleton';
 import { exportSpecificationSummary } from '../export-placements';
 import { getProjectProcessingHistory } from './projectProcessingApi';
-import { projectProcessingCapabilityLabel } from './projectProcessingPresentation';
-import { VideoPlayer } from '../video-player/VideoPlayer';
 import {
-  getProjectHistory,
-  getProjectOutputs,
-  projectOutputContentUrl,
-  ProjectApiConflictError,
-  reuseProjectWorkingMedia,
-} from './projectsApi';
+  PROJECT_RESULT_ADOPT_ACTION_LABEL,
+  PROJECT_RESULT_READOPT_ACTION_LABEL,
+  projectProcessingCapabilityLabel,
+} from './projectProcessingPresentation';
+import { VideoPlayer } from '../video-player/VideoPlayer';
+import { getProjectHistory, getProjectOutputs, projectOutputContentUrl } from './projectsApi';
 import type { ProjectSessionPort } from './useProjectSession';
-import { useStableOperationKey } from './useStableOperationKey';
+import { useProjectRetainedResultAdoption } from './useProjectRetainedResultAdoption';
 
 const revisionSourceLabel: Record<ProjectCurrentResponse['revision']['source'], string> = {
   create: 'Project created',
@@ -51,14 +45,10 @@ export const ProjectHistorySection = ({
   readonly archived: boolean;
 }) => {
   const theme = useTheme();
-  const queryClient = useQueryClient();
   const projectId = current.project.id;
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busyItemKey, setBusyItemKey] = useState<string | null>(null);
+  const { adoptMedia, busyItemKey, message, error } = useProjectRetainedResultAdoption(session);
   const [preview, setPreview] = useState<ProjectOutputHistoryItem | null>(null);
   const previewTriggerRef = useRef<HTMLElement | null>(null);
-  const operation = useStableOperationKey();
 
   const revisions = useInfiniteQuery({
     queryKey: ['projects', 'history', projectId, 'revisions'],
@@ -89,60 +79,6 @@ export const ProjectHistorySection = ({
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
   });
-
-  const adoptMedia = useCallback(
-    async (media: AdoptProjectWorkingMediaRequest['media'], label: string, itemKey: string) => {
-      setError(null);
-      setMessage(null);
-      if (!(await session.flush())) {
-        setError('Save or discard your pending Project changes before changing the current cut.');
-        return;
-      }
-      const latest = session.getCurrent();
-      if (latest === null) return;
-      const signature = JSON.stringify({
-        projectId,
-        expectedVersion: latest.project.version,
-        expectedRevisionNumber: latest.revision.revisionNumber,
-        media,
-      });
-      const operationKey = operation.keyFor(signature);
-      setBusyItemKey(itemKey);
-      try {
-        const response = await reuseProjectWorkingMedia({
-          projectId,
-          operationKey,
-          expectedVersion: latest.project.version,
-          expectedRevisionNumber: latest.revision.revisionNumber,
-          media,
-          localEdit: null,
-        });
-        if (!response.isCurrent) {
-          throw new ProjectApiConflictError('The Project advanced after this adoption.', {
-            kind: 'revision',
-            projectId,
-            expectedRevisionNumber: response.revision.revisionNumber,
-            actualRevisionNumber: response.project.currentRevisionNumber,
-          });
-        }
-        operation.reset();
-        session.acceptCurrent({ project: response.project, revision: response.revision });
-        setMessage(
-          `${label} is now the current cut. Your original video and the video’s current version were not changed.`,
-        );
-        await queryClient.invalidateQueries({ queryKey: ['projects', 'history', projectId] });
-      } catch (caught) {
-        setError(
-          caught instanceof ProjectApiConflictError
-            ? 'The Project changed before this older result could be used. Refresh and try again.'
-            : 'This older result could not be used in the Project.',
-        );
-      } finally {
-        setBusyItemKey(null);
-      }
-    },
-    [operation, projectId, queryClient, session],
-  );
 
   const revisionItems = revisions.data?.pages.flatMap((page) => page.revisions) ?? [];
   const outputItems = outputs.data?.pages.flatMap((page) => page.outputs) ?? [];
@@ -340,10 +276,18 @@ export const ProjectHistorySection = ({
                 Started from change {attempt.initiatingRevisionNumber} · {attempt.phase} ·{' '}
                 <time dateTime={attempt.createdAt}>{formatDateTime(attempt.createdAt)}</time>
               </span>
-              {attempt.result?.historical ? (
+              {/*
+               * A superseded result was applied and then moved past — usually by the operator's own
+               * save. Adopting it again is a legitimate undo, but it is an undo, and the label has
+               * to say so; the old copy claimed it "was not applied automatically", which for this
+               * case was simply untrue.
+               */}
+              {attempt.result && attempt.result.state !== 'current' ? (
                 <>
                   <span>
-                    Kept in this Project as an older result. It was not applied automatically.
+                    {attempt.result.state === 'superseded'
+                      ? 'Applied to this Project. Your later work moved past it.'
+                      : 'Kept in this Project. It was not applied, because the Project changed while the run was going.'}
                   </span>
                   <Button
                     size="small"
@@ -357,7 +301,9 @@ export const ProjectHistorySection = ({
                       )
                     }
                   >
-                    Use in Project
+                    {attempt.result.state === 'superseded'
+                      ? PROJECT_RESULT_READOPT_ACTION_LABEL
+                      : PROJECT_RESULT_ADOPT_ACTION_LABEL}
                   </Button>
                 </>
               ) : null}
