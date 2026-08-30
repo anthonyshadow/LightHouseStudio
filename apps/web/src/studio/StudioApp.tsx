@@ -772,8 +772,9 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
             workingMedia: projectWorkingMedia,
             onLaunch: handleCreateLaunch,
             onChooseAnother: chooseAnotherProjectResource,
-            launchingOperation:
-              activeOverlay === 'video-upload' || videoEditing ? null : launchingOperation,
+            // Spent by the launch hook the moment the editor holds the video, so this is the whole
+            // truth about whether a launch is still in flight.
+            launchingOperation,
             characterSwapAvailable: availability.videoProcessing?.characterSwap.available ?? false,
             virtualTryOnAvailable: availability.videoProcessing?.virtualTryOn.available ?? false,
             visualIncompatibilityReason: existingVideo.visualProviderCompatibility.compatible
@@ -784,7 +785,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
           }
         : null,
     [
-      activeOverlay,
       availability.videoProcessing,
       chooseAnotherProjectResource,
       creativeToolBlockedReasons.editVideo,
@@ -794,7 +794,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
       projectContextActive,
       projectCreative,
       projectWorkingMedia,
-      videoEditing,
     ],
   );
   const projectRecordingAvailable =
