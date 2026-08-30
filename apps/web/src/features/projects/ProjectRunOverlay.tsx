@@ -2,10 +2,8 @@ import { useTheme } from '@emotion/react';
 import { Button } from '../../ui';
 import { BlockingOverlay } from '../../ui/primitives/BlockingOverlay';
 import { projectProcessingDetail, projectProcessingTitle } from './projectProcessingPresentation';
-import {
-  projectProcessingCommandInFlight,
-  type ProjectProcessingController,
-} from './useProjectProcessingController';
+import { projectProcessingCommandInFlight } from './projectProcessingPhase';
+import type { ProjectProcessingController } from './useProjectProcessingController';
 
 /**
  * Whether an AI run currently owns this Project.
