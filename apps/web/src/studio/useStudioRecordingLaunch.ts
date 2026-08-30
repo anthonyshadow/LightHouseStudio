@@ -64,9 +64,22 @@ export const useStudioRecordingLaunch = ({
   // A Create-task launch outlives the click: the video may still be streaming, and adoption is
   // async. The request rides here until the editor is actually ready to receive it.
   const pendingCreateLaunchRef = useRef<ProjectCreateOperationId | null>(null);
-  const [launchingOperation, setLaunchingOperation] = useState<ProjectCreateOperationId | null>(
-    null,
-  );
+  /**
+   * The launch in flight, and the Project it was made in.
+   *
+   * Naming the Project is what makes "a request must not survive the Project it was made in" a fact
+   * about the value rather than a cleanup that has to fire: read against the current one below, a
+   * launch made elsewhere is simply not in flight here, and cannot strand a Project's launchers on
+   * a card nobody pressed.
+   */
+  const [createLaunch, setCreateLaunch] = useState<{
+    readonly projectId: string | null;
+    readonly operation: ProjectCreateOperationId;
+  } | null>(null);
+  const launchingOperation =
+    createLaunch !== null && createLaunch.projectId === activeProjectId
+      ? createLaunch.operation
+      : null;
   /**
    * Ends a launch — one that arrived, and one that never will.
    *
@@ -76,7 +89,7 @@ export const useStudioRecordingLaunch = ({
    */
   const clearCreateLaunch = useCallback(() => {
     pendingCreateLaunchRef.current = null;
-    setLaunchingOperation(null);
+    setCreateLaunch(null);
   }, []);
   const captureSupported = Boolean(
     browser.mediaRecorder && browser.mediaDevices && browser.secureContext,
@@ -141,7 +154,7 @@ export const useStudioRecordingLaunch = ({
   ]);
 
   /**
-   * Spends a Create-task launch once the workflow holds the video.
+   * Arms a Create-task launch for a visual provider once the workflow holds the video.
    *
    * A successful arm is the one path that does not settle here: `addStep` schedules a render, and
    * the pass after it sees the configured step and opens the editor. Every other path clears the
@@ -150,16 +163,15 @@ export const useStudioRecordingLaunch = ({
    */
   // Named individually rather than depending on the workflow object, which is rebuilt every render:
   // this effect would otherwise re-enter on every pass through a component that renders often.
-  const { addStep: addVisualStep, phase: existingVideoPhase, selection, steps } = existingVideo;
+  const { addStep: addVisualStep, selection, steps } = existingVideo;
   useEffect(() => {
     const request = pendingCreateLaunchRef.current;
     if (request === null || !selection) return;
-    if (request === 'adjust') {
-      // Nothing to arm and no overlay to open: the on-device editor is dispatched by the controller
-      // that owns it, from its own one-shot — on this same condition, in this same commit.
-      if (existingVideoPhase === 'ready') clearCreateLaunch();
-      return;
-    }
+    // The on-device editor has nothing to arm and no overlay to open. The controller that owns it
+    // dispatches it and ends the launch in the same act, so this effect must not end it on a
+    // second, matching predicate — two owners of "spent" is how it came to be spent without ever
+    // being dispatched.
+    if (request === 'adjust') return;
     const modelId = VISUAL_MODEL_FOR_OPERATION[request];
     // An existing step is the one thing pre-arming must never touch: it may hold configured
     // settings, and discarding those is the editor's own confirmation to ask for. This is also
@@ -172,30 +184,20 @@ export const useStudioRecordingLaunch = ({
     // `launchingOperation` is in here for the request itself: the ref that carries it is not
     // reactive, so with a selection already in hand nothing else in this list changes when a launch
     // is armed, and the request would sit unspent with the card busy for good.
-  }, [
-    addVisualStep,
-    clearCreateLaunch,
-    existingVideoPhase,
-    launchingOperation,
-    openOverlay,
-    selection,
-    steps,
-  ]);
+  }, [addVisualStep, clearCreateLaunch, launchingOperation, openOverlay, selection, steps]);
 
   /**
-   * A request must not survive the Project it was made in.
-   *
-   * The ref is dropped in the cleanup because React runs every cleanup before any body, and the two
-   * effects above both read it — cleared in a body, this one declared last, they would act on the
-   * old Project's request first. The state is cleared in the body, which teardown does not run:
-   * left set, it strands the new Project's launchers on a launch made in the old one.
+   * The ref has to be dropped on the way out, because it is the one half that cannot name its own
+   * Project: the adoption and pre-arm effects above read it directly, and React runs every cleanup
+   * before any body, so clearing it here is what stops them acting on the old Project's request.
+   * The launch state needs no cleanup — it carries its Project and is read against the current one.
    */
-  useEffect(() => {
-    setLaunchingOperation(null);
-    return () => {
+  useEffect(
+    () => () => {
       pendingCreateLaunchRef.current = null;
-    };
-  }, [activeProjectId]);
+    },
+    [activeProjectId],
+  );
 
   const openExistingVideo = useCallback(() => {
     setRecordingForExistingVideo(false);
@@ -248,7 +250,9 @@ export const useStudioRecordingLaunch = ({
     (request?: ProjectCreateOperationId) => {
       if (!recording.presented || recordingActive) return;
       pendingCreateLaunchRef.current = request ?? null;
-      setLaunchingOperation(request ?? null);
+      setCreateLaunch(
+        request === undefined ? null : { projectId: activeProjectId, operation: request },
+      );
       if (projectContextActive && !existingVideo.selection) {
         // Asking again is the retry: clear the attempt marker so a previously refused or failed
         // adoption can run once more for the same take.
@@ -265,6 +269,7 @@ export const useStudioRecordingLaunch = ({
       openExistingVideo();
     },
     [
+      activeProjectId,
       existingVideo.selection,
       openExistingVideo,
       projectContextActive,
@@ -308,5 +313,6 @@ export const useStudioRecordingLaunch = ({
     clearExistingVideoIntent,
     discardPendingAdoption,
     launchingOperation,
+    clearCreateLaunch,
   } as const;
 };
