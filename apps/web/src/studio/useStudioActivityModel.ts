@@ -39,6 +39,7 @@ export const useStudioActivityModel = ({
     recordingActive,
     finalizing,
     reviewLocked,
+    configurationIsDurable: creativeConfigurationIsDurable,
   });
 
   const creativeConfigurationLockState = creativeConfigurationLocks({

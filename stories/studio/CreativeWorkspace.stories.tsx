@@ -28,6 +28,7 @@ const WorkspaceHarness = () => {
   const editVideoToggleRef = useRef<HTMLButtonElement>(null);
   const characterToggleRef = useRef<HTMLButtonElement>(null);
   const outfitToggleRef = useRef<HTMLButtonElement>(null);
+  const voiceToggleRef = useRef<HTMLButtonElement>(null);
 
   const state: CreativeWorkspaceState = {
     activeTool: null,
@@ -38,6 +39,7 @@ const WorkspaceHarness = () => {
     onOpenEditVideo: fn(),
     onOpenCharacter: fn(),
     onOpenOutfit: fn(),
+    onOpenVoice: fn(),
   };
 
   return (
@@ -58,6 +60,7 @@ const WorkspaceHarness = () => {
             editVideoToggleRef,
             characterToggleRef,
             outfitToggleRef,
+            voiceToggleRef,
           }}
         />
       </div>

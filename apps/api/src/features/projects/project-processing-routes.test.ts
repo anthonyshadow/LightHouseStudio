@@ -341,6 +341,23 @@ describe('Project processing route authority', () => {
     );
   });
 
+  it('refuses a Project whose creative setup cannot describe a run, without failing the request', async () => {
+    const { app } = application(new DeterministicVideoProvider());
+    // No prompt and no reference asset: the recipe this Project describes is not runnable. The
+    // schema used to reject it by throwing, which reached the operator as a bare 500.
+    const { projectId } = await prepareProject(app, '');
+
+    const response = await submit(app, projectId, randomUUID());
+
+    expect(response.statusCode).toBe(409);
+    expect(response.json()).toMatchObject({
+      error: {
+        code: 'conflict',
+        message: 'Character Swap cannot start yet. A prompt, reference image, or both is required.',
+      },
+    });
+  });
+
   it('removes an accepted Project operation from the local queue without claiming provider cancellation', async () => {
     const provider = new DeterministicVideoProvider();
     const { app, repository } = application(provider);

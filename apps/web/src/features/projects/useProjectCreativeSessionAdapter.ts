@@ -106,6 +106,17 @@ export const useProjectCreativeSessionAdapter = ({
   const pendingProposal = projectSession?.proposal ?? null;
   const current = projectSession?.current ?? null;
   const snapshot = current?.revision.snapshot ?? null;
+  /**
+   * What the Project effectively holds: its saved revision with any staged change laid over it.
+   *
+   * Everything that drives the Studio *from* the Project reads this rather than the bare snapshot,
+   * because a selection is now staged rather than written on the spot. Without it the editor would
+   * prefill from the last saved revision and silently ignore the pick that opened it.
+   */
+  const effectiveSnapshot = useMemo(
+    () => (snapshot === null ? null : effectiveCreativeSnapshot(snapshot, pendingProposal)),
+    [pendingProposal, snapshot],
+  );
   const savedVoice =
     snapshot?.selectedVoice?.kind === 'saved-voice' ? snapshot.selectedVoice : null;
   const savedVoiceId = savedVoice?.voiceId ?? null;
@@ -302,9 +313,9 @@ export const useProjectCreativeSessionAdapter = ({
   }, [current?.revision.id, existingVideo, projectId, snapshot]);
 
   useEffect(() => {
-    if (projectId === null || snapshot === null) return;
+    if (projectId === null || effectiveSnapshot === null) return;
     const needsExistingVideoControls =
-      snapshot.visualTreatment.kind !== 'none' || snapshot.selectedVoice !== null;
+      effectiveSnapshot.visualTreatment.kind !== 'none' || effectiveSnapshot.selectedVoice !== null;
     if (
       !needsExistingVideoControls ||
       existingVideo.selection !== null ||
@@ -317,17 +328,17 @@ export const useProjectCreativeSessionAdapter = ({
     if (existingVideoSourceKeyRef.current === sourceKey) return;
     existingVideoSourceKeyRef.current = sourceKey;
     void existingVideo.adoptRecordedArtifact();
-  }, [existingVideo, projectId, snapshot]);
+  }, [effectiveSnapshot, existingVideo, projectId]);
 
   useEffect(() => {
-    if (projectId === null || snapshot === null) return;
+    if (projectId === null || effectiveSnapshot === null) return;
     const configKey = JSON.stringify({
       projectId,
       revisionId: current?.revision.id,
-      visualTreatment: snapshot.visualTreatment,
-      selectedCharacter: snapshot.selectedCharacter,
-      selectedOutfit: snapshot.selectedOutfit,
-      selectedVoice: snapshot.selectedVoice,
+      visualTreatment: effectiveSnapshot.visualTreatment,
+      selectedCharacter: effectiveSnapshot.selectedCharacter,
+      selectedOutfit: effectiveSnapshot.selectedOutfit,
+      selectedVoice: effectiveSnapshot.selectedVoice,
       savedVoiceRelationship:
         savedVoiceKey !== null && savedVoiceRelationship.key === savedVoiceKey
           ? savedVoiceRelationship.status
@@ -341,7 +352,7 @@ export const useProjectCreativeSessionAdapter = ({
     });
     if (existingVideoConfigurationKeyRef.current === configKey) return;
 
-    const voice = snapshot.selectedVoice;
+    const voice = effectiveSnapshot.selectedVoice;
     if (voice?.kind === 'local-effect') {
       existingVideo.selectLocalVoice(voice.effectId, localVoiceName(voice.effectId));
     } else if (voice?.kind === 'saved-voice') {
@@ -357,7 +368,7 @@ export const useProjectCreativeSessionAdapter = ({
       existingVideo.clearVoice();
     }
 
-    const visual = snapshot.visualTreatment;
+    const visual = effectiveSnapshot.visualTreatment;
     if (visual.kind === 'none' || existingVideo.selection === null) {
       existingVideoConfigurationKeyRef.current = configKey;
       return;
@@ -375,11 +386,13 @@ export const useProjectCreativeSessionAdapter = ({
       savedRecipeId:
         visual.kind === 'character-swap'
           ? // A variant is its own saved recipe; sending the parent id would silently drop it.
-            (snapshot.selectedCharacter?.variantId ??
-            snapshot.selectedCharacter?.characterId ??
+            (effectiveSnapshot.selectedCharacter?.variantId ??
+            effectiveSnapshot.selectedCharacter?.characterId ??
             null)
-          : (snapshot.selectedOutfit?.outfitId ?? null),
-      prompt: snapshot.creativeIntent.appliedPrompt ?? snapshot.creativeIntent.userIntent,
+          : (effectiveSnapshot.selectedOutfit?.outfitId ?? null),
+      prompt:
+        effectiveSnapshot.creativeIntent.appliedPrompt ??
+        effectiveSnapshot.creativeIntent.userIntent,
       enhancePrompt: visual.kind === 'virtual-try-on' ? (visual.enhancePrompt ?? false) : false,
       referenceImage: studioSession.draft.referenceImage?.file ?? null,
       inputKind:
@@ -389,8 +402,8 @@ export const useProjectCreativeSessionAdapter = ({
             (studioSession.draft.referenceImage ? 'reference-image' : 'prompt')),
       ...(parsedProvider.success ? { provider: parsedProvider.data } : {}),
       ...(visual.outputResolution ? { outputResolution: visual.outputResolution } : {}),
-      characterName: snapshot.selectedCharacter?.characterLabel ?? null,
-      characterVariantName: snapshot.selectedCharacter?.variantLabel ?? null,
+      characterName: effectiveSnapshot.selectedCharacter?.characterLabel ?? null,
+      characterVariantName: effectiveSnapshot.selectedCharacter?.variantLabel ?? null,
     });
     existingVideoConfigurationKeyRef.current = configKey;
   }, [
@@ -399,7 +412,7 @@ export const useProjectCreativeSessionAdapter = ({
     projectId,
     savedVoiceKey,
     savedVoiceRelationship,
-    snapshot,
+    effectiveSnapshot,
     studioSession.draft.referenceImage,
   ]);
 
@@ -452,7 +465,8 @@ export const useProjectCreativeSessionAdapter = ({
     // was proposed a moment ago and has not landed yet" without a second copy of either fact.
     const pending = effectiveCreativeSnapshot(snapshot, pendingProposal);
     if (creativeChoices(pending) === creativeChoices(proposal)) return;
-    proposeCreative(proposal);
+    // Staged, not scheduled: a boundary writes the revision.
+    proposeCreative(proposal, { autosave: false });
   }, [
     current,
     existingVideo.voiceSelection,

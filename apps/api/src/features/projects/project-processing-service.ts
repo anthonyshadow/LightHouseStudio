@@ -245,16 +245,20 @@ export class ProjectProcessingService {
         ? snapshot.selectedCharacter?.referenceAssetId
         : snapshot.selectedOutfit?.referenceAssetId) ??
       null;
+    // The same expression the workspace puts into the editable step, so the prompt this Project
+    // would submit is the prompt the operator was shown. Reading `appliedPrompt` alone let a
+    // Project look ready on screen and fail validation here.
+    const prompt = snapshot.creativeIntent.appliedPrompt ?? snapshot.creativeIntent.userIntent;
     if (capability === 'character-swap') {
       return {
         referenceAssetId,
-        recipe: videoTransformRecipeSchema.parse({
+        recipe: this.#validRecipe(capability, {
           operation: capability,
           ...(snapshot.visualTreatment.providerId === null
             ? {}
             : { provider: snapshot.visualTreatment.providerId }),
           inputKind: 'character',
-          prompt: snapshot.creativeIntent.appliedPrompt ?? '',
+          prompt,
           enhancePrompt: false,
           hasReferenceImage: referenceAssetId !== null,
           ...(snapshot.visualTreatment.outputResolution === null
@@ -270,10 +274,12 @@ export class ProjectProcessingService {
     const inputKind = treatment.inputKind ?? snapshot.selectedOutfit?.inputKind ?? null;
     return {
       referenceAssetId,
-      recipe: videoTransformRecipeSchema.parse({
+      recipe: this.#validRecipe(capability, {
         operation: capability,
         ...(inputKind === null ? {} : { inputKind }),
-        prompt: snapshot.creativeIntent.appliedPrompt ?? '',
+        // A reference-image try-on is defined by the image alone — the recipe contract refuses
+        // prompt text beside it — so carried-over intent must not be sent as one.
+        prompt: inputKind === 'reference-image' ? '' : prompt,
         enhancePrompt: treatment.enhancePrompt ?? false,
         hasReferenceImage: referenceAssetId !== null,
         ...(treatment.outputResolution === null
@@ -281,6 +287,22 @@ export class ProjectProcessingService {
           : { outputResolution: treatment.outputResolution }),
       }),
     };
+  }
+
+  /**
+   * A Project whose creative setup cannot describe a runnable edit is a conflict to resolve, not a
+   * server fault. `parse` throws a `ZodError` that no handler owns, which reaches the operator as a
+   * bare 500; this states what is missing instead, in the schema's own app-owned words.
+   */
+  #validRecipe(
+    capability: Exclude<ProjectProcessingCapability, 'voice'>,
+    candidate: unknown,
+  ): VideoTransformRecipe {
+    const parsed = videoTransformRecipeSchema.safeParse(candidate);
+    if (parsed.success) return parsed.data;
+    const label = capability === 'character-swap' ? 'Character Swap' : 'Virtual Try-On';
+    const detail = parsed.error.issues[0]?.message ?? 'Its creative setup is incomplete.';
+    throw new AppError(409, 'conflict', `${label} cannot start yet. ${detail}`);
   }
 
   async submit(input: {
