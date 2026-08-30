@@ -25,7 +25,7 @@ import type { ProjectWorkingMediaActivity } from './ProjectWorkingMediaSection';
 import {
   PROJECT_WORKFLOW_STEPS,
   ProjectWorkflowProgress,
-  stepForSnapshot,
+  entryTaskForSnapshot,
   type ProjectWorkflowStepId,
 } from './ProjectWorkflowProgress';
 import type { ProjectProcessingController } from './useProjectProcessingController';
@@ -201,7 +201,7 @@ export const ProjectWorkspaceSurface = ({
     null,
   );
   if (enteredWorkspaceTask === null)
-    setEnteredWorkspaceTask(stepForSnapshot(current.revision.snapshot));
+    setEnteredWorkspaceTask(entryTaskForSnapshot(current.revision.snapshot));
   const saveStatus = projectWorkspaceSaveStatus(
     session,
     sourceActivity?.busy ?? false,
@@ -219,7 +219,7 @@ export const ProjectWorkspaceSurface = ({
       ? 'Finish updating the current cut before removing the original video.'
       : undefined);
   const activeWorkspaceTask =
-    pinnedWorkspaceTask ?? enteredWorkspaceTask ?? stepForSnapshot(current.revision.snapshot);
+    pinnedWorkspaceTask ?? enteredWorkspaceTask ?? entryTaskForSnapshot(current.revision.snapshot);
   const focusWorkspaceTask = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const lastIndex = projectWorkspaceTasks.length - 1;
     const nextIndex: Record<string, number | undefined> = {
@@ -344,6 +344,7 @@ export const ProjectWorkspaceSurface = ({
               sourceBusy={sourceActivity?.busy ?? false}
               workingMediaBusy={workingMediaActivity?.busy ?? false}
               onOpenSource={openSourceTask}
+              onOpenTask={selectWorkspaceTask}
               onWorkingMediaActivityChange={handleWorkingMediaActivity}
             />
           </section>

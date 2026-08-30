@@ -248,7 +248,7 @@ const renderSection = (
 
 const selectSavedVideo = async () => {
   const user = userEvent.setup();
-  await user.click(screen.getByRole('button', { name: 'Use a saved video instead' }));
+  await user.click(screen.getByRole('button', { name: 'Make a saved video the current cut' }));
   const choice = await screen.findByRole('button', { name: /Retained master/u });
   await user.click(choice);
   await waitFor(() =>
@@ -281,7 +281,9 @@ describe('ProjectWorkingMediaSection', () => {
     renderSection(createSession(), { archived: true });
 
     expect(screen.getByRole('heading', { name: 'Current cut' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Use a saved video instead' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Make a saved video the current cut' }),
+    ).toBeDisabled();
   });
 
   it('adopts one exact retained Version and announces durable non-copy semantics', async () => {

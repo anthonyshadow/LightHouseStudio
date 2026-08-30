@@ -335,7 +335,12 @@ describe('Project route surface', () => {
     expect(
       within(overviewSource).getByRole('heading', { name: 'No original video yet' }),
     ).toBeVisible();
-    expect(within(overviewSource).getByRole('button', { name: 'Upload' })).toBeVisible();
+    // Enabled, not merely present: asserting visibility is what let a wholly inert picker ship.
+    expect(within(overviewSource).getByRole('button', { name: 'Upload' })).toBeEnabled();
+    expect(within(overviewSource).getByRole('button', { name: 'Use a saved video' })).toBeEnabled();
+    expect(
+      within(overviewSource).getByRole('button', { name: 'Record in the workspace' }),
+    ).toBeEnabled();
     await userEvent.click(screen.getByRole('button', { name: 'Add original video' }));
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(`/projects/${activeId}/workspace`),
@@ -465,6 +470,41 @@ describe('Project route surface', () => {
     expect(within(progress).queryByText('History')).not.toBeInTheDocument();
     expect(within(progress).getByText('Save').closest('li')).toHaveAttribute('data-state', 'done');
     expect(progress.querySelector('[aria-current="step"]')).toBeNull();
+  });
+
+  it('opens a saved Project on Create while its progress still reads finished', async () => {
+    const completed = acceptedProject();
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () =>
+        HttpResponse.json({
+          ...completed,
+          revision: {
+            ...completed.revision,
+            snapshot: {
+              ...completed.revision.snapshot,
+              workflowPhase: 'complete',
+              lastSuccessfulOutput: {
+                savedVideoId: '0f5a2fe1-9d6b-4b52-9d4a-7c2d1b6e4a31',
+                videoVersionId: '5b0a4c37-2e18-4d6e-9b0f-3a2c8d1e7f45',
+              },
+            },
+          },
+        }),
+      ),
+    );
+    renderProjects(`/projects/${activeId}/workspace`);
+
+    // Two different questions: how far the Project has come, and what to open. Finishing a round is
+    // not finishing the Project, so it lands on the next edit and still reads as done.
+    const tabs = await screen.findByRole('tablist', { name: 'Project tasks' });
+    expect(within(tabs).getByRole('tab', { name: 'Create' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    const progress = screen.getByRole('list', { name: 'Project workflow progress' });
+    expect(progress.querySelector('[aria-current="step"]')).toBeNull();
+    expect(within(progress).getByText('Save').closest('li')).toHaveAttribute('data-state', 'done');
+    expect(screen.getByText('Version saved — carry on')).toBeVisible();
   });
 
   it('reads a review-phase Project as waiting on Save', async () => {
@@ -1499,24 +1539,26 @@ describe('Project route surface', () => {
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
     expect(screen.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: 'Remove original video' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove original video' });
+    await user.click(screen.getByRole('button', { name: 'Replace the original video' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Replace the original video' });
     expect(dialog).toHaveTextContent('The video itself is not deleted');
     expect(dialog).toHaveTextContent('accepted-source.mp4');
 
-    await user.click(within(dialog).getByRole('button', { name: 'Remove original video' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Remove and choose another' }));
 
     expect(removeBody).toEqual({ expectedVersion: 2, expectedRevisionNumber: 2 });
     expect(await screen.findByRole('heading', { name: 'No original video yet' })).toBeVisible();
     await waitFor(() =>
       expect(
-        screen.queryByRole('dialog', { name: 'Remove original video' }),
+        screen.queryByRole('dialog', { name: 'Replace the original video' }),
       ).not.toBeInTheDocument(),
     );
     // The three ways back to a source are live again, and Remove is gone with the source.
     expect(screen.getByRole('button', { name: 'Upload' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Use a saved video' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Remove original video' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Replace the original video' }),
+    ).not.toBeInTheDocument();
     expect(clear).toHaveBeenCalledWith(activeId);
   });
 
@@ -1546,15 +1588,15 @@ describe('Project route surface', () => {
       sourceRuntime: { available: true, present: vi.fn(), clear: vi.fn() },
     });
 
-    await user.click(await screen.findByRole('button', { name: 'Remove original video' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove original video' });
-    await user.click(within(dialog).getByRole('button', { name: 'Remove original video' }));
+    await user.click(await screen.findByRole('button', { name: 'Replace the original video' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Replace the original video' });
+    await user.click(within(dialog).getByRole('button', { name: 'Remove and choose another' }));
 
     // The dialog is where the operator is looking, so the refusal has to land there.
-    expect(await within(dialog).findByText('Original video not removed')).toBeVisible();
-    expect(screen.getByRole('dialog', { name: 'Remove original video' })).toBeVisible();
+    expect(await within(dialog).findByText('Original video not replaced')).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Replace the original video' })).toBeVisible();
     // Still retryable rather than dismissed with the source silently intact behind it.
-    expect(within(dialog).getByRole('button', { name: 'Remove original video' })).toBeEnabled();
+    expect(within(dialog).getByRole('button', { name: 'Remove and choose another' })).toBeEnabled();
   });
 
   it('does not offer source removal on the overview or for an empty Project', async () => {
@@ -1574,7 +1616,9 @@ describe('Project route surface', () => {
     // A source-bearing Project must not mount the Source task on the overview: doing so would
     // re-read the source bytes just to show a button.
     expect(await screen.findByText(/Original video ready/u)).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Remove original video' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Replace the original video' }),
+    ).not.toBeInTheDocument();
   });
 
   it('accepts one finalized recording while exposing bounded source activity', async () => {

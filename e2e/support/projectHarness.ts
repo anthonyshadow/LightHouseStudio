@@ -690,7 +690,7 @@ export const installProjectHarness = async (
         result: {
           assetId: PROJECT_PROCESSING_RESULT_ASSET_ID,
           retainedAt: '2030-01-01T00:07:00.000Z',
-          historical: false,
+          state: 'current' as const,
           media: {
             mimeType: source.source.mimeType,
             container: source.source.container,

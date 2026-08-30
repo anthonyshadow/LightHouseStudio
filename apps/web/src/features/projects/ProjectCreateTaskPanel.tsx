@@ -11,6 +11,7 @@ import {
   type ProjectCreativeResourceKind,
 } from './projectCreatePresentation';
 import { ProjectProcessingStatusPanel } from './ProjectProcessingStatusPanel';
+import type { ProjectWorkflowStepId } from './ProjectWorkflowProgress';
 import {
   ProjectWorkingMediaSection,
   type ProjectWorkingMediaActivity,
@@ -55,6 +56,7 @@ interface ProjectCreateTaskPanelProps {
   readonly sourceBusy: boolean;
   readonly workingMediaBusy: boolean;
   readonly onOpenSource: () => void;
+  readonly onOpenTask: (task: ProjectWorkflowStepId) => void;
   readonly onWorkingMediaActivityChange?:
     ((activity: ProjectWorkingMediaActivity) => void) | undefined;
 }
@@ -74,6 +76,7 @@ export const ProjectCreateTaskPanel = ({
   sourceBusy,
   workingMediaBusy,
   onOpenSource,
+  onOpenTask,
   onWorkingMediaActivityChange,
 }: ProjectCreateTaskPanelProps) => {
   const theme = useTheme();
@@ -113,6 +116,26 @@ export const ProjectCreateTaskPanel = ({
         <StatusNotice role="status" tone="neutral" title="Read-only Project">
           This Project is archived. You can review its setup and the current cut, but you cannot
           start an edit or change it.
+        </StatusNotice>
+      ) : null}
+
+      {/*
+       * A save clears the creative setup and moves the phase to `complete`, both deliberately —
+       * but silently, so the workspace looked wiped and the operator concluded the Project had
+       * broken. Saying it is the whole fix. It retires itself: the first creative pick rewrites
+       * the phase back to `creative`.
+       */}
+      {!archived &&
+      snapshot.workflowPhase === 'complete' &&
+      snapshot.lastSuccessfulOutput !== null ? (
+        <StatusNotice role="status" tone="neutral" title="Version saved — carry on">
+          <p>
+            Everything here still works. The saved Version is what you’re editing, and your
+            character, outfit and prompt were cleared so the next round starts clean.
+          </p>
+          <Button size="small" variant="secondary" onClick={() => onOpenTask('history')}>
+            See saved Versions
+          </Button>
         </StatusNotice>
       ) : null}
 
@@ -171,7 +194,11 @@ export const ProjectCreateTaskPanel = ({
       />
 
       {processing ? (
-        <ProjectProcessingStatusPanel controller={processing} />
+        <ProjectProcessingStatusPanel
+          controller={processing}
+          session={session}
+          onOpenTask={onOpenTask}
+        />
       ) : (
         <StatusNotice role="status" tone="neutral" title="Processing unavailable">
           No provider work can be submitted from this workspace.

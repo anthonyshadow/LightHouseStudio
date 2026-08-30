@@ -474,10 +474,10 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   expect(projects.sourceOperationKeys).toHaveLength(1);
 
   // The wrong source is recoverable without deleting the Project: remove it and choose again.
-  await page.getByRole('button', { name: 'Remove original video' }).click();
-  const removeDialog = page.getByRole('dialog', { name: 'Remove original video' });
+  await page.getByRole('button', { name: 'Replace the original video' }).click();
+  const removeDialog = page.getByRole('dialog', { name: 'Replace the original video' });
   await expect(removeDialog).toBeVisible();
-  await removeDialog.getByRole('button', { name: 'Remove original video' }).click();
+  await removeDialog.getByRole('button', { name: 'Remove and choose another' }).click();
 
   await expect(page.getByRole('heading', { name: 'No original video yet' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Upload' })).toBeEnabled();
@@ -627,12 +627,13 @@ test('an accepted Project operation reconnects after refresh and presents its re
     .getByRole('button', { name: 'Use in Studio' })
     .click();
   await openProjectTask(page, 'Create');
-  // No save step: choosing the character reached the Project on its own, and the card that uses it
-  // names it. Pressing a button to make a choice real is exactly what this replaced.
+  // No save step: choosing the character shows up immediately on the card that uses it. It is
+  // staged rather than written, so no revision exists yet — the paid start below is the boundary
+  // that writes one, and it must carry this exact choice.
   await expect(
     page.getByRole('tabpanel', { name: 'Create', exact: true }).getByText('Project Field Host'),
   ).toBeVisible();
-  await expect.poll(() => projects.checkpointRequests.length).toBeGreaterThanOrEqual(1);
+  expect(projects.checkpointRequests).toHaveLength(0);
   // Launch from the Create task rather than the stage rail: the editor must arrive already on the
   // operation that was asked for. The rail's own path is covered by existing-video.spec.ts.
   await page
@@ -647,6 +648,7 @@ test('an accepted Project operation reconnects after refresh and presents its re
     existingVideo.getByRole('button', { name: 'Start Project Character Swap' }),
   ).toBeEnabled();
   await existingVideo.getByRole('button', { name: 'Start Project Character Swap' }).click();
+  await expect.poll(() => projects.checkpointRequests.length).toBeGreaterThanOrEqual(1);
 
   await expect.poll(() => projects.processingOperationKeys).toHaveLength(1);
   expect(projects.processingOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
@@ -677,10 +679,11 @@ test('an accepted Project operation reconnects after refresh and presents its re
     /\/content$/u,
   );
   await openProjectTask(page, 'History');
-  // One change more than the manual flow recorded. Choosing the character now writes its own
-  // change as it is made, where before it rode along with the save the operator had to press.
+  // Choosing the character adds no change of its own: it is staged, and the checkpoint taken
+  // before the paid start is what records it. The history is the operator's decisions, not the
+  // Studio's settling.
   await expect(
-    page.getByRole('tabpanel', { name: 'History' }).getByText(/^Change 6 ·/u),
+    page.getByRole('tabpanel', { name: 'History' }).getByText(/^Change 5 ·/u),
   ).toBeVisible();
   expect(projects.processingOperationKeys).toHaveLength(1);
   expect(projects.processingReconcileCount).toBeGreaterThanOrEqual(1);
@@ -724,12 +727,9 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
   await expect(
     page.getByRole('tabpanel', { name: 'Create', exact: true }).getByText('Project Field Host'),
   ).toBeVisible();
-  await expect.poll(() => projects.checkpointRequests.length).toBe(1);
-  expect(projects.checkpointRequests[0]?.proposal.selectedCharacter).toMatchObject({
-    characterId: 'project-field-host',
-    characterLabel: 'Project Field Host',
-    characterRevision: selectedCharacter?.updatedAt,
-  });
+  // Staged, not written: a pick is not a change to the Project until a boundary says so. The
+  // adoption below flushes it, which is where the revision appears.
+  expect(projects.checkpointRequests).toHaveLength(0);
   await expect(page.getByText('Project Field Host changed after you saved progress.')).toHaveCount(
     0,
   );
@@ -799,7 +799,13 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
   );
   // One checkpoint, carrying the chosen character. The second used to be the operator pressing
   // save; adopting a render writes its own revision through the working-media command instead.
+  // The adoption flushed the staged pick on its way through, so exactly one revision carries it.
   expect(projects.checkpointRequests).toHaveLength(1);
+  expect(projects.checkpointRequests[0]?.proposal.selectedCharacter).toMatchObject({
+    characterId: 'project-field-host',
+    characterLabel: 'Project Field Host',
+    characterRevision: selectedCharacter?.updatedAt,
+  });
   expect(projects.workingMediaOperationKeys).toHaveLength(1);
   expectNoExternalProviderTraffic(network);
 });
@@ -900,11 +906,9 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   await expect(
     page.getByRole('tabpanel', { name: 'Create', exact: true }).getByText('Project Field Host'),
   ).toBeVisible();
-  await expect.poll(() => projects.checkpointRequests.length).toBe(1);
-  expect(projects.checkpointRequests[0]?.proposal.selectedCharacter).toMatchObject({
-    characterId: 'project-field-host',
-    characterLabel: 'Project Field Host',
-  });
+  // Picking stages the choice; it does not append a revision. A Project revision records a change
+  // the operator made, not the Studio settling into one, so the write waits for a real boundary.
+  expect(projects.checkpointRequests).toHaveLength(0);
 
   await page
     .getByRole('navigation', { name: 'Creative workspace tools' })
@@ -912,6 +916,12 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
     .click();
   const existingVideo = page.getByRole('dialog', { name: 'Use existing video' });
   await existingVideo.getByRole('button', { name: 'Start Project Character Swap' }).click();
+  // Starting a paid run is one such boundary: the exact setup it will use is written first.
+  await expect.poll(() => projects.checkpointRequests.length).toBeGreaterThanOrEqual(1);
+  expect(projects.checkpointRequests.at(-1)?.proposal.selectedCharacter).toMatchObject({
+    characterId: 'project-field-host',
+    characterLabel: 'Project Field Host',
+  });
   await expect.poll(() => projects.processingOperationKeys).toHaveLength(1);
   expect(projects.processingOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
   expect(projects.processingProviderIntents).toEqual(['video']);

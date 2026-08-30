@@ -21,6 +21,7 @@ import {
 import {
   projectProcessingBlocksArchive,
   projectProcessingPhase,
+  projectProcessingResultState,
   projectProcessingRetryPolicy,
   promoteProjectJobResult,
   type ProjectAssetLink,
@@ -939,7 +940,10 @@ export class ProjectProcessingService {
           : {
               assetId: attempt.outputAssetId,
               retainedAt: attempt.completedAt ?? attempt.updatedAt,
-              historical: !isCurrent,
+              state: projectProcessingResultState({
+                resultRevisionId: attempt.resultRevisionId,
+                isCurrent,
+              }),
               media: attempt.result,
               contentUrl: `/api/projects/${encodeURIComponent(projectId)}/processing/${encodeURIComponent(attempt.operationId)}/result/content`,
             },

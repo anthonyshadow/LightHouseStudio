@@ -74,6 +74,7 @@ import {
   thumbnailStyles,
 } from './VideoGallery.styles';
 import { ActionMenu } from '../../ui/primitives/ActionMenu';
+import { PROJECT_SET_ORIGINAL_VIDEO_ACTION_LABEL } from '../projects/projectProcessingPresentation';
 
 const duration = (milliseconds: number): string => {
   const seconds = Math.round(milliseconds / 1_000);
@@ -320,7 +321,7 @@ const VideoGalleryGrid = ({
                     },
                     {
                       id: 'project-source',
-                      label: 'Use as Project source',
+                      label: PROJECT_SET_ORIGINAL_VIDEO_ACTION_LABEL,
                       disabled: busy || video.status !== 'ready',
                       onSelect: (trigger) => onAddToProject(video, trigger),
                     },

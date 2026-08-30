@@ -141,7 +141,7 @@ const staleAttempt: ProjectProcessingAttempt = {
   result: {
     assetId: '4159225b-60f4-4f94-a3d5-08feee91a91d',
     retainedAt: now,
-    historical: true,
+    state: 'unapplied' as const,
     media: {
       mimeType: 'video/mp4',
       container: 'mp4',
@@ -282,7 +282,7 @@ describe('ProjectHistorySection', () => {
     expect(screen.getByRole('heading', { name: 'Project changes' })).toBeVisible();
     expect(await screen.findByText(/Saved at change 1; made current at change 2/u)).toBeVisible();
     expect(screen.getByText(/Removed from your videos/u)).toBeVisible();
-    expect(screen.getByText(/Kept in this Project as an older result/u)).toBeVisible();
+    expect(screen.getByText(/Kept in this Project. It was not applied/u)).toBeVisible();
     expect(
       screen.getByRole('link', { name: 'Download Removed master, Version 1' }),
     ).toHaveAttribute(
@@ -524,7 +524,7 @@ describe('ProjectHistorySection', () => {
       </StudioDesignProvider>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Use in Project' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Use this result now' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This older result could not be used in the Project.',
     );

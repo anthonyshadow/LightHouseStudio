@@ -155,7 +155,7 @@ export const ProjectWorkingMediaSection = ({
           title="Picks one exact version of one of your own videos, and never sets a target for Add Version."
           onClick={() => setPickerOpen(true)}
         >
-          Use a saved video instead
+          Make a saved video the current cut
         </Button>
         {message ? (
           <StatusNotice
