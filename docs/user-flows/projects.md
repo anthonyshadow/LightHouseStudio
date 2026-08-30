@@ -205,8 +205,9 @@ navigation cannot drift apart. The masthead row is a fixed `3rem`, so the compac
 wraps and drops its step labels below `64rem`, leaving ordinals plus per-step `aria-label`.
 
 **Which task opens.** The workspace opens on the step the Project is actually up to, derived from
-`workflowPhase` by `stepForSnapshot` — a Project with no source opens on Source, one with a source
-on Create, one in `review` on Save, one `complete` on History. That choice is latched on entry: a
+`workflowPhase` by `entryTaskForSnapshot` — a Project with no source opens on Source, one with a
+source on Create, one in `review` on Save, and a `complete` one on Create, because a finished round
+is where the next edit starts rather than an ending. That choice is latched on entry: a
 phase change mid-session does not move the open panel out from under the operator. An explicit
 choice writes `?task=<id>` and outranks both.
 
@@ -391,7 +392,7 @@ revision, and `ProjectService.duplicate` composes it with the same create path e
    The dialog proposes `"<title> (copy)"` (bounded by `duplicateProjectTitle`), keeps the original's
    Campaign as the default, and states plainly that no video is duplicated and nothing is charged
    until work is started in the new Project. On success it opens the copy at
-   `stepForSnapshot(snapshot)` — the step it is actually ready for.
+   `entryTaskForSnapshot(snapshot)` — the step it is actually ready for.
 
 ## Flow: Project-scoped provider processing
 

@@ -1,10 +1,8 @@
 import type {
-  ProjectCurrentResponse,
   ProjectProcessingAttempt,
   ProjectProcessingCapability,
   ProjectProcessingMutationResponse,
 } from '@studio/contracts';
-import { projectMediaReferencesEqual } from '@studio/domain';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ApiClientError, apiErrorMessage } from '../../adapters/api-client/apiClient';
 import {
@@ -64,29 +62,15 @@ const isRecoverableHistoricalAttempt = (attempt: ProjectProcessingAttempt): bool
  * A finished result the operator has not dealt with yet — and only that.
  *
  * A result that was applied belongs in History, not in the live panel: resurfacing every applied
- * run made an ordinary save look like a failure on every subsequent load. This surfaces the one
- * case that still wants a decision, and retires itself three ways — a newer attempt replaces it,
- * adopting it puts its asset on the Project, and anything else leaves it in History.
+ * run made an ordinary save look like a failure on every subsequent load. `state` is the server's
+ * whole answer to what became of a result, adoption included, so this stays a filter and never a
+ * second opinion. It retires itself three ways — a newer attempt replaces it, adopting it moves it
+ * to `current`, and anything else leaves it in History.
  */
 const undecidedRetainedResult = (
   candidate: ProjectProcessingAttempt | undefined,
-  current: ProjectCurrentResponse | null,
-): ProjectProcessingAttempt | null => {
-  if (
-    candidate === undefined ||
-    candidate.phase !== 'complete' ||
-    candidate.result?.state !== 'unapplied'
-  ) {
-    return null;
-  }
-  const held = { kind: 'asset', assetId: candidate.result.assetId } as const;
-  const snapshot = current?.revision.snapshot;
-  return [snapshot?.workingMedia, snapshot?.presentedMedia].some((reference) =>
-    projectMediaReferencesEqual(reference ?? null, held),
-  )
-    ? null
-    : candidate;
-};
+): ProjectProcessingAttempt | null =>
+  candidate?.phase === 'complete' && candidate.result?.state === 'unapplied' ? candidate : null;
 
 const attemptNeedsProjectRefresh = (attempt: ProjectProcessingAttempt): boolean =>
   attempt.phase === 'complete' ||
@@ -233,7 +217,7 @@ export const useProjectProcessingController = ({
           // Newest-first from both repositories, so a later run retires an older notice on its own.
           attempt =
             history.attempts.find(isRecoverableHistoricalAttempt) ??
-            undecidedRetainedResult(history.attempts[0], activeSession.getCurrent());
+            undecidedRetainedResult(history.attempts[0]);
         }
         const prior = stateRef.current;
         if (

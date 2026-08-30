@@ -16,12 +16,8 @@ export interface ProjectRecordingCandidate {
   readonly ready: boolean;
 }
 
-/** The stand-in for a surface mounted where no live-media runtime exists to take a source. */
-export const unavailableSourceRuntime: ProjectSourceRuntime = {
-  available: false,
-  present: () => undefined,
-  clear: () => undefined,
-};
+/** What a surface mounted away from the capture graph hands the section. */
+export const detachedSourceRuntime: ProjectSourceRuntime = { kind: 'detached' };
 
 interface ProjectSourceNotice {
   readonly title: string;
@@ -84,7 +80,6 @@ export const ProjectSourceSection = ({
   recordingActive = false,
   removalBlockedReason,
   onStartRecording,
-  startRecordingLabel,
   onActivityChange,
   onCurrentChange,
 }: {
@@ -94,8 +89,6 @@ export const ProjectSourceSection = ({
   readonly recordingActive?: boolean | undefined;
   readonly removalBlockedReason?: string | undefined;
   readonly onStartRecording?: (() => void) | undefined;
-  /** Names what Record does where there is no stage — on the overview it opens the workspace. */
-  readonly startRecordingLabel?: string | undefined;
   readonly onActivityChange?: ((activity: ProjectSourceActivity) => void) | undefined;
   readonly onCurrentChange?: ((current: ProjectCurrentResponse) => void) | undefined;
 }) => {
@@ -114,6 +107,9 @@ export const ProjectSourceSection = ({
   );
   const archived = current.project.archivedAt !== null;
   const controlsDisabled = archived || controller.busy || controller.accepted;
+  // Recording needs the capture graph, which only mounts on a Studio route. Where it is absent and
+  // the caller offered a way to one, the control names where recording actually happens.
+  const detached = runtime.kind === 'detached';
   const stateNotice = projectSourceNotice(controller.phase, controller.message);
   // The controller's phase/message stay the single owner of the failure text; the dialog just
   // renders it where the operator is looking when a removal is refused.
@@ -188,7 +184,7 @@ export const ProjectSourceSection = ({
               busy={recordingActive}
               onClick={onStartRecording}
             >
-              {startRecordingLabel ?? 'Record'}
+              {detached && onStartRecording !== undefined ? 'Record in the workspace' : 'Record'}
             </Button>
           )}
           <Button disabled={controlsDisabled} onClick={() => inputRef.current?.click()}>
@@ -212,9 +208,9 @@ export const ProjectSourceSection = ({
               Replace the original video
             </Button>
           ) : null}
-          {runtime.available ? null : (
+          {detached ? (
             <small>Choosing here opens the workspace, where you can watch it.</small>
-          )}
+          ) : null}
           <small>Choosing, recording, or reopening a video never starts paid AI work.</small>
         </div>
       </section>
