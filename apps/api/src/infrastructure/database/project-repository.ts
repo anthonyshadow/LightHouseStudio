@@ -224,6 +224,13 @@ const toProjectCurrentRead = (row: CurrentProjectRow): ProjectCurrentRead => {
  * A Project row joined to the revision it currently points at. Identity is asserted on all four
  * columns — owner, project, revision id and revision number — so a stale or cross-owner revision
  * can never satisfy the join.
+ *
+ * Every read that uses this join runs **unlocked**, deliberately. `FOR SHARE OF projects` re-reads
+ * only the locked `projects` row after it waits out a concurrent `appendRevision`, while the joined
+ * `project_revisions` side keeps the original statement snapshot — so the re-read pointer names a
+ * revision the join cannot see, and a perfectly healthy aggregate reads as broken. The plain
+ * statement snapshot is consistent across both sides, and every mutation still asserts version and
+ * revision number, so no caller relied on the lock for correctness.
  */
 const currentRevisionMatch = and(
   eq(projectRevisions.projectId, projects.id),
@@ -817,7 +824,7 @@ export class DrizzleProjectRepository
           isNull(projects.deletedAt),
         ),
       )
-      .for('share', { of: projects })
+      // Unlocked on purpose — see `currentRevisionMatch`.
       .limit(1);
     return row === undefined ? null : toProjectCurrentRead(row);
   }
@@ -899,7 +906,7 @@ export class DrizzleProjectRepository
           isNull(projects.deletedAt),
         ),
       )
-      .for('share', { of: projects })
+      // Unlocked on purpose — see `currentRevisionMatch`.
       .limit(1);
     if (row === undefined) return null;
     return {
@@ -960,7 +967,7 @@ export class DrizzleProjectRepository
         ),
       )
       .orderBy(desc(projectWorkingMediaAdoptions.adoptedRevisionNumber))
-      .for('share', { of: projects })
+      // Unlocked on purpose — see `currentRevisionMatch`.
       .limit(1);
     if (row === undefined) return null;
     const current = toProjectCurrentRead(row);
@@ -993,7 +1000,7 @@ export class DrizzleProjectRepository
           eq(projectWorkingMediaAdoptions.operationKey, operationKey),
         ),
       )
-      .for('share', { of: projects })
+      // Unlocked on purpose — see `currentRevisionMatch`.
       .limit(1);
     return row === undefined
       ? null

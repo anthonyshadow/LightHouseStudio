@@ -50,3 +50,24 @@ process.once('SIGINT', () => void close('SIGINT'));
 process.once('SIGTERM', () => void close('SIGTERM'));
 
 await app.listen({ host: config.host, port: config.port });
+
+// Announced deliberately. Until this line the API said nothing until it shut down, so a healthy
+// server was indistinguishable from a crashed one — most visibly beside the Vite banner under
+// `dev:servers`, where only the web half ever spoke. Keys are reported as booleans, never values:
+// a startup line is exactly the kind of place a secret leaks into a log.
+app.log.info(
+  {
+    url: `http://${config.host}:${config.port}`,
+    databaseMode: config.databaseMode,
+    dataDirectory: config.lightframeDataDir,
+    characterSwapProvider: config.existingVideoCharacterSwapProvider,
+    providersConfigured: {
+      decart: config.decartApiKey !== undefined,
+      pruna: config.prunaVideoReplaceEnabled,
+      elevenLabs: config.elevenLabsApiKey !== undefined,
+      openAi: config.openAiApiKey !== undefined,
+      wiro: config.wiroApiKey !== undefined,
+    },
+  },
+  'Lightframe Studio API ready',
+);

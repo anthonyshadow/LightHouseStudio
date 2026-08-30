@@ -10,7 +10,15 @@ export const characterBuilderBlockedReasons = ({
   recordingActive,
   finalizing,
   reviewLocked,
-}: FinalizationState & { readonly reviewLocked: boolean }) => {
+  configurationIsDurable = false,
+}: FinalizationState & {
+  readonly reviewLocked: boolean;
+  /**
+   * Whether the media on the stage is a saved, recoverable thing rather than an unsaved take —
+   * a Project's own source video, for instance.
+   */
+  readonly configurationIsDurable?: boolean;
+}) => {
   const activity = recordingActive
     ? 'Finish recording and finalization before building a character.'
     : finalizing
@@ -19,9 +27,14 @@ export const characterBuilderBlockedReasons = ({
 
   return {
     activity,
+    // A durable configuration has nothing to save or discard: asking a Project to release its own
+    // source before building a character names an action that does not exist there, and blocked
+    // creating an outfit from the very panel that offers it. The same rule
+    // `creativeConfigurationLocks` states — only work that would make the saved value wrong locks
+    // it — so only an active recording or a finalizing take still applies.
     open:
       activity ??
-      (reviewLocked
+      (reviewLocked && !configurationIsDurable
         ? 'Save and release or discard the current take before building a character.'
         : undefined),
   };

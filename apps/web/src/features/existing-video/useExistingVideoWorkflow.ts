@@ -834,7 +834,13 @@ export const useExistingVideoWorkflow = ({
       currentMetadata,
       voiceSelection,
       pendingVoiceSelection,
-      voiceAvailable: recording.sidecar.state === 'ready' && recording.sidecar.blob !== null,
+      // The capture sidecar is what restores original audio onto a *visual* result; voice work
+      // rewrites the audio of the complete video and never reads it. Gating voice on the sidecar
+      // therefore refused every adopted or generated video, which has its own audio track. Kept as
+      // a union so a local take whose container carries no usable audio still offers its sidecar.
+      voiceAvailable:
+        (recording.sidecar.state === 'ready' && recording.sidecar.blob !== null) ||
+        (currentMetadata?.hasAudio ?? false),
       visualProviderCompatibility,
       comparison,
       elapsedSeconds,
