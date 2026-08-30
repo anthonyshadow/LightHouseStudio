@@ -68,8 +68,11 @@ export const useStudioRecordingLaunch = ({
     null,
   );
   /**
-   * Abandons a launch that will never arrive. Only handlers and settled promises call this: an
-   * effect clears the ref alone, because the card stops reading as busy once the editor is up.
+   * Ends a launch — one that arrived, and one that never will.
+   *
+   * Both halves always move together. Clearing the ref alone and leaving the state set, on the
+   * grounds that the surface hides it while the editor is up, stranded every Create launcher the
+   * moment that editor closed.
    */
   const clearCreateLaunch = useCallback(() => {
     pendingCreateLaunchRef.current = null;
@@ -153,8 +156,8 @@ export const useStudioRecordingLaunch = ({
     if (request === null || !selection) return;
     if (request === 'adjust') {
       // Nothing to arm and no overlay to open: the on-device editor is dispatched by the controller
-      // that owns it, from its own one-shot. Ref only, so this effect schedules no render.
-      if (existingVideoPhase === 'ready') pendingCreateLaunchRef.current = null;
+      // that owns it, from its own one-shot — on this same condition, in this same commit.
+      if (existingVideoPhase === 'ready') clearCreateLaunch();
       return;
     }
     const modelId = VISUAL_MODEL_FOR_OPERATION[request];
@@ -163,25 +166,36 @@ export const useStudioRecordingLaunch = ({
     // where a Project's saved visual treatment lands, because the creative adapter writes it into
     // the same slot as soon as the workflow holds the video.
     if (steps[0] !== undefined || !addVisualStep(modelId)) {
-      pendingCreateLaunchRef.current = null;
+      clearCreateLaunch();
       openOverlay('video-upload');
     }
     // `launchingOperation` is in here for the request itself: the ref that carries it is not
     // reactive, so with a selection already in hand nothing else in this list changes when a launch
     // is armed, and the request would sit unspent with the card busy for good.
-  }, [addVisualStep, existingVideoPhase, launchingOperation, openOverlay, selection, steps]);
+  }, [
+    addVisualStep,
+    clearCreateLaunch,
+    existingVideoPhase,
+    launchingOperation,
+    openOverlay,
+    selection,
+    steps,
+  ]);
 
   /**
-   * A request must not survive the Project it was made in. Ref only: this cleanup also runs when
-   * the runtime unmounts, and scheduling a render on a tree that is going away is both pointless
-   * and a way to perturb everything still tearing down around it.
+   * A request must not survive the Project it was made in.
+   *
+   * The ref is dropped in the cleanup because React runs every cleanup before any body, and the two
+   * effects above both read it — cleared in a body, this one declared last, they would act on the
+   * old Project's request first. The state is cleared in the body, which teardown does not run:
+   * left set, it strands the new Project's launchers on a launch made in the old one.
    */
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    setLaunchingOperation(null);
+    return () => {
       pendingCreateLaunchRef.current = null;
-    },
-    [activeProjectId],
-  );
+    };
+  }, [activeProjectId]);
 
   const openExistingVideo = useCallback(() => {
     setRecordingForExistingVideo(false);

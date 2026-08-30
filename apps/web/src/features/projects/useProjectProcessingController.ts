@@ -17,7 +17,7 @@ import { getProject } from './projectsApi';
 import type { ProjectSessionPort } from './useProjectSession';
 import { useStableOperationKey } from './useStableOperationKey';
 
-type ProjectProcessingCommandPhase =
+export type ProjectProcessingCommandPhase =
   | 'idle'
   | 'loading'
   | 'preparing'
@@ -26,6 +26,38 @@ type ProjectProcessingCommandPhase =
   | 'cancelling'
   | 'refreshing'
   | 'error';
+
+/**
+ * What each phase means to whoever is watching.
+ *
+ * `command` is a request the operator started — the window a submission occupies before there is an
+ * accepted attempt to poll. `read` is asking the server what it already holds: free, it submits
+ * nothing and owns nothing. `settled` is neither.
+ *
+ * One total table rather than a list per answer, so a ninth phase is a compile error here instead
+ * of a phase that belongs to no answer and silently stops every surface keyed on these.
+ */
+const PHASE_ACTIVITY = {
+  idle: 'settled',
+  loading: 'read',
+  preparing: 'command',
+  submitting: 'command',
+  retrying: 'command',
+  cancelling: 'command',
+  refreshing: 'read',
+  error: 'settled',
+} as const satisfies Record<ProjectProcessingCommandPhase, 'command' | 'read' | 'settled'>;
+
+/**
+ * Whether a command the operator started is still in flight.
+ *
+ * Deliberately narrower than `busy`, which also counts a read: `loading` is the phase this
+ * controller enters on mount and on every revision change, and `refreshing` is what the
+ * check-status controls set themselves, so a surface that blocks on `busy` blocks for work that
+ * submits nothing.
+ */
+export const projectProcessingCommandInFlight = (phase: ProjectProcessingCommandPhase): boolean =>
+  PHASE_ACTIVITY[phase] === 'command';
 
 type ProjectProcessingControllerState = Readonly<{
   projectId: string | null;
@@ -568,6 +600,16 @@ export const useProjectProcessingController = ({
     startOperation.reset();
     retryOperation.reset();
     pollFailuresRef.current = 0;
+    /*
+     * A command owns `phase` and `attempt` until it settles them itself, so a new revision is not a
+     * reason to start over while one is in flight — and one always lands mid-command, because the
+     * checkpoint a Start takes is what appends it. Resetting underneath the command wound a live
+     * submission back to `loading` with no attempt and `authorityLoaded` false, and the read below
+     * then declined to run, so nothing restored it until the provider answered: for the whole of
+     * that window the Project reported an idle status check rather than the run it was making.
+     * The Project itself has not changed here — the effect above clears the marker when it does.
+     */
+    if (commandActiveRef.current !== null) return;
     replaceState({
       phase: projectId === null || sessionProjectId === null ? 'idle' : 'loading',
       attempt: null,
@@ -575,12 +617,7 @@ export const useProjectProcessingController = ({
       unverifiedOperationId: null,
       authorityLoaded: false,
     });
-    if (
-      projectId === null ||
-      sessionProjectId !== projectId ||
-      revisionId === null ||
-      commandActiveRef.current !== null
-    ) {
+    if (projectId === null || sessionProjectId !== projectId || revisionId === null) {
       return;
     }
     const controller = new AbortController();
@@ -635,9 +672,7 @@ export const useProjectProcessingController = ({
       attempt,
       message,
       unverifiedOperationId,
-      busy: ['loading', 'preparing', 'submitting', 'retrying', 'cancelling', 'refreshing'].includes(
-        phase,
-      ),
+      busy: PHASE_ACTIVITY[phase] !== 'settled',
       active: attempt?.nextPollAfterMs !== null && attempt?.nextPollAfterMs !== undefined,
       authorityReady: phase === 'idle' && unverifiedOperationId === null && authorityLoaded,
       start,

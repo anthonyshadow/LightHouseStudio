@@ -2,24 +2,29 @@ import { useTheme } from '@emotion/react';
 import { Button } from '../../ui';
 import { BlockingOverlay } from '../../ui/primitives/BlockingOverlay';
 import { projectProcessingDetail, projectProcessingTitle } from './projectProcessingPresentation';
-import type { ProjectProcessingController } from './useProjectProcessingController';
+import {
+  projectProcessingCommandInFlight,
+  type ProjectProcessingController,
+} from './useProjectProcessingController';
 
 /**
  * Whether an AI run currently owns this Project.
  *
- * `busy` covers the local command round-trip — including the window between preparing and
+ * The command phases cover the local round-trip — including the window between preparing and
  * submitting, where no attempt exists yet — and `active` covers the accepted run the controller is
- * polling. Neither alone spans the whole thing.
+ * polling. Neither alone spans the whole thing. Deliberately not `busy`, which also counts a status
+ * read — see `projectProcessingCommandInFlight`.
  *
- * Two states deliberately do *not* block. An attempt that is not current belongs to an earlier
- * change and cannot replace what is on the stage, so freezing the workspace for it would be a lie.
- * And an unverified submission needs the operator to check it — a scrim there would trap them in
- * front of the one control that resolves it.
+ * Two further states deliberately do *not* block. An attempt that is not current belongs to an
+ * earlier change and cannot replace what is on the stage, so freezing the workspace for it would be
+ * a lie. And an unverified submission needs the operator to check it — a scrim there would trap
+ * them in front of the one control that resolves it.
  */
 export const projectRunInFlight = (controller: ProjectProcessingController | undefined): boolean =>
   controller !== undefined &&
   controller.unverifiedOperationId === null &&
-  (controller.busy || (controller.active && controller.attempt?.isCurrent === true));
+  (projectProcessingCommandInFlight(controller.phase) ||
+    (controller.active && controller.attempt?.isCurrent === true));
 
 /**
  * States that an AI run owns the Project, and stops anything else being done to it meanwhile.
