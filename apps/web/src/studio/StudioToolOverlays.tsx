@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import { lazy, Suspense, type RefObject } from 'react';
 import type { BrowserCapabilities, ModelMode } from '../application/types';
 import type {
   CreativeAssetRepository,
@@ -7,7 +7,6 @@ import type {
 } from '../features/creative-assets/types';
 import { ownedRecordingArtifact } from '../features/recording/types';
 import type { ExistingVideoSavedRecipe } from '../features/existing-video/ExistingVideoRecipeChooser';
-import { ExistingVideoVoiceEditor } from '../features/existing-video/ExistingVideoVoiceEditor';
 import type { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import { hasDraftContent, SessionComposer } from '../features/media-session';
 import { CaptureSettingsPanel } from '../features/recording';
@@ -28,6 +27,19 @@ import type { useStudioSavedVideoController } from './useStudioSavedVideoControl
 import type { useTakeReviewFlow } from './useTakeReviewFlow';
 import type { ProjectProcessingController } from '../features/projects/useProjectProcessingController';
 import { REVIEW_LOCK_REASON } from './studioPolicies';
+
+/*
+ * Lazy for the same reason `ExistingVideoPanel` is: the voice chooser carries the voice workspace,
+ * the saved-voice library and their API client, and a static import of it from here put roughly
+ * 60 KB of them in every Studio route's closure — `check:build-manifest` holds that closure to a
+ * budget, and this rail entry is opened by a minority of sessions. The editor reaches the same
+ * component through its own lazy panel, so the two entry points still share one owner.
+ */
+const ExistingVideoVoiceEditor = lazy(() =>
+  import('../features/existing-video/ExistingVideoVoiceEditor').then((module) => ({
+    default: module.ExistingVideoVoiceEditor,
+  })),
+);
 
 interface StudioToolOverlaysProps {
   readonly activeOverlay: ActiveOverlay;
@@ -260,13 +272,15 @@ export const StudioToolOverlays = ({
         returnFocusRef={voiceToggleRef}
       >
         {existingVideo.selection ? (
-          <ExistingVideoVoiceEditor
-            workflow={existingVideo}
-            durationMs={existingVideo.selection.metadata.durationMs}
-            elevenLabsAvailable={availability.elevenLabs}
-            elevenLabsModel={availability.elevenLabsModel}
-            locked={existingVideo.providerActive}
-          />
+          <Suspense fallback={<p role="status">Loading voice options…</p>}>
+            <ExistingVideoVoiceEditor
+              workflow={existingVideo}
+              durationMs={existingVideo.selection.metadata.durationMs}
+              elevenLabsAvailable={availability.elevenLabs}
+              elevenLabsModel={availability.elevenLabsModel}
+              locked={existingVideo.providerActive}
+            />
+          </Suspense>
         ) : (
           <StatusNotice role="status" tone="neutral" title="No video yet">
             Record or upload a video first — a voice replaces the audio of a video you already have.

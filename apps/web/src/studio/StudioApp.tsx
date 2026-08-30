@@ -249,9 +249,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
       : {}),
   });
   const videoEditor = useVideoEditSession();
-  // "Adjust video" is asked for before the workflow holds the Project's video, so the request waits
-  // here until it does — the same one-shot shape the gallery's edit intent uses.
-  const adjustRequestedRef = useRef(false);
   const projectWorkingMedia = useProjectWorkingMediaController(
     activeProjectId,
     activeProjectSession,
@@ -266,6 +263,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     clearExistingVideoIntent,
     discardPendingAdoption,
     launchingOperation,
+    clearCreateLaunch,
   } = useStudioRecordingLaunch({
     browser,
     session,
@@ -486,20 +484,35 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     focusStudio,
     focusEditVideo,
   });
-  // Spends the "Adjust video" launch. It lives here rather than in the launch hook because only
-  // this controller can open the editor, and only once it has been rebuilt around the new media.
+  /*
+   * Spends the "Adjust video" launch. It lives here rather than in the launch hook because only
+   * this controller can open the editor, and only once it has been rebuilt around the new media —
+   * so this is also where the launch ends, in the same act as the dispatch it pays for.
+   *
+   * Read off the launch itself rather than mirrored into a ref here. A ref could not be reset by
+   * the hook, so a launch the operator abandoned — a cancelled acquisition, a refused adoption, a
+   * change of Project — stayed armed and opened this editor unbidden at the next ready video; and
+   * because a ref is not reactive, pressing "Adjust video" with a video already in hand changed
+   * nothing this effect could see, so it never fired at all.
+   */
   const { openVideoAdjust } = savedVideo;
   useEffect(() => {
     if (
-      !adjustRequestedRef.current ||
+      launchingOperation !== 'adjust' ||
       !existingVideo.selection ||
       existingVideo.phase !== 'ready'
     ) {
       return;
     }
-    adjustRequestedRef.current = false;
+    clearCreateLaunch();
     openVideoAdjust();
-  }, [existingVideo.phase, existingVideo.selection, openVideoAdjust]);
+  }, [
+    clearCreateLaunch,
+    existingVideo.phase,
+    existingVideo.selection,
+    launchingOperation,
+    openVideoAdjust,
+  ]);
   // Published for the surfaces that outlive this runtime. Registered in a layout effect so a
   // selection made on the route that mounted us is applied before first paint, and withdrawn on
   // unmount so the shell holds a selection instead of calling into a torn-down session.
@@ -755,7 +768,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     (operation: ProjectCreateOperationId, trigger: HTMLButtonElement) => {
       createLaunchTriggerRef.current = trigger;
       setCreateLaunchActive(true);
-      if (operation === 'adjust') adjustRequestedRef.current = true;
       // No checkpoint here on purpose. The selection is already on its way to the Project through
       // the ordinary autosave, and the editor's prefill is reactive — it configures the step when
       // the revision lands. Forcing a write first re-presented the stage artifact underneath the

@@ -14,50 +14,12 @@ import {
   submitProjectProcessing,
 } from './projectProcessingApi';
 import { getProject } from './projectsApi';
+import {
+  projectProcessingBusy,
+  type ProjectProcessingCommandPhase,
+} from './projectProcessingPhase';
 import type { ProjectSessionPort } from './useProjectSession';
 import { useStableOperationKey } from './useStableOperationKey';
-
-export type ProjectProcessingCommandPhase =
-  | 'idle'
-  | 'loading'
-  | 'preparing'
-  | 'submitting'
-  | 'retrying'
-  | 'cancelling'
-  | 'refreshing'
-  | 'error';
-
-/**
- * What each phase means to whoever is watching.
- *
- * `command` is a request the operator started — the window a submission occupies before there is an
- * accepted attempt to poll. `read` is asking the server what it already holds: free, it submits
- * nothing and owns nothing. `settled` is neither.
- *
- * One total table rather than a list per answer, so a ninth phase is a compile error here instead
- * of a phase that belongs to no answer and silently stops every surface keyed on these.
- */
-const PHASE_ACTIVITY = {
-  idle: 'settled',
-  loading: 'read',
-  preparing: 'command',
-  submitting: 'command',
-  retrying: 'command',
-  cancelling: 'command',
-  refreshing: 'read',
-  error: 'settled',
-} as const satisfies Record<ProjectProcessingCommandPhase, 'command' | 'read' | 'settled'>;
-
-/**
- * Whether a command the operator started is still in flight.
- *
- * Deliberately narrower than `busy`, which also counts a read: `loading` is the phase this
- * controller enters on mount and on every revision change, and `refreshing` is what the
- * check-status controls set themselves, so a surface that blocks on `busy` blocks for work that
- * submits nothing.
- */
-export const projectProcessingCommandInFlight = (phase: ProjectProcessingCommandPhase): boolean =>
-  PHASE_ACTIVITY[phase] === 'command';
 
 type ProjectProcessingControllerState = Readonly<{
   projectId: string | null;
@@ -672,7 +634,7 @@ export const useProjectProcessingController = ({
       attempt,
       message,
       unverifiedOperationId,
-      busy: PHASE_ACTIVITY[phase] !== 'settled',
+      busy: projectProcessingBusy(phase),
       active: attempt?.nextPollAfterMs !== null && attempt?.nextPollAfterMs !== undefined,
       authorityReady: phase === 'idle' && unverifiedOperationId === null && authorityLoaded,
       start,
