@@ -1111,8 +1111,10 @@ describe('StudioApp composition lifecycle', () => {
     expect(await screen.findByText('Deferred Projects workspace')).toBeInTheDocument();
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
     expect(stage.closest('[hidden]')).not.toBeInTheDocument();
-    expect(typeof harness.latestProjectSurfaceProps?.sourceRuntime?.present).toBe('function');
-    expect(typeof harness.latestProjectSurfaceProps?.sourceRuntime?.clear).toBe('function');
+    // `present`/`clear` are the union's own guarantee once the discriminant is `stage`, so this one
+    // assertion carries what three `typeof` checks used to: the workspace got the Studio bridge's
+    // runtime rather than the detached default.
+    expect(harness.latestProjectSurfaceProps?.sourceRuntime?.kind).toBe('stage');
     expect(typeof harness.latestProjectSurfaceProps?.onStartRecording).toBe('function');
     expect(typeof harness.latestProjectSurfaceProps?.onSourceActivityChange).toBe('function');
     expect(typeof harness.latestProjectSurfaceProps?.onSessionChange).toBe('function');

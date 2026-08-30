@@ -9,6 +9,10 @@ import type {
   VideoTransformOperationId,
   VideoTransformStep,
 } from './types';
+// Deep paths, never the `../projects` barrel: `projects/index.ts` re-exports `projects/rules`,
+// which imports this file, so the barrel would close a cycle that `check:modules` fails on.
+import type { ProjectMediaReference } from '../projects/types';
+import { projectMediaReferencesEqual } from '../projects/relations';
 
 const ACTIVE_PROJECT_PROCESSING_STATUSES = new Set([
   'pending',
@@ -144,24 +148,37 @@ export const projectProcessingRestartTransition = (
 /**
  * Which of the three things happened to a retained result.
  *
- * `resultRevisionId` is written only when a result is promoted onto a revision, and left null when
- * one is retained without being applied. It is therefore the only fact that separates "never became
- * the cut" from "became the cut, and the Project has since moved on" — `isCurrent` cannot, because
- * the operator's own output-save revision moves the head.
+ * Ask the media first, because it is the only witness that answers in every case. Neither of the
+ * job's own facts can: `resultRevisionId` records *promotion* only, so it misses a result adopted
+ * from History — adoption writes a working-media revision and never touches the job link — and any
+ * promotion older than the column, which was added without a backfill. And "is this the head's
+ * attempt" misses the reverse, because saving a re-framed Version moves the head while leaving the
+ * cut exactly where it was.
  *
- * One caveat, deliberately tolerated: `result_revision_id` was added without a backfill, so an
- * attempt promoted before that migration reads as `unapplied`. The worst that follows is offering a
- * free, non-destructive re-adopt of a result the Project already holds — never a paid action, and
- * never a claim that something failed.
+ * So: holding it means it is the cut. Otherwise `resultRevisionId` separates a result the Project
+ * has moved past from one that never became the cut at all.
+ *
+ * One case this still cannot see: a Version save that presents its output swaps the reference for a
+ * `saved-video-version` wrapping the same bytes, which reads here as not held. An unpromoted result
+ * falls back to `unapplied` there — free to re-adopt, never a claim that anything failed.
  */
 export const projectProcessingResultState = ({
   resultRevisionId,
-  isCurrent,
+  resultAssetId,
+  heldMedia,
 }: Readonly<{
   resultRevisionId: string | null;
-  isCurrent: boolean;
+  resultAssetId: string;
+  /** What the Project holds right now: its working media and what it presents. */
+  heldMedia: readonly ProjectMediaReference[];
 }>): ProjectProcessingResultState =>
-  resultRevisionId === null ? 'unapplied' : isCurrent ? 'current' : 'superseded';
+  heldMedia.some((reference) =>
+    projectMediaReferencesEqual(reference, { kind: 'asset', assetId: resultAssetId }),
+  )
+    ? 'current'
+    : resultRevisionId === null
+      ? 'unapplied'
+      : 'superseded';
 
 export const currentProjectProcessingAttempt = <Attempt extends ProjectProcessingAttemptFacts>(
   currentRevision: Readonly<{ id: string; revisionNumber: number }>,

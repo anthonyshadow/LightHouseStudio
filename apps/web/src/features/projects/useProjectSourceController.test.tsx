@@ -14,7 +14,7 @@ import { mockApiServer } from '../../test/msw/server';
 import {
   useProjectSourceController,
   type ProjectSourceActivity,
-  type ProjectSourceRuntime,
+  type ProjectStageSourceRuntime,
 } from './useProjectSourceController';
 
 const firstProjectId = '18b120ac-1578-46e3-8c3d-42307772f391';
@@ -168,9 +168,9 @@ const adoptedWorkingResponse = (projectId: string): ProjectWorkingMediaResponse 
 };
 
 const runtime = () => {
-  const present = vi.fn<ProjectSourceRuntime['present']>();
-  const clear = vi.fn<ProjectSourceRuntime['clear']>();
-  return { available: true, present, clear } satisfies ProjectSourceRuntime;
+  const present = vi.fn<ProjectStageSourceRuntime['present']>();
+  const clear = vi.fn<ProjectStageSourceRuntime['clear']>();
+  return { kind: 'stage', present, clear } satisfies ProjectStageSourceRuntime;
 };
 
 afterEach(() => {
@@ -444,8 +444,8 @@ describe('useProjectSourceController', () => {
         }),
       ),
     );
-    const mediaOwner: ProjectSourceRuntime = {
-      available: true,
+    const mediaOwner: ProjectStageSourceRuntime = {
+      kind: 'stage',
       present: vi.fn(() => events.push('present')),
       clear: vi.fn(() => events.push('clear')),
     };

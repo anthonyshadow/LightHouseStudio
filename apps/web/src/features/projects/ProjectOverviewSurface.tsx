@@ -243,10 +243,9 @@ export const ProjectOverviewSurface = ({
             runtime={sourceRuntime}
             recordingCandidate={recordingCandidate}
             recordingActive={recordingActive}
-            // Record needs the capture graph, which only mounts on a Studio route. Navigating is
-            // honest and keeps the control live; the alternative was a permanently greyed button.
+            // Navigating is honest and keeps the control live; the alternative was a permanently
+            // greyed button. The section names the destination from its own runtime.
             onStartRecording={() => void navigate(projectWorkspacePath(project.id, 'source'))}
-            startRecordingLabel="Record in the workspace"
             {...(onSourceActivityChange ? { onActivityChange: onSourceActivityChange } : {})}
             onCurrentChange={acceptOverviewSource}
           />

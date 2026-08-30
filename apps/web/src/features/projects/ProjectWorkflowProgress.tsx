@@ -24,18 +24,26 @@ export type ProjectWorkflowStepId = (typeof PROJECT_WORKFLOW_STEPS)[number]['id'
 const PROGRESS_STEPS = PROJECT_WORKFLOW_STEPS.filter(({ id }) => id !== 'history');
 
 /**
+ * Stated separately from the task ids because `PROGRESS_STEPS` is a filter of a `as const` list and
+ * so keeps the full union: only this type says that progress never lands on the record.
+ */
+type ProjectProgressStepId = Exclude<ProjectWorkflowStepId, 'history'>;
+
+/**
+ * How far the Project has come, or `null` once every step is behind it.
+ *
  * The domain only ever writes `source`, `creative`, `review` and `complete`; `processing` and
  * `export` exist in the contract but are never persisted, so they fall back to the nearest
  * truthful step rather than inventing a fifth one.
  */
-export const stepForSnapshot = (snapshot: Snapshot): ProjectWorkflowStepId => {
+const progressStepForSnapshot = (snapshot: Snapshot): ProjectProgressStepId | null => {
   if (snapshot.sourceAssetId === null) return 'source';
   switch (snapshot.workflowPhase) {
     case 'review':
     case 'export':
       return 'save';
     case 'complete':
-      return 'history';
+      return null;
     default:
       return 'create';
   }
@@ -44,15 +52,13 @@ export const stepForSnapshot = (snapshot: Snapshot): ProjectWorkflowStepId => {
 /**
  * Which task to *open*, which is not the same question as how far the Project has come.
  *
- * A saved Project has finished its lifecycle — `stepForSnapshot` says so, and the progress strip
- * needs that to render every step done. But finishing a round is not finishing the Project: the
- * saved Version is on the stage and every launcher is live, so landing the operator on History
- * told them the opposite of the truth. They come back to make the next edit.
+ * A saved Project has finished its lifecycle, and the progress strip needs that to render every
+ * step done. But finishing a round is not finishing the Project: the saved Version is on the stage
+ * and every launcher is live, so landing the operator on History told them the opposite of the
+ * truth. They come back to make the next edit.
  */
-export const entryTaskForSnapshot = (snapshot: Snapshot): ProjectWorkflowStepId => {
-  const step = stepForSnapshot(snapshot);
-  return step === 'history' ? 'create' : step;
-};
+export const entryTaskForSnapshot = (snapshot: Snapshot): ProjectWorkflowStepId =>
+  progressStepForSnapshot(snapshot) ?? 'create';
 
 interface ProjectWorkflowProgressProps {
   readonly snapshot: Snapshot;
@@ -73,9 +79,12 @@ export const ProjectWorkflowProgress = ({
   variant = 'overview',
 }: ProjectWorkflowProgressProps) => {
   const theme = useTheme();
-  const activeStep = stepForSnapshot(snapshot);
-  // A Project on `history` has been through every step, so none of them is current any more.
-  const activeIndex = PROGRESS_STEPS.findIndex(({ id }) => id === activeStep);
+  const activeStep = progressStepForSnapshot(snapshot);
+  // A finished Project is past every step: all of them read done, and none of them is current.
+  const activeIndex =
+    activeStep === null
+      ? PROGRESS_STEPS.length
+      : PROGRESS_STEPS.findIndex(({ id }) => id === activeStep);
 
   return (
     <ol
@@ -88,13 +97,7 @@ export const ProjectWorkflowProgress = ({
         <li
           key={step.id}
           aria-label={`Step ${index + 1} of ${PROGRESS_STEPS.length}: ${step.label}`}
-          data-state={
-            activeIndex === -1 || index < activeIndex
-              ? 'done'
-              : index === activeIndex
-                ? 'current'
-                : 'upcoming'
-          }
+          data-state={index < activeIndex ? 'done' : index === activeIndex ? 'current' : 'upcoming'}
           {...(index === activeIndex ? { 'aria-current': 'step' as const } : {})}
         >
           <span data-step-ordinal aria-hidden="true">

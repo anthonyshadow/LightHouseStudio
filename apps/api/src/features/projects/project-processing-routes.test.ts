@@ -432,7 +432,7 @@ describe('Project processing route authority', () => {
     expect(provider.submissions).toBe(1);
   });
 
-  it('retains an obsolete paid success as history without promoting current Project media', async () => {
+  it('retains an obsolete paid success unpromoted, then reads it as current once adopted', async () => {
     const provider = new DeterministicVideoProvider();
     const { app, repository } = application(provider);
     const { projectId, sourceAssetId } = await prepareProject(app);
@@ -504,6 +504,39 @@ describe('Project processing route authority', () => {
           presentedMedia: { kind: 'asset', assetId: sourceAssetId },
         },
       },
+    });
+
+    // Adopting the result writes a working-media revision and never touches the job link, so
+    // `result_revision_id` stays null on media that is now demonstrably the cut. Only the media the
+    // Project holds settles that; without it the panel warns "kept, not applied" about what is on
+    // screen, for as long as the Project exists.
+    const resultAssetId = retained!.attempt.result!.assetId;
+    const adopted = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/working-media/reuse`,
+      headers: {
+        ...browserHeaders,
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: {
+        expectedVersion: 5,
+        expectedRevisionNumber: 4,
+        media: { kind: 'asset', assetId: resultAssetId },
+        localEdit: null,
+      },
+    });
+    expect(adopted.statusCode).toBe(201);
+    const history = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/processing/history`,
+      headers: browserHeaders,
+    });
+    expect(history.statusCode).toBe(200);
+    expect(projectProcessingHistoryResponseSchema.parse(history.json()).attempts[0]).toMatchObject({
+      operationId,
+      isCurrent: false,
+      result: { state: 'current' },
     });
   });
 
@@ -684,7 +717,7 @@ describe('Project processing route authority', () => {
     expect(replay.statusCode).toBe(200);
     expect(provider.submissions).toBe(2);
 
-    const currentAttemptReads = vi.spyOn(repository, 'getCurrentProjectAttempt');
+    const currentAttemptReads = vi.spyOn(repository, 'getCurrentProjectAuthority');
     const supersessionReads = vi.spyOn(repository, 'isProjectAttemptSuperseded');
     const history = await app.inject({
       method: 'GET',

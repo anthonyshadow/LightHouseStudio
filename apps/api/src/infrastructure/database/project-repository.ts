@@ -78,6 +78,7 @@ import {
   type PersistedProcessingJobStatus,
   type ProjectProcessingAdmissionResult,
   type ProjectProcessingAttemptRecord,
+  type ProjectProcessingCurrentAuthority,
   type ProjectProcessingHistoryPage,
   type ProjectProcessingRepository,
   type ProjectProcessingResultRetentionResult,
@@ -93,6 +94,7 @@ import {
 } from '../../features/projects/project-asset-memberships.js';
 import {
   projectAssetLinksForRevision,
+  projectHeldMedia,
   projectMediaReferencesEqual,
   projectVersionReferenceLinksForRevision,
 } from '../../features/projects/project-snapshot-relations.js';
@@ -2527,16 +2529,19 @@ export class DrizzleProjectRepository
     return row === undefined ? null : toProjectProcessingAttempt(row.job, row.link);
   }
 
-  async getCurrentProjectAttempt(
+  async getCurrentProjectAuthority(
     ownerUserId: string,
     projectId: string,
-  ): Promise<ProjectProcessingAttemptRecord | null> {
+  ): Promise<ProjectProcessingCurrentAuthority | null> {
     const current = await this.getCurrent(ownerUserId, projectId);
     if (current === null) return null;
-    return this.#currentProcessingAttempt(this.db, ownerUserId, projectId, {
-      id: current.revision.id,
-      revisionNumber: current.revision.revisionNumber,
-    });
+    return {
+      attempt: await this.#currentProcessingAttempt(this.db, ownerUserId, projectId, {
+        id: current.revision.id,
+        revisionNumber: current.revision.revisionNumber,
+      }),
+      heldMedia: projectHeldMedia(current.revision.snapshot),
+    };
   }
 
   async isProjectAttemptSuperseded(
@@ -2661,6 +2666,7 @@ export class DrizzleProjectRepository
     return {
       attempts: page,
       currentOperationId: currentAttempt?.operationId ?? null,
+      heldMedia: projectHeldMedia(current.revision.snapshot),
       supersededOperationIds: page.flatMap((attempt) =>
         retriedOperationIds.has(attempt.operationId) ||
         (latestRow !== undefined &&

@@ -89,6 +89,7 @@ import {
   resumableProjectProcessingAttempt,
   type ProjectProcessingAdmissionResult,
   type ProjectProcessingAttemptRecord,
+  type ProjectProcessingCurrentAuthority,
   type ProjectProcessingHistoryPage,
   type ProjectProcessingRepository,
   type ProjectProcessingResultRetentionResult,
@@ -117,6 +118,7 @@ import {
 import {
   projectMediaReferencesEqual,
   projectAssetLinksForRevision,
+  projectHeldMedia,
   projectPosterReferenceForSnapshot,
   projectVersionReferenceLinksForRevision,
 } from './project-snapshot-relations.js';
@@ -181,15 +183,18 @@ const attemptForOperation = (
 ): ProjectProcessingAttemptRecord | null =>
   library.processingJobs.find((attempt) => attempt.operationId === operationId) ?? null;
 
-const currentAttemptForAggregate = (
+const currentAuthorityForAggregate = (
   aggregate: StoredProjectAggregate,
   attempts: readonly ProjectProcessingAttemptRecord[],
-): ProjectProcessingAttemptRecord | null => {
+): ProjectProcessingCurrentAuthority => {
   const current = currentRead(aggregate);
-  return currentProjectProcessingAttempt(
-    { id: current.revision.id, revisionNumber: current.revision.revisionNumber },
-    attempts,
-  );
+  return {
+    attempt: currentProjectProcessingAttempt(
+      { id: current.revision.id, revisionNumber: current.revision.revisionNumber },
+      attempts,
+    ),
+    heldMedia: projectHeldMedia(current.revision.snapshot),
+  };
 };
 
 const attemptsForProject = (
@@ -889,17 +894,17 @@ export class FileProjectRepository
     return project === undefined ? null : attempt;
   }
 
-  async getCurrentProjectAttempt(
+  async getCurrentProjectAuthority(
     ownerUserId: string,
     projectId: string,
-  ): Promise<ProjectProcessingAttemptRecord | null> {
+  ): Promise<ProjectProcessingCurrentAuthority | null> {
     const library = await this.#read(ownerUserId);
     const aggregate = library.projects.find(
       ({ project }) => project.id === projectId && project.deletedAt === null,
     );
     return aggregate === undefined
       ? null
-      : currentAttemptForAggregate(
+      : currentAuthorityForAggregate(
           aggregate,
           attemptsForProject(library.processingJobs, projectId),
         );
@@ -951,10 +956,11 @@ export class FileProjectRepository
       );
     const page = attempts.slice(0, input.pageSize) as ProjectProcessingAttemptRecord[];
     const last = page.at(-1);
+    const authority = currentAuthorityForAggregate(aggregate, projectAttempts);
     return {
       attempts: page,
-      currentOperationId:
-        currentAttemptForAggregate(aggregate, projectAttempts)?.operationId ?? null,
+      currentOperationId: authority.attempt?.operationId ?? null,
+      heldMedia: authority.heldMedia,
       supersededOperationIds: page.flatMap((attempt) =>
         projectProcessingAmbiguityIsSuperseded(attempt, projectAttempts)
           ? [attempt.operationId]
@@ -1001,10 +1007,10 @@ export class FileProjectRepository
       );
       const aggregate = projects[projectIndex];
       if (aggregate !== undefined) {
-        const latest = currentAttemptForAggregate(
+        const latest = currentAuthorityForAggregate(
           aggregate,
           attemptsForProject(processingJobs, aggregate.project.id),
-        );
+        ).attempt;
         const nextStatus =
           latest?.operationId === current.operationId
             ? projectStatusAfterProcessingTrace(aggregate.project.status, trace.status)
@@ -1054,10 +1060,10 @@ export class FileProjectRepository
           else attempts.push(attempt);
         }
         const projects = library.projects.map((aggregate) => {
-          const currentAttempt = currentAttemptForAggregate(
+          const currentAttempt = currentAuthorityForAggregate(
             aggregate,
             attemptsByProject.get(aggregate.project.id) ?? [],
-          );
+          ).attempt;
           if (
             currentAttempt === null ||
             !projectProcessingNeedsAttention(currentAttempt.status) ||
@@ -1146,10 +1152,10 @@ export class FileProjectRepository
         };
       }
 
-      const currentAttempt = currentAttemptForAggregate(
+      const currentAttempt = currentAuthorityForAggregate(
         aggregate,
         attemptsForProject(library.processingJobs, input.projectId),
-      );
+      ).attempt;
       const promotion = input.currentPromotion;
       const promoteCurrent =
         promotion !== null &&

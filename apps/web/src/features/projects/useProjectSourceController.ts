@@ -35,18 +35,25 @@ export interface ProjectSourceActivity {
   readonly abort: (() => void) | null;
 }
 
-export interface ProjectSourceRuntime {
-  /**
-   * Whether this runtime actually owns live media, or only absorbs the calls.
-   *
-   * Stated by the runtime rather than inferred by comparing it against a particular no-op object:
-   * a surface has no way to know which instance it was handed, and a wrapper, memoized copy or
-   * test double around a real runtime is still a real runtime.
-   */
-  readonly available: boolean;
-  readonly present: (projectId: string, input: PresentStageSourceInput) => void;
-  readonly clear: (projectId: string) => void;
-}
+/**
+ * Whether this surface owns live media, stated rather than inferred.
+ *
+ * `detached` deliberately carries no methods, so no surface can hold a runtime that absorbs
+ * `present` and `clear` into no-ops and call them as though a stage were there. The controller
+ * below narrows once, because it is the one caller that legitimately runs on both. The remedy for
+ * "you cannot record here" is route knowledge, which belongs to the surface that mounted the
+ * section, not here.
+ */
+export type ProjectSourceRuntime =
+  | {
+      readonly kind: 'stage';
+      readonly present: (projectId: string, input: PresentStageSourceInput) => void;
+      readonly clear: (projectId: string) => void;
+    }
+  | { readonly kind: 'detached' };
+
+/** The half that owns live media, for producers and test doubles that build one. */
+export type ProjectStageSourceRuntime = Extract<ProjectSourceRuntime, { kind: 'stage' }>;
 
 interface SourceAcceptanceOperation {
   readonly signature: string;
@@ -193,6 +200,15 @@ export const useProjectSourceController = (
   const hydratedMediaRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
 
+  // Narrowed and bound once. Every call below targets this Project's stage, and a detached surface
+  // has none, so neither the narrowing nor the id is worth repeating nine times.
+  const stage = runtime.kind === 'stage' ? runtime : null;
+  const presentOnStage = useCallback(
+    (input: PresentStageSourceInput) => stage?.present(projectId, input),
+    [projectId, stage],
+  );
+  const clearStage = useCallback(() => stage?.clear(projectId), [projectId, stage]);
+
   const busy = phase === 'preparing' || phase === 'saving' || phase === 'removing';
   const accepted = source !== null || current.revision.snapshot.sourceAssetId !== null;
   const effectivePhase =
@@ -203,10 +219,10 @@ export const useProjectSourceController = (
     controllerRef.current?.abort('project-source-aborted');
     controllerRef.current = null;
     operation.reset();
-    if (current.revision.snapshot.sourceAssetId === null) runtime.clear(projectId);
+    if (current.revision.snapshot.sourceAssetId === null) clearStage();
     setPhase(current.revision.snapshot.sourceAssetId === null ? 'idle' : 'saved');
     setMessage('Preparing the video was cancelled safely.');
-  }, [current.revision.snapshot.sourceAssetId, operation, projectId, runtime]);
+  }, [clearStage, current.revision.snapshot.sourceAssetId, operation]);
 
   useEffect(() => {
     onActivityChange?.({
@@ -221,9 +237,9 @@ export const useProjectSourceController = (
   const presentAccepted = useCallback(
     (response: ProjectSourceResponse, signal: AbortSignal) => {
       signal.throwIfAborted();
-      runtime.present(projectId, remoteArtifactInput(response.source));
+      presentOnStage(remoteArtifactInput(response.source));
     },
-    [projectId, runtime],
+    [presentOnStage],
   );
 
   const presentCurrent = useCallback(
@@ -260,23 +276,23 @@ export const useProjectSourceController = (
       }
       await assertMediaReachable(working.media, signal);
       signal.throwIfAborted();
-      runtime.present(projectId, remoteArtifactInput(working.media));
+      presentOnStage(remoteArtifactInput(working.media));
     },
-    [current.revision.snapshot.presentedMedia, presentAccepted, projectId, runtime],
+    [current.revision.snapshot.presentedMedia, presentAccepted, presentOnStage, projectId],
   );
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      runtime.clear(projectId);
+      clearStage();
     };
-  }, [projectId, runtime]);
+  }, [clearStage]);
 
   useEffect(() => {
     if (current.revision.snapshot.sourceAssetId === null) {
       hydratedMediaRef.current = null;
-      runtime.clear(projectId);
+      clearStage();
       return;
     }
     const mediaIdentity = JSON.stringify(current.revision.snapshot.presentedMedia);
@@ -285,7 +301,7 @@ export const useProjectSourceController = (
     const controller = new AbortController();
     controllerRef.current?.abort('project-source-replaced');
     controllerRef.current = controller;
-    runtime.clear(projectId);
+    clearStage();
     void getProjectSource(projectId, controller.signal)
       .then(async (response) => {
         await presentCurrent(response, controller.signal);
@@ -307,12 +323,12 @@ export const useProjectSourceController = (
       controller.abort('project-route-unmounted');
     };
   }, [
+    clearStage,
     current.revision.id,
     current.revision.snapshot.presentedMedia,
     current.revision.snapshot.sourceAssetId,
     presentCurrent,
     projectId,
-    runtime,
     onCurrentChange,
   ]);
 
@@ -348,13 +364,13 @@ export const useProjectSourceController = (
       // A file the operator just chose is already owned bytes; only re-presentation without a
       // local file streams from the content route.
       if (previewFile === undefined) presentAccepted(response, controller.signal);
-      else runtime.present(projectId, artifactInput(previewFile, response.source));
+      else presentOnStage(artifactInput(previewFile, response.source));
       operation.reset();
       setSource(response.source);
       setMessage(null);
       setPhase('saved');
     },
-    [onCurrentChange, operation, presentAccepted, projectId, queryClient, runtime],
+    [onCurrentChange, operation, presentAccepted, presentOnStage, projectId, queryClient],
   );
 
   const finishRemoval = useCallback(
@@ -365,14 +381,14 @@ export const useProjectSourceController = (
       // presented would be treated as already on the stage and never re-hydrated.
       hydratedMediaRef.current = null;
       operation.reset();
-      runtime.clear(projectId);
+      clearStage();
       setSource(null);
       setMessage(null);
       setPhase('idle');
       await reconcileProject(queryClient, next);
       onCurrentChange?.(next);
     },
-    [onCurrentChange, operation, projectId, queryClient, runtime],
+    [clearStage, onCurrentChange, operation, queryClient],
   );
 
   /**
@@ -443,7 +459,7 @@ export const useProjectSourceController = (
       setPhase('preparing');
       setMessage(null);
       if (previewBeforeAcceptance && presentationFile !== undefined) {
-        runtime.present(projectId, artifactInput(presentationFile));
+        presentOnStage(artifactInput(presentationFile));
       }
       try {
         const response = await request(operationKey, controller.signal);
@@ -465,11 +481,13 @@ export const useProjectSourceController = (
         if (controllerRef.current === controller) controllerRef.current = null;
       }
     },
-    [finishAcceptance, operation, projectId, runtime],
+    [finishAcceptance, operation, presentOnStage, projectId],
   );
 
+  // A finalized recording is already on the stage; an upload is not. Whether a stage is here to
+  // take that preview is a separate question, and the runtime narrowing above answers it.
   const runUpload = useCallback(
-    (file: File, kind: 'uploaded' | 'recorded', preview: boolean) =>
+    (file: File, kind: 'uploaded' | 'recorded') =>
       runAcceptance({
         signature: JSON.stringify({
           kind,
@@ -481,7 +499,7 @@ export const useProjectSourceController = (
           expectedRevisionNumber: current.project.currentRevisionNumber,
         }),
         presentationFile: file,
-        previewBeforeAcceptance: preview,
+        previewBeforeAcceptance: kind === 'uploaded',
         request: (operationKey, signal) =>
           uploadProjectSource({
             projectId,
@@ -496,17 +514,9 @@ export const useProjectSourceController = (
     [current.project.currentRevisionNumber, current.project.version, projectId, runAcceptance],
   );
 
-  // Previewing before acceptance means calling `runtime.present`. Where there is no stage — the
-  // Project overview — that is a no-op, so ask for it only where it can happen.
-  const upload = useCallback(
-    (file: File) => runUpload(file, 'uploaded', runtime.available),
-    [runUpload, runtime.available],
-  );
+  const upload = useCallback((file: File) => runUpload(file, 'uploaded'), [runUpload]);
 
-  const acceptRecording = useCallback(
-    (file: File) => runUpload(file, 'recorded', false),
-    [runUpload],
-  );
+  const acceptRecording = useCallback((file: File) => runUpload(file, 'recorded'), [runUpload]);
 
   const reuseSavedVideo = useCallback(
     (video: SavedVideoSummary) =>

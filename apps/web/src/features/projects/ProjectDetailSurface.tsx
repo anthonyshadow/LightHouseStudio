@@ -8,7 +8,7 @@ import type { ProjectCreateRuntime } from './ProjectCreateTaskPanel';
 import { projectProcessingBlockedReason } from './projectProcessingPresentation';
 import { ProjectOverviewSurface } from './ProjectOverviewSurface';
 import { dialogActionsStyles, workspaceInnerStyles } from './ProjectRouteSurface.styles';
-import { unavailableSourceRuntime, type ProjectRecordingCandidate } from './ProjectSourceSection';
+import { detachedSourceRuntime, type ProjectRecordingCandidate } from './ProjectSourceSection';
 import type { ProjectWorkingMediaActivity } from './ProjectWorkingMediaSection';
 import { ProjectWorkspaceSurface } from './ProjectWorkspaceSurface';
 import type { ProjectProcessingController } from './useProjectProcessingController';
@@ -40,7 +40,7 @@ export interface ProjectRouteSurfaceProps {
 export const ProjectDetailSurface = ({
   projectId,
   workspaceMode = false,
-  sourceRuntime = unavailableSourceRuntime,
+  sourceRuntime = detachedSourceRuntime,
   recordingCandidate,
   recordingActive,
   onStartRecording,

@@ -198,7 +198,7 @@ moving between those tasks, and a clickable strip would give one piece of state 
 compact variant never wraps and drops its labels below `64rem`, keeping ordinals and per-step
 `aria-label`.
 
-The workspace now opens on the step the Project is up to, via an exported `stepForSnapshot`, and
+The workspace now opens on the step the Project is up to, via an exported `entryTaskForSnapshot`, and
 tasks are deep-linkable through `?task=<id>`. The initial choice is **latched on entry** — a phase
 change mid-session does not pull the open panel out from under the user — and any explicit choice
 outranks it. A query parameter rather than a path segment because the anchored

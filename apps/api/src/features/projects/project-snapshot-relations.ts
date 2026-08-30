@@ -1,11 +1,20 @@
 import type {
   ProjectAssetLink,
+  ProjectMediaReference,
   ProjectOutputReference,
   ProjectRevision,
   ProjectSnapshot,
   ProjectVersionReferenceLink,
 } from '@studio/domain';
 export { projectMediaReferencesEqual } from '@studio/domain';
+
+/** What a Project holds right now, with the pointers it has not set dropped. */
+export const projectHeldMedia = (
+  snapshot: Pick<ProjectSnapshot, 'workingMedia' | 'presentedMedia'>,
+): readonly ProjectMediaReference[] =>
+  [snapshot.workingMedia, snapshot.presentedMedia].filter(
+    (reference): reference is ProjectMediaReference => reference !== null,
+  );
 
 /**
  * The Saved Video Version that best represents a Project right now, or nothing.
