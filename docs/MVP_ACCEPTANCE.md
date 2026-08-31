@@ -10,7 +10,9 @@ production migration, or live-provider use.
 
 ## How to use this record
 
-The objective criteria remain authoritative in [MVP definition](MVP_DEFINITION.md). The source files
+The objective criteria were defined in `MVP_DEFINITION.md` (superseded and removed 2026-08-31; its
+accepted decisions live on in the [domain model](product/DOMAIN_MODEL.md), and the text remains in
+git history). The source files
 and tests below identify the evidence exercised for the 2026-08-14 local working-tree candidate;
 they do not broaden the product boundary. Record the exact candidate, command, result, environment,
 and any skipped boundary for a future rerun rather than inferring a pass from an earlier prompt or
@@ -20,8 +22,8 @@ Physical devices, assistive technologies, real camera/microphone and codec/memor
 Neon/R2, and paid providers are separately authorized manual gates. Their absence must be reported,
 but it does not broaden the local MVP or public-service boundary.
 
-**The product has changed since this candidate.** The fifteen-step roadmap in
-[`archived/10-implementation-roadmap.md`](archived/10-implementation-roadmap.md) landed
+**The product has changed since this candidate.** The first audit's fifteen-step roadmap
+(`archived/10-implementation-roadmap.md`, removed 2026-08-31; step→commit record in git history) landed
 between 2026-08-18 and 2026-08-21 and altered surfaces this record exercised — the Project surfaces
 were split, saving gained an export placement, Projects gained duplication, and Project source now
 streams. The 2026-08-14 conclusion stands for the 2026-08-14 candidate only; quoting it as current

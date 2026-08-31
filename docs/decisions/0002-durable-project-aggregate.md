@@ -23,8 +23,8 @@ adding the following compatible current behavior:
 
 The original references below to “no browser Project route or UI,” snapshot v1 as the only format,
 prepared-create-only local recovery, and Campaign as future describe the foundation change itself,
-not current product capability. See [Architecture](../ARCHITECTURE.md),
-[MVP definition](../MVP_DEFINITION.md), and [MVP acceptance](../MVP_ACCEPTANCE.md) for current
+not current product capability. See [Architecture](../ARCHITECTURE.md), the
+[domain model](../product/DOMAIN_MODEL.md), and [MVP acceptance](../MVP_ACCEPTANCE.md) for current
 composition and evidence.
 
 ## Context
@@ -117,8 +117,10 @@ initiating/producing column names changed. Restore the pre-migration database or
 code rather than dropping or renaming retained lineage ad hoc.
 
 The one-active-context model does not yet support several independently resumable works-in-progress
-inside one Project. The deferred [Project Deliverable child model](../PROJECT_DELIVERABLE_MODEL.md)
-defines that possible extension without making it current behavior.
+inside one Project. The deferred Project Deliverable child model (its design note was superseded
+and removed 2026-08-31; the surviving option is recorded under decision D1 in
+[Decisions required](../DECISIONS_REQUIRED.md)) defined that possible extension without making it
+current behavior.
 
 The later Campaign implementation groups Projects through a separately designed,
 owner-constrained relationship. It preserves standalone Project behavior and explicit archive,

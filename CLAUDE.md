@@ -44,6 +44,12 @@ Imports point inward. `apps/web` must never import `apps/api` implementation.
 
 | Need                                                            | Document                             |
 | --------------------------------------------------------------- | ------------------------------------ |
+| What the product is becoming (vision, MVP boundary, non-goals)  | `docs/product/PRODUCT_VISION.md`     |
+| Canonical terminology and the domain model                      | `docs/product/DOMAIN_MODEL.md`       |
+| The target user flows and where today's flows differ            | `docs/product/TARGET_USER_FLOWS.md`  |
+| The roadmap and its implementation prompts                      | `docs/roadmap/`                      |
+| The evidence-backed current-state assessment                    | `docs/audits/CURRENT_STATE_AUDIT.md` |
+| Open product/architecture decisions                             | `docs/DECISIONS_REQUIRED.md`         |
 | How a user moves through the product, and where it breaks down  | `docs/user-flows/`                   |
 | Observable contract for one capability                          | `docs/user-flows/feature-behavior/`  |
 | Module ownership, lifecycle, persistence, deployment boundaries | `docs/ARCHITECTURE.md`               |
@@ -52,8 +58,9 @@ Imports point inward. `apps/web` must never import `apps/api` implementation.
 | Privacy, provider contact, retention, cost                      | `docs/PRIVACY_AND_TEMPORARY_DATA.md` |
 | Everything else                                                 | `docs/README.md` (the map)           |
 
-Do not read every document before every task. Historical material is in `docs/archived/` and is
-never implementation authority.
+Do not read every document before every task. Superseded documentation was permanently removed on
+2026-08-31 per `docs/audits/DOCUMENTATION_PRUNING_REPORT.md`; git history is the record, never
+implementation authority.
 
 ## Hard rules
 

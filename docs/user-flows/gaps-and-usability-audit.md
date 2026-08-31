@@ -3,13 +3,18 @@
 Consolidated findings from the code-first audit. Every item cites the code that produced it.
 Severities are **Critical / High / Medium / Low / Observation**.
 
+> **Open items are now consolidated in the
+> [current-state audit](../audits/CURRENT_STATE_AUDIT.md) (2026-08-30), which is the live
+> findings register.** This document remains as the closure ledger and rationale record.
+
 **Status:** every tier is now closed. The four **High** product gaps — G1, G2, G3 and G4 — plus
 **Tier 1** (B1, B3), **Tier 2** (G3, G4, G7/M6, the §7 terminology pass), **Tier 3** (N4, N2, N3,
 B2, N10, N1, G6) and **Tier 4** (N7/T7, N5, G8, N8, N9, B6, B8/T6, R1, R4, R5). **R3** closed as a
 consequence of G6. Each entry below records what shipped. Everything else remains an open finding.
 
-**The fifteen-step roadmap in [`../archived/10-implementation-roadmap.md`](../archived/10-implementation-roadmap.md)
-has since landed as well**, closing four findings this document had left open: **G5** and **M9**
+**The first audit's fifteen-step roadmap (`archived/10-implementation-roadmap.md`, removed
+2026-08-31; step→commit record in git history) has since landed as well**, closing four findings
+this document had left open: **G5** and **M9**
 (step 14, the account panel), **G8** and **M7** (step 15, the persistent explainer) and **M3**
 (step 15, the Outfits empty state). **M10** was closed separately — `isChunkLoadError` now tells a
 stale lazy chunk apart from a crash. Still open at that point: **M5**, **M8**, **M12**, **R2**,
@@ -19,7 +24,8 @@ stale lazy chunk apart from a crash. Still open at that point: **M5**, **M8**, *
 refactors that landed for other reasons. Their entries below record that correction rather than new
 work; verifying a finding still holds before acting on it is part of the job.
 
-**The [UI/UX plan](../archived/LightFrameUXImplementationPlan.md) has since run to completion** — all five
+**The UI/UX implementation plan (`archived/LightFrameUXImplementationPlan.md`, removed 2026-08-31;
+text in git history) has since run to completion** — all five
 tiers — and closed or invalidated four more of the findings left open here:
 
 | Finding | What happened                                                                                                                                                                           |

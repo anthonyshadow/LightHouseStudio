@@ -12,8 +12,8 @@ screenshots, ordinary tests, or shared environments.
 2. Confirm the person running the check is authorized to use the credentials and approve spend.
 3. Review current account model availability, pricing, quota, content policy, and retention. Stop
    if they differ from the approved configuration.
-4. Configure only the provider under test using repository-root `.env` and `.env.example`; restart
-   the API.
+4. Configure only the provider under test in the active environment profile file
+   (`.env.development` or `.env.production`, per the README's environment model); restart the API.
 5. Verify `GET /api/capabilities` reports the expected operation availability/input/reference/
    enhancement capabilities without a provider or batch model name. This is not a reachability,
    entitlement, policy, quota, or billing check.
