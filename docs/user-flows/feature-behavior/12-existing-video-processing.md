@@ -27,7 +27,7 @@ source, then edit either base, save, start over, or discard.
    On laptop and desktop, the overlay keeps its header, progress, source preview and controls, and
    contextual action bar fixed while only the right-side edit selection and configuration region
    scrolls. Tablet and phone retain one vertical reading order and one contained panel scroller.
-   **Adjust video** stays with the source preview above Replace/Discard because it changes the
+   **Edit video** stays with the source preview above Replace/Discard because it changes the
    immutable base rather than adding a visual or Voice treatment.
    Once a video is selected, backdrop clicks cannot dismiss the panel; the creator must use an
    explicit close action or complete the workflow.
@@ -37,7 +37,7 @@ source, then edit either base, save, start over, or discard.
    finalization. After a healthy finalization, Studio validates and adopts the normalized
    recording as the source, then opens the editor. The inline player is not mounted during live
    preview, recording, or finalization.
-5. The creator may choose provider-free **Adjust video** for the artifact currently displayed.
+5. The creator may choose provider-free **Edit video** for the artifact currently displayed.
    Studio closes the panel and replaces its ordinary tool/capture regions with the local editing
    workspace around the same stage and video node. Trim, crop, 90° rotation, flips,
    lighting, filters, Before, reset, and grouped undo/redo remain draft-only until a dedicated
@@ -76,7 +76,7 @@ source, then edit either base, save, start over, or discard.
    through the ordinary Voice workspace before Start edit.
    Explicitly closing the panel retains the tab-local selection and plan; an **Edit video** action
    in the recorded-take controls reopens the same workflow. Whenever a playback is retained and
-   **Edit Video** is available, the main Studio tool row/column disables its live-only **Select
+   **Edit video** is available, the main Studio tool row/column disables its live-only **Select
    Character** and **Select Outfit** launchers. The editor's own Character Swap,
    Virtual Try-On, Voice, saved-resource, and builder controls remain governed only by the editor
    workflow and stay available when their existing step-specific requirements are met.

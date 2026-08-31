@@ -416,7 +416,7 @@ vi.mock('../features/existing-video/ExistingVideoPanel', () => ({
       ) : null}
       {onAdjustVideo ? (
         <button type="button" onClick={onAdjustVideo}>
-          Adjust video
+          Edit video
         </button>
       ) : null}
     </div>
@@ -429,7 +429,7 @@ vi.mock('../features/take-review/TakeDock', () => ({
       Saved Video review controls
       {onEditVideo ? (
         <button type="button" onClick={onEditVideo}>
-          Adjust video
+          Edit video
         </button>
       ) : null}
     </div>
@@ -707,7 +707,7 @@ vi.mock('./CreativeWorkspace', () => ({
           disabled={!props.state.hasPlaybackVideo}
           onClick={props.actions.onOpenEditVideo}
         >
-          Edit Video rail
+          Edit video rail
         </button>
         <button type="button" onClick={props.actions.onOpenCharacter}>
           Open character options
@@ -972,7 +972,7 @@ describe('StudioApp composition lifecycle', () => {
     );
     expect(router.state.location.pathname).toBe(`/studio/${directVideoId}`);
     expect(screen.getByTestId('media-stage')).toBe(stage);
-    expect(await screen.findByRole('button', { name: 'Adjust video' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Edit video' })).toBeVisible();
     expect(
       screen.queryByRole('navigation', { name: 'Video editing tools' }),
     ).not.toBeInTheDocument();
@@ -1210,18 +1210,77 @@ describe('StudioApp composition lifecycle', () => {
     expect(harness.recording.discard).toHaveBeenCalled();
   });
 
-  it('opens the existing-video chooser for finalized playback without adopting the current take', () => {
-    harness.recording.presented = { id: 'dock-take' };
+  it('adopts the presented take when Edit video is pressed for finalized playback', async () => {
+    const media = new Blob(['take'], { type: 'video/mp4' });
+    harness.recording.original = { id: 'dock-take', media };
+    harness.recording.presented = { id: 'dock-take', media };
     harness.takeStagePresentation = { kind: 'playback', mode: 'local' };
     renderStudio();
 
-    const editVideo = screen.getByRole('button', { name: 'Edit Video rail' });
+    const editVideo = screen.getByRole('button', { name: 'Edit video rail' });
     expect(editVideo).toBeEnabled();
     fireEvent.click(editVideo);
 
-    expect(screen.getByRole('region', { name: 'Use existing video' })).toBeInTheDocument();
-    expect(harness.existingVideo.adoptRecordedArtifact).not.toHaveBeenCalled();
+    // The take on the stage is the video being edited: pressing Edit video adopts it instead of
+    // opening an empty chooser beside it.
+    await waitFor(() => expect(harness.existingVideo.adoptRecordedArtifact).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Use existing video' })).toHaveTextContent(
+        'Post-recording editor',
+      ),
+    );
     expect(harness.latestWorkspace?.state.activeTool).toBe('edit-video');
+  });
+
+  it('opens the editor directly from the Project rail without the chooser detour', async () => {
+    const media = new Blob(['cut'], { type: 'video/mp4' });
+    harness.recording.original = { id: 'project-cut', media };
+    harness.recording.presented = { id: 'project-cut', media };
+    harness.takeStagePresentation = { kind: 'playback', mode: 'local' };
+    harness.existingVideo.adoptRecordedArtifact.mockImplementationOnce(() => {
+      harness.existingVideo.phase = 'ready';
+      harness.existingVideo.selection = {
+        metadata: {
+          kind: 'uploaded',
+          mode: 'local',
+          selectedAt: '2026-08-11T16:00:00.000Z',
+          displayName: 'project-cut.mp4',
+          container: 'mp4',
+          videoCodec: 'avc',
+          audioCodec: null,
+          durationMs: 10_000,
+          width: 1_280,
+          height: 720,
+          sizeBytes: media.size,
+          hasAudio: false,
+        },
+      };
+      return Promise.resolve(true);
+    });
+    const context = vi
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockImplementation(() => null);
+    renderStudio(undefined, '/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
+    await screen.findByText('Deferred Projects workspace');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit video rail' }));
+
+    // A workspace launch adopts the current cut and opens the editor itself — never the
+    // "Use existing video" chooser the operator did not visit.
+    await waitFor(() =>
+      expect(screen.getByRole('navigation', { name: 'Video editing tools' })).toBeVisible(),
+    );
+    expect(screen.queryByRole('region', { name: 'Use existing video' })).not.toBeInTheDocument();
+
+    // Leaving the editor returns to the workspace, not to the chooser.
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('navigation', { name: 'Video editing tools' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByRole('region', { name: 'Use existing video' })).not.toBeInTheDocument();
+    context.mockRestore();
   });
 
   it('prompts for an optional name before saving the presented video', async () => {
@@ -1301,8 +1360,8 @@ describe('StudioApp composition lifecycle', () => {
     renderStudio();
     const stage = await screen.findByTestId('media-stage');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit Video rail' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Adjust video' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit video rail' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit video' }));
 
     await waitFor(() =>
       expect(screen.getByRole('navigation', { name: 'Video editing tools' })).toBeVisible(),

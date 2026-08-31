@@ -91,12 +91,12 @@ export const ExistingVideoSourceCard = ({
         <button
           type="button"
           css={sourceAdjustStyles(theme)}
-          aria-label="Adjust video"
+          aria-label="Edit video"
           disabled={locked}
           onClick={onAdjust}
         >
           <span>
-            <strong>Adjust video</strong>
+            <strong>Edit video</strong>
             <small>Trim, crop, rotate, relight, or filter on this device.</small>
           </span>
           <span css={sourceAdjustStatusStyles(theme)}>Local</span>

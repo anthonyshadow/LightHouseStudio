@@ -23,10 +23,12 @@
    at 5:00.
 8. Wait for the main recorder and optional audio sidecar to settle. Studio releases live tracks
    and shows **Recorded take playback** on the same stage.
-9. Every finalized playback enables **Edit Video** in the creative tool rail — until then it is
+9. Every finalized playback enables **Edit video** in the creative tool rail — until then it is
    disabled and says it needs a recorded or uploaded video — and keeps the compact
    Save, Discard, Voice, Release, and [detailed review](07-take-review-and-cleanup.md) path.
-   **Edit Video** opens the existing-video source chooser without silently adopting that take.
+   **Edit video** adopts the presented take into the existing-video workflow and opens its panel
+   already holding that take; a refused adoption surfaces the workflow's own error and opens
+   nothing.
 10. In an open empty Project, **Record** uses this same local preview, recorder, Stop/finalization,
     and artifact owner. The Project remains **No source yet** until the operator chooses **Use
     finalized recording** and the API durably stores, inspects, and atomically accepts it. A failed

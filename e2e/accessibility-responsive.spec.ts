@@ -337,7 +337,7 @@ for (const viewport of representativeViewports) {
     await expect(page.getByRole('main')).toBeFocused();
     await expectNoDocumentOverflow(page);
     // With no media the editor has nothing to open, and says so rather than only greying out.
-    await expect(page.getByRole('button', { name: 'Edit Video' })).toHaveAccessibleDescription(
+    await expect(page.getByRole('button', { name: 'Edit video' })).toHaveAccessibleDescription(
       'Record or upload a video to edit it.',
     );
     await expect(page.getByRole('button', { name: /Recipe|Shelf|Dock|Workshop/u })).toHaveCount(0);
@@ -817,7 +817,7 @@ test('phone and tablet expose supported creative tools without Recipe UI', async
         .locator('button')
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
     )
-    .toEqual(['Edit Video', 'Select Character', 'Select Outfit', 'Select Voice']);
+    .toEqual(['Edit video', 'Select Character', 'Select Outfit', 'Select Voice']);
   await expect(page.getByRole('button', { name: /Open Select AI options/u })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Recipe|Shelf|Dock/u })).toHaveCount(0);
 
@@ -837,12 +837,12 @@ test('phone and tablet expose supported creative tools without Recipe UI', async
           .locator('button')
           .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
       )
-      .toEqual(['Edit Video', 'Select Character', 'Select Outfit', 'Select Voice']);
+      .toEqual(['Edit video', 'Select Character', 'Select Outfit', 'Select Voice']);
     await expect(page.getByRole('button', { name: /Select AI/u })).toHaveCount(0);
 
     // Four tools do not fit a phone as words, so the labels go visually hidden rather than being
     // removed: a blocked tool still describes itself to a screen reader, which `title` never does.
-    const editVideo = rail.getByRole('button', { name: 'Edit Video' });
+    const editVideo = rail.getByRole('button', { name: 'Edit video' });
     await expect(editVideo).toBeDisabled();
     await expect(rail.locator('[data-tool-blocked]').first()).toBeAttached();
     await expect(editVideo).toHaveAccessibleDescription(/./u);

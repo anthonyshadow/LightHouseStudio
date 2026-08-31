@@ -79,6 +79,8 @@ interface StudioToolOverlaysProps {
   readonly onStartExistingVideoRecording: () => void;
   readonly onDiscardExistingVideoSelection: () => void;
   readonly onOpenExistingVideo: () => void;
+  /** Opens the editor on the presented take when no existing-video selection is held yet. */
+  readonly onEditPresentedTake: () => void;
   readonly onOpenSavedCharacters: () => void;
   readonly onOpenSavedOutfits: () => void;
   readonly onOpenSavedVideosLibrary: () => void;
@@ -126,6 +128,7 @@ export const StudioToolOverlays = ({
   onStartExistingVideoRecording,
   onDiscardExistingVideoSelection,
   onOpenExistingVideo,
+  onEditPresentedTake,
   onOpenSavedCharacters,
   onOpenSavedOutfits,
   onOpenSavedVideosLibrary,
@@ -298,7 +301,13 @@ export const StudioToolOverlays = ({
         mainRef={mainRef}
         onClose={onCloseOverlay}
         onDiscardTake={onDiscardExistingVideoSelection}
-        {...(existingVideo.selection ? { onEditVideo: onOpenExistingVideo } : {})}
+        {...(existingVideo.selection
+          ? { onEditVideo: onOpenExistingVideo }
+          : ownedRecordingArtifact(recording.presented)
+            ? // A fresh take is edited by adopting the video on the stage, not by opening an
+              // empty chooser beside it.
+              { onEditVideo: onEditPresentedTake }
+            : {})}
         onOpenVoiceTreatments={() => onOpenOverlay('voice-treatments')}
         onBackToTakeReview={() => onOpenOverlay('take-review')}
         {...(ownedRecordingArtifact(recording.presented)

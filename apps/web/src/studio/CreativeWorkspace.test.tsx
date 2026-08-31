@@ -34,7 +34,7 @@ describe('CreativeWorkspace responsive tools', () => {
   // The rail offers the same capability at every width. It used to drop Character and Outfit
   // below 64rem with no entry point and no explanation, which is how a mobile operator concluded
   // the product had no AI tools at all.
-  it('places Character, Outfit and Voice after Edit Video, at every width', () => {
+  it('places Character, Outfit and Voice after Edit video, at every width', () => {
     render(
       <StudioDesignProvider>
         <CreativeWorkspace {...createProps()} />
@@ -45,7 +45,7 @@ describe('CreativeWorkspace responsive tools', () => {
       within(rail)
         .getAllByRole('button')
         .map((button) => button.getAttribute('aria-label')),
-    ).toEqual(['Edit Video', 'Select Character', 'Select Outfit', 'Select Voice']);
+    ).toEqual(['Edit video', 'Select Character', 'Select Outfit', 'Select Voice']);
   });
 
   it('opens the voice chooser, and names the chosen voice in the control that owns it', () => {
@@ -80,7 +80,7 @@ describe('CreativeWorkspace responsive tools', () => {
     expect(voice).toHaveAccessibleDescription('Voice is not available inside a Project yet.');
   });
 
-  it('enables Edit Video only for inactive playback and invokes the editor action', () => {
+  it('enables Edit video only for inactive playback and invokes the editor action', () => {
     const props = createProps();
     const view = render(
       <StudioDesignProvider>
@@ -88,7 +88,7 @@ describe('CreativeWorkspace responsive tools', () => {
       </StudioDesignProvider>,
     );
 
-    const editVideo = screen.getByRole('button', { name: 'Edit Video' });
+    const editVideo = screen.getByRole('button', { name: 'Edit video' });
     expect(editVideo).toBeEnabled();
     fireEvent.click(editVideo);
     expect(props.actions.onOpenEditVideo).toHaveBeenCalledOnce();
@@ -98,24 +98,24 @@ describe('CreativeWorkspace responsive tools', () => {
         <CreativeWorkspace {...createProps({ hasPlaybackVideo: false })} />
       </StudioDesignProvider>,
     );
-    expect(screen.getByRole('button', { name: 'Edit Video' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit video' })).toBeDisabled();
 
     view.rerender(
       <StudioDesignProvider>
         <CreativeWorkspace {...createProps({ recordingActive: true })} />
       </StudioDesignProvider>,
     );
-    expect(screen.getByRole('button', { name: 'Edit Video' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit video' })).toBeDisabled();
   });
 
-  it('marks Edit Video as the active dialog launcher while the editor is open', () => {
+  it('marks Edit video as the active dialog launcher while the editor is open', () => {
     render(
       <StudioDesignProvider>
         <CreativeWorkspace {...createProps({ activeTool: 'edit-video' })} />
       </StudioDesignProvider>,
     );
 
-    expect(screen.getByRole('button', { name: 'Edit Video' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Edit video' })).toHaveAttribute(
       'aria-current',
       'page',
     );
@@ -131,7 +131,7 @@ describe('CreativeWorkspace responsive tools', () => {
     expect(screen.getByRole('button', { name: 'Select Character' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Select Outfit' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: /Shelf|Dock|Recipe/u })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Edit Video' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Edit video' })).toBeEnabled();
 
     view.rerender(
       <StudioDesignProvider>
@@ -156,7 +156,7 @@ describe('CreativeWorkspace responsive tools', () => {
       </StudioDesignProvider>,
     );
 
-    const editVideo = screen.getByRole('button', { name: 'Edit Video' });
+    const editVideo = screen.getByRole('button', { name: 'Edit video' });
     expect(editVideo).toBeDisabled();
     expect(editVideo).toHaveAccessibleDescription('Record or upload a video to edit it.');
     expect(editVideo).toHaveAttribute('title', 'Record or upload a video to edit it.');
@@ -181,7 +181,7 @@ describe('CreativeWorkspace responsive tools', () => {
       </StudioDesignProvider>,
     );
 
-    const editVideo = screen.getByRole('button', { name: 'Edit Video' });
+    const editVideo = screen.getByRole('button', { name: 'Edit video' });
     expect(editVideo).toBeEnabled();
     expect(editVideo).toHaveAccessibleDescription('Open the video editor');
     expect(screen.getByRole('button', { name: 'Select Outfit' })).toHaveAccessibleDescription(
@@ -199,6 +199,6 @@ describe('CreativeWorkspace responsive tools', () => {
     expect(screen.getByRole('button', { name: 'Select Character' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Select Outfit' })).toBeEnabled();
     expect(screen.queryByRole('button', { name: /Shelf|Dock|Recipe/u })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Edit Video' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Edit video' })).toBeEnabled();
   });
 });

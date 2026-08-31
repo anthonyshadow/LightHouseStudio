@@ -23,7 +23,6 @@ interface UseStudioRecordingLaunchOptions {
   readonly stagePresentationKind: ReturnType<typeof useTakeReviewFlow>['stagePresentation']['kind'];
   readonly existingVideo: ReturnType<typeof useExistingVideoWorkflow>;
   readonly creationIntent: StudioCreationIntent | null;
-  readonly projectContextActive: boolean;
   readonly activeProjectId: string | null;
   readonly projectSourceActivity: ProjectSourceActivity | null;
   /** Resolves true once the presented original is owned bytes; false on cancel or failure. */
@@ -49,7 +48,6 @@ export const useStudioRecordingLaunch = ({
   stagePresentationKind,
   existingVideo,
   creationIntent,
-  projectContextActive,
   activeProjectId,
   projectSourceActivity,
   acquireOwnedMedia,
@@ -125,6 +123,10 @@ export const useStudioRecordingLaunch = ({
     }
 
     adoptingRecordingRef.current = artifact.id;
+    // Captured before the adoption settles: a launch armed at this moment owns its own exit (the
+    // pre-arm or spend effect), and reading the ref afterwards raced them — a spent launch read
+    // back as null and opened the chooser on top of the editor it had just launched.
+    const request = pendingCreateLaunchRef.current;
     void existingVideo.adoptRecordedArtifact().then((adopted) => {
       if (adoptingRecordingRef.current !== artifact.id) return;
       // Only a completed adoption spends the one-shot editor intent. A refusal (still locked, no
@@ -138,7 +140,6 @@ export const useStudioRecordingLaunch = ({
       }
       adoptingRecordingRef.current = null;
       setRecordingForExistingVideo(false);
-      const request = pendingCreateLaunchRef.current;
       // A Create launch is settled by the pre-arm effect below, once the workflow actually holds
       // the video: opening the editor first would mount its panel before the tool is set.
       if (request === null) openOverlay('video-upload');
@@ -253,9 +254,11 @@ export const useStudioRecordingLaunch = ({
       setCreateLaunch(
         request === undefined ? null : { projectId: activeProjectId, operation: request },
       );
-      if (projectContextActive && !existingVideo.selection) {
+      if (!existingVideo.selection) {
         // Asking again is the retry: clear the attempt marker so a previously refused or failed
-        // adoption can run once more for the same take.
+        // adoption can run once more for the same take. This branch covers standalone takes and
+        // Project cuts alike: the presented artifact is the video the operator is looking at, so
+        // pressing Edit video adopts it rather than opening an empty chooser beside it.
         adoptingRecordingRef.current = null;
         setRecordingForExistingVideo(true);
         // A streamed Project source needs its complete bytes before adoption can validate it. The
@@ -272,7 +275,6 @@ export const useStudioRecordingLaunch = ({
       activeProjectId,
       existingVideo.selection,
       openExistingVideo,
-      projectContextActive,
       recording.presented,
       recordingActive,
     ],

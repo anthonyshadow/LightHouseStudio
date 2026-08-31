@@ -736,11 +736,11 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
 
   await page
     .getByRole('navigation', { name: 'Creative workspace tools' })
-    .getByRole('button', { name: 'Edit Video', exact: true })
+    .getByRole('button', { name: 'Edit video', exact: true })
     .click();
-  const existingVideo = page.getByRole('dialog', { name: 'Use existing video' });
-  await expect(existingVideo).toBeVisible();
-  await existingVideo.getByRole('button', { name: 'Adjust video' }).click();
+  // A workspace rail launch opens the editor directly on the current cut; the "Use existing
+  // video" chooser never appears on the way in.
+  await expect(page.getByRole('dialog', { name: 'Use existing video' })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Edit video' })).toBeVisible();
   await expect(page.locator('[data-video-edit-workspace]')).toBeAttached();
   await expect(page.locator('[data-project-route]')).toHaveCSS('display', 'none');
@@ -910,10 +910,8 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   // the operator made, not the Studio settling into one, so the write waits for a real boundary.
   expect(projects.checkpointRequests).toHaveLength(0);
 
-  await page
-    .getByRole('navigation', { name: 'Creative workspace tools' })
-    .getByRole('button', { name: 'Edit Video', exact: true })
-    .click();
+  // The rail now opens the editor directly, so provider work starts from its own Create card.
+  await page.getByRole('button', { name: 'Open Character Swap' }).click();
   const existingVideo = page.getByRole('dialog', { name: 'Use existing video' });
   await existingVideo.getByRole('button', { name: 'Start Project Character Swap' }).click();
   // Starting a paid run is one such boundary: the exact setup it will use is written first.

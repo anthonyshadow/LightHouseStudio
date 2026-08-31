@@ -259,11 +259,11 @@ describe('ExistingVideoPanel', () => {
     expect(screen.getByRole('button', { name: 'Upload from device' })).toBeEnabled();
     expect(screen.getByText(/MP4\/H.264/u)).toBeInTheDocument();
     expect(screen.getByText(/any aspect ratio/iu)).toBeInTheDocument();
-    expect(screen.getByText(/use Adjust video after upload to crop/iu)).toBeInTheDocument();
+    expect(screen.getByText(/use Edit video after upload to crop/iu)).toBeInTheDocument();
     expect(screen.queryByText(/Decart submission/u)).not.toBeInTheDocument();
   });
 
-  it('offers local Adjust video and disables visual AI for an incompatible edited aspect', () => {
+  it('offers local Edit video and disables visual AI for an incompatible edited aspect', () => {
     const source = new File(['edited'], 'square-edited.mp4', { type: 'video/mp4' });
     const onAdjustVideo = vi.fn();
     render(
@@ -309,11 +309,11 @@ describe('ExistingVideoPanel', () => {
     const sourceCard = screen.getByRole('heading', { name: 'Current video' }).closest('section');
     expect(sourceCard).not.toBeNull();
     const adjustVideo = within(sourceCard as HTMLElement).getByRole('button', {
-      name: 'Adjust video',
+      name: 'Edit video',
     });
     expect(
       within(screen.getByLabelText('Editing tools')).queryByRole('button', {
-        name: 'Adjust video',
+        name: 'Edit video',
       }),
     ).not.toBeInTheDocument();
     fireEvent.click(adjustVideo);

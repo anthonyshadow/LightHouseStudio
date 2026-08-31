@@ -148,7 +148,7 @@ export const projectCreateLaunchers = (
   },
   {
     id: 'adjust',
-    title: 'Adjust video',
+    title: 'Edit video',
     description: 'Trim, crop, rotate and colour-correct on this device.',
     input: null,
     cost: null,

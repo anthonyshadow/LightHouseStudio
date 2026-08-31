@@ -621,7 +621,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'video-edit-lighting-dirty',
     setup: async (page) => {
       const { dialog } = await selectVisualVideo(page, true);
-      await dialog.getByRole('button', { name: 'Adjust video' }).click();
+      await dialog.getByRole('button', { name: 'Edit video' }).click();
       await page.getByRole('button', { name: 'Lighting', exact: true }).click();
       await page.getByRole('slider', { name: 'Brightness' }).fill('34');
       await expect(page.getByRole('heading', { name: 'Lighting settings' })).toBeVisible();
@@ -632,7 +632,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'video-edit-crop-dirty',
     setup: async (page) => {
       const { dialog } = await selectVisualVideo(page, true);
-      await dialog.getByRole('button', { name: 'Adjust video' }).click();
+      await dialog.getByRole('button', { name: 'Edit video' }).click();
       await page.getByRole('button', { name: 'Crop', exact: true }).click();
       await page.getByRole('button', { name: '1:1', exact: true }).click();
       await expect(page.getByRole('heading', { name: 'Crop settings' })).toBeVisible();

@@ -107,7 +107,7 @@ export const createLocalTake = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Stop recording' }).click();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
-  await expect(page.getByRole('button', { name: 'Edit Video', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Edit video', exact: true })).toBeEnabled();
   const takeControls = page.getByRole('group', { name: 'Recorded take controls' });
   await expect(takeControls.getByRole('button', { name: 'Edit video' })).toHaveCount(0);
   await takeControls.getByRole('button', { name: 'Voice' }).click();
