@@ -99,9 +99,11 @@ assets. Video is the initial primary medium; future formats may include images, 
 product imagery, social creative, and advertising creative. AI providers and models remain
 implementation choices behind user-facing capabilities rather than the definition of the product.
 
-Read the [product vision](docs/PRODUCT_VISION.md) for positioning, audiences, principles, and core
-terminology, and the [product roadmap](docs/PRODUCT_ROADMAP.md) for the current-to-future sequence.
-Neither document changes the current loopback, account, provider, privacy, or deployment limits.
+Read the [product vision](docs/product/PRODUCT_VISION.md) for positioning, principles, and the MVP
+boundary, the [domain model](docs/product/DOMAIN_MODEL.md) for canonical terminology, and the
+[product roadmap](docs/roadmap/PRODUCT_ROADMAP.md) for the current-to-future sequence.
+Neither direction document changes the current loopback, account, provider, privacy, or deployment
+limits.
 
 ## Product flow
 
@@ -514,20 +516,22 @@ persistence, and HTTP boundaries.
 
 Start with the [documentation map](docs/README.md). Key references:
 
+- [Product vision](docs/product/PRODUCT_VISION.md) and the
+  [domain model and terminology](docs/product/DOMAIN_MODEL.md)
+- [Target user flows](docs/product/TARGET_USER_FLOWS.md) and the
+  [target architecture](docs/architecture/TARGET_ARCHITECTURE.md)
+- [Current-state audit](docs/audits/CURRENT_STATE_AUDIT.md),
+  [product roadmap](docs/roadmap/PRODUCT_ROADMAP.md), and
+  [open decisions](docs/DECISIONS_REQUIRED.md)
 - [Current user flows and navigation](docs/user-flows/README.md)
-- [Known flow gaps and usability findings](docs/user-flows/gaps-and-usability-audit.md)
 - [Per-capability behaviour](docs/user-flows/feature-behavior/README.md)
 - [Architecture and ownership](docs/ARCHITECTURE.md)
-- [Product vision and terminology](docs/PRODUCT_VISION.md)
-- [Product roadmap](docs/PRODUCT_ROADMAP.md)
 - [Local MVP acceptance and evidence](docs/MVP_ACCEPTANCE.md)
 - [Privacy and temporary data](docs/PRIVACY_AND_TEMPORARY_DATA.md)
-- [Maintainability audit](docs/MAINTAINABILITY_AUDIT.md)
 - [Browser support](docs/BROWSER_SUPPORT.md)
 - [Manual QA](docs/MANUAL_QA.md)
 - [Testing strategy](docs/TESTING.md)
 - [Agent quick guide](CLAUDE.md) and the [repository working guide](AGENTS.md)
-- [Archived documentation](docs/archived/README.md)
 
 Before changing behavior, read the agent quick guide, trace the owning presentation, orchestration,
 domain/contract, provider boundary, and tests, then update the affected canonical document and

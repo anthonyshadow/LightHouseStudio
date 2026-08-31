@@ -40,8 +40,8 @@ qualifications:
 One Campaign may group multiple Projects, while a Project represents a focused resumable production
 effort and may remain independent. Campaign never owns Project/media processing state. Multi-format support
 requires explicit format-specific contracts, snapshot migration, validation, storage, preview,
-retention, and cleanup decisions. See [Product Vision](PRODUCT_VISION.md) and
-[Product Roadmap](PRODUCT_ROADMAP.md); neither document changes current runtime authority.
+retention, and cleanup decisions. See the [Product Vision](product/PRODUCT_VISION.md) and
+[Product Roadmap](roadmap/PRODUCT_ROADMAP.md); neither document changes current runtime authority.
 
 ## Dependency boundaries
 

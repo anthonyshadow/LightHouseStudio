@@ -8,7 +8,7 @@ documentation. Where behaviour could not be established from code, it is marked 
   `apps/api/drizzle/*.sql`.
 - Audit date: 2026-08-16, against the working tree at commit `0237235`.
 - Nothing in this directory describes planned or aspirational behaviour. Planned work belongs in
-  [`../PRODUCT_ROADMAP.md`](../PRODUCT_ROADMAP.md).
+  [`../roadmap/PRODUCT_ROADMAP.md`](../roadmap/PRODUCT_ROADMAP.md).
 
 ## Documents
 
@@ -132,7 +132,7 @@ them. Whether a media stage exists at all is `isStudioRuntimePath`.
 | Account creative-library sync                                          | **Complete**            | Neon is authoritative in relational modes; fresh sessions hydrate the local-first cache. Divergence, conflict and transport failures fail closed and recover with Try again · Save current copy · Reload account copy. No merge exists, by design |
 | **Project provider voice / live starts**                               | **Deliberately absent** | Blocked with an explicit reason (`ProjectCreativeCheckpointPanel.tsx:14`)                                                                                                                                                                         |
 | **`/studio/{videoId}` deep link**                                      | **Orphaned**            | The route loads a Saved Video into review, but no UI in the app ever links to it                                                                                                                                                                  |
-| **Account settings**                                                   | **Absent**              | The account menu contains only "Log out" (`AccountMenu.tsx:245-247`)                                                                                                                                                                              |
+| **Account settings**                                                   | **Present**             | The account menu offers Account details, Settings, and Log out (`features/account/SettingsPanel.tsx`; see `dashboard-and-navigation.md`)                                                                                                          |
 
 ## How a new user is expected to move through the product
 

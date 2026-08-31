@@ -6,8 +6,10 @@ This file applies repository-wide; a nearer `AGENTS.md` may override it. The app
 is local-first, loopback-oriented, and single-operator. Configuration-gated
 cloud infrastructure does not imply public deployment, shared tenancy,
 registration, billing, public sharing, or unrestricted provider use. Implement
-current behavior, not a target state. Change the runtime, framework, persistence
-authority, provider, or deployment model only when explicitly in scope.
+current behavior, not a target state — unless the task is an approved roadmap
+slice from `docs/roadmap/`, in which case implement exactly that approved scope.
+Change the runtime, framework, persistence authority, provider, or deployment
+model only when explicitly in scope.
 
 ## Read selectively
 
@@ -18,14 +20,18 @@ points to. Start with affected source and tests. Open only what the task needs:
 - `docs/README.md`: documentation ownership;
 - `docs/user-flows/`: current route-level user journeys, navigation, and known gaps;
 - affected file in `docs/user-flows/feature-behavior/`: observable per-capability behavior;
-- `docs/PRODUCT_VISION.md`: product positioning, hierarchy, principles, and terminology;
-- `docs/PRODUCT_ROADMAP.md`: current-to-future capability direction and future architecture notes;
-- `docs/ARCHITECTURE.md`: architecture and lifecycle ownership;
+- `docs/product/PRODUCT_VISION.md`: product positioning, principles, and MVP boundary;
+- `docs/product/DOMAIN_MODEL.md`: canonical terminology, hierarchy, and deprecated names;
+- `docs/roadmap/PRODUCT_ROADMAP.md`: approved direction; `docs/DECISIONS_REQUIRED.md`: open calls;
+- `docs/ARCHITECTURE.md`: architecture and lifecycle ownership as built;
+- `docs/architecture/TARGET_ARCHITECTURE.md`: where each layer is going;
 - `docs/TESTING.md`: testing and release validation;
 - `docs/PRIVACY_AND_TEMPORARY_DATA.md`: provider, privacy, and temporary data;
 - `docs/CLOUD_PERSISTENCE.md`: cloud persistence and migrations;
 - `docs/MANUAL_QA.md` and `docs/LIVE_PROVIDER_SMOKE.md`: live/device checks; and
-- `docs/archived/` and `LESSONS.md`: historical rationale only.
+- `LESSONS.md`: reusable engineering constraints. Superseded corpora were
+  permanently removed on 2026-08-31 per
+  `docs/audits/DOCUMENTATION_PRUNING_REPORT.md`; git history is the record.
 
 Do not read every document by default. Historical plans are not current
 implementation authority.

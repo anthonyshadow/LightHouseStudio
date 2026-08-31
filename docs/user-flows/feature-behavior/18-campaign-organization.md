@@ -18,9 +18,9 @@ making Campaign setup a prerequisite for creative work.
 2. Choose **Create Campaign**, enter a required Name and optional Brief, and submit. Creation is
    idempotent and opens `/campaigns/:campaignId` immediately. A success callout offers **Create
    Project in Campaign** or **Not now**.
-3. Choose the persistent **New Project** action, enter a name with the active Campaign fixed as the
-   relationship source, or use **Quick
-   project** in Projects to create a standalone `Untitled Project`.
+3. Choose the persistent **New Project** action, enter a name with the active Campaign fixed as
+   the relationship source, or use **Create without a name** in the New Project dialog to create a
+   standalone `Untitled Project`.
 4. Campaign detail shows its active and archived Projects. Open one, move it to another active
    Campaign, or detach it to **No Campaign**. Membership changes use the Project version and never
    overwrite concurrent Project work silently.

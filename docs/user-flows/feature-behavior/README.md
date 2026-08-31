@@ -11,7 +11,7 @@
 These stories describe observable behavior in the current local-first Studio. They are journey
 references, not release-readiness claims or future requirements. They use **video** and current
 feature names deliberately where the implemented contract is video-specific; the broader
-Campaign, Project, and Asset vocabulary in [Product Vision](../../PRODUCT_VISION.md) does not make
+Campaign, Project, and Asset vocabulary in the [domain model](../../product/DOMAIN_MODEL.md) does not make
 future features current.
 
 ## Journeys

@@ -4,8 +4,9 @@ Status: partially implemented infrastructure roadmap; public-product phases rema
 
 Original planning date: 2026-08-07
 
-Prerequisite: every completion requirement in
-[`user-accounts-phase-1-audit-and-plan.md`](archived/user-accounts-phase-1-audit-and-plan.md) must pass.
+Prerequisite: every completion requirement in the phase-1 accounts plan
+(`archived/user-accounts-phase-1-audit-and-plan.md`, removed 2026-08-31; text in git history) must
+pass.
 
 ## Purpose and boundary
 
@@ -23,7 +24,7 @@ below remains deferred.
 
 This is the service-readiness roadmap, not the product capability roadmap. Campaigns, user-facing
 Projects, multi-format content, distribution, and collaboration direction are maintained in the
-[Product Roadmap](PRODUCT_ROADMAP.md).
+[Product Roadmap](roadmap/PRODUCT_ROADMAP.md).
 
 Phase 2 requires a separately approved public-product security and operations design. The current
 loopback Host/Origin boundary is not authentication for a remotely accessible product. Do not add a

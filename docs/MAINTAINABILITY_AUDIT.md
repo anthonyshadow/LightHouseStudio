@@ -1,5 +1,8 @@
 # Maintainability audit
 
+> Open findings from this document are consolidated in the
+> [current-state audit](audits/CURRENT_STATE_AUDIT.md) (2026-08-30), the live findings register.
+
 **Cleanup records current as of:** 2026-08-12
 **Status:** mixed — the dated cleanup sections below are historical records; the placement rules
 and the sections titled _Current deferred and approval-required findings_ and _Deferred findings_
