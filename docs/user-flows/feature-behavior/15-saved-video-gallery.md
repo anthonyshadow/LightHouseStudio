@@ -66,9 +66,11 @@ Studio stage.
    object URL, recorder, or provider session. The dialog lists immutable Versions with ordinal, current marker, origin,
    timestamp, media facts, and status. Selecting an older Version previews and downloads that exact
    content without changing the Saved Video current pointer.
-7. **Open in Studio** navigates to `/studio/:videoId`, fetches owner-checked metadata and only the
-   current Version bytes, enforces the 300 MB bound, and opens the existing review workspace.
-   Direct entry, refresh, and pasted URLs work without navigation state; **Adjust video** remains
+7. **Open in Studio** navigates to `/studio/create` (push navigation), fetches owner-checked
+   metadata and only the current Version bytes, enforces the 300 MB bound, and opens the existing
+   review workspace. The `/studio/:videoId` deep link exists for direct entry but is not the
+   gallery's navigation target.
+   Direct entry, refresh, and pasted URLs work without navigation state; **Edit video** remains
    an explicit action from review rather than opening the editor automatically.
    **Use as Project source** links the exact ready Version to a selected empty same-owner Project
    through the existing source-acceptance contract; the Video remains reusable and no bytes are

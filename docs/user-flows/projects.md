@@ -253,9 +253,11 @@ that tab; an archived Project gets a single read-only notice. Immediately after 
 `complete`, and doing that silently made a working Project look wiped. The notice retires itself:
 the first creative pick rewrites the phase back to `creative`. Otherwise:
 
-1. **`ProjectCreateLaunchers`** — three cards: **Character Swap**, **Virtual Try-On** and **Adjust
-   video**. Each opens the existing editor through `openPlaybackEditor`, the same handler the stage
-   rail's Edit Video button uses, and the two visual ones arrive with their tool already set.
+1. **`ProjectCreateLaunchers`** — three cards: **Character Swap**, **Virtual Try-On** and **Edit
+   video**. Each launches through `openPlaybackEditor`, the same handler the stage rail's Edit
+   video button uses; the two visual cards open the "Use existing video" surface with their tool
+   already set, while **Edit video** (card and rail alike) opens the on-device editor directly on
+   the current cut, and leaving that editor returns to the workspace rather than to the chooser.
    **No launcher calls `ProjectProcessingController.start`** — the one cost-acknowledged Start stays
    in `ExistingVideoProjectProcessingActions.tsx`. Each AI card **carries the creative choice it
    consumes** — Character on one, Outfit on the other, each with a **Change** action routed through
@@ -263,7 +265,7 @@ the first creative pick rewrites the phase back to `creative`. Otherwise:
    separate creative-setup section: that arrangement said everything twice. When a card cannot act
    it shows the first true reason, from `projectCreateLaunchers` in `projectCreatePresentation.ts`:
    archived → unresolved provider run → authority not yet established → provider unconfigured →
-   this video incompatible → source still loading → editor blocked → current cut busy. **Adjust
+   this video incompatible → source still loading → editor blocked → current cut busy. **Edit
    video** is exempt from the provider rows — the local editor is free, so a queued remote run does
    not block it.
 2. **Resource-issue notices**, when a saved character, outfit or voice has since disappeared. These
@@ -465,5 +467,5 @@ what the whole Project is built from.
   "Continue Work" panel simply takes `projects[0]`. Whether that is genuinely the most recently
   updated project depends on the repository implementation for the configured `DATABASE_MODE`;
   this was not exercised end-to-end during the audit.
-- Behaviour of the archived project list when a campaign filter is active — the code always
-  requests all archived projects, but no test asserts the intended behaviour.
+- (Resolved: the campaign filter applies to both active and archived lists — see the N10 entry
+  above; this earlier "always requests all archived projects" concern no longer holds.)

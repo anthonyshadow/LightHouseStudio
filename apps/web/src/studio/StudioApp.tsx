@@ -272,7 +272,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     stagePresentationKind: takeReview.stagePresentation.kind,
     existingVideo,
     creationIntent,
-    projectContextActive,
     activeProjectId,
     projectSourceActivity: activeProjectSourceActivity,
     acquireOwnedMedia: mediaAcquisition.acquire,
@@ -464,8 +463,15 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     window.requestAnimationFrame(() => characterSelectorRef.current?.focus());
   }, [characterSelectorRef, clearActiveRecipe, closeOverlayIf]);
   const openTakeReview = useCallback(() => openOverlay('take-review'), [openOverlay]);
+  // A Create launch opens the editor from the inspector column, so focus must come back to the card
+  // that was pressed rather than to the stage rail on the other side of the layout. Every other way
+  // in clears it, or closing a rail-opened editor would jump to a card nobody touched.
+  const createLaunchTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [createLaunchActive, setCreateLaunchActive] = useState(false);
   const focusEditVideo = useCallback(() => {
-    window.requestAnimationFrame(() => editVideoToggleRef.current?.focus());
+    window.requestAnimationFrame(() =>
+      (createLaunchTriggerRef.current ?? editVideoToggleRef.current)?.focus(),
+    );
   }, [editVideoToggleRef]);
   const savedVideo = useStudioSavedVideoController({
     existingVideo,
@@ -485,14 +491,14 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     focusEditVideo,
   });
   /*
-   * Spends the "Adjust video" launch. It lives here rather than in the launch hook because only
+   * Spends the "Edit video" launch. It lives here rather than in the launch hook because only
    * this controller can open the editor, and only once it has been rebuilt around the new media —
    * so this is also where the launch ends, in the same act as the dispatch it pays for.
    *
    * Read off the launch itself rather than mirrored into a ref here. A ref could not be reset by
    * the hook, so a launch the operator abandoned — a cancelled acquisition, a refused adoption, a
    * change of Project — stayed armed and opened this editor unbidden at the next ready video; and
-   * because a ref is not reactive, pressing "Adjust video" with a video already in hand changed
+   * because a ref is not reactive, pressing "Edit video" with a video already in hand changed
    * nothing this effect could see, so it never fired at all.
    */
   const { openVideoAdjust } = savedVideo;
@@ -505,7 +511,9 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
       return;
     }
     clearCreateLaunch();
-    openVideoAdjust();
+    // A workspace launch never travelled through the "Use existing video" chooser, so leaving the
+    // editor must not open it either — the operator goes back to the workspace they pressed.
+    openVideoAdjust({ returnTo: 'workspace' });
   }, [
     clearCreateLaunch,
     existingVideo.phase,
@@ -678,16 +686,13 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     existingVideo.showResult();
     openOverlay('take-review');
   }, [existingVideo, openOverlay]);
-  // A Create launch opens the editor from the inspector column, so focus must come back to the card
-  // that was pressed rather than to the stage rail on the other side of the layout. Every other way
-  // in clears it, or closing a rail-opened editor would jump to a card nobody touched.
-  const createLaunchTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const [createLaunchActive, setCreateLaunchActive] = useState(false);
   const openEditorFromRail = useCallback(() => {
     createLaunchTriggerRef.current = null;
     setCreateLaunchActive(false);
-    openPlaybackEditor();
-  }, [openPlaybackEditor]);
+    // Inside a Project the rail opens the editor directly on the current cut — the same launch the
+    // Create card makes — instead of detouring through the "Use existing video" chooser.
+    openPlaybackEditor(projectContextActive ? 'adjust' : undefined);
+  }, [openPlaybackEditor, projectContextActive]);
   const closeExistingVideo = useCallback(() => {
     if (existingVideo.providerActive) return;
     if (existingVideo.active) existingVideo.cancelBeforeAcceptance();
@@ -925,6 +930,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
         onStartExistingVideoRecording={startExistingVideoRecording}
         onDiscardExistingVideoSelection={discardExistingVideoSelection}
         onOpenExistingVideo={openExistingVideo}
+        onEditPresentedTake={openEditorFromRail}
         onOpenSavedCharacters={openSavedCharacters}
         onOpenSavedOutfits={openOutfitSelector}
         onOpenSavedVideosLibrary={nav.openVideos}

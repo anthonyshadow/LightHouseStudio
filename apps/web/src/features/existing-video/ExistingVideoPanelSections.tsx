@@ -72,8 +72,8 @@ export const ExistingVideoUploadChooser = ({
       </div>
       <span>MP4/H.264, MOV/H.264, or WebM/VP8 · any aspect ratio · up to 5 minutes</span>
       <span data-secondary-upload-guidance>
-        For the best experience, upload 16:9 or 9:16, or use Adjust video after upload to crop to
-        16:9 or 9:16.
+        For the best experience, upload 16:9 or 9:16, or use Edit video after upload to crop to 16:9
+        or 9:16.
       </span>
       <span data-drag-only-guidance>Drag and drop a video anywhere in this area</span>
     </div>

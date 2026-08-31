@@ -16,13 +16,13 @@ deliberately release or discard it.
    **Recorded take playback** on the Studio stage. Local and live AI recordings retain compact
    Save, Discard, Voice, and Close actions directly beneath the video. They never overlay the take or
    its native playback controls, and the narrowest supported viewport wraps them into a second row.
-5. Confirm **Edit Video** is enabled in the creative tool rail for any finalized playback. An
-   editor-backed upload reopens its retained editor state; a local/live-AI take opens
-   the existing-video source chooser without automatically adopting the take. While playback is
+5. Confirm **Edit video** is enabled in the creative tool rail for any finalized playback. An
+   editor-backed upload reopens its retained editor state; a local/live-AI take is adopted into
+   the existing-video workflow, whose panel opens already holding it. While playback is
    retained, the rail's live-only **Select Character** and **Select Outfit** actions
    are disabled. This rail lock does not disable Character Swap, Virtual Try-On, Voice, or other
    controls inside the open existing-video editor.
-   From that editor, **Adjust video** enters the stage-owned local editing workspace without
+   From that editor, **Edit video** enters the stage-owned local editing workspace without
    remounting the stage video. A confirmed validated export replaces the immutable source; discard
    or failure preserves the take shown when editing began.
 6. When the detailed **Latest take** surface opens after finishing an editor flow or returning from

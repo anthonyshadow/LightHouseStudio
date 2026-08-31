@@ -169,8 +169,30 @@ test('Local capture starts only from the control bar and keeps the local take in
     'playback',
   );
   await expect(page.getByRole('group', { name: 'Recorded take controls' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Edit Video', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Edit video', exact: true })).toBeEnabled();
   expect((await readBrowserState(page)).cameraCalls).toBe(1);
+  expectNoExternalProviderTraffic(network);
+});
+
+test('a fresh take reaches Edit video without a save-and-reload detour', async ({ page }) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await page.goto('/studio/create');
+
+  const controls = page.getByLabel('Studio session controls');
+  await controls.getByRole('button', { name: 'Start camera' }).click();
+  await expect(page.getByLabel('Live local camera preview')).toBeVisible();
+  await controls.getByRole('button', { name: 'Record' }).click();
+  await controls.getByRole('button', { name: 'Stop recording' }).click();
+  await expect(page.getByLabel('Recorded take playback')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Edit video', exact: true }).click();
+
+  // Pressing Edit video adopts the take on the stage: the panel opens holding it, never empty.
+  const dialog = page.getByRole('dialog', { name: 'Use existing video' });
+  await expect(dialog.getByRole('heading', { name: 'Current video' })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Edit video' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('navigation', { name: 'Video editing tools' })).toBeVisible();
   expectNoExternalProviderTraffic(network);
 });
 
@@ -210,7 +232,7 @@ test('provider-free upload previews and enters the existing take/save surface', 
   expect(network.blockedExternalWebSockets).toEqual([]);
 });
 
-test('provider-free Adjust video renders locally and atomically replaces the persistent source', async ({
+test('provider-free Edit video renders locally and atomically replaces the persistent source', async ({
   page,
 }) => {
   await installCameraSentinel(page);
@@ -228,7 +250,7 @@ test('provider-free Adjust video renders locally and atomically replaces the per
     ).__lightframeVideoEditorStage = video as HTMLVideoElement;
   });
 
-  await upload.getByRole('button', { name: 'Adjust video' }).click();
+  await upload.getByRole('button', { name: 'Edit video' }).click();
   await expect(upload).toBeHidden();
   await expect(page.getByRole('navigation', { name: 'Video editing tools' })).toBeVisible();
   await expect(page.getByLabel('Video edit settings')).toBeVisible();
@@ -320,7 +342,7 @@ test('provider-free Adjust video renders locally and atomically replaces the per
     ),
   ).toBe(true);
 
-  await upload.getByRole('button', { name: 'Adjust video' }).click();
+  await upload.getByRole('button', { name: 'Edit video' }).click();
   await page.getByRole('button', { name: 'Crop', exact: true }).click();
   await page.getByRole('button', { name: '1:1', exact: true }).click();
   await page.getByRole('button', { name: 'Save edited video' }).click();
@@ -361,7 +383,7 @@ test('a selected upload ignores backdrop dismissal and can be reopened after an 
 
   const editVideo = page
     .getByRole('navigation', { name: 'Creative workspace tools' })
-    .getByRole('button', { name: 'Edit Video', exact: true });
+    .getByRole('button', { name: 'Edit video', exact: true });
   await expect(editVideo).toBeVisible();
   await editVideo.click();
   await expect(dialog).toBeVisible();
@@ -443,7 +465,7 @@ test('the upload editor and open saved-character chooser reflow at every support
     await expect(dialog).toBeHidden();
     const editVideo = page
       .getByRole('navigation', { name: 'Creative workspace tools' })
-      .getByRole('button', { name: 'Edit Video', exact: true });
+      .getByRole('button', { name: 'Edit video', exact: true });
     await expect(editVideo).toBeVisible();
     expect((await editVideo.boundingBox())?.height).toBeGreaterThanOrEqual(44);
     await expectNoDocumentOverflow(page);

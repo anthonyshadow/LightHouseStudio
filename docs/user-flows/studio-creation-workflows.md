@@ -25,7 +25,7 @@ belongs to the runtime, which leaves when the operator does — and shows one of
 
 | Presentation | When                                                                                                         |
 | ------------ | ------------------------------------------------------------------------------------------------------------ |
-| `idle`       | No stream, no take. Shows the first-take guide when enabled                                                  |
+| `idle`       | No stream, no take                                                                                           |
 | `live`       | A display stream exists (local camera, or provider output when a model session is transforming usable video) |
 | `finalizing` | Recording is stopping, or a finalization window is open                                                      |
 | `playback`   | A presented take exists and review is ready                                                                  |
@@ -36,9 +36,9 @@ experience**, mute microphone, camera on/off, stop model, stop recording, plus r
 (discard, voice treatments, **Save**, **Replace saved version**).
 
 To the side, `CreativeWorkspace` (`studio/CreativeWorkspace.tsx`) renders a tool rail:
-**Edit Video** · **Character** · **Outfit**. A tool that cannot act is disabled and states the
+**Edit video** · **Character** · **Outfit**. A tool that cannot act is disabled and states the
 condition it is waiting on, in the same words the rest of the Studio uses
-(`studio/studioActivityPolicy.ts`): **Edit Video** needs a recorded or uploaded video, and the
+(`studio/studioActivityPolicy.ts`): **Edit video** needs a recorded or uploaded video, and the
 Character and Outfit tools are held by a take under review or an active recording. The rail also
 owns the "Reference image could not be restored" notice, with **Retry** and **Continue without
 reference**.
@@ -71,7 +71,7 @@ reference**.
 8. The stage switches to `playback`. `reviewLocked` is now true, which locks capture settings and
    mode switching.
 
-**Exit** — Save, discard, voice treatments, Edit Video, or the existing-video overlay.
+**Exit** — Save, discard, voice treatments, Edit video, or the existing-video overlay.
 
 ## Flow: Upload / import an existing video
 
@@ -137,7 +137,7 @@ Voice is independent of the visual edit and can be applied alone
 
 ## Flow: Local video adjust
 
-1. **Edit Video** in the tool rail, or **Edit video** from the Videos library.
+1. **Edit video** in the tool rail, or **Edit video** from the Videos library.
 2. `useVideoEditSession` (`features/video-editor/useVideoEditSession.ts`) opens
    `VideoEditWorkspace` in place of the creative workspace (`StudioWorkspace.tsx`).
 3. Rendering happens entirely in the browser: `videoEditRender.worker.ts` + `videoEditShader.ts` +
@@ -161,8 +161,8 @@ Voice is independent of the visual edit and can be applied alone
      tolerating thumbnail failure
    - invalidates the saved-video lists
 4. When the video was loaded from an existing Saved Video, **Replace Saved Version** is offered
-   alongside the plain save; it calls `POST /api/videos/{videoId}/versions` after a
-   `window.confirm` (`useStudioSavedVideoController.ts`).
+   alongside the plain save; it calls `POST /api/videos/{videoId}/versions` after an in-app
+   confirmation dialog (`useStudioSavedVideoController.ts`).
 5. If the Studio was entered with `?projectId=`, the newly saved video is auto-attached to the
    project and the app redirects to `/projects/{id}` (`StudioApp.tsx`), with retry handling
    on the attach step.

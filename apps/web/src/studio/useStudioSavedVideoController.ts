@@ -102,6 +102,9 @@ export const useStudioSavedVideoController = ({
   const [loadedSource, setLoadedSource] = useState<LoadedSavedVideoSource | null>(null);
   const galleryEditRequestedRef = useRef(false);
   const gallerySourceLoadControllerRef = useRef<AbortController | null>(null);
+  // Set when an editor session begins, read when it ends: a session entered from the
+  // "Use existing video" chooser returns there on exit; a direct workspace launch does not.
+  const editorReturnRef = useRef<'video-upload' | 'workspace'>('video-upload');
 
   const activeLoadedSource =
     !loadedSource ||
@@ -118,27 +121,34 @@ export const useStudioSavedVideoController = ({
     ) &&
     recording.presented.id !== activeLoadedSource?.artifactId,
   );
-  const openVideoAdjust = useCallback(() => {
-    // Declares owned bytes: the editor renders from the complete media. With an active
-    // existing-video selection the presented artifact is always owned.
-    const sourceArtifact = ownedRecordingArtifact(
-      comparedExistingVideoArtifact ?? recording.presented,
-    );
-    const metadata = existingVideo.currentMetadata;
-    if (!sourceArtifact || !metadata || recordingActive || existingVideo.providerActive) return;
-    closeOverlay();
-    videoEditor.begin({ artifact: sourceArtifact, metadata });
-    focusStudio();
-  }, [
-    closeOverlay,
-    comparedExistingVideoArtifact,
-    existingVideo.currentMetadata,
-    existingVideo.providerActive,
-    focusStudio,
-    recording.presented,
-    recordingActive,
-    videoEditor,
-  ]);
+  const openVideoAdjust = useCallback(
+    (options?: Readonly<{ returnTo?: 'video-upload' | 'workspace' }>) => {
+      // Declares owned bytes: the editor renders from the complete media. With an active
+      // existing-video selection the presented artifact is always owned.
+      const sourceArtifact = ownedRecordingArtifact(
+        comparedExistingVideoArtifact ?? recording.presented,
+      );
+      const metadata = existingVideo.currentMetadata;
+      if (!sourceArtifact || !metadata || recordingActive || existingVideo.providerActive) return;
+      // Where leaving the editor lands depends on how it was entered: a session begun from the
+      // "Use existing video" chooser returns there; a direct workspace launch returns to the
+      // workspace, because opening a chooser nobody visited is a dead end.
+      editorReturnRef.current = options?.returnTo ?? 'video-upload';
+      closeOverlay();
+      videoEditor.begin({ artifact: sourceArtifact, metadata });
+      focusStudio();
+    },
+    [
+      closeOverlay,
+      comparedExistingVideoArtifact,
+      existingVideo.currentMetadata,
+      existingVideo.providerActive,
+      focusStudio,
+      recording.presented,
+      recordingActive,
+      videoEditor,
+    ],
+  );
 
   const loadSavedVideo = useCallback(
     async (
@@ -351,7 +361,9 @@ export const useStudioSavedVideoController = ({
   const returnFromVideoEditor = useCallback(() => {
     videoEditor.close();
     setDiscardPromptOpen(false);
-    openVideoUpload();
+    // A session entered directly from a workspace launch returns to that workspace; reopening the
+    // "Use existing video" chooser is only right when the session began there.
+    if (editorReturnRef.current === 'video-upload') openVideoUpload();
     focusEditVideo();
   }, [focusEditVideo, openVideoUpload, videoEditor]);
 

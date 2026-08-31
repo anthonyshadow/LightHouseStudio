@@ -5,7 +5,7 @@ a provider, and replace the immutable source only after a validated export and e
 
 ## Journey
 
-1. Uploads may use any playable aspect ratio. In **Use existing video**, select **Adjust video** for
+1. Uploads may use any playable aspect ratio. In **Use existing video**, select **Edit video** for
    the currently displayed source or latest healthy result. The side panel closes and Studio
    enters one `video-edit` workspace around the existing `MediaStage`; its `<video>` node and
    playback time remain authoritative. Source geometry, duration, size, and audio facts come from

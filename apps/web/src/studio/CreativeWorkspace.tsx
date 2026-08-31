@@ -91,7 +91,7 @@ export const CreativeWorkspace = ({ state, actions, refs }: CreativeWorkspacePro
     {
       id: 'edit-video',
       icon: 'editVideo',
-      name: 'Edit Video',
+      name: 'Edit video',
       selected: undefined,
       selectedNoun: 'edit',
       hint: 'Open the video editor',
