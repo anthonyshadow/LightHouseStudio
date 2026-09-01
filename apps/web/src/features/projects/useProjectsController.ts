@@ -26,6 +26,8 @@ export const projectQueryKeys = {
   lists: ['projects', 'list'] as const,
   list: (lifecycle: 'active' | 'archived') => ['projects', 'list', lifecycle] as const,
   detail: (projectId: string) => ['projects', 'detail', projectId] as const,
+  /** The most recent Version this Project has saved, whether or not it is still its current cut. */
+  latestOutput: (projectId: string) => ['projects', 'latest-output', projectId] as const,
 };
 
 /**

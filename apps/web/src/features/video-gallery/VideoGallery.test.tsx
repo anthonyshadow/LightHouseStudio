@@ -295,6 +295,53 @@ describe('VideoGallery', () => {
     }
   });
 
+  it('opens the export panel on the placement the Version was produced for', async () => {
+    const item = video({
+      currentVersion: {
+        ...video().currentVersion,
+        width: 1_080,
+        height: 1_920,
+        exportSpecification: {
+          container: 'video/mp4',
+          aspect: '9:16',
+          resolution: { width: 1_080, height: 1_920 },
+          includeAudio: true,
+        },
+      },
+    });
+    mockGalleryPages({ '': page([item]) });
+    mockApiServer.use(jsonScenario('GET', `/api/videos/${item.id}`, [{ body: detail(item) }]));
+    renderGallery();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Preview Morning take' }));
+    const preview = await screen.findByRole('dialog', { name: 'Morning take' });
+    fireEvent.click(within(preview).getByLabelText('More actions for Morning take'));
+    fireEvent.click(within(preview).getByRole('menuitem', { name: 'Export' }));
+
+    const exportPanel = await screen.findByRole('dialog', { name: 'Export video' });
+    expect(within(exportPanel).getByRole('button', { name: 'Phone, full screen' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    // These bytes already are that placement, so the offer stays the stored file rather than a
+    // re-encode of it into the shape it is already in.
+    expect(
+      within(exportPanel).getByRole('link', { name: 'Download Morning take, Version 1' }),
+    ).toHaveAttribute(
+      'href',
+      `/api/videos/${item.id}/versions/${item.currentVersion.id}/content?download=true`,
+    );
+    expect(within(exportPanel).getByText(/nothing is trimmed/u)).toBeVisible();
+
+    // A different destination is the only thing that makes re-framing work worth doing.
+    fireEvent.click(within(exportPanel).getByRole('button', { name: 'Square post' }));
+    expect(
+      await within(exportPanel).findByRole('button', {
+        name: 'Download Morning take, Version 1, for Square post',
+      }),
+    ).toBeVisible();
+  });
+
   it('selects, previews, and downloads an exact older Version without using or changing current', async () => {
     const current = video({
       versionCount: 2,

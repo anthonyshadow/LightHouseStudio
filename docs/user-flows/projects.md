@@ -178,12 +178,22 @@ deep link.
    the media stage holding the accepted original is visible. The section is mounted **only** while
    `sourceAssetId === null`; mounting it on a source-bearing Project would make the overview
    re-download the source bytes into a hidden stage.
-5. Below that, `ProjectAssetsSection` lists attached asset memberships with a kind filter
+5. **Saved output.** `ProjectDeliverableSection` asks `GET /api/projects/{id}/outputs?pageSize=1`
+   and shows the most recent saved Version — poster, title, Version ordinal, placement, pixel size,
+   date, **Download** and **View in Assets**. It deliberately does not read the snapshot's
+   `lastSuccessfulOutput`: the domain clears that reference on any material change, so a returning
+   operator's snapshot names nothing while the output history still does. When the newest output is
+   no longer the Project's current cut (`isCurrentForProject === false`) the card says the Project
+   has changed since. A `removed` Video keeps Download and drops View in Assets; a `missing` one
+   keeps its details and drops Download. With nothing saved, an active Project with a source reads
+   "No saved output yet" and offers **Go to Save**; a sourceless or archived Project with no output
+   renders no section at all, because naming an unreachable Save step is a dead end.
+6. Below that, `ProjectAssetsSection` lists attached asset memberships with a kind filter
    (All / Videos / Characters / Outfits / Voices), thumbnails, and an add flow per kind. A standing
    line under the heading states that attached Assets are not the Project source.
 
 **Create, Save and History still exist only in the workspace.** The overview surfaces the Source
-task and the workflow shape; the rest is behind the primary action.
+task, the finished output and the workflow shape; the rest is behind the primary action.
 
 **Exit** — `/projects/{id}/workspace` (via **Add source** / **Continue editing**, or automatically
 once a source is accepted from the overview), `/campaigns/{id}`, `/projects`,

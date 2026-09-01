@@ -9,6 +9,7 @@ import {
   checkpointProject,
   createProject,
   getProject,
+  getProjectOutputs,
   listProjects,
   ProjectApiConflictError,
   removeProjectSource,
@@ -147,6 +148,79 @@ describe('Projects API adapter', () => {
     );
 
     await expect(listProjects({ lifecycle: 'active', pageSize: 20 })).rejects.toThrow();
+  });
+
+  it('asks for one saved output when only the most recent is wanted, and validates it', async () => {
+    const savedVideoId = 'e1cfa9a0-9dd2-4c8e-8db7-3b0d5d1f8f70';
+    const videoVersionId = '0b4a5b6a-9f6c-4a0c-9a44-9a7e0f9a1c3d';
+    const output = {
+      kind: 'saved-video-version',
+      output: {
+        projectId,
+        savedVideoId,
+        videoVersionId,
+        producingRevisionId: revisionId,
+        producingRevisionNumber: 1,
+        createdAt: now,
+      },
+      savedVideo: {
+        id: savedVideoId,
+        title: 'Launch cut, final',
+        libraryStatus: 'ready',
+        currentVersionId: videoVersionId,
+      },
+      version: {
+        id: videoVersionId,
+        videoId: savedVideoId,
+        ordinal: 1,
+        origin: 'uploaded',
+        characterName: null,
+        characterVariantName: null,
+        sourceVersionId: null,
+        mimeType: 'video/mp4',
+        filename: 'launch-cut-final.mp4',
+        sizeBytes: 4,
+        durationMs: 1_000,
+        width: 1_920,
+        height: 1_080,
+        exportSpecification: {
+          container: 'video/mp4',
+          aspect: '16:9',
+          resolution: { width: 1_920, height: 1_080 },
+          includeAudio: true,
+        },
+        createdAt: now,
+      },
+      referenceRevision: null,
+      isCurrentForProject: true,
+      contentUrl: `/api/projects/${projectId}/outputs/${videoVersionId}/content`,
+    };
+    const observed = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'GET',
+        `/api/projects/${projectId}/outputs`,
+        { body: { outputs: [output], nextCursor: null } },
+        observed.observe,
+      ),
+    );
+
+    await expect(getProjectOutputs({ projectId, pageSize: 1 })).resolves.toEqual({
+      outputs: [output],
+      nextCursor: null,
+    });
+    // One row, not a page of twenty, for a surface that shows exactly one.
+    expect(new URL(observed.requests[0]!.url).searchParams.get('pageSize')).toBe('1');
+
+    mockApiServer.use(
+      jsonScenario('GET', `/api/projects/${projectId}/outputs`, {
+        body: {
+          outputs: [{ ...output, version: { ...output.version, width: 0 } }],
+          nextCursor: null,
+        },
+      }),
+    );
+    await expect(getProjectOutputs({ projectId, pageSize: 1 })).rejects.toThrow();
   });
 
   it('sends one app-owned operation key and owner-free Quick Start body', async () => {

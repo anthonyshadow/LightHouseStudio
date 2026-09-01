@@ -21,6 +21,7 @@ import {
   projectExportFilename,
   projectExportPreview,
   projectExportSpecificationForAspect,
+  projectExportSpecificationsEqual,
   projectExportVideoEditSpec,
   removeProjectSource,
   renameProject,
@@ -1033,6 +1034,30 @@ describe('Project export specifications', () => {
     expect(projectExportVideoEditSpec(null, landscapeSource)).toBeNull();
     expect(projectExportPreview(null, landscapeSource)).toBeNull();
     expect(projectExportFilename('launch-cut.mp4', null)).toBe('launch-cut.mp4');
+  });
+
+  it('compares two placements by everything that decides the bytes', () => {
+    const widescreen = projectExportSpecificationForAspect('16:9')!;
+    expect(projectExportSpecificationsEqual(null, null)).toBe(true);
+    expect(projectExportSpecificationsEqual(widescreen, null)).toBe(false);
+    expect(projectExportSpecificationsEqual(null, widescreen)).toBe(false);
+    expect(
+      projectExportSpecificationsEqual(widescreen, projectExportSpecificationForAspect('16:9')),
+    ).toBe(true);
+    expect(
+      projectExportSpecificationsEqual(widescreen, projectExportSpecificationForAspect('9:16')),
+    ).toBe(false);
+    // A stored rendition can carry a size no canonical placement would choose today, and asking
+    // only about the aspect would call it the same output.
+    expect(
+      projectExportSpecificationsEqual(widescreen, {
+        ...widescreen,
+        resolution: { width: 1_280, height: 720 },
+      }),
+    ).toBe(false);
+    expect(
+      projectExportSpecificationsEqual(widescreen, { ...widescreen, includeAudio: false }),
+    ).toBe(false);
   });
 
   it('offers one canonical size per placement and validates it', () => {

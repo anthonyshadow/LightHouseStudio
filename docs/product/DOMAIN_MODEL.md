@@ -140,9 +140,19 @@ The output a Project currently designates as "the result": a specific Saved Vide
 provenance-linked to the revision that produced it. A returning user must be able to see and
 download the final deliverable without re-entering the workspace. Saving a deliverable does not end
 the Project; work may continue and later saves may supersede it (see D2).
-_Status: partially implemented — outputs and provenance exist (`project_outputs`), but the product
-currently marks the Project "completed" on save and does not surface the deliverable on the
-Project overview._
+
+Two different records answer "what has this Project produced", and they are not interchangeable.
+The snapshot's `lastSuccessfulOutput` names the Version produced from the _exact_ material state it
+sits beside, so the domain clears it on any material change (`nextSnapshot` in
+`packages/domain/src/projects/rules.ts`) — after one further edit it is `null` even though the save
+happened. The durable record is the append-only output history (`project_outputs`, served by
+`GET /api/projects/:id/outputs`, newest first, each row carrying `isCurrentForProject`). A surface
+showing what a Project has produced must read the history; a surface asking whether the current cut
+is already saved reads the snapshot.
+
+_Status: partially implemented — outputs and provenance exist, and the Project overview surfaces
+the most recent one (poster, placement, Download, View in Assets), saying so when the Project has
+changed since. The product still marks the Project "completed" on save._
 
 ### Export
 

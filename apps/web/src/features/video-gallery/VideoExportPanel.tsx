@@ -1,6 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { SavedVideoSummary, SavedVideoVersion } from '@studio/contracts';
-import type { ProjectExportSpecification } from '@studio/domain';
+import { projectExportSpecificationsEqual, type ProjectExportSpecification } from '@studio/domain';
 import { useState, type RefObject } from 'react';
 import { downloadSavedVideoUrl } from '../../adapters/api-client/savedVideosApi';
 import { Button, LinkButton, OverlayPanel, StatusNotice } from '../../ui';
@@ -31,13 +31,24 @@ export const VideoExportPanel = ({
   readonly onClose: () => void;
 }) => {
   const theme = useTheme();
-  const [placement, setPlacement] = useState<ProjectExportSpecification | null>(null);
+  // The Version records the placement its bytes were produced for, so the panel opens on the answer
+  // this video already has rather than asking the question a second time.
+  const [placement, setPlacement] = useState<ProjectExportSpecification | null>(
+    version.exportSpecification,
+  );
   const { render, failure, cancel, download } = useSavedVideoPlacementDownload();
   const rendering = render.phase === 'rendering';
   // A placement can only be produced where the browser can render one; elsewhere the chooser says
   // so and the original shape is what the operator gets. Carrying the placement rather than a
   // boolean lets the offer below narrow to it.
-  const reframing = render.supported ? placement : null;
+  //
+  // Re-framing the placement already recorded would be work with nothing to show for it: a Version
+  // carries a placement exactly when a rendition was stored for it, so those bytes are that shape
+  // and the server can simply hand them over.
+  const reframing =
+    render.supported && !projectExportSpecificationsEqual(placement, version.exportSpecification)
+      ? placement
+      : null;
 
   const close = () => {
     cancel();
