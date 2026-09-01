@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { ApplicationRuntime, type HttpRequest } from '../application/application-runtime.js';
-import { isSpooledAudioUpload, type SpooledAudioUpload } from '../application/spooled-upload.js';
+import { isSpooledUpload, type SpooledUpload } from '../application/spooled-upload.js';
 import { parseVideoJobMultipart } from '../features/video-jobs/multipart.js';
 import { AppError } from '../http/app-error.js';
 
@@ -16,7 +16,7 @@ const UPLOAD_LIMIT_BYTES = 300_000_000;
 const MULTIPART_LIMIT_BYTES = 310_551_296;
 const CLIENT_CHUNK_BYTES = 1_024 * 1_024;
 const REAL_SOCKET_CANCEL_BYTES = 16 * CLIENT_CHUNK_BYTES;
-const UPLOAD_DIRECTORY_PREFIX = 'lightframe-voice-upload-';
+const UPLOAD_DIRECTORY_PREFIX = 'lightframe-upload-';
 const executeFile = promisify(execFile);
 
 interface RawResponse {
@@ -112,7 +112,7 @@ const pathWasRemoved = async (candidate: string): Promise<boolean> =>
     (error: unknown) => error instanceof Error && 'code' in error && error.code === 'ENOENT',
   );
 
-const wasRemoved = (upload: SpooledAudioUpload): Promise<boolean> => pathWasRemoved(upload.path);
+const wasRemoved = (upload: SpooledUpload): Promise<boolean> => pathWasRemoved(upload.path);
 
 const installProbeErrorHandler = (application: ApplicationRuntime): void => {
   application.setErrorHandler((error, _request, reply) => {
@@ -212,7 +212,7 @@ const runServer = async (): Promise<never> => {
       acceptedContentTypes: ['application/octet-stream'],
     },
     async (request) => {
-      if (!isSpooledAudioUpload(request.body)) {
+      if (!isSpooledUpload(request.body)) {
         throw new Error('The media probe route did not receive a spooled upload.');
       }
       const upload = request.body;

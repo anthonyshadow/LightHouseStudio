@@ -16,7 +16,7 @@ const MEBIBYTE = 1_024 * 1_024;
 
 describe('Bun large-media boundary', () => {
   it('spools raw and multipart 300 MB boundaries with bounded memory and cleanup', async () => {
-    // The probe proves cleanup by diffing `lightframe-voice-upload-*` directories in `tmpdir()`.
+    // The probe proves cleanup by diffing `lightframe-upload-*` directories in `tmpdir()`.
     // That prefix is not unique to this process, so a sibling test spooling an upload in the same
     // run would be counted as this probe's leak. A private temporary root makes the accounting
     // observe only the directories the probe itself created.
