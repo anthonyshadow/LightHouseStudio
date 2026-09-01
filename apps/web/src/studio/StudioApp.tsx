@@ -129,7 +129,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   const captureSettingsFocusRequestRef = useRef(false);
   const {
     creationIntent,
-    queryCreationIntent,
     requestedCreationProjectId,
     validCreationProjectId,
     directVideoId,
@@ -159,7 +158,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   const contextualProjectId = useProjectVideoCreationContext({
     pathname: location.pathname,
     locationKey: location.key,
-    queryCreationIntent,
+    creationIntent,
     requestedCreationProjectId,
     validCreationProjectId,
   });
@@ -167,11 +166,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   useEffect(() => {
     if (creationIntent !== 'upload' || location.pathname !== APP_PATHS.create) return;
     openOverlay('video-upload');
-    // Router state carried the intent in; drop it so Back cannot re-open the upload panel.
-    if (location.state !== null) {
-      void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-    }
-  }, [creationIntent, location.pathname, location.search, location.state, navigate, openOverlay]);
+  }, [creationIntent, location.pathname, openOverlay]);
 
   useEffect(() => {
     if (desktopStudioLayout) closeOverlayIf(['capture-settings']);

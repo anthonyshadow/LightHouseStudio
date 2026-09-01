@@ -88,7 +88,6 @@ const testUser = (now: string): AuthenticatedUser => ({
 });
 
 const installTestAuthentication = (application: ApplicationRuntime): void => {
-  application.decorateRequest('auth', null);
   application.addHook('onRequest', (request: HttpRequest) => {
     const now = new Date().toISOString();
     request.auth = {

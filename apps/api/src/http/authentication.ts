@@ -27,7 +27,6 @@ export const installAuthentication = (
   authService: AuthService,
   config: RuntimeConfig,
 ): void => {
-  app.decorateRequest('auth', null);
   app.addHook('onRequest', async (request: HttpRequest, reply) => {
     if (!request.url.startsWith('/api/')) return;
     if (config.nodeEnv === 'test' && !config.demoAuthEnabled) {

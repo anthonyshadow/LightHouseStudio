@@ -142,7 +142,7 @@ export const useProjectWorkingMediaController = (
       setMessage(
         'The current cut is ready. No video or version was saved, and your original video is unchanged.',
       );
-      videoEditor.completeCommit(response.media.assetId);
+      videoEditor.completeCommit();
       videoEditor.close();
       return true;
     } catch (error) {

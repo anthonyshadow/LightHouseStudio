@@ -7,7 +7,6 @@ import { useEffect, useLayoutEffect, useRef } from 'react';
 import { createMemoryRouter, RouterProvider, useLocation, type InitialEntry } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from '../application/auth/AuthProvider';
-import type { AuthenticatedShellProps } from './shell/AuthenticatedShell';
 import { RouteErrorBoundary } from './AppRouter';
 import {
   CLIENT_DIAGNOSTIC_LIMIT,
@@ -19,7 +18,6 @@ import { StudioDesignProvider } from '../ui';
 
 const appHarness = vi.hoisted(() => ({
   mountCount: 0,
-  latestProps: null as AuthenticatedShellProps | null,
 }));
 
 const authApi = vi.hoisted(() => ({
@@ -66,8 +64,7 @@ vi.mock('../features/auth/LoginDialog', () => {
 // Standing in for the shell also keeps the session-expiry cases honest: the real shell registers a
 // teardown hold, which is exactly the condition "nothing holding it" is meant to exclude.
 vi.mock('./shell/AuthenticatedShell', () => ({
-  AuthenticatedShell: (props: AuthenticatedShellProps) => {
-    appHarness.latestProps = props;
+  AuthenticatedShell: () => {
     const location = useLocation();
     const mainRef = useRef<HTMLElement>(null);
     useEffect(() => {
@@ -133,7 +130,6 @@ describe('AppRouter', () => {
     description.name = 'description';
     document.head.append(description);
     appHarness.mountCount = 0;
-    appHarness.latestProps = null;
     authApi.fetchCurrentSession.mockReset();
     authApi.login.mockReset().mockResolvedValue(testSession);
     authApi.logout.mockReset().mockResolvedValue(undefined);
