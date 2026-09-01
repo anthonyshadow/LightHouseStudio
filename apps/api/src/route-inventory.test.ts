@@ -3,6 +3,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createApp } from './app.js';
 import type { ApplicationRuntime } from './application/application-runtime.js';
 import type { CreativeLibraryRepository } from './features/creative-libraries/creative-library-repository.js';
+import { FileProjectRepository } from './features/projects/file-project-repository.js';
+import type { DirectUploadRepository } from './storage/direct-upload.js';
+import { R2AssetByteStore } from './storage/r2-asset-byte-store.js';
 import { testConfig } from './test/fakes.js';
 
 type RouteMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD';
@@ -85,6 +88,15 @@ const cloudOnlyRoutes: readonly Route[] = [
   'PUT /api/creative-library',
 ];
 
+/** Registered only when `persistence.directVideoUploads` supplies a repository and R2 store. */
+const directUploadRoutes: readonly Route[] = [
+  'POST /api/videos/uploads',
+  'GET /api/videos/uploads/:uploadId/parts',
+  'POST /api/videos/uploads/:uploadId/parts/:partNumber',
+  'POST /api/videos/uploads/:uploadId/complete',
+  'DELETE /api/videos/uploads/:uploadId',
+];
+
 const projectSourceRoutes: readonly Route[] = [
   'GET /api/projects/:projectId/source',
   'GET /api/projects/:projectId/source/content',
@@ -123,6 +135,24 @@ const creativeLibraries: CreativeLibraryRepository = {
   replace: () => Promise.resolve('conflict'),
 };
 
+/**
+ * Registration is what this oracle asserts, so the fakes only need to exist: nothing here is ever
+ * called. `claimExpired` alone must resolve, because closing the app runs one cleanup pass.
+ */
+const unreachable = () => Promise.reject(new Error('The route oracle never performs uploads.'));
+const directUploadRepository: DirectUploadRepository = {
+  create: unreachable,
+  findByIdempotency: unreachable,
+  restart: unreachable,
+  find: unreachable,
+  setProviderUploadId: unreachable,
+  markVerifying: unreachable,
+  returnToUploading: unreachable,
+  markReady: unreachable,
+  markTerminal: unreachable,
+  claimExpired: () => Promise.resolve([]),
+};
+
 const registeredElysiaRoutes = (app: ApplicationRuntime): Route[] =>
   (
     app as unknown as {
@@ -156,6 +186,44 @@ describe('API route inventory oracle', () => {
     });
     apps.push(app);
     const explicit = [...alwaysRegisteredRoutes, ...cloudOnlyRoutes];
+    const expected = withExplicitHeadSiblings(explicit);
+    const actual = registeredElysiaRoutes(app);
+
+    expect(new Set(actual).size).toBe(actual.length);
+    expect(sorted(actual)).toEqual(sorted(expected));
+  });
+
+  it('registers the full inventory a real cloud deployment serves', () => {
+    // What neon actually looks like: one repository object serving the Project surfaces, direct
+    // multipart uploads into R2, and the creative-library mirror — not the creative routes alone.
+    // The prior cloud case asserted a persistence bag no deployment passes, so the five upload
+    // routes were inventoried nowhere and a registration regression there was invisible.
+    const config = testConfig({ databaseMode: 'neon' });
+    const app = createApp({
+      config,
+      persistence: {
+        creativeLibraries,
+        projects: new FileProjectRepository(config.lightframeDataDir),
+        directVideoUploads: {
+          repository: directUploadRepository,
+          // Never contacted: registration only needs the store to exist, and the class is
+          // nominally typed, so a real instance with inert credentials is the honest fake.
+          storage: new R2AssetByteStore({
+            accountId: 'route-oracle',
+            accessKeyId: 'route-oracle',
+            secretAccessKey: 'route-oracle',
+            bucket: 'route-oracle',
+          }),
+        },
+      },
+    });
+    apps.push(app);
+    const explicit = [
+      ...alwaysRegisteredRoutes,
+      ...cloudOnlyRoutes,
+      ...projectSourceRoutes,
+      ...directUploadRoutes,
+    ];
     const expected = withExplicitHeadSiblings(explicit);
     const actual = registeredElysiaRoutes(app);
 
