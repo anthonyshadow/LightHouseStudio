@@ -135,6 +135,8 @@ export interface StoredSavedVideoSummary {
   readonly video: StoredSavedVideoAggregate['video'];
   readonly currentVersion: StoredVideoVersion;
   readonly versionCount: number;
+  /** The aggregate's monotonic revision — the CAS token compare-and-set mutations check. */
+  readonly revision: number;
 }
 export type SavedVideoReceipt = z.infer<typeof receiptSchema>;
 export interface SavedVideoReceiptLookup {
@@ -207,8 +209,9 @@ export interface SavedVideoRepository {
     ownerUserId: string,
     videoId: string,
     title: string,
+    expectedRevision: number,
     updatedAt: string,
-  ): Promise<StoredSavedVideoAggregate | null>;
+  ): Promise<StoredSavedVideoAggregate | 'not-found' | 'conflict'>;
   markMissing(ownerUserId: string, videoId: string, updatedAt: string): Promise<void>;
   setThumbnail(
     ownerUserId: string,
@@ -491,7 +494,14 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
         ({ id }) => id === aggregate.video.currentVersionId,
       );
       return currentVersion
-        ? [{ video: aggregate.video, currentVersion, versionCount: aggregate.versions.length }]
+        ? [
+            {
+              video: aggregate.video,
+              currentVersion,
+              versionCount: aggregate.versions.length,
+              revision: aggregate.revision,
+            },
+          ]
         : [];
     });
   }
@@ -550,15 +560,17 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
     ownerUserId: string,
     videoId: string,
     title: string,
+    expectedRevision: number,
     updatedAt: string,
-  ): Promise<StoredSavedVideoAggregate | null> {
+  ): Promise<StoredSavedVideoAggregate | 'not-found' | 'conflict'> {
     return this.#mutate(ownerUserId, async (library) => {
       const index = library.videos.findIndex(
         (item) => item.video.id === videoId && item.video.deletedAt === null,
       );
-      if (index < 0) return null;
+      if (index < 0) return 'not-found';
       const current = library.videos[index];
-      if (current === undefined) return null;
+      if (current === undefined) return 'not-found';
+      if (current.revision !== expectedRevision) return 'conflict';
       const next = storedSavedVideoAggregateSchema.parse({
         ...current,
         video: { ...current.video, title, updatedAt },

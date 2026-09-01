@@ -747,6 +747,7 @@ const directSavedVideo: SavedVideoDetail = {
   sourceVideoId: null,
   versionCount: 2,
   thumbnailAvailable: false,
+  revision: 1,
   createdAt: '2026-08-11T15:00:00.000Z',
   updatedAt: '2026-08-11T16:00:00.000Z',
   versions: [directVideoVersion],

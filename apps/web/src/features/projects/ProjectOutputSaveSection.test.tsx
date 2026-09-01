@@ -139,6 +139,7 @@ const savedSummary = (): SavedVideoSummary => ({
   sourceVideoId: null,
   versionCount: 3,
   thumbnailAvailable: false,
+  revision: 1,
   createdAt: now,
   updatedAt: now,
 });

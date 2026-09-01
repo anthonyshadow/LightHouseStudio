@@ -474,6 +474,7 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
         video: toVideo(video),
         currentVersion: toVersion(currentVersion),
         versionCount: versionCountByVideoId.get(video.id) ?? 1,
+        revision: video.revision,
       })),
       total,
       characterNames,
@@ -521,6 +522,7 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
       video: toVideo(video),
       currentVersion: toVersion(version),
       versionCount: countByVideoId.get(video.id) ?? 1,
+      revision: video.revision,
     }));
   }
 
@@ -612,8 +614,9 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
     ownerUserId: string,
     videoId: string,
     title: string,
+    expectedRevision: number,
     updatedAt: string,
-  ): Promise<StoredSavedVideoAggregate | null> {
+  ): Promise<StoredSavedVideoAggregate | 'not-found' | 'conflict'> {
     const [updated] = await this.db
       .update(savedVideos)
       .set({
@@ -625,11 +628,28 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
         and(
           eq(savedVideos.ownerUserId, ownerUserId),
           eq(savedVideos.id, videoId),
+          eq(savedVideos.revision, expectedRevision),
           isNull(savedVideos.deletedAt),
         ),
       )
       .returning({ id: savedVideos.id });
-    return updated === undefined ? null : this.get(ownerUserId, updated.id);
+    if (updated !== undefined) {
+      const aggregate = await this.get(ownerUserId, updated.id);
+      return aggregate ?? 'not-found';
+    }
+    // No row matched: tell a stale token apart from a video that is not there at all.
+    const [existing] = await this.db
+      .select({ id: savedVideos.id })
+      .from(savedVideos)
+      .where(
+        and(
+          eq(savedVideos.ownerUserId, ownerUserId),
+          eq(savedVideos.id, videoId),
+          isNull(savedVideos.deletedAt),
+        ),
+      )
+      .limit(1);
+    return existing === undefined ? 'not-found' : 'conflict';
   }
 
   async markMissing(ownerUserId: string, videoId: string, updatedAt: string): Promise<void> {

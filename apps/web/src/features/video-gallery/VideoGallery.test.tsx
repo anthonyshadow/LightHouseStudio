@@ -70,6 +70,7 @@ const video = (override: Partial<SavedVideoSummary> = {}): SavedVideoSummary => 
   sourceVideoId: null,
   versionCount: 1,
   thumbnailAvailable: true,
+  revision: 1,
   assignment: 'project-output',
   createdAt: '2026-08-05T12:00:00.000Z',
   updatedAt: '2026-08-05T12:00:00.000Z',
@@ -625,7 +626,7 @@ describe('VideoGallery', () => {
     });
     fireEvent.submit(renameInput.closest('form')!);
     expect(await screen.findByRole('heading', { name: 'Renamed take' })).toBeInTheDocument();
-    expect(api.renameSavedVideo).toHaveBeenCalledWith(original.id, 'Renamed take');
+    expect(api.renameSavedVideo).toHaveBeenCalledWith(original.id, 'Renamed take', 1);
     fireEvent.click(screen.getByLabelText('More actions for Renamed take'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from Assets' }));
     const removeDialog = screen.getByRole('dialog', { name: 'Remove video from Assets' });

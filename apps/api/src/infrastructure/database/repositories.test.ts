@@ -442,9 +442,11 @@ describe('DrizzleSavedVideoRepository', () => {
     await expect(repository.get(ownerUserId, videoId)).resolves.toMatchObject({
       video: { id: videoId, currentVersionId: nextVersionId },
     });
-    await expect(repository.rename(ownerUserId, videoId, 'Renamed', now)).resolves.toMatchObject({
-      video: { id: videoId, currentVersionId: nextVersionId },
-    });
+    await expect(repository.rename(ownerUserId, videoId, 'Renamed', 2, now)).resolves.toMatchObject(
+      {
+        video: { id: videoId, currentVersionId: nextVersionId },
+      },
+    );
     await repository.markMissing(ownerUserId, videoId, now);
     await expect(
       repository.setThumbnail(ownerUserId, videoId, versionId, assetId, now),
@@ -533,6 +535,8 @@ describe('DrizzleSavedVideoRepository', () => {
       [{ format: 'portrait' }],
       [],
       [],
+      // The CAS rename that matches no row runs a second, disambiguating select.
+      [],
       [],
       [video],
       [],
@@ -551,7 +555,9 @@ describe('DrizzleSavedVideoRepository', () => {
       formats: ['portrait'],
     });
     await expect(repository.get(ownerUserId, videoId)).resolves.toBeNull();
-    await expect(repository.rename(ownerUserId, videoId, 'Missing', now)).resolves.toBeNull();
+    await expect(repository.rename(ownerUserId, videoId, 'Missing', 1, now)).resolves.toBe(
+      'not-found',
+    );
     await expect(
       repository.append(ownerUserId, videoId, nextVersionId, nextVersion, receipt),
     ).resolves.toBe('conflict');

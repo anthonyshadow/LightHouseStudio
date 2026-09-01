@@ -47,6 +47,7 @@ const detail: SavedVideoDetail = {
   sourceVideoId: null,
   versionCount: 1,
   thumbnailAvailable: false,
+  revision: 1,
   createdAt: '2026-08-05T12:00:00.000Z',
   updatedAt: '2026-08-05T12:00:00.000Z',
   versions: [],
@@ -60,6 +61,7 @@ const summary: SavedVideoSummary = {
   sourceVideoId: detail.sourceVideoId,
   versionCount: detail.versionCount,
   thumbnailAvailable: detail.thumbnailAvailable,
+  revision: detail.revision,
   createdAt: detail.createdAt,
   updatedAt: detail.updatedAt,
 };
@@ -119,7 +121,7 @@ describe('saved videos API client', () => {
       total: 1,
       facets: { characterNames: ['Mara'], formats: ['landscape'] },
     });
-    await expect(renameSavedVideo(videoId, 'Renamed')).resolves.toEqual(detail);
+    await expect(renameSavedVideo(videoId, 'Renamed', 1)).resolves.toEqual(detail);
     await expect(deleteSavedVideo(videoId)).resolves.toBeUndefined();
 
     const appendRequest = requests.find(

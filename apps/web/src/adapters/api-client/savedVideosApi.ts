@@ -333,14 +333,18 @@ export const getSavedVideo = (videoId: string, signal?: AbortSignal): Promise<Sa
     invalidResponse,
   );
 
-export const renameSavedVideo = (videoId: string, title: string): Promise<SavedVideoDetail> =>
+export const renameSavedVideo = (
+  videoId: string,
+  title: string,
+  expectedRevision: number,
+): Promise<SavedVideoDetail> =>
   requestJson(
     `/api/videos/${encodeURIComponent(videoId)}`,
     {
       method: 'PATCH',
       cache: 'no-store',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ title, expectedRevision }),
     },
     savedVideoDetailSchema,
     invalidResponse,

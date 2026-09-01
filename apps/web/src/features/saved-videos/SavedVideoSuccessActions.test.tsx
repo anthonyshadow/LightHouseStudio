@@ -69,6 +69,7 @@ const savedVideo = (): SavedVideoDetail => ({
   sourceVideoId: null,
   versionCount: 2,
   thumbnailAvailable: false,
+  revision: 1,
   createdAt: now,
   updatedAt: now,
 });
