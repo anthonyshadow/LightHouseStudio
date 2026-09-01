@@ -1,7 +1,7 @@
 import { writeSync } from 'node:fs';
 import { access, readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isSpooledAudioUpload } from '../application/spooled-upload.js';
+import { isSpooledUpload } from '../application/spooled-upload.js';
 import { AppError } from './app-error.js';
 import { parseBody, requestInterruptionError, type BodyReaderOptions } from './body-reader.js';
 
@@ -245,8 +245,8 @@ describe('HTTP body reader', () => {
       { bodyParser: 'spooled', acceptedContentTypePrefixes: ['audio/'] },
     );
 
-    expect(isSpooledAudioUpload(parsed)).toBe(true);
-    if (!isSpooledAudioUpload(parsed)) throw new Error('Expected a spooled upload.');
+    expect(isSpooledUpload(parsed)).toBe(true);
+    if (!isSpooledUpload(parsed)) throw new Error('Expected a spooled upload.');
     expect(parsed.byteLength).toBe(10);
     expect(parsed.checksumSha256).toBe(
       '52c57dd2c32c19a2cbd996024cd98267fdbc08e4ea0087d3a4e37cd1afeac4c7',
@@ -288,8 +288,8 @@ describe('HTTP body reader', () => {
       { bodyParser: 'spooled', acceptedContentTypePrefixes: ['audio/'] },
     );
 
-    expect(isSpooledAudioUpload(parsed)).toBe(true);
-    if (!isSpooledAudioUpload(parsed)) throw new Error('Expected a spooled upload.');
+    expect(isSpooledUpload(parsed)).toBe(true);
+    if (!isSpooledUpload(parsed)) throw new Error('Expected a spooled upload.');
     expect(bunFileTarget).toEqual(expect.any(Number));
     await expect(readFile(parsed.path, 'utf8')).resolves.toBe('bun-voice-data');
     await parsed.cleanup();

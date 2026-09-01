@@ -23,7 +23,7 @@ import type {
   HttpReply,
   HttpRequest,
 } from '../../application/application-runtime.js';
-import { isSpooledAudioUpload } from '../../application/spooled-upload.js';
+import { isSpooledUpload } from '../../application/spooled-upload.js';
 import { ownerUserIdForRequest } from '../../http/authentication.js';
 import { AppError } from '../../http/app-error.js';
 import { requestHeader } from '../../http/request-helpers.js';
@@ -143,7 +143,7 @@ export const registerSavedVideoRoutes = (
       payloadTooLargeMessage: 'The saved video must be 300 MB or smaller.',
     },
     async (request, reply) => {
-      if (!isSpooledAudioUpload(request.body))
+      if (!isSpooledUpload(request.body))
         throw new AppError(400, 'invalid_video', 'Provide video bytes to save.');
       try {
         const detail = await service.saveNew(
@@ -182,7 +182,7 @@ export const registerSavedVideoRoutes = (
           'Choose a valid saved video and expected current version.',
         );
       }
-      if (!isSpooledAudioUpload(request.body))
+      if (!isSpooledUpload(request.body))
         throw new AppError(400, 'invalid_video', 'Provide video bytes to save.');
       try {
         const detail = await service.appendVersion(

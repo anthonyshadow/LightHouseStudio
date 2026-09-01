@@ -43,7 +43,7 @@ import type {
 import { ownerUserIdForRequest } from '../../http/authentication.js';
 import { AppError } from '../../http/app-error.js';
 import { requestHeader, requireConfiguredService } from '../../http/request-helpers.js';
-import { isSpooledAudioUpload } from '../../application/spooled-upload.js';
+import { isSpooledUpload } from '../../application/spooled-upload.js';
 import { sendRangedAsset } from '../saved-videos/byte-range.js';
 import type { ProjectService, ProjectServiceMutationResult } from './project-service.js';
 import type {
@@ -324,7 +324,7 @@ export const registerProjectRoutes = (
         const operationKey = projectOperationKeySchema.safeParse(
           requestHeader(request, 'idempotency-key'),
         );
-        const upload = isSpooledAudioUpload(request.body) ? request.body : null;
+        const upload = isSpooledUpload(request.body) ? request.body : null;
         try {
           const metadata = sourceUploadMetadata(request);
           if (!params.success || !operationKey.success || upload === null) {
@@ -427,7 +427,7 @@ export const registerProjectRoutes = (
         const operationKey = projectOperationKeySchema.safeParse(
           requestHeader(request, 'idempotency-key'),
         );
-        const upload = isSpooledAudioUpload(request.body) ? request.body : null;
+        const upload = isSpooledUpload(request.body) ? request.body : null;
         try {
           const metadata = workingMediaUploadMetadata(request);
           if (!params.success || !operationKey.success || upload === null) {
@@ -525,7 +525,7 @@ export const registerProjectRoutes = (
           const operationKey = projectOperationKeySchema.safeParse(
             requestHeader(request, 'idempotency-key'),
           );
-          const upload = isSpooledAudioUpload(request.body) ? request.body : null;
+          const upload = isSpooledUpload(request.body) ? request.body : null;
           try {
             const metadata = renditionUploadMetadata(request);
             if (!params.success || !operationKey.success || upload === null) {
