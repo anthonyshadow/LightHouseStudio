@@ -117,13 +117,6 @@ export const projectAssetItemStyles = (theme: Theme): CSSObject => ({
     letterSpacing: '0.08em',
     textTransform: 'uppercase',
   },
-  '& [data-project-asset-id]': {
-    minWidth: 0,
-    color: theme.colors.textFaint,
-    fontFamily: theme.type.mono,
-    fontSize: '0.6875rem',
-    overflowWrap: 'anywhere',
-  },
   '& > [role="status"]': { marginBlock: theme.space.xs, borderRadius: 0 },
 });
 
@@ -176,7 +169,6 @@ export const projectAssetMetaStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   display: 'flex',
   alignItems: 'baseline',
-  justifyContent: 'space-between',
   gap: theme.space.sm,
 });
 

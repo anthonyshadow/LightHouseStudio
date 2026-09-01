@@ -175,7 +175,7 @@ describe('CreativeWorkspace responsive tools', () => {
           {...createProps({
             editVideoBlockedReason: 'Record or upload a video to edit it.',
             liveToolBlockedReason:
-              'Save and release or discard the current take before building a character.',
+              'Save and close, or discard, the current take before building a character.',
           })}
         />
       </StudioDesignProvider>,
@@ -185,7 +185,7 @@ describe('CreativeWorkspace responsive tools', () => {
     expect(editVideo).toBeEnabled();
     expect(editVideo).toHaveAccessibleDescription('Open the video editor');
     expect(screen.getByRole('button', { name: 'Select Outfit' })).toHaveAccessibleDescription(
-      'Save and release or discard the current take before building a character.',
+      'Save and close, or discard, the current take before building a character.',
     );
   });
 

@@ -35,7 +35,7 @@ export const characterBuilderBlockedReasons = ({
     open:
       activity ??
       (reviewLocked && !configurationIsDurable
-        ? 'Save and release or discard the current take before building a character.'
+        ? 'Save and close, or discard, the current take before building a character.'
         : undefined),
   };
 };
@@ -108,7 +108,7 @@ export const characterRemovalBlockedReason = ({
     return 'Wait for the current take to finish finalizing before changing the selected AI settings.';
   }
   if (reviewLocked) {
-    return 'Release or discard the current take before changing the selected AI settings.';
+    return 'Save and close, or discard, the current take before changing the selected AI settings.';
   }
   if (aiSessionActive) return 'Stop AI before changing the selected AI settings.';
   if (sessionDisconnected) {

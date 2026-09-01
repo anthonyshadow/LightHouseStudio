@@ -12,7 +12,7 @@ const state = (overrides: Partial<Parameters<typeof characterBuilderBlockedReaso
 describe('characterBuilderBlockedReasons', () => {
   it('asks an unsaved take to be settled before a character is built', () => {
     expect(state({ reviewLocked: true }).open).toBe(
-      'Save and release or discard the current take before building a character.',
+      'Save and close, or discard, the current take before building a character.',
     );
   });
 

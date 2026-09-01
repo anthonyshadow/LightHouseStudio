@@ -44,6 +44,11 @@ export type ProviderAvailability = {
   referenceImageOptimizerVersion?: string | null;
   wardrobeAddOutfitAvailable?: boolean;
   directSavedVideoUploadAvailable?: boolean;
+  /**
+   * Whether removing a Saved Video deletes its stored bytes here. `undefined` until the capability
+   * read resolves, and a confirmation must then claim nothing about the file either way.
+   */
+  savedVideoRemovalDeletesMedia?: boolean | undefined;
   /** `undefined` until the capability read resolves — not the same answer as `false`. */
   creativeLibraryCloudMirror?: boolean | undefined;
   /** `undefined` until the capability read resolves; a surface must fall back to the safer claim. */

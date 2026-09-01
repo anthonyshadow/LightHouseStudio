@@ -62,7 +62,7 @@ provider work.
    exact Version verification, server inspection, checksum/owner validation, and atomic source
    revision acceptance. A failed/unaccepted staging attempt can be replaced.
 10. A Project's source is immutable _while it is attached_: a second acceptance conflicts rather
-    than overwriting it. **Replace the original video** detaches it explicitly, returning the Project to the
+    than overwriting it. **Remove original video** detaches it explicitly, returning the Project to the
     Source step as a `draft` with its creative setup — Character, Outfit, Voice, prompt, treatment,
     local edit — intact, and clearing only the derived working and presented media. Removal is
     refused while a provider attempt is unresolved and on an archived or deleted Project, and the

@@ -63,9 +63,6 @@ const FILTERS: readonly { readonly value: AssetFilter; readonly label: string }[
   { value: 'voice', label: 'Voices' },
 ];
 
-const abbreviatedId = (value: string): string =>
-  value.length > 16 ? `${value.slice(0, 8)}…${value.slice(-6)}` : value;
-
 // Opening an attached Video in the workspace means two materially different things depending on
 // whether the Project already has a source, so the control has to say which one.
 const projectWorkspaceAdoptionLabel = (projectHasSource: boolean): string =>
@@ -408,9 +405,6 @@ export const ProjectAssetsSection = ({
                   />
                   <div css={projectAssetMetaStyles(theme)}>
                     <span data-project-asset-kind>{kindLabel(membership.kind)}</span>
-                    <small data-project-asset-id title={membership.resourceId}>
-                      {abbreviatedId(membership.resourceId)}
-                    </small>
                   </div>
                   <h3>{resolved.label}</h3>
                   {resolved.unavailable ? (

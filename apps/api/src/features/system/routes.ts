@@ -30,6 +30,7 @@ export interface CapabilityAvailability {
   readonly promptOptimizerVersion: string;
   readonly wardrobeAddOutfitAvailable: boolean;
   readonly directSavedVideoUploadAvailable: boolean;
+  readonly savedVideoRemovalDeletesStoredMedia: boolean;
   readonly creativeLibraryCloudMirrorAvailable: boolean;
   readonly mediaPersistence: MediaPersistence;
 }
@@ -111,6 +112,7 @@ export const registerSystemRoutes = (
       },
       savedVideos: {
         directMultipartUpload: availability.directSavedVideoUploadAvailable,
+        removalDeletesStoredMedia: availability.savedVideoRemovalDeletesStoredMedia,
       },
       creativeLibrary: {
         cloudMirror: availability.creativeLibraryCloudMirrorAvailable,

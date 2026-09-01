@@ -87,6 +87,32 @@ const FORMAT_LABELS: Readonly<Record<SavedVideoFormat, string>> = {
   square: 'Square',
 };
 
+/**
+ * What removal does to the stored file, in the deployment's own terms.
+ *
+ * Two genuinely different behaviours, not two phrasings of one: object storage deletes the bytes
+ * that nothing else retains, while a deployment holding its media on disk only drops the record and
+ * leaves the file where it is — there is no sweep that comes along later. Where the capability has
+ * not been read, the confirmation makes no claim at all rather than picking the friendlier one.
+ */
+const removalMediaCopy = (
+  deletesStoredMedia: boolean | undefined,
+): { readonly summary: string; readonly detail: string | null } => {
+  if (deletesStoredMedia === undefined) {
+    return { summary: 'Removes this video from Assets.', detail: null };
+  }
+  return deletesStoredMedia
+    ? {
+        summary: 'Removes this video from Assets and deletes its stored file.',
+        detail:
+          'Its stored file is deleted, unless another saved video or a Project’s history still uses it.',
+      }
+    : {
+        summary: 'Hides this video from Assets. Its file is not erased.',
+        detail: 'Its stored file stays on the server.',
+      };
+};
+
 const ORIGIN_LABELS: Readonly<Record<SavedVideoOrigin, string>> = {
   recorded: 'Studio recording',
   uploaded: 'Uploaded video',
@@ -353,12 +379,18 @@ export const VideoGallery = ({
   onUse,
   focusVideoId = null,
   onFocusVideoConsumed,
+  removalDeletesStoredMedia,
 }: {
   onUse: (video: SavedVideoSummary, intent: 'play' | 'edit') => Promise<void>;
   /** A Saved Video to open directly in preview, addressed by id rather than by loaded row. */
   focusVideoId?: string | null;
   /** Fires once the id has been acted on, so the caller can drop it from the URL. */
   onFocusVideoConsumed?: () => void;
+  /**
+   * What this deployment does to the stored file on removal. `undefined` while the capability is
+   * unread, and the confirmation then says nothing about the bytes rather than guessing.
+   */
+  removalDeletesStoredMedia?: boolean | undefined;
 }) => {
   const theme = useTheme();
   const queryClient = useQueryClient();
@@ -380,6 +412,7 @@ export const VideoGallery = ({
     readonly kind: 'rename' | 'remove';
     readonly video: SavedVideoSummary;
   } | null>(null);
+  const removalCopy = removalMediaCopy(removalDeletesStoredMedia);
   const [projectTarget, setProjectTarget] = useState<SavedVideoSummary | null>(null);
   const [previewRepairTarget, setPreviewRepairTarget] = useState<SavedVideoSummary | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
@@ -858,7 +891,7 @@ export const VideoGallery = ({
         open={action?.kind === 'remove'}
         onClose={closeAction}
         title="Remove video from Assets"
-        description="Hides this video from Assets. Its file is not erased."
+        description={removalCopy.summary}
         placement="bottom"
         size="standard"
         closeDisabled={deleteMutation.isPending}
@@ -885,6 +918,7 @@ export const VideoGallery = ({
           Remove “{action?.video.title}” from Assets? Its versions stay available from the history
           of any Project that kept them.
         </p>
+        {removalCopy.detail ? <p>{removalCopy.detail}</p> : null}
         {actionError ? (
           <StatusNotice role="alert" tone="danger" title="Video not removed">
             {actionError}

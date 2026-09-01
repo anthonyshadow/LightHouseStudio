@@ -117,7 +117,7 @@ describe('health and capabilities contracts', () => {
           },
         },
         wardrobe: { addOutfitAvailable: true },
-        savedVideos: { directMultipartUpload: true },
+        savedVideos: { directMultipartUpload: true, removalDeletesStoredMedia: false },
         creativeLibrary: { cloudMirror: true },
         mediaPersistence: 'browser-only',
       }),
@@ -169,7 +169,7 @@ describe('health and capabilities contracts', () => {
         },
       },
       wardrobe: { addOutfitAvailable: true },
-      savedVideos: { directMultipartUpload: true },
+      savedVideos: { directMultipartUpload: true, removalDeletesStoredMedia: false },
       creativeLibrary: { cloudMirror: true },
       mediaPersistence: 'browser-only',
     });

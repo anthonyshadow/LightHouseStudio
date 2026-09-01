@@ -1,5 +1,6 @@
 import type { SafeError } from '../errors/safe-error';
 import type { SessionModeId } from '../session';
+import type { VideoTransformOperationId } from '../video-processing/types';
 
 export type RecordingLifecycleStatus =
   'idle' | 'ready' | 'recording' | 'stopping' | 'recorded' | 'error';
@@ -23,6 +24,15 @@ export interface RecordingArtifact<TMedia = unknown> {
   readonly createdAt?: string;
   /** Describes how this artifact entered the current temporary take pipeline. */
   readonly kind?: 'uploaded' | 'recorded' | 'edited' | 'visual' | 'voice';
+  /**
+   * Which visual operation produced this artifact, when `kind` is `'visual'`.
+   *
+   * `kind` alone says only that a visual tool made these bytes, and Character Swap and Virtual
+   * Try-On are different tools with different results. Anything that has to name the work — a save
+   * recording its origin, a label describing it — reads this rather than assuming the one it
+   * happens to see more often.
+   */
+  readonly visualOperation?: VideoTransformOperationId;
   /** The artifact used as input for this revision, when it was generated. */
   readonly parentArtifactId?: string | null;
   /** Parent saved-character identity used for this exact artifact, when applicable. */

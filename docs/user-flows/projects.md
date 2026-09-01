@@ -234,17 +234,17 @@ deep link to a task returns to that task after re-authenticating.
 Three ways to give the Project its source, plus one way to take it back
 (`ProjectSourceSection.tsx`):
 
-| Action                         | Behaviour                                                                                                                                                                                                                                                                                            |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Record**                     | Calls `startProjectRecording` (`StudioApp.tsx`): discards local work, navigates to the workspace path, focuses the stage, and starts local capture. Stopping produces a finalized artifact; the button then becomes **Use finalized recording**, which posts the file to `/api/projects/{id}/source` |
-| **Upload**                     | Hidden `<input type="file" accept="video/mp4,video/quicktime,video/webm">`; the file is validated and posted to `/api/projects/{id}/source` with `x-lightframe-project-source` metadata and an Idempotency-Key                                                                                       |
-| **Use Saved Video**            | `ProjectSavedVideoPicker` → `POST /api/projects/{id}/source/reuse` with the exact `savedVideoId` + `videoVersionId`. Each row shows a poster thumbnail and duration, and **Preview** plays the exact Version inline before it is committed                                                           |
-| **Replace the original video** | Shown only once a source exists. A `ConfirmationDialog` explains that the video itself is not deleted, then `POST /api/projects/{id}/source/remove` with both CAS tokens. The Project returns to `draft` on the Source step with its creative setup intact                                           |
+| Action                    | Behaviour                                                                                                                                                                                                                                                                                            |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Record**                | Calls `startProjectRecording` (`StudioApp.tsx`): discards local work, navigates to the workspace path, focuses the stage, and starts local capture. Stopping produces a finalized artifact; the button then becomes **Use finalized recording**, which posts the file to `/api/projects/{id}/source` |
+| **Upload**                | Hidden `<input type="file" accept="video/mp4,video/quicktime,video/webm">`; the file is validated and posted to `/api/projects/{id}/source` with `x-lightframe-project-source` metadata and an Idempotency-Key                                                                                       |
+| **Use Saved Video**       | `ProjectSavedVideoPicker` → `POST /api/projects/{id}/source/reuse` with the exact `savedVideoId` + `videoVersionId`. Each row shows a poster thumbnail and duration, and **Preview** plays the exact Version inline before it is committed                                                           |
+| **Remove original video** | Shown only once a source exists. A `ConfirmationDialog` explains that the video itself is not deleted, then `POST /api/projects/{id}/source/remove` with both CAS tokens. The Project returns to `draft` on the Source step with its creative setup intact                                           |
 
 Phases render as notices: `hydrating` → "Preparing source", `preparing` → "Uploading and checking
 your video…", `saving` → "Saving the source video and this change to your Project", `removing` →
 "Removing source", `conflict` →
-warning, `error` → danger. Once accepted, the three add-controls are disabled and **Replace the original video**
+warning, `error` → danger. Once accepted, the three add-controls are disabled and **Remove original video**
 appears beside them. Removal is refused — with the reason stated in the dialog — while a provider
 attempt is unresolved, while working media is being adopted, and while a recording is in flight.
 

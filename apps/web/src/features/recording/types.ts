@@ -3,6 +3,7 @@ import type {
   RecordingLifecycleStatus,
   UploadedVideoCodec,
   UploadedVideoContainer,
+  VideoTransformOperationId,
 } from '@studio/domain';
 import type { StudioMode } from '../../application/types';
 import type { CameraPermissionState } from '../../adapters/browser-media/browserMedia';
@@ -238,6 +239,7 @@ export type RecordingController = {
     label: string,
     source?: RecordingArtifact,
     character?: VideoCharacterAttribution | null,
+    visualOperation?: VideoTransformOperationId,
   ) => RecordingArtifact;
   completeProcessing: (
     blob: Blob,

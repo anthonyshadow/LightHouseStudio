@@ -50,7 +50,7 @@ const capabilityPayload: CapabilitiesResponse = {
     },
   },
   wardrobe: { addOutfitAvailable: true },
-  savedVideos: { directMultipartUpload: true },
+  savedVideos: { directMultipartUpload: true, removalDeletesStoredMedia: true },
   creativeLibrary: { cloudMirror: true },
   mediaPersistence: 'account',
 };
@@ -72,6 +72,7 @@ const availableProviders: ProviderAvailability = {
   referenceImageOptimizerVersion: 'lucy-character-reference-v1',
   wardrobeAddOutfitAvailable: true,
   directSavedVideoUploadAvailable: true,
+  savedVideoRemovalDeletesMedia: true,
   creativeLibraryCloudMirror: true,
   mediaPersistence: 'account',
 };

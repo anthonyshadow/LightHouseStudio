@@ -154,10 +154,12 @@ export const useExistingVideoFinalization = ({
       // A visual result only exists for a submitted (owned) source, so the narrow cannot fail here.
       const source = editBase ?? ownedRecordingArtifact(recording.original);
       if (!source) throw new Error('The original video is unavailable.');
+      const operation = operationForModel(step.modelId);
       return {
         blob: normalized.blob,
         mimeType: normalized.mimeType,
-        label: `${operationForModel(step.modelId)}-${stepIndex + 1}`,
+        label: `${operation}-${stepIndex + 1}`,
+        operation,
         source,
         metadata: {
           ...validatedResult.metadata,

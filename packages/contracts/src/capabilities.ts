@@ -81,6 +81,17 @@ export const capabilitiesResponseSchema = z
     savedVideos: z
       .object({
         directMultipartUpload: z.boolean(),
+        /**
+         * Whether removing a Saved Video also deletes the stored bytes behind it.
+         *
+         * Deliberately its own fact rather than something a surface derives from
+         * `mediaPersistence`: removal deletes bytes when the deployment stores them in object
+         * storage, while `mediaPersistence` answers the different question of whether media leaves
+         * the machine at all. A relational deployment keeping its bytes on local disk is
+         * `account` and does *not* delete them, so a confirmation built from `mediaPersistence`
+         * would tell that operator their file is gone when it is still there.
+         */
+        removalDeletesStoredMedia: z.boolean(),
       })
       .strict(),
     creativeLibrary: z

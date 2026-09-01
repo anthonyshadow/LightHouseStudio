@@ -344,6 +344,24 @@ describe('SavedVideoService', () => {
     });
   });
 
+  it('bounds a portrait poster on its long edge rather than cropping it to landscape', async () => {
+    const video = await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
+    const thumbnail = await sharp({
+      create: { width: 1080, height: 1920, channels: 3, background: '#3d5a80' },
+    })
+      .webp()
+      .toBuffer();
+
+    await service.saveThumbnail(ownerUserId, video.id, video.currentVersion.id, thumbnail);
+
+    const content = await service.thumbnail(ownerUserId, video.id);
+    await expect(sharp(await readAsset(content.asset)).metadata()).resolves.toMatchObject({
+      format: 'webp',
+      width: 270,
+      height: 480,
+    });
+  });
+
   it('paginates metadata newest-first without returning media bytes', async () => {
     const first = await service.saveNew(
       ownerUserId,

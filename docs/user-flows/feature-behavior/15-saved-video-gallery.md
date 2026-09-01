@@ -52,7 +52,8 @@ Studio stage.
    origin, version count, and a lazy optional thumbnail. Thumbnails preserve the source aspect
    ratio: the long edge is bounded and the short edge follows, so a 9:16 source produces a portrait
    poster rather than a centre-cropped landscape tile, and a source already inside the bound is
-   never upscaled.
+   never upscaled. The route re-encodes what arrives on that same bound, so the stored poster keeps
+   the shape the browser produced.
    Thumbnail generation is client-side and retried once; missing or failed generation renders a
    deliberate `No preview yet` placeholder and never fails Save. Such a record offers an inline
    **Generate preview** action that regenerates from the current Version — automatic frame, first
@@ -81,7 +82,10 @@ Studio stage.
    Separately, **Import Saved Video** can add a non-owning Project Asset membership without
    replacing that Project's immutable source.
 8. Rename changes metadata. **Remove from Assets** confirms, tombstones only the chosen record, and
-   removes it from the visible gallery. Every video can be removed independently in any order; retained derived
+   removes it from the visible gallery. The confirmation states what this deployment actually does
+   to the file, from the `savedVideos.removalDeletesStoredMedia` capability: object storage says the
+   stored file is deleted unless something still uses it, local storage says the file is not erased,
+   and an unread capability claims neither. Every video can be removed independently in any order; retained derived
    records keep their historical source lineage even when that source record is deleted. With
    private R2 selected, deletion removes only immutable-version and thumbnail objects that no
    Project output still retains. A tombstoned global record stays hidden, while an exact

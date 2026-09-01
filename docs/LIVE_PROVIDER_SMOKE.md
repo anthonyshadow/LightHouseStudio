@@ -194,8 +194,9 @@ For each resolution row:
 2. Confirm Character Swap requires one JPEG/PNG/WebP identity reference, prompt-only characters are
    absent, and neither Prompt nor Enhance Prompt is rendered. Confirm the provider-neutral notice
    says the selected identity and source performance/scene are used automatically, with no
-   model selector. When Decart is also configured, confirm the editor offers a Decart API / Pruna
-   API toggle and leaves Pruna selected for this procedure. Confirm the editor offers `720p` and
+   model selector. When Decart is also configured, confirm the editor offers a Character Swap
+   method toggle naming each option by its capability rather than its provider — the Pruna binding
+   reads `Reference image · up to 1080p` — and leaves that option selected for this procedure. Confirm the editor offers `720p` and
    `1080p`, defaults a new Character Swap setup to `720p`, and locks the choice after submission.
    Confirm VTO never contacts Pruna.
 3. Submit H.264 MP4 as pass-through. Separately Start from H.264 MOV and VP8 WebM, confirm local
@@ -349,7 +350,7 @@ setting. A zero-retention request may require an eligible provider account.
 
 Record only content-free outcomes in the release review notes.
 
-After each pass, Stop AI/camera, release or discard test takes, close Studio, verify media/WebRTC
+After each pass, Stop AI/camera, close or discard test takes, close Studio, verify media/WebRTC
 indicators are gone, remove credentials when no longer needed, and restart to confirm optional
 integrations disable cleanly.
 

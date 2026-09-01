@@ -109,6 +109,8 @@ interface StudioLibraryOverlaysProps {
   readonly focusedSavedVideoId: string | null;
   readonly onFocusedSavedVideoConsumed: () => void;
   readonly onUseVideo: (video: SavedVideoSummary, intent: 'play' | 'edit') => Promise<void>;
+  /** What removal does to the bytes here, so the gallery's confirmation can say it. */
+  readonly savedVideoRemovalDeletesMedia: boolean | undefined;
   readonly onCreateCharacter: () => void;
   readonly onCopyCharacter: (character: SavedCharacterPrompt) => void;
   readonly onOpenWardrobe: (character: SavedCharacterPrompt) => void;
@@ -132,6 +134,7 @@ export const StudioLibraryOverlays = ({
   focusedSavedVideoId,
   onFocusedSavedVideoConsumed,
   onUseVideo,
+  savedVideoRemovalDeletesMedia,
   onCreateCharacter,
   onCopyCharacter,
   onOpenWardrobe,
@@ -195,6 +198,7 @@ export const StudioLibraryOverlays = ({
               onUse={onUseVideo}
               focusVideoId={focusedSavedVideoId}
               onFocusVideoConsumed={onFocusedSavedVideoConsumed}
+              removalDeletesStoredMedia={savedVideoRemovalDeletesMedia}
             />
           </Suspense>
         ) : null}

@@ -205,7 +205,7 @@ export const ProjectSourceSection = ({
               disabled={archived || controller.busy}
               onClick={() => setRemoveDialogOpen(true)}
             >
-              Replace the original video
+              Remove original video
             </Button>
           ) : null}
           {detached ? (
@@ -217,7 +217,7 @@ export const ProjectSourceSection = ({
       {removeDialogOpen ? (
         <ConfirmationDialog
           open
-          title="Replace the original video"
+          title="Remove original video"
           description="This Project goes back to choosing a video."
           body={
             <>
@@ -235,7 +235,7 @@ export const ProjectSourceSection = ({
           busy={controller.busy}
           confirmDisabled={removalBlockedReason !== undefined}
           alert={removalFailure}
-          alertTitle="Original video not replaced"
+          alertTitle="Original video not removed"
           returnFocusRef={removeTriggerRef}
           onCancel={() => setRemoveDialogOpen(false)}
           onConfirm={() => {

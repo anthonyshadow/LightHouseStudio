@@ -99,13 +99,18 @@ const mockGalleryPages = (pages: Readonly<Record<string, unknown>>): Request[] =
 const renderGallery = (
   onUse = vi.fn().mockResolvedValue(undefined),
   focus?: Readonly<{ focusVideoId: string | null; onFocusVideoConsumed: () => void }>,
+  removalDeletesStoredMedia?: boolean,
 ) => {
   const queryClient = createRemoteStateQueryClient();
   queryClients.push(queryClient);
   const tree = (
     <QueryClientProvider client={queryClient}>
       <StudioDesignProvider>
-        <VideoGallery onUse={onUse} {...(focus ?? {})} />
+        <VideoGallery
+          onUse={onUse}
+          {...(focus ?? {})}
+          {...(removalDeletesStoredMedia === undefined ? {} : { removalDeletesStoredMedia })}
+        />
       </StudioDesignProvider>
     </QueryClientProvider>
   );
@@ -631,6 +636,50 @@ describe('VideoGallery', () => {
     fireEvent.click(within(removeDialog).getByRole('button', { name: 'Remove from Assets' }));
     await waitFor(() => expect(api.deleteSavedVideo).toHaveBeenCalledWith(original.id));
     expect(screen.queryByRole('heading', { name: 'Renamed take' })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      name: 'says the file is deleted where the deployment deletes it',
+      removalDeletesStoredMedia: true,
+      present: 'Removes this video from Assets and deletes its stored file.',
+      absent: 'Its file is not erased.',
+    },
+    {
+      name: 'says the file is kept where the deployment keeps it',
+      removalDeletesStoredMedia: false,
+      present: 'Its file is not erased.',
+      absent: 'deletes its stored file',
+    },
+  ])('$name', async ({ removalDeletesStoredMedia, present, absent }) => {
+    mockGalleryPages({ '': page([video()]) });
+    renderGallery(undefined, undefined, removalDeletesStoredMedia);
+    await screen.findByRole('heading', { name: 'Morning take' });
+
+    fireEvent.click(screen.getByLabelText('More actions for Morning take'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from Assets' }));
+
+    const removeDialog = screen.getByRole('dialog', { name: 'Remove video from Assets' });
+    expect(removeDialog).toHaveTextContent(present);
+    expect(removeDialog).not.toHaveTextContent(absent);
+  });
+
+  it('claims nothing about the stored file until the capability has been read', async () => {
+    mockGalleryPages({ '': page([video()]) });
+    renderGallery();
+    await screen.findByRole('heading', { name: 'Morning take' });
+
+    fireEvent.click(screen.getByLabelText('More actions for Morning take'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from Assets' }));
+
+    const removeDialog = screen.getByRole('dialog', { name: 'Remove video from Assets' });
+    expect(removeDialog).toHaveTextContent('Removes this video from Assets.');
+    expect(removeDialog).not.toHaveTextContent('not erased');
+    expect(removeDialog).not.toHaveTextContent('deleted');
+    // The claim it can still make: history keeps what it kept, whatever the storage does.
+    expect(removeDialog).toHaveTextContent(
+      'Its versions stay available from the history of any Project that kept them',
+    );
   });
 
   it('keeps failed rename and removal actions open with accessible retry errors', async () => {
