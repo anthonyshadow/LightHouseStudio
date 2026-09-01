@@ -454,7 +454,7 @@ export const VideoGallery = ({
     placeholderData: keepPreviousData,
   });
   const previewDetailQuery = useQuery({
-    queryKey: ['saved-videos', 'detail', previewVideo?.id ?? null],
+    queryKey: savedVideoQueryKeys.detail(previewVideo?.id ?? ''),
     queryFn: ({ signal }) => getSavedVideo(previewVideo!.id, signal),
     enabled: previewVideo !== null,
   });
@@ -483,6 +483,7 @@ export const VideoGallery = ({
     mutationFn: (videoId: string) => deleteSavedVideo(videoId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.lists });
+      await queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.total });
     },
   });
 
@@ -525,7 +526,7 @@ export const VideoGallery = ({
     let settled = false;
     void queryClient
       .fetchQuery({
-        queryKey: ['saved-videos', 'detail', focusVideoId],
+        queryKey: savedVideoQueryKeys.detail(focusVideoId),
         queryFn: ({ signal }) => getSavedVideo(focusVideoId, signal),
       })
       .then((focused) => {

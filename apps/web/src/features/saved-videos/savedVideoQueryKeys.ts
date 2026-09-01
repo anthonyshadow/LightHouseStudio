@@ -6,4 +6,6 @@ export const savedVideoQueryKeys = {
    * single-page count cached under it would be reshaped rather than updated.
    */
   total: ['saved-videos', 'total'] as const,
+  /** One Saved Video's full detail, as the preview overlay and focus deep-link read it. */
+  detail: (videoId: string) => ['saved-videos', 'detail', videoId] as const,
 };

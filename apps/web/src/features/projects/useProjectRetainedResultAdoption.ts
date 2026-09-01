@@ -2,6 +2,7 @@ import type { AdoptProjectWorkingMediaRequest } from '@studio/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useState } from 'react';
 import { ProjectApiConflictError, reuseProjectWorkingMedia } from './projectsApi';
+import { projectQueryKeys } from './useProjectsController';
 import type { ProjectSessionPort } from './useProjectSession';
 import { useStableOperationKey } from './useStableOperationKey';
 
@@ -61,7 +62,7 @@ export const useProjectRetainedResultAdoption = (session: ProjectSessionPort) =>
         setMessage(
           `${label} is now the current cut. Your original video and the video’s current version were not changed.`,
         );
-        await queryClient.invalidateQueries({ queryKey: ['projects', 'history', projectId] });
+        await queryClient.invalidateQueries({ queryKey: projectQueryKeys.history(projectId) });
       } catch (caught) {
         setError(
           caught instanceof ProjectApiConflictError
