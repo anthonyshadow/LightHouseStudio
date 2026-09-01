@@ -189,7 +189,7 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
             },
           },
           wardrobe: { addOutfitAvailable: false },
-          savedVideos: { directMultipartUpload: false },
+          savedVideos: { directMultipartUpload: false, removalDeletesStoredMedia: false },
           creativeLibrary: { cloudMirror: false },
           mediaPersistence: 'browser-only',
         } satisfies CapabilitiesResponse),

@@ -413,7 +413,7 @@ export const installProviderNetworkDriver = async (
           wardrobe: {
             addOutfitAvailable: options.wardrobeAddOutfitAvailable ?? false,
           },
-          savedVideos: { directMultipartUpload: false },
+          savedVideos: { directMultipartUpload: false, removalDeletesStoredMedia: false },
           creativeLibrary: { cloudMirror: cloudMirrored },
           mediaPersistence: cloudMirrored ? 'account' : 'browser-only',
         } satisfies CapabilitiesResponse),

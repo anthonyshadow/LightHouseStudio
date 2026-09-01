@@ -366,8 +366,11 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
   const assetBytes =
     dependencies.persistence?.assetBytes ??
     new LocalAssetByteStore(dependencies.config.lightframeDataDir);
+  // One expression for what removal does to the bytes, so the confirmation the operator reads and
+  // the service that acts on it can never disagree about this deployment's behaviour.
+  const deleteStoredAssetsOnManualDelete = dependencies.config.assetStoreProvider === 'r2';
   const savedVideoService = new SavedVideoService(savedVideoRepository, assetBytes, {
-    deleteStoredAssetsOnManualDelete: dependencies.config.assetStoreProvider === 'r2',
+    deleteStoredAssetsOnManualDelete,
     ...(projectRetention === undefined ? {} : { projectRetention }),
     ...(projectRepository === undefined ? {} : { projectOutputs: projectRepository }),
   });
@@ -455,6 +458,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
     promptOptimizerVersion: dependencies.config.openAiPromptOptimizerVersion,
     wardrobeAddOutfitAvailable: outfitTryOnService.available,
     directSavedVideoUploadAvailable: directSavedVideoUploadService !== undefined,
+    savedVideoRemovalDeletesStoredMedia: deleteStoredAssetsOnManualDelete,
     // The same condition `registerCreativeLibraryRoutes` registers on, so the advertised capability
     // and the routes that back it cannot disagree.
     creativeLibraryCloudMirrorAvailable: dependencies.persistence?.creativeLibraries !== undefined,

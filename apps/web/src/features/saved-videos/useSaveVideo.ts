@@ -40,7 +40,9 @@ const originForArtifact = (artifact: RecordingArtifact): SavedVideoOrigin => {
     case 'edited':
       return 'editor';
     case 'visual':
-      return 'character-swap';
+      // The tool that ran states itself; the fallback only covers an artifact restored from before
+      // the operation was recorded, where Character Swap is the one that existed.
+      return artifact.visualOperation ?? 'character-swap';
     case 'voice':
       return 'voice-treatment';
     case 'recorded':

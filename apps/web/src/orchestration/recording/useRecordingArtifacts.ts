@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import type { VideoTransformOperationId } from '@studio/domain';
 import { revokeArtifactUrl } from '../../features/recording/recordingHelpers';
 import type {
   PresentedRecordingArtifact,
@@ -133,6 +134,7 @@ export const useRecordingArtifacts = () => {
       label: string,
       explicitSource?: RecordingArtifact,
       characterAttribution?: VideoCharacterAttribution | null,
+      visualOperation?: VideoTransformOperationId,
     ): RecordingArtifact => {
       const source = explicitSource ?? stateRef.current.original;
       if (!source) throw new Error('Original recording is unavailable.');
@@ -142,6 +144,7 @@ export const useRecordingArtifacts = () => {
         mimeType,
         label,
         characterAttribution,
+        visualOperation,
       );
       repairedPlaybackArtifactIdRef.current = null;
       transition({ type: 'complete-visual', artifact });

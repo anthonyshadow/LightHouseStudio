@@ -408,7 +408,7 @@ describe('ExistingVideoPanel', () => {
     expect(document.body.textContent).not.toMatch(/Decart|Pruna|Lucy|p-video/u);
   });
 
-  it('offers configured Decart and Pruna APIs as a keyboard-operable Character Swap toggle', () => {
+  it('names each configured Character Swap method by what it needs, never by its provider', () => {
     const updateStep = vi.fn();
     render(
       <StudioDesignProvider>
@@ -461,13 +461,13 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    const toggle = screen.getByRole('group', { name: 'Character Swap API' });
-    expect(within(toggle).getByRole('button', { name: 'Decart API' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    fireEvent.click(within(toggle).getByRole('button', { name: 'Pruna API' }));
+    const toggle = screen.getByRole('group', { name: 'Character Swap method' });
+    expect(
+      within(toggle).getByRole('button', { name: 'Prompt or reference · up to 720p' }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(within(toggle).getByRole('button', { name: 'Reference image · up to 1080p' }));
     expect(updateStep).toHaveBeenCalledWith('lucy', { provider: 'pruna' });
+    expect(document.body.textContent).not.toMatch(/Decart|Pruna/u);
   });
 
   it('hands Record a local video to the stage-owned recording flow without rendering inline capture', () => {

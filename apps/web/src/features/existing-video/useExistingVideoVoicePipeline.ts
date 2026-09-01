@@ -95,6 +95,7 @@ export const useExistingVideoVoicePipeline = ({
           finalized.label,
           finalized.source,
           finalized.characterAttribution,
+          finalized.operation,
         );
         completeVisualPlan();
         return;
@@ -105,6 +106,7 @@ export const useExistingVideoVoicePipeline = ({
         finalized.mimeType,
         finalized.label,
         finalized.characterAttribution,
+        finalized.operation,
       );
       try {
         const outcome = await applySelectedVoice(
@@ -120,6 +122,7 @@ export const useExistingVideoVoicePipeline = ({
           finalized.label,
           finalized.source,
           finalized.characterAttribution,
+          finalized.operation,
         );
         setComparison('result');
         if (outcome.status === 'canceled') {

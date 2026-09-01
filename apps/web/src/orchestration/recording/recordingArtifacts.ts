@@ -5,6 +5,7 @@ import {
   failAudioSidecar,
   isSessionModeId,
   startAudioSidecar,
+  type VideoTransformOperationId,
 } from '@studio/domain';
 import { selectAudioMime, selectVideoMime } from '../../features/recording/recordingHelpers';
 import type {
@@ -268,6 +269,12 @@ export const createProcessedRecordingArtifact = (
     characterName: string;
     characterVariantName: string | null;
   }> | null,
+  /**
+   * Which visual tool produced these bytes. Passed by the caller that ran it rather than read back
+   * out of `label`: the label is a filename fragment, and a save that has to name its origin should
+   * not depend on how one is spelled.
+   */
+  visualOperation?: VideoTransformOperationId,
 ): RecordingArtifact => {
   const extension = mimeType.includes('mp4')
     ? 'mp4'
@@ -283,6 +290,7 @@ export const createProcessedRecordingArtifact = (
     name: identity.name,
     createdAt,
     kind: label === 'voice' || label.startsWith('voice-') ? 'voice' : 'visual',
+    ...(visualOperation === undefined ? {} : { visualOperation }),
     parentArtifactId: source.id,
     ...(characterAttribution === undefined
       ? {}

@@ -175,6 +175,24 @@ describe('useSaveVideo', () => {
     expect(api.saveSavedVideoThumbnail).toHaveBeenCalledTimes(6);
   });
 
+  it('saves a visual result under the tool that produced it', async () => {
+    const { result } = renderHook(() => useSaveVideo());
+
+    await act(async () => {
+      await result.current.save({ ...artifact('visual'), visualOperation: 'virtual-try-on' });
+      await result.current.save({ ...artifact('visual'), visualOperation: 'character-swap' });
+      await result.current.save(artifact('visual'));
+    });
+
+    expect(api.saveVideo.mock.calls.map((call) => call[0].origin)).toEqual([
+      'virtual-try-on',
+      'character-swap',
+      // No operation recorded: the artifact predates the field, and Character Swap is the tool
+      // that existed when it could have been made.
+      'character-swap',
+    ]);
+  });
+
   it('appends a version, tolerates thumbnail failure, reports save failure, and resets', async () => {
     const { result } = renderHook(() => useSaveVideo());
     api.createSavedVideoThumbnail.mockRejectedValue(new Error('no frame'));

@@ -160,11 +160,13 @@ source, then edit either base, save, start over, or discard.
   Character Swap capability requires H.264 MP4, H.264 MOV or VP8 WebM is converted locally only
   at explicit Start. The converted Blob is revalidated, remains ephemeral, and never replaces the
   immutable source. MP4 passes through.
-- When both server bindings are configured, Character Swap exposes a Decart API / Pruna API toggle
-  before submission. The configured default is selected initially; changing it immediately applies
-  that provider's reference, prompt, preparation, resolution, failure-retention, and output-sizing
-  rules. Virtual Try-On remains Decart-only. The chosen provider is validated by the broker and
-  there is no automatic provider fallback.
+- When both server bindings are configured, Character Swap exposes a method toggle before
+  submission. Each option is named from its own advertised capability — what it needs and the
+  resolution it reaches, such as `Prompt or reference · up to 720p` — never by the provider behind
+  it. The configured default is selected initially; changing it immediately applies that binding's
+  reference, prompt, preparation, resolution, failure-retention, and output-sizing rules. Virtual
+  Try-On has a single binding. The choice is validated by the broker and there is no automatic
+  provider fallback.
 - Decart results must be 1280×720 or 720×1280. When Pruna Character Swap is active, the editor
   offers `720p` and `1080p` for each submission; the selected value is an
   approximate 1 MP/2 MP budget. A different inspected width/height emits a content-free

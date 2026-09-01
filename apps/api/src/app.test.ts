@@ -69,7 +69,7 @@ describe('API shell', () => {
         },
       },
       wardrobe: { addOutfitAvailable: false },
-      savedVideos: { directMultipartUpload: false },
+      savedVideos: { directMultipartUpload: false, removalDeletesStoredMedia: false },
       creativeLibrary: { cloudMirror: false },
       mediaPersistence: 'browser-only',
     });

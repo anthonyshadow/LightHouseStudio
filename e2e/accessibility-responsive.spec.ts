@@ -120,7 +120,7 @@ const installProviderFreeStudio = async (page: Page): Promise<MockStudioState> =
               },
             },
             wardrobe: { addOutfitAvailable: false },
-            savedVideos: { directMultipartUpload: false },
+            savedVideos: { directMultipartUpload: false, removalDeletesStoredMedia: false },
             creativeLibrary: { cloudMirror: false },
             mediaPersistence: 'browser-only',
           } satisfies CapabilitiesResponse),

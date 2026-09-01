@@ -612,6 +612,7 @@ describe('useExistingVideoWorkflow', () => {
       'character-swap-1',
       recording.original,
       { characterName: 'Mara', characterVariantName: 'Evening' },
+      'character-swap',
     );
     expect(onSubmissionAccepted).toHaveBeenCalledTimes(1);
     expect(result.current.completedStepCount).toBe(1);
@@ -646,6 +647,16 @@ describe('useExistingVideoWorkflow', () => {
       operation: 'virtual-try-on',
       prompt: 'Second submission from the retained original',
     });
+    // The operation travels with the artifact, so a Virtual Try-On result is saved as one rather
+    // than inheriting the label of the only visual tool that used to exist.
+    expect(recording.completeVisualProcessing).toHaveBeenLastCalledWith(
+      expect.any(Blob),
+      'video/mp4',
+      'virtual-try-on-1',
+      recording.original,
+      null,
+      'virtual-try-on',
+    );
 
     for (let submissionNumber = 3; submissionNumber <= 5; submissionNumber += 1) {
       act(() => result.current.startOver());

@@ -161,6 +161,7 @@ export const ShellChrome = ({ services, user, session, logout }: ShellChromeProp
             focusedSavedVideoId={route.focusedSavedVideoId}
             onFocusedSavedVideoConsumed={nav.clearFocusedSavedVideo}
             onUseVideo={libraryHandoff.useVideo}
+            savedVideoRemovalDeletesMedia={availability.savedVideoRemovalDeletesMedia}
             onCreateCharacter={libraryHandoff.createCharacter}
             onCopyCharacter={libraryHandoff.copyCharacter}
             onOpenWardrobe={libraryHandoff.openWardrobe}

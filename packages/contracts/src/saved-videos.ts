@@ -15,11 +15,19 @@ export const SAVED_VIDEO_ORIGINS = [
 export const savedVideoOriginSchema = z.enum(SAVED_VIDEO_ORIGINS);
 export const savedVideoStatusSchema = z.enum(['ready', 'processing', 'failed', 'missing']);
 /**
+ * The longest edge of a stored poster frame. The short edge follows the source aspect ratio.
+ *
+ * Owned here because both ends of the poster path bound the same image: the browser encodes to this
+ * edge, and the route re-encodes what arrives. When only the client knew the number, the server
+ * bounded the poster its own way and cropped every portrait video into a landscape tile.
+ */
+export const SAVED_VIDEO_THUMBNAIL_LONG_EDGE = 480;
+/**
  * The largest poster body `PUT /api/videos/:videoId/versions/:versionId/thumbnail` accepts.
  *
  * This bounds the re-encoded WebP the browser produces, not the image an operator picks: the
- * poster is capped at a 480px long edge, so it lands orders of magnitude under this. It exists so
- * the client and the route state the same number instead of each keeping its own.
+ * poster is capped at `SAVED_VIDEO_THUMBNAIL_LONG_EDGE`, so it lands orders of magnitude under
+ * this. It exists so the client and the route state the same number instead of each keeping its own.
  */
 export const SAVED_VIDEO_THUMBNAIL_MAX_BYTES = 5 * 1024 * 1024;
 export const SAVED_VIDEO_TITLE_MAX_LENGTH = 120;

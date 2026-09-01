@@ -40,6 +40,9 @@ const unavailableProviders: ProviderAvailability = {
   referenceImageOptimizerVersion: null,
   wardrobeAddOutfitAvailable: false,
   directSavedVideoUploadAvailable: false,
+  // Same reasoning again: `false` would promise the operator their file survives a removal, which
+  // is exactly the claim an unread capability cannot make.
+  savedVideoRemovalDeletesMedia: undefined,
   // Deliberately absent rather than `false`: before the read resolves, and after it fails, whether
   // this deployment keeps a cloud copy is unknown, and a surface must not claim either answer.
   creativeLibraryCloudMirror: undefined,

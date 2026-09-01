@@ -61,6 +61,19 @@ const heading = (step: ExistingVideoStep): string =>
 const shortLabel = (step: ExistingVideoStep): string =>
   step.modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try-On';
 
+/**
+ * Names a Character Swap option by what it asks for and what it produces — never by the provider
+ * behind it. The operator is choosing a way of working, and which vendor serves it is ours to know,
+ * not theirs to decide on. Read off the capability the server already sends so the two options
+ * cannot describe themselves as the same thing when their configuration changes.
+ */
+const characterSwapMethodLabel = (
+  option: Pick<VideoProcessingOperationCapability, 'referencePolicy' | 'outputResolutions'>,
+): string =>
+  `${option.referencePolicy === 'required' ? 'Reference image' : 'Prompt or reference'} · up to ${
+    option.outputResolutions.includes('1080p') ? '1080p' : '720p'
+  }`;
+
 export const ExistingVideoVisualEditor = ({
   step,
   savedRecipes,
@@ -164,16 +177,16 @@ export const ExistingVideoVisualEditor = ({
         <>
           <p>Confirm you have rights and consent for submitted media before continuing.</p>
           {providerOptions.length > 1 ? (
-            <div css={inputModeStyles(theme)} role="group" aria-label="Character Swap API">
-              {providerOptions.map(({ providerId }) => (
+            <div css={inputModeStyles(theme)} role="group" aria-label="Character Swap method">
+              {providerOptions.map((option) => (
                 <Button
-                  key={providerId}
-                  variant={step.provider === providerId ? 'primary' : 'secondary'}
-                  aria-pressed={step.provider === providerId}
+                  key={option.providerId}
+                  variant={step.provider === option.providerId ? 'primary' : 'secondary'}
+                  aria-pressed={step.provider === option.providerId}
                   disabled={recipeLocked}
-                  onClick={() => onUpdate(step.id, { provider: providerId })}
+                  onClick={() => onUpdate(step.id, { provider: option.providerId })}
                 >
-                  {providerId === 'decart' ? 'Decart API' : 'Pruna API'}
+                  {characterSwapMethodLabel(option)}
                 </Button>
               ))}
             </div>

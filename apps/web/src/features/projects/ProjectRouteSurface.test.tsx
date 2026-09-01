@@ -816,6 +816,11 @@ describe('Project route surface', () => {
       `/api/videos/${savedVideoId}/thumbnail?v=${videoVersionId}`,
     );
     expect(screen.getByRole('button', { name: 'Use as the original video' })).toBeVisible();
+    // Internal identifiers are ours, not the operator's: the card names the video, not its UUID.
+    const membershipCard = screen
+      .getByRole('heading', { name: 'Library source' })
+      .closest('article');
+    expect(membershipCard?.textContent).not.toContain(savedVideoId.slice(0, 8));
     await user.click(screen.getByRole('button', { name: 'Preview' }));
     const dialog = await screen.findByRole('dialog', { name: 'Library source' });
     const previewBody = dialog.querySelector<HTMLElement>('[data-overlay-body-mode="contained"]');
@@ -1732,8 +1737,8 @@ describe('Project route surface', () => {
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
     expect(screen.getByRole('heading', { name: 'Original video ready' })).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: 'Replace the original video' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Replace the original video' });
+    await user.click(screen.getByRole('button', { name: 'Remove original video' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove original video' });
     expect(dialog).toHaveTextContent('The video itself is not deleted');
     expect(dialog).toHaveTextContent('accepted-source.mp4');
 
@@ -1743,15 +1748,13 @@ describe('Project route surface', () => {
     expect(await screen.findByRole('heading', { name: 'No original video yet' })).toBeVisible();
     await waitFor(() =>
       expect(
-        screen.queryByRole('dialog', { name: 'Replace the original video' }),
+        screen.queryByRole('dialog', { name: 'Remove original video' }),
       ).not.toBeInTheDocument(),
     );
     // The three ways back to a source are live again, and Remove is gone with the source.
     expect(screen.getByRole('button', { name: 'Upload' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Use a saved video' })).toBeEnabled();
-    expect(
-      screen.queryByRole('button', { name: 'Replace the original video' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove original video' })).not.toBeInTheDocument();
     expect(clear).toHaveBeenCalledWith(activeId);
   });
 
@@ -1781,13 +1784,13 @@ describe('Project route surface', () => {
       sourceRuntime: { kind: 'stage', present: vi.fn(), clear: vi.fn() },
     });
 
-    await user.click(await screen.findByRole('button', { name: 'Replace the original video' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Replace the original video' });
+    await user.click(await screen.findByRole('button', { name: 'Remove original video' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove original video' });
     await user.click(within(dialog).getByRole('button', { name: 'Remove and choose another' }));
 
     // The dialog is where the operator is looking, so the refusal has to land there.
-    expect(await within(dialog).findByText('Original video not replaced')).toBeVisible();
-    expect(screen.getByRole('dialog', { name: 'Replace the original video' })).toBeVisible();
+    expect(await within(dialog).findByText('Original video not removed')).toBeVisible();
+    expect(screen.getByRole('dialog', { name: 'Remove original video' })).toBeVisible();
     // Still retryable rather than dismissed with the source silently intact behind it.
     expect(within(dialog).getByRole('button', { name: 'Remove and choose another' })).toBeEnabled();
   });
@@ -1809,9 +1812,7 @@ describe('Project route surface', () => {
     // A source-bearing Project must not mount the Source task on the overview: doing so would
     // re-read the source bytes just to show a button.
     expect(await screen.findByText(/Original video ready/u)).toBeVisible();
-    expect(
-      screen.queryByRole('button', { name: 'Replace the original video' }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove original video' })).not.toBeInTheDocument();
   });
 
   it('accepts one finalized recording while exposing bounded source activity', async () => {

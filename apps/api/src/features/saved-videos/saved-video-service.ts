@@ -3,6 +3,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import {
   SAVED_VIDEO_FORMATS,
+  SAVED_VIDEO_THUMBNAIL_LONG_EDGE,
   savedVideoDetailSchema,
   savedVideoSummarySchema,
   type SavedVideoDetail,
@@ -724,7 +725,13 @@ export class SavedVideoService {
       thumbnail = await withWorkflowSpan('media.sharp.saved_video_thumbnail', {}, () =>
         sharp(input, { failOn: 'error', limitInputPixels: 20_000_000 })
           .rotate()
-          .resize(480, 270, { fit: 'cover', position: 'centre', withoutEnlargement: true })
+          // Bounded on the long edge, never cropped: the browser already produced this poster at
+          // the source aspect ratio, and centre-cropping it to 16:9 here threw away the top and
+          // bottom of every portrait video — the exact framing a phone-shot take depends on.
+          .resize(SAVED_VIDEO_THUMBNAIL_LONG_EDGE, SAVED_VIDEO_THUMBNAIL_LONG_EDGE, {
+            fit: 'inside',
+            withoutEnlargement: true,
+          })
           .webp({ quality: 78 })
           .toBuffer(),
       );

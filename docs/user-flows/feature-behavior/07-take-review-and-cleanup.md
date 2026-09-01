@@ -1,7 +1,7 @@
 # Take review and cleanup
 
 **Outcome:** preserve one finalized take long enough to inspect, optionally process, save, and
-deliberately release or discard it.
+deliberately close or discard it.
 
 ## Journey
 

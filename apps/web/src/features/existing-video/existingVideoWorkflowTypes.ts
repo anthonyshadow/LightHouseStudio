@@ -4,6 +4,7 @@ import type {
   VideoJobStatusResponse,
   VideoOutputResolution,
   VideoTransformModelId,
+  VideoTransformOperationId,
 } from '@studio/contracts';
 import type { RecordingArtifact, VideoCharacterAttribution } from '../recording/types';
 import type { LocalVoiceEffectId } from '../voice-effects/types';
@@ -58,6 +59,8 @@ export type FinalizedVisual = Readonly<{
   blob: Blob;
   mimeType: string;
   label: string;
+  /** The tool that produced these bytes, kept beside the label so a save can name it exactly. */
+  operation: VideoTransformOperationId;
   source: RecordingArtifact;
   metadata: ValidatedExistingVideo['metadata'];
   generation: number;

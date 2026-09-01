@@ -1,5 +1,4 @@
-/** The longest edge of a stored poster frame. The short edge follows the source aspect ratio. */
-const THUMBNAIL_LONG_EDGE = 480;
+import { SAVED_VIDEO_THUMBNAIL_LONG_EDGE as THUMBNAIL_LONG_EDGE } from '@studio/contracts';
 
 /** Where in the video an automatic poster frame is taken from, in seconds. */
 const autoFrameTimestamp = (durationSeconds: number): number =>

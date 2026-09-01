@@ -474,8 +474,8 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   expect(projects.sourceOperationKeys).toHaveLength(1);
 
   // The wrong source is recoverable without deleting the Project: remove it and choose again.
-  await page.getByRole('button', { name: 'Replace the original video' }).click();
-  const removeDialog = page.getByRole('dialog', { name: 'Replace the original video' });
+  await page.getByRole('button', { name: 'Remove original video' }).click();
+  const removeDialog = page.getByRole('dialog', { name: 'Remove original video' });
   await expect(removeDialog).toBeVisible();
   await removeDialog.getByRole('button', { name: 'Remove and choose another' }).click();
 
