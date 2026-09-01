@@ -230,6 +230,8 @@ export const ProjectOutputSaveSection = ({
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists }),
           queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.lists }),
+          // A save to a new Video changed the Videos tab count too.
+          queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.total }),
           // The overview reads the newest saved output, and this save just became it.
           queryClient.invalidateQueries({
             queryKey: projectQueryKeys.latestOutput(pending.projectId),

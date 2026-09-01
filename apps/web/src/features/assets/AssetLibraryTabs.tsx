@@ -7,6 +7,7 @@ import { media } from '../../ui/media';
 import { VisuallyHidden } from '../../ui';
 import { skeletonSurfaceStyles } from '../../ui/primitives/Skeleton';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
+import { savedVoiceCountQueryKey } from '../../orchestration/voice-library/useVoiceLibrary';
 
 /** A tab never mistakes an unread library for an empty one. */
 export type AssetCountState =
@@ -138,7 +139,7 @@ export const AssetLibraryTabs = ({
     queryFn: ({ signal }) => listSavedVideos({ pageSize: 1, signal }),
   });
   const voicesQuery = useQuery({
-    queryKey: ['voices', 'saved-count'],
+    queryKey: savedVoiceCountQueryKey,
     queryFn: ({ signal }) => fetchSavedVoiceCount(signal),
   });
 

@@ -61,6 +61,14 @@ const EMPTY_CRITERIA: VoiceFilterCriteria = {
 
 const CLIENT_CACHE_TTL_MS = 5 * 60_000;
 
+/**
+ * The saved-voices count the Assets hub shows on its Voices tab.
+ *
+ * Exported from here because this hook owns the only two mutations that change it; the key value
+ * predates this export and stays as it is so no cached entry is orphaned.
+ */
+export const savedVoiceCountQueryKey = ['voices', 'saved-count'] as const;
+
 const voiceLibraryQueryKeys = {
   all: ['voice-library'] as const,
   saved: ['voice-library', 'saved'] as const,
@@ -258,6 +266,9 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
         queryKey: voiceLibraryQueryKeys.all,
         refetchType: 'none',
       });
+      // The Voices tab count changed with the membership. Unlike the pages above — which this
+      // handler already rewrote in place — nothing rewrites the count, so it must actually refetch.
+      void queryClient.invalidateQueries({ queryKey: savedVoiceCountQueryKey });
     },
   });
 
