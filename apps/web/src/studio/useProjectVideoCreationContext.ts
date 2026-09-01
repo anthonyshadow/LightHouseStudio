@@ -15,7 +15,7 @@ interface UseProjectVideoCreationContextOptions {
    * the same URL later re-checks the Project whether or not the runtime unmounted in between.
    */
   readonly locationKey: string;
-  readonly queryCreationIntent: StudioCreationIntent | null;
+  readonly creationIntent: StudioCreationIntent | null;
   readonly requestedCreationProjectId: string | null;
   readonly validCreationProjectId: string | null;
 }
@@ -30,7 +30,7 @@ interface UseProjectVideoCreationContextOptions {
 export const useProjectVideoCreationContext = ({
   pathname,
   locationKey,
-  queryCreationIntent,
+  creationIntent,
   requestedCreationProjectId,
   validCreationProjectId,
 }: UseProjectVideoCreationContextOptions): string | null => {
@@ -49,13 +49,10 @@ export const useProjectVideoCreationContext = ({
       return;
     }
     if (validCreationProjectId === null) {
-      void navigate(
-        studioCreatePath(queryCreationIntent ? { intent: queryCreationIntent } : undefined),
-        {
-          replace: true,
-          state: null,
-        },
-      );
+      void navigate(studioCreatePath(creationIntent ? { intent: creationIntent } : undefined), {
+        replace: true,
+        state: null,
+      });
       return;
     }
     const projectId = validCreationProjectId;
@@ -69,23 +66,23 @@ export const useProjectVideoCreationContext = ({
           setVerified({ requestKey: currentRequestKey, projectId });
           return;
         }
-        void navigate(
-          studioCreatePath(queryCreationIntent ? { intent: queryCreationIntent } : undefined),
-          { replace: true, state: null },
-        );
+        void navigate(studioCreatePath(creationIntent ? { intent: creationIntent } : undefined), {
+          replace: true,
+          state: null,
+        });
       })
       .catch(() => {
         if (controller.signal.aborted) return;
-        void navigate(
-          studioCreatePath(queryCreationIntent ? { intent: queryCreationIntent } : undefined),
-          { replace: true, state: null },
-        );
+        void navigate(studioCreatePath(creationIntent ? { intent: creationIntent } : undefined), {
+          replace: true,
+          state: null,
+        });
       });
     return () => controller.abort('creation-context-changed');
   }, [
     navigate,
     pathname,
-    queryCreationIntent,
+    creationIntent,
     requestKey,
     requestedCreationProjectId,
     validCreationProjectId,

@@ -293,7 +293,3 @@ export const canonicalizeProtectedDestination = (destination: string): string | 
   if (!isProtectedAppPath(pathname) || canonicalizeLegacyAppPath(pathname) !== null) return null;
   return `${pathname}${parsed.search}${parsed.hash}`;
 };
-
-/** Classifies the actual Studio workspace subtree for lifecycle guards. */
-export const isStudioPath = (pathname: string): boolean =>
-  pathname === APP_PATHS.studio || pathname.startsWith(`${APP_PATHS.studio}/`);

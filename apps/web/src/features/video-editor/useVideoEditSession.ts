@@ -78,11 +78,6 @@ export const useVideoEditSession = () => {
   const [error, setError] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<VideoEditCandidate | null>(null);
   const [supported, setSupported] = useState(false);
-  const [lastApplied, setLastApplied] = useState<Readonly<{
-    sourceArtifactId: string;
-    editedArtifactId: string;
-    spec: VideoEditSpec;
-  }> | null>(null);
   const transactionStartRef = useRef<VideoEditSpec | null>(null);
   const renderControllerRef = useRef<AbortController | null>(null);
   const generationRef = useRef(0);
@@ -115,7 +110,6 @@ export const useVideoEditSession = () => {
     setProgress(0);
     setError(null);
     setCandidate(null);
-    setLastApplied(null);
     setSupported(videoEditPreviewSupported() && videoEditRenderingSupported());
     setPhase('editing');
   }, []);
@@ -298,18 +292,9 @@ export const useVideoEditSession = () => {
     setCandidate(null);
     setPhase('error');
   }, []);
-  const completeCommit = useCallback(
-    (editedArtifactId: string) => {
-      if (!source || !candidate) return;
-      setLastApplied({
-        sourceArtifactId: source.artifact.id,
-        editedArtifactId,
-        spec: candidate.spec,
-      });
-      setPhase('complete');
-    },
-    [candidate, source],
-  );
+  const completeCommit = useCallback(() => {
+    setPhase('complete');
+  }, []);
 
   useEffect(() => {
     if (!dirty && !isVideoEditBusy(phase)) return;
@@ -336,7 +321,6 @@ export const useVideoEditSession = () => {
       progress,
       error,
       candidate,
-      lastApplied,
       dirty,
       supported,
       canUndo: history.past.length > 0,
@@ -374,7 +358,6 @@ export const useVideoEditSession = () => {
       progress,
       error,
       candidate,
-      lastApplied,
       dirty,
       supported,
       history.past.length,

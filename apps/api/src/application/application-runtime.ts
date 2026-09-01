@@ -624,10 +624,6 @@ export class ApplicationRuntime {
     };
   }
 
-  decorateRequest(_name: string, _value: unknown): this {
-    return this;
-  }
-
   addHook(name: 'onRequest', hook: OnRequestHook): this;
   addHook(name: 'onSend', hook: OnSendHook): this;
   addHook(name: 'onClose', hook: OnCloseHook): this;

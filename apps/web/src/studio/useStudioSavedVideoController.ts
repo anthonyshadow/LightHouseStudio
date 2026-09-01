@@ -430,7 +430,7 @@ export const useStudioSavedVideoController = ({
           audioSidecar: validated.audioSidecar,
         });
         existingVideo.replaceSource(validated, artifact);
-        videoEditor.completeCommit(artifact.id);
+        videoEditor.completeCommit();
         videoEditor.close();
         openVideoUpload();
       } catch {

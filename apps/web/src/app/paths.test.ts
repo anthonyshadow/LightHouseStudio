@@ -13,7 +13,6 @@ import {
   isProjectWorkspacePath,
   isProjectsPath,
   isProtectedAppPath,
-  isStudioPath,
   isStudioRuntimePath,
   PROTECTED_ROUTES,
   projectIdFromPath,
@@ -195,8 +194,6 @@ describe('authenticated application paths', () => {
     ]) {
       expect(isProtectedAppPath(path)).toBe(false);
     }
-    expect(isStudioPath('/studio/future-child')).toBe(true);
-    expect(isStudioPath('/projects')).toBe(false);
     expect(studioVideoIdFromPath('/studio/not-a-uuid')).toBeNull();
   });
 });

@@ -15,10 +15,6 @@ import { useAuthenticatedSessionLifecycle } from './useAuthenticatedSessionLifec
 import { useShellServices } from './useShellServices';
 import { useStudioHandoff } from './useStudioHandoff';
 
-export interface AuthenticatedShellProps {
-  readonly initialIntent?: 'upload';
-}
-
 /**
  * What an authenticated operator has for as long as they stay signed in.
  *
@@ -38,7 +34,7 @@ const StudioRuntime = lazy(() =>
  */
 const StudioRuntimeLoading = () => <p role="status">Loading Studio…</p>;
 
-const AuthenticatedShellSurfaces = ({ initialIntent }: AuthenticatedShellProps) => {
+const AuthenticatedShellSurfaces = () => {
   const theme = useTheme();
   const auth = useAuth();
   const location = useLocation();
@@ -54,7 +50,6 @@ const AuthenticatedShellSurfaces = ({ initialIntent }: AuthenticatedShellProps) 
   const handoff = useStudioHandoff({ runtimeRouteActive, openStudio: nav.openStudio });
   const services = useShellServices({
     ownerUserId: user.id,
-    ...(initialIntent ? { initialIntent } : {}),
     confirmation,
     handoff,
     creativeLocks,
@@ -99,8 +94,8 @@ const AuthenticatedShellSurfaces = ({ initialIntent }: AuthenticatedShellProps) 
   );
 };
 
-export const AuthenticatedShell = (props: AuthenticatedShellProps) => (
+export const AuthenticatedShell = () => (
   <RemoteStateProvider>
-    <AuthenticatedShellSurfaces {...props} />
+    <AuthenticatedShellSurfaces />
   </RemoteStateProvider>
 );
