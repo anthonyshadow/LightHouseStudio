@@ -14,6 +14,9 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const buttonStyles = (theme: Theme, size: ButtonSize, variant: ButtonVariant): CSSObject => ({
   minHeight: size === 'small' ? '2.75rem' : '2.85rem',
   minWidth: size === 'small' ? '2.75rem' : '3rem',
+  // Stated here rather than left to the global reset, which grants it to `button` and not to `a`.
+  // A control that looks like a button has to behave like one whichever element is wearing it.
+  maxWidth: '100%',
   padding: size === 'small' ? '0.55rem 0.8rem' : '0.7rem 1rem',
   // A link reads as running text, so it keeps the block metrics but claims no box of its own.
   ...(variant === 'link' ? { minWidth: 0, paddingInline: 0 } : {}),
@@ -130,12 +133,27 @@ export interface LinkButtonProps extends AnchorHTMLAttributes<HTMLAnchorElement>
 }
 
 /**
+ * How an anchor wears a button.
+ *
+ * The underline is cleared before the variant styles apply, so `variant="link"` still draws its
+ * own; every other variant reads as a button rather than as running text. Exported because not
+ * every anchor in the product can be this component: a client-side destination has to be the
+ * router's own link, and it should still be the same control as the ones beside it.
+ */
+export const linkButtonStyles = (
+  theme: Theme,
+  size: ButtonSize = 'regular',
+  variant: ButtonVariant = 'secondary',
+): readonly CSSObject[] => [
+  buttonStyles(theme, size, variant),
+  { textDecoration: 'none' },
+  buttonVariantStyles(theme, variant),
+];
+
+/**
  * `Button`'s anchor form, for the actions that must be a real link — every `<a download>` in the
  * product, which cannot be a `<button>` because the browser has to own the save. It shares the
  * metrics, the fill and the focus ring, so a Download beside a Save is the same control.
- *
- * The underline is cleared before the variant styles apply, so `variant="link"` still draws its
- * own; every other variant reads as a button rather than as running text.
  */
 export const LinkButton = forwardRef<HTMLAnchorElement, LinkButtonProps>(function LinkButton(
   { variant = 'secondary', size = 'regular', children, ...props },
@@ -144,15 +162,7 @@ export const LinkButton = forwardRef<HTMLAnchorElement, LinkButtonProps>(functio
   const theme = useTheme();
 
   return (
-    <a
-      ref={ref}
-      css={[
-        buttonStyles(theme, size, variant),
-        { textDecoration: 'none' },
-        buttonVariantStyles(theme, variant),
-      ]}
-      {...props}
-    >
+    <a ref={ref} css={linkButtonStyles(theme, size, variant)} {...props}>
       {children}
     </a>
   );

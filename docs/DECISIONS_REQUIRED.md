@@ -141,13 +141,12 @@ single largest complexity contributor in the capture graph — with no Project i
 revisit after composition ships. Do not spend removal effort now; do not extend it either.
 **Blocks:** nothing. **Decide by:** post-Phase 4 review.
 
-## D13 — Compact navigation: Campaigns or Assets in the fourth slot?
+## D13 — Compact navigation: Campaigns or Assets in the fourth slot? — **decided**
 
 **Question:** The phone bottom bar keeps Campaigns (declared optional everywhere) and drops Assets
 (where finished work lives).
-**Recommendation:** swap — Dashboard / Studio / Projects / **Assets**; Campaigns reachable from
-Dashboard and Projects.
-**Blocks:** a Phase 1 slice. **Decide by:** that slice.
+**Decision (2026-09-01):** swapped — Dashboard / Studio / Projects / **Assets**; Campaigns stays on
+the rail and is reached from the Dashboard and the Projects list. Implemented in slice 1.5.
 
 ## D14 — Retention and cleanup policy
 

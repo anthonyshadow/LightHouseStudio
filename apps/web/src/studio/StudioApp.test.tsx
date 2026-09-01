@@ -8,7 +8,7 @@ import type {
 import { createPhaseOneEntitlements } from '@studio/domain';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { InputHTMLAttributes, PropsWithChildren, ReactNode } from 'react';
-import { createMemoryRouter, RouterProvider } from 'react-router';
+import { createMemoryRouter, Link, RouterProvider } from 'react-router';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   CreativeWorkspaceActions,
@@ -546,43 +546,28 @@ vi.mock('./useTakeReviewFlow', () => ({
   }),
 }));
 
+// Mirrors the real header's shape: destinations are addresses rendered as links, and only the
+// actions beside them are handlers. A stub that kept click handlers would have gone on passing
+// after the header stopped having any.
 vi.mock('./StudioHeader', () => ({
   StudioHeader: ({
     activeDestination,
-    onOpenDashboard,
-    onOpenStudio,
-    onOpenProjects,
-    onOpenCampaigns,
-    onOpenAssets,
+    destinationPaths,
     onLogout,
   }: {
     activeDestination: StudioHeaderDestination;
-    onOpenDashboard: () => void;
-    onOpenStudio: () => void;
-    onOpenProjects: () => void;
-    onOpenCampaigns: () => void;
-    onOpenAssets: () => void;
+    destinationPaths: Readonly<Record<StudioHeaderDestination, string>>;
     onLogout: () => void;
   }) => {
     harness.latestHeaderDestination = activeDestination;
     return (
       <div>
         Studio header
-        <button type="button" onClick={onOpenDashboard}>
-          Open Dashboard
-        </button>
-        <button type="button" onClick={onOpenStudio}>
-          Open Studio
-        </button>
-        <button type="button" onClick={onOpenProjects}>
-          Open Projects
-        </button>
-        <button type="button" onClick={onOpenCampaigns}>
-          Open Campaigns
-        </button>
-        <button type="button" onClick={onOpenAssets}>
-          Open Assets
-        </button>
+        <Link to={destinationPaths.dashboard}>Open Dashboard</Link>
+        <Link to={destinationPaths.studio}>Open Studio</Link>
+        <Link to={destinationPaths.projects}>Open Projects</Link>
+        <Link to={destinationPaths.campaigns}>Open Campaigns</Link>
+        <Link to={destinationPaths.assets}>Open Assets</Link>
         <button type="button" onClick={onLogout}>
           Log out
         </button>
@@ -885,7 +870,7 @@ describe('StudioApp composition lifecycle', () => {
     const { router } = renderStudio();
     expect(await screen.findByTestId('media-stage')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Assets' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Open Assets' }));
     await screen.findByText('Deferred saved videos');
     expect(router.state.location.pathname).toBe('/assets/videos');
     // Not hidden — absent. A stage kept behind `display: none` still holds a camera, a <video>
@@ -902,7 +887,7 @@ describe('StudioApp composition lifecycle', () => {
     expect(router.state.historyAction).toBe('REPLACE');
     expect(screen.queryByTestId('media-stage')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Studio' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Open Studio' }));
     await waitFor(() => expect(screen.getByTestId('media-stage')).toBeInTheDocument());
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
     expect(harness.session.startLocal).not.toHaveBeenCalled();
@@ -932,7 +917,7 @@ describe('StudioApp composition lifecycle', () => {
   it('switches Asset libraries in one entry and closes without stacking a hub route', async () => {
     const { router } = renderStudio();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Assets' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Open Assets' }));
     await waitFor(() => expect(router.state.location.pathname).toBe('/assets/videos'));
     expect(router.state.historyAction).toBe('PUSH');
 
@@ -1097,7 +1082,7 @@ describe('StudioApp composition lifecycle', () => {
     expect(screen.queryAllByTestId('media-stage')).toHaveLength(0);
     expect(harness.session.startLocal).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Open Studio' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Open Studio' }));
     await waitFor(() =>
       expect(screen.queryByText('Deferred Projects workspace')).not.toBeInTheDocument(),
     );

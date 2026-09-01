@@ -1,6 +1,7 @@
 import type { Preview } from '@storybook/react-vite';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState, type PropsWithChildren } from 'react';
+import { MemoryRouter } from 'react-router';
 import { createRemoteStateQueryClient } from '@web/application/remote-state/RemoteStateProvider';
 import { StudioDesignProvider } from '@web/ui';
 
@@ -18,22 +19,26 @@ const StoryRemoteStateProvider = ({ children }: PropsWithChildren) => {
 const preview: Preview = {
   tags: ['autodocs'],
   decorators: [
+    // A router wraps every story because navigation is anchors: the header, and anything else that
+    // sends the operator somewhere, renders a router link and cannot mount without one.
     (Story) => (
-      <StoryRemoteStateProvider>
-        <StudioDesignProvider>
-          <div
-            css={(theme) => ({
-              width: '100%',
-              minHeight: '100dvh',
-              padding: theme.space.lg,
-              color: theme.colors.text,
-              background: theme.gradients.shellAmbient,
-            })}
-          >
-            <Story />
-          </div>
-        </StudioDesignProvider>
-      </StoryRemoteStateProvider>
+      <MemoryRouter>
+        <StoryRemoteStateProvider>
+          <StudioDesignProvider>
+            <div
+              css={(theme) => ({
+                width: '100%',
+                minHeight: '100dvh',
+                padding: theme.space.lg,
+                color: theme.colors.text,
+                background: theme.gradients.shellAmbient,
+              })}
+            >
+              <Story />
+            </div>
+          </StudioDesignProvider>
+        </StoryRemoteStateProvider>
+      </MemoryRouter>
     ),
   ],
   parameters: {

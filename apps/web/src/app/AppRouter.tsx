@@ -32,9 +32,10 @@ const LazyAuthenticatedShell = lazy(() =>
   import('./shell/AuthenticatedShell').then((module) => ({ default: module.AuthenticatedShell })),
 );
 
-const ENTRY_DESCRIPTION = 'Record or upload a video, then review and edit it in Lightframe Studio.';
+const ENTRY_DESCRIPTION =
+  'Lightframe Studio turns your footage into finished, platform-ready video: import or record, edit on your device, and export the file each placement needs.';
 const STUDIO_DESCRIPTION =
-  'Lightframe is a local-first browser studio for recording, uploads, post-recording edits, and advanced live AI.';
+  'Lightframe Studio turns footage into finished, platform-ready video — importing, editing and export in one local-first browser workspace, with AI as an option inside it.';
 
 const routeSurfaceStyles = {
   width: '100%',

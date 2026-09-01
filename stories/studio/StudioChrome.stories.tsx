@@ -55,11 +55,14 @@ const meta = {
     capabilityState: 'ready',
     user: headerUser,
     activeDestination: 'studio',
-    onOpenDashboard: fn(),
+    destinationPaths: {
+      dashboard: '/dashboard',
+      studio: '/studio/create',
+      projects: '/projects',
+      campaigns: '/campaigns',
+      assets: '/assets/videos',
+    },
     onOpenStudio: fn(),
-    onOpenCampaigns: fn(),
-    onOpenProjects: fn(),
-    onOpenAssets: fn(),
     onCreateProject: fn(),
     onCreateCampaign: fn(),
     onCreateAsset: fn(),
@@ -89,11 +92,14 @@ const HeaderHarness = () => {
         capabilityState="ready"
         user={headerUser}
         activeDestination="studio"
-        onOpenDashboard={fn()}
+        destinationPaths={{
+          dashboard: '/dashboard',
+          studio: '/studio/create',
+          projects: '/projects',
+          campaigns: '/campaigns',
+          assets: '/assets/videos',
+        }}
         onOpenStudio={fn()}
-        onOpenCampaigns={fn()}
-        onOpenProjects={fn()}
-        onOpenAssets={fn()}
         onCreateProject={fn()}
         onCreateCampaign={fn()}
         onCreateAsset={fn()}

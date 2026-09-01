@@ -161,7 +161,7 @@ test('Back and Forward restore focus across canonical organization routes', asyn
   await loginFromEntry(page);
   await expect(page.locator('#studio-main')).toBeFocused();
 
-  await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  await page.getByRole('link', { name: 'Assets', exact: true }).click();
   await expect(page).toHaveURL(/\/assets\/videos$/u);
   await expect(page.getByRole('dialog', { name: 'Videos' })).toBeVisible();
 
@@ -196,7 +196,7 @@ test('Asset libraries open with no Studio stage and hand a selection back to it'
   await page.goto(STUDIO_PATH);
   await expect(page.getByLabel('Studio media stage')).toHaveCount(1);
 
-  await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  await page.getByRole('link', { name: 'Assets', exact: true }).click();
   await expect(page).toHaveURL(/\/assets\/videos$/u);
   for (const library of [
     { label: 'Videos', path: '/assets/videos', empty: 'No videos in Assets yet' },
@@ -227,7 +227,7 @@ test('Asset libraries open with no Studio stage and hand a selection back to it'
 
   // Creating from a library still lands in Studio with the runtime mounted, which is the path the
   // shell's handoff channel exists to serve.
-  await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  await page.getByRole('link', { name: 'Assets', exact: true }).click();
   await page
     .getByRole('navigation', { name: 'Asset libraries' })
     .getByRole('button', { name: /Characters/u })
@@ -251,7 +251,7 @@ test('closing an Asset library consumes its history entry without stacking a hub
   const dashboardHistoryIndex = await readHistoryIndex(page);
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    await page.getByRole('button', { name: 'Assets', exact: true }).click();
+    await page.getByRole('link', { name: 'Assets', exact: true }).click();
     await expect(page).toHaveURL(/\/assets\/videos$/u);
     await page
       .getByRole('dialog', { name: 'Videos' })
@@ -403,7 +403,7 @@ test('Projects quick creation, lifecycle, refresh, and explicit Assets exit keep
     .click();
   await expect(page.getByText('Draft', { exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  await page.getByRole('link', { name: 'Assets', exact: true }).click();
   await expect(page).toHaveURL(/\/assets\/videos$/u);
   await page.reload();
   await expect(page).toHaveURL(/\/assets\/videos$/u);
@@ -569,7 +569,7 @@ test('a Project saves exact Versions, reconciles response loss, and retains trut
   await expect(targetForm.getByText('Launch master', { exact: true })).toBeVisible();
   await targetForm.getByRole('button', { name: 'Cancel' }).click();
 
-  await page.getByRole('button', { name: 'Assets', exact: true }).click();
+  await page.getByRole('link', { name: 'Assets', exact: true }).click();
   const gallery = page.getByRole('dialog', { name: 'Videos' });
   await expect(gallery.getByText('No Project').first()).toBeVisible();
   await expect(gallery.getByRole('heading', { name: 'Legacy unassigned' })).toBeVisible();

@@ -15,16 +15,18 @@ Primary destinations (desktop rail): **Dashboard · Studio · Projects · Campai
 - **Campaigns** — the optional organizer over Projects.
 - **Assets** — the Libraries (Videos, Characters, Outfits, Voices), opened as overlays.
 
-Compact (phone) navigation carries four slots; because Campaigns are optional and finished work is
-not, the compact bar should favor Assets/Videos over Campaigns **(gap — today Campaigns keeps the
-slot; decision D13)**. The Project workspace is the flagship editing surface; the manual editor is
-a first-class part of it, not an annex of an AI wizard **(gap)**.
+Compact (phone) navigation carries four slots and spends the fourth on Assets rather than Campaigns
+(decision D13): Campaigns are optional and finished work is not. Campaigns stays on the rail and one
+press away from the Dashboard and the Projects list. Every destination is a real link, on both the
+rail and the compact bar. The Project workspace is the flagship editing surface; the manual editor
+is a first-class part of it, not an annex of an AI wizard **(gap)**.
 
 ## 1. First-time entry
 
 **Sees:** a public entry page stating what the product is — a studio that turns footage into
-finished, platform-ready marketing video; editing on-device; AI optional — and a Log in action.
-**(gap: today's copy says "record or upload, restyle it, download" — an AI-restyle identity.)**
+finished, platform-ready marketing video; editing on-device; AI optional — and a Log in action. The
+capabilities are listed in the order the work happens: bring footage in, edit it, deliver it, and
+only then the optional AI. The document description says the same thing.
 **Does:** logs in.
 **System:** restores any requested deep link, else lands on Dashboard.
 **Next:** Dashboard's first-run card points at the two honest starts: "Create a Project" or "Start

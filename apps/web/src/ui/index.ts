@@ -1,6 +1,6 @@
 export { StudioDesignProvider } from './StudioDesignProvider';
 export { studioTheme } from './theme';
-export { Button, LinkButton } from './primitives/Button';
+export { Button, LinkButton, linkButtonStyles } from './primitives/Button';
 export { Surface } from './primitives/Surface';
 export { TextAreaField, TextField, NO_BROWSER_SUGGESTIONS } from './primitives/FormControls';
 export { ListSearchField } from './primitives/ListSearchField';
