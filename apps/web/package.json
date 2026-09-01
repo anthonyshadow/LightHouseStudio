@@ -10,19 +10,19 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@decartai/sdk": "0.1.20",
+    "@decartai/sdk": "0.1.22",
     "@emotion/react": "11.14.0",
-    "@mediabunny/aac-encoder": "1.54.0",
+    "@mediabunny/aac-encoder": "1.55.3",
     "@studio/contracts": "workspace:*",
     "@studio/domain": "workspace:*",
-    "@tanstack/react-query": "5.101.4",
+    "@tanstack/react-query": "5.102.8",
     "@uppy/aws-s3": "5.1.0",
     "@uppy/core": "5.2.0",
     "idb": "8.0.3",
-    "mediabunny": "1.54.0",
+    "mediabunny": "1.55.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-router": "8.3.0"
+    "react-router": "8.3.1"
   },
   "devDependencies": {
     "fake-indexeddb": "6.2.5"
