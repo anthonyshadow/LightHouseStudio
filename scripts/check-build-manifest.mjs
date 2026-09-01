@@ -25,7 +25,17 @@ export const BUILD_CLOSURE_BUDGETS = {
   // field primitives are what the shell renders, so the constant is in this closure by definition,
   // and the two `data-*` attributes are the half that actually stops a manager offering what was
   // typed into another Project. `FORBIDDEN_CLOSURE_DEPENDENCIES` again untouched.
-  'src/app/shell/AuthenticatedShell.tsx': 727_000,
+  //
+  // Raised again from 727_000 on 2026-09-01, by 1_000. The primary navigation became real anchors:
+  // the rail, the compact bar and the brand are the router's `Link` rather than buttons calling
+  // `navigate`, which is what gives an operator middle-click, copy-link and open-in-new-tab on the
+  // five destinations they use most, and states them as links to assistive technology. That pulled
+  // `Link` into a closure nothing had needed it in — 252 bytes over the previous ceiling, and the
+  // navigation is the shell by definition, so there is no lazy boundary to move it behind. What
+  // was recoverable was recovered in the same change: the header stopped taking five navigation
+  // handlers, and `ProtectedRoute` had already absorbed the duplicated restore-and-wait the
+  // not-found route would otherwise have carried. `FORBIDDEN_CLOSURE_DEPENDENCIES` untouched.
+  'src/app/shell/AuthenticatedShell.tsx': 728_000,
   // Shell plus capture graph, which is what a Studio route costs. Looser, because a Studio route is
   // where media code belongs; `FORBIDDEN_CLOSURE_DEPENDENCIES` is what keeps it from leaking out.
   'src/studio/StudioApp.tsx': 910_000,

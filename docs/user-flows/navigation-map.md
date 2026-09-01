@@ -86,7 +86,8 @@ EntryPage
 StudioHeader (all protected routes)
   ├─ brand ─────────────────────────────► /dashboard              StudioHeader.tsx:317
   ├─ nav: Dashboard/Studio/Projects/Campaigns/Assets              StudioHeader.tsx
-  │      (compact bar below 48rem carries the first four; Assets is reached from the Dashboard)
+  │      (real links, not buttons; compact bar below 48rem drops Campaigns, which
+  │       stays on the rail and is reached from the Dashboard and Projects — D13)
   │      Studio ──────────────────────► /studio/create            useStudioNavigationActions.ts
   ├─ Quick Create ▸ New video ──────────► /studio/create          ShellChrome.tsx
   │              ▸ New Project ─────────► /projects + createIntent ShellChrome.tsx

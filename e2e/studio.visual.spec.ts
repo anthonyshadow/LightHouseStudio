@@ -646,7 +646,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'campaigns-workspace',
     setup: async (page) => {
       await installCampaignHarness(page, true);
-      await page.getByRole('button', { name: 'Campaigns', exact: true }).click();
+      await page.getByRole('link', { name: 'Campaigns', exact: true }).click();
       await expect(page.getByRole('heading', { name: 'Active Campaigns' })).toBeVisible();
       await expect(page.getByRole('heading', { name: 'Summer launch' })).toBeVisible();
     },

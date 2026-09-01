@@ -140,9 +140,14 @@ check as passing.
   persists, so arriving somewhere is a new history entry rather than a remount, and the same keying
   is what makes a return _within_ Studio behave like a fresh visit.
 - **Asset libraries are overlays**, not pages — they key off `location.pathname` in
-  `StudioLibraryOverlays.tsx`. That is also why the compact bottom navigation carries four
-  destinations and not five: below `48rem` Assets is reached from the Dashboard, because a shelf
-  you open over the current surface is not a place to stand. The rail keeps all five.
+  `StudioLibraryOverlays.tsx`. The compact bottom navigation still carries four destinations and not
+  five, but Campaigns is the one it leaves out (D13): finished work is reached constantly, an
+  optional organizer may never be made. The rail keeps all five.
+- **Primary navigation is anchors, not buttons.** The rail, the compact bar and the brand render
+  react-router `Link`s wearing `linkButtonStyles`, so middle-click, copy-link and open-in-new-tab
+  work. `StudioHeader` takes `destinationPaths`, not `onOpen*` handlers; the nav styles key off
+  `[data-nav-destination]` rather than the element name. A test or spec that queries navigation
+  wants `getByRole('link')`.
 - **Route registration is conditional.** Project source/working-media/output and creative-library
   routes only exist in certain `DATABASE_MODE` configurations. `503 feature_unavailable` is a
   legitimate response; handle it.

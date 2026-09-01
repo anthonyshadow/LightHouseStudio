@@ -197,7 +197,7 @@ export const primaryNavigationStyles = (theme: Theme): CSSObject => ({
   border: `1px solid ${theme.colors.border}`,
   borderRadius: theme.radii.round,
   background: theme.colors.canvasRaised,
-  '& > button': {
+  '& > [data-nav-destination]': {
     minHeight: '2.4rem',
     minWidth: 0,
     padding: `0.45rem ${theme.space.md}`,
@@ -205,7 +205,7 @@ export const primaryNavigationStyles = (theme: Theme): CSSObject => ({
     fontSize: theme.fontSizes.metadata,
     whiteSpace: 'nowrap',
   },
-  '& > button[aria-current="page"]': {
+  '& > [data-nav-destination][aria-current="page"]': {
     color: theme.colors.onAccent,
     background: theme.colors.accent,
   },
@@ -220,7 +220,7 @@ export const primaryNavigationStyles = (theme: Theme): CSSObject => ({
     border: 0,
     borderRadius: 0,
     background: 'transparent',
-    '& > button': {
+    '& > [data-nav-destination]': {
       position: 'relative',
       width: '100%',
       minHeight: '2.75rem',
@@ -233,11 +233,11 @@ export const primaryNavigationStyles = (theme: Theme): CSSObject => ({
       fontSize: theme.fontSizes.body,
       whiteSpace: 'normal',
     },
-    '& > button[aria-current="page"]': {
+    '& > [data-nav-destination][aria-current="page"]': {
       color: theme.colors.text,
       background: 'transparent',
     },
-    '& > button[aria-current="page"]::before': {
+    '& > [data-nav-destination][aria-current="page"]::before': {
       position: 'absolute',
       insetBlock: '0.85rem',
       insetInlineStart: `-${theme.space.md}`,
@@ -245,7 +245,7 @@ export const primaryNavigationStyles = (theme: Theme): CSSObject => ({
       background: theme.colors.accent,
       content: '""',
     },
-    '& > button:hover:not(:disabled)': { background: theme.colors.surfaceSoft },
+    '& > [data-nav-destination]:hover': { background: theme.colors.surfaceSoft },
     '& [data-nav-icon]': {
       width: '1.1rem',
       height: '1.1rem',
@@ -253,7 +253,9 @@ export const primaryNavigationStyles = (theme: Theme): CSSObject => ({
       flex: '0 0 auto',
       color: theme.colors.textFaint,
     },
-    '& > button[aria-current="page"] [data-nav-icon]': { color: theme.colors.accent },
+    '& > [data-nav-destination][aria-current="page"] [data-nav-icon]': {
+      color: theme.colors.accent,
+    },
   },
   [media.down('compact')]: { display: 'none' },
 });
@@ -263,6 +265,9 @@ const brandMarkOnly: CSSObject = { gridTemplateColumns: '2rem', '& > div': { dis
 
 export const brandStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
+  // The reset hands `max-width: 100%` to `button` alone, and the brand is an anchor now: without it
+  // the wordmark can push the header wider than the viewport at narrow widths.
+  maxWidth: '100%',
   display: 'inline-grid',
   gridTemplateColumns: '2.4rem minmax(0, 1fr)',
   alignItems: 'center',
@@ -273,6 +278,9 @@ export const brandStyles = (theme: Theme): CSSObject => ({
   color: theme.colors.text,
   background: 'transparent',
   textAlign: 'start',
+  // The brand is an anchor now, and an anchor arrives underlined. It reads as a wordmark, not as
+  // running text, so the rule the rest of the navigation gets applies here too.
+  textDecoration: 'none',
   cursor: 'pointer',
   '& img': { width: '2.35rem', height: '2.35rem' },
   '& > div': { minWidth: 0 },
@@ -338,7 +346,7 @@ export const mobileNavigationStyles = (theme: Theme): CSSObject => ({
     padding: `${theme.space.xxs} max(${theme.space.xs}, env(safe-area-inset-right)) max(${theme.space.xxs}, env(safe-area-inset-bottom)) max(${theme.space.xs}, env(safe-area-inset-left))`,
     borderBlockStart: `1px solid ${theme.colors.borderStrong}`,
     background: theme.colors.canvasRaised,
-    '& button': {
+    '& [data-nav-destination]': {
       minWidth: 0,
       minHeight: '3.5rem',
       flexDirection: 'column',
@@ -347,8 +355,8 @@ export const mobileNavigationStyles = (theme: Theme): CSSObject => ({
       borderRadius: theme.radii.small,
       fontSize: '0.65rem',
     },
-    '& button svg': { width: '1.05rem', height: '1.05rem' },
-    '& button[aria-current="page"]': {
+    '& [data-nav-destination] svg': { width: '1.05rem', height: '1.05rem' },
+    '& [data-nav-destination][aria-current="page"]': {
       color: theme.colors.accent,
       background: 'transparent',
     },

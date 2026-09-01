@@ -154,7 +154,24 @@ describe('AppRouter', () => {
     expect(screen.queryByText('Studio route')).not.toBeInTheDocument();
     expect(appHarness.mountCount).toBe(0);
     expect(document.title).toBe('Enter Lightframe Studio');
-    expect(description?.content).toContain('Record or upload a video');
+    expect(description?.content).toContain('finished, platform-ready video');
+  });
+
+  it('introduces the product as make, edit, deliver — with AI last', () => {
+    // The order is the claim. Leading with restyling described a tool that changes videos; this
+    // describes the one that finishes them, and puts AI where it belongs: optional, and after.
+    authApi.fetchCurrentSession.mockReturnValue(new Promise(() => undefined));
+    renderApplication('/', null);
+
+    expect(
+      screen.getByText('Turn your footage into finished, platform-ready video.'),
+    ).toBeVisible();
+    const capabilities = screen.getAllByRole('listitem').map((item) => item.textContent);
+    expect(capabilities).toHaveLength(4);
+    expect(capabilities[0]).toContain('footage you already shot');
+    expect(capabilities[1]).toContain('Trim, crop, rotate');
+    expect(capabilities[2]).toContain('shape each placement needs');
+    expect(capabilities[3]).toContain('Optionally change who is on screen');
   });
 
   it('restores an authenticated entry directly to Dashboard', async () => {

@@ -10,6 +10,7 @@ import {
   savedVideoLibraryPath,
 } from '../app/paths';
 import { useRouteBack } from '../app/useRouteBack';
+import type { StudioHeaderDestination } from './StudioHeader';
 
 /**
  * The Studio shell's outbound destinations in one place, so header, dashboard, asset cards and
@@ -34,7 +35,20 @@ export const useStudioNavigationActions = () => {
     () =>
       ({
         navigateTo: (path: string) => void navigate(path),
-        openDashboard: () => void navigate(APP_PATHS.dashboard),
+        /**
+         * Where each primary destination lives, so the navigation can be real links.
+         *
+         * A function rather than a value: Assets resolves to the library last used, which lives in
+         * a ref this memo does not depend on, and a frozen record would send every operator back to
+         * the shelf they opened first.
+         */
+        destinationPaths: (): Readonly<Record<StudioHeaderDestination, string>> => ({
+          dashboard: APP_PATHS.dashboard,
+          studio: APP_PATHS.create,
+          projects: APP_PATHS.projects,
+          campaigns: APP_PATHS.campaigns,
+          assets: ASSET_DESTINATION_PATHS[lastAssetDestinationRef.current],
+        }),
         openStudio: () => void navigate(APP_PATHS.create),
         openProjects: () => void navigate(APP_PATHS.projects),
         openCampaigns: () => void navigate(APP_PATHS.campaigns),

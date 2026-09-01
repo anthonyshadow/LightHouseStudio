@@ -3,6 +3,7 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
+import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../ui';
 import { StudioHeader } from './StudioHeader';
@@ -39,11 +40,14 @@ const headerProps = {
     lastLoginAt: '2026-08-05T12:00:00.000Z',
   },
   activeDestination: 'studio' as const,
-  onOpenDashboard: vi.fn(),
+  destinationPaths: {
+    dashboard: '/dashboard',
+    studio: '/studio/create',
+    projects: '/projects',
+    campaigns: '/campaigns',
+    assets: '/assets/videos',
+  },
   onOpenStudio: vi.fn(),
-  onOpenProjects: vi.fn(),
-  onOpenCampaigns: vi.fn(),
-  onOpenAssets: vi.fn(),
   onCreateProject: vi.fn(),
   onCreateCampaign: vi.fn(),
   onCreateAsset: vi.fn(),
@@ -55,13 +59,15 @@ const headerProps = {
 const renderHeader = (overrides: Partial<ComponentProps<typeof StudioHeader>> = {}) =>
   render(
     <StudioDesignProvider>
-      <StudioHeader
-        {...headerProps}
-        availability={availability}
-        browser={browser}
-        capabilityState="ready"
-        {...overrides}
-      />
+      <MemoryRouter>
+        <StudioHeader
+          {...headerProps}
+          availability={availability}
+          browser={browser}
+          capabilityState="ready"
+          {...overrides}
+        />
+      </MemoryRouter>
       <button type="button">Outside header</button>
     </StudioDesignProvider>,
   );
@@ -72,31 +78,37 @@ afterEach(() => {
 });
 
 describe('StudioHeader', () => {
-  it('exposes Dashboard, Studio, Projects, Campaigns, and Assets as primary navigation', async () => {
-    const user = userEvent.setup();
+  it('gives every primary destination a real address rather than a click handler', () => {
+    // Middle-click, copy-link and open-in-new-tab are the browser's to give, and only an anchor
+    // with an href can hand them over.
     const { container } = renderHeader();
     const navigation = screen.getByRole('navigation', { name: 'Primary' });
 
     // The Studio destination shares the rail and the mobile navigation with every other surface,
     // and is the one the create surface marks: without it, Studio has no current location.
     expect(container.querySelector('nav[aria-label="Mobile primary"]')).not.toBeNull();
-    expect(within(navigation).getByRole('button', { name: 'Studio' })).toHaveAttribute(
+    expect(within(navigation).getByRole('link', { name: 'Studio' })).toHaveAttribute(
       'aria-current',
       'page',
     );
-    await user.click(within(navigation).getByRole('button', { name: 'Studio' }));
-    expect(headerProps.onOpenStudio).toHaveBeenCalledOnce();
-    await user.click(within(navigation).getByRole('button', { name: 'Dashboard' }));
-    expect(headerProps.onOpenDashboard).toHaveBeenCalledOnce();
-    await user.click(within(navigation).getByRole('button', { name: 'Projects' }));
-    expect(headerProps.onOpenProjects).toHaveBeenCalledOnce();
-    await user.click(within(navigation).getByRole('button', { name: 'Campaigns' }));
-    expect(headerProps.onOpenCampaigns).toHaveBeenCalledOnce();
-    await user.click(within(navigation).getByRole('button', { name: 'Assets' }));
-    expect(headerProps.onOpenAssets).toHaveBeenCalledOnce();
+    expect(
+      within(navigation)
+        .getAllByRole('link')
+        .map((link) => [link.textContent, link.getAttribute('href')]),
+    ).toEqual([
+      ['Dashboard', '/dashboard'],
+      ['Studio', '/studio/create'],
+      ['Projects', '/projects'],
+      ['Campaigns', '/campaigns'],
+      ['Assets', '/assets/videos'],
+    ]);
+    expect(screen.getByRole('link', { name: 'Open Lightframe Dashboard' })).toHaveAttribute(
+      'href',
+      '/dashboard',
+    );
   });
 
-  it('carries the four surfaces in the compact bar and keeps Assets on the rail', () => {
+  it('carries Assets in the compact bar and leaves Campaigns to the rail', () => {
     const { container } = renderHeader({ activeDestination: 'dashboard' });
     const header = screen.getByRole('banner');
     const desktopNavigation = screen.getByRole('navigation', { name: 'Primary' });
@@ -104,26 +116,23 @@ describe('StudioHeader', () => {
       'nav[aria-label="Mobile primary"]',
     );
 
-    expect(within(desktopNavigation).getByRole('button', { name: 'Dashboard' })).toHaveAttribute(
+    expect(within(desktopNavigation).getByRole('link', { name: 'Dashboard' })).toHaveAttribute(
       'aria-current',
       'page',
     );
     expect(mobileNavigation).not.toBeNull();
-    // Assets is a shelf opened over the surface you are on, not a surface: the compact bar keeps
-    // the four you stand on, and the Dashboard carries the way into the shelf.
+    // Four slots, and Campaigns is the optional one: finished work is reached constantly, a
+    // Campaign may never be made at all. The rail still carries both.
     expect(
       within(mobileNavigation!)
-        .getAllByRole('button', { hidden: true })
-        .map((button) => button.textContent),
-    ).toEqual(['Dashboard', 'Studio', 'Projects', 'Campaigns']);
-    expect(within(desktopNavigation).getByRole('button', { name: 'Assets' })).toBeVisible();
+        .getAllByRole('link', { hidden: true })
+        .map((link) => link.textContent),
+    ).toEqual(['Dashboard', 'Studio', 'Projects', 'Assets']);
+    expect(within(desktopNavigation).getByRole('link', { name: 'Campaigns' })).toBeVisible();
     expect(within(header).getByRole('button', { name: 'Quick Create' })).toBeVisible();
     expect(within(header).getByRole('button', { name: 'Core Studio ready' })).toBeVisible();
     expect(within(header).getByRole('button', { name: 'Demo Creator account menu' })).toBeVisible();
     expect(header).not.toHaveTextContent('Pro Plan');
-
-    within(mobileNavigation!).getAllByRole('button', { hidden: true })[2]?.click();
-    expect(headerProps.onOpenProjects).toHaveBeenCalledOnce();
   });
 
   it('marks Assets as the current destination independently from Account', async () => {
@@ -131,7 +140,7 @@ describe('StudioHeader', () => {
     renderHeader({ activeDestination: 'assets' });
     const navigation = screen.getByRole('navigation', { name: 'Primary' });
 
-    expect(within(navigation).getByRole('button', { name: 'Assets' })).toHaveAttribute(
+    expect(within(navigation).getByRole('link', { name: 'Assets' })).toHaveAttribute(
       'aria-current',
       'page',
     );

@@ -1,6 +1,7 @@
 import { useTheme } from '@emotion/react';
 import type { AuthenticatedSessionResponse, AuthenticatedUser } from '@studio/contracts';
 import { useCallback, useRef, useState } from 'react';
+import { Link } from 'react-router';
 import { AccountMenu } from '../features/account/AccountMenu';
 import type { BrowserCapabilities, ProviderAvailability } from '../features/media-session';
 import { liveExperienceAvailability } from './studioLiveAvailability';
@@ -9,7 +10,7 @@ import {
   type CapabilityState,
   type StudioAvailabilityPresentation,
 } from './studioAvailabilityPresentation';
-import { AppIcon, Button, type AppIconName } from '../ui';
+import { AppIcon, Button, linkButtonStyles, type AppIconName } from '../ui';
 import { useDismissiblePopover } from '../ui/primitives/useDismissiblePopover';
 import { useMenuKeyboardNavigation } from '../ui/primitives/useMenuKeyboardNavigation';
 import {
@@ -40,11 +41,10 @@ type StudioHeaderProps = {
   session?: AuthenticatedSessionResponse;
   accountBusy?: boolean;
   activeDestination: StudioHeaderDestination;
-  onOpenDashboard: () => void;
+  /** Where each destination lives. Navigation is anchors, so it needs addresses, not handlers. */
+  destinationPaths: Readonly<Record<StudioHeaderDestination, string>>;
+  /** Still a handler: the Create menu offers a new video as an action, not as a place to go. */
   onOpenStudio: () => void;
-  onOpenProjects: () => void;
-  onOpenCampaigns: () => void;
-  onOpenAssets: () => void;
   onCreateProject: () => void;
   onCreateCampaign: () => void;
   onCreateAsset: (trigger: HTMLButtonElement | null) => void;
@@ -195,11 +195,8 @@ export const StudioHeader = ({
   session,
   accountBusy,
   activeDestination,
-  onOpenDashboard,
+  destinationPaths,
   onOpenStudio,
-  onOpenProjects,
-  onOpenCampaigns,
-  onOpenAssets,
   onCreateProject,
   onCreateCampaign,
   onCreateAsset,
@@ -222,34 +219,33 @@ export const StudioHeader = ({
    * Studio is a destination like any other: without it the create surface — the product's main
    * one — is the only place the rail can never mark, so the operator loses their location there.
    *
-   * Assets is the exception, and only on a compact layout. It is not a place you work; it is a
-   * shelf you open over the place you are working, and it closes back to it. A phone's bottom bar
-   * has room for the four surfaces you actually stand on, and the Dashboard carries the way in to
-   * the shelf — which is where you already are when you go looking for saved work.
+   * Campaigns is the one the compact bar leaves out. A phone's bottom bar has room for four, and
+   * the choice is between an organizer the product declares optional everywhere and the place
+   * finished work lives. Assets opens over the current surface rather than replacing it, which was
+   * the old argument for keeping it out — but a shelf you reach for constantly beats a folder you
+   * may never make, and Campaigns is still one press away from the Dashboard and from Projects.
+   * The rail carries all five.
    */
   const destinations = [
     {
       id: 'dashboard',
       label: 'Dashboard',
       icon: 'dashboard',
-      open: onOpenDashboard,
       compact: true,
     },
-    { id: 'studio', label: 'Studio', icon: 'video', open: onOpenStudio, compact: true },
-    { id: 'projects', label: 'Projects', icon: 'projects', open: onOpenProjects, compact: true },
+    { id: 'studio', label: 'Studio', icon: 'video', compact: true },
+    { id: 'projects', label: 'Projects', icon: 'projects', compact: true },
     {
       id: 'campaigns',
       label: 'Campaigns',
       icon: 'campaigns',
-      open: onOpenCampaigns,
-      compact: true,
+      compact: false,
     },
-    { id: 'assets', label: 'Assets', icon: 'assets', open: onOpenAssets, compact: false },
+    { id: 'assets', label: 'Assets', icon: 'assets', compact: true },
   ] as const satisfies readonly {
     id: StudioHeaderDestination;
     label: string;
     icon: AppIconName;
-    open: () => void;
     /** Whether the compact bottom bar carries it, or only the rail does. */
     compact: boolean;
   }[];
@@ -258,30 +254,29 @@ export const StudioHeader = ({
   return (
     <>
       <header css={headerStyles(theme)}>
-        <button
-          type="button"
+        <Link
+          to={destinationPaths.dashboard}
           aria-label="Open Lightframe Dashboard"
           css={brandStyles(theme)}
-          onClick={onOpenDashboard}
         >
           <img src="/favicon.svg" alt="" width="38" height="38" />
           <div>
             <strong>Lightframe</strong>
             <span>Studio</span>
           </div>
-        </button>
+        </Link>
         <nav aria-label="Primary" css={primaryNavigationStyles(theme)}>
-          {destinations.map(({ id, label, icon, open }) => (
-            <Button
+          {destinations.map(({ id, label, icon }) => (
+            <Link
               key={id}
-              size="small"
-              variant="quiet"
+              data-nav-destination
+              to={destinationPaths[id]}
+              css={linkButtonStyles(theme, 'small', 'quiet')}
               aria-current={activeDestination === id ? 'page' : undefined}
-              onClick={open}
             >
               <AppIcon data-nav-icon name={icon} />
               <span>{label}</span>
-            </Button>
+            </Link>
           ))}
         </nav>
         <div css={headerActionsStyles(theme)}>
@@ -342,17 +337,17 @@ export const StudioHeader = ({
         </div>
       </header>
       <nav aria-label="Mobile primary" css={mobileNavigationStyles(theme)}>
-        {compactDestinations.map(({ id, label, icon, open }) => (
-          <Button
+        {compactDestinations.map(({ id, label, icon }) => (
+          <Link
             key={id}
-            size="small"
-            variant="quiet"
+            data-nav-destination
+            to={destinationPaths[id]}
+            css={linkButtonStyles(theme, 'small', 'quiet')}
             aria-current={activeDestination === id ? 'page' : undefined}
-            onClick={open}
           >
             <AppIcon name={icon} width="1.05rem" height="1.05rem" />
             <span>{label}</span>
-          </Button>
+          </Link>
         ))}
       </nav>
     </>

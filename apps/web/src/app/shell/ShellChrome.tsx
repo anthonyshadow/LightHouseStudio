@@ -74,11 +74,8 @@ export const ShellChrome = ({ services, user, session, logout }: ShellChromeProp
                     ? 'assets'
                     : 'studio'
           }
-          onOpenDashboard={nav.openDashboard}
+          destinationPaths={nav.destinationPaths()}
           onOpenStudio={nav.openStudio}
-          onOpenProjects={nav.openProjects}
-          onOpenCampaigns={nav.openCampaigns}
-          onOpenAssets={nav.openAssets}
           onCreateProject={nav.createProject}
           onCreateCampaign={nav.createCampaign}
           onCreateAsset={(trigger) => {

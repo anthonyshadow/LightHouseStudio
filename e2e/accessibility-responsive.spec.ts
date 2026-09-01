@@ -433,7 +433,7 @@ for (const viewport of dashboardViewports) {
       expect(mobileNavigationBox!.y + mobileNavigationBox!.height).toBeGreaterThanOrEqual(
         viewport.height - 1,
       );
-      for (const trigger of await mobileNavigation.getByRole('button').all()) {
+      for (const trigger of await mobileNavigation.getByRole('link').all()) {
         const bounds = await trigger.boundingBox();
         expect(bounds).not.toBeNull();
         expect(bounds!.height).toBeGreaterThanOrEqual(44);
@@ -616,7 +616,7 @@ test('small-mobile Dashboard remains usable at 200% text', async ({ page }) => {
     exact: true,
   });
   await expect(mobileNavigation).toBeVisible();
-  for (const trigger of await mobileNavigation.getByRole('button').all()) {
+  for (const trigger of await mobileNavigation.getByRole('link').all()) {
     const bounds = await trigger.boundingBox();
     expect(bounds).not.toBeNull();
     expect(bounds!.height).toBeGreaterThanOrEqual(44);
@@ -712,7 +712,7 @@ test('Project workspace keeps a 16:9 stage and the shared navigation at responsi
       await expect(page.getByRole('navigation', { name: 'Primary', exact: true })).toBeVisible();
       await expect(page.getByRole('navigation', { name: 'Mobile primary' })).toBeHidden();
     }
-    await expect(page.getByRole('button', { name: 'Projects', exact: true })).toHaveAttribute(
+    await expect(page.getByRole('link', { name: 'Projects', exact: true })).toHaveAttribute(
       'aria-current',
       'page',
     );

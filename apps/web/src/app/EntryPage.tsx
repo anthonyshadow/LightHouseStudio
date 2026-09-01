@@ -102,10 +102,19 @@ const entryStyles = (theme: Theme): CSSObject => ({
 });
 
 /** What the product does, said as outcomes and without a noun the visitor has not met yet. */
+/**
+ * What the product is, in the order it happens: bring footage in, work on it, deliver it — and
+ * only then, optionally, AI. The order is the claim. Leading with restyling described a tool that
+ * changes videos; leading with delivery describes the one that finishes them.
+ */
 const ENTRY_CAPABILITIES: ReadonlyArray<{ icon: AppIconName; text: string }> = [
-  { icon: 'video', text: 'Record with your camera, or upload a video you already have.' },
-  { icon: 'character', text: 'Change who is on screen, what they wear, or how they sound.' },
-  { icon: 'editVideo', text: 'Trim, crop, rotate, relight and filter on this device.' },
+  { icon: 'video', text: 'Bring in the footage you already shot, or record it here.' },
+  { icon: 'editVideo', text: 'Trim, crop, rotate, relight and filter — all on this device.' },
+  { icon: 'save', text: 'Save it in the shape each placement needs, then download the file.' },
+  {
+    icon: 'spark',
+    text: 'Optionally change who is on screen, what they wear, or how they sound.',
+  },
 ];
 
 interface EntryPageProps {
@@ -140,9 +149,9 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
   return (
     <main css={entryStyles(theme)}>
       <div>
-        <span data-entry-eyebrow>Local-first video creation</span>
+        <span data-entry-eyebrow>Local-first video studio</span>
         <h1>Lightframe</h1>
-        <p>Record or upload a video, restyle it, and download the result.</p>
+        <p>Turn your footage into finished, platform-ready video.</p>
         <div data-entry-stage aria-hidden="true">
           <AppIcon name="video" width="2.5rem" height="2.5rem" />
         </div>
