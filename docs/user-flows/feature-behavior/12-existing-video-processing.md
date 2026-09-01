@@ -190,6 +190,10 @@ source, then edit either base, save, start over, or discard.
 - Every generated result is revalidated after transcoding for a non-empty MP4, H.264 video, AAC
   when audio is required, duration, orientation, and playable tracks. An unconverted fallback is
   never published.
+- A generated result is held in the browser and nowhere else: the server hands the bytes over once
+  and retains nothing, so getting the same result back means paying for it again. While one is held
+  and unsaved, a hard unload raises the browser's own leave-site warning. In-app navigation was
+  already guarded by the temporary-work discard prompt.
 - Remote reference import accepts public HTTPS only, rejects credentials/private/link-local/mixed
   DNS and unsafe redirects, pins DNS per hop, caps redirects/bytes, validates actual decoded
   JPEG/PNG/WebP contents, supports abort, and never persists, logs, echoes, or forwards the URL.

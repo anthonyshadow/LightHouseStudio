@@ -20,6 +20,10 @@ import { StudioDesignProvider } from '../../ui';
 import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import { chooseMenuAction } from '../../test/actionMenu';
 import { mockApiServer } from '../../test/msw/server';
+import {
+  PROJECT_VOICE_MEMBERSHIP_NOTE,
+  PROJECT_VOICE_UNAVAILABLE_REASON,
+} from './projectProcessingPresentation';
 import { ProjectRouteSurface, type ProjectRouteSurfaceProps } from './ProjectRouteSurface';
 import type { ProjectStageSourceRuntime } from './useProjectSourceController';
 import type { ProjectSessionPort } from './useProjectSession';
@@ -775,6 +779,31 @@ describe('Project route surface', () => {
 
     await waitFor(() => expect(router.state.location.pathname).toBe('/dashboard'));
     expect(screen.getByText('Dashboard previous')).toBeVisible();
+  });
+
+  it('says a Voice cannot run inside a Project before one is attached', async () => {
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(currentProject(activeId))),
+      http.get('*/api/elevenlabs/voices', () =>
+        HttpResponse.json({ voices: [], hasMore: false, nextPageToken: null, total: 0 }),
+      ),
+      http.get('*/api/elevenlabs/voices/saved-count', () => HttpResponse.json({ count: 0 })),
+      http.get('*/api/elevenlabs/shared-voices', () =>
+        HttpResponse.json({ voices: [], hasMore: false, page: 0, total: 0 }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderProjects(`/projects/${activeId}`);
+
+    await user.click(await screen.findByRole('button', { name: 'Add Asset' }));
+    const chooser = await screen.findByRole('dialog', { name: 'Add Asset' });
+    const addVoice = within(chooser).getByRole('button', { name: 'Add Voice' });
+    expect(addVoice).toHaveAttribute('title', PROJECT_VOICE_MEMBERSHIP_NOTE);
+
+    await user.click(addVoice);
+    const picker = await screen.findByRole('dialog', { name: 'Add Voice' });
+    expect(picker).toHaveTextContent('Voice does not run inside a Project yet');
+    expect(picker).toHaveTextContent(PROJECT_VOICE_UNAVAILABLE_REASON);
   });
 
   it('shows bounded Saved Video memberships, previews in place, and detaches only the association', async () => {

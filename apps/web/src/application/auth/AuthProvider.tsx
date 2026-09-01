@@ -254,3 +254,13 @@ export const useAuth = (): AuthContextValue => {
   if (!context) throw new Error('useAuth must be used within AuthProvider.');
   return context;
 };
+
+/**
+ * Whether a real session is in hand.
+ *
+ * `expiring` counts: the session stays readable while a teardown hold is registered, and a surface
+ * that treated that moment as signed out would unmount the very work the hold exists to protect.
+ * Stated once because more than one route decision now turns on it.
+ */
+export const hasActiveSession = (auth: Pick<AuthContextValue, 'status' | 'session'>): boolean =>
+  (auth.status === 'authenticated' || auth.status === 'expiring') && auth.session !== null;

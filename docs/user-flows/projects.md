@@ -190,7 +190,9 @@ deep link.
    renders no section at all, because naming an unreachable Save step is a dead end.
 6. Below that, `ProjectAssetsSection` lists attached asset memberships with a kind filter
    (All / Videos / Characters / Outfits / Voices), thumbnails, and an add flow per kind. A standing
-   line under the heading states that attached Assets are not the Project source.
+   line under the heading states that attached Assets are not the Project source. **Add Voice**
+   carries the reason a Project cannot run one yet, and its picker repeats it above the library, so
+   attaching a Voice reads as organizing for later rather than as a step that does something now.
 
 **Create, Save and History still exist only in the workspace.** The overview surfaces the Source
 task, the finished output and the workflow shape; the rest is behind the primary action.

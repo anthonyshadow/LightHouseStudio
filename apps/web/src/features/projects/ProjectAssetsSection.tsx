@@ -28,6 +28,10 @@ import { kindLabel, ProjectAssetThumbnail } from './ProjectAssetThumbnail';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
 import { safeProjectError } from './ProjectDialogs';
 import {
+  PROJECT_VOICE_MEMBERSHIP_NOTE,
+  PROJECT_VOICE_UNAVAILABLE_REASON,
+} from './projectProcessingPresentation';
+import {
   addAssetActionStyles,
   projectAssetActionsStyles,
   projectAssetFiltersStyles,
@@ -496,6 +500,7 @@ export const ProjectAssetsSection = ({
             <Button
               key={kind}
               variant="secondary"
+              {...(kind === 'voice' ? { title: PROJECT_VOICE_MEMBERSHIP_NOTE } : {})}
               onClick={() => setPicker(kind === 'video' ? 'video-options' : kind)}
             >
               {kind === 'voice' ? 'Add Voice' : `Add ${kindLabel(kind)}`}
@@ -553,19 +558,30 @@ export const ProjectAssetsSection = ({
         open={picker === 'voice'}
         onClose={() => setPicker(null)}
         title="Add Voice"
-        description="Browse or save a Voice, then select it to attach it to this Project."
+        description={PROJECT_VOICE_MEMBERSHIP_NOTE}
         placement="fullscreen"
         size="wide"
         bodyMode="scroll"
         returnFocusRef={addTriggerRef}
       >
         {picker === 'voice' ? (
-          <Suspense fallback={<p role="status">Loading Voices…</p>}>
-            <VoiceLibrary
-              disabled={busy}
-              onSelect={(voice: VoiceSummary) => void attach('voice', voice.voiceId)}
-            />
-          </Suspense>
+          <>
+            <StatusNotice
+              role="status"
+              tone="neutral"
+              title="Voice does not run inside a Project yet"
+              css={{ marginBlockEnd: theme.space.md }}
+            >
+              {PROJECT_VOICE_UNAVAILABLE_REASON} Attaching one here records that this Project is
+              meant to use it; it changes nothing about the video.
+            </StatusNotice>
+            <Suspense fallback={<p role="status">Loading Voices…</p>}>
+              <VoiceLibrary
+                disabled={busy}
+                onSelect={(voice: VoiceSummary) => void attach('voice', voice.voiceId)}
+              />
+            </Suspense>
+          </>
         ) : null}
       </OverlayPanel>
 

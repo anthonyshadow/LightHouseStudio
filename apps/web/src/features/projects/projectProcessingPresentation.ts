@@ -120,6 +120,17 @@ export const PROJECT_PROCESSING_AUTHORITY_PENDING_REASON =
 export const PROJECT_VOICE_UNAVAILABLE_REASON =
   'Voice is not available inside a Project yet. Choosing one would stop Character Swap and Virtual Try-On from starting.';
 
+/**
+ * What attaching a Voice to a Project actually does, said where the choice is offered.
+ *
+ * The membership is real and harmless — it is a note about material this Project is meant to use,
+ * and nothing here deletes or changes a Voice. What it is not is a step: standing beside Characters
+ * and Outfits, which the workspace can act on, it read as one. Saying so is the difference between
+ * organizing for later and pressing a button that silently does nothing.
+ */
+export const PROJECT_VOICE_MEMBERSHIP_NOTE =
+  'Keeping a Voice here notes it for later. A Project cannot apply one yet, so attaching it changes nothing about this Project’s video.';
+
 /** One word for pointing a Project at a video it does not yet have, wherever it is offered. */
 export const PROJECT_SET_ORIGINAL_VIDEO_ACTION_LABEL = 'Set as a Project’s original video';
 
