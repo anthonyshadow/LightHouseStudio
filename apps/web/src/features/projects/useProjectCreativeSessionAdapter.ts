@@ -6,8 +6,10 @@ import {
 } from '../../adapters/api-client/apiClient';
 import { fetchWorkspaceVoiceRelationship } from '../../adapters/api-client/voicesApi';
 import type { CreativeAssetRepository, CreativeAssetStore } from '../creative-assets/types';
+import type { ExistingVideoVoiceSelection } from '../existing-video/existingVideoWorkflowTypes';
 import type { useExistingVideoWorkflow } from '../existing-video/useExistingVideoWorkflow';
 import type { useStudioSession } from '../../orchestration/session';
+import type { ActiveStudioRecipe } from '../../studio/referenceRecipeIdentity';
 import type { useReferenceRecipeHandoff } from '../../studio/useReferenceRecipeHandoff';
 import {
   createProjectCreativeProposal,
@@ -55,6 +57,29 @@ const creativeChoices = (value: {
     value.creativeIntent,
   ]);
 
+/** What the Studio was holding when the revision a saved output produced landed. */
+type EndedCreativeRound = Readonly<{
+  revisionId: string;
+  activeRecipe: string;
+  voiceSelection: string;
+}>;
+
+/**
+ * Whether the operator has chosen something the ended round was not already holding.
+ *
+ * Only a selection that is *there* counts. The Studio settles into a post-save revision after it
+ * lands — the configuration effect follows the cleared snapshot and drops the voice a tick later —
+ * and reading that removal as a choice would carry the rest of the ended round out with it. A
+ * removal never needs carrying anyway: the save cleared the whole configuration already.
+ */
+const operatorPickedAfter = (
+  round: EndedCreativeRound,
+  activeRecipe: ActiveStudioRecipe,
+  voiceSelection: ExistingVideoVoiceSelection | null,
+): boolean =>
+  (activeRecipe !== null && JSON.stringify(activeRecipe) !== round.activeRecipe) ||
+  (voiceSelection !== null && JSON.stringify(voiceSelection) !== round.voiceSelection);
+
 const creativeHydrationKey = (projectId: string, snapshot: ProjectSessionPort['current']) =>
   snapshot === null
     ? null
@@ -97,7 +122,7 @@ export const useProjectCreativeSessionAdapter = ({
   const historicalHydrationControllerRef = useRef<AbortController | null>(null);
   const existingVideoSourceKeyRef = useRef<string | null>(null);
   const existingVideoConfigurationKeyRef = useRef<string | null>(null);
-  const freedOutputRevisionRef = useRef<string | null>(null);
+  const endedRoundRef = useRef<EndedCreativeRound | null>(null);
 
   // Read off the port rather than through it: the port is rebuilt on every autosave phase change,
   // so an effect depending on the whole thing re-enters three more times for each pick it caused.
@@ -292,25 +317,47 @@ export const useProjectCreativeSessionAdapter = ({
 
   /**
    * A saved output ends the round it was configured for, and the Project clears its own creative
-   * configuration with it, so the visual tool is freed for the next round. The voice needs no
-   * handling here: the configuration effect below already follows the snapshot back to none.
+   * configuration with it, so the visual tool and the rail's selection are freed for the next
+   * round. The voice needs no handling here: the configuration effect below already follows the
+   * snapshot back to none.
+   *
+   * Releasing the recipe is what keeps the two halves of the Studio saying the same thing. The
+   * Create task reads the Project, which now holds nothing; the rail reads its own handoff, which
+   * would otherwise go on presenting the character the save just ended as the active choice. It is
+   * a release and not a proposal — the Project is already right, and `clearActiveRecipe` refuses
+   * while a recording or live model session owns the mode, which is why the outbound effect below
+   * still has to guard for itself rather than trust that this ran.
    *
    * This is keyed to the one post-save revision rather than driven by "the snapshot carries no
    * treatment": a tool the operator picks after a save is not checkpointed until they save
-   * progress, so an unsaved choice looks exactly the same and must not be swept away.
+   * progress, so an unsaved choice looks exactly the same and must not be swept away. What the
+   * round was holding as it ended is recorded here for the same reason, and read by the outbound
+   * effect below: it is the only moment at which the leftover can still be told from a new pick.
    */
   useEffect(() => {
     const revisionId = current?.revision.id ?? null;
     if (projectId === null || snapshot === null || revisionId === null) return;
     if (snapshot.workflowPhase !== 'complete' || snapshot.lastSuccessfulOutput === null) {
-      freedOutputRevisionRef.current = null;
+      endedRoundRef.current = null;
       return;
     }
-    if (freedOutputRevisionRef.current === revisionId) return;
-    freedOutputRevisionRef.current = revisionId;
+    if (endedRoundRef.current?.revisionId === revisionId) return;
+    endedRoundRef.current = {
+      revisionId,
+      activeRecipe: JSON.stringify(handoff.state.activeRecipe),
+      voiceSelection: JSON.stringify(existingVideo.voiceSelection),
+    };
+    handoff.actions.clearActiveRecipe();
     const step = existingVideo.steps[0];
     if (step) existingVideo.removeStep(step.id);
-  }, [current?.revision.id, existingVideo, projectId, snapshot]);
+  }, [
+    current?.revision.id,
+    existingVideo,
+    handoff.actions,
+    handoff.state.activeRecipe,
+    projectId,
+    snapshot,
+  ]);
 
   useEffect(() => {
     if (projectId === null || effectiveSnapshot === null) return;
@@ -446,6 +493,20 @@ export const useProjectCreativeSessionAdapter = ({
     // Project whose format differs from the one the Studio happens to be set to. Checked after the
     // two free guards above, because building this key is the expensive part of the effect.
     if (hydrationKeyRef.current !== creativeHydrationKey(projectId, current)) return;
+    // A saved output ends the round it was configured for, and the Project clears its own creative
+    // configuration with it. Nothing in the browser clears the Studio's, so on the revision the
+    // save produced this effect sees the round that ended and cannot tell it from a fresh pick.
+    // Writing it back would be worse than a noisy revision: the configuration is material, so the
+    // Project drops the output reference the save just recorded and stops reporting itself
+    // complete — undoing part of a save nobody asked to undo. Only a selection made on top of what
+    // the round ended holding carries out.
+    const endedRound = endedRoundRef.current;
+    if (
+      endedRound?.revisionId === current.revision.id &&
+      !operatorPickedAfter(endedRound, handoff.state.activeRecipe, existingVideo.voiceSelection)
+    ) {
+      return;
+    }
     const proposal = createProjectCreativeProposal({
       current,
       draft: studioSession.draft,

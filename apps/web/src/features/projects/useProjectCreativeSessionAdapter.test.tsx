@@ -130,7 +130,10 @@ const setup = (
       replaceRecipeDraft: vi.fn(() => true),
       selectMode: vi.fn(() => true),
     },
-    handoff: { state: { activeRecipe: null }, actions: { useRecipe: vi.fn() } },
+    handoff: {
+      state: { activeRecipe: null },
+      actions: { useRecipe: vi.fn(), clearActiveRecipe: vi.fn(() => true) },
+    },
     repository: {
       ready: vi.fn(() => Promise.resolve()),
       getSnapshot: vi.fn(() => ({ store, health: 'ready', notice: null })),
@@ -186,15 +189,23 @@ describe('useProjectCreativeSessionAdapter output completion', () => {
       addStep: ReturnType<typeof vi.fn>;
     };
 
+    const handoff = dependencies.handoff as unknown as {
+      actions: { clearActiveRecipe: ReturnType<typeof vi.fn> };
+    };
+
     const { rerender } = renderHook(() => useProjectCreativeSessionAdapter(dependencies));
     await waitFor(() => expect(existingVideo.removeStep).toHaveBeenCalledWith(leftoverStep.id));
     expect(existingVideo.clearVoice).toHaveBeenCalled();
     expect(existingVideo.addStep).not.toHaveBeenCalled();
+    // The rail reads its own handoff, so without this it would go on presenting the character the
+    // save just ended while the Create task, reading the Project, says nothing is chosen.
+    expect(handoff.actions.clearActiveRecipe).toHaveBeenCalled();
 
     // A tool chosen after the save is not checkpointed yet, so re-running must not sweep it away.
     rerender();
     rerender();
     expect(existingVideo.removeStep).toHaveBeenCalledTimes(1);
+    expect(handoff.actions.clearActiveRecipe).toHaveBeenCalledTimes(1);
   });
 
   it('leaves the controls alone while the Project is still being configured', async () => {
@@ -205,12 +216,16 @@ describe('useProjectCreativeSessionAdapter output completion', () => {
     const existingVideo = dependencies.existingVideo as unknown as {
       removeStep: ReturnType<typeof vi.fn>;
     };
+    const handoff = dependencies.handoff as unknown as {
+      actions: { clearActiveRecipe: ReturnType<typeof vi.fn> };
+    };
 
     renderHook(() => useProjectCreativeSessionAdapter(dependencies));
 
     // Hydration settling proves the effects ran; no saved output means nothing was freed.
     await waitFor(() => expect(restoreAspectRatio).toHaveBeenCalled());
     expect(existingVideo.removeStep).not.toHaveBeenCalled();
+    expect(handoff.actions.clearActiveRecipe).not.toHaveBeenCalled();
   });
 });
 
@@ -272,7 +287,7 @@ describe('useProjectCreativeSessionAdapter selection propagation', () => {
     });
     Object.assign(dependencies.handoff as object, {
       state: { activeRecipe: { origin: 'character-prompt', assetId: character.id } },
-      actions: { useRecipe: vi.fn() },
+      actions: { useRecipe: vi.fn(), clearActiveRecipe: vi.fn(() => true) },
     });
   };
 
@@ -324,5 +339,73 @@ describe('useProjectCreativeSessionAdapter selection propagation', () => {
     // Hydration settling proves the effects ran; an unchanged setup writes no revision.
     await waitFor(() => expect(restoreAspectRatio).toHaveBeenCalled());
     expect(session.propose).not.toHaveBeenCalled();
+  });
+});
+
+describe('useProjectCreativeSessionAdapter after a saved output', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const character = {
+    id: 'character-one',
+    name: 'Ada',
+    prompt: 'Ada presenting',
+    modelModeId: 'lucy-latest' as const,
+    updatedAt: now,
+  };
+
+  const withStore = (dependencies: Parameters<typeof useProjectCreativeSessionAdapter>[0]) =>
+    Object.assign(dependencies.repository as object, {
+      getSnapshot: () => ({
+        store: { ...store, savedCharacterPrompts: [character] },
+        health: 'ready',
+        notice: null,
+      }),
+    });
+
+  it('does not write the ended round back over the output the save just recorded', async () => {
+    const { dependencies } = setup({
+      snapshot: completedOutputSnapshot,
+      existingVideo: { steps: [leftoverStep], voiceSelection: { voiceId: 'voice-one' } },
+    });
+    const session = dependencies.projectSession as unknown as {
+      propose: Mock<(proposal: ProjectSessionProposalContract) => boolean>;
+    };
+    const existingVideo = dependencies.existingVideo as unknown as {
+      removeStep: ReturnType<typeof vi.fn>;
+    };
+    withStore(dependencies);
+    Object.assign(dependencies.handoff as object, {
+      state: { activeRecipe: { origin: 'character-prompt', assetId: character.id } },
+      actions: { useRecipe: vi.fn(), clearActiveRecipe: vi.fn(() => true) },
+    });
+
+    const { rerender } = renderHook(() => useProjectCreativeSessionAdapter(dependencies));
+    await waitFor(() => expect(existingVideo.removeStep).toHaveBeenCalledWith(leftoverStep.id));
+    // The configuration effect follows the cleared snapshot and drops the voice a tick later.
+    Object.assign(dependencies.existingVideo as object, { voiceSelection: null });
+    rerender();
+
+    expect(session.propose).not.toHaveBeenCalled();
+  });
+
+  it('carries a pick made after the save out to the next round', async () => {
+    const { dependencies, restoreAspectRatio } = setup({
+      snapshot: { ...completedOutputSnapshot, selectedVoice: null },
+    });
+    const session = dependencies.projectSession as unknown as {
+      propose: Mock<(proposal: ProjectSessionProposalContract) => boolean>;
+    };
+    withStore(dependencies);
+
+    const { rerender } = renderHook(() => useProjectCreativeSessionAdapter(dependencies));
+    await waitFor(() => expect(restoreAspectRatio).toHaveBeenCalled());
+    Object.assign(dependencies.handoff as object, {
+      state: { activeRecipe: { origin: 'character-prompt', assetId: character.id } },
+      actions: { useRecipe: vi.fn(), clearActiveRecipe: vi.fn(() => true) },
+    });
+    rerender();
+
+    await waitFor(() => expect(session.propose).toHaveBeenCalledTimes(1));
+    expect(session.propose.mock.calls[0]?.[0].selectedCharacter?.characterId).toBe(character.id);
   });
 });
