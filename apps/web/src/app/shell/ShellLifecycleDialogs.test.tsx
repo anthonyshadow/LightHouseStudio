@@ -2,7 +2,7 @@
 
 import { createRef, type ComponentProps } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import { ShellLifecycleDialogs } from './ShellLifecycleDialogs';
 
@@ -47,6 +47,16 @@ const renderDialogs = (props: DialogProps) =>
   );
 
 describe('ShellLifecycleDialogs', () => {
+  // Both end-of-session surfaces are code-split, so the first render resolves their imports before
+  // either can appear. Loading them here keeps that one-off module cost out of the first
+  // assertion's wait budget, which it otherwise takes most of once the full suite runs in parallel.
+  beforeAll(async () => {
+    await Promise.all([
+      import('../../ui/primitives/ConfirmationDialog'),
+      import('../../studio/SessionExpiryNotice'),
+    ]);
+  });
+
   afterEach(cleanup);
 
   it('presents sanitized logout failure recovery actions', async () => {

@@ -99,7 +99,9 @@ export const StudioExistingVideoOverlay = ({
             : {})}
           saveVideoState={saveVideoState}
           onOpenSavedVideosLibrary={onOpenSavedVideosLibrary}
-          onAdjustVideo={savedVideo.openVideoAdjust}
+          // Wrapped, not passed: this lands on a button's `onClick`, which would otherwise hand
+          // the click event in as the options argument.
+          onAdjustVideo={() => savedVideo.openVideoAdjust()}
           recordingSupported={
             browser.mediaRecorder && browser.mediaDevices && browser.secureContext
           }

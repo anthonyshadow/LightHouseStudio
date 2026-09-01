@@ -78,9 +78,12 @@ interface StudioToolOverlaysProps {
   readonly onFinishExistingVideo: () => void;
   readonly onStartExistingVideoRecording: () => void;
   readonly onDiscardExistingVideoSelection: () => void;
-  readonly onOpenExistingVideo: () => void;
-  /** Opens the editor on the presented take when no existing-video selection is held yet. */
-  readonly onEditPresentedTake: () => void;
+  /**
+   * Edits the video the operator is looking at. The launch itself decides what that means — the
+   * editor on a Project's current cut, the chooser holding a standalone take — so this component
+   * only decides whether there is a video to edit.
+   */
+  readonly onEditVideo: () => void;
   readonly onOpenSavedCharacters: () => void;
   readonly onOpenSavedOutfits: () => void;
   readonly onOpenSavedVideosLibrary: () => void;
@@ -127,8 +130,7 @@ export const StudioToolOverlays = ({
   onFinishExistingVideo,
   onStartExistingVideoRecording,
   onDiscardExistingVideoSelection,
-  onOpenExistingVideo,
-  onEditPresentedTake,
+  onEditVideo,
   onOpenSavedCharacters,
   onOpenSavedOutfits,
   onOpenSavedVideosLibrary,
@@ -140,6 +142,9 @@ export const StudioToolOverlays = ({
   const { availability, state: capabilityState } = provider;
   const { recording, processing, recordingActive, mediaLocked } = takeReview;
   const { activeCharacterName } = handoff.state;
+  // The one narrowing the take actions share: a take can be edited or saved only once the stage
+  // holds its complete bytes.
+  const presentedOwned = ownedRecordingArtifact(recording.presented);
 
   return (
     <>
@@ -301,18 +306,10 @@ export const StudioToolOverlays = ({
         mainRef={mainRef}
         onClose={onCloseOverlay}
         onDiscardTake={onDiscardExistingVideoSelection}
-        {...(existingVideo.selection
-          ? { onEditVideo: onOpenExistingVideo }
-          : ownedRecordingArtifact(recording.presented)
-            ? // A fresh take is edited by adopting the video on the stage, not by opening an
-              // empty chooser beside it.
-              { onEditVideo: onEditPresentedTake }
-            : {})}
+        {...(existingVideo.selection || presentedOwned ? { onEditVideo } : {})}
         onOpenVoiceTreatments={() => onOpenOverlay('voice-treatments')}
         onBackToTakeReview={() => onOpenOverlay('take-review')}
-        {...(ownedRecordingArtifact(recording.presented)
-          ? { onSaveVideo: savedVideo.requestSavePresentedVideo }
-          : {})}
+        {...(presentedOwned ? { onSaveVideo: savedVideo.requestSavePresentedVideo } : {})}
         saveVideoState={saveVideoState}
         onOpenSavedVideosLibrary={onOpenSavedVideosLibrary}
         hasUnsavedChanges={savedVideo.presentedHasUnsavedChanges}

@@ -13,6 +13,7 @@ import {
   installSuccessfulStudioHarness,
   readCreativeAssetStore,
   readBrowserState,
+  startLocalPreview,
 } from './support/studioHarness';
 import { installProviderNetworkDriver } from './support/studioHarness.network';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
@@ -178,9 +179,8 @@ test('a fresh take reaches Edit video without a save-and-reload detour', async (
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/studio/create');
 
+  await startLocalPreview(page);
   const controls = page.getByLabel('Studio session controls');
-  await controls.getByRole('button', { name: 'Start camera' }).click();
-  await expect(page.getByLabel('Live local camera preview')).toBeVisible();
   await controls.getByRole('button', { name: 'Record' }).click();
   await controls.getByRole('button', { name: 'Stop recording' }).click();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();

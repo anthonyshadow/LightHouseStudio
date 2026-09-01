@@ -15,6 +15,9 @@ const VISUAL_MODEL_FOR_OPERATION = {
   'virtual-try-on': 'lucy-vton-latest',
 } as const;
 
+/** Which surface made a launch. Only the Create cards report their own as busy. */
+export type StudioEditorLaunchOrigin = 'create-card' | 'rail';
+
 interface UseStudioRecordingLaunchOptions {
   readonly browser: BrowserCapabilities;
   readonly session: ReturnType<typeof useStudioSession>;
@@ -73,11 +76,19 @@ export const useStudioRecordingLaunch = ({
   const [createLaunch, setCreateLaunch] = useState<{
     readonly projectId: string | null;
     readonly operation: ProjectCreateOperationId;
+    readonly origin: StudioEditorLaunchOrigin;
   } | null>(null);
-  const launchingOperation =
-    createLaunch !== null && createLaunch.projectId === activeProjectId
-      ? createLaunch.operation
-      : null;
+  const activeLaunch =
+    createLaunch !== null && createLaunch.projectId === activeProjectId ? createLaunch : null;
+  /** The launch to dispatch, whichever surface made it. */
+  const launchedOperation = activeLaunch?.operation ?? null;
+  /**
+   * The launch the Create surface may report as its own.
+   *
+   * Only a card press belongs to that surface: reporting a rail press here made the "Edit video"
+   * card read busy and disabled its neighbours for a launch nobody made there.
+   */
+  const launchingOperation = activeLaunch?.origin === 'create-card' ? activeLaunch.operation : null;
   /**
    * Ends a launch — one that arrived, and one that never will.
    *
@@ -182,10 +193,10 @@ export const useStudioRecordingLaunch = ({
       clearCreateLaunch();
       openOverlay('video-upload');
     }
-    // `launchingOperation` is in here for the request itself: the ref that carries it is not
+    // `launchedOperation` is in here for the request itself: the ref that carries it is not
     // reactive, so with a selection already in hand nothing else in this list changes when a launch
     // is armed, and the request would sit unspent with the card busy for good.
-  }, [addVisualStep, clearCreateLaunch, launchingOperation, openOverlay, selection, steps]);
+  }, [addVisualStep, clearCreateLaunch, launchedOperation, openOverlay, selection, steps]);
 
   /**
    * The ref has to be dropped on the way out, because it is the one half that cannot name its own
@@ -248,11 +259,11 @@ export const useStudioRecordingLaunch = ({
   ]);
 
   const openPlaybackEditor = useCallback(
-    (request?: ProjectCreateOperationId) => {
+    (request?: ProjectCreateOperationId, origin: StudioEditorLaunchOrigin = 'create-card') => {
       if (!recording.presented || recordingActive) return;
       pendingCreateLaunchRef.current = request ?? null;
       setCreateLaunch(
-        request === undefined ? null : { projectId: activeProjectId, operation: request },
+        request === undefined ? null : { projectId: activeProjectId, operation: request, origin },
       );
       if (!existingVideo.selection) {
         // Asking again is the retry: clear the attempt marker so a previously refused or failed
@@ -315,6 +326,7 @@ export const useStudioRecordingLaunch = ({
     clearExistingVideoIntent,
     discardPendingAdoption,
     launchingOperation,
+    launchedOperation,
     clearCreateLaunch,
   } as const;
 };
