@@ -9,6 +9,17 @@ import { useCreativeLibraryCloudSync } from './useCreativeLibraryCloudSync';
 import { captureRequests, jsonScenario, serverConflictScenario } from '../../test/msw/handlers';
 import { mockApiServer } from '../../test/msw/server';
 
+/**
+ * Both creative-library responses are the full snapshot envelope, and the client now parses them
+ * with the strict shared contract — so the fixtures say everything the server says.
+ */
+const FIXTURE_UPDATED_AT = '2026-08-05T12:00:00.000Z';
+const snapshotBody = (revision: number) => ({
+  revision,
+  store: createEmptyCreativeAssetStore(),
+  updatedAt: FIXTURE_UPDATED_AT,
+});
+
 const addPrompt = (title: string) => {
   const repository = createCreativeAssetRepository({ storage: null });
   void repository.createSavedPrompt({
@@ -27,10 +38,16 @@ describe('useCreativeLibraryCloudSync', () => {
       jsonScenario(
         'GET',
         '/api/creative-library',
-        { body: { revision: 0, store: createEmptyCreativeAssetStore() } },
+        {
+          body: {
+            revision: 0,
+            store: createEmptyCreativeAssetStore(),
+            updatedAt: FIXTURE_UPDATED_AT,
+          },
+        },
         observe,
       ),
-      jsonScenario('PUT', '/api/creative-library', { body: { revision: 1 } }, observe),
+      jsonScenario('PUT', '/api/creative-library', { body: snapshotBody(1) }, observe),
     );
 
     const rendered = renderHook(() =>
@@ -68,7 +85,13 @@ describe('useCreativeLibraryCloudSync', () => {
       jsonScenario(
         'GET',
         '/api/creative-library',
-        { body: { revision: 0, store: createEmptyCreativeAssetStore() } },
+        {
+          body: {
+            revision: 0,
+            store: createEmptyCreativeAssetStore(),
+            updatedAt: FIXTURE_UPDATED_AT,
+          },
+        },
         observe,
       ),
     );
@@ -89,7 +112,13 @@ describe('useCreativeLibraryCloudSync', () => {
       jsonScenario(
         'GET',
         '/api/creative-library',
-        { body: { revision: 6, store: accountRepository.getSnapshot().store } },
+        {
+          body: {
+            revision: 6,
+            store: accountRepository.getSnapshot().store,
+            updatedAt: FIXTURE_UPDATED_AT,
+          },
+        },
         observe,
       ),
     );
@@ -115,7 +144,13 @@ describe('useCreativeLibraryCloudSync', () => {
       jsonScenario(
         'GET',
         '/api/creative-library',
-        { body: { revision: 4, store: remoteRepository.getSnapshot().store } },
+        {
+          body: {
+            revision: 4,
+            store: remoteRepository.getSnapshot().store,
+            updatedAt: FIXTURE_UPDATED_AT,
+          },
+        },
         observe,
       ),
     );
@@ -142,10 +177,16 @@ describe('useCreativeLibraryCloudSync', () => {
       jsonScenario(
         'GET',
         '/api/creative-library',
-        { body: { revision: 4, store: remoteRepository.getSnapshot().store } },
+        {
+          body: {
+            revision: 4,
+            store: remoteRepository.getSnapshot().store,
+            updatedAt: FIXTURE_UPDATED_AT,
+          },
+        },
         observe,
       ),
-      jsonScenario('PUT', '/api/creative-library', { body: { revision: 5 } }, observe),
+      jsonScenario('PUT', '/api/creative-library', { body: snapshotBody(5) }, observe),
     );
 
     const rendered = renderHook(() => useCreativeLibraryCloudSync(repository));
@@ -176,7 +217,13 @@ describe('useCreativeLibraryCloudSync', () => {
       jsonScenario(
         'GET',
         '/api/creative-library',
-        { body: { revision: 4, store: remoteRepository.getSnapshot().store } },
+        {
+          body: {
+            revision: 4,
+            store: remoteRepository.getSnapshot().store,
+            updatedAt: FIXTURE_UPDATED_AT,
+          },
+        },
         observe,
       ),
     );
@@ -209,13 +256,19 @@ describe('useCreativeLibraryCloudSync', () => {
       jsonScenario(
         'GET',
         '/api/creative-library',
-        { body: { revision: 0, store: createEmptyCreativeAssetStore() } },
+        {
+          body: {
+            revision: 0,
+            store: createEmptyCreativeAssetStore(),
+            updatedAt: FIXTURE_UPDATED_AT,
+          },
+        },
         observe,
       ),
       jsonScenario(
         'PUT',
         '/api/creative-library',
-        [{ body: { revision: 1 } }, { body: { revision: 2 } }],
+        [{ body: snapshotBody(1) }, { body: snapshotBody(2) }],
         observe,
       ),
     );
@@ -303,10 +356,16 @@ describe('useCreativeLibraryCloudSync', () => {
       jsonScenario(
         'GET',
         '/api/creative-library',
-        { body: { revision: 0, store: createEmptyCreativeAssetStore() } },
+        {
+          body: {
+            revision: 0,
+            store: createEmptyCreativeAssetStore(),
+            updatedAt: FIXTURE_UPDATED_AT,
+          },
+        },
         observe,
       ),
-      jsonScenario('PUT', '/api/creative-library', { body: { revision: 1 } }, observe),
+      jsonScenario('PUT', '/api/creative-library', { body: snapshotBody(1) }, observe),
     );
     act(() => rendered.result.current.retry());
 

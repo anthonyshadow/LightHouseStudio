@@ -19,7 +19,7 @@ export const authenticatedUserSchema = z
   })
   .strict();
 
-const capabilitySchema = z.enum([
+export const capabilitySchema = z.enum([
   'local-camera',
   'upload-video',
   'character-swap',
