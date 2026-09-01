@@ -174,7 +174,7 @@ describe('ProjectSavedVideoPicker', () => {
   });
 
   it('disables selection and preview while busy or while a Version is not ready', async () => {
-    mockApiServer.use(listVideos([summary({ status: 'processing' })]));
+    mockApiServer.use(listVideos([summary({ status: 'missing' })]));
     renderPicker();
 
     let row = (await screen.findAllByRole('listitem'))[0]!;

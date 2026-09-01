@@ -13,7 +13,12 @@ export const SAVED_VIDEO_ORIGINS = [
   'legacy-import',
 ] as const;
 export const savedVideoOriginSchema = z.enum(SAVED_VIDEO_ORIGINS);
-export const savedVideoStatusSchema = z.enum(['ready', 'processing', 'failed', 'missing']);
+/**
+ * What the API can actually say about a Saved Video. The stored enum also holds 'deleted', but a
+ * tombstoned record is served as a 404, never as a status — the parity suite states the exclusion.
+ * The old 'processing' and 'failed' members had no writer anywhere.
+ */
+export const savedVideoStatusSchema = z.enum(['ready', 'missing']);
 /**
  * The longest edge of a stored poster frame. The short edge follows the source aspect ratio.
  *

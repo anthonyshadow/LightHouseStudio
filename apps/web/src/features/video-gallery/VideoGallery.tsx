@@ -125,8 +125,6 @@ const ORIGIN_LABELS: Readonly<Record<SavedVideoOrigin, string>> = {
 
 const STATUS_LABELS: Readonly<Record<SavedVideoSummary['status'], string>> = {
   ready: 'Ready',
-  processing: 'Processing',
-  failed: 'Processing failed',
   missing: 'File unavailable',
 };
 
