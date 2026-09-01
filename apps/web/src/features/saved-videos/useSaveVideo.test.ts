@@ -95,6 +95,7 @@ const savedVideo: SavedVideoDetail = {
   sourceVideoId: null,
   versionCount: 1,
   thumbnailAvailable: false,
+  revision: 1,
   createdAt: '2026-08-05T12:00:00.000Z',
   updatedAt: '2026-08-05T12:00:00.000Z',
   versions: [],

@@ -151,6 +151,25 @@ describe('SavedVideoService', () => {
     expect(updated.versions[0]).toEqual(original.currentVersion);
   });
 
+  it('renames only against the expected revision, and says which failure happened', async () => {
+    const saved = await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
+    expect(saved.revision).toBe(1);
+
+    const renamed = await service.rename(ownerUserId, saved.id, ' First  rename ', saved.revision);
+    expect(renamed).toMatchObject({ title: 'First rename', revision: 2 });
+
+    // The token the first rename spent: the video changed, so this title must not land.
+    await expect(
+      service.rename(ownerUserId, saved.id, 'Stale rename', saved.revision),
+    ).rejects.toMatchObject({ statusCode: 409, code: 'conflict' });
+    await expect(
+      service.rename(ownerUserId, crypto.randomUUID(), 'No such video', 1),
+    ).rejects.toMatchObject({ statusCode: 404, code: 'not_found' });
+    await expect(service.get(ownerUserId, saved.id)).resolves.toMatchObject({
+      title: 'First rename',
+    });
+  });
+
   it('deletes a source and its unshared stored bytes while retaining its derived record', async () => {
     const source = await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
     const derived = await service.saveNew(
@@ -405,7 +424,12 @@ describe('SavedVideoService', () => {
     )!;
     const listPage = vi.fn().mockResolvedValue({
       videos: [
-        { video: aggregate!.video, currentVersion, versionCount: aggregate!.versions.length },
+        {
+          video: aggregate!.video,
+          currentVersion,
+          versionCount: aggregate!.versions.length,
+          revision: aggregate!.revision,
+        },
       ],
       total: 2,
       characterNames: ['Mara'],

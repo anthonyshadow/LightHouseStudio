@@ -94,6 +94,11 @@ export const savedVideoSummarySchema = z
     versionCount: z.number().int().positive(),
     thumbnailAvailable: z.boolean(),
     assignment: z.enum(['project-output', 'unassigned']).optional(),
+    /**
+     * The video's monotonic revision, bumped by every material change to the record. A mutation
+     * that must not overwrite unseen work — rename today — sends it back as `expectedRevision`.
+     */
+    revision: z.number().int().positive(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
@@ -132,7 +137,13 @@ export const savedVideoParamsSchema = z.object({ videoId: z.uuid() }).strict();
 export const savedVideoVersionParamsSchema = z
   .object({ videoId: z.uuid(), versionId: z.uuid() })
   .strict();
-export const renameSavedVideoRequestSchema = z.object({ title: savedVideoTitleSchema }).strict();
+export const renameSavedVideoRequestSchema = z
+  .object({
+    title: savedVideoTitleSchema,
+    /** The summary's `revision`; a stale one conflicts instead of overwriting a changed video. */
+    expectedRevision: z.number().int().positive(),
+  })
+  .strict();
 
 export const savedVideoUploadMetadataSchema = z
   .object({

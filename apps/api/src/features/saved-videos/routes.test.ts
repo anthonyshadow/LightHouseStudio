@@ -260,13 +260,13 @@ describe('saved-video routes', () => {
         cookie,
         'content-type': 'application/json',
       },
-      payload: { title: 'Wrong origin' },
+      payload: { title: 'Wrong origin', expectedRevision: 1 },
     });
     const renamed = await app.inject({
       method: 'PATCH',
       url: `/api/videos/${videoId}`,
       headers: { ...browserHeaders, cookie, 'content-type': 'application/json' },
-      payload: { title: '  Final   cut  ' },
+      payload: { title: '  Final   cut  ', expectedRevision: 1 },
     });
     const deleted = await app.inject({
       method: 'DELETE',

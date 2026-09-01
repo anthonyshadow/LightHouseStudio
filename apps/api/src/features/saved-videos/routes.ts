@@ -224,7 +224,12 @@ export const registerSavedVideoRoutes = (
     if (!params.success || !body.success)
       throw new AppError(400, 'validation_error', 'Provide a valid video title.');
     return savedVideoDetailSchema.parse(
-      await service.rename(ownerUserIdForRequest(request), params.data.videoId, body.data.title),
+      await service.rename(
+        ownerUserIdForRequest(request),
+        params.data.videoId,
+        body.data.title,
+        body.data.expectedRevision,
+      ),
     );
   });
 

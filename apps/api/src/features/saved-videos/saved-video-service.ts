@@ -72,6 +72,7 @@ const aggregateSummary = (
   video: aggregate.video,
   currentVersion: version,
   versionCount: aggregate.versions.length,
+  revision: aggregate.revision,
 });
 
 export const publicSavedVideoSummary = (
@@ -87,6 +88,7 @@ export const publicSavedVideoSummary = (
     versionCount: summary.versionCount,
     thumbnailAvailable: summary.currentVersion.thumbnailAssetId !== null,
     assignment: assignedToProject ? 'project-output' : 'unassigned',
+    revision: summary.revision,
     createdAt: summary.video.createdAt,
     updatedAt: summary.video.updatedAt,
   });
@@ -637,15 +639,23 @@ export class SavedVideoService {
     return this.#repository.findActiveReceipts(lookups);
   }
 
-  async rename(ownerUserId: string, videoId: string, title: string): Promise<SavedVideoDetail> {
+  async rename(
+    ownerUserId: string,
+    videoId: string,
+    title: string,
+    expectedRevision: number,
+  ): Promise<SavedVideoDetail> {
     const aggregate = await this.#repository.rename(
       ownerUserId,
       videoId,
       normalizeSavedVideoTitle(title),
+      expectedRevision,
       this.#now().toISOString(),
     );
-    if (aggregate === null)
+    if (aggregate === 'not-found')
       throw new AppError(404, 'not_found', 'That saved video is unavailable.');
+    if (aggregate === 'conflict')
+      throw new AppError(409, 'conflict', 'The saved video changed before it could be renamed.');
     const assigned = await this.#projectOutputs?.assignedSavedVideoIds(ownerUserId, [videoId]);
     return publicSavedVideoDetail(aggregate, assigned?.has(videoId) ?? false);
   }

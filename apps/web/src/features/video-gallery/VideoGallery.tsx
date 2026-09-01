@@ -458,8 +458,15 @@ export const VideoGallery = ({
   });
 
   const renameMutation = useMutation({
-    mutationFn: ({ videoId, title }: { readonly videoId: string; readonly title: string }) =>
-      renameSavedVideo(videoId, title),
+    mutationFn: ({
+      videoId,
+      title,
+      expectedRevision,
+    }: {
+      readonly videoId: string;
+      readonly title: string;
+      readonly expectedRevision: number;
+    }) => renameSavedVideo(videoId, title, expectedRevision),
     onSuccess: (updated) => {
       queryClient.setQueriesData<InfiniteData<SavedVideosResponse>>(
         { queryKey: savedVideoQueryKeys.lists },
@@ -577,7 +584,14 @@ export const VideoGallery = ({
     if (!title || title === action.video.title) return;
     setActionError(null);
     try {
-      await renameMutation.mutateAsync({ videoId: action.video.id, title });
+      await renameMutation.mutateAsync({
+        videoId: action.video.id,
+        title,
+        // The revision the row was rendered from. A stale one means the video changed under the
+        // dialog; the 409 keeps this title from overwriting what happened, and the alert below
+        // says so while the operator's text stays put.
+        expectedRevision: action.video.revision,
+      });
       setNotice({ role: 'status', tone: 'success', message: `Renamed video to “${title}”.` });
       setAction(null);
     } catch (error) {

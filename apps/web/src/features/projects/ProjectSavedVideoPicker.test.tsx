@@ -37,6 +37,7 @@ const summary = (overrides: Partial<SavedVideoSummary> = {}): SavedVideoSummary 
   sourceVideoId: null,
   versionCount: 2,
   thumbnailAvailable: true,
+  revision: 1,
   createdAt: now,
   updatedAt: now,
   ...overrides,
