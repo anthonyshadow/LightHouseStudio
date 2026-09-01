@@ -286,6 +286,38 @@ describe('AppRouter', () => {
     expect(appHarness.mountCount).toBe(0);
   });
 
+  it.each(['/advanced', '/studio/not-a-route', '/not-a-route?project=untrusted'])(
+    'tells a signed-in operator that %s does not exist instead of moving them',
+    async (path) => {
+      const { router } = renderApplication(path);
+
+      expect(
+        await screen.findByRole('heading', { name: 'That page doesn’t exist' }),
+      ).toBeInTheDocument();
+      // The address is left alone: a silent redirect is what hides the typo in the first place.
+      expect(router.state.location.pathname).toBe(path.split('?')[0]);
+      expect(screen.getByRole('link', { name: 'Go to Dashboard' })).toHaveAttribute(
+        'href',
+        '/dashboard',
+      );
+      expect(appHarness.mountCount).toBe(0);
+      expect(document.title).toBe('Page not found · Lightframe');
+    },
+  );
+
+  it('waits for session restoration before deciding an unknown path is a typo', async () => {
+    // Deciding while the session is unknown would bounce a signed-in operator to the entry page,
+    // which then forwards them to the Dashboard — the silent redirect, restored by the back door.
+    authApi.fetchCurrentSession.mockResolvedValue(testSession);
+    const { router } = renderApplication('/advanced', null);
+
+    expect(screen.getByRole('status')).toHaveTextContent('Restoring your Studio session…');
+    expect(
+      await screen.findByRole('heading', { name: 'That page doesn’t exist' }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/advanced');
+  });
+
   describe('route error boundary', () => {
     const Boom = ({ error }: { readonly error: Error }) => {
       throw error;

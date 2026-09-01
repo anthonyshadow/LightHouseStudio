@@ -621,6 +621,9 @@ describe('useExistingVideoWorkflow', () => {
     });
 
     expect(result.current.result?.objectUrl).toContain('blob:visual-character-swap');
+    // What the unload guard reads. The server hands these bytes over once and keeps nothing, so a
+    // closed tab is another charge to get them back.
+    expect(result.current.providerResultHeld).toBe(true);
 
     act(() => result.current.startOver());
     expect(recording.clearVisualProcessing).toHaveBeenCalledOnce();
@@ -628,6 +631,7 @@ describe('useExistingVideoWorkflow', () => {
     expect(result.current.selection?.file).toBe(sourceFile);
     expect(result.current.steps).toEqual([]);
     expect(result.current.result).toBeNull();
+    expect(result.current.providerResultHeld).toBe(false);
     expect(result.current.comparison).toBe('original');
     expect(result.current.completedStepCount).toBe(0);
 

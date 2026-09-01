@@ -260,17 +260,23 @@ Narrow screens reveal that same region through **Review & Generate** instead of 
 stateful controls.
 
 `StudioExitGuard` blocks navigation leaving the protected application route family while recording, finalization, local video
-render/validation, or Project working-media adoption is active. A temporary take, active Voice process, dirty video-edit draft, or
+render/validation, or Project working-media adoption is active. An unsaved take, active Voice process, dirty video-edit draft, or
 dirty AI-settings or Outfit Builder form requires confirmed discard before the route proceeds. Rendering
-must be cancelled before discard; navigation cannot abandon the worker. A session that ends
+must be cancelled before discard; navigation cannot abandon the worker. Every destination that mounts
+the Studio runtime is a workspace the guard recognizes, `/studio/<savedVideoId>` included, and each
+Saved Video is its own: opening a second one leaves the first. A presented artifact that already
+exists on the server — a Saved Video loaded onto the stage — is not discardable work and raises no
+prompt. A session that ends
 underneath the operator is the third exit path alongside in-app navigation and hard unload: the shell
 holds teardown, `useStudioSessionExpiryController` names what is about to be lost, and the guard
 stands aside for the redirect that follows so the operator never faces two prompts for one exit. A URL-owned Project
 session removes the prior blanket exemption for `/studio/*` navigation: changing Project identity
 or entering Studio/global-library context first flushes its semantic proposal, stays on failure or
 conflict, or requires explicit discard. Hard unload receives the matching browser warning for
-temporary work and dirty/saving Project proposals. The browser cannot await an ordinary fetch
-during forced unload, so only already accepted server revisions are crash-safe.
+temporary work, dirty/saving Project proposals, and an unsaved provider result — those bytes are
+handed over once and retained nowhere, so losing the tab means paying for them again. The browser
+cannot await an ordinary fetch during forced unload, so only already accepted server revisions are
+crash-safe.
 
 The shell is viewport-bound with safe-area padding and deliberate support for `1440×960`,
 `1280×720`, `834×1112`, `390×844`, and `320×568`. The stage, responsive tool/session regions, and

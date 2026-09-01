@@ -23,6 +23,9 @@ const projectSession = (overrides: Partial<ProjectSessionPort> = {}): ProjectSes
   ...overrides,
 });
 
+const SAVED_VIDEO_ID = 'c26b5280-1538-44cd-82db-a6b1356acf62';
+const OTHER_SAVED_VIDEO_ID = '2efcc6c3-e82c-419a-8807-c0026170fb75';
+
 const GuardHarness = (props: StudioExitGuardProps) => {
   const navigate = useNavigate();
   return (
@@ -60,6 +63,14 @@ const GuardHarness = (props: StudioExitGuardProps) => {
       >
         Open Project overview
       </button>
+      <button
+        type="button"
+        onClick={() => {
+          void navigate(`/studio/${OTHER_SAVED_VIDEO_ID}`);
+        }}
+      >
+        Open another saved video
+      </button>
       <StudioExitGuard {...props} />
     </main>
   );
@@ -70,6 +81,9 @@ const renderProjectGuard = (overrides: Partial<StudioExitGuardProps> = {}) => {
     recordingOrFinalizing: false,
     videoRenderingActive: false,
     hasTemporaryTake: false,
+    // A temporary take in these fixtures is an unsaved one unless a case says otherwise; the cases
+    // that separate them set both explicitly.
+    hasUnsavedTake: overrides.hasTemporaryTake ?? false,
     voiceProcessingActive: false,
     creativeWorkDirty: false,
     onDiscardTemporaryWork: vi.fn(),
@@ -98,6 +112,9 @@ const renderGuard = (overrides: Partial<StudioExitGuardProps> = {}) => {
     recordingOrFinalizing: false,
     videoRenderingActive: false,
     hasTemporaryTake: false,
+    // A temporary take in these fixtures is an unsaved one unless a case says otherwise; the cases
+    // that separate them set both explicitly.
+    hasUnsavedTake: overrides.hasTemporaryTake ?? false,
     voiceProcessingActive: false,
     creativeWorkDirty: false,
     onDiscardTemporaryWork: vi.fn(),
@@ -110,6 +127,33 @@ const renderGuard = (overrides: Partial<StudioExitGuardProps> = {}) => {
       { path: '/studio/create/live', element: <h1>Live AI route</h1> },
     ],
     { initialEntries: ['/studio/create'] },
+  );
+  const view = render(
+    <StudioDesignProvider>
+      <RouterProvider router={router} />
+    </StudioDesignProvider>,
+  );
+  return { ...view, props, router };
+};
+
+const renderSavedVideoGuard = (overrides: Partial<StudioExitGuardProps> = {}) => {
+  const props: StudioExitGuardProps = {
+    recordingOrFinalizing: false,
+    videoRenderingActive: false,
+    hasTemporaryTake: false,
+    hasUnsavedTake: overrides.hasTemporaryTake ?? false,
+    voiceProcessingActive: false,
+    creativeWorkDirty: false,
+    onDiscardTemporaryWork: vi.fn(),
+    ...overrides,
+  };
+  const router = createMemoryRouter(
+    [
+      { path: '/', element: <h1>Entry route</h1> },
+      { path: '/studio/:videoId', element: <GuardHarness {...props} /> },
+      { path: '/projects/:projectId', element: <h1>Project overview route</h1> },
+    ],
+    { initialEntries: [`/studio/${SAVED_VIDEO_ID}`] },
   );
   const view = render(
     <StudioDesignProvider>
@@ -159,6 +203,40 @@ describe('StudioExitGuard', () => {
 
     expect(router.state.location.search).toBe('?task=history');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('stops a dirty local edit leaving a Saved Video workspace silently', async () => {
+    const { router } = renderSavedVideoGuard({ creativeWorkDirty: true });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Studio' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Discard temporary work and leave?' }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/studio/${SAVED_VIDEO_ID}`);
+  });
+
+  it('treats another Saved Video as leaving this one', async () => {
+    // Two videos are two workspaces: opening the second abandons the first one's edits exactly as
+    // going to the Dashboard would, and used to do it without asking.
+    const { router } = renderSavedVideoGuard({ creativeWorkDirty: true });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open another saved video' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Discard temporary work and leave?' }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(`/studio/${SAVED_VIDEO_ID}`);
+  });
+
+  it('lets an unmodified Saved Video be closed without offering to discard it', async () => {
+    // The video on the stage is presented, but it is already on the server. Offering to discard it
+    // would be offering to throw away a file that is not going anywhere.
+    renderSavedVideoGuard({ hasTemporaryTake: true, hasUnsavedTake: false });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Studio' }));
+
+    expect(await screen.findByRole('heading', { name: 'Entry route' })).toBeInTheDocument();
   });
 
   it('stands aside for the expiry redirect instead of raising a second prompt', async () => {
@@ -231,6 +309,27 @@ describe('StudioExitGuard', () => {
     window.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('protects a hard unload while an unsaved provider result is the only copy', () => {
+    // The server hands a generated result over once and keeps nothing, so a closed tab is a second
+    // charge to get it back. A take is different — it can be recorded again — which is why this
+    // arms the prompt on its own rather than riding on `hasUnsavedTake`.
+    renderGuard({ unsavedProviderResult: true });
+    const event = new Event('beforeunload', { cancelable: true });
+
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('leaves a hard unload alone once the provider result has been saved', () => {
+    renderGuard({ hasTemporaryTake: true, hasUnsavedTake: false, unsavedProviderResult: false });
+    const event = new Event('beforeunload', { cancelable: true });
+
+    window.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(false);
   });
 
   it('flushes a dirty Project session before switching URL-owned Project context', async () => {

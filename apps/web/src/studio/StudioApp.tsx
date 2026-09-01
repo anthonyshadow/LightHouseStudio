@@ -872,8 +872,14 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
         recordingOrFinalizing={work.recordingOrFinalizing}
         videoRenderingActive={work.videoRenderingActive}
         hasTemporaryTake={work.hasTemporaryTake}
+        hasUnsavedTake={work.hasTemporaryTake && savedVideo.presentedHasUnsavedChanges}
         voiceProcessingActive={work.voiceProcessingActive}
         creativeWorkDirty={work.creativeWorkDirty}
+        // The two halves meet only here: the workflow knows a provider produced these bytes, the
+        // saved-video controller knows they have not been written down anywhere.
+        unsavedProviderResult={
+          existingVideo.providerResultHeld && savedVideo.presentedHasUnsavedChanges
+        }
         projectContextDirty={projectContextActive && work.creativeWorkDirty}
         projectSourceActivity={activeProjectSourceActivity}
         projectSession={activeProjectSession}

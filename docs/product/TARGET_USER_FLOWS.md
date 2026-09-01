@@ -106,14 +106,15 @@ mute, replace)**, Subtitles **(gap)** — timeline with frame stepping, undo/red
 ## 10. Optional AI editing
 
 **Sees:** AI tools presented beside — not above — manual tools: Character Swap, Virtual Try-On,
-Voice **(gap — voice unavailable in Projects today)**, each with a plain cost note and provider
+Voice **(gap — voice does not run in Projects today; the rail entry and the Add Voice picker both
+say so, and attaching one is organizing for later)**, each with a plain cost note and provider
 status.
 **Does:** configures (choose character/outfit/voice from Libraries or build one), explicitly
 starts; may leave and return while work runs.
 **System:** durable job with visible queued/processing/ready/failed states; unknown acceptance is
 reconciled, never resubmitted; results are retained server-side and appear in the Project as
 adoptable assets — nothing dangles **(gap for standalone flow: results are session-only until
-saved)**.
+saved, though closing the tab on an unsaved one now warns first)**.
 **Next:** adopt the result as the current cut, keep both, or discard — all reversible via History.
 
 ## 11. Composition and stitching **(gap — the target centerpiece)**
@@ -169,5 +170,7 @@ confirms, and never destroys bytes that retained history references.
 Every persistent state carries a control: a failed upload → retry; a failed AI job → the reason and
 a no-new-cost recovery or an explicit paid retry; an ambiguous submission → "we're confirming what
 the provider accepted" with reconcile; a missing file → a repair state, not a broken tile; an
-unknown URL → a "that page doesn't exist" surface **(gap — today it silently redirects)**. The user
-is never told less than what happened, and never stranded without a next step.
+unknown URL → a "that page doesn't exist" surface, shown to a signed-in operator with a way back to
+the Dashboard, while anyone not signed in still lands on the entry page rather than learning which
+addresses exist. The user is never told less than what happened, and never stranded without a next
+step.

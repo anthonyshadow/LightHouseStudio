@@ -16,7 +16,8 @@ import {
   Routes,
   useLocation,
 } from 'react-router';
-import { Button } from '../ui/primitives/Button';
+import { hasActiveSession, useAuth } from '../application/auth/AuthProvider';
+import { Button, LinkButton } from '../ui/primitives/Button';
 import { formatClientDiagnostics, isChunkLoadError, recordClientError } from './clientDiagnostics';
 import { EntryPage } from './EntryPage';
 import {
@@ -46,17 +47,20 @@ const routeSurfaceStyles = {
   textAlign: 'center' as const,
 };
 
-const titleForPath = (pathname: string): string => {
+const NOT_FOUND_TITLE = 'Page not found · Lightframe';
+
+const titleForPath = (pathname: string, notFound: boolean): string => {
+  if (notFound) return NOT_FOUND_TITLE;
   const route = protectedRouteForPath(pathname);
   if (route !== null) return route.title;
   // Legacy paths are protected but redirect before they render, so they never keep a title.
   return isProtectedAppPath(pathname) ? 'Lightframe Studio' : 'Enter Lightframe Studio';
 };
 
-const RouteMetadata = () => {
+const RouteMetadata = ({ notFound }: { readonly notFound: boolean }) => {
   const location = useLocation();
   const studioRoute = isProtectedAppPath(location.pathname);
-  const title = titleForPath(location.pathname);
+  const title = titleForPath(location.pathname, notFound);
 
   useLayoutEffect(() => {
     document.title = title;
@@ -160,6 +164,25 @@ const EntryRoute = ({ focusEnterOnMount }: EntryRouteProps) => (
   <EntryPage focusEnterOnMount={focusEnterOnMount} />
 );
 
+/**
+ * An address this app does not have.
+ *
+ * Small on purpose: there is nothing here to work with, so it says what happened and hands back the
+ * one destination that always exists. The link is a real anchor, so the address can be copied or
+ * opened in a new tab like any other.
+ */
+const NotFoundRoute = () => (
+  <main css={routeSurfaceStyles}>
+    <div>
+      <h1>That page doesn’t exist</h1>
+      <p>Nothing lives at this address. Your saved account content is unchanged.</p>
+      <LinkButton variant="primary" href={APP_PATHS.dashboard}>
+        Go to Dashboard
+      </LinkButton>
+    </div>
+  </main>
+);
+
 const AuthenticatedShellRoute = () => {
   const location = useLocation();
   const routeState = location.state as { creationIntent?: unknown } | null;
@@ -173,6 +196,7 @@ const AuthenticatedShellRoute = () => {
 
 export const RoutedApplication = () => {
   const location = useLocation();
+  const auth = useAuth();
   const [hasVisitedProtectedApp, setHasVisitedProtectedApp] = useState(() =>
     isProtectedAppPath(location.pathname),
   );
@@ -189,9 +213,15 @@ export const RoutedApplication = () => {
       ? legacyPath
       : `${legacyPath}${location.search}${location.hash}`;
 
+  // The entry route matches ahead of the catch-all, so `/` is never the address that is missing.
+  const notFound =
+    location.pathname !== APP_PATHS.entry &&
+    !isProtectedAppPath(location.pathname) &&
+    hasActiveSession(auth);
+
   return (
     <>
-      <RouteMetadata />
+      <RouteMetadata notFound={notFound} />
       <RouteErrorBoundary resetKey={location.key}>
         <Routes>
           <Route
@@ -210,7 +240,13 @@ export const RoutedApplication = () => {
                   )}
                 </ProtectedRoute>
               ) : (
-                <Navigate replace to={APP_PATHS.entry} />
+                // Only someone already signed in is told the address is wrong; to everyone else a
+                // typo and a real protected route stay indistinguishable. Routed through the same
+                // guard so the wait for session restoration is the same one — deciding early would
+                // send a signed-in operator to the entry page, which forwards them to the Dashboard.
+                <ProtectedRoute unauthenticated={<Navigate replace to={APP_PATHS.entry} />}>
+                  <NotFoundRoute />
+                </ProtectedRoute>
               )
             }
           />

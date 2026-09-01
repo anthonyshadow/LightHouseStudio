@@ -8,7 +8,11 @@ Derived from `apps/web/src/app/paths.ts`, `apps/web/src/app/AppRouter.tsx`,
 There is exactly one route entry: `createBrowserRouter([{ path: '*', element: <RoutedApplication /> }])`.
 `RoutedApplication` renders either the public entry page or, for any path recognised by
 `isProtectedAppPath`, the lazily-loaded `AuthenticatedShell` inside `ProtectedRoute`. Anything
-unrecognised redirects to `/`.
+unrecognised is answered by who is asking: a signed-in operator gets a "That page doesn't exist"
+surface with a Dashboard link, at the address they typed, while everyone else still redirects to
+`/` — so a typo and a real protected route stay indistinguishable to anyone without a session. The
+decision waits for session restoration, because deciding while the session is unknown would send a
+signed-in operator to the entry page, which forwards them straight to the Dashboard.
 
 Consequences that matter for every flow:
 
@@ -65,8 +69,8 @@ Consequences that matter for every flow:
 | `/studio/assets/voices`                           | `/assets/voices`           |
 | `/studio/live`                                    | `/studio/create/live`      |
 
-`/studio/assets/recipes` was removed with the retired Recipe UI; it now falls through to the entry
-page like any other unknown path. `/campaign` carries a compatibility comment and is **not** a
+`/studio/assets/recipes` was removed with the retired Recipe UI; it now falls through like any other
+unknown path. `/campaign` carries a compatibility comment and is **not** a
 member of `PROTECTED_LEAF_PATHS`, so it is reachable only through the final
 `canonicalizeLegacyAppPath` clause of `isProtectedAppPath`, and `canonicalizeProtectedDestination`
 still resolves it in one hop (so a login return to `/campaign?x=1` lands on `/campaigns?x=1`).

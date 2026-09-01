@@ -829,6 +829,16 @@ export const useExistingVideoWorkflow = ({
       retryJob,
       original: recording.original,
       result: recording.processed ?? recording.visual,
+      /**
+       * A provider-produced result is being held in this tab and nowhere else.
+       *
+       * The server hands those bytes over once and does not retain them, so whatever is holding
+       * this is holding the only copy of something already paid for. Said as a fact about the
+       * result rather than about what is on screen: the comparison toggle changes the view, not
+       * what would be lost.
+       */
+      providerResultHeld:
+        resultHasServerApprovedVisual && (recording.processed ?? recording.visual) !== null,
       editBase,
       editBaseMetadata,
       currentMetadata,
@@ -904,6 +914,7 @@ export const useExistingVideoWorkflow = ({
       recording.processed,
       recording.visual,
       removeStep,
+      resultHasServerApprovedVisual,
       reset,
       cleanup,
       startOver,

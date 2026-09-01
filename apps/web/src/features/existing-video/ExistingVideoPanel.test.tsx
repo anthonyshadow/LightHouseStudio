@@ -58,6 +58,7 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   retryJob: null,
   original: null,
   result: null,
+  providerResultHeld: false,
   editBase: null,
   editBaseMetadata: null,
   currentMetadata: null,
