@@ -8,6 +8,7 @@ import { useRouteBack } from '../../app/useRouteBack';
 import { AppIcon, Button } from '../../ui';
 import { useCampaignDetail } from '../campaigns/useCampaignsController';
 import { ProjectAssetsSection } from './ProjectAssetsSection';
+import { ProjectDeliverableSection } from './ProjectDeliverableSection';
 import {
   DeleteProjectDialog,
   DuplicateProjectDialog,
@@ -251,6 +252,8 @@ export const ProjectOverviewSurface = ({
           />
         </section>
       ) : null}
+
+      <ProjectDeliverableSection current={current} archived={archived} />
 
       <ProjectAssetsSection
         projectId={project.id}

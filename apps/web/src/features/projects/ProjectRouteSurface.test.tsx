@@ -4,6 +4,8 @@ import type {
   CampaignContract,
   ProjectAssetsResponse,
   ProjectCurrentResponse,
+  ProjectOutputHistoryItem,
+  ProjectOutputHistoryResponse,
   ProjectSourceResponse,
   ProjectWorkingMediaResponse,
   SavedVideoSummary,
@@ -76,6 +78,12 @@ let projectAssetsResponse: ProjectAssetsResponse = {
   videoSummaries: [],
   nextCursor: null,
 };
+
+/**
+ * Read by `renderProjects`'s default handler rather than overridden with `mockApiServer.use`: that
+ * prepends, so a handler registered before the render would lose to the default registered after it.
+ */
+let projectOutputsResponse: ProjectOutputHistoryResponse = { outputs: [], nextCursor: null };
 
 const campaign = (): CampaignContract => ({
   id: campaignId,
@@ -173,6 +181,85 @@ const acceptedProject = (): ProjectCurrentResponse => {
   };
 };
 
+const outputSavedVideoId = '0f5a2fe1-9d6b-4b52-9d4a-7c2d1b6e4a31';
+const outputVersionId = '5b0a4c37-2e18-4d6e-9b0f-3a2c8d1e7f45';
+
+/** An accepted Project that has saved one Version, which is what its snapshot now points at. */
+const savedProject = (): ProjectCurrentResponse => {
+  const accepted = acceptedProject();
+  return {
+    project: { ...accepted.project, status: 'completed' },
+    revision: {
+      ...accepted.revision,
+      snapshot: {
+        ...accepted.revision.snapshot,
+        workflowPhase: 'complete',
+        lastSuccessfulOutput: {
+          savedVideoId: outputSavedVideoId,
+          videoVersionId: outputVersionId,
+        },
+      },
+    },
+  };
+};
+
+const savedOutput = (): ProjectOutputHistoryItem => ({
+  kind: 'saved-video-version',
+  output: {
+    projectId: activeId,
+    savedVideoId: outputSavedVideoId,
+    videoVersionId: outputVersionId,
+    producingRevisionId: revisionId,
+    producingRevisionNumber: 1,
+    createdAt: now,
+  },
+  savedVideo: {
+    id: outputSavedVideoId,
+    title: 'Launch cut, final',
+    libraryStatus: 'ready',
+    currentVersionId: outputVersionId,
+  },
+  version: {
+    id: outputVersionId,
+    videoId: outputSavedVideoId,
+    ordinal: 3,
+    origin: 'uploaded',
+    characterName: null,
+    characterVariantName: null,
+    sourceVersionId: null,
+    mimeType: 'video/mp4',
+    filename: 'launch-cut-final.mp4',
+    sizeBytes: 4,
+    durationMs: 1_000,
+    width: 1_920,
+    height: 1_080,
+    exportSpecification: {
+      container: 'video/mp4',
+      aspect: '16:9',
+      resolution: { width: 1_920, height: 1_080 },
+      includeAudio: true,
+    },
+    createdAt: now,
+  },
+  referenceRevision: null,
+  isCurrentForProject: true,
+  contentUrl: `/api/projects/${activeId}/outputs/${outputVersionId}/content`,
+});
+
+const installSavedProject = (
+  overrides: Partial<ProjectOutputHistoryItem> = {},
+  project: ProjectCurrentResponse = savedProject(),
+) => {
+  installProjectLists();
+  projectOutputsResponse = {
+    outputs: [{ ...savedOutput(), ...overrides }],
+    nextCursor: null,
+  };
+  mockApiServer.use(
+    http.get(`*/api/projects/${project.project.id}`, () => HttpResponse.json(project)),
+  );
+};
+
 const acceptedSourceResponse = (): ProjectSourceResponse => ({
   ...acceptedProject(),
   source: {
@@ -204,9 +291,7 @@ const renderProjects = (
     http.get('*/api/projects/:projectId/history', () =>
       HttpResponse.json({ revisions: [], nextCursor: null }),
     ),
-    http.get('*/api/projects/:projectId/outputs', () =>
-      HttpResponse.json({ outputs: [], nextCursor: null }),
-    ),
+    http.get('*/api/projects/:projectId/outputs', () => HttpResponse.json(projectOutputsResponse)),
     http.get('*/api/projects/:projectId/processing/history', () =>
       HttpResponse.json({ attempts: [], nextCursor: null }),
     ),
@@ -218,6 +303,7 @@ const renderProjects = (
       { path: '/campaigns/:campaignId', element: <div>Campaign return</div> },
       { path: '/dashboard', element: <div>Dashboard previous</div> },
       { path: '/studio/:videoId', element: <div>Studio direct</div> },
+      { path: '/assets/videos', element: <div>Videos library</div> },
     ],
     {
       initialEntries: [
@@ -253,6 +339,7 @@ afterEach(() => {
   vi.restoreAllMocks();
   window.history.replaceState({ idx: 0 }, '');
   projectAssetsResponse = { assets: [], videoSummaries: [], nextCursor: null };
+  projectOutputsResponse = { outputs: [], nextCursor: null };
 });
 
 describe('Project route surface', () => {
@@ -505,6 +592,112 @@ describe('Project route surface', () => {
     expect(progress.querySelector('[aria-current="step"]')).toBeNull();
     expect(within(progress).getByText('Save').closest('li')).toHaveAttribute('data-state', 'done');
     expect(screen.getByText('Version saved — carry on')).toBeVisible();
+  });
+
+  it('shows the saved output where a returning operator lands, with its placement and download', async () => {
+    installSavedProject();
+    const { router } = renderProjects(`/projects/${activeId}`);
+
+    const deliverable = await screen.findByRole('region', { name: 'Saved output' });
+    expect(
+      await within(deliverable).findByRole('heading', { name: 'Launch cut, final' }),
+    ).toBeVisible();
+    // The recorded placement, said in the words the chooser offered it in — not "16:9".
+    expect(within(deliverable).getByText('Widescreen')).toBeVisible();
+    expect(within(deliverable).getByText('Version 3')).toBeVisible();
+    expect(within(deliverable).getByText('1920×1080')).toBeVisible();
+    expect(
+      within(deliverable).getByRole('img', { name: 'Thumbnail for Launch cut, final' }),
+    ).toBeVisible();
+    expect(
+      within(deliverable).getByRole('link', { name: 'Download Launch cut, final, Version 3' }),
+    ).toHaveAttribute(
+      'href',
+      `/api/projects/${activeId}/outputs/${outputVersionId}/content?download=true`,
+    );
+
+    await userEvent.click(within(deliverable).getByRole('button', { name: 'View in Assets' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/assets/videos'));
+    expect(router.state.location.search).toBe(`?video=${outputSavedVideoId}`);
+  });
+
+  it('names an absent saved output only where saving is the next step', async () => {
+    installProjectLists();
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(acceptedProject())),
+      http.get(`*/api/projects/${archivedId}`, () => HttpResponse.json(currentProject(archivedId))),
+    );
+    const { router } = renderProjects(`/projects/${activeId}`);
+
+    const deliverable = await screen.findByRole('region', { name: 'Saved output' });
+    expect(
+      await within(deliverable).findByRole('heading', { name: 'No saved output yet' }),
+    ).toBeVisible();
+    await userEvent.click(within(deliverable).getByRole('button', { name: 'Go to Save' }));
+    await waitFor(() => expect(router.state.location.search).toBe('?task=save'));
+
+    // A Project with no original video is already being asked for one, and an archived Project
+    // cannot save at all. Pointing either at Save would be a dead end, so neither is offered it.
+    cleanup();
+    renderProjects(`/projects/${archivedId}`);
+    expect(await screen.findByRole('heading', { name: 'Archived concept' })).toBeVisible();
+    expect(screen.queryByRole('region', { name: 'Saved output' })).not.toBeInTheDocument();
+  });
+
+  it('still shows the saved output after the Project has moved past it', async () => {
+    // The domain clears `lastSuccessfulOutput` on any material change, so a returning operator's
+    // snapshot names nothing. The work still happened, and the overview has to say so.
+    const edited = acceptedProject();
+    installSavedProject({ isCurrentForProject: false }, edited);
+    renderProjects(`/projects/${activeId}`);
+
+    const deliverable = await screen.findByRole('region', { name: 'Saved output' });
+    expect(
+      await within(deliverable).findByRole('heading', { name: 'Launch cut, final' }),
+    ).toBeVisible();
+    expect(edited.revision.snapshot.lastSuccessfulOutput).toBeNull();
+    expect(within(deliverable).getByText(/You have changed this Project since/u)).toBeVisible();
+    expect(within(deliverable).queryByText('No saved output yet')).not.toBeInTheDocument();
+  });
+
+  it('keeps a saved output the library no longer holds honest about what is left', async () => {
+    installSavedProject({
+      savedVideo: { ...savedOutput().savedVideo, libraryStatus: 'removed' },
+    });
+    renderProjects(`/projects/${activeId}`);
+
+    const deliverable = await screen.findByRole('region', { name: 'Saved output' });
+    expect(await within(deliverable).findByText(/Removed from your Videos/u)).toBeVisible();
+    // The Project still points at it, so it is still downloadable here — but there is no longer a
+    // library entry to send anyone to.
+    expect(
+      within(deliverable).getByRole('link', { name: 'Download Launch cut, final, Version 3' }),
+    ).toBeVisible();
+    expect(
+      within(deliverable).queryByRole('button', { name: 'View in Assets' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('still hands an archived Project its saved output, without offering it a Save step', async () => {
+    const archivedSaved = savedProject();
+    installSavedProject(
+      {},
+      {
+        project: { ...archivedSaved.project, id: archivedId, status: 'archived', archivedAt: now },
+        revision: archivedSaved.revision,
+      },
+    );
+    renderProjects(`/projects/${archivedId}`);
+
+    const deliverable = await screen.findByRole('region', { name: 'Saved output' });
+    expect(
+      await within(deliverable).findByRole('link', {
+        name: 'Download Launch cut, final, Version 3',
+      }),
+    ).toBeVisible();
+    expect(
+      within(deliverable).queryByRole('button', { name: 'Go to Save' }),
+    ).not.toBeInTheDocument();
   });
 
   it('reads a review-phase Project as waiting on Save', async () => {

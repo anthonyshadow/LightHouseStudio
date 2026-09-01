@@ -230,6 +230,10 @@ export const ProjectOutputSaveSection = ({
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists }),
           queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.lists }),
+          // The overview reads the newest saved output, and this save just became it.
+          queryClient.invalidateQueries({
+            queryKey: projectQueryKeys.latestOutput(pending.projectId),
+          }),
         ]);
         setSavedVideo(response.savedVideo);
         setPhase('saved');

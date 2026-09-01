@@ -65,7 +65,10 @@ Studio stage.
    returns focus to the thumbnail, and detaches its player source when closed; it owns no tracks,
    object URL, recorder, or provider session. The dialog lists immutable Versions with ordinal, current marker, origin,
    timestamp, media facts, and status. Selecting an older Version previews and downloads that exact
-   content without changing the Saved Video current pointer.
+   content without changing the Saved Video current pointer. **Export** opens the placement chooser
+   on the placement that Version was produced for, because a Version records one exactly when a
+   rendition was stored for it: those bytes already are that shape, so the offer stays the plain
+   server download until a _different_ placement is chosen, and only then is anything re-framed.
 7. **Open in Studio** navigates to `/studio/create` (push navigation), fetches owner-checked
    metadata and only the current Version bytes, enforces the 300 MB bound, and opens the existing
    review workspace. The `/studio/:videoId` deep link exists for direct entry but is not the

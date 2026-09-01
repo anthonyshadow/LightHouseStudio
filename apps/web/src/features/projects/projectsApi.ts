@@ -551,9 +551,11 @@ export const getProjectHistory = (input: {
 export const getProjectOutputs = (input: {
   readonly projectId: string;
   readonly cursor?: string;
+  /** Defaults to a full page; a surface showing only the most recent output asks for one. */
+  readonly pageSize?: number;
   readonly signal?: AbortSignal;
 }): Promise<ProjectOutputHistoryResponse> => {
-  const query = new URLSearchParams({ pageSize: '20' });
+  const query = new URLSearchParams({ pageSize: String(input.pageSize ?? 20) });
   if (input.cursor) query.set('cursor', input.cursor);
   return requestJson(
     `/api/projects/${encodeURIComponent(input.projectId)}/outputs?${query.toString()}`,
