@@ -9,7 +9,7 @@ import { createPhaseOneEntitlements } from '@studio/domain';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { InputHTMLAttributes, PropsWithChildren, ReactNode } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   CreativeWorkspaceActions,
   CreativeWorkspaceRefs,
@@ -67,6 +67,27 @@ const referenceAsset: ReferenceImageAsset = {
 };
 
 const harness = vi.hoisted(() => {
+  /** The one shape a ready existing-video selection has; only the file ever differs. */
+  const readySelection = (
+    displayName: string,
+    sizeBytes: number,
+    selectedAt = '2026-08-11T16:00:00.000Z',
+  ) => ({
+    metadata: {
+      kind: 'uploaded' as const,
+      mode: 'local' as const,
+      selectedAt,
+      displayName,
+      container: 'mp4' as const,
+      videoCodec: 'avc' as const,
+      audioCodec: null,
+      durationMs: 10_000,
+      width: 1_280,
+      height: 720,
+      sizeBytes,
+      hasAudio: false as const,
+    },
+  });
   const store = {
     schemaVersion: 7 as const,
     savedPrompts: [],
@@ -182,22 +203,7 @@ const harness = vi.hoisted(() => {
     discard: vi.fn(),
   };
   const existingVideo = {
-    selection: null as null | {
-      metadata: {
-        kind: 'uploaded';
-        mode: 'local';
-        selectedAt: string;
-        displayName: string;
-        container: 'mp4';
-        videoCodec: 'avc';
-        audioCodec: null;
-        durationMs: number;
-        width: number;
-        height: number;
-        sizeBytes: number;
-        hasAudio: false;
-      };
-    },
+    selection: null as null | ReturnType<typeof readySelection>,
     steps: [],
     comparison: 'result' as const,
     get currentMetadata() {
@@ -226,22 +232,7 @@ const harness = vi.hoisted(() => {
       };
       recording.presented = artifact;
       existingVideo.phase = 'ready';
-      existingVideo.selection = {
-        metadata: {
-          kind: 'uploaded',
-          mode: 'local',
-          selectedAt: '2026-08-11T16:00:00.000Z',
-          displayName: file.name,
-          container: 'mp4',
-          videoCodec: 'avc',
-          audioCodec: null,
-          durationMs: 10_000,
-          width: 1_280,
-          height: 720,
-          sizeBytes: file.size,
-          hasAudio: false,
-        },
-      };
+      existingVideo.selection = readySelection(file.name, file.size);
       return Promise.resolve(artifact);
     }),
     // Resolves whether the take actually became the source, which is what spends the editor intent.
@@ -258,6 +249,7 @@ const harness = vi.hoisted(() => {
   };
 
   return {
+    readySelection,
     repository,
     session,
     recording,
@@ -807,6 +799,15 @@ const applySavedCharacter = async () => {
 };
 
 describe('StudioApp composition lifecycle', () => {
+  // The shell code-splits the runtime, so the very first render resolves
+  // `lazy(() => import('./StudioApp'))` before any stage can mount. Loading it here keeps that
+  // one-off module cost — the whole Studio graph, transformed and evaluated on demand — out of the
+  // first assertion's wait budget, which it otherwise spends outright when the full suite runs its
+  // workers in parallel.
+  beforeAll(async () => {
+    await import('./StudioApp');
+  });
+
   afterEach(cleanup);
 
   beforeEach(() => {
@@ -1239,27 +1240,11 @@ describe('StudioApp composition lifecycle', () => {
     harness.takeStagePresentation = { kind: 'playback', mode: 'local' };
     harness.existingVideo.adoptRecordedArtifact.mockImplementationOnce(() => {
       harness.existingVideo.phase = 'ready';
-      harness.existingVideo.selection = {
-        metadata: {
-          kind: 'uploaded',
-          mode: 'local',
-          selectedAt: '2026-08-11T16:00:00.000Z',
-          displayName: 'project-cut.mp4',
-          container: 'mp4',
-          videoCodec: 'avc',
-          audioCodec: null,
-          durationMs: 10_000,
-          width: 1_280,
-          height: 720,
-          sizeBytes: media.size,
-          hasAudio: false,
-        },
-      };
+      harness.existingVideo.selection = harness.readySelection('project-cut.mp4', media.size);
       return Promise.resolve(true);
     });
-    const context = vi
-      .spyOn(HTMLCanvasElement.prototype, 'getContext')
-      .mockImplementation(() => null);
+    // Restored by the global `vi.restoreAllMocks()` in vitest.setup.ts.
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null);
     renderStudio(undefined, '/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
     await screen.findByText('Deferred Projects workspace');
 
@@ -1280,7 +1265,6 @@ describe('StudioApp composition lifecycle', () => {
       ).not.toBeInTheDocument(),
     );
     expect(screen.queryByRole('region', { name: 'Use existing video' })).not.toBeInTheDocument();
-    context.mockRestore();
   });
 
   it('prompts for an optional name before saving the presented video', async () => {
@@ -1337,22 +1321,11 @@ describe('StudioApp composition lifecycle', () => {
       durationMs: 10_000,
       sizeBytes: media.size,
     };
-    harness.existingVideo.selection = {
-      metadata: {
-        kind: 'uploaded',
-        mode: 'local',
-        selectedAt: '2026-08-04T12:00:00.000Z',
-        displayName: 'editable-result.mp4',
-        container: 'mp4',
-        videoCodec: 'avc',
-        audioCodec: null,
-        durationMs: 10_000,
-        width: 1_280,
-        height: 720,
-        sizeBytes: media.size,
-        hasAudio: false,
-      },
-    };
+    harness.existingVideo.selection = harness.readySelection(
+      'editable-result.mp4',
+      media.size,
+      '2026-08-04T12:00:00.000Z',
+    );
     harness.takeStagePresentation = { kind: 'playback', mode: 'local' };
     const context = vi
       .spyOn(HTMLCanvasElement.prototype, 'getContext')

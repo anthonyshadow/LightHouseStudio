@@ -263,6 +263,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     clearExistingVideoIntent,
     discardPendingAdoption,
     launchingOperation,
+    launchedOperation,
     clearCreateLaunch,
   } = useStudioRecordingLaunch({
     browser,
@@ -504,7 +505,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   const { openVideoAdjust } = savedVideo;
   useEffect(() => {
     if (
-      launchingOperation !== 'adjust' ||
+      launchedOperation !== 'adjust' ||
       !existingVideo.selection ||
       existingVideo.phase !== 'ready'
     ) {
@@ -518,7 +519,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     clearCreateLaunch,
     existingVideo.phase,
     existingVideo.selection,
-    launchingOperation,
+    launchedOperation,
     openVideoAdjust,
   ]);
   // Published for the surfaces that outlive this runtime. Registered in a layout effect so a
@@ -689,9 +690,10 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   const openEditorFromRail = useCallback(() => {
     createLaunchTriggerRef.current = null;
     setCreateLaunchActive(false);
-    // Inside a Project the rail opens the editor directly on the current cut — the same launch the
-    // Create card makes — instead of detouring through the "Use existing video" chooser.
-    openPlaybackEditor(projectContextActive ? 'adjust' : undefined);
+    // Inside a Project the rail opens the editor directly on the current cut — the same dispatch
+    // the Create card makes — instead of detouring through the "Use existing video" chooser. It
+    // names itself as the rail so the Create cards do not report a press made somewhere else.
+    openPlaybackEditor(projectContextActive ? 'adjust' : undefined, 'rail');
   }, [openPlaybackEditor, projectContextActive]);
   const closeExistingVideo = useCallback(() => {
     if (existingVideo.providerActive) return;
@@ -708,7 +710,9 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
         return;
       }
       if (kind === 'voice') {
-        openEditorFromRail();
+        // The voice chooser lives inside the existing-video panel, not the editor: adopt the cut
+        // if it is not held yet, then open that panel.
+        openPlaybackEditor(undefined, 'rail');
         return;
       }
       if (kind === 'prompt' || kind === 'recipe' || kind === 'reference') {
@@ -717,7 +721,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
       }
       openCharacterSelector();
     },
-    [openCharacterSelector, openEditorFromRail, openOutfitSelector, openOverlay],
+    [openCharacterSelector, openOutfitSelector, openOverlay, openPlaybackEditor],
   );
   const creativeWorkspace = (
     <>
@@ -929,8 +933,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
         onFinishExistingVideo={finishExistingVideoSetup}
         onStartExistingVideoRecording={startExistingVideoRecording}
         onDiscardExistingVideoSelection={discardExistingVideoSelection}
-        onOpenExistingVideo={openExistingVideo}
-        onEditPresentedTake={openEditorFromRail}
+        onEditVideo={openEditorFromRail}
         onOpenSavedCharacters={openSavedCharacters}
         onOpenSavedOutfits={openOutfitSelector}
         onOpenSavedVideosLibrary={nav.openVideos}
