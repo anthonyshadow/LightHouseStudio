@@ -156,8 +156,8 @@ mutations do not retry by default and do not refetch on window focus or reconnec
 non-billable capability read is the only bounded automatic retry. Project summary/current reads,
 saved-video metadata/cursor pages, voice-library metadata pages, and accepted video-job status reads
 use Query cancellation and targeted cache updates or invalidation. Project lists use separate
-bounded active/archived cursor pages. Quick project retains one operation key through an uncertain
-response; rename/archive/restore reconcile server CAS before invalidating the current Project and
+bounded active/archived cursor pages. Project creation retains one operation key through an
+uncertain response; rename/archive/restore reconcile server CAS before invalidating the current Project and
 list caches. Voice pages remain fresh for five minutes. Video-job status
 polling follows the server-provided cadence and never retries a failed read automatically. Video
 bytes and Blobs, editor and camera state, current timeline edits, temporary UI state, local

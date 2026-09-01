@@ -8,10 +8,13 @@ remains the permanent record of removed text).
 ## 1. Deletion manifest — **approved and executed 2026-08-31**
 
 Entries M1–M6 were deleted and every reference repaired on 2026-08-31 (approval given
-2026-08-31). M7 executed partially: `.superdesign/tmp/*.html` removed; the
-`.claude/worktrees/exciting-goldstine-c5dfcd` worktree was **left in place** because inspection
-found uncommitted modifications inside it (`ShellLifecycleDialogs.test.tsx`,
-`StudioApp.test.tsx`, `vitest.setup.ts`) — its removal awaits the owner's review of that work.
+2026-08-31). M7 executed in two steps: `.superdesign/tmp/*.html` removed 2026-08-31; the
+`.claude/worktrees/exciting-goldstine-c5dfcd` worktree was initially left in place because
+inspection found uncommitted modifications inside it (`ShellLifecycleDialogs.test.tsx`,
+`StudioApp.test.tsx`, `vitest.setup.ts`), then removed later the same day once the owner reviewed
+that work and its commit (`ac214d99`) was merged. The manifest is fully executed; a 2026-09-01
+verification re-ran the deleted-path greps and the three checks (`check:docs`, `format:check`,
+`check:retired-program`) against the executed state — all green.
 
 Every entry lists: path · reason · still-valid unique content and where it now lives · replacement
 · references that must be updated on deletion.
