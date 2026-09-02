@@ -28,13 +28,15 @@ describe('CreativeLibraryManagementMenu', () => {
     await user.click(trigger);
     await user.click(screen.getByRole('menuitem', { name: /Export or import library/u }));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Library data' });
+    const dialog = await screen.findByRole('dialog', { name: 'Library backup' });
     expect(within(dialog).getByRole('button', { name: 'Export library' })).toBeVisible();
     expect(within(dialog).getByRole('button', { name: 'Import library' })).toBeVisible();
     expect(within(dialog).getByText(/available wherever you sign in/u)).toBeVisible();
 
-    await user.click(within(dialog).getByRole('button', { name: 'Close library data' }));
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Library data' })).toBeNull());
+    await user.click(within(dialog).getByRole('button', { name: 'Close Library backup' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Library backup' })).toBeNull(),
+    );
     await waitFor(() => expect(trigger).toHaveFocus());
   });
 });

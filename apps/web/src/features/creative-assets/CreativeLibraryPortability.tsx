@@ -165,7 +165,7 @@ export const CreativeLibraryPortability = ({
       </div>
       <ConfirmationDialog
         open={candidate !== null}
-        title="Replace your account creative library?"
+        title="Replace your Library?"
         description="Every Character, Outfit, wardrobe variant and saved prompt in your current library is replaced with the contents of the file. Anything not in the file is lost."
         body={
           <>
@@ -182,7 +182,7 @@ export const CreativeLibraryPortability = ({
         alert={replaceFailure ?? undefined}
         alertTitle={replaceFailure ? 'The library was not replaced' : undefined}
         confirmLabel={replacing ? 'Replacing library…' : 'Replace library'}
-        cancelLabel="Keep account library"
+        cancelLabel="Keep current Library"
         danger
         busy={replacing}
         returnFocusRef={importTriggerRef}

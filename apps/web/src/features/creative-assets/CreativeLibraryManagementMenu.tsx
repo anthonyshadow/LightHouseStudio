@@ -39,11 +39,11 @@ export const CreativeLibraryManagementMenu = ({
       <OverlayPanel
         open={open}
         onClose={() => setOpen(false)}
-        title="Library data"
-        description="Export a backup or replace the current account library from a Lightframe file."
+        title="Library backup"
+        description="Export a backup of your Library, or replace it from a Lightframe file."
         placement="bottom"
         height="tall"
-        closeLabel="Close library data"
+        closeLabel="Close Library backup"
         returnFocusRef={triggerRef}
       >
         <CreativeLibraryPortability repository={repository} store={store} mirror={mirror} />
