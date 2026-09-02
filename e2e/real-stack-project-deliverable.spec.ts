@@ -174,8 +174,10 @@ test('a Project goes from an uploaded source to a downloadable deliverable throu
     await adoption.getByRole('button', { name: 'Use as the current cut' }).click();
     await expect(adoption).toBeHidden({ timeout: 60_000 });
     // The editor keeps the workspace covered until the render has actually been stored — a real
-    // upload takes longer than a simulator's reply — and hands back to whichever task the Project
-    // is now up to. The adoption notice lives in Create, so ask for that task before reading it.
+    // upload takes longer than a simulator's reply — and hands back to the task the operator was
+    // on. That is deliberate: the workspace latches its task on entry and a phase change never
+    // pulls the open panel away; only the operator's own choice moves it. This journey launched the
+    // editor from Original, and the adoption notice lives in Create, so choose that task to read it.
     await expect(page.locator('[data-project-route]')).toBeVisible({ timeout: 60_000 });
     await openProjectTask(page, 'Create');
     await expect(page.getByText('Edit is now the current cut', { exact: true })).toBeVisible();
