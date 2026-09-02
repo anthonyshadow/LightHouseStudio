@@ -252,7 +252,14 @@ const appendSavedVideoForOutput = (
   );
   const current = library.videos[index];
   if (current === undefined) return { kind: 'not-found' };
-  if (current.video.currentVersionId !== input.expectedVersionId) {
+  // Two expectations, one meaning: the video the caller described is still the video on disk.
+  // The version id catches a moved cut; the revision catches everything else the token counts
+  // (a rename landing between the caller's read and this commit), so the `revision` the caller
+  // recorded in its receipt — expected + 1 — is true whenever this commit succeeds.
+  if (
+    current.video.currentVersionId !== input.expectedVersionId ||
+    current.revision !== input.expectedRevision
+  ) {
     return {
       kind: 'conflict',
       savedVideoId: input.videoId,

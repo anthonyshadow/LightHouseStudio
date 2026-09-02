@@ -1,3 +1,4 @@
+import type { LocalVoiceEffectId } from '../voice/types';
 import type { VideoEditSpec } from '../video-editing';
 
 export const PROJECT_SNAPSHOT_SCHEMA_VERSION = 2 as const;
@@ -86,7 +87,7 @@ export interface ProjectOutfitSelection {
 export type ProjectVoiceSelection =
   | {
       readonly kind: 'local-effect';
-      readonly effectId: 'warm-studio' | 'clear-presenter' | 'robot';
+      readonly effectId: LocalVoiceEffectId;
       readonly effectRevision: 'builtin-v1' | null;
     }
   | {

@@ -527,7 +527,11 @@ test('paused account-library sync keeps the Dashboard and recovery controls unoc
     { storageKey: CREATIVE_ASSET_STORAGE_KEY, store: LOCAL_CREATIVE_STORE },
   );
   const network = await installSuccessfulStudioHarness(page, {
-    creativeLibraryRemoteState: { revision: 1, store: REMOTE_CREATIVE_STORE },
+    creativeLibraryRemoteState: {
+      revision: 1,
+      store: REMOTE_CREATIVE_STORE,
+      updatedAt: '2026-08-20T10:00:00.000Z',
+    },
   });
   await installCampaignHarness(page, true);
   await installProjectHarness(page, true, { includeUnassignedVideo: true });
@@ -539,6 +543,12 @@ test('paused account-library sync keeps the Dashboard and recovery controls unoc
   const createVideo = page.getByRole('button', { name: 'Create video' });
   await expect(notice).toBeVisible();
   await expect(notice).toContainText('Account library sync paused');
+  // Divergence, not outage: the fixture's cloud copy differs from the local one, so both
+  // resolution controls must exist. Without these two lines the loop below would happily measure
+  // a notice whose recovery buttons silently vanished — an invalid snapshot pauses sync with the
+  // same title but offers only "Try again".
+  await expect(notice.getByRole('button', { name: 'Save current copy' })).toBeVisible();
+  await expect(notice.getByRole('button', { name: 'Reload account copy' })).toBeVisible();
 
   for (const viewport of dashboardViewports) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });

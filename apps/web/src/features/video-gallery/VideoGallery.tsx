@@ -26,6 +26,7 @@ import {
   savedVideoContentUrl,
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
+import { ApiClientError } from '../../adapters/api-client/transport';
 import {
   AppIcon,
   Button,
@@ -457,6 +458,22 @@ export const VideoGallery = ({
     enabled: previewVideo !== null,
   });
 
+  const replaceVideoInLists = (updated: SavedVideoSummary) => {
+    queryClient.setQueriesData<InfiniteData<SavedVideosResponse>>(
+      { queryKey: savedVideoQueryKeys.lists },
+      (current) =>
+        current
+          ? {
+              ...current,
+              pages: current.pages.map((page) => ({
+                ...page,
+                videos: page.videos.map((video) => (video.id === updated.id ? updated : video)),
+              })),
+            }
+          : current,
+    );
+  };
+
   const renameMutation = useMutation({
     mutationFn: ({
       videoId,
@@ -467,21 +484,7 @@ export const VideoGallery = ({
       readonly title: string;
       readonly expectedRevision: number;
     }) => renameSavedVideo(videoId, title, expectedRevision),
-    onSuccess: (updated) => {
-      queryClient.setQueriesData<InfiniteData<SavedVideosResponse>>(
-        { queryKey: savedVideoQueryKeys.lists },
-        (current) =>
-          current
-            ? {
-                ...current,
-                pages: current.pages.map((page) => ({
-                  ...page,
-                  videos: page.videos.map((video) => (video.id === updated.id ? updated : video)),
-                })),
-              }
-            : current,
-      );
-    },
+    onSuccess: replaceVideoInLists,
   });
 
   const deleteMutation = useMutation({
@@ -596,6 +599,22 @@ export const VideoGallery = ({
       setAction(null);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'The video could not be renamed.');
+      if (error instanceof ApiClientError && error.status === 409) {
+        // This dialog's token lost. Fetch who won and hand the dialog the video as it now is —
+        // otherwise every retry resubmits the same stale expectation, and with focus refetches
+        // off there is nothing else that would ever refresh it.
+        try {
+          const fresh = await getSavedVideo(action.video.id);
+          replaceVideoInLists(fresh);
+          setAction((current) =>
+            current?.kind === 'rename' && current.video.id === fresh.id
+              ? { ...current, video: fresh }
+              : current,
+          );
+        } catch {
+          await queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.lists });
+        }
+      }
     }
   };
 
@@ -872,7 +891,7 @@ export const VideoGallery = ({
             {...(actionError ? { error: actionError } : {})}
             onChange={(event) => setRenameTitle(event.currentTarget.value)}
           />
-          {actionError ? <p>Correct the title or retry when the local API is available.</p> : null}
+          {actionError ? <p>You can correct the title and try again.</p> : null}
         </form>
       </OverlayPanel>
 

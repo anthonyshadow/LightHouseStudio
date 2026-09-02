@@ -40,6 +40,7 @@ vi.mock('../saved-videos/thumbnailClient', () => ({
 }));
 
 import { StudioDesignProvider } from '../../ui';
+import { ApiClientError } from '../../adapters/api-client/transport';
 import { createRemoteStateQueryClient } from '../../application/remote-state/RemoteStateProvider';
 import { HttpResponse, http } from 'msw';
 import { captureRequests, galleryPaginationScenario, jsonScenario } from '../../test/msw/handlers';
@@ -595,8 +596,10 @@ describe('VideoGallery', () => {
   });
 
   it('renames and confirms deletion in focus-managed dialogs without loading media bytes', async () => {
-    const original = video();
-    const renamed = video({ title: 'Renamed take' });
+    // A revision no fixture defaults to, so the assertion below can only pass if the dialog
+    // really sent the row's own token rather than a hardcoded 1.
+    const original = video({ revision: 4 });
+    const renamed = video({ title: 'Renamed take', revision: 5 });
     mockApiServer.use(
       jsonScenario('GET', '/api/videos', [
         { body: page([original]) },
@@ -626,7 +629,7 @@ describe('VideoGallery', () => {
     });
     fireEvent.submit(renameInput.closest('form')!);
     expect(await screen.findByRole('heading', { name: 'Renamed take' })).toBeInTheDocument();
-    expect(api.renameSavedVideo).toHaveBeenCalledWith(original.id, 'Renamed take', 1);
+    expect(api.renameSavedVideo).toHaveBeenCalledWith(original.id, 'Renamed take', 4);
     fireEvent.click(screen.getByLabelText('More actions for Renamed take'));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Remove from Assets' }));
     const removeDialog = screen.getByRole('dialog', { name: 'Remove video from Assets' });
@@ -715,6 +718,65 @@ describe('VideoGallery', () => {
       'Removal is temporarily unavailable.',
     );
     expect(removeDialog).toBeVisible();
+  });
+
+  it('recovers from a rename conflict by retrying against the video as it now is', async () => {
+    const original = video({ revision: 2 });
+    // What the server holds by the time the dialog submits: renamed elsewhere, token moved on.
+    const moved = video({ title: 'Moved on', revision: 6 });
+    mockGalleryPages({ '': page([original]) });
+    const detailCapture = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'GET',
+        `/api/videos/${original.id}`,
+        [{ body: detail(moved) }],
+        detailCapture.observe,
+      ),
+    );
+    api.renameSavedVideo
+      .mockRejectedValueOnce(
+        new ApiClientError('The saved video changed before it could be renamed.', 409, 'conflict'),
+      )
+      .mockResolvedValueOnce(video({ title: 'Final name', revision: 7 }));
+    renderGallery();
+    await screen.findByRole('heading', { name: 'Morning take' });
+
+    fireEvent.click(screen.getByLabelText('More actions for Morning take'));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    const renameDialog = screen.getByRole('dialog', { name: 'Rename saved video' });
+    fireEvent.change(within(renameDialog).getByRole('textbox', { name: /Video title/u }), {
+      target: { value: 'Final name' },
+    });
+    fireEvent.submit(
+      within(renameDialog)
+        .getByRole('textbox', { name: /Video title/u })
+        .closest('form')!,
+    );
+    expect(await within(renameDialog).findByRole('alert')).toHaveTextContent(
+      'The saved video changed before it could be renamed.',
+    );
+    // The losing token was replaced by the winner's: the row behind the dialog (inert while the
+    // dialog holds focus, hence `hidden`) shows what the video became, and the operator's typed
+    // title survived in the field.
+    await waitFor(() => expect(detailCapture.requests).toHaveLength(1));
+    expect(
+      await screen.findByRole('heading', { name: 'Moved on', hidden: true }),
+    ).toBeInTheDocument();
+    expect(within(renameDialog).getByRole('textbox', { name: /Video title/u })).toHaveValue(
+      'Final name',
+    );
+
+    fireEvent.submit(
+      within(renameDialog)
+        .getByRole('textbox', { name: /Video title/u })
+        .closest('form')!,
+    );
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog', { name: 'Rename saved video' })).not.toBeInTheDocument(),
+    );
+    // The retry carried the refetched revision — not the stale 2 it opened with.
+    expect(api.renameSavedVideo).toHaveBeenLastCalledWith(original.id, 'Final name', 6);
   });
 
   it('requests character and format filters with each supported sort order', async () => {

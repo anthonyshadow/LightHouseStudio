@@ -274,15 +274,21 @@ describe('useSaveVideo', () => {
   it('invalidates saved-video metadata after save and replace, but not after failure', async () => {
     const { result, queryClient } = renderHook(() => useSaveVideo());
     const listKey = [...savedVideoQueryKeys.lists, { sort: 'latest' }] as const;
-    const seedList = () => queryClient.setQueryData(listKey, { videos: [] });
+    // The Videos tab count lives under its own key, outside `lists` — a save that only
+    // invalidated the pages would leave the tab announcing yesterday's number.
+    const seed = () => {
+      queryClient.setQueryData(listKey, { videos: [] });
+      queryClient.setQueryData(savedVideoQueryKeys.total, 3);
+    };
 
-    seedList();
+    seed();
     await act(async () => {
       await result.current.save(artifact());
     });
     expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(savedVideoQueryKeys.total)?.isInvalidated).toBe(true);
 
-    seedList();
+    seed();
     await act(async () => {
       await result.current.replace(artifact('edited'), {
         videoId,
@@ -290,13 +296,15 @@ describe('useSaveVideo', () => {
       });
     });
     expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryState(savedVideoQueryKeys.total)?.isInvalidated).toBe(true);
 
-    seedList();
+    seed();
     api.saveVideo.mockRejectedValueOnce(new Error('disk unavailable'));
     await act(async () => {
       await result.current.save(artifact());
     });
     expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(false);
+    expect(queryClient.getQueryState(savedVideoQueryKeys.total)?.isInvalidated).toBe(false);
   });
 
   it('coalesces same-tick save attempts before React publishes the saving state', async () => {

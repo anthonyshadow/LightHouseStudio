@@ -510,6 +510,9 @@ export class ProjectOutputService {
               kind: 'append',
               videoId: savedVideoId,
               expectedVersionId: request.target.expectedVersionId,
+              // The receipt above serializes this read's revision + 1 as the video's new token;
+              // the commit CASes on it so the recorded value is the written value, never a guess.
+              expectedRevision: targetAggregate!.revision,
               version,
             },
       projectRevision: {
