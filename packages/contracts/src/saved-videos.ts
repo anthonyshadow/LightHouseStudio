@@ -95,8 +95,12 @@ export const savedVideoSummarySchema = z
     thumbnailAvailable: z.boolean(),
     assignment: z.enum(['project-output', 'unassigned']).optional(),
     /**
-     * The video's monotonic revision, bumped by every material change to the record. A mutation
-     * that must not overwrite unseen work — rename today — sends it back as `expectedRevision`.
+     * The video's monotonic revision, bumped by every change to its substance — a rename, a new
+     * Version, a Project output appended to it. Presentation and bookkeeping writes (a poster
+     * stored, bytes discovered missing) deliberately do not bump it: they happen on read paths,
+     * and a read that invalidated every held token would turn one broken preview into a rename
+     * conflict. A mutation that must not overwrite unseen work — rename today — sends it back as
+     * `expectedRevision`. Both repositories enforce the same set.
      */
     revision: z.number().int().positive(),
     createdAt: z.iso.datetime(),

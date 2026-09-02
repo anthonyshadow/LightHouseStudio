@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { savedVideoStatus } from './infrastructure/database/schema.js';
 import {
   CAMPAIGN_STATUSES as CONTRACT_CAMPAIGN_STATUSES,
   CHARACTER_REFERENCE_FRAMINGS,
@@ -95,9 +96,11 @@ describe('independent domain and wire value sets', () => {
 
   it('serves every stored Saved Video status except the tombstone', () => {
     // 'deleted' is deliberately absent from the wire: a tombstoned record is a 404, never a
-    // status. The wire enum is the stored enum minus exactly that member.
-    const stored = ['ready', 'missing', 'deleted'] as const;
-    expect(savedVideoStatusSchema.options).toEqual(stored.filter((value) => value !== 'deleted'));
+    // status. The wire enum is the stored enum minus exactly that member — read from the real
+    // pgEnum, so a status added to storage has to show up here or be excluded on purpose.
+    expect(savedVideoStatusSchema.options).toEqual(
+      savedVideoStatus.enumValues.filter((value) => value !== 'deleted'),
+    );
   });
 
   it('keeps Campaign statuses, plan ids and capability ids in parity', () => {

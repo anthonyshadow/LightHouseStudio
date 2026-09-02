@@ -331,6 +331,14 @@ export interface ProjectOutputMetadataUnitOfWork {
           readonly kind: 'append';
           readonly videoId: string;
           readonly expectedVersionId: string;
+          /**
+           * The aggregate revision the caller composed its response and receipt from. The commit
+           * writes `expectedRevision + 1`, so this expectation is what makes the recorded
+           * `savedVideo.revision` true rather than a guess — a rename landing between the
+           * caller's read and this transaction bumps the row and must surface as a conflict, not
+           * as a durably recorded stale token.
+           */
+          readonly expectedRevision: number;
           readonly version: StoredVideoVersion;
         };
     readonly projectRevision: AppendProjectRevisionPersistenceInput;

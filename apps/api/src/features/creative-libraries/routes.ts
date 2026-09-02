@@ -1,4 +1,7 @@
-import { creativeLibraryReplaceRequestSchema } from '@studio/contracts';
+import {
+  creativeLibraryReplaceRequestSchema,
+  creativeLibrarySnapshotSchema,
+} from '@studio/contracts';
 import { CREATIVE_LIBRARY_EXPORT_MAX_BYTES, sanitizeCreativeAssetStore } from '@studio/domain';
 import type { ApplicationRuntime } from '../../application/application-runtime.js';
 import { ownerUserIdForRequest } from '../../http/authentication.js';
@@ -17,10 +20,14 @@ export const registerCreativeLibraryRoutes = (
 ): void => {
   if (repository === undefined) return;
 
+  // Both success bodies leave through the contract schema. The repository interface declares the
+  // same three fields, but a declaration is a promise the compiler stops checking at the app
+  // boundary — the client parses this strictly, so a drifted repository would 502 every browser.
+  // Parsing here makes the twin impossible to drift silently.
   app.get('/api/creative-library', async (request) => {
     const snapshot = await repository.load(ownerUserIdForRequest(request));
     await referenceImages?.purgeExpiredUnreferenced?.().catch(() => undefined);
-    return snapshot;
+    return creativeLibrarySnapshotSchema.parse(snapshot);
   });
 
   app.put('/api/creative-library', replaceRouteOptions, async (request) => {
@@ -46,6 +53,6 @@ export const registerCreativeLibraryRoutes = (
       );
     }
     await referenceImages?.purgeExpiredUnreferenced?.().catch(() => undefined);
-    return replaced;
+    return creativeLibrarySnapshotSchema.parse(replaced);
   });
 };
