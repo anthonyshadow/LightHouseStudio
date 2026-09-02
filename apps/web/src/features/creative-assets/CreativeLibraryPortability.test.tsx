@@ -150,7 +150,7 @@ describe('CreativeLibraryPortability', () => {
     chooseFile(view.container, file);
 
     const dialog = await screen.findByRole('dialog', {
-      name: 'Replace your account creative library?',
+      name: 'Replace your Library?',
     });
     // The confirmation states what arrives and what leaves before anything is replaced.
     expect(
@@ -183,7 +183,7 @@ describe('CreativeLibraryPortability', () => {
     const view = renderPortability(existing);
     chooseFile(view.container, file);
     const dialog = await screen.findByRole('dialog');
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Keep account library' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Keep current Library' }));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(existing.getSnapshot().store.savedPrompts[0]?.title).toBe('Only local');

@@ -10,7 +10,7 @@ import type { CreativeLibraryMirror } from './useCreativeLibraryCloudSync';
  * second product storage model.
  */
 const STORAGE_SUMMARIES: Readonly<Record<CreativeLibraryMirror, string>> = {
-  checking: 'Checking your account library…',
+  checking: 'Checking your Library…',
   'browser-only': 'Account sync is unavailable in this configuration.',
   cloud: 'Available wherever you sign in.',
 };

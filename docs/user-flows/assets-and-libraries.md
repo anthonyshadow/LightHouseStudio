@@ -48,7 +48,7 @@ Creative-library writes use one owner-scoped revision compare-and-swap. Sync fai
 | Revision conflict                                 | pause and preserve the current session copy |
 | Transport failure                                 | pause and preserve the current session copy |
 
-`CreativeLibrarySyncNotice` is mounted once in `ShellChrome`, because a paused account library
+`CreativeLibrarySyncNotice` is mounted once in `ShellChrome`, because a paused Library
 affects saves on every protected route. **Try again** repeats the complete read/compare sequence.
 **Save current copy** confirms a fresh-revision overwrite of the account snapshot. **Reload account
 copy** confirms replacing the current cache. There is no automatic merge: the contract is a

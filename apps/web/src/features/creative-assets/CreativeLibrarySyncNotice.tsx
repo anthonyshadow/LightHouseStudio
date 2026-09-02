@@ -32,7 +32,7 @@ const actionStyles = (theme: Theme): CSSObject => ({
 });
 
 const KEEP_LOCAL = {
-  title: 'Save the current creative library to your account?',
+  title: 'Save this session’s Library to your account?',
   description:
     'The account copy of your Characters, Outfits and saved prompts is replaced with the current copy. Changes saved only by another session are lost.',
   confirmLabel: 'Save current copy',
@@ -40,7 +40,7 @@ const KEEP_LOCAL = {
 } as const;
 
 const KEEP_CLOUD = {
-  title: 'Reload the account creative library?',
+  title: 'Reload the account copy of your Library?',
   description:
     'The current Characters, Outfits and saved prompts are replaced with the account copy. Any unsynced changes in this session are lost.',
   confirmLabel: 'Reload account copy',
