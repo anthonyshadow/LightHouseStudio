@@ -97,7 +97,7 @@
         "@studio/contracts": "workspace:*",
         "@studio/domain": "workspace:*",
         "@tanstack/react-query": "5.101.4",
-        "@uppy/aws-s3": "5.1.0",
+        "@uppy/aws-s3": "6.0.0",
         "@uppy/core": "6.0.0",
         "idb": "8.0.3",
         "mediabunny": "1.54.0",
@@ -927,13 +927,9 @@
 
     "@typescript/typescript-win32-x64": ["@typescript/typescript-win32-x64@7.0.2", "", { "os": "win32", "cpu": "x64" }, "sha512-0BQ3HkAHHlKLSp1qRvf3SUhGpGsDuhB/jgFw75guyqbxJqEaS0Cw/VFO8i2nHglJUzQCRtMMR/IBAKE3ETMC4g=="],
 
-    "@uppy/aws-s3": ["@uppy/aws-s3@5.1.0", "", { "dependencies": { "@uppy/companion-client": "^5.1.1", "@uppy/utils": "^7.1.4" }, "peerDependencies": { "@uppy/core": "^5.2.0" } }, "sha512-UBz+shrtDbnOf11AboDrkc9Fq2Cdf8HbFftE+gqfxig6fkv5rHpHhBCLkl8wCGAq+X/CxdqvvNhm/OM23Uzw2w=="],
-
-    "@uppy/companion-client": ["@uppy/companion-client@5.1.1", "", { "dependencies": { "@uppy/utils": "^7.1.1", "namespace-emitter": "^2.0.1", "p-retry": "^6.1.0" }, "peerDependencies": { "@uppy/core": "^5.1.1" } }, "sha512-DzrOWTbIZHvtgAFXBMYHk2wD27NjpBSVhY2tEiEIUhPd2CxbFRZjHM/N3HOt3VwZEAP471QWFLlJRWPcIY3A2Q=="],
+    "@uppy/aws-s3": ["@uppy/aws-s3@6.0.0", "", { "peerDependencies": { "@uppy/core": "^6.0.0" } }, "sha512-FnHZr50CgzQInmIfiJjPr7wLXHbTgX6QMkYRIR/Px5rzjwSlacbrnDa2+LrgaJgpFBKGruC++svu+AdotKyxIg=="],
 
     "@uppy/core": ["@uppy/core@6.0.0", "", { "dependencies": { "@transloadit/prettier-bytes": "^2.0.0", "classnames": "^2.5.1", "lodash": "^4.18.1", "mime-match": "^1.0.2", "namespace-emitter": "^2.0.1", "nanoid": "^5.1.11", "p-queue": "^9.3.3", "p-retry": "^6.1.0", "preact": "^10.29.2" } }, "sha512-qaNqf4t2nxnbFFLSVmLr7Jw9TaA4fzvl8paR/ggwiOo5XFgAfbCFzjDzP8l2r5UzR6cCt3wS95QWvrm82UGZ+g=="],
-
-    "@uppy/utils": ["@uppy/utils@7.2.0", "", { "dependencies": { "lodash": "^4.17.23", "preact": "^10.26.10" } }, "sha512-6lC246qszMv6bTyl/+QyHwrudgeguWkA94ME1wHn+a6uRAvmtAEaUManIfGqTJfoKvWAiCJqdJPl5xRJjhAloQ=="],
 
     "@vitejs/plugin-react": ["@vitejs/plugin-react@6.0.5", "", { "dependencies": { "@rolldown/pluginutils": "1.0.1" }, "peerDependencies": { "vite": "8.2.0" } }, "sha512-BOVzne/NL162sMdResB25mUv+vWMF5NoAjNf09TeGlE7ZpszZWSD3winycicLJw72yeVsoCn/2kOhEuCvEShMA=="],
 
