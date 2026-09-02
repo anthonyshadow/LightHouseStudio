@@ -232,7 +232,7 @@ test('provider-free upload previews and enters the existing take/save surface', 
   expect(network.blockedExternalWebSockets).toEqual([]);
 });
 
-test('provider-free Edit video renders locally and atomically replaces the persistent source', async ({
+test('@cross-browser provider-free Edit video renders locally and atomically replaces the persistent source', async ({
   page,
 }) => {
   await installCameraSentinel(page);
