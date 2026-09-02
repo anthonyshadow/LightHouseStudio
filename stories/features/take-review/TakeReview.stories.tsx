@@ -16,6 +16,8 @@ const meta = {
     recording: createRecordedController(),
     processing: createVoiceProcessingController(),
     elevenLabsAvailable: true,
+    // Required since the dock stopped defaulting a view no caller used.
+    view: 'take',
   },
   parameters: {
     docs: {

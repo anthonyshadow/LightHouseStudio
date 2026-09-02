@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { useLocation } from 'react-router';
 import { hydrateReferenceImage } from '../adapters/api-client/apiClient';
 import { useAuth } from '../application/auth/AuthProvider';
 import type { ExistingVideoCharacterPort } from '../app/shell/studioHandoff';
@@ -150,7 +150,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   } = overlay;
 
   const auth = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const { availability, state: capabilityState, retry: retryProviderAvailability } = provider;
   const savedVideoSave = useSaveVideo(Boolean(availability.directSavedVideoUploadAvailable));
