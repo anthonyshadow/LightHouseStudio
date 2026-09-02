@@ -19,7 +19,6 @@ const trustedHeaders = {
 
 const installRouteTestAuth = (app: ApplicationRuntime) => {
   installErrorHandling(app);
-  app.decorateRequest('auth', null);
   app.addHook('onRequest', async (request: HttpRequest) => {
     await Promise.resolve();
     request.auth = {

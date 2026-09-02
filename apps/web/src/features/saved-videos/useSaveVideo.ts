@@ -104,6 +104,9 @@ export const useSaveVideo = (directMultipartUpload = false) => {
   const completeSave = useCallback(
     (artifactId: string, video: SavedVideoDetail) => {
       void queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.lists });
+      // The Videos tab count is derived from the same membership the lists show; a save that
+      // created a video moved it, and a replace costs one no-op refetch of a single integer.
+      void queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.total });
       setState({ status: 'saved', artifactId, video });
     },
     [queryClient],

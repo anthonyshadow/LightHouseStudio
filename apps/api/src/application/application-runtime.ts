@@ -14,7 +14,7 @@ import {
 import { Elysia, type HTTPMethod } from 'elysia';
 import pino, { type Logger } from 'pino';
 import type { AuthenticatedUser, EntitlementSnapshot } from '@studio/contracts';
-import { isSpooledAudioUpload } from './spooled-upload.js';
+import { isSpooledUpload } from './spooled-upload.js';
 import { AppError } from '../http/app-error.js';
 import { currentTraceId, SanitizingSpanExporter } from '../observability/telemetry.js';
 import {
@@ -624,10 +624,6 @@ export class ApplicationRuntime {
     };
   }
 
-  decorateRequest(_name: string, _value: unknown): this {
-    return this;
-  }
-
   addHook(name: 'onRequest', hook: OnRequestHook): this;
   addHook(name: 'onSend', hook: OnSendHook): this;
   addHook(name: 'onClose', hook: OnCloseHook): this;
@@ -834,7 +830,7 @@ export class ApplicationRuntime {
       const payload = reply.sent ? reply.payload : result === reply ? reply.payload : result;
       return await this.toResponse(request, reply, payload);
     } catch (error) {
-      if (isSpooledAudioUpload(request.body)) await request.body.cleanup().catch(() => undefined);
+      if (isSpooledUpload(request.body)) await request.body.cleanup().catch(() => undefined);
       return this.handleError(error, request, reply);
     }
   }

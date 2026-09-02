@@ -3,6 +3,9 @@ import { FakeElevenLabsProvider, sharedVoice, voice } from '../../test/fakes.js'
 import { VoiceService } from './voice-service.js';
 
 const signal = (): AbortSignal => new AbortController().signal;
+// The service no longer invents an owner: every call states one, like the routes do. One UUID for
+// the whole file keeps the migration and coalescing keys — which are per-owner — consistent.
+const ownerUserId = '7f1c2ab4-9d3e-4f5a-8b6c-0d1e2f3a4b5c';
 const filters = {
   search: '',
   language: '',
@@ -34,6 +37,7 @@ describe('VoiceService catalog and saved-library policy', () => {
       nextPageToken: null,
       refresh: false,
       signal: signal(),
+      ownerUserId,
     });
     const page = await service.listSharedVoices({
       ...filters,
@@ -42,6 +46,7 @@ describe('VoiceService catalog and saved-library policy', () => {
       sort: 'trending',
       refresh: false,
       signal: signal(),
+      ownerUserId,
     });
 
     expect(page.voices).toHaveLength(1);
@@ -59,6 +64,7 @@ describe('VoiceService catalog and saved-library policy', () => {
       sort: 'trending' as const,
       refresh: false,
       signal: signal(),
+      ownerUserId,
     };
 
     await service.listSharedVoices(input);
@@ -77,6 +83,7 @@ describe('VoiceService catalog and saved-library policy', () => {
       pageSize: 20,
       nextPageToken: null,
       refresh: false,
+      ownerUserId,
     };
 
     await Promise.all([
@@ -95,8 +102,8 @@ describe('VoiceService catalog and saved-library policy', () => {
     const service = serviceFor(provider);
 
     const results = await Promise.all([
-      service.saveSharedVoice('owner-one', 'shared-one', signal()),
-      service.saveSharedVoice('owner-one', 'shared-one', signal()),
+      service.saveSharedVoice('owner-one', 'shared-one', signal(), ownerUserId),
+      service.saveSharedVoice('owner-one', 'shared-one', signal(), ownerUserId),
     ]);
 
     expect(results).toEqual([
@@ -108,7 +115,7 @@ describe('VoiceService catalog and saved-library policy', () => {
 
     provider.sharedVoices = [sharedVoice({ voiceId: 'ineligible', rate: 2 })];
     await expect(
-      service.saveSharedVoice('owner-one', 'ineligible', signal()),
+      service.saveSharedVoice('owner-one', 'ineligible', signal(), ownerUserId),
     ).rejects.toMatchObject({ reason: 'shared-voice-ineligible' });
   });
 
@@ -123,15 +130,20 @@ describe('VoiceService catalog and saved-library policy', () => {
       nextPageToken: null,
       refresh: false,
       signal: signal(),
+      ownerUserId,
     });
-    await expect(service.removeWorkspaceVoice('voice-one', signal())).resolves.toEqual({
-      status: 'removed',
-      voiceId: 'voice-one',
-    });
-    await expect(service.removeWorkspaceVoice('voice-one', signal())).resolves.toEqual({
-      status: 'already-removed',
-      voiceId: 'voice-one',
-    });
+    await expect(service.removeWorkspaceVoice('voice-one', signal(), ownerUserId)).resolves.toEqual(
+      {
+        status: 'removed',
+        voiceId: 'voice-one',
+      },
+    );
+    await expect(service.removeWorkspaceVoice('voice-one', signal(), ownerUserId)).resolves.toEqual(
+      {
+        status: 'already-removed',
+        voiceId: 'voice-one',
+      },
+    );
     expect(provider.deletedVoiceIds).toHaveLength(0);
   });
 
@@ -149,6 +161,7 @@ describe('VoiceService catalog and saved-library policy', () => {
       nextPageToken: null,
       refresh: false,
       signal: signal(),
+      ownerUserId,
     });
 
     expect(page.voices.map((candidate) => candidate.voiceId)).toEqual(['match']);
@@ -170,6 +183,7 @@ describe('VoiceService catalog and saved-library policy', () => {
       nextPageToken: null,
       refresh: false,
       signal: signal(),
+      ownerUserId,
     });
     const french = await service.listWorkspaceVoices({
       ...filters,
@@ -178,6 +192,7 @@ describe('VoiceService catalog and saved-library policy', () => {
       nextPageToken: null,
       refresh: false,
       signal: signal(),
+      ownerUserId,
     });
 
     expect(provider.workspaceSearches.slice(-2).map((search) => search.language)).toEqual([

@@ -2,11 +2,11 @@ import { createHash } from 'node:crypto';
 import { access } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
-import { spoolAudioUpload, SpooledUploadTooLargeError } from './spooled-upload.js';
+import { spoolUpload, SpooledUploadTooLargeError } from './spooled-upload.js';
 
-describe('spoolAudioUpload', () => {
+describe('spoolUpload', () => {
   it('writes a bounded private upload and cleans it idempotently', async () => {
-    const upload = await spoolAudioUpload(Readable.from([Buffer.from('safe-audio')]), 20);
+    const upload = await spoolUpload(Readable.from([Buffer.from('safe-audio')]), 20);
     expect(upload.byteLength).toBe(10);
     expect(upload.checksumSha256).toBe(createHash('sha256').update('safe-audio').digest('hex'));
     await expect(access(upload.path)).resolves.toBeUndefined();
@@ -17,7 +17,7 @@ describe('spoolAudioUpload', () => {
 
   it('removes partial output when the stream exceeds its limit', async () => {
     await expect(
-      spoolAudioUpload(Readable.from([Buffer.alloc(5), Buffer.alloc(6)]), 10),
+      spoolUpload(Readable.from([Buffer.alloc(5), Buffer.alloc(6)]), 10),
     ).rejects.toBeInstanceOf(SpooledUploadTooLargeError);
   });
 });

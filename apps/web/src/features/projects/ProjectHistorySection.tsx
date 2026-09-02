@@ -8,6 +8,7 @@ import { LoadingPlaceholder } from '../../ui/primitives/LoadingPlaceholder';
 import { Skeleton } from '../../ui/primitives/Skeleton';
 import { exportSpecificationSummary } from '../export-placements';
 import { getProjectProcessingHistory } from './projectProcessingApi';
+import { projectQueryKeys } from './useProjectsController';
 import {
   PROJECT_RESULT_ADOPT_ACTION_LABEL,
   PROJECT_RESULT_READOPT_ACTION_LABEL,
@@ -51,7 +52,7 @@ export const ProjectHistorySection = ({
   const previewTriggerRef = useRef<HTMLElement | null>(null);
 
   const revisions = useInfiniteQuery({
-    queryKey: ['projects', 'history', projectId, 'revisions'],
+    queryKey: projectQueryKeys.historyRevisions(projectId),
     queryFn: ({ pageParam, signal }) =>
       getProjectHistory({
         projectId,
@@ -62,7 +63,7 @@ export const ProjectHistorySection = ({
     getNextPageParam: (page) => page.nextCursor,
   });
   const outputs = useInfiniteQuery({
-    queryKey: ['projects', 'history', projectId, 'outputs'],
+    queryKey: projectQueryKeys.historyOutputs(projectId),
     queryFn: ({ pageParam, signal }) =>
       getProjectOutputs({
         projectId,
@@ -73,7 +74,7 @@ export const ProjectHistorySection = ({
     getNextPageParam: (page) => page.nextCursor,
   });
   const processing = useInfiniteQuery({
-    queryKey: ['projects', 'history', projectId, 'processing'],
+    queryKey: projectQueryKeys.historyProcessing(projectId),
     queryFn: ({ pageParam, signal }) =>
       getProjectProcessingHistory(projectId, pageParam ?? undefined, signal),
     initialPageParam: null as string | null,

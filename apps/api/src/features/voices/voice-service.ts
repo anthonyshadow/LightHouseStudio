@@ -31,7 +31,6 @@ export const WORKSPACE_VOICE_CACHE_TTL_MS = 60_000;
 const SHARED_VOICE_CACHE_LIMIT = 60;
 const WORKSPACE_VOICE_CACHE_LIMIT = 40;
 const MAX_SAVED_PROVIDER_PAGES_PER_REQUEST = 25;
-const DEFAULT_TEST_OWNER_USER_ID = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
 
 class BoundedTtlCache<Value> {
   readonly #maximumEntries: number;
@@ -204,7 +203,7 @@ type WorkspaceListInput = VoiceFilters &
     nextPageToken: string | null;
     refresh: boolean;
     signal: AbortSignal;
-    ownerUserId?: string;
+    ownerUserId: string;
   }>;
 
 type SharedListInput = VoiceFilters &
@@ -214,7 +213,7 @@ type SharedListInput = VoiceFilters &
     sort: SharedVoicesQuery['sort'];
     refresh: boolean;
     signal: AbortSignal;
-    ownerUserId?: string;
+    ownerUserId: string;
   }>;
 
 export class VoiceService {
@@ -370,7 +369,7 @@ export class VoiceService {
   }
 
   async listWorkspaceVoices(input: WorkspaceListInput): Promise<WorkspaceVoicesResponse> {
-    const ownerUserId = input.ownerUserId ?? DEFAULT_TEST_OWNER_USER_ID;
+    const ownerUserId = input.ownerUserId;
     const filters: VoiceFilters = {
       search: input.search,
       language: input.language,
@@ -505,7 +504,7 @@ export class VoiceService {
     const page = await this.#sharedPage(input);
     const eligible = page.voices.filter(eligibleSharedVoice).slice(0, input.pageSize);
     const savedIds = await this.#savedVoiceIds(
-      input.ownerUserId ?? DEFAULT_TEST_OWNER_USER_ID,
+      input.ownerUserId,
       eligible.map((voice) => voice.voiceId),
       input.refresh,
       input.signal,
@@ -552,7 +551,7 @@ export class VoiceService {
   async workspacePreview(
     voiceId: string,
     signal: AbortSignal,
-    ownerUserId = DEFAULT_TEST_OWNER_USER_ID,
+    ownerUserId: string,
   ): Promise<AudioStream> {
     await this.#ensureSavedVoiceMigration(ownerUserId, signal);
     if (!(await this.#savedVoices.has(ownerUserId, voiceId))) {
@@ -585,7 +584,7 @@ export class VoiceService {
     publicOwnerId: string,
     voiceId: string,
     signal: AbortSignal,
-    ownerUserId = DEFAULT_TEST_OWNER_USER_ID,
+    ownerUserId: string,
   ): Promise<VoiceLibraryMutationResponse> {
     const key = `${ownerUserId}:${publicOwnerId}:${voiceId}`;
     const active = this.#addOperations.get(key);
@@ -653,7 +652,7 @@ export class VoiceService {
   async removeWorkspaceVoice(
     voiceId: string,
     signal: AbortSignal,
-    ownerUserId = DEFAULT_TEST_OWNER_USER_ID,
+    ownerUserId: string,
   ): Promise<VoiceLibraryMutationResponse> {
     const key = `${ownerUserId}:${voiceId}`;
     const active = this.#removeOperations.get(key);
@@ -683,15 +682,10 @@ export class VoiceService {
     readonly audio: VoiceConversionAudio;
     readonly mimeType: VoiceConversionContentType;
     readonly signal: AbortSignal;
-    readonly ownerUserId?: string;
+    readonly ownerUserId: string;
   }): Promise<AudioStream> {
-    await this.#ensureSavedVoiceMigration(
-      input.ownerUserId ?? DEFAULT_TEST_OWNER_USER_ID,
-      input.signal,
-    );
-    if (
-      !(await this.#savedVoices.has(input.ownerUserId ?? DEFAULT_TEST_OWNER_USER_ID, input.voiceId))
-    ) {
+    await this.#ensureSavedVoiceMigration(input.ownerUserId, input.signal);
+    if (!(await this.#savedVoices.has(input.ownerUserId, input.voiceId))) {
       throw new VoiceServiceError('library-voice-not-found');
     }
     const [candidate, model] = await runParallel(

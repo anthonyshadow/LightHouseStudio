@@ -260,13 +260,28 @@ describe('saved-video routes', () => {
         cookie,
         'content-type': 'application/json',
       },
-      payload: { title: 'Wrong origin' },
+      payload: { title: 'Wrong origin', expectedRevision: 1 },
     });
     const renamed = await app.inject({
       method: 'PATCH',
       url: `/api/videos/${videoId}`,
       headers: { ...browserHeaders, cookie, 'content-type': 'application/json' },
-      payload: { title: '  Final   cut  ' },
+      payload: { title: '  Final   cut  ', expectedRevision: 1 },
+    });
+    // The first rename moved the token to 2, so replaying 1 must lose and replaying the fresh
+    // token must win — the pair is what proves the route hands `expectedRevision` to the CAS
+    // rather than accepting any positive integer.
+    const stale = await app.inject({
+      method: 'PATCH',
+      url: `/api/videos/${videoId}`,
+      headers: { ...browserHeaders, cookie, 'content-type': 'application/json' },
+      payload: { title: 'Second thoughts', expectedRevision: 1 },
+    });
+    const fresh = await app.inject({
+      method: 'PATCH',
+      url: `/api/videos/${videoId}`,
+      headers: { ...browserHeaders, cookie, 'content-type': 'application/json' },
+      payload: { title: 'Second thoughts', expectedRevision: 2 },
     });
     const deleted = await app.inject({
       method: 'DELETE',
@@ -281,7 +296,11 @@ describe('saved-video routes', () => {
 
     expect(rejected.statusCode).toBe(403);
     expect(renamed.statusCode).toBe(200);
-    expect(renamed.json()).toMatchObject({ id: videoId, title: 'Final cut' });
+    expect(renamed.json()).toMatchObject({ id: videoId, title: 'Final cut', revision: 2 });
+    expect(stale.statusCode).toBe(409);
+    expect(stale.json()).toMatchObject({ error: { code: 'conflict' } });
+    expect(fresh.statusCode).toBe(200);
+    expect(fresh.json()).toMatchObject({ id: videoId, title: 'Second thoughts', revision: 3 });
     expect(deleted.statusCode).toBe(204);
     expect(deleted.body).toBe('');
     expect(afterDelete.statusCode).toBe(404);

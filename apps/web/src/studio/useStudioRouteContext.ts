@@ -15,11 +15,7 @@ import {
 
 export type StudioRouteContext = Readonly<{
   pathname: string;
-  /**
-   * Intent carried by `?intent=`, kept separate from the resolved intent so redirects can rebuild
-   * the query string without inventing one the URL never had.
-   */
-  queryCreationIntent: StudioCreationIntent | null;
+  /** Intent carried by `?intent=` — the URL is its only source, so redirects can rebuild it. */
   creationIntent: StudioCreationIntent | null;
   /** Raw `?projectId=`, retained so an unparseable value can still be detected and dropped. */
   requestedCreationProjectId: string | null;
@@ -43,17 +39,16 @@ export type StudioRouteContext = Readonly<{
  * Reads the current location into the destinations and identifiers the authenticated app acts on.
  * Derivation only — nothing here navigates, fetches or holds state.
  */
-export const useStudioRouteContext = (initialIntent?: StudioCreationIntent): StudioRouteContext => {
+export const useStudioRouteContext = (): StudioRouteContext => {
   const location = useLocation();
   const createQuery = useMemo(
     () => (location.pathname === APP_PATHS.create ? new URLSearchParams(location.search) : null),
     [location.pathname, location.search],
   );
-  const queryCreationIntent =
+  const creationIntent =
     createQuery?.get('intent') === 'record' || createQuery?.get('intent') === 'upload'
       ? (createQuery.get('intent') as StudioCreationIntent)
       : null;
-  const creationIntent = queryCreationIntent ?? initialIntent ?? null;
   const requestedCreationProjectId = createQuery?.get('projectId') ?? null;
   const parsedCreationProjectId = requestedCreationProjectId
     ? projectIdSchema.safeParse(requestedCreationProjectId)
@@ -87,7 +82,6 @@ export const useStudioRouteContext = (initialIntent?: StudioCreationIntent): Stu
   return useMemo(
     () => ({
       pathname: location.pathname,
-      queryCreationIntent,
       creationIntent,
       requestedCreationProjectId,
       validCreationProjectId,
@@ -118,7 +112,6 @@ export const useStudioRouteContext = (initialIntent?: StudioCreationIntent): Stu
       projectOverviewActive,
       projectRouteActive,
       projectWorkspaceActive,
-      queryCreationIntent,
       requestedCreationProjectId,
       routeOriginProjectId,
       validCreationProjectId,

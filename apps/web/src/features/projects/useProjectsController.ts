@@ -28,6 +28,15 @@ export const projectQueryKeys = {
   detail: (projectId: string) => ['projects', 'detail', projectId] as const,
   /** The most recent Version this Project has saved, whether or not it is still its current cut. */
   latestOutput: (projectId: string) => ['projects', 'latest-output', projectId] as const,
+  /**
+   * The prefix every history panel query hangs off, so one invalidation reaches revisions,
+   * outputs and processing attempts together — which is exactly how adoption uses it.
+   */
+  history: (projectId: string) => ['projects', 'history', projectId] as const,
+  historyRevisions: (projectId: string) => ['projects', 'history', projectId, 'revisions'] as const,
+  historyOutputs: (projectId: string) => ['projects', 'history', projectId, 'outputs'] as const,
+  historyProcessing: (projectId: string) =>
+    ['projects', 'history', projectId, 'processing'] as const,
 };
 
 /**

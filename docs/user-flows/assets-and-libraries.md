@@ -73,7 +73,7 @@ character/format filters, and server-provided facets.
 - The empty state says that Videos saved to Assets appear here and explains preview, download and
   Version history without naming an internal workflow.
 - Origin and status contract values are mapped to readable labels such as **Studio recording**,
-  **Imported video**, **Processing failed** and **File unavailable**. Raw enum values are not shown.
+  **Imported video** and **File unavailable**. Raw enum values are not shown.
 - Cards retain thumbnail/no-preview states, duration, dimensions, created date, Version count,
   format, character attribution, project attribution, Download and the existing overflow actions.
 - `?video=<uuid>` opens that exact Saved Video preview, then the shell replaces away the parameter

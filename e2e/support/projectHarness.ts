@@ -141,6 +141,7 @@ export const installProjectHarness = async (
       id: videoId,
       title: 'Legacy unassigned',
       status: 'ready',
+      revision: 1,
       currentVersion: version,
       sourceVideoId: null,
       versionCount: 1,
@@ -426,6 +427,7 @@ export const installProjectHarness = async (
               id: savedVideoId,
               title: target.kind === 'new' ? target.title : 'Project output',
               status: 'ready',
+              revision: 1,
               currentVersion: version,
               sourceVideoId:
                 body.media.kind === 'saved-video-version' ? body.media.savedVideoId : null,

@@ -37,6 +37,7 @@ const summary = (overrides: Partial<SavedVideoSummary> = {}): SavedVideoSummary 
   sourceVideoId: null,
   versionCount: 2,
   thumbnailAvailable: true,
+  revision: 1,
   createdAt: now,
   updatedAt: now,
   ...overrides,
@@ -174,7 +175,7 @@ describe('ProjectSavedVideoPicker', () => {
   });
 
   it('disables selection and preview while busy or while a Version is not ready', async () => {
-    mockApiServer.use(listVideos([summary({ status: 'processing' })]));
+    mockApiServer.use(listVideos([summary({ status: 'missing' })]));
     renderPicker();
 
     let row = (await screen.findAllByRole('listitem'))[0]!;

@@ -13,7 +13,12 @@ export const SAVED_VIDEO_ORIGINS = [
   'legacy-import',
 ] as const;
 export const savedVideoOriginSchema = z.enum(SAVED_VIDEO_ORIGINS);
-export const savedVideoStatusSchema = z.enum(['ready', 'processing', 'failed', 'missing']);
+/**
+ * What the API can actually say about a Saved Video. The stored enum also holds 'deleted', but a
+ * tombstoned record is served as a 404, never as a status — the parity suite states the exclusion.
+ * The old 'processing' and 'failed' members had no writer anywhere.
+ */
+export const savedVideoStatusSchema = z.enum(['ready', 'missing']);
 /**
  * The longest edge of a stored poster frame. The short edge follows the source aspect ratio.
  *
@@ -89,6 +94,15 @@ export const savedVideoSummarySchema = z
     versionCount: z.number().int().positive(),
     thumbnailAvailable: z.boolean(),
     assignment: z.enum(['project-output', 'unassigned']).optional(),
+    /**
+     * The video's monotonic revision, bumped by every change to its substance — a rename, a new
+     * Version, a Project output appended to it. Presentation and bookkeeping writes (a poster
+     * stored, bytes discovered missing) deliberately do not bump it: they happen on read paths,
+     * and a read that invalidated every held token would turn one broken preview into a rename
+     * conflict. A mutation that must not overwrite unseen work — rename today — sends it back as
+     * `expectedRevision`. Both repositories enforce the same set.
+     */
+    revision: z.number().int().positive(),
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
   })
@@ -127,7 +141,13 @@ export const savedVideoParamsSchema = z.object({ videoId: z.uuid() }).strict();
 export const savedVideoVersionParamsSchema = z
   .object({ videoId: z.uuid(), versionId: z.uuid() })
   .strict();
-export const renameSavedVideoRequestSchema = z.object({ title: savedVideoTitleSchema }).strict();
+export const renameSavedVideoRequestSchema = z
+  .object({
+    title: savedVideoTitleSchema,
+    /** The summary's `revision`; a stale one conflicts instead of overwriting a changed video. */
+    expectedRevision: z.number().int().positive(),
+  })
+  .strict();
 
 export const savedVideoUploadMetadataSchema = z
   .object({

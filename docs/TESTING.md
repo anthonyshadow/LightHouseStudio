@@ -71,6 +71,15 @@ Campaign and Project-processing migration/repository integration cases use the s
 database gate and run with the Project case when `LIGHTFRAME_RUN_PROJECT_POSTGRES_TEST=true`;
 ordinary tests never contact Neon or a provider.
 
+**Never run Vitest and Playwright at the same time.** Both saturate the machine, and the
+`apps/web/src/studio` suite — `StudioApp.test.tsx` above all — asserts across lazy `Suspense`
+boundaries and post-navigation queries that race under CPU contention. A concurrent run reports
+those as failures that look exactly like a regression in the code under review (one observed run:
+nine unit failures, then a clean pass of all of them a minute later with nothing changed). Run the
+two sequentially, locally and in any script. When a flake does appear, measure it before
+attributing it — loop the same command a dozen times on the current tree and again on stashed
+`HEAD` — rather than concluding from one run.
+
 `test:unit` and `test:integration` are useful focused subsets; `bun run test` runs both categories
 once through a single Node-backed Vitest invocation. Bun owns package installation and the API
 runtime, but `bun test` is a different runner and is not an alias for this retained suite. Selected
@@ -212,8 +221,18 @@ The retained suite protects:
 - creative-library export to a file and import back, including the replace confirmation and the
   file carrying records rather than reference bytes;
 - one media stage per Studio visit, shared overlay focus/inert/Escape behavior, dominant recording Stop,
-  200% text, and constrained mobile scrolling; and
-- unexpected external HTTP and WebSocket denial in ordinary automated tests.
+  200% text, and constrained mobile scrolling;
+- unexpected external HTTP and WebSocket denial in ordinary automated tests; and
+- **the real stack, once, end to end** (`e2e/real-stack-project-deliverable.spec.ts`): a real
+  login, a Project created through the running API, a source uploaded as real bytes, an on-device
+  render adopted as the current cut, a save that produces a real Video, and a download served from
+  where the server stored it — asserted against the server's own output history and Video record,
+  not a simulator's. Every other browser journey drives an in-page simulator on purpose: simulators
+  are how a lost response, a never-settling provider or a mid-upload disconnect is injected, and
+  they stay for that. They cannot prove the server honours its own contract, because each one _is_
+  the contract restated; this journey is where that proof lives. The provider-free
+  upload → edit → save journey additionally runs on WebKit and mobile WebKit (`@cross-browser`),
+  because the on-device render is the one path whose engine differences matter.
 
 ## Local MVP acceptance boundary
 
@@ -299,21 +318,29 @@ Ordinary pushes and pull requests run:
 1. dependency audit;
 2. `bun run quality`, including the static Storybook build;
 3. the built production smoke;
-4. focused functional Playwright journeys;
-5. an isolated PostgreSQL migration/transaction smoke with fake R2 configuration;
-6. on pull requests and `develop`/`main` pushes, CodeQL JavaScript/TypeScript analysis with the
+4. the retained Vitest suite under coverage, gated on the thresholds in `vitest.config.ts`;
+5. focused functional Playwright journeys against a real API and PostgreSQL service with bytes
+   stored on the runner — the stack the real-stack journey below drives end to end;
+6. an isolated PostgreSQL migration/transaction smoke with fake R2 configuration;
+7. on pull requests and `develop`/`main` pushes, CodeQL JavaScript/TypeScript analysis with the
    `security-extended` query suite; and
-7. on pull requests, dependency review for newly introduced direct and transitive vulnerabilities
+8. on pull requests, dependency review for newly introduced direct and transitive vulnerabilities
    and denied licenses.
 
-The required `Quality` check aggregates the essential, functional-browser, and database jobs. Repository
-branch protection also requires the separate `Dependency Review` and `CodeQL` checks. CodeQL runs
-weekly in addition to ordinary push and pull-request analysis. GitHub Actions are pinned to full
-commit SHAs; the `github-actions` Dependabot entry remains responsible for proposing pin updates.
+The required `Quality` check aggregates the essential, coverage, functional-browser, and database
+jobs. Repository branch protection also requires the separate `Dependency Review` and `CodeQL`
+checks. CodeQL runs weekly in addition to ordinary push and pull-request analysis. GitHub Actions
+are pinned to full commit SHAs; the `github-actions` Dependabot entry remains responsible for
+proposing pin updates.
 
-Coverage, curated visual regression, and broad screenshot capture run only through
+Coverage is a real gate, not a report: the thresholds in `vitest.config.ts` (statements 81, branches
+69, functions 82, lines 83) fail the job when missed, and the job is required. They were set from the
+suite as measured on 2026-09-02 (81.8 / 73.2 / 83.3 / 84.3) — statements clears its bar by under a
+point, so a change that adds a large uncovered surface will be the one that trips it; raise a
+threshold when coverage genuinely improves, and lower one only with the same deliberateness as a
+bundle budget. Curated visual regression and broad screenshot capture still run only through
 `workflow_dispatch`. Exact-candidate release work still runs the full release command list in the
-project README, including coverage and visual regression.
+project README, including visual regression.
 
 ### When a functional job fails only on CI
 

@@ -135,6 +135,8 @@ export interface StoredSavedVideoSummary {
   readonly video: StoredSavedVideoAggregate['video'];
   readonly currentVersion: StoredVideoVersion;
   readonly versionCount: number;
+  /** The aggregate's monotonic revision — the CAS token compare-and-set mutations check. */
+  readonly revision: number;
 }
 export type SavedVideoReceipt = z.infer<typeof receiptSchema>;
 export interface SavedVideoReceiptLookup {
@@ -207,8 +209,9 @@ export interface SavedVideoRepository {
     ownerUserId: string,
     videoId: string,
     title: string,
+    expectedRevision: number,
     updatedAt: string,
-  ): Promise<StoredSavedVideoAggregate | null>;
+  ): Promise<StoredSavedVideoAggregate | 'not-found' | 'conflict'>;
   markMissing(ownerUserId: string, videoId: string, updatedAt: string): Promise<void>;
   setThumbnail(
     ownerUserId: string,
@@ -491,7 +494,14 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
         ({ id }) => id === aggregate.video.currentVersionId,
       );
       return currentVersion
-        ? [{ video: aggregate.video, currentVersion, versionCount: aggregate.versions.length }]
+        ? [
+            {
+              video: aggregate.video,
+              currentVersion,
+              versionCount: aggregate.versions.length,
+              revision: aggregate.revision,
+            },
+          ]
         : [];
     });
   }
@@ -550,15 +560,17 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
     ownerUserId: string,
     videoId: string,
     title: string,
+    expectedRevision: number,
     updatedAt: string,
-  ): Promise<StoredSavedVideoAggregate | null> {
+  ): Promise<StoredSavedVideoAggregate | 'not-found' | 'conflict'> {
     return this.#mutate(ownerUserId, async (library) => {
       const index = library.videos.findIndex(
         (item) => item.video.id === videoId && item.video.deletedAt === null,
       );
-      if (index < 0) return null;
+      if (index < 0) return 'not-found';
       const current = library.videos[index];
-      if (current === undefined) return null;
+      if (current === undefined) return 'not-found';
+      if (current.revision !== expectedRevision) return 'conflict';
       const next = storedSavedVideoAggregateSchema.parse({
         ...current,
         video: { ...current.video, title, updatedAt },
@@ -579,10 +591,13 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
       const current = library.videos[index];
       if (index < 0 || current === undefined || current.video.status === 'missing') return;
       const videos = [...library.videos];
+      // Deliberately not a revision bump: the CAS token counts changes to the video's substance —
+      // its title and its versions. Discovering the bytes missing happens on a read path, and a
+      // read that invalidated every token the operator holds would turn one broken preview into a
+      // rename conflict. The Postgres repository draws the same line.
       videos[index] = storedSavedVideoAggregateSchema.parse({
         ...current,
         video: { ...current.video, status: 'missing', updatedAt },
-        revision: current.revision + 1,
       });
       await this.#write({ ...library, revision: library.revision + 1, videos });
     });
@@ -610,11 +625,11 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
         ...version,
         thumbnailAssetId: assetId,
       });
+      // A poster changes how the video is presented, not what it is; see markMissing for the rule.
       const next = storedSavedVideoAggregateSchema.parse({
         ...current,
         video: { ...current.video, updatedAt },
         versions,
-        revision: current.revision + 1,
       });
       const videos = [...library.videos];
       videos[index] = next;
@@ -634,10 +649,11 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
       if (index < 0 || current === undefined) return null;
       if (current.video.deletedAt !== null) return current;
       const videos = [...library.videos];
+      // No bump on the way out either: a tombstoned video answers every later mutation with 404,
+      // so a final increment could never be compared against anything.
       const deleted = storedSavedVideoAggregateSchema.parse({
         ...current,
         video: { ...current.video, status: 'deleted', deletedAt, updatedAt: deletedAt },
-        revision: current.revision + 1,
       });
       videos[index] = deleted;
       await this.#write({ ...library, revision: library.revision + 1, videos });

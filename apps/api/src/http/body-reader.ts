@@ -5,15 +5,15 @@ import path from 'node:path';
 import { Readable } from 'node:stream';
 import type { FileSink } from 'bun';
 import {
-  spoolAudioUpload,
+  spoolUpload,
   SpooledUploadTooLargeError,
-  type SpooledAudioUpload,
+  type SpooledUpload,
 } from '../application/spooled-upload.js';
 import { AppError } from './app-error.js';
 
 const BUN_FILE_SINK_HIGH_WATER_MARK_BYTES = 64 * 1_024;
-const UPLOAD_DIRECTORY_PREFIX = 'lightframe-voice-upload-';
-const UPLOAD_FILE_NAME = 'recording.audio';
+const UPLOAD_DIRECTORY_PREFIX = 'lightframe-upload-';
+const UPLOAD_FILE_NAME = 'upload.bin';
 
 export interface BodyReaderOptions {
   readonly bodyParser?: 'json' | 'buffer' | 'spooled' | 'multipart';
@@ -112,7 +112,7 @@ const spoolBunRequestBody = async (
   body: ReadableStream<Uint8Array>,
   maximumBytes: number,
   signal: AbortSignal,
-): Promise<SpooledAudioUpload> => {
+): Promise<SpooledUpload> => {
   const directory = await mkdtemp(path.join(tmpdir(), UPLOAD_DIRECTORY_PREFIX));
   const filePath = path.join(directory, UPLOAD_FILE_NAME);
   const reader = body.getReader();
@@ -155,7 +155,7 @@ const spoolBunRequestBody = async (
 
     let cleaned = false;
     return {
-      kind: 'spooled-audio-upload',
+      kind: 'spooled-upload',
       path: filePath,
       byteLength,
       checksumSha256: hash.digest('hex'),
@@ -232,7 +232,7 @@ export const parseBody = async (
     }
     try {
       return typeof Bun === 'undefined'
-        ? await spoolAudioUpload(webBodyAsNodeReadable(request, signal), maximumBytes)
+        ? await spoolUpload(webBodyAsNodeReadable(request, signal), maximumBytes)
         : await spoolBunRequestBody(request.body, maximumBytes, signal);
     } catch (error) {
       if (error instanceof SpooledUploadTooLargeError) {

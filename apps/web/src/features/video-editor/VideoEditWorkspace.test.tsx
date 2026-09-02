@@ -54,7 +54,6 @@ const createSession = (overrides: Partial<VideoEditSession> = {}): VideoEditSess
     progress: 0,
     error: null,
     candidate: null,
-    lastApplied: null,
     dirty: true,
     supported: true,
     canUndo: true,

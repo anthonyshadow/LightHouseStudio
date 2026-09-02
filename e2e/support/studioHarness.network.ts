@@ -318,6 +318,7 @@ export const installProviderNetworkDriver = async (
         sourceVideoId: metadata?.sourceVideoId ?? null,
         versionCount: 1,
         thumbnailAvailable: false,
+        revision: 1,
         createdAt,
         updatedAt: createdAt,
         versions: [version],

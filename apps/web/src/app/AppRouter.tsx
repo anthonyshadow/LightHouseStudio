@@ -184,16 +184,11 @@ const NotFoundRoute = () => (
   </main>
 );
 
-const AuthenticatedShellRoute = () => {
-  const location = useLocation();
-  const routeState = location.state as { creationIntent?: unknown } | null;
-  const initialIntent = routeState?.creationIntent === 'upload' ? 'upload' : undefined;
-  return (
-    <Suspense fallback={<StudioLoading />}>
-      <LazyAuthenticatedShell {...(initialIntent ? { initialIntent } : {})} />
-    </Suspense>
-  );
-};
+const AuthenticatedShellRoute = () => (
+  <Suspense fallback={<StudioLoading />}>
+    <LazyAuthenticatedShell />
+  </Suspense>
+);
 
 export const RoutedApplication = () => {
   const location = useLocation();

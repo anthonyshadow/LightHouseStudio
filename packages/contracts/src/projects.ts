@@ -47,8 +47,17 @@ export const PROJECT_WORKFLOW_PHASES = [
   'complete',
 ] as const;
 export const PROJECT_SOURCE_KINDS = ['uploaded', 'recorded', 'saved-video-version'] as const;
-const VIDEO_EDIT_CROP_PRESETS = ['original', 'freeform', '16:9', '9:16', '1:1', '4:5'] as const;
-const VIDEO_EDIT_FILTERS = ['original', 'vivid', 'warm', 'cool', 'mono', 'fade'] as const;
+export const VIDEO_EDIT_CROP_PRESETS = [
+  'original',
+  'freeform',
+  '16:9',
+  '9:16',
+  '1:1',
+  '4:5',
+] as const;
+export const VIDEO_EDIT_FILTERS = ['original', 'vivid', 'warm', 'cool', 'mono', 'fade'] as const;
+/** Mirrors the domain's LOCAL_VOICE_EFFECT_IDS by hand; the parity suite holds the two together. */
+export const LOCAL_VOICE_EFFECT_IDS = ['warm-studio', 'clear-presenter', 'robot'] as const;
 
 export const projectStatusSchema = z.enum(PROJECT_STATUSES);
 export const projectAssetRoleSchema = z.enum(PROJECT_ASSET_ROLES);
@@ -97,7 +106,7 @@ const projectVoiceSelectionSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('local-effect'),
-      effectId: z.enum(['warm-studio', 'clear-presenter', 'robot']),
+      effectId: z.enum(LOCAL_VOICE_EFFECT_IDS),
       effectRevision: z.literal('builtin-v1').nullable(),
     })
     .strict(),
@@ -335,7 +344,7 @@ export const legacyProjectSnapshotSchema = z
         z
           .object({
             kind: z.literal('local-effect'),
-            effectId: z.enum(['warm-studio', 'clear-presenter', 'robot']),
+            effectId: z.enum(LOCAL_VOICE_EFFECT_IDS),
           })
           .strict(),
         z

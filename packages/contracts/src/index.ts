@@ -1,6 +1,7 @@
 export * from './capabilities';
 export * from './export-placements';
 export * from './campaigns';
+export * from './creative-library';
 export * from './auth';
 export * from './common';
 export * from './health';

@@ -747,12 +747,13 @@ const directSavedVideo: SavedVideoDetail = {
   sourceVideoId: null,
   versionCount: 2,
   thumbnailAvailable: false,
+  revision: 1,
   createdAt: '2026-08-11T15:00:00.000Z',
   updatedAt: '2026-08-11T16:00:00.000Z',
   versions: [directVideoVersion],
 };
 
-const renderStudio = (initialIntent?: 'upload', initialPath = '/studio/create') =>
+const renderStudio = (initialPath = '/studio/create') =>
   (() => {
     const router = createMemoryRouter(
       [
@@ -760,7 +761,7 @@ const renderStudio = (initialIntent?: 'upload', initialPath = '/studio/create') 
           path: '*',
           // The real composition: the shell supplies the query cache, confirmations and session
           // lifecycle the Studio runtime reads, so rendering it bare would test a wiring nobody has.
-          element: <AuthenticatedShell {...(initialIntent ? { initialIntent } : {})} />,
+          element: <AuthenticatedShell />,
         },
       ],
       { initialEntries: [initialPath] },
@@ -895,7 +896,7 @@ describe('StudioApp composition lifecycle', () => {
 
   it('hands a requested Saved Video to the library and drops the parameter once it is used', async () => {
     const requestedId = '3d1b3b5a-6d2c-4d1f-9c0e-7a1f2b3c4d5e';
-    const { router } = renderStudio(undefined, `/assets/videos?video=${requestedId}`);
+    const { router } = renderStudio(`/assets/videos?video=${requestedId}`);
 
     expect(await screen.findByText(`Requested video: ${requestedId}`)).toBeInTheDocument();
 
@@ -909,7 +910,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('ignores a malformed Saved Video parameter instead of requesting it', async () => {
-    renderStudio(undefined, '/assets/videos?video=not-a-uuid');
+    renderStudio('/assets/videos?video=not-a-uuid');
 
     expect(await screen.findByText('Requested video: none')).toBeInTheDocument();
   });
@@ -942,13 +943,13 @@ describe('StudioApp composition lifecycle', () => {
     ['/assets/characters', 'assets'],
     ['/assets/outfits', 'assets'],
   ] as const)('reports %s under the Assets destination', (path, destination) => {
-    renderStudio(undefined, path);
+    renderStudio(path);
 
     expect(harness.latestHeaderDestination).toBe(destination);
   });
 
   it('hydrates a direct Saved Video route into review while preserving the route and stage owner', async () => {
-    const { router } = renderStudio(undefined, `/studio/${directVideoId}`);
+    const { router } = renderStudio(`/studio/${directVideoId}`);
     const stage = await screen.findByTestId('media-stage');
 
     expect(await screen.findByRole('region', { name: 'Latest take' })).toBeVisible();
@@ -966,7 +967,7 @@ describe('StudioApp composition lifecycle', () => {
 
   it('shows a safe direct-route failure and returns to the canonical Video library', async () => {
     harness.getSavedVideo.mockRejectedValueOnce(new Error('private upstream detail'));
-    const { router } = renderStudio(undefined, `/studio/${directVideoId}`);
+    const { router } = renderStudio(`/studio/${directVideoId}`);
 
     expect(await screen.findByLabelText('Video unavailable')).toHaveTextContent(
       'That video could not be loaded safely. Your Assets are unchanged.',
@@ -979,10 +980,7 @@ describe('StudioApp composition lifecycle', () => {
   it('attaches an explicitly saved Project-launched Video and returns to Project detail', async () => {
     const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
     harness.savedVideoState = { status: 'saved', video: directSavedVideo };
-    const { router } = renderStudio(
-      undefined,
-      `/studio/create?intent=upload&projectId=${projectId}`,
-    );
+    const { router } = renderStudio(`/studio/create?intent=upload&projectId=${projectId}`);
 
     await waitFor(() =>
       expect(harness.attachProjectAsset).toHaveBeenCalledWith(
@@ -1003,10 +1001,7 @@ describe('StudioApp composition lifecycle', () => {
         membership: { id: '08707aa5-7b7f-4ce1-a48e-647370f6d3ab' },
         created: true,
       });
-    const { router } = renderStudio(
-      undefined,
-      `/studio/create?intent=upload&projectId=${projectId}`,
-    );
+    const { router } = renderStudio(`/studio/create?intent=upload&projectId=${projectId}`);
 
     expect(await screen.findByLabelText('Project attachment needs attention')).toHaveTextContent(
       'The Video was saved to Assets, but its Project association could not be completed.',
@@ -1020,10 +1015,7 @@ describe('StudioApp composition lifecycle', () => {
   it('degrades an inaccessible Project creation context to standalone creation', async () => {
     const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
     harness.getProject.mockRejectedValueOnce(new Error('not found'));
-    const { router } = renderStudio(
-      undefined,
-      `/studio/create?intent=upload&projectId=${projectId}`,
-    );
+    const { router } = renderStudio(`/studio/create?intent=upload&projectId=${projectId}`);
 
     await waitFor(() => expect(router.state.location.search).toBe('?intent=upload'));
     expect(router.state.location.pathname).toBe('/studio/create');
@@ -1032,7 +1024,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('starts capture from a record intent once per visit, not once per session', async () => {
-    const { router } = renderStudio(undefined, '/studio/create?intent=record');
+    const { router } = renderStudio('/studio/create?intent=record');
 
     await waitFor(() => expect(harness.session.startLocal).toHaveBeenCalledOnce());
 
@@ -1048,7 +1040,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('treats a return within Studio as a fresh record intent, without a remount to do it', async () => {
-    const { router } = renderStudio(undefined, '/studio/create?intent=record');
+    const { router } = renderStudio('/studio/create?intent=record');
     await waitFor(() => expect(harness.session.startLocal).toHaveBeenCalledOnce());
     const stage = await screen.findByTestId('media-stage');
 
@@ -1067,7 +1059,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('does not restart capture when the record-intent entry re-renders', async () => {
-    renderStudio(undefined, '/studio/create?intent=record');
+    renderStudio('/studio/create?intent=record');
 
     await waitFor(() => expect(harness.session.startLocal).toHaveBeenCalledOnce());
     fireEvent.click(screen.getByRole('button', { name: 'Open character options' }));
@@ -1076,7 +1068,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('mounts no media-stage owner while the Projects overview is active', async () => {
-    renderStudio(undefined, '/projects');
+    renderStudio('/projects');
 
     expect(await screen.findByText('Deferred Projects workspace')).toBeInTheDocument();
     expect(screen.queryAllByTestId('media-stage')).toHaveLength(0);
@@ -1091,7 +1083,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('keeps the same media-stage owner visible in an open Project and supplies source lifecycle seams', async () => {
-    renderStudio(undefined, '/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
+    renderStudio('/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
     const stage = await screen.findByTestId('media-stage');
 
     expect(await screen.findByText('Deferred Projects workspace')).toBeInTheDocument();
@@ -1108,7 +1100,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('flushes the active Project session before logout cleanup', async () => {
-    renderStudio(undefined, '/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
+    renderStudio('/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
     await screen.findByText('Deferred Projects workspace');
     const flush = vi.fn(() => Promise.resolve(true));
     const sessionPort: ProjectSessionPort = {
@@ -1133,7 +1125,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('closes Use existing video and hands local recording to the persistent stage', async () => {
-    renderStudio('upload');
+    renderStudio('/studio/create?intent=upload');
     const stage = await screen.findByTestId('media-stage');
 
     expect(screen.getByRole('region', { name: 'Use existing video' })).toBeInTheDocument();
@@ -1152,7 +1144,7 @@ describe('StudioApp composition lifecycle', () => {
       harness.takeStagePresentation = { kind: 'playback', mode: 'local' };
       return Promise.resolve();
     });
-    renderStudio('upload');
+    renderStudio('/studio/create?intent=upload');
 
     fireEvent.click(await screen.findByRole('button', { name: 'Record a local video' }));
 
@@ -1171,7 +1163,7 @@ describe('StudioApp composition lifecycle', () => {
       harness.takeStagePresentation = { kind: 'playback', mode: 'local' };
       return Promise.resolve();
     });
-    renderStudio('upload');
+    renderStudio('/studio/create?intent=upload');
 
     fireEvent.click(await screen.findByRole('button', { name: 'Record a local video' }));
 
@@ -1230,7 +1222,7 @@ describe('StudioApp composition lifecycle', () => {
     });
     // Restored by the global `vi.restoreAllMocks()` in vitest.setup.ts.
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => null);
-    renderStudio(undefined, '/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
+    renderStudio('/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace');
     await screen.findByText('Deferred Projects workspace');
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit video rail' }));

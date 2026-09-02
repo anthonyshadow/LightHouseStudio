@@ -190,7 +190,7 @@ describe('useProjectWorkingMediaController', () => {
       project: response().project,
       revision: response().revision,
     });
-    expect(videoEditor.completeCommit).toHaveBeenCalledWith(adoptedAssetId);
+    expect(videoEditor.completeCommit).toHaveBeenCalledOnce();
     expect(videoEditor.close).toHaveBeenCalledOnce();
     expect(hook.result.current.message).toContain('No video or version was saved');
   });

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { useLocation } from 'react-router';
 import { hydrateReferenceImage } from '../adapters/api-client/apiClient';
 import { useAuth } from '../application/auth/AuthProvider';
 import type { ExistingVideoCharacterPort } from '../app/shell/studioHandoff';
@@ -129,7 +129,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   const captureSettingsFocusRequestRef = useRef(false);
   const {
     creationIntent,
-    queryCreationIntent,
     requestedCreationProjectId,
     validCreationProjectId,
     directVideoId,
@@ -151,7 +150,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   } = overlay;
 
   const auth = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const { availability, state: capabilityState, retry: retryProviderAvailability } = provider;
   const savedVideoSave = useSaveVideo(Boolean(availability.directSavedVideoUploadAvailable));
@@ -159,7 +157,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   const contextualProjectId = useProjectVideoCreationContext({
     pathname: location.pathname,
     locationKey: location.key,
-    queryCreationIntent,
+    creationIntent,
     requestedCreationProjectId,
     validCreationProjectId,
   });
@@ -167,11 +165,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   useEffect(() => {
     if (creationIntent !== 'upload' || location.pathname !== APP_PATHS.create) return;
     openOverlay('video-upload');
-    // Router state carried the intent in; drop it so Back cannot re-open the upload panel.
-    if (location.state !== null) {
-      void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
-    }
-  }, [creationIntent, location.pathname, location.search, location.state, navigate, openOverlay]);
+  }, [creationIntent, location.pathname, openOverlay]);
 
   useEffect(() => {
     if (desktopStudioLayout) closeOverlayIf(['capture-settings']);

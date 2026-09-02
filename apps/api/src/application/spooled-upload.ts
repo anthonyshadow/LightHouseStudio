@@ -5,8 +5,8 @@ import path from 'node:path';
 import type { Readable } from 'node:stream';
 import { withWorkflowSpan } from '../observability/telemetry.js';
 
-export interface SpooledAudioUpload {
-  readonly kind: 'spooled-audio-upload';
+export interface SpooledUpload {
+  readonly kind: 'spooled-upload';
   readonly path: string;
   readonly byteLength: number;
   readonly checksumSha256: string;
@@ -20,11 +20,11 @@ export class SpooledUploadTooLargeError extends Error {
   }
 }
 
-export const isSpooledAudioUpload = (value: unknown): value is SpooledAudioUpload =>
+export const isSpooledUpload = (value: unknown): value is SpooledUpload =>
   typeof value === 'object' &&
   value !== null &&
   'kind' in value &&
-  value.kind === 'spooled-audio-upload' &&
+  value.kind === 'spooled-upload' &&
   'path' in value &&
   typeof value.path === 'string' &&
   'byteLength' in value &&
@@ -35,16 +35,13 @@ export const isSpooledAudioUpload = (value: unknown): value is SpooledAudioUploa
   'cleanup' in value &&
   typeof value.cleanup === 'function';
 
-export const spoolAudioUpload = (
-  source: Readable,
-  maximumBytes: number,
-): Promise<SpooledAudioUpload> =>
+export const spoolUpload = (source: Readable, maximumBytes: number): Promise<SpooledUpload> =>
   withWorkflowSpan(
     'temporary_file.create',
     { 'lightframe.maximum_bytes': maximumBytes },
     async () => {
-      const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-voice-upload-'));
-      const filePath = path.join(directory, 'recording.audio');
+      const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-upload-'));
+      const filePath = path.join(directory, 'upload.bin');
       let handle: Awaited<ReturnType<typeof open>> | undefined;
       let byteLength = 0;
       const hash = createHash('sha256');
@@ -63,7 +60,7 @@ export const spoolAudioUpload = (
         handle = undefined;
         let cleaned = false;
         return {
-          kind: 'spooled-audio-upload',
+          kind: 'spooled-upload',
           path: filePath,
           byteLength,
           checksumSha256: hash.digest('hex'),

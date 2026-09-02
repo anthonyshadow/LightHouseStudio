@@ -26,6 +26,7 @@ import {
   savedVideoContentUrl,
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
+import { ApiClientError } from '../../adapters/api-client/transport';
 import {
   AppIcon,
   Button,
@@ -125,8 +126,6 @@ const ORIGIN_LABELS: Readonly<Record<SavedVideoOrigin, string>> = {
 
 const STATUS_LABELS: Readonly<Record<SavedVideoSummary['status'], string>> = {
   ready: 'Ready',
-  processing: 'Processing',
-  failed: 'Processing failed',
   missing: 'File unavailable',
 };
 
@@ -454,35 +453,45 @@ export const VideoGallery = ({
     placeholderData: keepPreviousData,
   });
   const previewDetailQuery = useQuery({
-    queryKey: ['saved-videos', 'detail', previewVideo?.id ?? null],
+    queryKey: savedVideoQueryKeys.detail(previewVideo?.id ?? ''),
     queryFn: ({ signal }) => getSavedVideo(previewVideo!.id, signal),
     enabled: previewVideo !== null,
   });
 
+  const replaceVideoInLists = (updated: SavedVideoSummary) => {
+    queryClient.setQueriesData<InfiniteData<SavedVideosResponse>>(
+      { queryKey: savedVideoQueryKeys.lists },
+      (current) =>
+        current
+          ? {
+              ...current,
+              pages: current.pages.map((page) => ({
+                ...page,
+                videos: page.videos.map((video) => (video.id === updated.id ? updated : video)),
+              })),
+            }
+          : current,
+    );
+  };
+
   const renameMutation = useMutation({
-    mutationFn: ({ videoId, title }: { readonly videoId: string; readonly title: string }) =>
-      renameSavedVideo(videoId, title),
-    onSuccess: (updated) => {
-      queryClient.setQueriesData<InfiniteData<SavedVideosResponse>>(
-        { queryKey: savedVideoQueryKeys.lists },
-        (current) =>
-          current
-            ? {
-                ...current,
-                pages: current.pages.map((page) => ({
-                  ...page,
-                  videos: page.videos.map((video) => (video.id === updated.id ? updated : video)),
-                })),
-              }
-            : current,
-      );
-    },
+    mutationFn: ({
+      videoId,
+      title,
+      expectedRevision,
+    }: {
+      readonly videoId: string;
+      readonly title: string;
+      readonly expectedRevision: number;
+    }) => renameSavedVideo(videoId, title, expectedRevision),
+    onSuccess: replaceVideoInLists,
   });
 
   const deleteMutation = useMutation({
     mutationFn: (videoId: string) => deleteSavedVideo(videoId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.lists });
+      await queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.total });
     },
   });
 
@@ -525,7 +534,7 @@ export const VideoGallery = ({
     let settled = false;
     void queryClient
       .fetchQuery({
-        queryKey: ['saved-videos', 'detail', focusVideoId],
+        queryKey: savedVideoQueryKeys.detail(focusVideoId),
         queryFn: ({ signal }) => getSavedVideo(focusVideoId, signal),
       })
       .then((focused) => {
@@ -578,11 +587,34 @@ export const VideoGallery = ({
     if (!title || title === action.video.title) return;
     setActionError(null);
     try {
-      await renameMutation.mutateAsync({ videoId: action.video.id, title });
+      await renameMutation.mutateAsync({
+        videoId: action.video.id,
+        title,
+        // The revision the row was rendered from. A stale one means the video changed under the
+        // dialog; the 409 keeps this title from overwriting what happened, and the alert below
+        // says so while the operator's text stays put.
+        expectedRevision: action.video.revision,
+      });
       setNotice({ role: 'status', tone: 'success', message: `Renamed video to “${title}”.` });
       setAction(null);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : 'The video could not be renamed.');
+      if (error instanceof ApiClientError && error.status === 409) {
+        // This dialog's token lost. Fetch who won and hand the dialog the video as it now is —
+        // otherwise every retry resubmits the same stale expectation, and with focus refetches
+        // off there is nothing else that would ever refresh it.
+        try {
+          const fresh = await getSavedVideo(action.video.id);
+          replaceVideoInLists(fresh);
+          setAction((current) =>
+            current?.kind === 'rename' && current.video.id === fresh.id
+              ? { ...current, video: fresh }
+              : current,
+          );
+        } catch {
+          await queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.lists });
+        }
+      }
     }
   };
 
@@ -859,7 +891,7 @@ export const VideoGallery = ({
             {...(actionError ? { error: actionError } : {})}
             onChange={(event) => setRenameTitle(event.currentTarget.value)}
           />
-          {actionError ? <p>Correct the title or retry when the local API is available.</p> : null}
+          {actionError ? <p>You can correct the title and try again.</p> : null}
         </form>
       </OverlayPanel>
 

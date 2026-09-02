@@ -3411,7 +3411,15 @@ export class DrizzleProjectRepository
           .for('update')
           .limit(1);
         if (target === undefined) return { kind: 'not-found' } as const;
-        if (target.currentVersionId !== input.savedVideo.expectedVersionId) {
+        // Two expectations, one meaning: the video the caller described is still the row under
+        // lock. The version id catches a moved cut; the revision catches everything else the
+        // token counts (a rename landing between the caller's read and this transaction), so the
+        // `revision` the caller recorded in its receipt — expected + 1 — is exactly what the
+        // update below writes whenever this commit succeeds.
+        if (
+          target.currentVersionId !== input.savedVideo.expectedVersionId ||
+          target.revision !== input.savedVideo.expectedRevision
+        ) {
           return {
             kind: 'conflict',
             conflict: {
@@ -3491,6 +3499,8 @@ export class DrizzleProjectRepository
         receipt.result.revision.id === revision.id &&
         receipt.result.output.videoVersionId === version.id &&
         receipt.result.savedVideo.currentVersion.id === version.id &&
+        receipt.result.savedVideo.revision ===
+          (createAggregate !== null ? 1 : appendCurrent!.revision + 1) &&
         nextProject.id === current.id &&
         nextProject.ownerUserId === current.ownerUserId &&
         nextProject.version === current.version + 1 &&

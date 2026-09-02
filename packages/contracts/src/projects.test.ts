@@ -568,6 +568,7 @@ describe('Project snapshot contract', () => {
         sourceVideoId: null,
         versionCount: 1,
         thumbnailAvailable: false,
+        revision: 1,
         createdAt: now,
         updatedAt: now,
         versions: [] as unknown[],

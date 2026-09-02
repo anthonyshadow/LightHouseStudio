@@ -100,6 +100,7 @@ const video: SavedVideoSummary = {
   sourceVideoId: null,
   versionCount: 1,
   thumbnailAvailable: false,
+  revision: 1,
   assignment: 'project-output',
   createdAt: now,
   updatedAt: now,

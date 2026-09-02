@@ -94,9 +94,14 @@ export type StudioHarnessOptions = {
   videoProcessingAvailable?: boolean;
   realtimeProvidesVideo?: boolean;
   capabilityFailuresBeforeSuccess?: number;
-  /** A configured cloud mirror and its current account copy; omitted for browser-only deployments. */
+  /**
+   * A configured cloud mirror and its current account copy; omitted for browser-only deployments.
+   * The full snapshot envelope the real server serves — the client parses it strictly, so a
+   * fabrication missing `updatedAt` would not exercise divergence, it would read as an outage.
+   */
   creativeLibraryRemoteState?: {
     readonly revision: number;
     readonly store: CreativeAssetStore;
+    readonly updatedAt: string;
   };
 };

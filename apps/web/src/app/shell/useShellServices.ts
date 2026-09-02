@@ -19,7 +19,6 @@ import type { useStudioHandoff } from './useStudioHandoff';
 
 interface UseShellServicesOptions {
   readonly ownerUserId: string;
-  readonly initialIntent?: 'upload';
   readonly confirmation: ConfirmationRequest;
   readonly handoff: ReturnType<typeof useStudioHandoff>;
   readonly creativeLocks: StudioCreativeLocks;
@@ -43,14 +42,13 @@ interface UseShellServicesOptions {
  */
 export const useShellServices = ({
   ownerUserId,
-  initialIntent,
   confirmation,
   handoff,
   creativeLocks,
   projectSession,
   reportProjectSession,
 }: UseShellServicesOptions) => {
-  const route = useStudioRouteContext(initialIntent);
+  const route = useStudioRouteContext();
   const nav = useStudioNavigationActions();
   const desktopStudioLayout = useDesktopStudioLayout();
   const browser = useMemo(() => detectBrowserCapabilities(), []);

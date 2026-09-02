@@ -67,15 +67,18 @@ export type ProjectProcessingAttemptFacts = Readonly<{
   createdAt: string;
 }>;
 
-export type ProjectProcessingPublicPhase =
-  | 'submitting'
-  | 'accepted'
-  | 'processing'
-  | 'retrieving'
-  | 'saving-result'
-  | 'complete'
-  | 'needs-attention'
-  | 'cancelled';
+export const PROJECT_PROCESSING_PUBLIC_PHASES = [
+  'submitting',
+  'accepted',
+  'processing',
+  'retrieving',
+  'saving-result',
+  'complete',
+  'needs-attention',
+  'cancelled',
+] as const;
+
+export type ProjectProcessingPublicPhase = (typeof PROJECT_PROCESSING_PUBLIC_PHASES)[number];
 
 /**
  * What became of a retained provider result, which the boolean it replaces could not express.

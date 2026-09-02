@@ -9,7 +9,6 @@ import { VoiceEffectsPanel } from '../voice-effects/VoiceEffectsPanel';
 import { SavedVideoSuccessActions } from '../saved-videos/SavedVideoSuccessActions';
 import { TakeReviewActions } from './TakeReviewActions';
 import type { SaveVideoState } from '../saved-videos/useSaveVideo';
-import { media } from '../../ui/media';
 
 export type TakeDockProps = {
   recording: RecordingController;
@@ -17,7 +16,12 @@ export type TakeDockProps = {
   elevenLabsAvailable: boolean;
   elevenLabsModel?: string | null;
   browserCapabilities?: VoiceBrowserCapabilities;
-  view?: 'all' | 'take' | 'voice';
+  /**
+   * Which half of take review this dock renders. Every mount states one: the overlay renders the
+   * take panel and the voice panel as two docks, and the old 'all' two-column variant had no
+   * caller anywhere.
+   */
+  view: 'take' | 'voice';
   onCloseTake?: () => void;
   onDiscardTake?: () => void;
   onEditVideo?: () => void;
@@ -29,15 +33,13 @@ export type TakeDockProps = {
   hasUnsavedChanges?: boolean;
 };
 
-const gridStyles = (theme: Theme, view: NonNullable<TakeDockProps['view']>): CSSObject => ({
+const gridStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
-  gridTemplateColumns:
-    view === 'all' ? 'minmax(16rem, 1fr) minmax(18rem, 1.15fr)' : 'minmax(0, 1fr)',
+  gridTemplateColumns: 'minmax(0, 1fr)',
   gap: theme.space.md,
   minWidth: 0,
   minHeight: 0,
   minBlockSize: '100%',
-  [media.down('laptop')]: { gridTemplateColumns: '1fr' },
 });
 const metadataStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
@@ -212,7 +214,7 @@ export const TakeDock = ({
   elevenLabsAvailable,
   elevenLabsModel = null,
   browserCapabilities,
-  view = 'all',
+  view,
   onCloseTake,
   onDiscardTake,
   onEditVideo,
@@ -261,7 +263,7 @@ export const TakeDock = ({
       padding="compact"
       css={takeSurfaceStyles(theme)}
     >
-      <div css={gridStyles(theme, view)}>
+      <div css={gridStyles(theme)}>
         <div css={latestPanelStyles()}>
           <header>
             {/* The panel chrome already shows this title; the heading stays for the region label
@@ -339,17 +341,6 @@ export const TakeDock = ({
             </StatusNotice>
           ) : null}
         </div>
-        {view !== 'take' ? (
-          <div>
-            <VoiceEffectsPanel
-              recording={recording}
-              processing={processing}
-              elevenLabsAvailable={elevenLabsAvailable}
-              elevenLabsModel={elevenLabsModel}
-              {...(browserCapabilities ? { browserCapabilities } : {})}
-            />
-          </div>
-        ) : null}
       </div>
     </Surface>
   );

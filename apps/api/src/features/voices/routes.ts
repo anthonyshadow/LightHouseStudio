@@ -19,7 +19,7 @@ import type {
   HttpRequest,
 } from '../../application/application-runtime.js';
 import type { AudioStream } from '../../application/audio-stream.js';
-import { isSpooledAudioUpload } from '../../application/spooled-upload.js';
+import { isSpooledUpload } from '../../application/spooled-upload.js';
 import { AppError } from '../../http/errors.js';
 import { ownerUserIdForRequest } from '../../http/authentication.js';
 import { requireTrustedOrigin, requireVoiceProviderIntent } from '../../http/security.js';
@@ -253,7 +253,7 @@ export const registerVoiceRoutes = (
           'Use WebM, MP4, Ogg, WAV, MPEG, or AAC audio.',
         );
       }
-      if (!isSpooledAudioUpload(request.body) || request.body.byteLength === 0) {
+      if (!isSpooledUpload(request.body) || request.body.byteLength === 0) {
         throw new AppError(
           400,
           'invalid_audio',
