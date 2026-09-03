@@ -280,10 +280,19 @@ export const registerSavedVideoRoutes = (
     },
   );
 
-  app.get('/api/videos/:videoId/thumbnail', async (request, reply) => {
-    const params = savedVideoParamsSchema.safeParse(request.params);
-    if (!params.success) throw new AppError(400, 'validation_error', 'Choose a valid saved video.');
-    const thumbnail = await service.thumbnail(ownerUserIdForRequest(request), params.data.videoId);
+  // Version-scoped like its PUT sibling and the content route beside it. A poster belongs to one
+  // Version — a Project's output keeps its own after the Video moves on — so naming the Version in
+  // the path is what lets a surface ask for the frame it is actually showing.
+  app.get('/api/videos/:videoId/versions/:versionId/thumbnail', async (request, reply) => {
+    const params = savedVideoVersionParamsSchema.safeParse(request.params);
+    if (!params.success) {
+      throw new AppError(400, 'validation_error', 'Choose a valid saved video version.');
+    }
+    const thumbnail = await service.thumbnail(
+      ownerUserIdForRequest(request),
+      params.data.videoId,
+      params.data.versionId,
+    );
     void reply.header('Content-Length', thumbnail.asset.manifest.sizeBytes);
     void reply.header('Content-Type', thumbnail.mimeType);
     void reply.header('Content-Disposition', 'inline');

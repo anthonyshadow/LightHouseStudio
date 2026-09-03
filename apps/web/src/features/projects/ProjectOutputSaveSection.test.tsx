@@ -36,6 +36,14 @@ vi.mock('../video-editor/renderVideoEdit', () => ({
   videoEditRenderingSupported: () => renderCapable(),
 }));
 
+// jsdom cannot decode a video frame, so the poster the save generates is stated rather than
+// produced. What the test is for is the request that carries it, not mediabunny.
+vi.mock('../saved-videos/thumbnailClient', () => ({
+  createSavedVideoThumbnail: () => Promise.resolve(new Blob(['poster'], { type: 'image/webp' })),
+  createSavedVideoThumbnailFromImage: () =>
+    Promise.resolve(new Blob(['poster'], { type: 'image/webp' })),
+}));
+
 const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
 const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
 const sourceAssetId = 'a1289672-bfb5-4214-94f7-4bd54f12ce06';
@@ -371,6 +379,46 @@ describe('Project output save UI', () => {
       project: outputResponse(operationId).project,
       revision: outputResponse(operationId).revision,
     });
+  });
+
+  it('gives the Version it just saved a poster, the way a Studio save does', async () => {
+    // Without this the Project's own deliverable was the one saved video that never had a poster:
+    // the overview and the library both showed a placeholder until someone pressed Generate
+    // preview on it by hand.
+    let posterPath: string | null = null;
+    mockApiServer.use(
+      http.post(`*/api/projects/${projectId}/outputs`, ({ request }) =>
+        HttpResponse.json(outputResponse(request.headers.get('idempotency-key') ?? ''), {
+          status: 201,
+        }),
+      ),
+      // A real detail body: `versions` is `.min(1)`, so an empty one fails the response schema and
+      // the generation would reject where the test cannot see it.
+      http.put('*/api/videos/:videoId/versions/:versionId/thumbnail', ({ request }) => {
+        posterPath = new URL(request.url).pathname;
+        const video = savedSummary();
+        return HttpResponse.json({
+          ...video,
+          thumbnailAvailable: true,
+          versions: [video.currentVersion],
+        });
+      }),
+    );
+    const user = userEvent.setup();
+    renderSection();
+
+    const form = await openSaveDestination(user);
+    const title = within(form).getByRole('textbox', { name: 'Video title' });
+    await user.clear(title);
+    await user.type(title, 'Launch master');
+    await user.click(screen.getByRole('button', { name: 'Save video · New video' }));
+    expect(await screen.findByText('Saved “Launch master” as Version 1.')).toBeVisible();
+
+    // The poster is for the Version this save produced, and it never held the save up: the
+    // success above was already on screen before this settled.
+    await waitFor(() =>
+      expect(posterPath).toBe(`/api/videos/${savedVideoId}/versions/${versionId}/thumbnail`),
+    );
   });
 
   it('names one existing target inline and saves without a modal chain', async () => {

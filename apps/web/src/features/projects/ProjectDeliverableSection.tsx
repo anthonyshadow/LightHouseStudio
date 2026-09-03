@@ -41,7 +41,11 @@ const ProjectDeliverableCard = ({
       <div data-project-deliverable-poster="">
         <WorkPosterTile
           icon={<AppIcon name="video" />}
-          thumbnailUrl={savedVideoThumbnailUrl(item.savedVideo.id, item.version.id)}
+          thumbnailUrl={
+            item.thumbnailAvailable
+              ? savedVideoThumbnailUrl(item.savedVideo.id, item.version.id)
+              : null
+          }
           emptyCaption="No preview yet"
           failedCaption="Preview didn’t load"
           label={item.savedVideo.title}
