@@ -207,8 +207,8 @@ describe('DashboardRouteSurface', () => {
     });
     // The Project's own list response named the Version; the Video's said a poster exists.
     expect(posters.map((image) => image.getAttribute('src'))).toEqual([
-      `/api/videos/${projectPreview.savedVideoId}/thumbnail?v=${projectPreview.videoVersionId}`,
-      `/api/videos/${video.id}/thumbnail?v=${video.currentVersion.id}`,
+      `/api/videos/${projectPreview.savedVideoId}/versions/${projectPreview.videoVersionId}/thumbnail`,
+      `/api/videos/${video.id}/versions/${video.currentVersion.id}/thumbnail`,
     ]);
     expect(posters.every((image) => image.getAttribute('loading') === 'lazy')).toBe(true);
     // A Campaign organizes work rather than producing it, so it says so instead of waiting.

@@ -266,6 +266,8 @@ export const installProjectHarness = async (
               },
               isCurrentForProject:
                 current?.revision.snapshot.lastSuccessfulOutput?.videoVersionId === version.id,
+              // The simulator stores no bytes, so it has no poster to serve either.
+              thumbnailAvailable: false,
               contentUrl: `${outputPath}/${version.id}/content`,
             },
           ];

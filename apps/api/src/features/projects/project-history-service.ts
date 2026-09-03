@@ -10,7 +10,10 @@ import type {
   SavedVideoRepository,
   StoredVideoVersionRead,
 } from '../saved-videos/saved-video-repository.js';
-import { publicSavedVideoVersion } from '../saved-videos/saved-video-service.js';
+import {
+  publicSavedVideoVersion,
+  savedVideoVersionHasThumbnail,
+} from '../saved-videos/saved-video-service.js';
 import type { ProjectRepository } from './project-repository.js';
 
 const encodeCursor = (value: Record<string, unknown>): string =>
@@ -249,6 +252,7 @@ export class ProjectHistoryService {
       },
       version: publicSavedVideoVersion(retained.version),
       referenceRevision: referenceRevisionFor(referenceRevision, output),
+      thumbnailAvailable: savedVideoVersionHasThumbnail(retained.version),
       isCurrentForProject:
         currentOutput?.savedVideoId === output.savedVideoId &&
         currentOutput.videoVersionId === output.videoVersionId,

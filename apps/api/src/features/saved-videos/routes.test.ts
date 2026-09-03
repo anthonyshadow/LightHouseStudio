@@ -167,7 +167,7 @@ describe('saved-video routes', () => {
     });
     const thumbnail = await app.inject({
       method: 'GET',
-      url: `/api/videos/${videoId}/thumbnail`,
+      url: `/api/videos/${videoId}/versions/${versionId}/thumbnail`,
       headers: { host: browserHeaders.host, cookie },
     });
     const head = await app.inject({

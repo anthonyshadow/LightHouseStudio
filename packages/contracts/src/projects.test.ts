@@ -639,6 +639,7 @@ describe('Project snapshot contract', () => {
               createdAt: now,
             },
             isCurrentForProject: true,
+            thumbnailAvailable: true,
             contentUrl: `/api/projects/${projectId}/outputs/${versionId}/content`,
           },
         ],

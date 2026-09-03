@@ -248,6 +248,7 @@ const savedOutput = (): ProjectOutputHistoryItem => ({
   },
   referenceRevision: null,
   isCurrentForProject: true,
+  thumbnailAvailable: true,
   contentUrl: `/api/projects/${activeId}/outputs/${outputVersionId}/content`,
 });
 
@@ -381,7 +382,7 @@ describe('Project route surface', () => {
     const posters = document.querySelectorAll<HTMLImageElement>('[data-project-poster] img');
     expect(posters).toHaveLength(1);
     expect(posters[0]!.getAttribute('src')).toBe(
-      `/api/videos/${preview.savedVideoId}/thumbnail?v=${preview.videoVersionId}`,
+      `/api/videos/${preview.savedVideoId}/versions/${preview.videoVersionId}/thumbnail`,
     );
     expect(posters[0]!.getAttribute('loading')).toBe('lazy');
     // Deliberate, not broken: the archived row says it has nothing to show yet.
@@ -649,6 +650,18 @@ describe('Project route surface', () => {
     expect(screen.queryByRole('region', { name: 'Saved output' })).not.toBeInTheDocument();
   });
 
+  it('says a saved output has no preview rather than claiming one failed to load', async () => {
+    // The card used to ask for a poster unconditionally and read the 404 as a failed load, so a
+    // Version that never had one was reported as broken.
+    installSavedProject({ thumbnailAvailable: false });
+    renderProjects(`/projects/${activeId}`);
+
+    const deliverable = await screen.findByRole('region', { name: 'Saved output' });
+    expect(await within(deliverable).findByText('No preview yet')).toBeVisible();
+    expect(within(deliverable).queryByText('Preview didn’t load')).not.toBeInTheDocument();
+    expect(deliverable.querySelector('img')).toBeNull();
+  });
+
   it('still shows the saved output after the Project has moved past it', async () => {
     // The domain clears `lastSuccessfulOutput` on any material change, so a returning operator's
     // snapshot names nothing. The work still happened, and the overview has to say so.
@@ -843,7 +856,7 @@ describe('Project route surface', () => {
     const thumbnail = screen.getByRole('img', { name: 'Thumbnail for Library source' });
     expect(thumbnail.querySelector('img')).toHaveAttribute(
       'src',
-      `/api/videos/${savedVideoId}/thumbnail?v=${videoVersionId}`,
+      `/api/videos/${savedVideoId}/versions/${videoVersionId}/thumbnail`,
     );
     expect(screen.getByRole('button', { name: 'Use as the original video' })).toBeVisible();
     // Internal identifiers are ours, not the operator's: the card names the video, not its UUID.

@@ -406,11 +406,12 @@ export const readSavedVideoContent = async ({
 };
 
 /**
- * The poster for a video's current Version.
+ * The poster for one exact Version.
  *
- * The route always serves whichever poster is current and sends no cache headers, so the version
- * id is carried as a cache key: repairing or replacing a poster changes the URL, and every surface
- * showing it refetches without any of them tracking staleness by hand.
+ * The Version is a path segment rather than a query key, because it selects the frame rather than
+ * merely busting a cache: a Project's saved output keeps showing its own poster after the Video has
+ * moved on to a later Version. It doubles as the cache key it always was — repairing or replacing a
+ * poster changes the URL, and every surface showing it refetches without tracking staleness itself.
  */
 export const savedVideoThumbnailUrl = (videoId: string, versionId: string): string =>
-  `/api/videos/${encodeURIComponent(videoId)}/thumbnail?v=${encodeURIComponent(versionId)}`;
+  `/api/videos/${encodeURIComponent(videoId)}/versions/${encodeURIComponent(versionId)}/thumbnail`;

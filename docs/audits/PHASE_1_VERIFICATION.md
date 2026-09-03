@@ -49,11 +49,21 @@ Vitest and Playwright were run sequentially throughout, per [TESTING.md](../TEST
 - "Checking your account library…" → **Checking your Library…**.
 - One flow-doc sentence still said "account library sync".
 
-## Observations filed as follow-ups (not fixed)
+## Observations filed, then closed (2026-09-02)
 
-1. **Posters absent on older saved Videos.** The verified Project's output shows "Preview didn't
-   load" because its Video has no stored thumbnail (`thumbnailAvailable: false`, thumbnail route 404) — an honest fallback, and the gallery offers **Generate preview**. Every Video saved before
-   poster generation was wired needs that one press; a backfill was out of scope here.
-2. **D13 is implemented but still listed as open** in [Decisions required](../DECISIONS_REQUIRED.md);
-   the entry should be marked decided with a pointer to the compact-navigation rationale in
-   `StudioHeader.tsx`.
+Both were followed up immediately after this record was first written, and both turned out to be
+mis-stated here. What they actually were:
+
+1. **A Project's deliverable never had a poster at all — and the card lied about why.** Filed as
+   "posters absent on older saved Videos… an honest fallback", implying a legacy backfill. Neither
+   half held. `ProjectOutputSaveSection` never generated a poster, while the Studio save path
+   (`useSaveVideo.ts`) always had, so _every_ Video a Project produced was missing one, then and
+   in future — not a backfill, an ongoing gap. And the fallback was not honest: the deliverable
+   card asked for a poster unconditionally and read the resulting 404 as a failed load, so it said
+   "Preview didn't load" about a Version that never had one. Fixed at both altitudes: the output
+   save now generates the poster from the stored Version over byte ranges — after the save is
+   reported, never blocking it, failure leaving the existing repair path intact — and
+   `projectOutputHistoryItemSchema` carries `thumbnailAvailable` so the card can say "No preview
+   yet" when that is the truth. Videos saved before this still need one **Generate preview** press.
+2. **D13 was already marked decided**, in commit `59ca11dd` (slice 1.5), before this record claimed
+   otherwise. No change was needed; the claim was simply wrong.

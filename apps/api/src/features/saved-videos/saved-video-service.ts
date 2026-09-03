@@ -47,6 +47,16 @@ const currentVersion = (aggregate: StoredSavedVideoAggregate): StoredVideoVersio
   return version;
 };
 
+/**
+ * Whether a Version has a poster frame stored for it.
+ *
+ * One owner because two responses answer it — a Saved Video summary about its current Version, and
+ * a Project output about the Version that output is. If the answer ever gains a state the column
+ * alone cannot express, both move together or neither does.
+ */
+export const savedVideoVersionHasThumbnail = (version: StoredVideoVersion): boolean =>
+  version.thumbnailAssetId !== null;
+
 export const publicSavedVideoVersion = (version: StoredVideoVersion) => ({
   id: version.id,
   videoId: version.videoId,
@@ -86,7 +96,7 @@ export const publicSavedVideoSummary = (
     currentVersion: publicSavedVideoVersion(summary.currentVersion),
     sourceVideoId: summary.video.sourceVideoId,
     versionCount: summary.versionCount,
-    thumbnailAvailable: summary.currentVersion.thumbnailAssetId !== null,
+    thumbnailAvailable: savedVideoVersionHasThumbnail(summary.currentVersion),
     assignment: assignedToProject ? 'project-output' : 'unassigned',
     revision: summary.revision,
     createdAt: summary.video.createdAt,

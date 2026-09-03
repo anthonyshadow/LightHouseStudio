@@ -61,6 +61,8 @@ import {
 import type { ProjectSessionPort } from './useProjectSession';
 import { useStableOperationKey } from './useStableOperationKey';
 import { projectQueryKeys } from './useProjectsController';
+import { generateSavedVideoPreview } from '../saved-videos/useGenerateSavedVideoPreview';
+import { DEFAULT_SAVED_VIDEO_THUMBNAIL_CHOICE } from '../saved-videos/thumbnailSource';
 
 type OutputPhase = 'idle' | 'saving' | 'reconciling' | 'saved' | 'conflict' | 'error';
 
@@ -249,6 +251,23 @@ export const ProjectOutputSaveSection = ({
             ? `Saved “${response.savedVideo.title}” as Version ${response.savedVideo.currentVersion.ordinal}.${shape}`
             : `Added Version ${response.savedVideo.currentVersion.ordinal} to “${response.savedVideo.title}”.${shape}`,
         );
+        /*
+         * Give the new Version a poster, the way a Studio save already does. Without this a
+         * Project's own deliverable was the one kind of saved video that never had one: the
+         * overview and the library both fell back to a placeholder, and the only repair was
+         * pressing Generate preview on every Video a Project had ever produced. Every save mints
+         * a Version, and a new Version never has a poster, so this always has work to do.
+         *
+         * The signal is deliberately one nothing aborts. Started after the save is reported, the
+         * generation outlives this surface on purpose: the button beside the success notice opens
+         * the Videos library — the very screen the poster is for — and tying the work to the
+         * component would let that click cancel it. A failure leaves exactly the state that
+         * existed before, with the same repair still available.
+         */
+        void generateSavedVideoPreview(
+          { video: response.savedVideo, choice: DEFAULT_SAVED_VIDEO_THUMBNAIL_CHOICE },
+          new AbortController().signal,
+        ).catch(() => undefined);
       } catch (error) {
         const finalClientFailure =
           error instanceof ProjectApiConflictError ||

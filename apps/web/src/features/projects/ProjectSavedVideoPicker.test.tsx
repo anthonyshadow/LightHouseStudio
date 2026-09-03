@@ -100,7 +100,7 @@ describe('ProjectSavedVideoPicker', () => {
 
     expect(rows[0]!.querySelector('img')).toHaveAttribute(
       'src',
-      '/api/videos/11111111-1111-4111-8111-111111111111/thumbnail?v=22222222-2222-4222-8222-222222222222',
+      '/api/videos/11111111-1111-4111-8111-111111111111/versions/22222222-2222-4222-8222-222222222222/thumbnail',
     );
     expect(rows[0]!).toHaveTextContent('Version 2 · 1920×1080 · 1:30');
     expect(within(rows[0]!).getAllByText('1:30').length).toBeGreaterThan(0);
@@ -137,7 +137,7 @@ describe('ProjectSavedVideoPicker', () => {
     );
     expect(player).toHaveAttribute(
       'poster',
-      '/api/videos/11111111-1111-4111-8111-111111111111/thumbnail?v=22222222-2222-4222-8222-222222222222',
+      '/api/videos/11111111-1111-4111-8111-111111111111/versions/22222222-2222-4222-8222-222222222222/thumbnail',
     );
     expect(within(rows[0]!).getByRole('button', { name: 'Hide preview' })).toHaveAttribute(
       'aria-expanded',
