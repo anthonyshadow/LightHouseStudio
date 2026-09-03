@@ -1,6 +1,7 @@
 import {
   VIDEO_EDIT_HISTORY_LIMIT,
   createDefaultVideoEditSpec,
+  finalizeVideoEditSpec,
   getVideoEditOutputGeometry,
   normalizeVideoEditSpec,
   videoEditSpecsEqual,
@@ -18,7 +19,7 @@ import {
   type VideoEditSource,
   type VideoEditTool,
 } from './types';
-import { videoEditPreviewSupported } from './videoEditShader';
+import { videoEditPreviewSupported } from './videoEditSupport';
 
 type HistoryState = Readonly<{
   past: readonly VideoEditSpec[];
@@ -58,6 +59,8 @@ const resetToolSpec = (
       return { ...draft, adjustments: baseline.adjustments };
     case 'filters':
       return { ...draft, filter: baseline.filter };
+    case 'subtitles':
+      return { ...draft, subtitles: baseline.subtitles };
   }
 };
 
@@ -70,6 +73,7 @@ export const useVideoEditSession = () => {
     future: [],
   }));
   const [activeTool, setActiveTool] = useState<VideoEditTool>('trim');
+  const [selectedSubtitleId, setSelectedSubtitleId] = useState<string | null>(null);
   const [showingBefore, setShowingBefore] = useState(false);
   const [splitComparison, setSplitComparison] = useState(false);
   const [playheadMs, setPlayheadMs] = useState(0);
@@ -94,7 +98,13 @@ export const useVideoEditSession = () => {
     [source],
   );
   const draft = history.present;
-  const dirty = !videoEditSpecsEqual(draft, baseline);
+  /**
+   * What a render would produce from the draft. The draft may hold a subtitle the operator has
+   * not typed into yet; it neither renders nor counts as an edit, so "dirty" and the render both
+   * read the finalized form.
+   */
+  const finalizedDraft = useMemo(() => finalizeVideoEditSpec(draft), [draft]);
+  const dirty = !videoEditSpecsEqual(finalizedDraft, baseline);
   const begin = useCallback((nextSource: VideoEditSource) => {
     generationRef.current += 1;
     renderControllerRef.current?.abort();
@@ -104,6 +114,7 @@ export const useVideoEditSession = () => {
     setBaseline(nextBaseline);
     setHistory({ past: [], present: nextBaseline, future: [] });
     setActiveTool('trim');
+    setSelectedSubtitleId(null);
     setShowingBefore(false);
     setSplitComparison(false);
     setPlayheadMs(0);
@@ -121,6 +132,7 @@ export const useVideoEditSession = () => {
     transactionStartRef.current = null;
     setSource(null);
     setCandidate(null);
+    setSelectedSubtitleId(null);
     setShowingBefore(false);
     setSplitComparison(false);
     setError(null);
@@ -206,6 +218,18 @@ export const useVideoEditSession = () => {
     () => applySpec(resetToolSpec(activeTool, history.present, baseline)),
     [activeTool, applySpec, baseline, history.present],
   );
+
+  /** One history entry, and the selection let go if it pointed at the removed cue. */
+  const removeSubtitleCue = useCallback(
+    (id: string) => {
+      applySpec({
+        ...history.present,
+        subtitles: history.present.subtitles.filter((cue) => cue.id !== id),
+      });
+      setSelectedSubtitleId((selected) => (selected === id ? null : selected));
+    },
+    [applySpec, history.present],
+  );
   const resetAll = useCallback(() => applySpec(baseline), [applySpec, baseline]);
 
   const startRender = useCallback(async () => {
@@ -218,7 +242,7 @@ export const useVideoEditSession = () => {
     const generation = ++generationRef.current;
     const controller = new AbortController();
     renderControllerRef.current = controller;
-    const spec = history.present;
+    const spec = finalizedDraft;
     const geometry = getVideoEditOutputGeometry(sourceGeometry, spec);
     setError(null);
     setCandidate(null);
@@ -267,7 +291,7 @@ export const useVideoEditSession = () => {
     } finally {
       if (renderControllerRef.current === controller) renderControllerRef.current = null;
     }
-  }, [dirty, history.present, source, sourceGeometry, supported]);
+  }, [dirty, finalizedDraft, source, sourceGeometry, supported]);
 
   const cancelRender = useCallback(() => {
     generationRef.current += 1;
@@ -314,6 +338,7 @@ export const useVideoEditSession = () => {
       baseline,
       draft,
       activeTool,
+      selectedSubtitleId,
       showingBefore,
       splitComparison,
       playheadMs,
@@ -328,6 +353,7 @@ export const useVideoEditSession = () => {
       begin,
       close,
       setActiveTool,
+      setSelectedSubtitleId,
       setShowingBefore,
       setSplitComparison,
       setPlayheadMs,
@@ -339,6 +365,7 @@ export const useVideoEditSession = () => {
       redo,
       resetTool,
       resetAll,
+      removeSubtitleCue,
       startRender,
       cancelRender,
       resumeEditing,
@@ -351,6 +378,7 @@ export const useVideoEditSession = () => {
       baseline,
       draft,
       activeTool,
+      selectedSubtitleId,
       showingBefore,
       splitComparison,
       playheadMs,
@@ -372,6 +400,7 @@ export const useVideoEditSession = () => {
       redo,
       resetTool,
       resetAll,
+      removeSubtitleCue,
       startRender,
       cancelRender,
       resumeEditing,

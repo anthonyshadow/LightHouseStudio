@@ -14,7 +14,7 @@ vi.mock('../video-editor/renderVideoEdit', () => ({
   renderVideoEdit: (input: RenderVideoEditInput) => renderVideoEdit(input),
   videoEditRenderingSupported: () => videoEditRenderingSupported(),
 }));
-vi.mock('../video-editor/videoEditShader', () => ({
+vi.mock('../video-editor/videoEditSupport', () => ({
   videoEditPreviewSupported: () => videoEditPreviewSupported(),
 }));
 

@@ -8,7 +8,7 @@ import { SaveVideoDialog } from './SaveVideoDialog';
 
 // jsdom has no WebGL, so the render capability is stated explicitly rather than inferred.
 const renderCapable = vi.fn(() => true);
-vi.mock('../video-editor/videoEditShader', () => ({
+vi.mock('../video-editor/videoEditSupport', () => ({
   videoEditPreviewSupported: () => renderCapable(),
 }));
 vi.mock('../video-editor/renderVideoEdit', () => ({

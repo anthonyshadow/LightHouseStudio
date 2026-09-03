@@ -56,6 +56,11 @@ export const VIDEO_EDIT_CROP_PRESETS = [
   '4:5',
 ] as const;
 export const VIDEO_EDIT_FILTERS = ['original', 'vivid', 'warm', 'cool', 'mono', 'fade'] as const;
+/** Mirror the domain's subtitle vocabulary by hand; the parity suite holds the two together. */
+export const SUBTITLE_CUE_PLACEMENTS = ['top', 'middle', 'bottom'] as const;
+export const SUBTITLE_CUE_LIMIT = 200;
+export const SUBTITLE_CUE_TEXT_MAX_LENGTH = 200;
+export const SUBTITLE_CUE_MINIMUM_DURATION_MS = 100;
 /** Mirrors the domain's LOCAL_VOICE_EFFECT_IDS by hand; the parity suite holds the two together. */
 export const LOCAL_VOICE_EFFECT_IDS = ['warm-studio', 'clear-presenter', 'robot'] as const;
 
@@ -130,6 +135,16 @@ const projectLiveModeMetadataSchema = z
   .strict()
   .nullable();
 
+const subtitleCueSchema = z
+  .object({
+    id: z.uuid(),
+    text: z.string().trim().min(1).max(SUBTITLE_CUE_TEXT_MAX_LENGTH),
+    startMs: z.number().finite().nonnegative(),
+    endMs: z.number().finite(),
+    placement: z.enum(SUBTITLE_CUE_PLACEMENTS),
+  })
+  .strict();
+
 export const projectVideoEditSpecSchema = z
   .object({
     trim: z
@@ -165,6 +180,11 @@ export const projectVideoEditSpecSchema = z
       })
       .strict(),
     filter: z.enum(VIDEO_EDIT_FILTERS),
+    /**
+     * Absent from every snapshot written before subtitles existed, and read back as none. Cues
+     * may overlap; they must be listed in start order and each carry its own id.
+     */
+    subtitles: z.array(subtitleCueSchema).max(SUBTITLE_CUE_LIMIT).readonly().default([]),
   })
   .strict()
   .superRefine((value, context) => {
@@ -185,6 +205,33 @@ export const projectVideoEditSpecSchema = z
         message: 'The normalized crop must remain inside the source frame.',
       });
     }
+    // One pass over the cues for every per-list and per-cue rule; this runs on every snapshot read.
+    const seen = new Set<string>();
+    value.subtitles.forEach((cue, index) => {
+      if (cue.endMs - cue.startMs < SUBTITLE_CUE_MINIMUM_DURATION_MS) {
+        context.addIssue({
+          code: 'custom',
+          path: ['subtitles', index, 'endMs'],
+          message: 'A subtitle must last at least a tenth of a second.',
+        });
+      }
+      if (seen.has(cue.id)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['subtitles', index, 'id'],
+          message: 'Each subtitle needs its own identifier.',
+        });
+      }
+      seen.add(cue.id);
+      const previous = value.subtitles[index - 1];
+      if (previous !== undefined && previous.startMs > cue.startMs) {
+        context.addIssue({
+          code: 'custom',
+          path: ['subtitles', index, 'startMs'],
+          message: 'Subtitles must be listed in start order.',
+        });
+      }
+    });
   });
 
 const projectExportSpecificationSchema = projectExportSpecificationValueSchema.nullable();

@@ -99,6 +99,11 @@ recorded there.
 - Additive migration `0018` changes the Project snapshot-version check from V1-only to V1/V2 and
   creates the working-media adoption authority. It does not rewrite existing Project snapshots or
   copy media bytes and is not applied automatically to production.
+- Subtitles (slice 2.1, 2026-09-03) added `subtitles` inside the snapshot's `localEdit` as an
+  additive field with a default: every revision written before it is read back with no subtitles,
+  in both persistence modes, and the next write of that snapshot carries the empty list. No
+  migration was needed — the snapshot stays version 2 and the `0018` check is untouched — and the
+  file library format stays at version 7.
 - Additive migration `0019` adds processing-job result-asset/retry identity and Project-job
   result-revision fields, restrictive result relations, and recovery/history indexes. It does not
   assign legacy jobs to Projects, rewrite existing content, or apply automatically to production.

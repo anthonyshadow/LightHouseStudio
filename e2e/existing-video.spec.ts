@@ -363,6 +363,49 @@ test('@cross-browser provider-free Edit video renders locally and atomically rep
   expect(network.blockedExternalWebSockets).toEqual([]);
 });
 
+test('subtitles added on the timeline are burned into a local render', async ({ page }) => {
+  await installCameraSentinel(page);
+  const network = await installProviderNetworkDriver(page);
+  await page.goto('/studio/create');
+  const fixture = await loadDecodableH264VideoFixture();
+
+  await selectExistingVideo(page, fixture, 'captioned-source.mp4');
+  const upload = page.getByRole('dialog', { name: 'Use existing video' });
+  await upload.getByRole('button', { name: 'Edit video' }).click();
+  await expect(upload).toBeHidden();
+
+  await page.getByRole('button', { name: 'Subtitles', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Subtitles settings' })).toBeVisible();
+  await page.getByRole('button', { name: 'Add subtitle at playhead' }).click();
+  const text = page.getByRole('textbox', { name: 'Text' });
+  await expect(text).toBeFocused();
+  await text.fill('Hello from the timeline');
+  await text.blur();
+
+  // The cue starts at the playhead and runs to the end of this one-second clip, on the lane and
+  // in the list, selected and counted as an edit.
+  const cue = page.getByRole('group', { name: 'Subtitles on the timeline' }).getByRole('button');
+  await expect(cue).toHaveAccessibleName(
+    /^Subtitle 1: Hello from the timeline, 00:00\.00 to 00:0[01]\.\d\d$/u,
+  );
+  await expect(cue).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('list', { name: 'Subtitles' }).getByRole('button')).toContainText(
+    'Hello from the timeline',
+  );
+  await expect(page.getByText('Unsaved edits', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Save edited video' }).click();
+  const replacement = page.getByRole('dialog', { name: 'Replace the current video?' });
+  await expect(replacement).toBeVisible({ timeout: 60_000 });
+  await replacement.getByRole('button', { name: 'Replace Without Saving' }).click();
+
+  await expect(upload).toBeVisible();
+  await expect(upload.getByTitle(/captioned-source-edited-/u).first()).toBeVisible();
+  expect(await cameraCalls(page)).toBe(0);
+  expect(network.providerSdkRequests).toEqual([]);
+  expect(network.blockedExternalRequests).toEqual([]);
+});
+
 test('a selected upload ignores backdrop dismissal and can be reopened after an explicit close', async ({
   page,
 }) => {

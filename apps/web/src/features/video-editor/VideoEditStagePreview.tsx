@@ -4,9 +4,12 @@ import {
   getVideoEditOutputGeometry,
   normalizeVideoCrop,
   rotatedVideoEditDimensions,
+  type NormalizedVideoCrop,
+  type VideoEditSpec,
 } from '@studio/domain';
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { AppIcon, Button } from '../../ui';
+import { createSubtitleOverlaySync } from './subtitleRasterizer';
 import type { VideoEditStagePreviewContract } from './types';
 import { createVideoEditFrameRenderer } from './videoEditShader';
 import {
@@ -134,10 +137,16 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
         : contract.spec,
     [contract.spec, cropMode],
   );
-  const previewSpecRef = useRef(previewSpec);
-  useEffect(() => {
-    previewSpecRef.current = previewSpec;
-  }, [previewSpec]);
+  /**
+   * What a draw reads, mirrored from props so the frame loop never closes over a stale render. In
+   * crop mode the canvas shows the whole rotated source and the output frame is the crop rectangle
+   * inside it, so subtitles lay out there — exactly where the export will put them.
+   */
+  const drawInputsRef = useRef<{ spec: VideoEditSpec; crop: NormalizedVideoCrop | null }>({
+    spec: previewSpec,
+    crop: null,
+  });
+  const drawRef = useRef<(() => void) | null>(null);
   const previewScale = Math.min(1, 1280 / Math.max(displayGeometry.width, displayGeometry.height));
   const trimStartMs = contract.spec.trim.startMs;
   const trimEndMs = contract.spec.trim.endMs;
@@ -155,24 +164,47 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
     } catch {
       return;
     }
+    const frameRenderer = renderer;
+    const syncOverlay = createSubtitleOverlaySync(
+      () =>
+        Object.assign(document.createElement('canvas'), {
+          width: canvas.width,
+          height: canvas.height,
+        }),
+      (overlay) => frameRenderer.setOverlay(overlay),
+    );
+    const draw = () => {
+      if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) return;
+      const { spec, crop } = drawInputsRef.current;
+      const frame = crop
+        ? {
+            x: crop.x * canvas.width,
+            y: crop.y * canvas.height,
+            width: crop.width * canvas.width,
+            height: crop.height * canvas.height,
+          }
+        : { x: 0, y: 0, width: canvas.width, height: canvas.height };
+      try {
+        syncOverlay(spec.subtitles, video.currentTime * 1_000, frame);
+        frameRenderer.render(video, spec);
+      } catch {
+        // A transient seek/frame gap is retried on the next animation frame.
+      }
+    };
     let frameId = 0;
     let videoFrameId = 0;
     const render = () => {
-      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-        try {
-          renderer.render(video, previewSpecRef.current);
-        } catch {
-          // A transient seek/frame gap is retried on the next animation frame.
-        }
-      }
+      draw();
       if ('requestVideoFrameCallback' in video) {
         videoFrameId = video.requestVideoFrameCallback(render);
       } else {
         frameId = requestAnimationFrame(render);
       }
     };
+    drawRef.current = draw;
     render();
     return () => {
+      drawRef.current = null;
       if (videoFrameId && 'cancelVideoFrameCallback' in video) {
         video.cancelVideoFrameCallback(videoFrameId);
       }
@@ -186,6 +218,17 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
     previewScale,
     videoRef,
   ]);
+
+  // The draft changed: mirror it for the frame loop, and draw once if the video is paused — a
+  // paused video presents no new frame, so a subtitle being typed or a slider moved would
+  // otherwise wait for playback; a playing one is already being drawn every frame.
+  useEffect(() => {
+    drawInputsRef.current = {
+      spec: previewSpec,
+      crop: cropMode ? contract.spec.crop.rectangle : null,
+    };
+    if (videoRef.current?.paused !== false) drawRef.current?.();
+  }, [contract.spec.crop.rectangle, cropMode, previewSpec, videoRef]);
 
   useEffect(() => {
     const video = videoRef.current;

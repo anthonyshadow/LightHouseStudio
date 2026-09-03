@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createDefaultVideoEditSpec } from '@studio/domain';
+import { createDefaultVideoEditSpec, type VideoEditSpec } from '@studio/domain';
 import type { VideoEditWorkerRequest, VideoEditWorkerResponse } from './types';
 
 type WorkerMessageListener = (event: MessageEvent<VideoEditWorkerRequest>) => void;
@@ -23,19 +23,51 @@ const renderRequest = (
 });
 
 type ConversionOptions = {
-  video: Record<string, unknown>;
+  video: Record<string, unknown> & {
+    process?: (sample: { timestamp: number; toVideoFrame: () => { close: () => void } }) => unknown;
+  };
   audio?: Record<string, unknown>;
 };
 
 /**
  * A media runtime that records the conversion it was asked for and produces one byte of output,
- * so a test can assert the geometry and track decisions without decoding anything.
+ * so a test can assert the geometry and track decisions without decoding anything. Given sample
+ * timestamps, it also pushes one already re-based sample per timestamp through `process`, the way
+ * mediabunny does after trimming.
  */
-const stubMediaRuntime = () => {
+const stubMediaRuntime = (sampleTimestamps: readonly number[] = []) => {
   const initialized: ConversionOptions[] = [];
   let writable: WritableStream<{ data: Uint8Array; position: number }> | null = null;
   const videoTrack = { kind: 'video' };
   const audioTrack = { kind: 'audio' };
+  const renderer = {
+    render: vi.fn<(source: TexImageSource, spec: VideoEditSpec) => void>(),
+    setOverlay: vi.fn<(overlay: TexImageSource | null) => void>(),
+    dispose: vi.fn<() => void>(),
+  };
+  /**
+   * A 2D context that records each rasterization as the lines it drew, at the font it drew them
+   * in, so a test sees what the overlay held without decoding a pixel. A clear starts a new group.
+   */
+  const drawn: { font: string; lines: string[] }[] = [];
+  const context = {
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    fillStyle: '',
+    clearRect: vi.fn(() => {
+      drawn.push({ font: '', lines: [] });
+    }),
+    measureText: (text: string) => ({ width: text.length * 10 }),
+    beginPath: vi.fn(),
+    roundRect: vi.fn(),
+    fill: vi.fn(),
+    fillText: vi.fn((text: string) => {
+      const group = drawn.at(-1)!;
+      group.font = context.font;
+      group.lines.push(text);
+    }),
+  };
   vi.doMock('mediabunny', () => ({
     ALL_FORMATS: [],
     BlobSource: class {},
@@ -62,6 +94,9 @@ const stubMediaRuntime = () => {
           onProgress: null,
           cancel: () => Promise.resolve(),
           execute: async () => {
+            for (const timestamp of sampleTimestamps) {
+              options.video.process?.({ timestamp, toVideoFrame: () => ({ close: vi.fn() }) });
+            }
             const writer = writable!.getWriter();
             await writer.write({ data: new Uint8Array([1]), position: 0 });
             await writer.close();
@@ -73,7 +108,7 @@ const stubMediaRuntime = () => {
     canEncodeVideo: vi.fn(() => Promise.resolve(true)),
   }));
   vi.doMock('./videoEditShader', () => ({
-    createVideoEditFrameRenderer: () => ({ render: vi.fn(), dispose: vi.fn() }),
+    createVideoEditFrameRenderer: () => renderer,
   }));
   vi.stubGlobal(
     'OffscreenCanvas',
@@ -82,9 +117,13 @@ const stubMediaRuntime = () => {
         readonly width: number,
         readonly height: number,
       ) {}
+
+      getContext(): typeof context {
+        return context;
+      }
     },
   );
-  return { initialized };
+  return { initialized, renderer, drawn };
 };
 
 const loadWorker = async () => {
@@ -108,6 +147,7 @@ const loadWorker = async () => {
 
 afterEach(() => {
   vi.doUnmock('mediabunny');
+  vi.doUnmock('./videoEditShader');
   vi.resetModules();
   vi.unstubAllGlobals();
 });
@@ -230,5 +270,61 @@ describe('videoEditRender worker runtime', () => {
       processedHeight: 720,
     });
     expect(runtime.initialized[0]!.audio).toEqual({ codec: 'aac', forceTranscode: true });
+    expect(runtime.renderer.setOverlay).not.toHaveBeenCalled();
+  });
+
+  it('burns subtitles in output time through the trim, rasterizing once per change of the active set', async () => {
+    // Samples arrive already re-based: 0 s is the trim start (500 ms into the source).
+    const runtime = stubMediaRuntime([0.1, 0.4, 0.45, 1.0, 1.8, 2.05]);
+    const worker = await loadWorker();
+    const cue = (id: string, text: string, startMs: number, endMs: number) => ({
+      id,
+      text,
+      startMs,
+      endMs,
+      placement: 'bottom' as const,
+    });
+
+    worker.send(
+      renderRequest(41, {
+        spec: {
+          ...createDefaultVideoEditSpec(3_000),
+          trim: { startMs: 500, endMs: 3_000 },
+          subtitles: [
+            cue('a', 'Hello', 0, 1_000), // output 0–500 ms
+            cue('b', 'World', 800, 2_000), // output 300–1 500 ms
+            cue('c', 'Late', 2_500, 2_600), // output 2 000–2 100 ms
+          ],
+        },
+      }),
+    );
+
+    await vi.waitFor(() =>
+      expect(worker.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'complete', operationId: 41 }),
+      ),
+    );
+    // Four rasterizations, one per change of the set on screen: the overlap draws both cues, the
+    // later one above the earlier, and the type size comes from the 720-tall output frame.
+    expect(runtime.drawn.map(({ lines }) => lines)).toEqual([
+      ['Hello'],
+      ['World', 'Hello'],
+      ['World'],
+      ['Late'],
+    ]);
+    expect(runtime.drawn.every(({ font }) => font.startsWith('bold 32px'))).toBe(true);
+    const overlays = runtime.renderer.setOverlay.mock.calls.map(([overlay]) => overlay);
+    expect(overlays.map((overlay) => (overlay === null ? null : 'canvas'))).toEqual([
+      'canvas',
+      'canvas',
+      'canvas',
+      null,
+      'canvas',
+    ]);
+    // One overlay canvas for the whole render, sized to the output, reused across changes.
+    const canvases = new Set(overlays.filter((overlay) => overlay !== null));
+    expect(canvases.size).toBe(1);
+    expect([...canvases][0]).toMatchObject({ width: 1_280, height: 720 });
+    expect(runtime.renderer.render).toHaveBeenCalledTimes(6);
   });
 });

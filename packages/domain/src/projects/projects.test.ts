@@ -353,13 +353,14 @@ describe('Project aggregate rules', () => {
     expect(saved.ok).toBe(true);
     if (!saved.ok) return;
     // Nothing pre-fills the next round: a different treatment can be chosen without clearing up.
+    // The edit that made the working media is not a treatment and stays with the media it made.
     expect(saved.value.revisions.at(-1)!.snapshot).toMatchObject({
       selectedCharacter: null,
       selectedOutfit: null,
       selectedVoice: null,
       visualTreatment: { kind: 'none' },
       creativeIntent: { appliedPrompt: null, userIntent: 'A product walkthrough' },
-      localEdit: null,
+      localEdit: createDefaultVideoEditSpec(12_000),
       workflowPhase: 'complete',
     });
     // The producing revision keeps the exact configuration that made the retained Version.

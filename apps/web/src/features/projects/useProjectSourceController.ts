@@ -12,6 +12,7 @@ import type {
   PresentStageSourceInput,
   TakeMetadata,
 } from '../recording/types';
+import { currentCutOf, type CurrentCut } from './useProjectCurrentCut';
 import { projectQueryKeys, reconcileProject } from './useProjectsController';
 import { useStableOperationKey } from './useStableOperationKey';
 import {
@@ -256,11 +257,19 @@ export const useProjectSourceController = (
               assetId: sourceResponse.revision.snapshot.sourceAssetId!,
             };
       const presented = current.revision.snapshot.presentedMedia;
+      // The save step asks the same question of the same media; answer it from here so the
+      // placement chooser draws the cut's frame without a second round trip.
+      const seedCurrentCut = (media: CurrentCut) =>
+        queryClient.setQueryData(
+          projectQueryKeys.currentCut(projectId, presented),
+          currentCutOf(media),
+        );
       if (JSON.stringify(presented) === JSON.stringify(sourceReference)) {
         // Reopening streams media this session has never read; prove it is actually there, so an
         // unreachable source fails here as a Project problem rather than as a playback mystery.
         await assertMediaReachable(sourceResponse.source, signal);
         presentAccepted(sourceResponse, signal);
+        seedCurrentCut(sourceResponse.source);
         return;
       }
       const working = await getProjectWorkingMedia(projectId, signal);
@@ -277,8 +286,15 @@ export const useProjectSourceController = (
       await assertMediaReachable(working.media, signal);
       signal.throwIfAborted();
       presentOnStage(remoteArtifactInput(working.media));
+      seedCurrentCut(working.media);
     },
-    [current.revision.snapshot.presentedMedia, presentAccepted, presentOnStage, projectId],
+    [
+      current.revision.snapshot.presentedMedia,
+      presentAccepted,
+      presentOnStage,
+      projectId,
+      queryClient,
+    ],
   );
 
   useEffect(() => {

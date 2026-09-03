@@ -366,11 +366,15 @@ Both actions are disabled when archived, busy, `readyMedia === null`, or the pro
 
 **A settled save frees the next round.** The post-save revision `saveProjectOutput` appends clears
 the creative configuration it was produced from — `selectedCharacter`, `selectedOutfit`,
-`selectedVoice`, `visualTreatment`, the applied prompt and `localEdit` — keeping only the operator's
-own `userIntent`, the live-capture metadata and the chosen placement. The exact configuration that
-made the Version stays immutable on the producing revision and on the Version itself, so nothing is
-lost; it simply stops pre-filling the next round, which is what made a Character Swap Project
-unable to move to Virtual Try-On. `useProjectCreativeSessionAdapter` frees the live visual tool once
+`selectedVoice`, `visualTreatment` and the applied prompt — keeping the operator's own
+`userIntent`, the live-capture metadata, the chosen placement and `localEdit`. The exact
+configuration that made the Version stays immutable on the producing revision and on the Version
+itself, so nothing is lost; it simply stops pre-filling the next round, which is what made a
+Character Swap Project unable to move to Virtual Try-On. `localEdit` is kept because it is not a
+treatment but the record of the edit that made the working media, and the working media carries
+forward unchanged: a second save of the same cut is still an `editor` output, the editor still
+shows the applied baseline, and the placement chooser still knows where the burned-in subtitles
+sit. `useProjectCreativeSessionAdapter` frees the live visual tool once
 for that one revision, rather than whenever the snapshot carries no treatment — a tool chosen after
 a save is not checkpointed until progress is saved, so an unsaved choice looks the same and must not
 be swept away.

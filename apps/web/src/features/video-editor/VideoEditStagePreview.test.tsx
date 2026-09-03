@@ -1,15 +1,20 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createDefaultVideoEditSpec, type VideoEditSpec } from '@studio/domain';
+import { createDefaultVideoEditSpec, type SubtitleCue, type VideoEditSpec } from '@studio/domain';
 import { StudioDesignProvider } from '../../ui';
 import { VideoEditStagePreview } from './VideoEditStagePreview';
 
-const shader = vi.hoisted(() => ({
-  createVideoEditFrameRenderer: vi.fn(() => ({ render: vi.fn(), dispose: vi.fn() })),
-}));
+const shader = vi.hoisted(() => {
+  const renderer = {
+    render: vi.fn<(source: TexImageSource, spec: VideoEditSpec) => void>(),
+    setOverlay: vi.fn<(overlay: TexImageSource | null) => void>(),
+    dispose: vi.fn<() => void>(),
+  };
+  return { renderer, createVideoEditFrameRenderer: vi.fn(() => renderer) };
+});
 
 vi.mock('./videoEditShader', () => ({
   createVideoEditFrameRenderer: shader.createVideoEditFrameRenderer,
@@ -17,8 +22,37 @@ vi.mock('./videoEditShader', () => ({
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   shader.createVideoEditFrameRenderer.mockClear();
+  shader.renderer.render.mockClear();
+  shader.renderer.setOverlay.mockClear();
+  shader.renderer.dispose.mockClear();
 });
+
+/** jsdom has no 2D canvas; this one records the lines each rasterization drew, per clear. */
+const scriptedOverlayContext = () => {
+  const drawn: string[][] = [];
+  const context = {
+    font: '',
+    textAlign: '',
+    textBaseline: '',
+    fillStyle: '',
+    clearRect: () => {
+      drawn.push([]);
+    },
+    measureText: (text: string) => ({ width: text.length * 10 }),
+    beginPath: () => undefined,
+    roundRect: () => undefined,
+    fill: () => undefined,
+    fillText: (text: string) => {
+      drawn.at(-1)!.push(text);
+    },
+  };
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
+    context as unknown as CanvasRenderingContext2D,
+  );
+  return drawn;
+};
 
 const PreviewHarness = ({
   showingBefore = false,
@@ -33,6 +67,7 @@ const PreviewHarness = ({
     preset: 'freeform' as const,
     rectangle: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
   },
+  subtitles,
 }: {
   showingBefore?: boolean;
   splitComparison?: boolean;
@@ -43,12 +78,18 @@ const PreviewHarness = ({
   onCropCommit: () => void;
   onPlayheadChange?: (playheadMs: number) => void;
   initialCrop?: VideoEditSpec['crop'];
+  /** A fresh array on every render forces the paused-video redraw the preview offers. */
+  subtitles?: readonly SubtitleCue[];
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [spec, setSpec] = useState<VideoEditSpec>({
     ...createDefaultVideoEditSpec(10_000),
     crop: initialCrop,
   });
+  const effectiveSpec = useMemo(
+    () => (subtitles ? { ...spec, subtitles } : spec),
+    [spec, subtitles],
+  );
   return (
     <StudioDesignProvider>
       <video ref={videoRef} data-testid="source-video">
@@ -57,7 +98,7 @@ const PreviewHarness = ({
       <VideoEditStagePreview
         videoRef={videoRef}
         contract={{
-          spec,
+          spec: effectiveSpec,
           sourceWidth: 1_280,
           sourceHeight: 720,
           activeTool,
@@ -240,6 +281,48 @@ describe('VideoEditStagePreview', () => {
     expect(onApplySpec).toHaveBeenCalledWith(expect.objectContaining({ rotation: 90 }));
     expect(screen.getByLabelText('On-frame rotation controls')).toBeVisible();
     expect(screen.getByTestId('source-video')).toBe(video);
+  });
+
+  it('composites the subtitles covering the playhead, re-rasterizing only when the set changes', () => {
+    vi.spyOn(HTMLMediaElement.prototype, 'readyState', 'get').mockReturnValue(
+      HTMLMediaElement.HAVE_CURRENT_DATA,
+    );
+    const callbacks = { onCropStart: vi.fn(), onCropChange: vi.fn(), onCropCommit: vi.fn() };
+    const cue = (id: string, text: string, startMs: number, endMs: number): SubtitleCue => ({
+      id,
+      text,
+      startMs,
+      endMs,
+      placement: 'bottom',
+    });
+    const cues = [cue('a', 'Hello', 0, 2_000), cue('b', 'World', 1_500, 3_000)];
+    const drawn = scriptedOverlayContext();
+
+    const view = render(<PreviewHarness {...callbacks} activeTool="rotate" subtitles={cues} />);
+    const video = screen.getByTestId<HTMLVideoElement>('source-video');
+    // The first draw happens at mount, with the playhead at zero.
+    expect(drawn).toEqual([['Hello']]);
+    expect(shader.renderer.setOverlay).toHaveBeenLastCalledWith(expect.any(HTMLCanvasElement));
+    expect(shader.renderer.render).toHaveBeenCalled();
+
+    video.currentTime = 1.7;
+    view.rerender(<PreviewHarness {...callbacks} activeTool="rotate" subtitles={[...cues]} />);
+    // Both cues are on screen; the later one stacks above the earlier, so it is drawn first.
+    expect(drawn).toEqual([['Hello'], ['World', 'Hello']]);
+
+    // The same set on the next draw is not rasterized again.
+    view.rerender(<PreviewHarness {...callbacks} activeTool="rotate" subtitles={[...cues]} />);
+    expect(drawn).toEqual([['Hello'], ['World', 'Hello']]);
+
+    video.currentTime = 3.5;
+    view.rerender(<PreviewHarness {...callbacks} activeTool="rotate" subtitles={[...cues]} />);
+    expect(drawn).toEqual([['Hello'], ['World', 'Hello']]);
+    expect(shader.renderer.setOverlay).toHaveBeenLastCalledWith(null);
+    // Every overlay upload reused the one canvas.
+    const overlays = shader.renderer.setOverlay.mock.calls
+      .map(([overlay]) => overlay)
+      .filter((overlay) => overlay !== null);
+    expect(new Set(overlays).size).toBe(1);
   });
 
   it('keeps playback looped within the trim bounds while the external timeline owns transport', () => {

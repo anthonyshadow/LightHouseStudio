@@ -469,22 +469,19 @@ export const createEmptyProjectSnapshot = (nowValue: string): ProjectSnapshot =>
 /**
  * The creative configuration a Project starts a round of work from.
  *
- * A saved output ends the round it was configured for: the exact character, outfit, voice, prompt
- * and cut that produced it are immutable on the producing revision and on the retained Version, so
+ * A saved output ends the round it was configured for: the exact character, outfit, voice and
+ * prompt that produced it are immutable on the producing revision and on the retained Version, so
  * carrying them onto the post-save revision only pre-fills the next round with settings the
- * operator has to clear before choosing a different treatment. Live capture metadata and the export
- * placement are not part of that configuration and are left alone.
+ * operator has to clear before choosing a different treatment. `localEdit` is not a treatment: it
+ * records the edit that made the working media, and the working media carries forward unchanged —
+ * so it stays, and a second save of the same cut still knows the cut is an edit and what it burned
+ * in. Live capture metadata and the export placement are left alone for the same reason.
  */
 const clearedProjectCreativeConfiguration = (
   snapshot: ProjectSnapshot,
 ): Pick<
   ProjectSnapshot,
-  | 'selectedCharacter'
-  | 'selectedOutfit'
-  | 'selectedVoice'
-  | 'visualTreatment'
-  | 'creativeIntent'
-  | 'localEdit'
+  'selectedCharacter' | 'selectedOutfit' | 'selectedVoice' | 'visualTreatment' | 'creativeIntent'
 > => ({
   selectedCharacter: null,
   selectedOutfit: null,
@@ -500,7 +497,6 @@ const clearedProjectCreativeConfiguration = (
     referenceAssetId: null,
     resourceRevision: null,
   },
-  localEdit: null,
 });
 
 const materialSnapshot = (snapshot: ProjectSnapshot) => ({

@@ -40,6 +40,7 @@ const editSpec = {
     shadows: 0,
   },
   filter: 'warm' as const,
+  subtitles: [],
 };
 
 const current = (adopted = false): ProjectCurrentResponse => ({

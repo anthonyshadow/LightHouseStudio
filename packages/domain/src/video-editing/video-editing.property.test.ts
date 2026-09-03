@@ -4,7 +4,13 @@ import { expect } from 'vitest';
 import {
   createDefaultVideoEditSpec,
   getVideoEditOutputGeometry,
+  normalizeSubtitleCues,
   normalizeVideoEditSpec,
+  outputSubtitleCues,
+  SUBTITLE_CUE_LIMIT,
+  SUBTITLE_CUE_MAX_LINES,
+  SUBTITLE_CUE_MINIMUM_DURATION_MS,
+  SUBTITLE_CUE_TEXT_MAX_LENGTH,
   VIDEO_EDIT_MINIMUM_TRIM_MS,
 } from '.';
 
@@ -13,6 +19,40 @@ const sourceGeometry = fc.record({
   width: fc.integer({ min: 1, max: 7_680 }),
   height: fc.integer({ min: 1, max: 7_680 }),
   durationMs: fc.integer({ min: 1, max: 3_600_000 }),
+});
+const cueInput = fc.record({
+  id: fc.uuid(),
+  text: fc.string({ maxLength: 260 }),
+  startMs: finiteInput,
+  endMs: finiteInput,
+  placement: fc.constantFrom('top' as const, 'middle' as const, 'bottom' as const),
+});
+
+it.prop([sourceGeometry, fc.array(cueInput, { maxLength: 230 })], {
+  seed: 0x53554254,
+  numRuns: 100,
+})('normalizes arbitrary cue lists into a sorted, bounded, idempotent form', (source, cues) => {
+  const normalized = normalizeSubtitleCues(cues, source);
+  const durationMs = Math.max(SUBTITLE_CUE_MINIMUM_DURATION_MS, source.durationMs);
+
+  expect(normalizeSubtitleCues(normalized, source)).toEqual(normalized);
+  expect(normalized.length).toBeLessThanOrEqual(SUBTITLE_CUE_LIMIT);
+  for (const [index, cue] of normalized.entries()) {
+    expect(cue.startMs).toBeGreaterThanOrEqual(0);
+    expect(cue.endMs).toBeLessThanOrEqual(durationMs);
+    expect(cue.endMs - cue.startMs).toBeGreaterThanOrEqual(SUBTITLE_CUE_MINIMUM_DURATION_MS - 1e-6);
+    expect(cue.text.length).toBeLessThanOrEqual(SUBTITLE_CUE_TEXT_MAX_LENGTH);
+    expect(cue.text.split('\n').length).toBeLessThanOrEqual(SUBTITLE_CUE_MAX_LINES);
+    const previous = normalized[index - 1];
+    if (previous) expect(previous.startMs).toBeLessThanOrEqual(cue.startMs);
+  }
+
+  const trim = { startMs: 0, endMs: durationMs };
+  for (const cue of outputSubtitleCues({ trim, subtitles: normalized })) {
+    expect(cue.startMs).toBeGreaterThanOrEqual(0);
+    expect(cue.endMs).toBeLessThanOrEqual(durationMs);
+    expect(cue.endMs).toBeGreaterThan(cue.startMs);
+  }
 });
 
 it.prop(

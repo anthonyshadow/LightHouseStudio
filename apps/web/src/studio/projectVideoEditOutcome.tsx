@@ -12,25 +12,36 @@ import { StatusNotice } from '../ui';
  */
 export const projectVideoEditOutcome = (
   appliedProjectEdit: VideoEditSpec | null,
-): VideoEditOutcome => ({
-  commitLabel: 'Render preview',
-  errorTitle: 'Render preview not ready',
-  readyTitle: 'Ready to render locally',
-  readyDescription: 'Rendering creates a temporary Project preview. Discard requires confirmation.',
-  notices: (
-    <>
-      <StatusNotice tone="neutral" title="Temporary Render preview" role="status">
-        Rendering saves nothing yet. Keep the preview to make it the current cut; your original
-        video stays unchanged.
-      </StatusNotice>
-      {appliedProjectEdit ? (
-        <StatusNotice tone="neutral" title="Applied Project edit" role="status">
-          The current cut already includes the saved edit from{' '}
-          {Math.round(appliedProjectEdit.trim.startMs)}–{Math.round(appliedProjectEdit.trim.endMs)}{' '}
-          ms, {appliedProjectEdit.crop.preset} crop, and {appliedProjectEdit.filter} filter. New
-          controls start from that render, so the earlier edit is not applied twice.
+): VideoEditOutcome => {
+  const burnedIn = appliedProjectEdit?.subtitles.length ?? 0;
+  return {
+    commitLabel: 'Render preview',
+    errorTitle: 'Render preview not ready',
+    readyTitle: 'Ready to render locally',
+    readyDescription:
+      'Rendering creates a temporary Project preview. Discard requires confirmation.',
+    notices: (
+      <>
+        <StatusNotice tone="neutral" title="Temporary Render preview" role="status">
+          Rendering saves nothing yet. Keep the preview to make it the current cut; your original
+          video stays unchanged.
         </StatusNotice>
-      ) : null}
-    </>
-  ),
-});
+        {appliedProjectEdit ? (
+          <StatusNotice tone="neutral" title="Applied Project edit" role="status">
+            The current cut already includes the saved edit from{' '}
+            {Math.round(appliedProjectEdit.trim.startMs)}–
+            {Math.round(appliedProjectEdit.trim.endMs)} ms, {appliedProjectEdit.crop.preset} crop,
+            and {appliedProjectEdit.filter} filter
+            {burnedIn > 0
+              ? `, with ${burnedIn === 1 ? 'one subtitle' : `${burnedIn} subtitles`} burned in`
+              : ''}
+            . New controls start from that render, so the earlier edit is not applied twice.
+            {burnedIn > 0
+              ? ' Burned-in subtitles are pixels now: to change them, edit again from a cut that does not carry them.'
+              : ''}
+          </StatusNotice>
+        ) : null}
+      </>
+    ),
+  };
+};

@@ -6,7 +6,7 @@ import {
 } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { renderVideoEdit, videoEditRenderingSupported } from '../video-editor/renderVideoEdit';
-import { videoEditPreviewSupported } from '../video-editor/videoEditShader';
+import { videoEditPreviewSupported } from '../video-editor/videoEditSupport';
 
 /**
  * The same capability gate the local editor applies, because this is the same render path.

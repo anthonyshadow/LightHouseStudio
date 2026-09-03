@@ -1,10 +1,15 @@
 import { useTheme } from '@emotion/react';
+import { moveSubtitleCue, type SubtitleCue } from '@studio/domain';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { AppIcon, Button } from '../../ui';
+import { seekEditorVideo, selectSubtitleCue } from './seekEditorVideo';
 import type { VideoEditSession } from './useVideoEditSession';
-import { formatVideoEditTimelineTime } from './types';
+import { formatVideoEditTimelineTime, subtitleCueLabel } from './types';
 import {
+  SUBTITLE_ROW_HEIGHT,
   playheadStyles,
+  subtitleCueStyles,
+  subtitleLaneStyles,
   timelineBodyStyles,
   timelineHintStyles,
   timelineLabelsStyles,
@@ -22,6 +27,28 @@ const clamp = (value: number, minimum: number, maximum: number) =>
 
 type TrimEdge = 'in' | 'out';
 
+type CueDrag = Readonly<{ id: string; clientX: number; startMs: number }>;
+
+/**
+ * The lane row each cue takes: the first row whose last cue ended before this one starts — the
+ * interval colouring every timeline uses — so overlapping cues sit one above another.
+ */
+const subtitleLaneRows = (
+  cues: readonly SubtitleCue[],
+): Readonly<{ rows: readonly number[]; rowCount: number }> => {
+  const rowEnds: number[] = [];
+  const rows = cues.map((cue) => {
+    const row = rowEnds.findIndex((end) => end <= cue.startMs);
+    if (row === -1) {
+      rowEnds.push(cue.endMs);
+      return rowEnds.length - 1;
+    }
+    rowEnds[row] = cue.endMs;
+    return row;
+  });
+  return { rows, rowCount: rowEnds.length };
+};
+
 export type VideoEditTimelineProps = Readonly<{
   session: VideoEditSession;
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -29,8 +56,11 @@ export type VideoEditTimelineProps = Readonly<{
 
 export const VideoEditTimeline = ({ session, videoRef }: VideoEditTimelineProps) => {
   const theme = useTheme();
+  // One styled object for every cue block; only the inline geometry differs between them.
+  const cueStyles = subtitleCueStyles(theme);
   const trackRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef<TrimEdge | null>(null);
+  const cueDragRef = useRef<CueDrag | null>(null);
   const [playing, setPlaying] = useState(false);
   const durationMs = session.source?.metadata.durationMs ?? 0;
   const playheadMs = clamp(session.playheadMs, 0, durationMs);
@@ -38,6 +68,9 @@ export const VideoEditTimeline = ({ session, videoRef }: VideoEditTimelineProps)
   const startPercent = percent(session.draft.trim.startMs);
   const endPercent = percent(session.draft.trim.endMs);
   const playheadPercent = percent(playheadMs);
+  const cues = session.draft.subtitles;
+  const showLane = cues.length > 0 || session.activeTool === 'subtitles';
+  const { rows, rowCount } = subtitleLaneRows(cues);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -55,12 +88,7 @@ export const VideoEditTimeline = ({ session, videoRef }: VideoEditTimelineProps)
   }, [videoRef]);
 
   const seek = useCallback(
-    (nextMs: number) => {
-      const bounded = clamp(nextMs, 0, durationMs);
-      const video = videoRef.current;
-      if (video) video.currentTime = bounded / 1_000;
-      session.setPlayheadMs(bounded);
-    },
+    (nextMs: number) => seekEditorVideo(videoRef, session, nextMs, durationMs),
     [durationMs, session, videoRef],
   );
 
@@ -112,6 +140,34 @@ export const VideoEditTimeline = ({ session, videoRef }: VideoEditTimelineProps)
     session.beginTransaction();
     const current = edge === 'in' ? session.draft.trim.startMs : session.draft.trim.endMs;
     updateTrim(edge, current + direction * (event.shiftKey ? 10 : 1) * FRAME_DURATION_MS);
+  };
+
+  /** Moves a whole cue, keeping its length; the lane never retimes an edge. */
+  const moveCue = (cue: SubtitleCue, startMs: number) => {
+    const moved = moveSubtitleCue(cue, startMs, { durationMs });
+    session.previewSpec({
+      ...session.draft,
+      subtitles: session.draft.subtitles.map((entry) => (entry.id === cue.id ? moved : entry)),
+    });
+  };
+
+  const finishCueDrag = () => {
+    if (!cueDragRef.current) return;
+    cueDragRef.current = null;
+    session.commitTransaction();
+  };
+
+  const handleCueKey = (cue: SubtitleCue, event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault();
+      session.removeSubtitleCue(cue.id);
+      return;
+    }
+    const direction = event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0;
+    if (!direction) return;
+    event.preventDefault();
+    session.beginTransaction();
+    moveCue(cue, cue.startMs + direction * (event.shiftKey ? 10 : 1) * FRAME_DURATION_MS);
   };
 
   if (!session.source) return null;
@@ -196,8 +252,61 @@ export const VideoEditTimeline = ({ session, videoRef }: VideoEditTimelineProps)
               );
             })}
           </div>
+          {showLane ? (
+            <div
+              css={subtitleLaneStyles(theme, rowCount)}
+              role="group"
+              aria-label="Subtitles on the timeline"
+            >
+              {cues.map((cue, index) => (
+                <button
+                  key={cue.id}
+                  type="button"
+                  css={cueStyles}
+                  // Geometry inline: it changes per cue and per drag, and the styled part does not.
+                  style={{
+                    insetInlineStart: `${percent(cue.startMs)}%`,
+                    width: `max(1.25rem, ${percent(cue.endMs) - percent(cue.startMs)}%)`,
+                    insetBlockStart: `calc(0.125rem + ${rows[index]} * ${SUBTITLE_ROW_HEIGHT})`,
+                  }}
+                  data-row={rows[index]}
+                  aria-label={`Subtitle ${index + 1}: ${subtitleCueLabel(cue)}, ${formatVideoEditTimelineTime(cue.startMs)} to ${formatVideoEditTimelineTime(cue.endMs)}`}
+                  aria-pressed={cue.id === session.selectedSubtitleId}
+                  onClick={() => selectSubtitleCue(videoRef, session, cue, durationMs)}
+                  onPointerDown={(event) => {
+                    cueDragRef.current = {
+                      id: cue.id,
+                      clientX: event.clientX,
+                      startMs: cue.startMs,
+                    };
+                    session.beginTransaction();
+                    event.currentTarget.setPointerCapture?.(event.pointerId);
+                  }}
+                  onPointerMove={(event) => {
+                    const drag = cueDragRef.current;
+                    const bounds = trackRef.current?.getBoundingClientRect();
+                    if (drag?.id !== cue.id || !bounds?.width) return;
+                    const deltaMs = ((event.clientX - drag.clientX) / bounds.width) * durationMs;
+                    moveCue(cue, drag.startMs + deltaMs);
+                  }}
+                  onPointerUp={finishCueDrag}
+                  onPointerCancel={finishCueDrag}
+                  onKeyDown={(event) => handleCueKey(cue, event)}
+                  onKeyUp={(event) => {
+                    if (event.key.startsWith('Arrow')) session.commitTransaction();
+                  }}
+                  onBlur={session.commitTransaction}
+                >
+                  <span>{subtitleCueLabel(cue)}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
           <p css={timelineHintStyles(theme)}>
             Click to seek. Use Left or Right Arrow to step one frame; hold Shift for ten frames.
+            {showLane
+              ? ' A subtitle on the lane moves with Left or Right Arrow, and Delete removes it.'
+              : ''}
           </p>
         </div>
       </div>

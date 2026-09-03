@@ -49,7 +49,8 @@ list and the tree agree.
 | desktop                    | `07-existing-video/result.png`                       |
 | compact/tablet/mobile      | `07-existing-video/validated-setup.png`              |
 | mobile/small-mobile        | `08-video-editor/crop-dirty.png`                     |
-| desktop/compact/tablet     | `08-video-editor/lighting-dirty.png`                 |
+| desktop/tablet             | `08-video-editor/lighting-dirty.png`                 |
+| compact                    | `08-video-editor/subtitles-dirty.png`                |
 | desktop/small-mobile       | `09-projects/output-destination.png`                 |
 | All viewports              | `09-projects/output-review.png`                      |
 | desktop                    | `10-campaigns/workspace.png`                         |

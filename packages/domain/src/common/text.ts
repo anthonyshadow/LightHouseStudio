@@ -39,6 +39,12 @@ export const normalizeTags = (values: readonly string[]): string[] => {
 
 export const containsMeaningfulText = (value: string): boolean => /[\p{L}\p{N}]/u.test(value);
 
+/** "a", "a and b", "a, b and c" — the one way a list is read out in a sentence. */
+export const sentenceList = (parts: readonly string[]): string =>
+  parts.length <= 1
+    ? (parts[0] ?? '')
+    : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+
 /**
  * How a typed list search term matches a title or name: case-insensitive containment.
  *

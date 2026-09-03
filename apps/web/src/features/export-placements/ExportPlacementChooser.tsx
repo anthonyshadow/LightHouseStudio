@@ -4,6 +4,7 @@ import {
   projectExportSpecificationForAspect,
   type ProjectExportAspect,
   type ProjectExportSpecification,
+  type SubtitleCuePlacement,
   type VideoEditSourceGeometry,
 } from '@studio/domain';
 import { SegmentedControl, StatusNotice } from '../../ui';
@@ -171,6 +172,11 @@ export interface ExportPlacementChooserProps {
    * and describes the result without claiming a crop amount it cannot know.
    */
   readonly source?: VideoEditSourceGeometry | null;
+  /**
+   * Where the cut's burned-in subtitles sit, when it has any, so the description can say whether
+   * a shape keeps them. Absent or empty, nothing is said about subtitles.
+   */
+  readonly subtitlePlacements?: readonly SubtitleCuePlacement[];
   readonly disabled?: boolean;
   /** Set when the browser cannot render, which forces and explains the original shape. */
   readonly unavailable?: boolean;
@@ -184,6 +190,7 @@ export interface ExportPlacementChooserProps {
 export const ExportPlacementChooser = ({
   value,
   source = null,
+  subtitlePlacements = [],
   disabled = false,
   unavailable = false,
   onChange,
@@ -228,7 +235,7 @@ export const ExportPlacementChooser = ({
             {exportPlacementLabel(active.aspect)}
           </strong>
           <p css={{ margin: 0, fontSize: '0.85rem', textAlign: 'center' }}>
-            {exportPlacementDescription(active, source)}
+            {exportPlacementDescription(active, source, subtitlePlacements)}
           </p>
         </div>
       ) : null}

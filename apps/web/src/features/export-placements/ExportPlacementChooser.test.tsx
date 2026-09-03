@@ -71,6 +71,34 @@ describe('ExportPlacementChooser', () => {
     ).toBeVisible();
   });
 
+  it('says whether the cut’s subtitles survive the shape, exactly once the frame is known', () => {
+    const portrait = { width: 1_080, height: 1_920, durationMs: 12_000 } as const;
+    chooser({
+      value: projectExportSpecificationForAspect('1:1'),
+      source: portrait,
+      subtitlePlacements: ['bottom'],
+    });
+    expect(screen.getByText(/Its subtitles stay inside the kept picture\./u)).toBeVisible();
+    cleanup();
+
+    chooser({
+      value: projectExportSpecificationForAspect('16:9'),
+      source: portrait,
+      subtitlePlacements: ['top', 'bottom'],
+    });
+    expect(
+      screen.getByText(/Subtitles at the top and bottom would be cut by this shape\./u),
+    ).toBeVisible();
+    cleanup();
+
+    chooser({ value: projectExportSpecificationForAspect('1:1'), subtitlePlacements: ['bottom'] });
+    expect(screen.getByText(/This cut carries subtitles/u)).toBeVisible();
+    cleanup();
+
+    chooser({ value: projectExportSpecificationForAspect('1:1'), source: portrait });
+    expect(screen.queryByText(/subtitles/iu)).not.toBeInTheDocument();
+  });
+
   it('describes the result without inventing a crop amount when the frame is unmeasured', () => {
     chooser({ value: projectExportSpecificationForAspect('1:1') });
 

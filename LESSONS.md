@@ -29,6 +29,19 @@ Keep only lessons that should constrain future work.
 - Credentials, raw provider messages, URLs, payloads, and causes never enter browser state or
   client-visible errors.
 
+## A barrel keeps what it cannot prove pure
+
+- A module re-exported through a barrel (`export *`) is tree-shaken to its used bindings only if
+  the bundler can prove it has no side effects. A top-level `Object.freeze(...)` is not provably
+  pure, and neither is a top-level constant computed from imported bindings
+  (`const RATIO = LINES * LAYOUT.fontHeightRatio`), so the whole module lands in every closure that
+  imports the barrel — the shell included — whether or not anything there uses it. Write shared
+  constants `as const` literals, derive from imports inside a function, and measure the shell
+  closure after adding a domain module, not the diff.
+- Split domain rules by who pays for them: what every reader of a snapshot needs composes into the
+  normalizer; what only a lazy surface draws or times lives in a module the normalizer never
+  imports.
+
 ## Recover persisted data narrowly
 
 - Treat browser JSON and IndexedDB records as untrusted, versioned input.

@@ -1,3 +1,5 @@
+import { clamp } from './clamp';
+import { finalizeSubtitleCues, normalizeSubtitleCues, subtitleCuesEqual } from './subtitles';
 import type {
   NormalizedVideoCrop,
   VideoEditAdjustments,
@@ -12,24 +14,21 @@ export const VIDEO_EDIT_MINIMUM_TRIM_MS = 100;
 export const VIDEO_EDIT_HISTORY_LIMIT = 50;
 export const VIDEO_EDIT_PROVIDER_ASPECT_TOLERANCE = 0.01;
 
-export const DEFAULT_VIDEO_EDIT_ADJUSTMENTS: VideoEditAdjustments = Object.freeze({
+/*
+ * Plain objects, not `Object.freeze`: the types are already read-only, and a top-level freeze is a
+ * call the bundler cannot prove pure, which keeps this whole module in every closure that imports
+ * the domain barrel — the shell's included — whether or not anything there edits video.
+ */
+export const DEFAULT_VIDEO_EDIT_ADJUSTMENTS: VideoEditAdjustments = {
   brightness: 0,
   contrast: 0,
   saturation: 0,
   temperature: 0,
   highlights: 0,
   shadows: 0,
-});
+};
 
-export const FULL_VIDEO_CROP: NormalizedVideoCrop = Object.freeze({
-  x: 0,
-  y: 0,
-  width: 1,
-  height: 1,
-});
-
-const clamp = (value: number, minimum: number, maximum: number): number =>
-  Math.min(maximum, Math.max(minimum, Number.isFinite(value) ? value : minimum));
+export const FULL_VIDEO_CROP: NormalizedVideoCrop = { x: 0, y: 0, width: 1, height: 1 };
 
 const evenDimension = (value: number): number => Math.max(2, Math.floor(value / 2) * 2);
 
@@ -41,6 +40,7 @@ export const createDefaultVideoEditSpec = (durationMs: number): VideoEditSpec =>
   flipVertical: false,
   adjustments: DEFAULT_VIDEO_EDIT_ADJUSTMENTS,
   filter: 'original',
+  subtitles: [],
 });
 
 export const clampVideoEditAdjustment = (value: number): number =>
@@ -125,8 +125,19 @@ export const normalizeVideoEditSpec = (
     trim: { startMs, endMs },
     crop: { ...spec.crop, rectangle: cropRectangle },
     adjustments,
+    subtitles: normalizeSubtitleCues(spec.subtitles, source),
   };
 };
+
+/**
+ * The spec as it is rendered and recorded: the draft with its subtitles finalized. The draft may
+ * hold an empty cue the operator has not typed into yet; what renders and what the server accepts
+ * may not.
+ */
+export const finalizeVideoEditSpec = (spec: VideoEditSpec): VideoEditSpec => ({
+  ...spec,
+  subtitles: finalizeSubtitleCues(spec.subtitles),
+});
 
 export const rotatedVideoEditDimensions = (
   sourceWidth: number,
@@ -190,4 +201,5 @@ export const videoEditSpecsEqual = (left: VideoEditSpec, right: VideoEditSpec): 
     (key) =>
       left.adjustments[key as keyof VideoEditAdjustments] ===
       right.adjustments[key as keyof VideoEditAdjustments],
-  );
+  ) &&
+  subtitleCuesEqual(left.subtitles, right.subtitles);

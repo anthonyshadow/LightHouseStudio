@@ -102,7 +102,20 @@ describe('ProjectWorkingMediaService local authority', () => {
     const current = await createProjectWithSource();
     const getCurrent = vi.spyOn(projects, 'getCurrent');
     const operationKey = randomUUID();
-    const localEdit = createDefaultVideoEditSpec(renderInspection.durationMs);
+    // A cue rides inside the same field, so this proves it is stored, hydrated and replayed
+    // without a migration of its own.
+    const localEdit = {
+      ...createDefaultVideoEditSpec(renderInspection.durationMs),
+      subtitles: [
+        {
+          id: '6f0c1d2e-3a4b-4c5d-8e6f-7a8b9c0d1e2f',
+          text: 'Burned in',
+          startMs: 200,
+          endMs: 900,
+          placement: 'bottom' as const,
+        },
+      ],
+    };
     const input = {
       ownerUserId,
       projectId: current.project.id,

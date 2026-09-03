@@ -29,6 +29,15 @@ export const projectQueryKeys = {
   /** The most recent Version this Project has saved, whether or not it is still its current cut. */
   latestOutput: (projectId: string) => ['projects', 'latest-output', projectId] as const,
   /**
+   * Where the cut a revision presents lives and what frame it has. Keyed by the presented media
+   * reference, which is the cut's identity: a placement autosave is a new revision pointing at the
+   * same bytes, and must not re-read them.
+   */
+  currentCut: (
+    projectId: string,
+    cut: ProjectCurrentResponse['revision']['snapshot']['presentedMedia'],
+  ) => ['projects', 'current-cut', projectId, cut] as const,
+  /**
    * The prefix every history panel query hangs off, so one invalidation reaches revisions,
    * outputs and processing attempts together — which is exactly how adoption uses it.
    */

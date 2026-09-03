@@ -25,6 +25,7 @@ export const H264_DEPENDENT_SCENARIO_IDS = new Set<VisualScenarioId>([
   'upload-result',
   'video-edit-lighting-dirty',
   'video-edit-crop-dirty',
+  'video-edit-subtitles-dirty',
   'project-output-review',
   'project-output-destination',
 ]);
@@ -131,6 +132,10 @@ export const FOCUSED_VISUAL_SCENARIOS = {
     id: 'video-edit-crop-dirty',
     baseline: '08-video-editor/crop-dirty.png',
   },
+  videoEditSubtitlesDirty: {
+    id: 'video-edit-subtitles-dirty',
+    baseline: '08-video-editor/subtitles-dirty.png',
+  },
   campaignsWorkspace: {
     id: 'campaigns-workspace',
     baseline: '10-campaigns/workspace.png',
@@ -218,12 +223,17 @@ export const VISUAL_CASE_MATRIX = [
   })),
   { viewport: compactViewport, scenario: FOCUSED_VISUAL_SCENARIOS.uploadProcessing },
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.uploadResult },
+  // The editor at every viewport, one tool each so the budget holds: the phones show the crop
+  // frame, the compact desktop shows the subtitle lane and its burned-in preview, the rest the
+  // lighting inspector.
   ...VISUAL_VIEWPORTS.map((viewport) => ({
     viewport,
     scenario:
       viewport.id === 'mobile' || viewport.id === 'small-mobile'
         ? FOCUSED_VISUAL_SCENARIOS.videoEditCropDirty
-        : FOCUSED_VISUAL_SCENARIOS.videoEditLightingDirty,
+        : viewport.id === 'compact'
+          ? FOCUSED_VISUAL_SCENARIOS.videoEditSubtitlesDirty
+          : FOCUSED_VISUAL_SCENARIOS.videoEditLightingDirty,
   })),
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.campaignsWorkspace },
   ...VISUAL_VIEWPORTS.map((viewport) => ({

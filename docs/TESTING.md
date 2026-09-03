@@ -234,7 +234,9 @@ The retained suite protects:
   upload → edit → save journey is tagged `@cross-browser`, which **moves** it from Chromium to
   WebKit and mobile WebKit rather than adding to it — that is what the tag does here, and it is the
   trade taken deliberately: the on-device render is the path whose engine differences matter most,
-  and Chromium still exercises local rendering through the Project render-adoption journey.
+  and Chromium still exercises local rendering through the Project render-adoption journey and
+  through the untagged subtitle journey in `existing-video.spec.ts`, which adds a cue on the
+  timeline and renders it.
 
 ## Local MVP acceptance boundary
 

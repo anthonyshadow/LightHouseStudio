@@ -1415,6 +1415,15 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
       const localEdit = {
         ...createDefaultVideoEditSpec(12_000),
         filter: 'warm' as const,
+        subtitles: [
+          {
+            id: '4d1f6a2b-9c3e-4f5a-8b7d-2e1c0a9f8b7e',
+            text: 'Round trip',
+            startMs: 1_000,
+            endMs: 2_000,
+            placement: 'top' as const,
+          },
+        ],
       };
       const adopted = adoptProjectWorkingMedia(
         accepted.value,

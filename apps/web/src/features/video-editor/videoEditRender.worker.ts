@@ -1,10 +1,12 @@
 import {
   FULL_VIDEO_CROP,
   getVideoEditOutputGeometry,
+  outputSubtitleCues,
   rotatedVideoEditDimensions,
   type VideoEditSpec,
 } from '@studio/domain';
 import { ensureAacEncodingSupport } from '../../adapters/media-processing/aacEncoding';
+import { createSubtitleOverlaySync } from './subtitleRasterizer';
 import type { VideoEditWorkerRequest, VideoEditWorkerResponse } from './types';
 import {
   VIDEO_EDIT_OUTPUT_BLOCK_BYTES,
@@ -107,6 +109,15 @@ const render = async (
       crop: { preset: 'original', rectangle: FULL_VIDEO_CROP },
       rotation: 0,
     };
+    // Subtitles in output time: mediabunny re-bases every sample to the trimmed output before it
+    // reaches `process`, so the cues are re-based the same way, once, here.
+    const subtitles = outputSubtitleCues(request.spec);
+    const overlayFrame = { x: 0, y: 0, width: outputSize.width, height: outputSize.height };
+    const frameRenderer = renderer;
+    const syncOverlay = createSubtitleOverlaySync(
+      () => new OffscreenCanvas(outputSize.width, outputSize.height),
+      (overlay) => frameRenderer.setOverlay(overlay),
+    );
     const writable = new WritableStream({
       write(chunk: { data: Uint8Array; position: number }) {
         writer.write(chunk.data, chunk.position);
@@ -139,6 +150,7 @@ const render = async (
         height: outputSize.height,
         fit: 'fill',
         process: (sample) => {
+          syncOverlay(subtitles, sample.timestamp * 1_000, overlayFrame);
           const frame = sample.toVideoFrame();
           try {
             renderer?.render(frame, processedSpec);

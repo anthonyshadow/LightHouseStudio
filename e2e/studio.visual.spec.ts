@@ -642,6 +642,20 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       );
     },
   },
+  'video-edit-subtitles-dirty': {
+    id: 'video-edit-subtitles-dirty',
+    setup: async (page) => {
+      const { dialog } = await selectVisualVideo(page, true);
+      await dialog.getByRole('button', { name: 'Edit video' }).click();
+      await page.getByRole('button', { name: 'Subtitles', exact: true }).click();
+      await page.getByRole('button', { name: 'Add subtitle at playhead' }).click();
+      await page.getByRole('textbox', { name: 'Text' }).fill('Bring the whole story into frame');
+      await expect(page.getByRole('heading', { name: 'Subtitles settings' })).toBeVisible();
+      await expect(
+        page.getByRole('group', { name: 'Subtitles on the timeline' }).getByRole('button'),
+      ).toHaveAccessibleName(/Bring the whole story into frame/u);
+    },
+  },
   'campaigns-workspace': {
     id: 'campaigns-workspace',
     setup: async (page) => {

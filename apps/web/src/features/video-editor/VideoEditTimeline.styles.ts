@@ -160,6 +160,45 @@ export const playheadStyles = (theme: Theme, percent: number): CSSObject => ({
   },
 });
 
+/** One lane row; the cue blocks position themselves inline in multiples of this. */
+export const SUBTITLE_ROW_HEIGHT = '1.4rem';
+
+/** A lane under the trim track, one row per set of overlapping cues, so simultaneous text stacks. */
+export const subtitleLaneStyles = (theme: Theme, rows: number): CSSObject => ({
+  position: 'relative',
+  height: `calc(${Math.max(1, rows)} * ${SUBTITLE_ROW_HEIGHT} + 0.25rem)`,
+  marginBlockStart: theme.space.xs,
+  border: `1px dashed ${theme.colors.divider}`,
+  borderRadius: theme.radii.small,
+  background: theme.colors.surface,
+});
+
+/** Every cue block's look; its place on the lane is inline, because it changes with every drag. */
+export const subtitleCueStyles = (theme: Theme): CSSObject => ({
+  position: 'absolute',
+  height: '1.25rem',
+  padding: `0 ${theme.space.xs}`,
+  border: `1px solid ${theme.colors.accent}`,
+  borderRadius: theme.radii.small,
+  color: theme.colors.accentStrong,
+  background: theme.colors.accentSoft,
+  fontSize: '0.7rem',
+  fontWeight: 700,
+  lineHeight: 1,
+  textAlign: 'left',
+  overflow: 'hidden',
+  cursor: 'grab',
+  touchAction: 'none',
+  '& > span': {
+    display: 'block',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  '&[aria-pressed="true"]': { color: theme.colors.onAccent, background: theme.colors.accent },
+  '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '2px' },
+});
+
 export const timelineHintStyles = (theme: Theme): CSSObject => ({
   margin: `${theme.space.xxs} 0 0`,
   color: theme.colors.textFaint,

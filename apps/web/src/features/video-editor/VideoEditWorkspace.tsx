@@ -11,9 +11,11 @@ import {
 } from '@studio/domain';
 import { useEffect, useState, type ReactNode, type RefObject } from 'react';
 import { AppIcon, type AppIconName, Button, StatusNotice } from '../../ui';
+import { EditRange } from './EditRange';
+import { SubtitleToolSettings } from './SubtitleToolSettings';
 import type { VideoEditSession } from './useVideoEditSession';
 import { VideoEditTimeline } from './VideoEditTimeline';
-import { formatVideoEditTime, isVideoEditBusy, type VideoEditTool } from './types';
+import { isVideoEditBusy, type VideoEditTool } from './types';
 import {
   editSettingsBodyStyles,
   editSettingsStyles,
@@ -25,7 +27,6 @@ import {
   historyCompareStyles,
   inspectorIntroStyles,
   optionGridStyles,
-  rangeFieldStyles,
   renderProgressStyles,
   videoEditStageLayoutStyles,
 } from './VideoEditWorkspace.styles';
@@ -66,6 +67,13 @@ const TOOLS: readonly Readonly<{
     icon: 'filters',
     description: 'Choose a look rendered through the same local color pipeline as the preview.',
   },
+  {
+    id: 'subtitles',
+    label: 'Subtitles',
+    icon: 'subtitles',
+    description:
+      'Timed text burned into the render, laid out exactly as the preview shows it. Subtitles may overlap; they stack.',
+  },
 ];
 
 const ADJUSTMENT_LABELS: Record<keyof VideoEditAdjustments, string> = {
@@ -95,64 +103,23 @@ const FILTER_LABELS: Record<VideoEditFilter, string> = {
   fade: 'Fade',
 };
 
-type EditRangeProps = Readonly<{
-  label: string;
-  value: number;
-  minimum: number;
-  maximum: number;
-  step?: number;
-  onStart: () => void;
-  onChange: (value: number) => void;
-  onCommit: () => void;
-}>;
-
-const EditRange = ({
-  label,
-  value,
-  minimum,
-  maximum,
-  step = 1,
-  onStart,
-  onChange,
-  onCommit,
-}: EditRangeProps) => {
-  const theme = useTheme();
-  return (
-    <label css={rangeFieldStyles(theme)}>
-      <span>
-        <span>{label}</span>
-        <output>{step >= 10 ? formatVideoEditTime(value) : value}</output>
-      </span>
-      <input
-        type="range"
-        min={minimum}
-        max={maximum}
-        step={step}
-        value={value}
-        aria-label={label}
-        onPointerDown={onStart}
-        onKeyDown={(event) => {
-          if (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End') {
-            onStart();
-          }
-        }}
-        onChange={(event) => onChange(Number(event.currentTarget.value))}
-        onPointerUp={onCommit}
-        onPointerCancel={onCommit}
-        onKeyUp={onCommit}
-        onBlur={onCommit}
-      />
-    </label>
-  );
-};
-
 const updateTrim = (session: VideoEditSession, key: 'startMs' | 'endMs', value: number) =>
   session.previewSpec({ ...session.draft, trim: { ...session.draft.trim, [key]: value } });
 
-const ToolSettings = ({ session }: { session: VideoEditSession }) => {
+const ToolSettings = ({
+  session,
+  videoRef,
+}: {
+  session: VideoEditSession;
+  videoRef: RefObject<HTMLVideoElement | null>;
+}) => {
   const theme = useTheme();
   const source = session.source;
   if (!source) return null;
+
+  if (session.activeTool === 'subtitles') {
+    return <SubtitleToolSettings session={session} videoRef={videoRef} />;
+  }
 
   if (session.activeTool === 'trim') {
     return (
@@ -382,8 +349,10 @@ export const VideoEditWorkspace = ({
 
   useEffect(() => {
     if (!inspectorExpanded) return;
+    // Escape inside a text field belongs to the field — a subtitle being typed must not fold the
+    // inspector away from under the cursor.
     const collapseOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setInspectorExpanded(false);
+      if (event.key === 'Escape' && !isTextEntry(event.target)) setInspectorExpanded(false);
     };
     window.addEventListener('keydown', collapseOnEscape);
     return () => window.removeEventListener('keydown', collapseOnEscape);
@@ -576,7 +545,7 @@ export const VideoEditWorkspace = ({
               Reset
             </Button>
           </div>
-          <ToolSettings session={session} />
+          <ToolSettings session={session} videoRef={videoRef} />
           {!session.supported ? (
             <StatusNotice tone="warning" title="Local editor unavailable">
               This browser cannot provide the required WebGL, WebCodecs, worker, and OffscreenCanvas

@@ -781,7 +781,18 @@ describe('Project lifecycle routes', () => {
     });
     expect(source.statusCode).toBe(201);
     const operationKey = randomUUID();
-    const localEdit = createDefaultVideoEditSpec(1_000);
+    const localEdit = {
+      ...createDefaultVideoEditSpec(1_000),
+      subtitles: [
+        {
+          id: '2a7c4e1d-0b3f-4d8a-9e6c-5f1b2a3c4d5e',
+          text: 'Over the wire',
+          startMs: 100,
+          endMs: 600,
+          placement: 'middle' as const,
+        },
+      ],
+    };
     const upload = () =>
       app.inject({
         method: 'POST',

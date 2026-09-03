@@ -115,10 +115,13 @@ _Status: not implemented (single-clip editing only)._
 
 ### Subtitle track / subtitle cue
 
-Timed text over the composition: each cue has text, a start and end time, and a placement that may
-change per time range. Whether subtitles are burned into exports, carried as sidecar tracks, or
-both is an open decision (D4).
-_Status: not implemented anywhere (no schema, contract, or UI)._
+Timed text over the composition: each cue has text, a start and end time, and a placement region
+(top, middle or bottom). Subtitles are burned into the pixels wherever the edit is rendered (D4,
+decided 2026-09-02); a sidecar track is a later option if accessibility or localization demand it.
+_Status: implemented for the single clip. `SubtitleCue` is a field of `VideoEditSpec`
+(`subtitles`), persisted inside the revision's `localEdit`, rasterized and composited by the
+editor's shared renderer in the preview and the export worker. Cues may overlap and stack. A
+composition-level track that applies across clips remains target work (D3)._
 
 ### Working media / current cut
 
