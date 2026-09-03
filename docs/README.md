@@ -17,6 +17,7 @@ every relative link and anchor in `README.md`, `AGENTS.md`, and everything under
 | Open product/architecture decisions                               | [`DECISIONS_REQUIRED.md`](DECISIONS_REQUIRED.md)                                   |
 | Documentation dispositions and the deletion manifest              | [`audits/DOCUMENTATION_PRUNING_REPORT.md`](audits/DOCUMENTATION_PRUNING_REPORT.md) |
 | Phase 1 acceptance record (criteria, gates, evidence, follow-ups) | [`audits/PHASE_1_VERIFICATION.md`](audits/PHASE_1_VERIFICATION.md)                 |
+| Slice 2.1 subtitles audit and approved plan (prompt 13 → 14)      | [`roadmap/SLICE_2.1_SUBTITLES_PLAN.md`](roadmap/SLICE_2.1_SUBTITLES_PLAN.md)       |
 | Engineering instructions for agents                               | [`../CLAUDE.md`](../CLAUDE.md) (routing) → [`../AGENTS.md`](../AGENTS.md) (policy) |
 
 Product direction (vision, roadmap) never overrides implementation authority: the code, the
