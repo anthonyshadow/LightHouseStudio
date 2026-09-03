@@ -280,9 +280,25 @@ export const registerSavedVideoRoutes = (
     },
   );
 
-  // Version-scoped like its PUT sibling and the content route beside it. A poster belongs to one
-  // Version — a Project's output keeps its own after the Video moves on — so naming the Version in
-  // the path is what lets a surface ask for the frame it is actually showing.
+  /*
+   * Two poster routes, the same pair the content routes already offer, because surfaces ask two
+   * different questions. A Project card wants "a poster for this video" and carries the Version it
+   * points at only as a cache key, so it must keep resolving after the Video moves on. A Project's
+   * saved output wants "the poster of this exact Version" and would be lying if it showed a later
+   * one. Collapsing them onto the version-scoped route made every Project card whose reference had
+   * no poster of its own report a failed load instead of an absent one.
+   */
+  app.get('/api/videos/:videoId/thumbnail', async (request, reply) => {
+    const params = savedVideoParamsSchema.safeParse(request.params);
+    if (!params.success) throw new AppError(400, 'validation_error', 'Choose a valid saved video.');
+    const thumbnail = await service.thumbnail(ownerUserIdForRequest(request), params.data.videoId);
+    void reply.header('Content-Length', thumbnail.asset.manifest.sizeBytes);
+    void reply.header('Content-Type', thumbnail.mimeType);
+    void reply.header('Content-Disposition', 'inline');
+    void reply.header('X-Content-Type-Options', 'nosniff');
+    return reply.send(thumbnail.asset.createReadStream());
+  });
+
   app.get('/api/videos/:videoId/versions/:versionId/thumbnail', async (request, reply) => {
     const params = savedVideoVersionParamsSchema.safeParse(request.params);
     if (!params.success) {

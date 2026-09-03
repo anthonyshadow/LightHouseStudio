@@ -16,7 +16,7 @@ The runtime:
 - publishes only that converted MP4 and never exposes the raw recorder Blob for download;
 - publishes a valid converted main video when the sidecar fails or times out;
 - commits a healthy visual or voiced replacement before revoking the superseded URL; and
-- releases artifact URLs only on downstream invalidation, Release, Discard, or unmount.
+- releases artifact URLs only on downstream invalidation, Close, Discard, or unmount.
 
 Local video editing pins the displayed artifact and sidecar while a dedicated worker renders. The
 worker writes MediaBunny `StreamTarget` offsets into sparse 4 MiB blocks rather than repeatedly
@@ -75,7 +75,7 @@ For every supported device/browser target at the canonical viewports:
    Freeform output, then verify external H.264/AAC playback and expected provider compatibility.
    Measure before
    submission, after the visual result, during ordered visual-plus-voice replacement, after local
-   Voice, after ElevenLabs Voice when qualified, and after Release/Discard.
+   Voice, after ElevenLabs Voice when qualified, and after Close/Discard.
 4. Record recorder-settlement, H.264/AAC transcode, and Voice-processing durations plus whether the
    browser evicted, terminated, or materially degraded the tab.
 5. Play every downloaded result outside Studio and verify duration, video, and audio.

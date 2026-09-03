@@ -101,7 +101,6 @@ const entryStyles = (theme: Theme): CSSObject => ({
   '& button': { minHeight: '3rem' },
 });
 
-/** What the product does, said as outcomes and without a noun the visitor has not met yet. */
 /**
  * What the product is, in the order it happens: bring footage in, work on it, deliver it — and
  * only then, optionally, AI. The order is the claim. Leading with restyling described a tool that

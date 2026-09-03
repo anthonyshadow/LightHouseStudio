@@ -122,7 +122,7 @@ The accepted local upload subset is intentionally narrow by container, codec, an
 - duration greater than zero and no more than 300 seconds.
 
 Uploads may use any playable aspect ratio. Studio recommends 16:9 or 9:16 for the best experience
-and offers **Adjust video** after upload to crop to either ratio. Only sources within 1% of 16:9 or
+and offers **Edit video** after upload to crop to either ratio. Only sources within 1% of 16:9 or
 9:16 are eligible for Character Swap/VTO; other ratios retain local adjustment, Voice, and
 Download without provider contact.
 
@@ -146,7 +146,7 @@ authenticated content loading, Download, and Delete do not depend on thumbnail s
 ## Local video editor
 
 The editor checks WebGL preview and dedicated-worker WebCodecs/OffscreenCanvas export support only
-when **Adjust video** opens. Choosing an export placement at save time re-uses exactly that check
+when **Edit video** opens. Choosing an export placement at save time re-uses exactly that check
 (`exportPlacementRenderSupported`), so a browser that cannot run the editor cannot re-frame a video
 either; the save dialog says so and keeps the video's original shape. It does not use the limited-availability 2D canvas `filter` property.
 Preview and export share a WebGL shader for flips, curated filters, and manual lighting controls;

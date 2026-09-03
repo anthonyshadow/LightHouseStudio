@@ -47,6 +47,14 @@ export interface ExistingVideoToolCardsProps {
   readonly workflow: ExistingVideoWorkflow;
   readonly activeTool: ExistingVideoToolId | null;
   readonly locked: boolean;
+  /**
+   * Why Voice cannot be used here, when something other than the source's audio decides it.
+   *
+   * A Project is the case: it can hold a voice selection but has no way to start one, so leaving
+   * the card live let an operator configure a voice and only meet the refusal at Start — the dead
+   * end this was meant to close, one step later.
+   */
+  readonly voiceUnavailableReason?: string | undefined;
   readonly characterSwapAvailable?: boolean;
   readonly virtualTryOnAvailable?: boolean;
   readonly onSelect: (tool: ExistingVideoToolId, trigger: HTMLButtonElement) => void;
@@ -56,6 +64,7 @@ export const ExistingVideoToolCards = ({
   workflow,
   activeTool,
   locked,
+  voiceUnavailableReason,
   characterSwapAvailable = true,
   virtualTryOnAvailable = true,
   onSelect,
@@ -68,8 +77,14 @@ export const ExistingVideoToolCards = ({
   const selectedVisualTool = viewedVisualTool ?? configuredVisualTool;
 
   const renderTool = (tool: ToolDefinition) => {
+    // Stated once so the card's disabled state and its sentence can never disagree about why.
+    const voiceBlockedReason =
+      tool.id !== 'voice'
+        ? null
+        : (voiceUnavailableReason ??
+          (workflow.voiceAvailable ? null : 'The source has no usable audio.'));
     const unavailable =
-      (tool.id === 'voice' && !workflow.voiceAvailable) ||
+      (tool.id === 'voice' && voiceBlockedReason !== null) ||
       (tool.id === 'character' &&
         (!characterSwapAvailable || !workflow.visualProviderCompatibility.compatible)) ||
       (tool.id === 'vton' &&
@@ -83,7 +98,7 @@ export const ExistingVideoToolCards = ({
     const statusId = `existing-video-tool-${tool.id}-status`;
     const description = unavailable
       ? tool.id === 'voice'
-        ? 'The source has no usable audio.'
+        ? voiceBlockedReason
         : !workflow.visualProviderCompatibility.compatible
           ? (workflow.visualProviderCompatibility.reason ?? VIDEO_TRANSFORM_INCOMPATIBLE_REASON)
           : VIDEO_TRANSFORM_UNAVAILABLE_REASON

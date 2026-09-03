@@ -3,6 +3,7 @@ import type { VoiceSummary } from '@studio/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { lazy, Suspense, useState, type RefObject } from 'react';
 import { attachProjectAssetAndSync } from '../features/projects/useProjectAssetsController';
+import { PROJECT_VOICE_UNAVAILABLE_REASON } from '../features/projects/projectVoiceCopy';
 import { Button, OverlayPanel, StatusNotice } from '../ui';
 
 const VoiceLibrary = lazy(() =>
@@ -153,6 +154,20 @@ const OpenAssetCreationLauncher = ({
 
       {view === 'voice' ? (
         <div css={{ display: 'grid', gap: theme.space.sm }}>
+          {/*
+           * This view is only ever reached with a Project in hand, and a Project cannot run a
+           * Voice yet. Saying so here is the difference between attaching one knowingly and
+           * discovering at Start that it was never going to apply — the same sentence the Project's
+           * own Assets picker leads with, because it is the same promise.
+           */}
+          <StatusNotice
+            role="status"
+            tone="neutral"
+            title="Voice does not run inside a Project yet"
+          >
+            {PROJECT_VOICE_UNAVAILABLE_REASON} Attaching one here records that this Project is meant
+            to use it; it changes nothing about the video.
+          </StatusNotice>
           {voiceError ? (
             <StatusNotice tone="danger" role="alert" title="Project attachment failed">
               <p>{voiceError}</p>

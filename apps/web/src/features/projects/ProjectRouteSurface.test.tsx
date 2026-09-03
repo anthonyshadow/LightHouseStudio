@@ -23,7 +23,7 @@ import { mockApiServer } from '../../test/msw/server';
 import {
   PROJECT_VOICE_MEMBERSHIP_NOTE,
   PROJECT_VOICE_UNAVAILABLE_REASON,
-} from './projectProcessingPresentation';
+} from './projectVoiceCopy';
 import { ProjectRouteSurface, type ProjectRouteSurfaceProps } from './ProjectRouteSurface';
 import type { ProjectStageSourceRuntime } from './useProjectSourceController';
 import type { ProjectSessionPort } from './useProjectSession';
@@ -382,7 +382,7 @@ describe('Project route surface', () => {
     const posters = document.querySelectorAll<HTMLImageElement>('[data-project-poster] img');
     expect(posters).toHaveLength(1);
     expect(posters[0]!.getAttribute('src')).toBe(
-      `/api/videos/${preview.savedVideoId}/versions/${preview.videoVersionId}/thumbnail`,
+      `/api/videos/${preview.savedVideoId}/thumbnail?v=${preview.videoVersionId}`,
     );
     expect(posters[0]!.getAttribute('loading')).toBe('lazy');
     // Deliberate, not broken: the archived row says it has nothing to show yet.

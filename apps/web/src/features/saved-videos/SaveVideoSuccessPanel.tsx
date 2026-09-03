@@ -42,7 +42,7 @@ export const SaveVideoSuccessPanel = ({
       open={video !== null}
       onClose={onDismiss}
       title={versionAdded ? 'Version added to Assets' : 'Saved to Assets'}
-      description="Your video is retained in Assets. Studio still holds the temporary take until you release it."
+      description="Your video is retained in Assets. Studio still holds the temporary take until you close it."
       placement="bottom"
       size="standard"
       initialFocus="heading"

@@ -6,7 +6,8 @@ documentation. Where behaviour could not be established from code, it is marked 
 
 - Source of truth: `apps/web/src`, `apps/api/src`, `packages/domain/src`, `packages/contracts/src`,
   `apps/api/drizzle/*.sql`.
-- Audit date: 2026-08-16, against the working tree at commit `0237235`.
+- Audit date: 2026-08-16, against the working tree at commit `0237235`, with corrections applied
+  through 2026-09-02 as Phase 1 changed the behaviour these documents describe.
 - Nothing in this directory describes planned or aspirational behaviour. Planned work belongs in
   [`../roadmap/PRODUCT_ROADMAP.md`](../roadmap/PRODUCT_ROADMAP.md).
 
@@ -45,7 +46,7 @@ optional organizer for Projects.
 | **Saved Video**                 | Account  | API (`saved_videos` / `video_versions` or local JSON)                  | Append-only Versions; the only durable video library           |
 | **Project**                     | Account  | API (`projects`, `project_revisions`, …)                               | One immutable source, a revision chain, working media, outputs |
 | **Campaign**                    | Account  | API (`campaigns`)                                                      | Name + optional brief only; never owns Project working state   |
-| **Character / Outfit / Prompt** | Account  | `/api/creative-library` normalized Neon rows; IndexedDB cache/fallback | Account creative library                                       |
+| **Character / Outfit / Prompt** | Account  | `/api/creative-library` normalized Neon rows; IndexedDB cache/fallback | The account's Library                                          |
 | **Saved Voice**                 | Account  | API (`saved_voices`)                                                   | Provider-catalog voices retained for the account               |
 | **Reference image**             | Account  | API (`reference_image_assets` + byte store)                            | Generated or uploaded character/outfit imagery                 |
 | **Video job**                   | Account  | API (`processing_jobs`)                                                | A provider Character Swap / Virtual Try-On operation           |

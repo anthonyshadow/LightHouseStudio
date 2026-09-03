@@ -33,7 +33,7 @@ future features current.
 | Log in, restore, and log out safely                      | [Login and local session](14-login-and-session.md)                             |
 | Orient, create, browse Assets, and navigate responsively | [Dashboard, Assets, and navigation](19-dashboard-and-navigation.md)            |
 | Save, browse, version, and reload local videos           | [Videos in Assets](15-saved-video-gallery.md)                                  |
-| Reuse saved characters, outfits, voices, and videos      | [Creative Assets](16-saved-creative-libraries.md)                              |
+| Reuse saved characters, outfits, voices, and videos      | [Libraries](16-saved-creative-libraries.md)                                    |
 | Create, resume, process, and save one Project video      | [Project lifecycle and immutable source](17-empty-project-lifecycle.md)        |
 | Organize Projects with optional Campaigns                | [Campaign organization](18-campaign-organization.md)                           |
 

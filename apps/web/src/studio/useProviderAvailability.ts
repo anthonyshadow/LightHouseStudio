@@ -57,9 +57,12 @@ const unavailableProviders: ProviderAvailability = {
  */
 export const PROVIDER_AVAILABILITY_RETRY_DELAYS_MS = [250, 750, 1_500] as const;
 
+/** The one key this read lives under, so an invalidator never has to guess the literal. */
+export const providerAvailabilityQueryKey = ['provider-availability'] as const;
+
 export const useProviderAvailability = () => {
   const query = useQuery({
-    queryKey: ['provider-availability'],
+    queryKey: providerAvailabilityQueryKey,
     queryFn: ({ signal }) => fetchProviderAvailability(signal),
     // This authenticated configuration read is local, non-billable, and safe to retry while the
     // concurrently started API becomes ready. Provider-facing reads retain the global no-retry default.

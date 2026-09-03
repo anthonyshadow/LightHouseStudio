@@ -47,9 +47,11 @@ React, HTTP, persistence, and provider payloads. No new package; extend `project
 
 ### Frontend boundaries (`apps/web`)
 
-**Current:** feature-sliced; the Studio runtime is the app's gravitational center — the manual
-editor is reachable only through the "Use existing video" overlay, and Project surfaces launch
-editing through Studio plumbing (`StudioApp.tsx`, 938 lines, ~25 hooks; a 44-prop overlay hub).
+**Current:** feature-sliced; the Studio runtime is the app's gravitational center — Project
+surfaces launch editing through Studio plumbing (`StudioApp.tsx`, ~25 hooks; a 44-prop overlay
+hub). Slice 1.1 removed the wizard detour: a Project opens the editor directly on its current cut,
+and a fresh standalone take is adopted rather than dropped, so the "Use existing video" overlay is
+now the chooser for a standalone source rather than the only door to the editor.
 **Direction:**
 
 1. The **Project workspace becomes the flagship editing surface**: the manual editor (and later the

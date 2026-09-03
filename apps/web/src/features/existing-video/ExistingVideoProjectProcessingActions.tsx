@@ -3,11 +3,11 @@ import { useState, type RefObject } from 'react';
 import { Button, ConfirmationDialog } from '../../ui';
 import {
   PROJECT_PROCESSING_AUTHORITY_PENDING_REASON,
-  PROJECT_VOICE_UNAVAILABLE_REASON,
   projectProcessingCapabilityLabel,
   projectProcessingDetail,
   projectProcessingTitle,
 } from '../projects/projectProcessingPresentation';
+import { PROJECT_VOICE_UNAVAILABLE_REASON } from '../projects/projectVoiceCopy';
 import type { ProjectProcessingController } from '../projects/useProjectProcessingController';
 import {
   actionBarStyles,

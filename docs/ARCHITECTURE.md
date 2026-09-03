@@ -715,7 +715,7 @@ deleting any staged durable bytes.
 
 The browser treats TanStack Query/controller state only as an owner-scoped cache. Active and
 archived summary lists are separately bounded and never request snapshots or media. Project detail
-requests current summary/revision only. Quick Start sends `Untitled Project` with an app-owned UUID
+requests current summary/revision only. Creating without a name sends `Untitled Project` with an app-owned UUID
 operation key; exact response-loss replay resolves through the durable server receipt. Metadata
 mutations use Project-version CAS. A stale rename retains the proposed title until explicit reload
 and retry or discard. Empty detail does not hydrate media or start camera/provider work. Accepted

@@ -26,6 +26,7 @@ import { ExistingVideoPhaseIndicator } from './ExistingVideoPhaseIndicator';
 import type { ExistingVideoSavedRecipe } from './ExistingVideoRecipeChooser';
 import { ExistingVideoSourceCard } from './ExistingVideoSourceCard';
 import { ExistingVideoToolCards } from './ExistingVideoToolCards';
+import { PROJECT_VOICE_UNAVAILABLE_REASON } from '../projects/projectVoiceCopy';
 import {
   existingVideoEditorPhase,
   toolForStep,
@@ -377,6 +378,9 @@ export const ExistingVideoPanel = ({
                 workflow={workflow}
                 activeTool={activeTool}
                 locked={structureLocked}
+                {...(projectProcessing === undefined
+                  ? {}
+                  : { voiceUnavailableReason: PROJECT_VOICE_UNAVAILABLE_REASON })}
                 characterSwapAvailable={visualCapabilities.characterSwap.available}
                 virtualTryOnAvailable={visualCapabilities.virtualTryOn.available}
                 onSelect={selectTool}

@@ -180,7 +180,9 @@ deep link.
    re-download the source bytes into a hidden stage.
 5. **Saved output.** `ProjectDeliverableSection` asks `GET /api/projects/{id}/outputs?pageSize=1`
    and shows the most recent saved Version — poster, title, Version ordinal, placement, pixel size,
-   date, **Download** and **View in Assets**. It deliberately does not read the snapshot's
+   date, **Download** and **View in Assets**. The poster is asked for only when the output item's
+   `thumbnailAvailable` says the Version has one; otherwise the tile reads "No preview yet" rather
+   than reporting a load that never happened. It deliberately does not read the snapshot's
    `lastSuccessfulOutput`: the domain clears that reference on any material change, so a returning
    operator's snapshot names nothing while the output history still does. When the newest output is
    no longer the Project's current cut (`isCurrentForProject === false`) the card says the Project
@@ -351,6 +353,13 @@ the app:
    carries a placement, Download re-frames the retained Version locally through the video editor's
    worker and hands over a file named for the placement, with the original shape still one link
    away; a browser that cannot render says so and serves the original.
+9. The save then gives the new Version a poster, the way a Studio save already does — decoded from
+   the stored Version over byte ranges, started after the success is reported and never blocking
+   it. The signal is deliberately one nothing aborts: **View in Assets** sits in this very notice
+   and leaving would otherwise cancel the work on its way to the screen the poster is for. A
+   failure changes nothing an operator can see; the Videos library's **Generate preview** remains
+   the repair. Without this a Project's own deliverable was the one saved video that never had a
+   poster, because the API mints the Version with none.
 
 Both actions are disabled when archived, busy, `readyMedia === null`, or the project is
 `processing`.
