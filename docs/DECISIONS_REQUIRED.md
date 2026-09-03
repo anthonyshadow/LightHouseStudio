@@ -52,14 +52,16 @@ machinery in the codebase; normalized tables add joins and parity work with no q
 single-operator scale. Revisit (b) only if per-cue querying or collaboration arrives.
 **Blocks:** Phase 3. **Decide by:** Phase 3 design.
 
-## D4 — Subtitles: burn-in, sidecar, or both?
+## D4 — Subtitles: burn-in, sidecar, or both? — **decided**
 
 **Question:** Are subtitles rendered into exported pixels (burn-in via the existing WebGL/canvas
 render path), carried as a separate track/file (WebVTT sidecar on saved videos + player support),
 or both?
-**Recommendation:** burn-in first (marketing/social video plays muted with burned captions; it
-needs no new asset kind or player work), sidecar later if accessibility/localization demand it.
-**Blocks:** Phase 2 subtitles slice. **Decide by:** before that slice starts.
+**Decision (2026-09-02):** burn-in first — cues are part of the single-clip edit specification and
+are rendered into the pixels wherever that specification is rendered, through the shader the
+preview and the worker already share; no new asset kind, no player work. A sidecar remains a later
+option if accessibility or localization demand it. Design and consequences in the
+[slice 2.1 plan](roadmap/SLICE_2.1_SUBTITLES_PLAN.md); implemented in slice 2.1.
 
 ## D5 — Does the standalone Videos path survive?
 
