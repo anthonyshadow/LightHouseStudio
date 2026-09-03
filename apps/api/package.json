@@ -19,14 +19,14 @@
     "env:prepare": "bun run --no-env-file scripts/prepare-environment-files.ts"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1111.0",
-    "@aws-sdk/lib-storage": "3.1111.0",
-    "@aws-sdk/s3-request-presigner": "3.1111.0",
-    "@decartai/sdk": "0.1.20",
+    "@aws-sdk/client-s3": "3.1121.0",
+    "@aws-sdk/lib-storage": "3.1121.0",
+    "@aws-sdk/s3-request-presigner": "3.1121.0",
+    "@decartai/sdk": "0.1.22",
     "@elysia/opentelemetry": "1.4.12",
     "@elysiajs/static": "1.4.10",
-    "@fastify/busboy": "3.2.1",
-    "@node-rs/argon2": "2.1.0",
+    "@fastify/busboy": "3.2.2",
+    "@node-rs/argon2": "2.2.0",
     "@neondatabase/serverless": "1.1.0",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/exporter-trace-otlp-proto": "0.221.0",
@@ -35,17 +35,17 @@
     "@studio/domain": "workspace:*",
     "dotenv": "17.4.2",
     "drizzle-orm": "0.45.2",
-    "elysia": "1.4.29",
-    "jose": "6.2.8",
-    "mediabunny": "1.54.0",
-    "openai": "7.4.0",
+    "elysia": "1.4.30",
+    "jose": "6.2.10",
+    "mediabunny": "1.55.4",
+    "openai": "7.8.0",
     "pg": "8.23.0",
     "pino": "10.3.1",
-    "sharp": "0.35.3",
-    "zod": "4.4.3"
+    "sharp": "0.35.4",
+    "zod": "4.5.4"
   },
   "devDependencies": {
-    "@types/pg": "8.21.0",
+    "@types/pg": "8.23.1",
     "drizzle-kit": "0.31.10"
   }
 }
