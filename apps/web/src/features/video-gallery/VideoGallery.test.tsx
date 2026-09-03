@@ -153,7 +153,7 @@ describe('VideoGallery', () => {
     expect(document.querySelector('video')).toBeNull();
     expect(
       screen.getByRole('button', { name: 'Preview Morning take' }).querySelector('img'),
-    ).toHaveAttribute('src', `/api/videos/${item.id}/thumbnail?v=${item.currentVersion.id}`);
+    ).toHaveAttribute('src', `/api/videos/${item.id}/versions/${item.currentVersion.id}/thumbnail`);
     expect(screen.getByText('0:12')).toBeInTheDocument();
     expect(screen.getAllByText('Landscape').length).toBeGreaterThan(0);
     expect(screen.getByText('Studio recording')).toBeInTheDocument();
@@ -530,7 +530,10 @@ describe('VideoGallery', () => {
     await waitFor(() =>
       expect(
         screen.getByRole('button', { name: 'Preview Morning take' }).querySelector('img'),
-      ).toHaveAttribute('src', `/api/videos/${item.id}/thumbnail?v=${item.currentVersion.id}`),
+      ).toHaveAttribute(
+        'src',
+        `/api/videos/${item.id}/versions/${item.currentVersion.id}/thumbnail`,
+      ),
     );
   });
 

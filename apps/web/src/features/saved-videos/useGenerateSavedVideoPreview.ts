@@ -1,4 +1,4 @@
-import type { SavedVideosResponse, SavedVideoSummary } from '@studio/contracts';
+import type { SavedVideoDetail, SavedVideosResponse, SavedVideoSummary } from '@studio/contracts';
 import { useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { useEffect, useRef } from 'react';
 import { apiErrorMessage } from '../../adapters/api-client/apiClient';
@@ -16,6 +16,36 @@ export type GenerateSavedVideoPreviewInput = Readonly<{
 }>;
 
 /**
+ * Generates a Version's poster and stores it, leaving the lifetime to the caller.
+ *
+ * Separate from the hook below because the two callers want opposite things from cancellation. A
+ * dialog holds itself open for the whole operation and should abandon the work if it somehow goes
+ * away; a save starts one on its way out and must let it finish, because the button beside the
+ * success notice leads to the very screen the poster is for.
+ */
+export const generateSavedVideoPreview = async (
+  { video, choice }: GenerateSavedVideoPreviewInput,
+  signal: AbortSignal,
+): Promise<SavedVideoDetail> => {
+  try {
+    const media = thumbnailChoiceNeedsVideo(choice)
+      ? ({ kind: 'url', url: savedVideoContentUrl(video.id, video.currentVersion.id) } as const)
+      : null;
+    const poster = await createThumbnailForChoice(choice, media, signal);
+    return await saveSavedVideoThumbnail(video.id, video.currentVersion.id, poster, signal);
+  } catch (error) {
+    if (signal.aborted) throw error;
+    throw new Error(
+      apiErrorMessage(
+        error,
+        'The preview could not be generated from this video. Try again, or upload an image instead.',
+      ),
+      { cause: error },
+    );
+  }
+};
+
+/**
  * Repairs a Saved Video that has no poster frame. Generation stays in the browser, and reads only
  * what the frame needs: a frame source is decoded straight from the Version's content URL, which
  * the API serves in byte ranges, and an uploaded image needs no read at all.
@@ -27,33 +57,12 @@ export const useGenerateSavedVideoPreview = () => {
   useEffect(() => () => controller.current?.abort('unmount'), []);
 
   return useMutation({
-    mutationFn: async ({ video, choice }: GenerateSavedVideoPreviewInput) => {
+    mutationFn: async (input: GenerateSavedVideoPreviewInput) => {
       controller.current?.abort('replaced');
       const active = new AbortController();
       controller.current = active;
       try {
-        const media = thumbnailChoiceNeedsVideo(choice)
-          ? ({
-              kind: 'url',
-              url: savedVideoContentUrl(video.id, video.currentVersion.id),
-            } as const)
-          : null;
-        const poster = await createThumbnailForChoice(choice, media, active.signal);
-        return await saveSavedVideoThumbnail(
-          video.id,
-          video.currentVersion.id,
-          poster,
-          active.signal,
-        );
-      } catch (error) {
-        if (active.signal.aborted) throw error;
-        throw new Error(
-          apiErrorMessage(
-            error,
-            'The preview could not be generated from this video. Try again, or upload an image instead.',
-          ),
-          { cause: error },
-        );
+        return await generateSavedVideoPreview(input, active.signal);
       } finally {
         if (controller.current === active) controller.current = null;
       }

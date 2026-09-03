@@ -686,6 +686,12 @@ export const projectOutputHistoryItemSchema = z
     version: savedVideoVersionSchema,
     referenceRevision: projectOutputReferenceRevisionSchema.nullable(),
     isCurrentForProject: z.boolean(),
+    /**
+     * Whether *this output's Version* has a stored poster frame — not the Video's current one.
+     * A surface that asks for a poster it was never given cannot tell an absence from a failure,
+     * and told the operator a load had failed when nothing had ever been stored.
+     */
+    thumbnailAvailable: z.boolean(),
     contentUrl: z.string().startsWith('/api/projects/').max(500),
   })
   .strict();

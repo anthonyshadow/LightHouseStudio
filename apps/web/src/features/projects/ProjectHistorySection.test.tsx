@@ -115,6 +115,7 @@ const output: ProjectOutputHistoryItem = {
   },
   referenceRevision: { revisionId, revisionNumber: 2, createdAt: now },
   isCurrentForProject: false,
+  thumbnailAvailable: true,
   contentUrl: `/api/projects/${projectId}/outputs/${versionId}/content`,
 };
 

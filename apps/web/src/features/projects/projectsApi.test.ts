@@ -193,6 +193,7 @@ describe('Projects API adapter', () => {
       },
       referenceRevision: null,
       isCurrentForProject: true,
+      thumbnailAvailable: true,
       contentUrl: `/api/projects/${projectId}/outputs/${videoVersionId}/content`,
     };
     const observed = captureRequests();

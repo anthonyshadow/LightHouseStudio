@@ -61,7 +61,7 @@ const alwaysRegisteredRoutes: readonly Route[] = [
   'GET /api/videos/:videoId/content',
   'GET /api/videos/:videoId/versions/:versionId/content',
   'PUT /api/videos/:videoId/versions/:versionId/thumbnail',
-  'GET /api/videos/:videoId/thumbnail',
+  'GET /api/videos/:videoId/versions/:versionId/thumbnail',
   'POST /api/reference-images/:sourceAssetId/outfit-try-ons',
   'POST /api/reference-images/import',
   'POST /api/reference-images/optimize',
