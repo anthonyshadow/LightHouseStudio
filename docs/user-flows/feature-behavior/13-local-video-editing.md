@@ -5,8 +5,11 @@ a provider, and replace the immutable source only after a validated export and e
 
 ## Journey
 
-1. Uploads may use any playable aspect ratio. In **Use existing video**, select **Edit video** for
-   the currently displayed source or latest healthy result. The side panel closes and Studio
+1. Uploads may use any playable aspect ratio. **Edit video** opens the editor from three places:
+   the Project workspace rail and its Create card open it directly on the Project's current cut,
+   with no chooser in between; in the standalone flow it is offered in **Use existing video** for
+   the currently displayed source or latest healthy result, and pressing it on a fresh finalized
+   take adopts that take rather than opening an empty chooser beside it. The side panel closes and Studio
    enters one `video-edit` workspace around the existing `MediaStage`; its `<video>` node and
    playback time remain authoritative. Source geometry, duration, size, and audio facts come from
    that displayed artifact rather than being reused from the original upload.

@@ -326,6 +326,50 @@ describe('ExistingVideoPanel', () => {
     expect(screen.getAllByText(/require a 16:9 or 9:16 source/iu)).not.toHaveLength(0);
   });
 
+  it('closes the Voice dead end inside a Project rather than deferring it to Start', () => {
+    // A Project can hold a voice selection but has no way to start one. Leaving the card live let
+    // an operator configure a voice and only meet the refusal at Start — the same dead end, later.
+    const source = new File(['video'], 'in-project.mp4', { type: 'video/mp4' });
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={workflow({
+            selection: {
+              file: source,
+              mimeType: 'video/mp4',
+              audioSidecar: { blob: new Blob(['audio']), mimeType: 'audio/mp4' },
+              audioUnavailableReason: null,
+              metadata: {
+                kind: 'uploaded',
+                mode: 'local',
+                selectedAt: '2026-08-04T12:00:00.000Z',
+                displayName: source.name,
+                container: 'mp4',
+                videoCodec: 'avc',
+                audioCodec: 'aac',
+                durationMs: 30_000,
+                width: 1_920,
+                height: 1_080,
+                sizeBytes: source.size,
+                hasAudio: true,
+              },
+            },
+            phase: 'ready',
+            voiceAvailable: true,
+          })}
+          videoProcessingAvailable
+          projectProcessing={runningProjectOperation({ active: false })}
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    const voice = screen.getByRole('button', { name: 'Voice' });
+    expect(voice).toBeDisabled();
+    // The reason travels with the card, not just the eventual Start refusal.
+    expect(voice).toHaveAccessibleDescription(/not available inside a Project yet/u);
+  });
+
   it('applies provider-neutral Character Swap capability limits independently from VTO', () => {
     const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
     const updateStep = vi.fn();

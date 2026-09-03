@@ -10,7 +10,11 @@ import type {
   WorkspaceVoiceItem,
   WorkspaceVoicePage,
 } from '../../application/types';
-import { useVoiceLibrary, type VoiceLibraryClient } from './useVoiceLibrary';
+import {
+  savedVoiceCountQueryKey,
+  useVoiceLibrary,
+  type VoiceLibraryClient,
+} from './useVoiceLibrary';
 
 const emptyWorkspacePage = (overrides: Partial<WorkspaceVoicePage> = {}): WorkspaceVoicePage => ({
   voices: [],
@@ -84,11 +88,14 @@ const queryClients: QueryClient[] = [];
 const renderVoiceLibrary = (client: VoiceLibraryClient) => {
   const queryClient = createRemoteStateQueryClient();
   queryClients.push(queryClient);
-  return renderHook(() => useVoiceLibrary(client), {
-    wrapper: ({ children }: PropsWithChildren) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    ),
-  });
+  return {
+    queryClient,
+    ...renderHook(() => useVoiceLibrary(client), {
+      wrapper: ({ children }: PropsWithChildren) => (
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      ),
+    }),
+  };
 };
 
 afterEach(async () => {
@@ -235,7 +242,10 @@ describe('useVoiceLibrary', () => {
       page: 0,
       total: 1,
     });
-    const { result } = renderVoiceLibrary(client);
+    const { result, queryClient } = renderVoiceLibrary(client);
+    // The Voices tab count lives outside the paged keys this handler rewrites in place, so only an
+    // invalidation moves it; without one the tab kept announcing the pre-add number.
+    queryClient.setQueryData(savedVoiceCountQueryKey, 3);
     await waitFor(() => expect(client.listWorkspaceVoices).toHaveBeenCalledOnce());
 
     act(() => result.current.setTab('browse'));
@@ -248,5 +258,6 @@ describe('useVoiceLibrary', () => {
     expect(result.current.voices[0]).toMatchObject({ kind: 'shared', voice: { saved: true } });
     act(() => result.current.setTab('saved'));
     await waitFor(() => expect(client.listWorkspaceVoices).toHaveBeenCalledTimes(2));
+    expect(queryClient.getQueryState(savedVoiceCountQueryKey)?.isInvalidated).toBe(true);
   });
 });

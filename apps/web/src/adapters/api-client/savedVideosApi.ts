@@ -408,10 +408,21 @@ export const readSavedVideoContent = async ({
 /**
  * The poster for one exact Version.
  *
- * The Version is a path segment rather than a query key, because it selects the frame rather than
- * merely busting a cache: a Project's saved output keeps showing its own poster after the Video has
- * moved on to a later Version. It doubles as the cache key it always was — repairing or replacing a
- * poster changes the URL, and every surface showing it refetches without tracking staleness itself.
+ * The Version is a path segment rather than a query key, because here it selects the frame rather
+ * than merely busting a cache: a Project's saved output keeps showing its own poster after the
+ * Video has moved on. Callers must know the Version has one — the route answers 404 otherwise,
+ * which a surface with no `thumbnailAvailable` to check would show as a failed load.
  */
 export const savedVideoThumbnailUrl = (videoId: string, versionId: string): string =>
   `/api/videos/${encodeURIComponent(videoId)}/versions/${encodeURIComponent(versionId)}/thumbnail`;
+
+/**
+ * The poster for a video, whichever Version currently owns one.
+ *
+ * For surfaces that show a *video* and hold a Version reference only to key the cache — a Project
+ * card pointing at the media its snapshot names. The reference may be older than the Video, and
+ * asking for that exact Version's frame would report a failed load where there is simply no poster
+ * on that Version. Repairing a poster still changes the URL, so those surfaces refetch on their own.
+ */
+export const savedVideoPosterUrl = (videoId: string, cacheKeyVersionId: string): string =>
+  `/api/videos/${encodeURIComponent(videoId)}/thumbnail?v=${encodeURIComponent(cacheKeyVersionId)}`;

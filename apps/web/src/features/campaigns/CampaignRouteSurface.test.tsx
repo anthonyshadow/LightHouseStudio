@@ -190,7 +190,7 @@ describe('Campaign route surface', () => {
     const posters = document.querySelectorAll<HTMLImageElement>('[data-project-poster] img');
     expect(posters).toHaveLength(1);
     expect(posters[0]!.getAttribute('src')).toBe(
-      `/api/videos/${preview.savedVideoId}/versions/${preview.videoVersionId}/thumbnail`,
+      `/api/videos/${preview.savedVideoId}/thumbnail?v=${preview.videoVersionId}`,
     );
     // Two Project lists on the Campaign, two reads — the rows added none.
     expect(listReads).toBe(2);

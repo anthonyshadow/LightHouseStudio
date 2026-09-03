@@ -131,6 +131,8 @@ ProjectDetail (overview)
   ├─ Project source ▸ Upload / reuse ───► /projects/{id}/workspace once accepted
   ├─ Move Project ──────────────────────► ProjectCampaignDialog
   ├─ Assets ▸ attached Video ▸ adopt ───► /projects/{id}/workspace as source or working media
+  ├─ Saved output ▸ Download ───────────► /api/projects/{id}/outputs/{versionId}/content
+  ├─ Saved output ▸ View in Assets ─────► /assets/videos?video={savedVideoId}
   └─ Assets section ▸ add video ────────► /studio/create?projectId={id}[&intent=…]
 
 ProjectDetail (workspace)
@@ -185,6 +187,7 @@ recording, finalization, render, or dirty creative state exists.
 | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | `/studio/create?intent=record`                           | Starts local capture once per history entry (keyed on `location.key`), so returning to the same URL records again — within Studio as well as after leaving it                | `useStudioRecordingLaunch.ts`                         |
 | `/studio/create?intent=upload`                           | Opens the video-upload overlay; the query string is the intent's only carrier                                                                                                | `StudioApp.tsx`                                       |
+| `/projects/{id}/workspace?task=<id>`                     | Selects that guided task; an operator's pinned task outranks the step the Project is up to, and switching tasks is not leaving                                               | `ProjectWorkspaceSurface.tsx`                         |
 | `/studio/create?projectId=…`                             | Verifies the project is not archived/deleted, else strips the param                                                                                                          | `StudioApp.tsx`                                       |
 | Saving a video while `projectId` context is verified     | Attaches the new video to the project and replaces the URL with `/projects/{id}`; the save-success panel is suppressed                                                       | `StudioApp.tsx`                                       |
 | An explicitly requested save outside a project context   | Opens `SaveVideoSuccessPanel` with Download / View in Assets / Create another                                                                                                | `StudioLifecycleDialogs.tsx`                          |

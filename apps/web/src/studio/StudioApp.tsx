@@ -16,10 +16,8 @@ import { useVideoEditSession } from '../features/video-editor/useVideoEditSessio
 import { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
 import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 import { useProjectCreativeSessionAdapter } from '../features/projects/useProjectCreativeSessionAdapter';
-import {
-  PROJECT_PROVIDER_START_BLOCKED_REASON,
-  PROJECT_VOICE_UNAVAILABLE_REASON,
-} from '../features/projects/projectProcessingPresentation';
+import { PROJECT_PROVIDER_START_BLOCKED_REASON } from '../features/projects/projectProcessingPresentation';
+import { PROJECT_VOICE_UNAVAILABLE_REASON } from '../features/projects/projectVoiceCopy';
 import type {
   ProjectCreateOperationId,
   ProjectCreateRuntime,

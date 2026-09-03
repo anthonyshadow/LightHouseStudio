@@ -231,8 +231,10 @@ The retained suite protects:
   are how a lost response, a never-settling provider or a mid-upload disconnect is injected, and
   they stay for that. They cannot prove the server honours its own contract, because each one _is_
   the contract restated; this journey is where that proof lives. The provider-free
-  upload → edit → save journey additionally runs on WebKit and mobile WebKit (`@cross-browser`),
-  because the on-device render is the one path whose engine differences matter.
+  upload → edit → save journey is tagged `@cross-browser`, which **moves** it from Chromium to
+  WebKit and mobile WebKit rather than adding to it — that is what the tag does here, and it is the
+  trade taken deliberately: the on-device render is the path whose engine differences matter most,
+  and Chromium still exercises local rendering through the Project render-adoption journey.
 
 ## Local MVP acceptance boundary
 
@@ -261,10 +263,13 @@ does not receive GitHub Environment secrets or contact Neon/R2. Manual/live chec
 
 ## Browser and visual scope
 
-Chromium runs the full functional journey set. WebKit runs one focused cross-browser media smoke.
-The touch project runs that smoke plus the dedicated control-timeout/recording-Stop case. A
-browser-specific test must be tagged in its title with `@cross-browser` or `@touch`; do not run
-every desktop journey under every engine by default.
+Chromium runs every functional journey except the tagged ones — the tag projects are exclusive, not
+additive: `chromium` carries `grepInvert: /@(cross-browser|touch)/`, so tagging a journey hands it
+to another engine instead of widening it. WebKit runs the `@cross-browser` set (a focused media
+smoke and the upload → edit → save journey); the touch project runs those plus the dedicated
+control-timeout/recording-Stop case. A browser-specific test must be tagged in its title with
+`@cross-browser` or `@touch`; do not run every desktop journey under every engine by default, and
+when tagging one, decide knowingly which engine is giving it up.
 
 The current visual matrix contains 50 cases within the 50-case review budget. It retains Local live
 and recording at all five canonical viewports, plus selected entry, idle, Character, Builder,

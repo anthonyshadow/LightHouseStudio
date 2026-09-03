@@ -6,6 +6,13 @@ the archived first-pass audit. Direction lives in the [product vision](../produc
 the path forward in the [roadmap](../roadmap/PRODUCT_ROADMAP.md); open calls in
 [Decisions required](../DECISIONS_REQUIRED.md).
 
+> **Findings here are as of 2026-08-30 and roughly twenty are now closed.** Phase 1 landed on
+> 2026-09-02 and closed §4 items 1–4 and 8–10 along with register rows 5, 7, 8 and 9, plus api-7,
+> assets-3, assets-5, DOCS-1/2/3/8/11/12/13, PCD-8, PCD-11, prod-5, prod-9, shell-1, shell-4,
+> shell-5, STOR-3, studio-1, studio-4, tci-1, tci-2 and tci-3. Read this document for evidence and
+> for what remains; read [Phase 1 verification](PHASE_1_VERIFICATION.md) for what is already done,
+> before treating any finding below as outstanding work.
+
 ## 1. Scope and method
 
 Fifteen parallel read-only auditors each examined one subsystem (shell/routing, dashboard/

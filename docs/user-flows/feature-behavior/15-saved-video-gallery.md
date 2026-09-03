@@ -24,9 +24,9 @@ Studio stage.
    offers **Download**, **View in Assets** and **Create another** for that exact Version; a Project
    video context keeps its own attach-and-return behavior instead.
    Saving is explicit, reports progress/result, and repeated submission of the same artifact is
-   idempotent. An artifact with unsaved changes shows **Discard** but not **Release**. Once that
+   idempotent. An artifact with unsaved changes shows **Discard** but not **Close**. Once that
    artifact is saved, or when an unchanged Saved Video is opened in Studio, the same control slot
-   shows **Release** but not **Discard**.
+   shows **Close without saving** but not **Discard**.
 2. **Save video** creates a titled gallery record and immutable first version. In the
    standalone workflow, **Replace Existing Video** is secondary, requires confirmation, checks the
    expected current version, and appends bytes rather than overwriting history. In a Project, one
@@ -54,8 +54,11 @@ Studio stage.
    poster rather than a centre-cropped landscape tile, and a source already inside the bound is
    never upscaled. The route re-encodes what arrives on that same bound, so the stored poster keeps
    the shape the browser produced.
-   Thumbnail generation is client-side and retried once; missing or failed generation renders a
-   deliberate `No preview yet` placeholder and never fails Save. Such a record offers an inline
+   Thumbnail generation is client-side and retried once, and never fails Save. A record with no
+   stored poster renders a deliberate `No preview yet` placeholder; one whose poster exists but
+   could not be fetched says `Preview didn't load` instead. The two are kept apart because a
+   surface that cannot tell them apart reports an absence as a failure — every surface showing a
+   poster reads `thumbnailAvailable` to choose between them. Such a record offers an inline
    **Generate preview** action that regenerates from the current Version — automatic frame, first
    frame, or an uploaded image — uploads it through the existing thumbnail endpoint, and refreshes
    the card without a page reload. A failed repair reports an actionable message with a retry and
@@ -81,7 +84,11 @@ Studio stage.
    copied. It is named for that consequence and refuses a Project that already has a source.
    Separately, **Import Saved Video** can add a non-owning Project Asset membership without
    replacing that Project's immutable source.
-8. Rename changes metadata. **Remove from Assets** confirms, tombstones only the chosen record, and
+8. Rename changes metadata under compare-and-set: the request carries the `revision` the row was
+   rendered from, and the server answers `409` when the video moved on since. The dialog then
+   fetches the winning record, re-seeds itself with the fresh token and keeps the operator's typed
+   title, so the retry compares against what is actually stored rather than resubmitting a token
+   that can never win again. **Remove from Assets** confirms, tombstones only the chosen record, and
    removes it from the visible gallery. The confirmation states what this deployment actually does
    to the file, from the `savedVideos.removalDeletesStoredMedia` capability: object storage says the
    stored file is deleted unless something still uses it, local storage says the file is not erased,

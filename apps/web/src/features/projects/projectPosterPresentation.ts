@@ -1,5 +1,5 @@
 import type { ProjectPreviewContract } from '@studio/contracts';
-import { savedVideoThumbnailUrl } from '../../adapters/api-client/savedVideosApi';
+import { savedVideoPosterUrl } from '../../adapters/api-client/savedVideosApi';
 
 /**
  * Poster URLs for a page of Projects, keyed by Project id.
@@ -20,6 +20,6 @@ export const projectPosterUrls = (
       .flatMap((page) => page.previews)
       .map((preview) => [
         preview.projectId,
-        savedVideoThumbnailUrl(preview.savedVideoId, preview.videoVersionId),
+        savedVideoPosterUrl(preview.savedVideoId, preview.videoVersionId),
       ]),
   );

@@ -41,7 +41,7 @@ approved for LAN, tunnel, proxy, or public exposure.
   upload and recorded on the Version that was saved.
 - **Make another version** derives a new Project from an existing one by reference — same source,
   same creative setup, no bytes copied, nothing charged until work starts in the copy.
-- **Assets** opens Videos, Characters, Outfits, or Voices directly in one account library switcher.
+- **Assets** opens Videos, Characters, Outfits, or Voices directly in one Library switcher.
   Counts reserve their footprint until known, and library tabs do not add Back-stack hops.
 - **Every saved video can have a preview.** One missing a thumbnail can generate it on demand, from
   a frame or a chosen image, without touching its saved Versions.
@@ -122,7 +122,7 @@ limits.
    visual-processing experience, use 16:9 or 9:16 or crop to one of those ratios with **Adjust
    video** after upload. A healthy local recording is normalized on device and becomes the editor
    source after finalization.
-4. Review the source and optionally use **Adjust video** to trim, crop, rotate, flip, relight, or
+4. Review the source and optionally use **Edit video** to trim, crop, rotate, flip, relight, or
    filter it entirely in the browser. A validated export becomes the new immutable source only
    after explicit replacement confirmation.
 5. Optionally choose exactly one visual transformation—**Character Swap** or **Virtual Try On**—
@@ -148,9 +148,9 @@ Characters, Outfits, and Voices; and `/campaigns` plus `/projects` share one per
 capture runtime at all — no stage, no media session, no camera; `/studio/*` and
 `/projects/:projectId/workspace` mount one, and the workspace renders its Project controls beside
 that stage without creating another shell, player, media session, provider action, or browser
-authority store. **Quick project** creates a standalone
-`Untitled Project`; **New Project** asks for a name and optional Campaign, with the current Campaign
-preselected when launched from its detail. **No Campaign** is a virtual Project group, never a
+authority store. **New Project** asks for a name and optional Campaign, with the current Campaign
+preselected when launched from its detail, and **Create without a name** inside it commits an
+`Untitled Project` in one step. **No Campaign** is a virtual Project group, never a
 default database row. Project detail also contains a non-owning collection of Videos, Characters,
 Outfits, and Voices. Attach/detach never changes the immutable source, working media, outputs,
 history, or underlying asset.
@@ -228,7 +228,7 @@ resumable Project working media. Local editing and configuration do not contact 
 - Saved Characters expose a normalized Wardrobe containing the labelled original plus saved
   variants, an optional saved-voice default, and image-backed saved outfits as garment choices.
   Browsing, duplication into a new Character Builder draft, exact version selection, and default
-  voice persistence stay in the account creative library. Opening default-voice configuration
+  voice persistence stay in the account's Library. Opening default-voice configuration
   explicitly loads the saved
   ElevenLabs library; selecting the character in Existing Video preselects that voice without
   processing, and the edit can override it. **Add Outfit** contacts Pruna only
@@ -247,8 +247,9 @@ resumable Project working media. Local editing and configuration do not contact 
   contacts Decart or an image provider.
 - `lucy-latest` and pinned `lucy-vton-latest` start only after explicit user action. Decart receives
   live media and the applied prompt/reference snapshot.
-- Existing-video Character Swap exposes every configured server binding in a Decart API / Pruna API
-  toggle, with `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER` controlling the initial choice. Virtual
+- Existing-video Character Swap offers every configured server binding as a **Character Swap
+  method**, named by what each one accepts and produces rather than by its vendor, with
+  `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER` controlling the initial choice. Virtual
   Try-On remains on Decart `lucy-vton-latest`, independently of that Character Swap choice. Decart
   output remains fixed 720p; when Pruna is selected, the editor lets the creator choose its
   documented approximate 1 MP

@@ -88,10 +88,10 @@ primary flows in [user stories](user-flows/feature-behavior/README.md) and compl
 | `record-finalize`              | Main recorder and optional sidecar settle, then device-local H.264/AAC MP4 transcode completes before source/provider release; no raw download fallback                                                                                                                    |
 | `local-voice`                  | Warm/Clear/Robot always start from immutable original; success/cancel/failure preserves a valid take                                                                                                                                                                       |
 | `elevenlabs-voice`             | Saved browse/preview sends no take; Apply sends only original sidecar; remux/original recovery works                                                                                                                                                                       |
-| `gallery-download-playback`    | Save leaves review intact and enables Release; Videos in Assets downloads an MP4 with H.264 and AAC when audio exists                                                                                                                                                      |
+| `gallery-download-playback`    | Save leaves review intact and enables Close; Videos in Assets downloads an MP4 with H.264 and AAC when audio exists                                                                                                                                                        |
 | `project-output-save`          | Ready Project media saves as a new Saved Video or, after separate target selection and confirmation, one immutable added Version; refresh after response loss reconciles without duplication                                                                               |
 | `background-foreground`        | Background/foreground, screen lock/call/device interruption recovers safely or finalizes without take loss                                                                                                                                                                 |
-| `memory-checkpoints`           | Complete [300-second memory protocol](RECORDING_MEMORY_POLICY.md) through processing and Release/Discard                                                                                                                                                                   |
+| `memory-checkpoints`           | Complete [300-second memory protocol](RECORDING_MEMORY_POLICY.md) through processing and Close/Discard                                                                                                                                                                     |
 | `cleanup`                      | Camera/mic indicators, WebRTC/provider clients, recorders, timers, listeners, audio contexts, tracks, and superseded URLs terminate once                                                                                                                                   |
 
 Repeat the common recording boundary for Local, Character, and VTO. If recording/source/provider
@@ -191,7 +191,7 @@ focus return, reduced motion, and overlay stacking at every canonical viewport a
   selected until **Clear Voice setup** is used. Run a combined Character/VTO plus Voice plan and
   confirm the visual commits first, the result remains locked until Voice finishes, and a Voice
   retry uses that visual without another visual-processing submission.
-- Open **Adjust video** from Original and again from a visual/voiced Result. Confirm the persistent
+- Open **Edit video** from Original and again from a visual/voiced Result. Confirm the persistent
   stage keeps one video node and playback time while capture controls are replaced. Exercise trim
   looping and Set In/Out; all six crop modes; 90° rotations; both flips; every lighting range and
   filter; Before; per-tool/all reset; and grouped undo/redo. Use pointer capture and keyboard crop
@@ -236,7 +236,7 @@ focus return, reduced motion, and overlay stacking at every canonical viewport a
   duplicate player. **Use existing video** is the sole exception and borrows the same artifact URL
   or local stream in its inline player without owning/stopping tracks.
 - While review owns a take, new capture/mode/device changes are blocked. Exit is
-  Save-then-Release or confirmed Discard.
+  Save-then-Close or confirmed Discard.
 - Refresh/close warns about take loss; intentionally leaving proves the take is not durable.
 - Local and cloud Voice lock playback/saving during processing, create a healthy replacement
   before revoking the prior processed URL, and never mutate the immutable original.

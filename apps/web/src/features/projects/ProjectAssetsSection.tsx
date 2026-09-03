@@ -30,7 +30,7 @@ import { safeProjectError } from './ProjectDialogs';
 import {
   PROJECT_VOICE_MEMBERSHIP_NOTE,
   PROJECT_VOICE_UNAVAILABLE_REASON,
-} from './projectProcessingPresentation';
+} from './projectVoiceCopy';
 import {
   addAssetActionStyles,
   projectAssetActionsStyles,

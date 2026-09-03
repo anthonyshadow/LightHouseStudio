@@ -49,6 +49,19 @@ describe('AssetCreationLauncher', () => {
     expect(props.onCreateVideo).toHaveBeenCalledWith('record', projectId);
   });
 
+  it('says a Project cannot run a Voice before one is attached to it', async () => {
+    // This path attaches straight to the Project. Without the notice the operator only learned a
+    // Voice would not apply when Start refused, long after choosing one.
+    const user = userEvent.setup();
+    renderLauncher(projectId);
+
+    await user.click(screen.getByRole('button', { name: 'Add Voice' }));
+    const notice = (await screen.findByText('Voice does not run inside a Project yet')).closest(
+      '[role="status"]',
+    );
+    expect(notice).toHaveTextContent(/not available inside a Project yet/u);
+  });
+
   it('opens the canonical Voice library for global creation without attaching anything', async () => {
     const user = userEvent.setup();
     const props = renderLauncher(null);
