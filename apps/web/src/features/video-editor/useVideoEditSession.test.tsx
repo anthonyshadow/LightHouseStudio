@@ -2,6 +2,7 @@
 
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { VideoEditSpec } from '@studio/domain';
 import type { RecordingArtifact, UploadedTakeMetadata } from '../recording/types';
 
 const adapters = vi.hoisted(() => ({
@@ -13,7 +14,7 @@ vi.mock('./renderVideoEdit', () => ({
   renderVideoEdit: adapters.renderVideoEdit,
   videoEditRenderingSupported: () => true,
 }));
-vi.mock('./videoEditShader', () => ({
+vi.mock('./videoEditSupport', () => ({
   videoEditPreviewSupported: () => true,
 }));
 vi.mock('../existing-video/videoValidation', () => ({
@@ -163,6 +164,88 @@ describe('useVideoEditSession', () => {
     });
     await waitFor(() => expect(hook.result.current.phase).toBe('awaiting-replacement'));
     expect(adapters.validateEditedVideoOutput).toHaveBeenCalledOnce();
+  });
+
+  it('neither counts nor renders an untyped subtitle, and renders the finalized draft', async () => {
+    adapters.renderVideoEdit.mockResolvedValue({
+      blob: new Blob(['edited'], { type: 'video/mp4' }),
+      mimeType: 'video/mp4',
+    });
+    const hook = beginSession();
+    const untyped = {
+      id: 'cue-1',
+      text: '',
+      startMs: 0,
+      endMs: 1_000,
+      placement: 'bottom' as const,
+    };
+    act(() => {
+      hook.result.current.applySpec({ ...hook.result.current.draft, subtitles: [untyped] });
+    });
+    expect(hook.result.current.draft.subtitles).toHaveLength(1);
+    expect(hook.result.current.dirty).toBe(false);
+
+    act(() => {
+      hook.result.current.applySpec({
+        ...hook.result.current.draft,
+        subtitles: [{ ...untyped, text: '  Hello  ' }],
+      });
+    });
+    expect(hook.result.current.dirty).toBe(true);
+    await act(async () => {
+      await hook.result.current.startRender();
+    });
+    const rendered = { ...untyped, text: 'Hello' };
+    expect(adapters.renderVideoEdit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spec: expect.objectContaining({ subtitles: [rendered] }) as VideoEditSpec,
+      }),
+    );
+    expect(hook.result.current.candidate?.spec.subtitles).toEqual([rendered]);
+  });
+
+  it('removes a subtitle in one history entry and lets go of it as the selection', () => {
+    const hook = beginSession();
+    const keep = { id: 'cue-1', text: 'Keep', startMs: 0, endMs: 1_000, placement: 'top' as const };
+    const drop = {
+      id: 'cue-2',
+      text: 'Drop',
+      startMs: 2_000,
+      endMs: 3_000,
+      placement: 'top' as const,
+    };
+    act(() => {
+      hook.result.current.applySpec({ ...hook.result.current.draft, subtitles: [keep, drop] });
+      hook.result.current.setSelectedSubtitleId('cue-2');
+    });
+
+    act(() => hook.result.current.removeSubtitleCue('cue-2'));
+    expect(hook.result.current.draft.subtitles).toEqual([keep]);
+    expect(hook.result.current.selectedSubtitleId).toBeNull();
+
+    act(() => hook.result.current.setSelectedSubtitleId('cue-1'));
+    act(() => hook.result.current.undo());
+    expect(hook.result.current.draft.subtitles).toEqual([keep, drop]);
+    expect(hook.result.current.selectedSubtitleId).toBe('cue-1');
+  });
+
+  it('resets the Subtitles tool to the baseline and forgets the selection when a source begins', () => {
+    const hook = beginSession();
+    const cue = { id: 'cue-1', text: 'Hi', startMs: 0, endMs: 1_000, placement: 'top' as const };
+    act(() => {
+      hook.result.current.setActiveTool('subtitles');
+      hook.result.current.setSelectedSubtitleId('cue-1');
+      hook.result.current.applySpec({ ...hook.result.current.draft, subtitles: [cue] });
+    });
+    expect(hook.result.current.selectedSubtitleId).toBe('cue-1');
+    expect(hook.result.current.dirty).toBe(true);
+
+    act(() => hook.result.current.resetTool());
+    expect(hook.result.current.draft.subtitles).toEqual([]);
+    expect(hook.result.current.dirty).toBe(false);
+
+    act(() => hook.result.current.begin(source()));
+    expect(hook.result.current.selectedSubtitleId).toBeNull();
   });
 
   it('ignores a stale completion after cancellation and leaves the draft intact', async () => {

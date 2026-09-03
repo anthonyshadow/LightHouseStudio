@@ -35,7 +35,18 @@ export const BUILD_CLOSURE_BUDGETS = {
   // was recoverable was recovered in the same change: the header stopped taking five navigation
   // handlers, and `ProtectedRoute` had already absorbed the duplicated restore-and-wait the
   // not-found route would otherwise have carried. `FORBIDDEN_CLOSURE_DEPENDENCIES` untouched.
-  'src/app/shell/AuthenticatedShell.tsx': 728_000,
+  //
+  // Lowered from 728_000 to 724_000 on 2026-09-03. Subtitles became a field of the edit
+  // specification, whose normalization and equality every route that reads a Project snapshot
+  // pays for, plus the contract's cue schema and one rail glyph — 1_515 bytes of growth. Finding
+  // where the rest of the first build's 2_494 had gone recovered far more than that: a
+  // barrel-exported module with a top-level `Object.freeze` is kept in every closure that imports
+  // the barrel whether or not anything there uses it, and the video-editing rules had two. Written
+  // as plain objects, the whole rules module left this closure (5_675 bytes), and the layout,
+  // stacking and timing rules that only the editor, its worker and the placement chooser use live
+  // in a module `rules.ts` never imports. The ceiling follows the closure down so the next accidental
+  // freeze fails the build. `FORBIDDEN_CLOSURE_DEPENDENCIES` untouched.
+  'src/app/shell/AuthenticatedShell.tsx': 724_000,
   // Shell plus capture graph, which is what a Studio route costs. Looser, because a Studio route is
   // where media code belongs; `FORBIDDEN_CLOSURE_DEPENDENCIES` is what keeps it from leaking out.
   'src/studio/StudioApp.tsx': 910_000,

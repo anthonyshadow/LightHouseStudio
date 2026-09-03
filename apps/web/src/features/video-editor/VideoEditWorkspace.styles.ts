@@ -419,6 +419,81 @@ export const rangeFieldStyles = (theme: Theme): CSSObject => ({
   '& input:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '2px' },
 });
 
+export const subtitleEmptyStyles = (theme: Theme): CSSObject => ({
+  margin: 0,
+  color: theme.colors.textMuted,
+  fontSize: theme.fontSizes.metadata,
+  lineHeight: 1.45,
+});
+
+export const subtitleListStyles = (theme: Theme): CSSObject => ({
+  margin: 0,
+  padding: 0,
+  listStyle: 'none',
+  display: 'grid',
+  gap: theme.space.xxs,
+  '& > li > button': {
+    width: '100%',
+    minHeight: '2.75rem',
+    display: 'grid',
+    gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+    alignItems: 'center',
+    gap: theme.space.xs,
+    padding: `${theme.space.xxs} ${theme.space.xs}`,
+    border: `1px solid ${theme.colors.borderStrong}`,
+    borderRadius: theme.radii.small,
+    color: theme.colors.text,
+    background: theme.colors.surfaceSoft,
+    textAlign: 'left',
+    cursor: 'pointer',
+  },
+  '& > li > button > span:nth-of-type(1)': {
+    color: theme.colors.textFaint,
+    fontFamily: theme.type.mono,
+    fontSize: theme.fontSizes.caption,
+  },
+  '& > li > button > span:nth-of-type(2)': {
+    minWidth: 0,
+    overflow: 'hidden',
+    fontSize: theme.fontSizes.metadata,
+    fontWeight: 700,
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  '& > li > button > span:nth-of-type(3)': {
+    color: theme.colors.textMuted,
+    fontFamily: theme.type.mono,
+    fontSize: '0.65rem',
+    whiteSpace: 'nowrap',
+  },
+  '& > li > button > span:nth-of-type(4)': {
+    gridColumn: '2 / -1',
+    color: theme.colors.warning,
+    fontSize: theme.fontSizes.caption,
+    fontWeight: 700,
+  },
+  '& > li > button[aria-pressed="true"]': {
+    borderColor: theme.colors.accent,
+    background: theme.colors.accentSoft,
+  },
+  '& > li > button:focus-visible': {
+    outline: `2px solid ${theme.colors.focus}`,
+    outlineOffset: '2px',
+  },
+});
+
+export const subtitleEditorStyles = (theme: Theme): CSSObject => ({
+  display: 'grid',
+  gap: theme.space.sm,
+  paddingBlockStart: theme.space.sm,
+  borderBlockStart: `1px solid ${theme.colors.divider}`,
+  '& [data-editor-discard]': { justifySelf: 'start', color: theme.colors.danger },
+  '& [data-editor-discard]:hover:not(:disabled)': {
+    color: theme.colors.danger,
+    background: theme.colors.dangerSoft,
+  },
+});
+
 export const optionGridStyles = (theme: Theme, columns = 2): CSSObject => ({
   display: 'grid',
   gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,

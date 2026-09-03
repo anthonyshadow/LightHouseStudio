@@ -7,6 +7,7 @@ import {
   type SaveProjectOutputResponse,
 } from '@studio/contracts';
 import {
+  createDefaultVideoEditSpec,
   defaultProjectOutputTitle,
   SAVED_VIDEO_TITLE_MAX_LENGTH as DOMAIN_TITLE_MAX_LENGTH,
 } from '@studio/domain';
@@ -28,7 +29,7 @@ import type { ProjectSessionPort } from './useProjectSession';
 // jsdom has no WebGL, so the render capability is stated explicitly rather than left to the
 // environment: both the offered and the degraded path have to be exercised deliberately.
 const renderCapable = vi.fn(() => true);
-vi.mock('../video-editor/videoEditShader', () => ({
+vi.mock('../video-editor/videoEditSupport', () => ({
   videoEditPreviewSupported: () => renderCapable(),
 }));
 vi.mock('../video-editor/renderVideoEdit', () => ({
@@ -120,6 +121,28 @@ const current = (): ProjectCurrentResponse => ({
     authorKind: 'user',
     source: 'user-edit',
     createdAt: now,
+  },
+});
+
+/** The Project's uploaded source as the API describes it: a 1280×720 H.264 cut of `durationMs`. */
+const sourceResponse = (currentValue: ProjectCurrentResponse, durationMs: number) => ({
+  ...currentValue,
+  source: {
+    kind: 'uploaded',
+    savedVideoId: null,
+    videoVersionId: null,
+    mimeType: 'video/mp4',
+    filename: 'cut.mp4',
+    sizeBytes: 8,
+    container: 'mp4',
+    videoCodec: 'avc',
+    audioCodec: 'aac',
+    durationMs,
+    width: 1_280,
+    height: 720,
+    hasAudio: true,
+    acceptedAt: now,
+    contentUrl: `/api/projects/${projectId}/source/content`,
   },
 });
 
@@ -327,7 +350,14 @@ beforeEach(() => {
       },
     } satisfies Storage,
   });
-  mockApiServer.use(http.get(`*/api/projects/${projectId}`, () => HttpResponse.json(current())));
+  mockApiServer.use(
+    http.get(`*/api/projects/${projectId}`, () => HttpResponse.json(current())),
+    // The save step measures the cut once so the chooser can draw the crop; the ordinary
+    // fixture's cut is its uploaded source.
+    http.get(`*/api/projects/${projectId}/source`, () =>
+      HttpResponse.json(sourceResponse(current(), 10_000)),
+    ),
+  );
 });
 
 afterEach(() => {
@@ -781,6 +811,47 @@ describe('Project output save UI', () => {
 });
 
 describe('ProjectOutputSaveSection placement', () => {
+  it('measures the cut once, draws the crop, and says what the shape does to burned-in subtitles', async () => {
+    const placed = current();
+    renderSection(session(), {
+      currentValue: {
+        ...placed,
+        revision: {
+          ...placed.revision,
+          snapshot: {
+            ...placed.revision.snapshot,
+            localEdit: {
+              ...createDefaultVideoEditSpec(10_000),
+              subtitles: [
+                {
+                  id: '3b8b3d3e-5f0f-4a0c-9d1c-2d9f7a1b5c6e',
+                  text: 'Hello',
+                  startMs: 0,
+                  endMs: 1_000,
+                  placement: 'bottom',
+                },
+              ],
+            },
+            exportSpecification: {
+              container: 'video/mp4',
+              aspect: '1:1',
+              resolution: { width: 1_080, height: 1_080 },
+              includeAudio: true,
+            },
+          },
+        },
+      },
+    });
+
+    // A 1280×720 cut squared keeps the middle 56 % of the width, which the 80 %-wide caption
+    // region does not fit inside — stated from the measured frame, not described.
+    expect(
+      await screen.findByText(
+        /44% of the width is trimmed, evenly from the left and right\. Subtitles at the bottom would be cut by this shape\./u,
+      ),
+    ).toBeVisible();
+  });
+
   it('records a chosen placement through the session rather than the save request', async () => {
     const user = userEvent.setup();
     const propose = vi.fn(() => true);
@@ -882,26 +953,7 @@ describe('ProjectOutputSaveSection placement', () => {
       http.get(`*/api/projects/${projectId}`, () => HttpResponse.json(placedCurrent())),
       // The ordinary flow has a source and no working-media adoption, so that is what is offered.
       http.get(`*/api/projects/${projectId}/source`, () =>
-        HttpResponse.json({
-          ...placedCurrent(),
-          source: {
-            kind: 'uploaded',
-            savedVideoId: null,
-            videoVersionId: null,
-            mimeType: 'video/mp4',
-            filename: 'cut.mp4',
-            sizeBytes: 8,
-            container: 'mp4',
-            videoCodec: 'avc',
-            audioCodec: 'aac',
-            durationMs: 8_000,
-            width: 1_280,
-            height: 720,
-            hasAudio: true,
-            acceptedAt: now,
-            contentUrl: `/api/projects/${projectId}/source/content`,
-          },
-        }),
+        HttpResponse.json(sourceResponse(placedCurrent(), 8_000)),
       ),
       http.get(`*/api/projects/${projectId}/source/content`, () =>
         HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {

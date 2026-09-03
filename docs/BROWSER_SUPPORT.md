@@ -151,7 +151,11 @@ when **Edit video** opens. Choosing an export placement at save time re-uses exa
 either; the save dialog says so and keeps the video's original shape. It does not use the limited-availability 2D canvas `filter` property.
 Preview and export share a WebGL shader for flips, curated filters, and manual lighting controls;
 MediaBunny performs trim, baked 90° rotation, crop, H.264 encode, and AAC audio preservation in the
-worker. There is no synchronous main-thread processing fallback.
+worker. There is no synchronous main-thread processing fallback. Subtitles are rasterized on a 2D
+canvas — an `OffscreenCanvas` in the worker, so the worker also needs 2D text (`fillText`,
+`measureText`, `roundRect`) — in the interface's sans-serif stack, and composited by the same
+shader. The same device therefore draws identical text in the preview and in the file; a different
+device draws the same layout in whatever its font stack resolves to, because no face is bundled.
 
 A source with audio must export AAC plus a newly extracted matching sidecar; a silent source stays
 silent. Output dimensions are even, exact, and decoded locally before publication. The worker's

@@ -34,17 +34,28 @@ a provider, and replace the immutable source only after a validated export and e
 6. Hold **Compare** (or hold **C**) to bypass every draft transformation without seeking or changing
    undo history. **Split** keeps the original and edited render side by side on the same stage.
    Reset the active tool or all edits, and use the labelled 50-entry grouped Undo/Redo history.
-7. **Save edited video** starts one module worker. Studio announces local render/validation
+7. **Subtitles** adds timed text that is burned into the render. **Add subtitle at playhead**
+   creates a cue from the playhead — two seconds long, or to the trim end — selected and ready to
+   type. The inspector lists every cue and edits the selected one: text up to 200 characters on
+   three lines, start and end at least 100 ms apart with **Set start/end to playhead**, a Top /
+   Middle / Bottom placement, and **Delete subtitle**. A lane under the timeline shows each cue as
+   a block: click selects and seeks to it, drag moves it, Left/Right Arrow nudges one frame (ten
+   with Shift), Delete removes it. Cues may overlap; simultaneous cues in one region stack toward
+   the centre of the frame, earliest at the edge, and the lane gives each overlap its own row. A cue
+   outside the trim is kept and marked, not rendered; an untyped cue is neither rendered nor
+   counted as an edit. The stage draws subtitles exactly as the render burns them — same layout,
+   same face — including inside the crop frame while Crop is active, and redraws on a paused frame.
+8. **Save edited video** starts one module worker. Studio announces local render/validation
    progress; cancellation terminates the work and preserves the pinned source and draft.
-8. After validation, the replacement dialog initially focuses **Cancel** and offers **Replace
+9. After validation, the replacement dialog initially focuses **Cancel** and offers **Replace
    Without Saving** or **Replace and Save**. The Save path prompts for an optional gallery name,
    falling back to the existing generated artifact name when blank, and must finish publishing the
    artifact that was displayed when this edit session began—including a prior visual or voiced
    result—before replacement proceeds.
-9. A confirmed replacement creates an `edited` artifact whose `parentArtifactId` identifies that
-   pinned source, atomically makes it the immutable source, installs its matching audio sidecar,
-   clears superseded visual/voice layers, and returns to **Use existing video**.
-10. **Save Video** can then save the edited artifact as a new gallery record after the same optional
+10. A confirmed replacement creates an `edited` artifact whose `parentArtifactId` identifies that
+    pinned source, atomically makes it the immutable source, installs its matching audio sidecar,
+    clears superseded visual/voice layers, and returns to **Use existing video**.
+11. **Save Video** can then save the edited artifact as a new gallery record after the same optional
     naming prompt. If the source was loaded from Videos, the secondary confirmed Replace
     Existing action appends an immutable version using the captured saved video/version lineage.
 
@@ -59,8 +70,10 @@ Project session, durably stores/inspects/checksums the candidate, and CAS-append
 working/presented reference. Success closes the editor only after server acceptance and reports
 that no Saved Video or Version was created. Conflict/failure preserves the candidate for retry.
 Refresh hydrates adopted working media while the first accepted original remains immutable. The
-applied edit is shown as a historical baseline; new controls start neutral over already-rendered
-bytes so prior changes are not applied twice.
+applied edit — its subtitles included — is shown as a historical baseline; new controls start
+neutral over already-rendered bytes so prior changes are not applied twice. The baseline says how
+many subtitles were burned in and that changing them means editing again from a cut that does not
+carry them: burned text is pixels, the same way every baked edit is.
 
 ### Placement exports
 
@@ -70,11 +83,22 @@ duration, no rotation, filter or adjustment — plus one exact destination size 
 the cropped frame to. Nothing else about the edit path changes: the same 300,000,000-byte ceiling
 applies before publication, the same cancel semantics apply, and a browser that cannot render here
 cannot re-frame there either. Placement exports are chosen at a save step, not in this editor.
+Subtitles are pixels in the cut by then, so a placement crops them like any other pixel; the
+chooser says whether a shape keeps them, from the same region geometry the renderer laid them out
+with, once the cut's frame is known.
 
 ## Validation and compatibility
 
 - Preview and export use the same WebGL color shader; the editor never depends on
   `CanvasRenderingContext2D.filter` and has no synchronous main-thread encoder fallback.
+- Subtitles are rasterized on a 2D canvas — an `OffscreenCanvas` in the worker — and composited
+  by that shader in output space, over the graded frame, so text is never cropped, rotated, flipped
+  or colour-graded. The layout is the domain's, in fractions of the frame: text at most 80 % of
+  the width, type 4.5 % of the height, white on translucent boxes, in the interface's sans-serif
+  stack; portrait frames keep a 22 % band clear at top and bottom (the band a square or tall
+  re-frame of a phone cut removes), landscape frames 8 % and 10 %. Rasterization happens once per
+  change of the cues on screen, never per frame. Cues are re-based to the output's time through the
+  trim, because the worker receives frames in trimmed time.
 - MediaBunny runs in the dedicated worker, trims and bakes rotation/crop, optionally scales the
   cropped frame to one exact requested size, preserves the primary audio track unless a caller
   explicitly excludes it, and writes H.264/AAC MP4 through an offset-aware 4 MiB chunk accumulator
@@ -107,6 +131,13 @@ cannot re-frame there either. Placement exports are chosen at a save step, not i
 Pure and component tests cover geometry, history grouping, timeline playback/trim controls,
 keyboard compare, split and inspector state, on-frame crop/rotation, worker
 progress/cancellation/staleness, chunk limits, provider gating, replacement controls, and source ownership.
-Real H.264/AAC export, five-minute and maximum-size memory, gallery downloads, external playback,
-touch hardware, and Safari/Firefox/Chrome codec behavior require physical validation and must
-not be inferred from automation.
+Subtitles are covered at every altitude: domain rules (clamping, ordering, stacking, re-basing
+through the trim, region geometry against every placement crop — unit and property tests), the
+contract (defaults, order, limits, overlapping cues accepted), the rasterizer's wrapping and
+geometry against a scripted 2D context, the shader's overlay texture lifecycle, the worker's
+burn-in timing across cue boundaries through a non-zero trim, the preview's redraw discipline,
+the tool and lane components, and a Chromium journey that adds a cue on the timeline and renders
+it. Real H.264/AAC export, the burned text's pixel fidelity in an external player, five-minute and
+maximum-size memory, gallery downloads, external playback, touch hardware, and
+Safari/Firefox/Chrome codec and 2D-text behavior require physical validation and must not be
+inferred from automation.

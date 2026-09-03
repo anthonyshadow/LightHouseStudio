@@ -21,7 +21,7 @@ const editor = vi.hoisted(() => ({
   renderVideoEdit: vi.fn<() => Promise<{ blob: Blob; mimeType: 'video/mp4' }>>(),
 }));
 
-vi.mock('../video-editor/videoEditShader', () => ({
+vi.mock('../video-editor/videoEditSupport', () => ({
   videoEditPreviewSupported: () => editor.renderCapable(),
 }));
 vi.mock('../video-editor/renderVideoEdit', () => ({

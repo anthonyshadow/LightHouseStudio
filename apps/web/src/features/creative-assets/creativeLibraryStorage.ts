@@ -1,4 +1,4 @@
-import type { CreativeAssetStore } from '@studio/domain';
+import { sentenceList, type CreativeAssetStore } from '@studio/domain';
 import type { CreativeLibraryMirror } from './useCreativeLibraryCloudSync';
 
 /**
@@ -38,11 +38,6 @@ export const creativeLibraryStorageDetail = (mirror: CreativeLibraryMirror): str
 
 const quantity = (count: number, singular: string, plural: string): string =>
   `${count} ${count === 1 ? singular : plural}`;
-
-const sentenceList = (parts: readonly string[]): string =>
-  parts.length <= 1
-    ? (parts[0] ?? '')
-    : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 
 /** What a store holds, for a confirmation that has to say what is being replaced. */
 export const describeCreativeLibraryContents = (store: CreativeAssetStore): string =>

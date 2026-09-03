@@ -11,6 +11,8 @@ void main() {
 const FRAGMENT_SHADER = `
 precision mediump float;
 uniform sampler2D u_texture;
+uniform sampler2D u_overlay;
+uniform float u_overlayEnabled;
 uniform vec4 u_crop;
 uniform float u_rotation;
 uniform vec2 u_flip;
@@ -60,7 +62,11 @@ void main() {
   color += vec3(temperature * 0.12, temperature * 0.025, -temperature * 0.12);
   color += highlights * smoothstep(0.45, 1.0, luma) * 0.3;
   color += shadows * (1.0 - smoothstep(0.0, 0.55, luma)) * 0.3;
-  gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+  // Subtitles composite in output space, over the graded frame: sampled at v_uv rather than the
+  // cropped, rotated, flipped source position, so text is never re-framed or colour-graded. The
+  // overlay is premultiplied, which makes the blend one multiply-add.
+  vec4 overlay = texture2D(u_overlay, v_uv) * u_overlayEnabled;
+  gl_FragColor = vec4(overlay.rgb + clamp(color, 0.0, 1.0) * (1.0 - overlay.a), 1.0);
 }`;
 
 const FILTER_IDS: Record<VideoEditSpec['filter'], number> = {
@@ -72,7 +78,8 @@ const FILTER_IDS: Record<VideoEditSpec['filter'], number> = {
   fade: 5,
 };
 
-type RenderCanvas = HTMLCanvasElement | OffscreenCanvas;
+/** Either canvas the editor draws on: the page's preview, or the worker's output frame. */
+export type RenderCanvas = HTMLCanvasElement | OffscreenCanvas;
 
 /**
  * The WebGL context for either canvas kind.
@@ -105,8 +112,22 @@ const compileShader = (gl: WebGLRenderingContext, type: number, source: string):
 
 export type VideoEditFrameRenderer = Readonly<{
   render: (source: TexImageSource, spec: VideoEditSpec) => void;
+  /**
+   * Text composited over the graded frame in output space; `null` draws none. An upload is a
+   * full-frame copy to the GPU, so callers set it when the active cues change, never per frame.
+   */
+  setOverlay: (overlay: TexImageSource | null) => void;
   dispose: () => void;
 }>;
+
+const TRANSPARENT_PIXEL = new Uint8Array([0, 0, 0, 0]);
+
+const configureTexture = (gl: WebGLRenderingContext): void => {
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+};
 
 export const createVideoEditFrameRenderer = (canvas: RenderCanvas): VideoEditFrameRenderer => {
   const gl = webglContext(canvas, {
@@ -120,6 +141,7 @@ export const createVideoEditFrameRenderer = (canvas: RenderCanvas): VideoEditFra
   let program: WebGLProgram | null = null;
   let position: WebGLBuffer | null = null;
   let texture: WebGLTexture | null = null;
+  let overlayTexture: WebGLTexture | null = null;
   try {
     vertex = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
     fragment = compileShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
@@ -145,12 +167,22 @@ export const createVideoEditFrameRenderer = (canvas: RenderCanvas): VideoEditFra
     gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
     texture = gl.createTexture();
     if (!texture) throw new Error('The video editor could not allocate a GPU texture.');
+    gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    configureTexture(gl);
+    // The overlay lives on unit 1 and starts as one transparent pixel, so sampling it before any
+    // subtitle is set composites nothing rather than an incomplete texture.
+    overlayTexture = gl.createTexture();
+    if (!overlayTexture) throw new Error('The video editor could not allocate a GPU texture.');
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, overlayTexture);
+    configureTexture(gl);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, TRANSPARENT_PIXEL);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.uniform1i(gl.getUniformLocation(program, 'u_texture'), 0);
+    gl.uniform1i(gl.getUniformLocation(program, 'u_overlay'), 1);
   } catch (error) {
+    if (overlayTexture) gl.deleteTexture(overlayTexture);
     if (texture) gl.deleteTexture(texture);
     if (position) gl.deleteBuffer(position);
     if (program) gl.deleteProgram(program);
@@ -165,10 +197,27 @@ export const createVideoEditFrameRenderer = (canvas: RenderCanvas): VideoEditFra
   const adjustALocation = gl.getUniformLocation(program, 'u_adjustA');
   const adjustBLocation = gl.getUniformLocation(program, 'u_adjustB');
   const filterLocation = gl.getUniformLocation(program, 'u_filter');
+  const overlayEnabledLocation = gl.getUniformLocation(program, 'u_overlayEnabled');
+  gl.uniform1f(overlayEnabledLocation, 0);
 
   return {
+    setOverlay: (overlay) => {
+      if (overlay === null) {
+        gl.uniform1f(overlayEnabledLocation, 0);
+        return;
+      }
+      gl.activeTexture(gl.TEXTURE1);
+      gl.bindTexture(gl.TEXTURE_2D, overlayTexture);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, overlay);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, 0);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.uniform1f(overlayEnabledLocation, 1);
+    },
     render: (source, spec) => {
       gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, source);
@@ -189,6 +238,7 @@ export const createVideoEditFrameRenderer = (canvas: RenderCanvas): VideoEditFra
       gl.drawArrays(gl.TRIANGLES, 0, 6);
     },
     dispose: () => {
+      gl.deleteTexture(overlayTexture);
       gl.deleteTexture(texture);
       gl.deleteBuffer(position);
       gl.deleteProgram(program);
@@ -196,13 +246,4 @@ export const createVideoEditFrameRenderer = (canvas: RenderCanvas): VideoEditFra
       gl.deleteShader(fragment);
     },
   };
-};
-
-export const videoEditPreviewSupported = (): boolean => {
-  if (typeof document === 'undefined') return false;
-  const canvas = document.createElement('canvas');
-  const gl = canvas.getContext('webgl');
-  if (!gl) return false;
-  gl.getExtension('WEBGL_lose_context')?.loseContext();
-  return true;
 };

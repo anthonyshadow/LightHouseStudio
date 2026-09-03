@@ -462,11 +462,13 @@ Replace and Save. The Save path must commit the pinned source to Saved Videos be
 The dedicated module worker lazily
 loads MediaBunny and its AAC extension, uses `Conversion` for trim/baked rotation/crop and
 H.264/AAC encoding, and runs the shared WebGL shader after geometric transforms for flips, filters,
-and lighting. Its `StreamTarget` writes into offset-aware 4 MiB blocks with a 300,000,000-byte
+and lighting, compositing the subtitle overlay — rasterized on a 2D `OffscreenCanvas` once per
+change of the cues on screen, in output time re-based through the trim — over the graded frame in
+output space. Its `StreamTarget` writes into offset-aware 4 MiB blocks with a 300,000,000-byte
 maximum; cancellation and failure release all blocks. There is no synchronous main-thread export
 fallback. The preview creates one renderer for a stable canvas/media/geometry binding and sends
-crop, filter, and lighting changes through shader uniforms; those edits do not churn WebGL
-contexts. Partial shader/program setup is unwound, the worker disposes partially initialized
+crop, filter, and lighting changes through shader uniforms and subtitle changes through one
+overlay texture; those edits do not churn WebGL contexts. Partial shader/program setup is unwound, the worker disposes partially initialized
 resources on every exit, and feature probes explicitly release their temporary context.
 
 Validation requires non-empty playable H.264/AAC MP4 output, expected primary tracks, exact even

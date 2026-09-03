@@ -1,7 +1,7 @@
-import type { VideoEditSpec } from '@studio/domain';
+import type { SubtitleCue, VideoEditSpec } from '@studio/domain';
 import type { RecordingArtifact, UploadedTakeMetadata } from '../recording/types';
 
-export type VideoEditTool = 'trim' | 'crop' | 'rotate' | 'lighting' | 'filters';
+export type VideoEditTool = 'trim' | 'crop' | 'rotate' | 'lighting' | 'filters' | 'subtitles';
 
 export type VideoEditSessionPhase =
   | 'closed'
@@ -30,6 +30,10 @@ export const formatVideoEditTimelineTime = (milliseconds: number): string => {
     centiseconds % 100,
   ).padStart(2, '0')}`;
 };
+
+/** What the cue list and the timeline lane call a subtitle the operator has not typed into yet. */
+export const subtitleCueLabel = (cue: Pick<SubtitleCue, 'text'>): string =>
+  cue.text.trim() === '' ? 'Untitled subtitle' : cue.text.trim();
 
 export type VideoEditSource = Readonly<{
   artifact: RecordingArtifact;

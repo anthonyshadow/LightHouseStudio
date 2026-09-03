@@ -208,9 +208,9 @@ resumable Project working media. Local editing and configuration do not contact 
 ## Capabilities and provider boundaries
 
 - Local camera, microphone, existing-video validation/preview, recording, non-destructive trim,
-  crop, rotation, flips, lighting and filters, on-device MP4 transcoding, playback, local voice
-  effects, gallery saving, and saved-video download require no provider credentials or external
-  media traffic.
+  crop, rotation, flips, lighting, filters and burned-in subtitles, on-device MP4 transcoding,
+  playback, local voice effects, gallery saving, and saved-video download require no provider
+  credentials or external media traffic.
 - In authoritative `DATABASE_MODE=neon` plus private R2, Saved Video bytes upload directly from the
   browser with headless Uppy multipart transfers. The authenticated API owns the staged row and
   opaque key, signs only short-lived exact part operations, and verifies size, metadata, checksum,

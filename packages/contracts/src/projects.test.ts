@@ -130,6 +130,7 @@ const validSnapshot = () => ({
       shadows: 0,
     },
     filter: 'original' as const,
+    subtitles: [],
   },
   exportSpecification: {
     container: 'video/mp4' as const,
@@ -146,6 +147,50 @@ const validSnapshot = () => ({
 describe('Project snapshot contract', () => {
   it('accepts versioned creative intent without browser or provider internals', () => {
     expect(projectSnapshotSchema.parse(validSnapshot())).toEqual(validSnapshot());
+  });
+
+  it('accepts subtitle cues, overlapping ones included, and reads an absent list as none', () => {
+    const cueId = '3b8b3d3e-5f0f-4a0c-9d1c-2d9f7a1b5c6e';
+    const otherId = '9c2d7f5e-1a4b-4c3d-8e2f-0b1a2c3d4e5f';
+    const cues = [
+      { id: cueId, text: 'Hello', startMs: 0, endMs: 1_500, placement: 'bottom' as const },
+      { id: otherId, text: 'Overlapping', startMs: 1_000, endMs: 2_000, placement: 'top' as const },
+    ];
+    const withCues = {
+      ...validSnapshot(),
+      localEdit: { ...validSnapshot().localEdit, subtitles: cues },
+    };
+    expect(projectSnapshotSchema.parse(withCues)).toEqual(withCues);
+
+    // A snapshot stored before subtitles existed has no list at all.
+    const { subtitles, ...legacyEdit } = validSnapshot().localEdit;
+    expect(subtitles).toEqual([]);
+    expect(projectSnapshotSchema.parse({ ...validSnapshot(), localEdit: legacyEdit })).toEqual(
+      validSnapshot(),
+    );
+
+    const accepts = (list: unknown) =>
+      projectSnapshotSchema.safeParse({
+        ...validSnapshot(),
+        localEdit: { ...validSnapshot().localEdit, subtitles: list },
+      }).success;
+    expect(accepts([cues[1], cues[0]])).toBe(false);
+    expect(accepts([cues[0], { ...cues[1], id: cueId }])).toBe(false);
+    expect(accepts([{ ...cues[0], text: '   ' }])).toBe(false);
+    expect(accepts([{ ...cues[0], endMs: 0 }])).toBe(false);
+    // The minimum the domain enforces is the minimum the wire accepts.
+    expect(accepts([{ ...cues[0], endMs: 50 }])).toBe(false);
+    expect(accepts([{ ...cues[0], endMs: 100 }])).toBe(true);
+    expect(accepts([{ ...cues[0], id: 'cue-1' }])).toBe(false);
+    expect(accepts([{ ...cues[0], placement: 'left' }])).toBe(false);
+    const overflow = Array.from({ length: 201 }, (_, index) => ({
+      ...cues[0],
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+      startMs: index,
+      endMs: index + 100,
+    }));
+    expect(accepts(overflow.slice(0, 200))).toBe(true);
+    expect(accepts(overflow)).toBe(false);
   });
 
   it('migrates v1 snapshots explicitly without fabricating missing applied provenance', () => {

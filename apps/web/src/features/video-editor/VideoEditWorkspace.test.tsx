@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { createDefaultVideoEditSpec, type VideoEditSpec } from '@studio/domain';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { createDefaultVideoEditSpec, type SubtitleCue, type VideoEditSpec } from '@studio/domain';
 import { createRef } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
@@ -47,6 +47,7 @@ const createSession = (overrides: Partial<VideoEditSession> = {}): VideoEditSess
     baseline: draft,
     draft,
     activeTool: 'trim',
+    selectedSubtitleId: null,
     showingBefore: false,
     splitComparison: false,
     playheadMs: 2_500,
@@ -61,6 +62,7 @@ const createSession = (overrides: Partial<VideoEditSession> = {}): VideoEditSess
     begin: vi.fn(),
     close: vi.fn(),
     setActiveTool: vi.fn(),
+    setSelectedSubtitleId: vi.fn(),
     setShowingBefore: vi.fn(),
     setSplitComparison: vi.fn(),
     setPlayheadMs: vi.fn(),
@@ -72,6 +74,7 @@ const createSession = (overrides: Partial<VideoEditSession> = {}): VideoEditSess
     redo: vi.fn(),
     resetTool: vi.fn(),
     resetAll: vi.fn(),
+    removeSubtitleCue: vi.fn(),
     startRender: vi.fn(() => Promise.resolve()),
     cancelRender: vi.fn(),
     resumeEditing: vi.fn(),
@@ -97,6 +100,14 @@ const renderWorkspace = (session: VideoEditSession, onRequestDiscard = vi.fn()) 
     </StudioDesignProvider>,
   );
 };
+
+const subtitleCue = (id: string, text: string, startMs: number, endMs: number): SubtitleCue => ({
+  id,
+  text,
+  startMs,
+  endMs,
+  placement: 'bottom',
+});
 
 const renderProjectWorkspace = (
   session: VideoEditSession,
@@ -280,5 +291,148 @@ describe('VideoEditWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Render preview' }));
     expect(session.startRender).toHaveBeenCalledOnce();
     expect(screen.queryByRole('button', { name: 'Save edited video' })).not.toBeInTheDocument();
+  });
+
+  it('says when the applied Project edit burned subtitles in, and what that means', () => {
+    const session = createSession();
+    renderProjectWorkspace(session, {
+      ...session.draft,
+      subtitles: [subtitleCue('cue-1', 'Hello', 0, 1_000), subtitleCue('cue-2', 'World', 1, 2)],
+    });
+    const notice = screen.getByText('Applied Project edit').closest('[role="status"]');
+    expect(notice).toHaveTextContent('with 2 subtitles burned in');
+    expect(notice).toHaveTextContent('edit again from a cut that does not carry them');
+  });
+
+  it('adds a subtitle at the playhead and opens it for typing', () => {
+    const session = createSession({ activeTool: 'subtitles' });
+    renderWorkspace(session);
+    expect(screen.getByText(/No subtitles yet/u)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add subtitle at playhead' }));
+    expect(session.applySpec).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subtitles: [
+          expect.objectContaining({ text: '', startMs: 2_500, endMs: 4_500, placement: 'bottom' }),
+        ],
+      }),
+    );
+    const added = vi.mocked(session.applySpec).mock.calls[0]![0].subtitles[0]!;
+    expect(session.setSelectedSubtitleId).toHaveBeenCalledWith(added.id);
+  });
+
+  it('edits the selected subtitle as one undo entry per focus, repositions, seeks to and deletes it', () => {
+    const cue = subtitleCue('cue-1', 'Hello', 1_000, 2_000);
+    const session = createSession({
+      activeTool: 'subtitles',
+      draft: { ...createDefaultVideoEditSpec(source.metadata.durationMs), subtitles: [cue] },
+      selectedSubtitleId: 'cue-1',
+    });
+    renderWorkspace(session);
+    const video = screen.getByTestId<HTMLVideoElement>('editor-source-video');
+
+    const text = screen.getByRole('textbox', { name: 'Text' });
+    fireEvent.focus(text);
+    fireEvent.change(text, { target: { value: 'Hello there' } });
+    fireEvent.blur(text);
+    expect(session.beginTransaction).toHaveBeenCalledOnce();
+    expect(session.previewSpec).toHaveBeenCalledWith(
+      expect.objectContaining({ subtitles: [{ ...cue, text: 'Hello there' }] }),
+    );
+    expect(session.commitTransaction).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Top' }));
+    expect(session.applySpec).toHaveBeenLastCalledWith(
+      expect.objectContaining({ subtitles: [{ ...cue, placement: 'top' }] }),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Set end to playhead' }));
+    expect(session.applySpec).toHaveBeenLastCalledWith(
+      expect.objectContaining({ subtitles: [{ ...cue, endMs: 2_500 }] }),
+    );
+
+    const row = within(screen.getByRole('list', { name: 'Subtitles' })).getByRole('button');
+    expect(row).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(row);
+    expect(session.setSelectedSubtitleId).toHaveBeenCalledWith('cue-1');
+    expect(session.setPlayheadMs).toHaveBeenCalledWith(1_000);
+    expect(video.currentTime).toBe(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete subtitle' }));
+    expect(session.removeSubtitleCue).toHaveBeenCalledExactlyOnceWith('cue-1');
+  });
+
+  it('keeps Escape from collapsing the inspector while a subtitle is being typed', () => {
+    const cue = subtitleCue('cue-1', 'Hello', 1_000, 2_000);
+    const session = createSession({
+      activeTool: 'subtitles',
+      draft: { ...createDefaultVideoEditSpec(source.metadata.durationMs), subtitles: [cue] },
+      selectedSubtitleId: 'cue-1',
+    });
+    renderWorkspace(session);
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Text' }), { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Collapse inspector' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Expand inspector' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
+  it('shows subtitles as a lane of cue buttons that select, nudge, move and delete', () => {
+    const first = subtitleCue('cue-1', 'Hello', 1_000, 3_000);
+    const second = subtitleCue('cue-2', 'World', 2_000, 4_000);
+    const session = createSession({
+      draft: {
+        ...createDefaultVideoEditSpec(source.metadata.durationMs),
+        subtitles: [first, second],
+      },
+    });
+    renderWorkspace(session);
+    const lane = screen.getByRole('group', { name: 'Subtitles on the timeline' });
+    const blocks = within(lane).getAllByRole('button');
+    expect(blocks).toHaveLength(2);
+    // The two overlap, so the second takes a row of its own.
+    expect(blocks[0]).toHaveAttribute('data-row', '0');
+    expect(blocks[1]).toHaveAttribute('data-row', '1');
+    expect(blocks[0]).toHaveAccessibleName('Subtitle 1: Hello, 00:01.00 to 00:03.00');
+
+    fireEvent.click(blocks[0]!);
+    expect(session.setSelectedSubtitleId).toHaveBeenCalledWith('cue-1');
+    expect(session.setPlayheadMs).toHaveBeenCalledWith(1_000);
+
+    fireEvent.keyDown(blocks[0]!, { key: 'ArrowRight', shiftKey: true });
+    fireEvent.keyUp(blocks[0]!, { key: 'ArrowRight', shiftKey: true });
+    expect(session.beginTransaction).toHaveBeenCalled();
+    const nudged = vi.mocked(session.previewSpec).mock.calls.at(-1)![0].subtitles[0]!;
+    expect(nudged.startMs).toBeCloseTo(1_000 + 10 * (1_000 / 30));
+    expect(nudged.endMs - nudged.startMs).toBeCloseTo(2_000);
+    expect(session.commitTransaction).toHaveBeenCalled();
+
+    const track = screen.getByLabelText('Editable video timeline');
+    vi.spyOn(track, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      right: 1_000,
+      bottom: 44,
+      left: 0,
+      width: 1_000,
+      height: 44,
+      toJSON: () => ({}),
+    });
+    fireEvent.pointerDown(blocks[1]!, { pointerId: 1, clientX: 300 });
+    fireEvent.pointerMove(blocks[1]!, { pointerId: 1, clientX: 400 });
+    fireEvent.pointerUp(blocks[1]!, { pointerId: 1 });
+    const moved = vi.mocked(session.previewSpec).mock.calls.at(-1)![0].subtitles[1]!;
+    expect(moved.startMs).toBeCloseTo(3_000);
+    expect(moved.endMs).toBeCloseTo(5_000);
+
+    fireEvent.keyDown(blocks[1]!, { key: 'Delete' });
+    expect(session.removeSubtitleCue).toHaveBeenCalledExactlyOnceWith('cue-2');
   });
 });

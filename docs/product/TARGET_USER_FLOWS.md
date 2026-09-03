@@ -99,7 +99,8 @@ pickers ignore memberships)**.
 
 **Sees:** the editor as a first-class Project surface: preview stage (WYSIWYG), tool rail — Trim,
 Split **(gap)**, Crop/Reframe (aspect presets), Rotate, Lighting, Filters, Audio **(gap: levels,
-mute, replace)**, Subtitles **(gap)** — timeline with frame stepping, undo/redo, compare-to-original.
+mute, replace)**, Subtitles (timed, placed, burned in at render per D4) — timeline with frame
+stepping and a subtitle lane, undo/redo, compare-to-original.
 **Does:** edits non-destructively; renders a preview on-device; adopts it as the current cut.
 **System:** edit specifications persist with the revision so edits can be reopened and loosened
 **(gap — today re-editing starts from the baked render)**; the original is never modified.

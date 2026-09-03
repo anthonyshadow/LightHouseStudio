@@ -190,7 +190,10 @@ material flow problems are of shape, not breakage:
 **GAP-1 Single-source Projects** (db-1 = STOR-7 = PCD-1 = studio-3 = DC-2): schema PK, domain
 snapshot, contracts, capture bridge, and UI all enforce one video per Project.
 **GAP-2 No composition primitives** (db-2 = edit-1 = web-7 = DC-1 = prod-1): no clip, timeline,
-stitch, subtitle, or audio-level concept in any layer; player has no caption support (edit-2).
+stitch, or audio-level concept in any layer. Subtitles now exist on the single-clip edit as
+burn-in (slice 2.1, 2026-09-03: `VideoEditSpec.subtitles`, editor tool and lane, shared-shader
+compositing), which closes the single-clip half of edit-2; the player carries no caption track by
+decision (D4), and composition-level subtitle tracks remain Phase 3 work.
 **GAP-3 AI-round workspace model** (db-3 = DC-3-adjacent = prod-4): revision snapshots put AI
 selections first-class; the post-source phase is literally named "creative"; an output commit
 _requires_ project status `completed`; an AI run scrims the whole workspace.

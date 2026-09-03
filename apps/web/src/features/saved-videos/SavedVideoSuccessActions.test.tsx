@@ -19,7 +19,7 @@ const renderVideoEdit =
     }) => Promise<{ blob: Blob; mimeType: 'video/mp4' }>
   >();
 const readSavedVideoContent = vi.fn<() => Promise<Blob>>();
-vi.mock('../video-editor/videoEditShader', () => ({
+vi.mock('../video-editor/videoEditSupport', () => ({
   videoEditPreviewSupported: () => renderCapable(),
 }));
 vi.mock('../video-editor/renderVideoEdit', () => ({

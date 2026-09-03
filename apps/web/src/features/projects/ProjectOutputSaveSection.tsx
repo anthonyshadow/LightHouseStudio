@@ -11,10 +11,19 @@ import {
   isProjectExportPlacementAspect,
   projectExportFilename,
   projectMediaReferencesEqual,
+  subtitlePlacementsUsed,
   type ProjectExportSpecification,
 } from '@studio/domain';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
 import { useNavigate } from 'react-router';
 import { ApiClientError } from '../../adapters/api-client/apiClient';
 import { savedVideoLibraryPath } from '../../app/paths';
@@ -51,13 +60,12 @@ import {
 } from './projectOutputOperationStorage';
 import {
   getProject,
-  getProjectSource,
-  getProjectWorkingMedia,
   ProjectApiConflictError,
   readProjectWorkingMediaContent,
   saveProjectOutput,
   uploadProjectRendition,
 } from './projectsApi';
+import { ensureCurrentCut, useProjectCurrentCut, type CurrentCut } from './useProjectCurrentCut';
 import type { ProjectSessionPort } from './useProjectSession';
 import { useStableOperationKey } from './useStableOperationKey';
 import { projectQueryKeys } from './useProjectsController';
@@ -95,53 +103,6 @@ const useMobileDestinationSheet = (): boolean => {
     return () => query.removeEventListener?.('change', update);
   }, []);
   return mobile;
-};
-
-type CurrentCut = Readonly<{
-  contentUrl: string;
-  mimeType: string;
-  filename: string;
-  width: number;
-  height: number;
-  durationMs: number;
-  hasAudio: boolean;
-}>;
-
-/**
- * Describes the cut the stage is showing, wherever this Project keeps it.
- *
- * Only an edit or a previous save writes a working-media adoption, so the ordinary path — upload a
- * source, choose a placement, save — has none and asking for one 404s. The snapshot says which it
- * is, so this asks the matching surface rather than assuming the edited case. It returns where the
- * bytes are rather than the bytes: the caller reads them where it consumes them, so nothing here
- * keeps a large Blob alive.
- */
-const describeCurrentCut = async (
-  latest: ProjectCurrentResponse,
-  signal: AbortSignal,
-): Promise<CurrentCut> => {
-  const { workingMedia } = latest.revision.snapshot;
-  const source = await getProjectSource(latest.project.id, signal);
-  const sourceReference =
-    source.source.savedVideoId !== null && source.source.videoVersionId !== null
-      ? {
-          kind: 'saved-video-version' as const,
-          savedVideoId: source.source.savedVideoId,
-          videoVersionId: source.source.videoVersionId,
-        }
-      : { kind: 'asset' as const, assetId: latest.revision.snapshot.sourceAssetId ?? '' };
-  const cut = projectMediaReferencesEqual(workingMedia, sourceReference)
-    ? source.source
-    : (await getProjectWorkingMedia(latest.project.id, signal)).media;
-  return {
-    contentUrl: cut.contentUrl,
-    mimeType: cut.mimeType,
-    filename: cut.filename,
-    width: cut.width,
-    height: cut.height,
-    durationMs: cut.durationMs,
-    hasAudio: cut.hasAudio,
-  };
 };
 
 /** The placement a save has to produce bytes for; `source` and an unset placement produce none. */
@@ -195,6 +156,13 @@ export const ProjectOutputSaveSection = ({
   const renditionOperation = useStableOperationKey();
   const renditionFetchRef = useRef<AbortController | null>(null);
   const readyMedia = readyMediaFor(current);
+  // The cut's frame, so the chooser can draw the crop and say what it does to burned-in subtitles
+  // rather than describe them; one small read per revision, reused by the save itself.
+  const currentCut = useProjectCurrentCut(current, readyMedia !== null);
+  // The cut's subtitles are pixels by now; the chooser says whether a shape keeps them, from the
+  // edit that produced this cut.
+  const subtitles = current.revision.snapshot.localEdit?.subtitles;
+  const subtitlePlacements = useMemo(() => subtitlePlacementsUsed(subtitles ?? []), [subtitles]);
   // The chosen placement lives on the revision, so the snapshot is the value the control shows.
   const placement = current.revision.snapshot.exportSpecification;
   // A browser capability, measured once per mount rather than on every keystroke.
@@ -384,7 +352,9 @@ export const ProjectOutputSaveSection = ({
     let cut: CurrentCut;
     let rendered: ExportPlacementRenderResult | null;
     try {
-      cut = await describeCurrentCut(latest, controller.signal);
+      // Usually a cache hit — the stage's hydration or the chooser asked already. A miss is two
+      // metadata reads the query owns outright; cancelling them is not worth a second path.
+      cut = await ensureCurrentCut(queryClient, latest);
       /*
        * Scoped to this block deliberately. The render consumes the source and the block ends, so
        * the only large Blob still reachable while the result uploads is the result — holding both
@@ -774,10 +744,10 @@ export const ProjectOutputSaveSection = ({
             <div css={placementSectionStyles(theme)}>
               <ExportPlacementChooser
                 value={placement}
+                source={currentCut}
+                subtitlePlacements={subtitlePlacements}
                 disabled={archived || busy || processing}
                 unavailable={!placementSupported}
-                // The current cut's pixel size is not carried on the Project snapshot, so the crop
-                // is described rather than drawn here; the download knows the exact frame.
                 onChange={(specification) => {
                   session.propose({ exportSpecification: specification });
                 }}
