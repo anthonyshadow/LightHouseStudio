@@ -389,12 +389,21 @@ origin/method/header policy in [Cloud persistence](docs/CLOUD_PERSISTENCE.md).
 
 ## Branch and environment workflow
 
-`develop` is the default daily branch and accepts direct pushes; force-push and deletion remain
-blocked. `main` is the production promotion branch and accepts only a same-repository
-`develop` → `main` pull request after the required Quality, CodeQL, Dependency Review, and Release
-Source checks. Branch names never select credentials at runtime: commands set `LIGHTFRAME_ENV`
-explicitly, and ordinary CI cannot read the protected GitHub `development` or `production`
-Environment secrets.
+`develop` is the default daily branch and accepts direct pushes; deletion remains blocked, while
+force-push stays open so the promotion below can realign the branch. `main` is the production
+promotion branch and accepts only a same-repository `develop` → `main` pull request after the
+required Quality, CodeQL, Dependency Review, and Release Source checks.
+
+That pull request merges with GitHub's rebase strategy, which replays every commit onto `main`
+under a fresh SHA. The content is identical but the identifiers are not, so `develop` would
+otherwise read as both ahead of and behind `main` by the size of each release, compounding with
+every promotion. [Sync Develop](.github/workflows/sync-develop.yml) closes that gap: on each push
+to `main` it moves `develop` onto the commits the promotion kept. It compares by patch rather than
+by SHA and leaves the branch untouched when `develop` holds work `main` does not carry in any
+form, so a commit pushed while a promotion was merging is never discarded.
+
+Branch names never select credentials at runtime: commands set `LIGHTFRAME_ENV` explicitly, and
+ordinary CI cannot read the protected GitHub `development` or `production` Environment secrets.
 
 Creative-library and Character Builder IndexedDB names include both the runtime mode and
 authenticated user. Development therefore starts with empty browser persistence even when the same
