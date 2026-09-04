@@ -384,3 +384,44 @@ possibility, and that is where a bundled face belongs.
 
 Everything else in §3 is a routine call made the way the nearest existing code makes it, and prompt
 14 proceeds on those defaults.
+
+## 6. Verification (prompt 15), 2026-09-04
+
+Evidence for the four checks the verification prompt names. Commands and their actual results are
+in the prompt-15 completion report; this records what was established and what was not.
+
+**Cross-mode persistence of cue data.** Both modes read a revision snapshot back through the same
+`projectSnapshotSchema`, so the risk is a field carried by one store and dropped by the other. Each
+now has a cue round-trip: PostgreSQL in `project-repository.postgres.integration.test.ts` (an
+adoption carrying a `top` cue, against a migrated throwaway database), and the file store in
+`file-project-repository.test.ts`, which checkpoints two overlapping cues, restarts the repository,
+and additionally reads the metadata file off disk — a schema that accepted the write and dropped
+the field on read cannot pass by round-tripping an in-memory aggregate.
+
+**Render fidelity at all five placements.** Captions are pixels in the cut before a placement is
+chosen: `projectExportVideoEditSpec` builds a placement's spec from a default, and the rendition
+re-frames the current cut, which is the burned output. So the question each placement asks is what
+its crop does to the caption regions, and `projects.test.ts` now answers it for all five against
+both orientations. A landscape cut re-framed to any narrower shape loses every region — the caption
+box spans the middle 80% of the width and none of those keep that much. A portrait cut keeps every
+caption through a square or 4:5 re-frame and loses only the ends to widescreen, which is the reason
+`SUBTITLE_LAYOUT`'s portrait insets are as deep as they are, now held to it by a test.
+
+**Memory bound.** The output cap is enforced before allocation and the accumulator assembles sparse
+offset writes without a growing contiguous buffer, releasing its chunks on clear
+(`videoEditChunkAccumulator.test.ts`). Captions add one canvas for the whole render, not one per
+cue: `createSubtitleOverlaySync` builds it on first use and reuses it, asserted in
+`subtitleRasterizer.test.ts`. The source side is streamed by MediaBunny's `BlobSource` rather than
+buffered; that belongs to the library and was not re-tested here.
+
+**Reduced motion and keyboard.** The editor's own styles declare no transition or animation at all,
+and `StudioDesignProvider` neutralises both app-wide under `prefers-reduced-motion: reduce` with a
+universal selector, so the Subtitles surface respects it by construction. Keyboard operation of the
+cue lane is covered in `VideoEditWorkspace.test.tsx`: arrow nudge with and without Shift, Delete on
+a focused cue, and add/edit/delete through the tool panel.
+
+**Not established here.** Real Safari and Firefox export, and burned-text fidelity on a physical
+device, remain the manual release gate `docs/BROWSER_SUPPORT.md` describes — an automated Chromium
+render says nothing about another engine's codec path. A 300 MB source was not pushed through an
+actual render; what is proven is the cap and the accumulator's behaviour, not a measurement under
+that load.

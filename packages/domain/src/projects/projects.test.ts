@@ -20,6 +20,7 @@ import {
   ProjectRuleError,
   projectExportFilename,
   projectExportPreview,
+  PROJECT_EXPORT_ASPECTS,
   projectExportSpecificationForAspect,
   projectExportSpecificationsEqual,
   projectExportVideoEditSpec,
@@ -30,7 +31,11 @@ import {
   validateProjectExportSpecification,
   validateProjectSnapshot,
 } from './index';
-import { createDefaultVideoEditSpec } from '../video-editing';
+import {
+  createDefaultVideoEditSpec,
+  SUBTITLE_CUE_PLACEMENTS,
+  subtitlePlacementsCutByCrop,
+} from '../video-editing';
 
 const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
 const ownerUserId = '8565ab6c-70ee-409c-bb0a-ff08b7c98070';
@@ -1441,5 +1446,54 @@ describe('Project duplication', () => {
     expect(copied.endsWith(' (copy)')).toBe(true);
     // The result is itself a valid Project title, so a copy of a copy still works.
     expect(duplicateProjectTitle(copied)).toHaveLength(120);
+  });
+});
+
+/*
+ * Slice 2.1 verification: what each of the five placements does to captions that are already
+ * pixels in the cut. The renderer and the chooser read this same geometry, so the table is the
+ * spot-check — and it is what holds `SUBTITLE_LAYOUT`'s portrait insets to their stated reason,
+ * that a phone cut re-framed square or 4:5 keeps its captions.
+ */
+describe('burned captions across every export placement', () => {
+  const landscape = { width: 1_920, height: 1_080, durationMs: 12_000 };
+  const portrait = { width: 1_080, height: 1_920, durationMs: 12_000 };
+
+  const cutRegions = (
+    aspect: (typeof PROJECT_EXPORT_ASPECTS)[number],
+    source: typeof landscape,
+  ) => {
+    const preview = projectExportPreview(projectExportSpecificationForAspect(aspect), source);
+    if (preview === null) return [];
+    return subtitlePlacementsCutByCrop(SUBTITLE_CUE_PLACEMENTS, preview.crop, source);
+  };
+
+  it('keeps every region when the placement asks for no re-frame', () => {
+    expect(cutRegions('source', landscape)).toEqual([]);
+    expect(cutRegions('16:9', landscape)).toEqual([]);
+    expect(cutRegions('9:16', portrait)).toEqual([]);
+  });
+
+  it('cuts every region when a landscape cut is re-framed to a narrower shape', () => {
+    // The caption box spans the middle 80% of the width, and each of these keeps less than that,
+    // so there is no region a landscape source can caption and still survive the crop.
+    for (const aspect of ['9:16', '1:1', '4:5'] as const) {
+      expect(cutRegions(aspect, landscape)).toEqual(['top', 'middle', 'bottom']);
+    }
+  });
+
+  it('keeps a phone cut’s captions through a square or tall re-frame, and loses the ends to wide', () => {
+    expect(cutRegions('1:1', portrait)).toEqual([]);
+    expect(cutRegions('4:5', portrait)).toEqual([]);
+    // Widescreen from portrait discards the bands the top and bottom regions sit in; the middle
+    // region is the one that survives, which is what the chooser tells the operator.
+    expect(cutRegions('16:9', portrait)).toEqual(['top', 'bottom']);
+  });
+
+  it('covers all five placements, so a new one cannot be added without a caption answer', () => {
+    expect(PROJECT_EXPORT_ASPECTS).toHaveLength(5);
+    for (const aspect of PROJECT_EXPORT_ASPECTS) {
+      expect(() => cutRegions(aspect, landscape)).not.toThrow();
+    }
   });
 });
