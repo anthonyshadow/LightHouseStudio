@@ -53,6 +53,7 @@ export type AppIconName =
   | 'spark'
   | 'split'
   | 'stop'
+  | 'audio'
   | 'subtitles'
   | 'switchCamera'
   | 'trash'
@@ -288,6 +289,12 @@ const iconPaths: Record<AppIconName, ReactNode> = {
     </>
   ),
   stop: <rect x="6.5" y="6.5" width="11" height="11" rx="1.5" />,
+  audio: (
+    <>
+      <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" />
+      <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" />
+    </>
+  ),
   subtitles: (
     <>
       <rect x="3" y="5" width="18" height="14" rx="2.5" />

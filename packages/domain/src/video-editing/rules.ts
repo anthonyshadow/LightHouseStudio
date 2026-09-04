@@ -1,8 +1,10 @@
 import { clamp } from './clamp';
+import { VIDEO_EDIT_AUDIO_LEVEL_MAX } from './types';
 import { finalizeSubtitleCues, normalizeSubtitleCues, subtitleCuesEqual } from './subtitles';
 import type {
   NormalizedVideoCrop,
   VideoEditAdjustments,
+  VideoEditAudio,
   VideoEditCropPreset,
   VideoEditOutputGeometry,
   VideoEditProviderCompatibility,
@@ -30,6 +32,12 @@ export const DEFAULT_VIDEO_EDIT_ADJUSTMENTS: VideoEditAdjustments = {
 
 export const FULL_VIDEO_CROP: NormalizedVideoCrop = { x: 0, y: 0, width: 1, height: 1 };
 
+/** Plain object, not frozen, for the same bundle reason as the adjustments above. */
+export const DEFAULT_VIDEO_EDIT_AUDIO: VideoEditAudio = {
+  level: VIDEO_EDIT_AUDIO_LEVEL_MAX,
+  muted: false,
+};
+
 const evenDimension = (value: number): number => Math.max(2, Math.floor(value / 2) * 2);
 
 export const createDefaultVideoEditSpec = (durationMs: number): VideoEditSpec => ({
@@ -41,10 +49,27 @@ export const createDefaultVideoEditSpec = (durationMs: number): VideoEditSpec =>
   adjustments: DEFAULT_VIDEO_EDIT_ADJUSTMENTS,
   filter: 'original',
   subtitles: [],
+  audio: DEFAULT_VIDEO_EDIT_AUDIO,
 });
 
 export const clampVideoEditAdjustment = (value: number): number =>
   Math.round(clamp(value, -100, 100));
+
+export const clampVideoEditAudioLevel = (value: number): number =>
+  Math.round(clamp(value, 0, VIDEO_EDIT_AUDIO_LEVEL_MAX));
+
+export const normalizeVideoEditAudio = (audio: VideoEditAudio): VideoEditAudio => {
+  const level = clampVideoEditAudioLevel(audio.level);
+  const muted = audio.muted === true;
+  return level === audio.level && muted === audio.muted ? audio : { level, muted };
+};
+
+/**
+ * The one number the render and the preview both apply: a linear multiplier on the source's
+ * samples, silence when muted. Stated once so the file and the stage cannot disagree by a decibel.
+ */
+export const videoEditAudioGain = (audio: VideoEditAudio): number =>
+  audio.muted ? 0 : clampVideoEditAudioLevel(audio.level) / VIDEO_EDIT_AUDIO_LEVEL_MAX;
 
 export const normalizeVideoCrop = (crop: NormalizedVideoCrop): NormalizedVideoCrop => {
   const width = clamp(crop.width, 0.02, 1);
@@ -126,6 +151,7 @@ export const normalizeVideoEditSpec = (
     crop: { ...spec.crop, rectangle: cropRectangle },
     adjustments,
     subtitles: normalizeSubtitleCues(spec.subtitles, source),
+    audio: normalizeVideoEditAudio(spec.audio),
   };
 };
 
@@ -202,4 +228,6 @@ export const videoEditSpecsEqual = (left: VideoEditSpec, right: VideoEditSpec): 
       left.adjustments[key as keyof VideoEditAdjustments] ===
       right.adjustments[key as keyof VideoEditAdjustments],
   ) &&
-  subtitleCuesEqual(left.subtitles, right.subtitles);
+  subtitleCuesEqual(left.subtitles, right.subtitles) &&
+  left.audio.level === right.audio.level &&
+  left.audio.muted === right.audio.muted;

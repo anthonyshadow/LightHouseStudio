@@ -7,6 +7,7 @@ import {
   projectCurrentResponseSchema,
   projectHistoryResponseSchema,
   projectSessionProposalSchema,
+  projectVideoEditSpecSchema,
   projectOutputHistoryResponseSchema,
   projectOutputLinkSchema,
   projectOutputSaveResultSchema,
@@ -132,6 +133,7 @@ const validSnapshot = () => ({
     },
     filter: 'original' as const,
     subtitles: [],
+    audio: { level: 100, muted: false },
   },
   exportSpecification: {
     container: 'video/mp4' as const,
@@ -733,6 +735,7 @@ describe('projectSessionProposalSchema', () => {
     },
     filter: 'original' as const,
     subtitles: [],
+    audio: { level: 100, muted: false },
   };
 
   it('accepts a specification that states its cue list', () => {
@@ -754,5 +757,35 @@ describe('projectSessionProposalSchema', () => {
 
     expect(result.success).toBe(false);
     expect(result.error?.issues.at(0)?.message).toMatch(/out of date/u);
+  });
+
+  it('reads a pre-audio specification back as the source as recorded, and keeps the field last', () => {
+    const legacy: Record<string, unknown> = { ...spec };
+    delete legacy['audio'];
+    const parsed = projectVideoEditSpecSchema.parse(legacy);
+
+    expect(parsed.audio).toEqual({ level: 100, muted: false });
+    expect(Object.keys(parsed).at(-1)).toBe('audio');
+  });
+
+  it('accepts a whole percentage and a mute, and refuses a boost, a fraction or a bare level', () => {
+    const parse = (audio: unknown) =>
+      projectVideoEditSpecSchema.safeParse({ ...spec, audio }).success;
+
+    expect(
+      projectVideoEditSpecSchema.parse({ ...spec, audio: { level: 40, muted: true } }).audio,
+    ).toEqual({ level: 40, muted: true });
+    expect(parse({ level: 101, muted: false })).toBe(false);
+    expect(parse({ level: 33.5, muted: false })).toBe(false);
+    expect(parse({ level: 40 })).toBe(false);
+  });
+
+  it('refuses a specification from a client that cannot describe the level', () => {
+    const withoutAudio: Record<string, unknown> = { ...spec };
+    delete withoutAudio['audio'];
+    const result = projectSessionProposalSchema.safeParse(proposal(withoutAudio));
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.path.at(-1))).toEqual(['audio']);
   });
 });

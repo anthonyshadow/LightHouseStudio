@@ -26,8 +26,30 @@ type ConversionOptions = {
   video: Record<string, unknown> & {
     process?: (sample: { timestamp: number; toVideoFrame: () => { close: () => void } }) => unknown;
   };
-  audio?: Record<string, unknown>;
+  audio?: Record<string, unknown> & { process?: (sample: FakeAudioSampleInput) => unknown };
 };
+
+type FakeAudioSampleInput = {
+  numberOfFrames: number;
+  numberOfChannels: number;
+  sampleRate: number;
+  timestamp: number;
+  copyTo: (destination: Float32Array) => void;
+};
+
+/** What the worker constructs for a processed sample: the init it was given, nothing decoded. */
+class FakeAudioSample {
+  constructor(readonly init: { data: Float32Array; format: string } & Record<string, unknown>) {}
+}
+
+/** Two interleaved stereo frames, as the runtime hands them to `process` after remixing. */
+const interleavedSample = (): FakeAudioSampleInput => ({
+  numberOfFrames: 2,
+  numberOfChannels: 2,
+  sampleRate: 48_000,
+  timestamp: 0.5,
+  copyTo: (destination) => destination.set([0.5, -0.5, 1, -1]),
+});
 
 /**
  * A media runtime that records the conversion it was asked for and produces one byte of output,
@@ -85,6 +107,7 @@ const stubMediaRuntime = (sampleTimestamps: readonly number[] = []) => {
         writable = stream;
       }
     },
+    AudioSample: FakeAudioSample,
     Conversion: {
       init: (options: ConversionOptions) => {
         initialized.push(options);
@@ -193,6 +216,7 @@ describe('videoEditRender worker runtime', () => {
     }
     vi.doMock('mediabunny', () => ({
       ALL_FORMATS: [],
+      AudioSample: class {},
       BlobSource: class {},
       Conversion: {},
       Input,
@@ -271,6 +295,46 @@ describe('videoEditRender worker runtime', () => {
     });
     expect(runtime.initialized[0]!.audio).toEqual({ codec: 'aac', forceTranscode: true });
     expect(runtime.renderer.setOverlay).not.toHaveBeenCalled();
+  });
+
+  it('applies the audio level to every sample as a gain, and mute as silence', async () => {
+    const runtime = stubMediaRuntime();
+    const worker = await loadWorker();
+    const spec = createDefaultVideoEditSpec(1_000);
+
+    worker.send(renderRequest(43, { spec: { ...spec, audio: { level: 50, muted: false } } }));
+    await vi.waitFor(() =>
+      expect(worker.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'complete', operationId: 43 }),
+      ),
+    );
+    worker.send(renderRequest(47, { spec: { ...spec, audio: { level: 50, muted: true } } }));
+    await vi.waitFor(() =>
+      expect(worker.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'complete', operationId: 47 }),
+      ),
+    );
+
+    const [halved, muted] = runtime.initialized.map((options) => options.audio!);
+    expect(halved).toMatchObject({ codec: 'aac', forceTranscode: true });
+    const processed = halved!.process!(interleavedSample());
+    expect(processed).toBeInstanceOf(FakeAudioSample);
+    expect((processed as FakeAudioSample).init).toMatchObject({
+      format: 'f32',
+      numberOfChannels: 2,
+      sampleRate: 48_000,
+      timestamp: 0.5,
+    });
+    expect(Array.from((processed as FakeAudioSample).init.data)).toEqual([0.25, -0.25, 0.5, -0.5]);
+
+    const silenced = muted!.process!(interleavedSample()) as FakeAudioSample;
+    // A negative sample times zero is negative zero, which is still silence.
+    expect(Array.from(silenced.init.data).map((value) => value === 0)).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
   });
 
   it('burns subtitles in output time through the trim, rasterizing once per change of the active set', async () => {

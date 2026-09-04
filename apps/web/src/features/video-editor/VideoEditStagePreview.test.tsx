@@ -3,7 +3,12 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useMemo, useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createDefaultVideoEditSpec, type SubtitleCue, type VideoEditSpec } from '@studio/domain';
+import {
+  createDefaultVideoEditSpec,
+  type SubtitleCue,
+  type VideoEditAudio,
+  type VideoEditSpec,
+} from '@studio/domain';
 import { StudioDesignProvider } from '../../ui';
 import { VideoEditStagePreview } from './VideoEditStagePreview';
 
@@ -68,6 +73,7 @@ const PreviewHarness = ({
     rectangle: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
   },
   subtitles,
+  audio,
 }: {
   showingBefore?: boolean;
   splitComparison?: boolean;
@@ -80,6 +86,7 @@ const PreviewHarness = ({
   initialCrop?: VideoEditSpec['crop'];
   /** A fresh array on every render forces the paused-video redraw the preview offers. */
   subtitles?: readonly SubtitleCue[];
+  audio?: VideoEditAudio;
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [spec, setSpec] = useState<VideoEditSpec>({
@@ -87,8 +94,8 @@ const PreviewHarness = ({
     crop: initialCrop,
   });
   const effectiveSpec = useMemo(
-    () => (subtitles ? { ...spec, subtitles } : spec),
-    [spec, subtitles],
+    () => ({ ...spec, ...(subtitles ? { subtitles } : {}), ...(audio ? { audio } : {}) }),
+    [spec, subtitles, audio],
   );
   return (
     <StudioDesignProvider>
@@ -234,6 +241,31 @@ describe('VideoEditStagePreview', () => {
     expect(moved?.height).toBeCloseTo(0.75);
     expect(onCropStart).toHaveBeenCalledTimes(3);
     expect(onCropCommit).toHaveBeenCalledTimes(3);
+  });
+
+  it('plays the source at the draft level, silences it when muted, lets Compare hear the source, and hands it back as found', () => {
+    const callbacks = { onCropStart: vi.fn(), onCropChange: vi.fn(), onCropCommit: vi.fn() };
+    const view = render(<PreviewHarness {...callbacks} audio={{ level: 40, muted: false }} />);
+    const video = view.container.querySelector<HTMLVideoElement>('[data-testid="source-video"]')!;
+    expect(video.volume).toBe(0.4);
+    expect(video.muted).toBe(false);
+
+    view.rerender(<PreviewHarness {...callbacks} audio={{ level: 40, muted: true }} />);
+    expect(video.volume).toBe(0);
+    expect(video.muted).toBe(true);
+
+    view.rerender(
+      <PreviewHarness {...callbacks} audio={{ level: 40, muted: true }} showingBefore />,
+    );
+    expect(video.volume).toBe(1);
+    expect(video.muted).toBe(false);
+
+    view.rerender(<PreviewHarness {...callbacks} audio={{ level: 40, muted: true }} />);
+    expect(video.muted).toBe(true);
+
+    view.unmount();
+    expect(video.volume).toBe(1);
+    expect(video.muted).toBe(false);
   });
 
   it('bypasses the edit canvas for Before without replacing or seeking the source video', () => {

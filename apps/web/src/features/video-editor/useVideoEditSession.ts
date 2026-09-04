@@ -61,6 +61,8 @@ const resetToolSpec = (
       return { ...draft, filter: baseline.filter };
     case 'subtitles':
       return { ...draft, subtitles: baseline.subtitles };
+    case 'audio':
+      return { ...draft, audio: baseline.audio };
   }
 };
 

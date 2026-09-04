@@ -16,26 +16,26 @@ future features current.
 
 ## Journeys
 
-| Flow                                                        | Story                                                                          |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Record or upload, then edit and save                        | [Existing video processing](12-existing-video-processing.md)                   |
-| Trim, crop, relight, filter, subtitle, and replace a source | [Local non-destructive video editing](13-local-video-editing.md)               |
-| Choose camera, microphone, local format, and quality        | [Configure capture settings](01-configure-capture-settings.md)                 |
-| Preview and record without provider work                    | [Local camera capture](02-local-camera-capture.md)                             |
-| Run and record a live character transformation              | [Live character transformation](03-character-ai-session.md)                    |
-| Run and record live virtual try-on                          | [Virtual try-on session](04-virtual-try-on-session.md)                         |
-| Understand retained creative-storage compatibility          | [Retired Recipe UI boundary](06-recipe-shelf.md)                               |
-| Review, save, and release a take                            | [Take review and cleanup](07-take-review-and-cleanup.md)                       |
-| Apply browser-local voice effects                           | [Local voice treatments](08-local-voice-treatments.md)                         |
-| Browse, save, manage, and apply provider-backed voices      | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                   |
-| Recover from missing capabilities                           | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md) |
-| Build and preload a reusable character                      | [Studio character builder](11-studio-character-builder.md)                     |
-| Log in, restore, and log out safely                         | [Login and local session](14-login-and-session.md)                             |
-| Orient, create, browse Assets, and navigate responsively    | [Dashboard, Assets, and navigation](19-dashboard-and-navigation.md)            |
-| Save, browse, version, and reload local videos              | [Videos in Assets](15-saved-video-gallery.md)                                  |
-| Reuse saved characters, outfits, voices, and videos         | [Libraries](16-saved-creative-libraries.md)                                    |
-| Create, resume, process, and save one Project video         | [Project lifecycle and immutable source](17-empty-project-lifecycle.md)        |
-| Organize Projects with optional Campaigns                   | [Campaign organization](18-campaign-organization.md)                           |
+| Flow                                                               | Story                                                                          |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Record or upload, then edit and save                               | [Existing video processing](12-existing-video-processing.md)                   |
+| Trim, crop, relight, filter, subtitle, level, and replace a source | [Local non-destructive video editing](13-local-video-editing.md)               |
+| Choose camera, microphone, local format, and quality               | [Configure capture settings](01-configure-capture-settings.md)                 |
+| Preview and record without provider work                           | [Local camera capture](02-local-camera-capture.md)                             |
+| Run and record a live character transformation                     | [Live character transformation](03-character-ai-session.md)                    |
+| Run and record live virtual try-on                                 | [Virtual try-on session](04-virtual-try-on-session.md)                         |
+| Understand retained creative-storage compatibility                 | [Retired Recipe UI boundary](06-recipe-shelf.md)                               |
+| Review, save, and release a take                                   | [Take review and cleanup](07-take-review-and-cleanup.md)                       |
+| Apply browser-local voice effects                                  | [Local voice treatments](08-local-voice-treatments.md)                         |
+| Browse, save, manage, and apply provider-backed voices             | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                   |
+| Recover from missing capabilities                                  | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md) |
+| Build and preload a reusable character                             | [Studio character builder](11-studio-character-builder.md)                     |
+| Log in, restore, and log out safely                                | [Login and local session](14-login-and-session.md)                             |
+| Orient, create, browse Assets, and navigate responsively           | [Dashboard, Assets, and navigation](19-dashboard-and-navigation.md)            |
+| Save, browse, version, and reload local videos                     | [Videos in Assets](15-saved-video-gallery.md)                                  |
+| Reuse saved characters, outfits, voices, and videos                | [Libraries](16-saved-creative-libraries.md)                                    |
+| Create, resume, process, and save one Project video                | [Project lifecycle and immutable source](17-empty-project-lifecycle.md)        |
+| Organize Projects with optional Campaigns                          | [Campaign organization](18-campaign-organization.md)                           |
 
 ## Shared runtime rules
 

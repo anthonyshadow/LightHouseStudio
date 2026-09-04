@@ -1,7 +1,8 @@
 import type { SubtitleCue, VideoEditSpec } from '@studio/domain';
 import type { RecordingArtifact, UploadedTakeMetadata } from '../recording/types';
 
-export type VideoEditTool = 'trim' | 'crop' | 'rotate' | 'lighting' | 'filters' | 'subtitles';
+export type VideoEditTool =
+  'trim' | 'crop' | 'rotate' | 'lighting' | 'filters' | 'subtitles' | 'audio';
 
 export type VideoEditSessionPhase =
   | 'closed'
