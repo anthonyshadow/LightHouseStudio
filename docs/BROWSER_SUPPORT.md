@@ -167,6 +167,15 @@ Automated Chromium export or a working preview does not validate the codec path 
 Manual checks must exercise real export and cancellation in current Safari, Firefox, and Chrome,
 including touch, five-minute input, maximum-size memory, browser download, and external playback.
 
+The `@cross-browser` upload-and-edit journey therefore stops at the export on other engines, and is
+proof of the editor rather than of the codec path. The Linux WebKit build the runners use is the
+case that forced the distinction: it defines `VideoEncoder`, `VideoDecoder` and `OffscreenCanvas`,
+so every presence check above passes and **Save edited video** is offered, but no encode ever
+completes. Note the consequence for real browsers too — the support check is a presence check, so
+an engine that exposes the classes without a usable H.264 encode gets an enabled control and a
+render that fails, rather than the "Local editor unavailable" notice. Verifying the export on
+macOS WebKit says nothing about the runner, and was how that journey came to be tagged.
+
 ## Known physical risks
 
 - Safari/iOS can differ in `MediaRecorder` output, worker WebCodecs/OffscreenCanvas/WebGL behavior,
