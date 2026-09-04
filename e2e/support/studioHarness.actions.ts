@@ -6,6 +6,15 @@ export const expectNoExternalProviderTraffic = (network: NetworkJourneyState): v
   expect(network.blockedExternalWebSockets).toEqual([]);
 };
 
+/**
+ * Fails with what the page actually threw, rather than leaving the next step to wait out its
+ * timeout on a control that an app which never booted was never going to render. Worth asserting
+ * early in a journey that runs on more than one engine, where the boot failure may be the finding.
+ */
+export const expectNoUncaughtPageErrors = (network: NetworkJourneyState): void => {
+  expect(network.uncaughtPageErrors).toEqual([]);
+};
+
 export const expectNoDocumentOverflow = async (page: Page): Promise<void> => {
   const dimensions = await page.evaluate(() => ({
     width: window.innerWidth,

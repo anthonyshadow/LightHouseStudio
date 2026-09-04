@@ -28,6 +28,7 @@ export {
   discardTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
+  expectNoUncaughtPageErrors,
   openAiSettings,
   settleVisualPage,
   startCharacterAi,

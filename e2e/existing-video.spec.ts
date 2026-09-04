@@ -10,6 +10,7 @@ import {
   confirmSaveVideo,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
+  expectNoUncaughtPageErrors,
   installSuccessfulStudioHarness,
   readCreativeAssetStore,
   readBrowserState,
@@ -243,6 +244,10 @@ test('@cross-browser provider-free Edit video edits on every engine, and renders
   const network = await installProviderNetworkDriver(page);
   await page.goto('/studio/create');
   const fixture = await loadDecodableH264VideoFixture();
+
+  // Before anything engine-specific: if the app did not boot here, say why rather than waiting out
+  // a timeout on the upload control.
+  expectNoUncaughtPageErrors(network);
 
   await selectExistingVideo(page, fixture, 'local-edit-source.mp4');
   const upload = page.getByRole('dialog', { name: 'Use existing video' });

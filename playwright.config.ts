@@ -7,9 +7,16 @@ export default defineConfig({
   testDir: './e2e',
   testIgnore: ['**/*.test.ts', '**/*.visual.spec.ts', '**/*.production.spec.ts'],
   fullyParallel: true,
-  // Axe plus synthetic audio/video contexts are intentionally resource-heavy; cap concurrency so
-  // the local dev server remains stable on laptops and CI runners.
-  workers: 2,
+  /*
+   * Axe plus synthetic audio/video contexts are intentionally resource-heavy; cap concurrency so
+   * the local dev server remains stable on laptops and CI runners.
+   *
+   * One worker on a runner, where two WebKit contexts running media journeys on two cores is how
+   * "Target page, context or browser has been closed" appears at the first interaction of tests
+   * that touch nothing in common. That signature is a browser being killed, not a product failure,
+   * and the same specs pass locally in seconds. A workstation keeps both workers.
+   */
+  workers: runningInCi ? 1 : 2,
   forbidOnly: runningInCi,
   retries: runningInCi ? 2 : 0,
   reporter: [['list'], ['html', { open: 'never' }]],
