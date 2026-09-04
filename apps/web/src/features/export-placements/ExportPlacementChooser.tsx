@@ -178,8 +178,13 @@ export interface ExportPlacementChooserProps {
    */
   readonly subtitlePlacements?: readonly SubtitleCuePlacement[];
   readonly disabled?: boolean;
-  /** Set when the browser cannot render, which forces and explains the original shape. */
-  readonly unavailable?: boolean;
+  /**
+   * Whether the browser can re-frame, `null` while its probe is still running. Given whole rather
+   * than as two derived booleans, because deciding what waiting looks like is this component's
+   * job: unknown is inert, not unavailable, and a chooser that says a browser cannot re-frame and
+   * then takes it back a tick later is worse than one that waits.
+   */
+  readonly supported?: boolean | null;
   readonly onChange: (specification: ProjectExportSpecification | null) => void;
 }
 
@@ -192,10 +197,12 @@ export const ExportPlacementChooser = ({
   source = null,
   subtitlePlacements = [],
   disabled = false,
-  unavailable = false,
+  supported = true,
   onChange,
 }: ExportPlacementChooserProps) => {
   const theme = useTheme();
+  const unavailable = supported === false;
+  const inert = disabled || supported === null;
   const aspect: ProjectExportAspect = unavailable ? 'source' : (value?.aspect ?? 'source');
   const active = unavailable ? null : value;
 
@@ -212,7 +219,7 @@ export const ExportPlacementChooser = ({
           label="Where is this going?"
           value={aspect}
           options={SEGMENTS}
-          disabled={disabled || unavailable}
+          disabled={inert || unavailable}
           onChange={(next) => onChange(projectExportSpecificationForAspect(next))}
         />
       </div>

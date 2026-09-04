@@ -1,11 +1,10 @@
 import { SAVED_VIDEO_TITLE_MAX_LENGTH } from '@studio/contracts';
 import type { ProjectExportSpecification, VideoEditSourceGeometry } from '@studio/domain';
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import { Button, OverlayPanel, TextField } from '../../ui';
 import {
   ExportPlacementChooser,
   ExportPlacementProgress,
-  exportPlacementRenderSupported,
   type ExportPlacementRenderPhase,
 } from '../export-placements';
 import { ThumbnailSourceChooser } from './ThumbnailSourceChooser';
@@ -27,6 +26,12 @@ export interface SaveVideoDialogProps {
         readonly phase: ExportPlacementRenderPhase;
         readonly progress: number;
         readonly error: string | null;
+        /**
+         * Whether this browser can re-frame at all, `null` while its probe is still running. The
+         * hook driving the render above already measured it; asking again here would cost a second
+         * WebGL context and could answer differently mid-dialog.
+         */
+        readonly supported: boolean | null;
         readonly onCancel: () => void;
       }
     | undefined;
@@ -55,16 +60,9 @@ export const SaveVideoDialog = ({
   const rendering = placementRender?.phase === 'rendering';
   // Re-framing needs both a measured frame and a browser that can render one.
   const placementOffered = source !== null;
-  const [placementSupported, setPlacementSupported] = useState<boolean | null>(null);
-  useEffect(() => {
-    let current = true;
-    void exportPlacementRenderSupported().then((value) => {
-      if (current) setPlacementSupported(value);
-    });
-    return () => {
-      current = false;
-    };
-  }, []);
+  // Absent where the caller drives no re-framing render of its own, which is not a reason to doubt
+  // the browser: an unstated capability reads as available, the same as before anyone measured.
+  const placementSupported = placementRender?.supported ?? true;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -109,10 +107,8 @@ export const SaveVideoDialog = ({
           <ExportPlacementChooser
             value={placement}
             source={source}
-            // Unknown is not unavailable: the chooser waits a beat rather than telling the
-            // operator their browser cannot re-frame and then changing its mind.
-            disabled={rendering || placementSupported === null}
-            unavailable={placementSupported === false}
+            disabled={rendering}
+            supported={placementSupported}
             onChange={setPlacement}
           />
         ) : null}

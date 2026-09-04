@@ -38,11 +38,15 @@ export const SavedVideoSuccessActions = ({
   createAnotherLabel = 'Create another',
 }: SavedVideoSuccessActionsProps) => {
   const theme = useTheme();
-  const { render, failure, download } = useSavedVideoPlacementDownload();
+  // Three of this component's four call sites pass no specification at all, and the capability is
+  // only ever shown beside one, so those three do not make the browser measure it.
+  const { render, failure, download } = useSavedVideoPlacementDownload(
+    exportSpecification !== null,
+  );
   // A placement can only be produced where the browser can render; elsewhere the original shape is
   // what the operator gets, and saying so is better than offering a control that cannot work.
   // Carrying the specification rather than a boolean lets the offer below narrow to it.
-  const reframing = render.supported === true ? exportSpecification : null;
+  const reframing = render.supported ? exportSpecification : null;
 
   return (
     <div css={{ display: 'grid', gap: theme.space.xs }} data-saved-video-success-actions="">

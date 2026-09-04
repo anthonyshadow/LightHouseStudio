@@ -107,7 +107,7 @@ describe('ExportPlacementChooser', () => {
   });
 
   it('degrades to the original shape with the editor’s own explanation', () => {
-    chooser({ value: projectExportSpecificationForAspect('4:5'), unavailable: true });
+    chooser({ value: projectExportSpecificationForAspect('4:5'), supported: false });
 
     expect(screen.getByText('Local editor unavailable')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Keep as it is' })).toHaveAttribute(

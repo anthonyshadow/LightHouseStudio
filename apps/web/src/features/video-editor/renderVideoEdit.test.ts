@@ -3,6 +3,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultVideoEditSpec } from '@studio/domain';
 import { renderVideoEdit } from './renderVideoEdit';
+
+// The capability is this module's precondition, not its subject: these cases are about the worker
+// protocol, so the browser is stated to be able to encode rather than made to prove it.
+vi.mock('./videoEditSupport', () => ({ videoEditExportSupported: () => Promise.resolve(true) }));
 import type { VideoEditWorkerRequest, VideoEditWorkerResponse } from './types';
 
 class FakeWorker {
@@ -35,20 +39,25 @@ const input = (signal: AbortSignal, onProgress = vi.fn()) => ({
 beforeEach(() => {
   FakeWorker.instances = [];
   vi.stubGlobal('Worker', FakeWorker);
-  vi.stubGlobal('OffscreenCanvas', class {});
-  vi.stubGlobal('VideoEncoder', class {});
-  vi.stubGlobal('VideoDecoder', class {});
-  vi.stubGlobal('VideoFrame', class {});
 });
 
 afterEach(() => vi.unstubAllGlobals());
+
+/**
+ * The render asks whether the browser can encode before it spawns anything, so the worker appears
+ * one microtask after the call rather than during it.
+ */
+const startedWorker = async (): Promise<FakeWorker> => {
+  await vi.waitFor(() => expect(FakeWorker.instances[0]).toBeDefined());
+  return FakeWorker.instances[0]!;
+};
 
 describe('renderVideoEdit', () => {
   it('reports bounded progress, ignores stale responses, and resolves a completed MP4', async () => {
     const controller = new AbortController();
     const onProgress = vi.fn();
     const promise = renderVideoEdit(input(controller.signal, onProgress));
-    const worker = FakeWorker.instances[0]!;
+    const worker = await startedWorker();
     const renderRequest = worker.postMessage.mock.calls[0]![0];
     expect(renderRequest.type).toBe('render');
     const operationId = renderRequest.operationId;
@@ -67,7 +76,7 @@ describe('renderVideoEdit', () => {
   it('requests cancellation and terminates after the worker acknowledges it', async () => {
     const controller = new AbortController();
     const promise = renderVideoEdit(input(controller.signal));
-    const worker = FakeWorker.instances[0]!;
+    const worker = await startedWorker();
     const renderRequest = worker.postMessage.mock.calls[0]![0];
     const operationId = renderRequest.operationId;
 
@@ -81,7 +90,7 @@ describe('renderVideoEdit', () => {
 
   it('terminates and returns an app-owned error when the worker fails', async () => {
     const promise = renderVideoEdit(input(new AbortController().signal));
-    const worker = FakeWorker.instances[0]!;
+    const worker = await startedWorker();
     worker.onerror?.();
     await expect(promise).rejects.toThrow(/stopped unexpectedly/iu);
     expect(worker.terminate).toHaveBeenCalledOnce();

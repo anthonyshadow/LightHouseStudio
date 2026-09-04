@@ -15,8 +15,13 @@ export const videoEditPreviewSupported = (): boolean => {
   return true;
 };
 
-/** The classes an export needs. Cheap and synchronous, and a `false` here is final. */
-export const videoEditRenderingApisPresent = (): boolean =>
+/*
+ * The classes an export needs. Cheap, synchronous, and a `false` here is final — but private,
+ * because it is the pre-fix answer wearing a confident name: every one of these can be defined on
+ * an engine that cannot encode a frame. Nothing outside this module should be able to reach for it
+ * and think it has asked the question.
+ */
+const videoEditRenderingApisPresent = (): boolean =>
   typeof Worker !== 'undefined' &&
   typeof OffscreenCanvas !== 'undefined' &&
   typeof VideoEncoder !== 'undefined' &&
@@ -59,9 +64,10 @@ const trialEncode = (): Promise<boolean> =>
       settled = true;
       clearTimeout(timer);
       try {
-        if (encoder.state !== 'closed') encoder.close();
+        encoder.close();
       } catch {
-        // A browser that fails to close a failed encoder has already answered the question.
+        // Closing an already-closed encoder is the specified throw, and a browser that fails to
+        // close a failed one has answered the question anyway.
       }
       frame?.close();
       resolve(value);
@@ -80,11 +86,10 @@ const trialEncode = (): Promise<boolean> =>
       canvas.getContext('2d')?.fillRect(0, 0, 2, 2);
       frame = new VideoFrame(canvas, { timestamp: 0 });
       encoder.encode(frame, { keyFrame: true });
-      // A frame that produces no chunk at all is as unusable as one that errors.
-      void encoder.flush().then(
-        () => settle(false),
-        () => settle(false),
-      );
+      // A frame that produces no chunk at all is as unusable as one that errors, and a flush that
+      // rejects says the same thing, so both land on the same answer.
+      const noChunk = () => settle(false);
+      void encoder.flush().then(noChunk, noChunk);
     } catch {
       settle(false);
     }
@@ -114,7 +119,12 @@ export const videoEditExportSupported = (): Promise<boolean> => {
   return exportSupport;
 };
 
-/** Test seam: the probe is memoized for the life of the page, which outlives one test. */
-export const resetVideoEditExportSupportForTests = (): void => {
-  exportSupport = null;
-};
+/**
+ * Whether this browser can run the local editor at all: draw the preview and produce the file.
+ *
+ * The one owner of that composition. Both halves are needed by whoever offers an edit and by
+ * whoever offers a placement, and stating it once is what stops a third requirement being added to
+ * one caller and not the others.
+ */
+export const videoEditSupported = async (): Promise<boolean> =>
+  videoEditPreviewSupported() && (await videoEditExportSupported());
