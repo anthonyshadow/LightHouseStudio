@@ -12,10 +12,11 @@ const adapters = vi.hoisted(() => ({
 
 vi.mock('./renderVideoEdit', () => ({
   renderVideoEdit: adapters.renderVideoEdit,
-  videoEditRenderingSupported: () => true,
 }));
 vi.mock('./videoEditSupport', () => ({
   videoEditPreviewSupported: () => true,
+  videoEditRenderingApisPresent: () => true,
+  videoEditExportSupported: () => Promise.resolve(true),
 }));
 vi.mock('../existing-video/videoValidation', () => ({
   validateEditedVideoOutput: adapters.validateEditedVideoOutput,
@@ -55,9 +56,15 @@ const source = () => {
   return { artifact, metadata };
 };
 
-const beginSession = () => {
+/**
+ * Opening the editor starts an asynchronous capability probe — answering "can this browser encode"
+ * honestly means asking the encoder — and nothing may render until it answers. Every case waits
+ * for it here, the way the workspace does by keeping Save disabled.
+ */
+const beginSession = async () => {
   const hook = renderHook(() => useVideoEditSession());
   act(() => hook.result.current.begin(source()));
+  await waitFor(() => expect(hook.result.current.supported).not.toBeNull());
   return hook;
 };
 
@@ -78,8 +85,8 @@ beforeEach(() => {
 });
 
 describe('useVideoEditSession', () => {
-  it('resets transient compare modes when a source begins or closes', () => {
-    const hook = beginSession();
+  it('resets transient compare modes when a source begins or closes', async () => {
+    const hook = await beginSession();
     act(() => {
       hook.result.current.setShowingBefore(true);
       hook.result.current.setSplitComparison(true);
@@ -92,8 +99,8 @@ describe('useVideoEditSession', () => {
     expect(hook.result.current.splitComparison).toBe(false);
   });
 
-  it('groups a slider or crop gesture into one undo entry and preserves redo', () => {
-    const hook = beginSession();
+  it('groups a slider or crop gesture into one undo entry and preserves redo', async () => {
+    const hook = await beginSession();
     act(() => hook.result.current.beginTransaction());
     act(() => {
       hook.result.current.previewSpec({
@@ -118,8 +125,8 @@ describe('useVideoEditSession', () => {
     expect(hook.result.current.draft.adjustments.brightness).toBe(45);
   });
 
-  it('caps history at 50 entries', () => {
-    const hook = beginSession();
+  it('caps history at 50 entries', async () => {
+    const hook = await beginSession();
     for (let brightness = 1; brightness <= 55; brightness += 1) {
       act(() => {
         hook.result.current.applySpec({
@@ -143,7 +150,7 @@ describe('useVideoEditSession', () => {
           finishRender = resolve;
         }),
     );
-    const hook = beginSession();
+    const hook = await beginSession();
     act(() => {
       hook.result.current.applySpec({
         ...hook.result.current.draft,
@@ -171,7 +178,7 @@ describe('useVideoEditSession', () => {
       blob: new Blob(['edited'], { type: 'video/mp4' }),
       mimeType: 'video/mp4',
     });
-    const hook = beginSession();
+    const hook = await beginSession();
     const untyped = {
       id: 'cue-1',
       text: '',
@@ -204,8 +211,8 @@ describe('useVideoEditSession', () => {
     expect(hook.result.current.candidate?.spec.subtitles).toEqual([rendered]);
   });
 
-  it('removes a subtitle in one history entry and lets go of it as the selection', () => {
-    const hook = beginSession();
+  it('removes a subtitle in one history entry and lets go of it as the selection', async () => {
+    const hook = await beginSession();
     const keep = { id: 'cue-1', text: 'Keep', startMs: 0, endMs: 1_000, placement: 'top' as const };
     const drop = {
       id: 'cue-2',
@@ -229,8 +236,8 @@ describe('useVideoEditSession', () => {
     expect(hook.result.current.selectedSubtitleId).toBe('cue-1');
   });
 
-  it('resets the Subtitles tool to the baseline and forgets the selection when a source begins', () => {
-    const hook = beginSession();
+  it('resets the Subtitles tool to the baseline and forgets the selection when a source begins', async () => {
+    const hook = await beginSession();
     const cue = { id: 'cue-1', text: 'Hi', startMs: 0, endMs: 1_000, placement: 'top' as const };
     act(() => {
       hook.result.current.setActiveTool('subtitles');
@@ -256,7 +263,7 @@ describe('useVideoEditSession', () => {
           finishRender = resolve;
         }),
     );
-    const hook = beginSession();
+    const hook = await beginSession();
     act(() => {
       hook.result.current.applySpec({
         ...hook.result.current.draft,

@@ -23,10 +23,11 @@ const editor = vi.hoisted(() => ({
 
 vi.mock('../video-editor/videoEditSupport', () => ({
   videoEditPreviewSupported: () => editor.renderCapable(),
+  videoEditRenderingApisPresent: () => true,
+  videoEditExportSupported: () => Promise.resolve(editor.renderCapable()),
 }));
 vi.mock('../video-editor/renderVideoEdit', () => ({
   renderVideoEdit: () => editor.renderVideoEdit(),
-  videoEditRenderingSupported: () => editor.renderCapable(),
 }));
 
 vi.mock('../../adapters/api-client/savedVideosApi', async (importOriginal) => ({

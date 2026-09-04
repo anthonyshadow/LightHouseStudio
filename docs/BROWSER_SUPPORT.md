@@ -146,9 +146,16 @@ authenticated content loading, Download, and Delete do not depend on thumbnail s
 ## Local video editor
 
 The editor checks WebGL preview and dedicated-worker WebCodecs/OffscreenCanvas export support only
-when **Edit video** opens. Choosing an export placement at save time re-uses exactly that check
-(`exportPlacementRenderSupported`), so a browser that cannot run the editor cannot re-frame a video
-either; the save dialog says so and keeps the video's original shape. It does not use the limited-availability 2D canvas `filter` property.
+when **Edit video** opens, and the export half of that check encodes one 1280×720 H.264 frame
+rather than looking for the classes. The classes existing is not the codec working: an engine can
+expose `VideoEncoder` and still refuse every configuration, or accept one and produce nothing, and
+asking it to encode is the only question whose answer matches what the render will do. It asks for
+the profile MediaBunny asks for, so the control and the worker behind it cannot disagree, and the
+answer is reused for the life of the page. Choosing an export placement at save time re-uses
+exactly that check (`exportPlacementRenderSupported`), so a browser that cannot run the editor
+cannot re-frame a video either; the save dialog says so and keeps the video's original shape. Until
+the probe answers, the placement chooser is inert rather than declared unavailable, and the
+editor's Save stays disabled without showing the unavailable notice. It does not use the limited-availability 2D canvas `filter` property.
 Preview and export share a WebGL shader for flips, curated filters, and manual lighting controls;
 MediaBunny performs trim, baked 90° rotation, crop, H.264 encode, and AAC audio preservation in the
 worker. There is no synchronous main-thread processing fallback. Subtitles are rasterized on a 2D
@@ -168,13 +175,10 @@ Manual checks must exercise real export and cancellation in current Safari, Fire
 including touch, five-minute input, maximum-size memory, browser download, and external playback.
 
 The `@cross-browser` upload-and-edit journey therefore stops at the export on other engines, and is
-proof of the editor rather than of the codec path. The Linux WebKit build the runners use is the
-case that forced the distinction: it defines `VideoEncoder`, `VideoDecoder` and `OffscreenCanvas`,
-so every presence check above passes and **Save edited video** is offered, but no encode ever
-completes. Note the consequence for real browsers too — the support check is a presence check, so
-an engine that exposes the classes without a usable H.264 encode gets an enabled control and a
-render that fails, rather than the "Local editor unavailable" notice. Verifying the export on
-macOS WebKit says nothing about the runner, and was how that journey came to be tagged.
+proof of the editor rather than of the codec path. What it does assert everywhere is that the offer
+matches the capability: **Save edited video** is enabled only where the probe encoded a frame, and
+where it did not the "Local editor unavailable" notice is showing instead. Verifying the export on
+macOS WebKit says nothing about a Linux runner, and was how that journey came to be tagged.
 
 ## Known physical risks
 

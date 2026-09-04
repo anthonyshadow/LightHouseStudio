@@ -31,10 +31,11 @@ import type { ProjectSessionPort } from './useProjectSession';
 const renderCapable = vi.fn(() => true);
 vi.mock('../video-editor/videoEditSupport', () => ({
   videoEditPreviewSupported: () => renderCapable(),
+  videoEditRenderingApisPresent: () => true,
+  videoEditExportSupported: () => Promise.resolve(renderCapable()),
 }));
 vi.mock('../video-editor/renderVideoEdit', () => ({
   renderVideoEdit: vi.fn(),
-  videoEditRenderingSupported: () => renderCapable(),
 }));
 
 // jsdom cannot decode a video frame, so the poster the save generates is stated rather than
@@ -897,9 +898,13 @@ describe('ProjectOutputSaveSection placement', () => {
       },
     });
 
-    expect(screen.getByRole('button', { name: 'Tall feed post' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
+    // The chooser is inert until the encode probe answers, so the recorded placement lights up
+    // a tick after the first paint.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Tall feed post' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      ),
     );
     expect(screen.getByRole('button', { name: 'Save video · Tall feed post' })).toBeVisible();
     const form = await openSaveDestination(user);
@@ -1098,7 +1103,8 @@ describe('ProjectOutputSaveSection placement', () => {
     );
     renderSection({ ...session(), propose });
 
-    expect(screen.getByText('Local editor unavailable')).toBeVisible();
+    // The probe answers in an effect, so the notice arrives a tick after the first paint.
+    expect(await screen.findByText('Local editor unavailable')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Phone, full screen' })).toBeDisabled();
 
     await submitNewVideo(user);

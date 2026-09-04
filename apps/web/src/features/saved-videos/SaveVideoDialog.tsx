@@ -1,6 +1,6 @@
 import { SAVED_VIDEO_TITLE_MAX_LENGTH } from '@studio/contracts';
 import type { ProjectExportSpecification, VideoEditSourceGeometry } from '@studio/domain';
-import { useId, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { Button, OverlayPanel, TextField } from '../../ui';
 import {
   ExportPlacementChooser,
@@ -55,7 +55,16 @@ export const SaveVideoDialog = ({
   const rendering = placementRender?.phase === 'rendering';
   // Re-framing needs both a measured frame and a browser that can render one.
   const placementOffered = source !== null;
-  const placementSupported = useMemo(() => exportPlacementRenderSupported(), []);
+  const [placementSupported, setPlacementSupported] = useState<boolean | null>(null);
+  useEffect(() => {
+    let current = true;
+    void exportPlacementRenderSupported().then((value) => {
+      if (current) setPlacementSupported(value);
+    });
+    return () => {
+      current = false;
+    };
+  }, []);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -100,8 +109,10 @@ export const SaveVideoDialog = ({
           <ExportPlacementChooser
             value={placement}
             source={source}
-            disabled={rendering}
-            unavailable={!placementSupported}
+            // Unknown is not unavailable: the chooser waits a beat rather than telling the
+            // operator their browser cannot re-frame and then changing its mind.
+            disabled={rendering || placementSupported === null}
+            unavailable={placementSupported === false}
             onChange={setPlacement}
           />
         ) : null}

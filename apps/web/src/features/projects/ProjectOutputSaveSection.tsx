@@ -474,7 +474,7 @@ export const ProjectOutputSaveSection = ({
     // records that no placement was applied — the notice above the control said so beforehand.
     const specification = renditionPlacement(latest.revision.snapshot.exportSpecification);
     let renditions: SaveProjectOutputRequest['renditions'] = [];
-    if (specification !== null && placementSupported) {
+    if (specification !== null && placementSupported === true) {
       const produced = await produceRendition(latest, specification);
       if (produced === 'stopped') return;
       renditions = produced;
@@ -746,8 +746,10 @@ export const ProjectOutputSaveSection = ({
                 value={placement}
                 source={currentCut}
                 subtitlePlacements={subtitlePlacements}
-                disabled={archived || busy || processing}
-                unavailable={!placementSupported}
+                // Unknown is not unavailable: the chooser waits for the probe rather than saying
+                // this browser cannot re-frame and then taking it back.
+                disabled={archived || busy || processing || placementSupported === null}
+                unavailable={placementSupported === false}
                 onChange={(specification) => {
                   session.propose({ exportSpecification: specification });
                 }}

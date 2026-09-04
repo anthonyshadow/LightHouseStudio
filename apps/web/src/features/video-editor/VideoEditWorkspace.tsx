@@ -546,7 +546,8 @@ export const VideoEditWorkspace = ({
             </Button>
           </div>
           <ToolSettings session={session} videoRef={videoRef} />
-          {!session.supported ? (
+          {/* Only when the probe has actually answered; `null` is still asking. */}
+          {session.supported === false ? (
             <StatusNotice tone="warning" title="Local editor unavailable">
               This browser cannot provide the required WebGL, WebCodecs, worker, and OffscreenCanvas
               path. Your current video is unchanged and can still be saved.
@@ -590,7 +591,7 @@ export const VideoEditWorkspace = ({
         <Button
           variant="primary"
           busy={busy}
-          disabled={!session.dirty || !session.supported || busy}
+          disabled={!session.dirty || session.supported !== true || busy}
           onClick={() => void session.startRender()}
         >
           <AppIcon name="save" width="1.1rem" height="1.1rem" />

@@ -12,14 +12,14 @@ import {
   validateEditedVideoOutput,
   type ValidatedExistingVideo,
 } from '../existing-video/videoValidation';
-import { renderVideoEdit, videoEditRenderingSupported } from './renderVideoEdit';
+import { renderVideoEdit } from './renderVideoEdit';
 import {
   isVideoEditBusy,
   type VideoEditSessionPhase,
   type VideoEditSource,
   type VideoEditTool,
 } from './types';
-import { videoEditPreviewSupported } from './videoEditSupport';
+import { videoEditExportSupported, videoEditPreviewSupported } from './videoEditSupport';
 
 type HistoryState = Readonly<{
   past: readonly VideoEditSpec[];
@@ -81,10 +81,13 @@ export const useVideoEditSession = () => {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<VideoEditCandidate | null>(null);
-  const [supported, setSupported] = useState(false);
+  /** `null` while the export probe is still running; see `begin`. */
+  const [supported, setSupported] = useState<boolean | null>(null);
   const transactionStartRef = useRef<VideoEditSpec | null>(null);
   const renderControllerRef = useRef<AbortController | null>(null);
   const generationRef = useRef(0);
+  /** Separate from the render generation: a reopened editor must not adopt a stale probe result. */
+  const capabilityGenerationRef = useRef(0);
 
   const sourceGeometry = useMemo(
     () =>
@@ -121,7 +124,21 @@ export const useVideoEditSession = () => {
     setProgress(0);
     setError(null);
     setCandidate(null);
-    setSupported(videoEditPreviewSupported() && videoEditRenderingSupported());
+    /*
+     * Null until the answer is known, because the encode probe has to run one frame through the
+     * encoder to be worth anything. Unknown is neither "offer it" nor "warn about it": the notice
+     * would flash on every browser that can edit, and the control would invite a click the render
+     * might not honour. It resolves in a frame or two, well before an untouched spec is dirty.
+     */
+    if (videoEditPreviewSupported()) {
+      setSupported(null);
+      const generation = ++capabilityGenerationRef.current;
+      void videoEditExportSupported().then((canExport) => {
+        if (generation === capabilityGenerationRef.current) setSupported(canExport);
+      });
+    } else {
+      setSupported(false);
+    }
     setPhase('editing');
   }, []);
 
@@ -234,7 +251,7 @@ export const useVideoEditSession = () => {
 
   const startRender = useCallback(async () => {
     if (!source || !sourceGeometry || !dirty || renderControllerRef.current) return;
-    if (!supported) {
+    if (supported !== true) {
       setError('This browser cannot render local video edits without blocking the Studio.');
       setPhase('error');
       return;

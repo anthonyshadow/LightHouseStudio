@@ -10,10 +10,11 @@ import { SaveVideoDialog } from './SaveVideoDialog';
 const renderCapable = vi.fn(() => true);
 vi.mock('../video-editor/videoEditSupport', () => ({
   videoEditPreviewSupported: () => renderCapable(),
+  videoEditRenderingApisPresent: () => true,
+  videoEditExportSupported: () => Promise.resolve(renderCapable()),
 }));
 vi.mock('../video-editor/renderVideoEdit', () => ({
   renderVideoEdit: vi.fn(),
-  videoEditRenderingSupported: () => renderCapable(),
 }));
 
 beforeEach(() => renderCapable.mockReturnValue(true));
@@ -164,7 +165,8 @@ describe('SaveVideoDialog', () => {
       source: { width: 1_920, height: 1_080, durationMs: 12_000 },
     });
 
-    expect(screen.getByText('Local editor unavailable')).toBeVisible();
+    // The probe answers in an effect, so the notice arrives a tick after the first paint.
+    expect(await screen.findByText('Local editor unavailable')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Square post' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Save to Assets' }));
 

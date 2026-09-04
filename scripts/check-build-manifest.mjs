@@ -46,10 +46,29 @@ export const BUILD_CLOSURE_BUDGETS = {
   // stacking and timing rules that only the editor, its worker and the placement chooser use live
   // in a module `rules.ts` never imports. The ceiling follows the closure down so the next accidental
   // freeze fails the build. `FORBIDDEN_CLOSURE_DEPENDENCIES` untouched.
-  'src/app/shell/AuthenticatedShell.tsx': 724_000,
+  //
+  // Raised from 724_000 on 2026-09-04, and the Studio ceiling with it, for a reason unlike every
+  // entry above: no product code grew. The 37-package dependency bump changed how the bundler
+  // splits chunks — 114 emitted files became 82, and this closure went from 35 chunks to 15 — so
+  // each entry reaches coarser chunks and counts code it does not run. Total shipped JavaScript
+  // grew 1.9% (5_531_159 to 5_638_292 bytes) while this closure grew 1.6% and Studio's grew 18%.
+  //
+  // The cause was not isolated, and the ledger should say so rather than imply it was. Pinning
+  // Vite back to 8.2.1 does not restore the old split, nor does pinning `@vitejs/plugin-react`;
+  // regenerating the lockfile from the bumped manifests reproduces it exactly; forcing `rolldown`
+  // to 1.2.1 breaks the package build outright. What is verified is the half that matters most:
+  // `FORBIDDEN_CLOSURE_DEPENDENCIES` passes on every closure, so no provider, media or capture
+  // module has entered a surface that outlives it. This ceiling is a measurement of the bundler's
+  // new granularity, not permission for the graph to grow — recovering the split is worth its own
+  // change, and these numbers go back down when it lands.
+  'src/app/shell/AuthenticatedShell.tsx': 736_000,
   // Shell plus capture graph, which is what a Studio route costs. Looser, because a Studio route is
   // where media code belongs; `FORBIDDEN_CLOSURE_DEPENDENCIES` is what keeps it from leaking out.
-  'src/studio/StudioApp.tsx': 910_000,
+  //
+  // Raised from 910_000 on 2026-09-04. Two causes, kept apart: the chunking change above accounts
+  // for 166_066 bytes of it, and the local editor's honest export probe for 942 — measured by
+  // building this tree against the pre-bump lockfile, where every budget still passes.
+  'src/studio/StudioApp.tsx': 1_078_000,
 };
 
 /**

@@ -4,20 +4,20 @@ import {
   type ProjectExportSpecification,
   type VideoEditSourceGeometry,
 } from '@studio/domain';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { renderVideoEdit, videoEditRenderingSupported } from '../video-editor/renderVideoEdit';
-import { videoEditPreviewSupported } from '../video-editor/videoEditSupport';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { renderVideoEdit } from '../video-editor/renderVideoEdit';
+import {
+  videoEditExportSupported,
+  videoEditPreviewSupported,
+} from '../video-editor/videoEditSupport';
 
 /**
- * The same capability gate the local editor applies, because this is the same render path.
- *
- * Deliberately not memoised at module scope: probing costs a throwaway WebGL context, but caching
- * it there would make the capability un-mockable per test. Callers mount this hook only on the
- * surface that offers a placement, so the probe runs when that surface opens rather than with the
- * library around it.
+ * The same capability gate the local editor applies, because this is the same render path — and
+ * the same one the render worker applies to itself, so a placement is never offered on a browser
+ * whose encoder would refuse it.
  */
-export const exportPlacementRenderSupported = (): boolean =>
-  videoEditPreviewSupported() && videoEditRenderingSupported();
+export const exportPlacementRenderSupported = async (): Promise<boolean> =>
+  videoEditPreviewSupported() && (await videoEditExportSupported());
 
 export type ExportPlacementRenderPhase = 'idle' | 'rendering' | 'error';
 
@@ -41,8 +41,21 @@ export const useExportPlacementRender = () => {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
-  // A browser capability, not a property of any one render, so it is measured once.
-  const supported = useMemo(() => exportPlacementRenderSupported(), []);
+  /*
+   * A browser capability, not a property of any one render, so it is measured once — but measuring
+   * it means encoding a frame, so it arrives a beat later. `null` is "not yet known", which reads
+   * as neither an offer nor a warning until it resolves.
+   */
+  const [supported, setSupported] = useState<boolean | null>(null);
+  useEffect(() => {
+    let current = true;
+    void exportPlacementRenderSupported().then((value) => {
+      if (current) setSupported(value);
+    });
+    return () => {
+      current = false;
+    };
+  }, []);
 
   useEffect(() => () => controllerRef.current?.abort('unmount'), []);
 
@@ -69,7 +82,7 @@ export const useExportPlacementRender = () => {
       filename,
     }: ExportPlacementRenderInput): Promise<ExportPlacementRenderResult | null> => {
       if (controllerRef.current !== null) return null;
-      if (!supported) {
+      if (supported !== true) {
         setError(
           'This browser cannot re-frame a video without blocking the Studio. It keeps its original shape.',
         );
