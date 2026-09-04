@@ -19,7 +19,7 @@ import {
   type VideoEditSource,
   type VideoEditTool,
 } from './types';
-import { videoEditSupported } from './videoEditSupport';
+import { useVideoEditExportSupport } from './useVideoEditExportSupport';
 
 type HistoryState = Readonly<{
   past: readonly VideoEditSpec[];
@@ -81,8 +81,16 @@ export const useVideoEditSession = () => {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [candidate, setCandidate] = useState<VideoEditCandidate | null>(null);
-  /** `null` while the export probe is still running; see `begin`. */
-  const [supported, setSupported] = useState<boolean | null>(null);
+  /*
+   * `null` while the export probe is still running. Taken from the one hook that owns that
+   * subscription rather than started here: a bare `.then(setSupported)` in `begin` had no
+   * generation or unmount guard, so a reopened editor could adopt a stale answer and a resolution
+   * arriving after teardown updated a dead component.
+   */
+  // Gated on the editor being open, which is what the hook's `enabled` parameter is for: this hook
+  // is mounted by every Studio route, and asking unconditionally would run the trial encode during
+  // camera acquisition to answer a question a closed editor never asks.
+  const supported = useVideoEditExportSupport(phase !== 'closed');
   const transactionStartRef = useRef<VideoEditSpec | null>(null);
   const renderControllerRef = useRef<AbortController | null>(null);
   const generationRef = useRef(0);
@@ -122,14 +130,6 @@ export const useVideoEditSession = () => {
     setProgress(0);
     setError(null);
     setCandidate(null);
-    /*
-     * Null until the answer is known, because the encode probe has to run one frame through the
-     * encoder to be worth anything. Unknown is neither "offer it" nor "warn about it": the notice
-     * would flash on every browser that can edit, and the control would invite a click the render
-     * might not honour. It resolves in a frame or two, well before an untouched spec is dirty.
-     */
-    setSupported(null);
-    void videoEditSupported().then(setSupported);
     setPhase('editing');
   }, []);
 
@@ -242,6 +242,9 @@ export const useVideoEditSession = () => {
 
   const startRender = useCallback(async () => {
     if (!source || !sourceGeometry || !dirty || renderControllerRef.current) return;
+    // An unresolved probe is not a refusal: the control is disabled until it answers, so reaching
+    // here with `null` means something called this directly, and there is nothing to report yet.
+    if (supported === null) return;
     if (!supported) {
       setError('This browser cannot render local video edits without blocking the Studio.');
       setPhase('error');

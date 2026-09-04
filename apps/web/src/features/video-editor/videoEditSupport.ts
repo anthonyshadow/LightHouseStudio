@@ -42,9 +42,12 @@ const H264_PROBE_CONFIG: VideoEncoderConfig = {
 };
 
 /**
- * How long the trial encode may take before its answer stops being worth waiting for. Reaching it
- * keeps the control offered: `isConfigSupported` has already said yes by then, and disabling a
- * working editor because a probe was slow is the worse of the two mistakes.
+ * How long one frame may take before silence counts as an answer.
+ *
+ * Reaching it answers **no**. An engine that encodes needs milliseconds for a single frame, so this
+ * is already orders of magnitude of headroom; an engine that has produced neither a chunk nor an
+ * error by now is the hanging encoder this probe exists to catch, and answering yes on its behalf
+ * would memoize the guess and hand it the control it cannot honour.
  */
 const TRIAL_ENCODE_TIMEOUT_MS = 5_000;
 
@@ -56,15 +59,19 @@ const TRIAL_ENCODE_TIMEOUT_MS = 5_000;
  * WebKit build the browser-journey runners use answers every presence check while never completing
  * an encode. So ask the encoder to do the thing.
  */
-const trialEncode = (): Promise<boolean> =>
-  new Promise<boolean>((resolve) => {
+type TrialEncodeOutcome = 'encoded' | 'refused' | 'silent';
+
+const trialEncode = (): Promise<TrialEncodeOutcome> =>
+  new Promise<TrialEncodeOutcome>((resolve) => {
     let settled = false;
-    const settle = (value: boolean): void => {
+    let frame: VideoFrame | null = null;
+    let encoder: VideoEncoder | null = null;
+    const settle = (value: TrialEncodeOutcome): void => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       try {
-        encoder.close();
+        encoder?.close();
       } catch {
         // Closing an already-closed encoder is the specified throw, and a browser that fails to
         // close a failed one has answered the question anyway.
@@ -72,13 +79,14 @@ const trialEncode = (): Promise<boolean> =>
       frame?.close();
       resolve(value);
     };
-    const timer = setTimeout(() => settle(true), TRIAL_ENCODE_TIMEOUT_MS);
-    let frame: VideoFrame | null = null;
-    const encoder = new VideoEncoder({
-      output: () => settle(true),
-      error: () => settle(false),
-    });
+    const timer = setTimeout(() => settle('silent'), TRIAL_ENCODE_TIMEOUT_MS);
     try {
+      // Constructing the encoder is itself part of the trial: an engine that defines the class and
+      // refuses to build one has answered no, and must not reject the promise every surface memoizes.
+      encoder = new VideoEncoder({
+        output: () => settle('encoded'),
+        error: () => settle('refused'),
+      });
       encoder.configure(H264_PROBE_CONFIG);
       const canvas = new OffscreenCanvas(H264_PROBE_CONFIG.width, H264_PROBE_CONFIG.height);
       // Painting once is what gives the canvas image data. A frame built from one that has never
@@ -88,10 +96,10 @@ const trialEncode = (): Promise<boolean> =>
       encoder.encode(frame, { keyFrame: true });
       // A frame that produces no chunk at all is as unusable as one that errors, and a flush that
       // rejects says the same thing, so both land on the same answer.
-      const noChunk = () => settle(false);
+      const noChunk = () => settle('refused');
       void encoder.flush().then(noChunk, noChunk);
     } catch {
-      settle(false);
+      settle('refused');
     }
   });
 
@@ -111,10 +119,20 @@ export const videoEditExportSupported = (): Promise<boolean> => {
     try {
       const support = await VideoEncoder.isConfigSupported(H264_PROBE_CONFIG);
       if (support.supported !== true) return false;
+      const outcome = await trialEncode();
+      /*
+       * Silence is not a verdict, so it is not remembered as one. A throttled or backgrounded tab
+       * can starve a frame of the time it needs, and memoizing that would mark a working engine
+       * incapable for the rest of the page. Forgetting instead means the next asker tries again,
+       * while this one still gets the honest "not demonstrated" answer.
+       */
+      if (outcome === 'silent') exportSupport = null;
+      return outcome === 'encoded';
     } catch {
+      // Never rejects. Every surface holds this one promise for the life of the page, so a throw
+      // escaping here would leave them all waiting on an answer that can no longer arrive.
       return false;
     }
-    return await trialEncode();
   })();
   return exportSupport;
 };

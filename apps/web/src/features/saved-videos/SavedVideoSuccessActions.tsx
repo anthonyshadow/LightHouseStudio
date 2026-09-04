@@ -46,7 +46,11 @@ export const SavedVideoSuccessActions = ({
   // A placement can only be produced where the browser can render; elsewhere the original shape is
   // what the operator gets, and saying so is better than offering a control that cannot work.
   // Carrying the specification rather than a boolean lets the offer below narrow to it.
-  const reframing = render.supported ? exportSpecification : null;
+  // `=== true` deliberately: while the probe is unresolved this is neither a re-framing download
+  // nor a plain one. Reading `null` as no would quietly hand over the original-shape file under a
+  // label the operator chose a placement for, and the notice below is gated on a definite no.
+  const reframing = render.supported === true ? exportSpecification : null;
+  const capabilityPending = exportSpecification !== null && render.supported === null;
 
   return (
     <div css={{ display: 'grid', gap: theme.space.xs }} data-saved-video-success-actions="">
@@ -62,6 +66,13 @@ export const SavedVideoSuccessActions = ({
             }
           >
             Download for {exportPlacementLabel(reframing.aspect).toLowerCase()}
+          </Button>
+        ) : capabilityPending ? (
+          // A placement was chosen and we do not yet know whether this browser can honour it.
+          // Offering the plain download here would hand over the original shape under a label the
+          // operator picked a placement for, so the control waits rather than doing the wrong one.
+          <Button variant="secondary" busy disabled>
+            Download
           </Button>
         ) : (
           <LinkButton

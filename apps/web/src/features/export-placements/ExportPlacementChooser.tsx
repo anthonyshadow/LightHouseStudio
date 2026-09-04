@@ -203,6 +203,13 @@ export const ExportPlacementChooser = ({
   const theme = useTheme();
   const unavailable = supported === false;
   const inert = disabled || supported === null;
+  /*
+   * Withdrawn on screen only. Calling `onChange(null)` here looked like making the state agree with
+   * the display, but one of the three callers persists that value: it would erase the operator's
+   * stored placement on the server, attributed to them and gone from their other devices, because
+   * of a capability answer on this one browser. The recorded placement stays; the save path asks
+   * the capability itself and stores the cut in its own shape when the answer is no.
+   */
   const aspect: ProjectExportAspect = unavailable ? 'source' : (value?.aspect ?? 'source');
   const active = unavailable ? null : value;
 

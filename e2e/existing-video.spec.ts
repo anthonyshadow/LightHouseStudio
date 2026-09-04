@@ -233,13 +233,9 @@ test('provider-free upload previews and enters the existing take/save surface', 
   expect(network.blockedExternalWebSockets).toEqual([]);
 });
 
-test('@cross-browser provider-free Edit video edits on every engine, and renders and replaces the source where the engine can encode', async ({
+test('@cross-browser provider-free Edit video edits on every engine and reports what it can encode', async ({
   page,
-  browserName,
 }) => {
-  // Three full renders below, each already budgeting a minute of its own, which the default 30s
-  // test timeout made unreachable.
-  test.setTimeout(180_000);
   await installCameraSentinel(page);
   const network = await installProviderNetworkDriver(page);
   await page.goto('/studio/create');
@@ -329,15 +325,11 @@ test('@cross-browser provider-free Edit video edits on every engine, and renders
    * Everything above is engine-sensitive and runs everywhere: the upload, the editor, its tools,
    * the WebGL preview and the compare hold, and the reflow through every supported viewport.
    *
-   * The export below does not: it needs a working H.264 encode, and engines differ. What every
-   * engine must do is tell the truth about that in advance, which is asserted here. The editor
-   * offers Save only where its probe encoded a frame, and where it could not it says so and leaves
-   * the video alone — the Linux WebKit build the runners use passes every presence check while
-   * never completing an encode, and used to be offered a control that led nowhere.
-   *
-   * The export itself is then proved where a runner can prove it. Real Safari and Firefox export
-   * stays the manual release gate `docs/BROWSER_SUPPORT.md` says it is, because an engine that
-   * encodes one probe frame has still not been shown to encode a whole video.
+   * The export does not: it needs a working H.264 encode, and engines differ. What every engine
+   * must do is tell the truth about that in advance, which is where this journey ends. The
+   * export itself is the sibling test below, which runs unconditionally on the one project the
+   * automated suite can hold to it; real Safari and Firefox export stays the manual release
+   * gate `docs/BROWSER_SUPPORT.md` describes.
    */
   const save = page.getByRole('button', { name: 'Save edited video' });
   const unavailable = page.getByText('Local editor unavailable');
@@ -347,7 +339,107 @@ test('@cross-browser provider-free Edit video edits on every engine, and renders
     if (await save.isEnabled()) await expect(unavailable).toHaveCount(0);
     else await expect(unavailable).toBeVisible();
   }).toPass({ timeout: 15_000 });
-  if (browserName !== 'chromium') return;
+});
+
+/*
+ * Untagged on purpose. The tag projects are exclusive, so an untagged test runs on chromium and
+ * only there — which is what this journey needs and what it never had: guarded inside the
+ * cross-browser test above, first on an engine name and then on the page's own answer, it was
+ * skipped on every project that ran that test while reporting green.
+ */
+test('a local render replaces the persistent source atomically, and a re-crop gates the visual tools', async ({
+  page,
+}) => {
+  // Three full renders below, each budgeting a minute of its own.
+  test.setTimeout(180_000);
+  await installCameraSentinel(page);
+  const network = await installProviderNetworkDriver(page);
+  await page.goto('/studio/create');
+  const fixture = await loadDecodableH264VideoFixture();
+
+  // Before anything engine-specific: if the app did not boot here, say why rather than waiting out
+  // a timeout on the upload control.
+  expectNoUncaughtPageErrors(network);
+
+  await selectExistingVideo(page, fixture, 'local-edit-source.mp4');
+  const upload = page.getByRole('dialog', { name: 'Use existing video' });
+  const stageVideo = page.getByLabel('Studio media stage').locator('video');
+  await expect(stageVideo).toHaveCount(1);
+  await stageVideo.evaluate((video) => {
+    (
+      window as typeof window & { __lightframeVideoEditorStage?: HTMLVideoElement }
+    ).__lightframeVideoEditorStage = video as HTMLVideoElement;
+  });
+
+  await upload.getByRole('button', { name: 'Edit video' }).click();
+  await expect(upload).toBeHidden();
+  await expect(page.getByRole('navigation', { name: 'Video editing tools' })).toBeVisible();
+  await expect(page.getByLabel('Video edit settings')).toBeVisible();
+  await expect(page.locator('video')).toHaveCount(1);
+  expect(
+    await stageVideo.evaluate(
+      (video) =>
+        (window as typeof window & { __lightframeVideoEditorStage?: HTMLVideoElement })
+          .__lightframeVideoEditorStage === video,
+    ),
+  ).toBe(true);
+
+  for (const viewport of Object.values(STUDIO_VIEWPORT_SIZES)) {
+    await page.setViewportSize(viewport);
+    await expectNoDocumentOverflow(page);
+
+    const [stageBox, toolsBox, historyBox, timelineBox, settingsBox, actionsBox] =
+      await Promise.all([
+        page.getByLabel('Studio media stage').boundingBox(),
+        page.getByRole('navigation', { name: 'Video editing tools' }).boundingBox(),
+        page.locator('[data-video-editor-history]').boundingBox(),
+        page.locator('[data-video-edit-timeline]').boundingBox(),
+        page.getByLabel('Video edit settings').boundingBox(),
+        page.locator('[data-video-editor-actions]').boundingBox(),
+      ]);
+
+    expect(stageBox).not.toBeNull();
+    expect(toolsBox).not.toBeNull();
+    expect(historyBox).not.toBeNull();
+    expect(timelineBox).not.toBeNull();
+    expect(settingsBox).not.toBeNull();
+    expect(actionsBox).not.toBeNull();
+    if (!stageBox || !toolsBox || !historyBox || !timelineBox || !settingsBox || !actionsBox) {
+      continue;
+    }
+
+    expect(Math.abs(stageBox.width / stageBox.height - 16 / 9)).toBeLessThan(0.01);
+    expect(toolsBox.y + toolsBox.height).toBeLessThanOrEqual(stageBox.y + 1);
+    expect(historyBox.y).toBeGreaterThanOrEqual(stageBox.y + stageBox.height - 1);
+    expect(historyBox.y).toBeLessThanOrEqual(stageBox.y + stageBox.height + 16);
+    expect(timelineBox.y).toBeGreaterThanOrEqual(historyBox.y + historyBox.height - 1);
+
+    if (viewport.width >= 1_024) {
+      expect(settingsBox.x).toBeGreaterThanOrEqual(stageBox.x + stageBox.width - 1);
+    } else if (viewport.width >= 768) {
+      expect(settingsBox.y).toBeGreaterThanOrEqual(timelineBox.y + timelineBox.height - 1);
+    } else {
+      expect(settingsBox.y + settingsBox.height).toBeLessThanOrEqual(actionsBox.y + 1);
+      expect(actionsBox.y + actionsBox.height).toBeLessThanOrEqual(viewport.height - 72 + 1);
+    }
+  }
+
+  await page.setViewportSize(STUDIO_VIEWPORT_SIZES.compactDesktop);
+
+  await page.getByRole('button', { name: 'Lighting', exact: true }).click();
+  await page.getByRole('slider', { name: 'Brightness' }).fill('24');
+  const compare = page.getByRole('button', {
+    name: 'Hold to show original. Keyboard shortcut C.',
+  });
+  await compare.hover();
+  await page.mouse.down();
+  await expect(compare).toHaveAttribute('aria-pressed', 'true');
+  await page.mouse.up();
+  await expect(compare).toHaveAttribute('aria-pressed', 'false');
+
+  const save = page.getByRole('button', { name: 'Save edited video' });
+  // Unconditional: an engine that stops reporting it can encode is the regression this exists
+  // to catch, not a reason to skip the rest.
   await expect(save).toBeEnabled();
 
   await save.click();

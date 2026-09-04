@@ -46,7 +46,8 @@ export const VideoExportPanel = ({
   // carries a placement exactly when a rendition was stored for it, so those bytes are that shape
   // and the server can simply hand them over.
   const reframing =
-    render.supported && !projectExportSpecificationsEqual(placement, version.exportSpecification)
+    render.supported === true &&
+    !projectExportSpecificationsEqual(placement, version.exportSpecification)
       ? placement
       : null;
 
