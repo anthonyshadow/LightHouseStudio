@@ -310,6 +310,18 @@ test('@cross-browser provider-free Edit video edits on every engine and reports 
 
   await page.setViewportSize(STUDIO_VIEWPORT_SIZES.compactDesktop);
 
+  // The level is heard on the stage element itself, on every engine, before any render exists.
+  const heard = () =>
+    stageVideo.evaluate((video) => ({
+      volume: Math.round((video as HTMLVideoElement).volume * 100),
+      muted: (video as HTMLVideoElement).muted,
+    }));
+  await page.getByRole('button', { name: 'Audio', exact: true }).click();
+  await page.getByRole('slider', { name: 'Level' }).fill('40');
+  await expect.poll(heard).toEqual({ volume: 40, muted: false });
+  await page.getByRole('button', { name: 'Mute', exact: true }).click();
+  await expect.poll(heard).toEqual({ volume: 0, muted: true });
+
   await page.getByRole('button', { name: 'Lighting', exact: true }).click();
   await page.getByRole('slider', { name: 'Brightness' }).fill('24');
   const compare = page.getByRole('button', {
@@ -318,8 +330,11 @@ test('@cross-browser provider-free Edit video edits on every engine and reports 
   await compare.hover();
   await page.mouse.down();
   await expect(compare).toHaveAttribute('aria-pressed', 'true');
+  // Compare plays the source as recorded, the way it shows the source frame.
+  await expect.poll(heard).toEqual({ volume: 100, muted: false });
   await page.mouse.up();
   await expect(compare).toHaveAttribute('aria-pressed', 'false');
+  await expect.poll(heard).toEqual({ volume: 0, muted: true });
 
   /*
    * Everything above is engine-sensitive and runs everywhere: the upload, the editor, its tools,

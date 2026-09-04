@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_VIDEO_EDIT_AUDIO,
+  VIDEO_EDIT_AUDIO_LEVEL_MAX,
+  clampVideoEditAudioLevel,
+  normalizeVideoEditAudio,
+  videoEditAudioGain,
   SUBTITLE_CUE_DEFAULT_DURATION_MS,
   SUBTITLE_CUE_LIMIT,
   SUBTITLE_CUE_MINIMUM_DURATION_MS,
@@ -329,5 +334,44 @@ describe('subtitle rules', () => {
         cue({ id: 'b', placement: 'top' }),
       ]),
     ).toEqual(['top', 'bottom']);
+  });
+});
+
+describe('audio level', () => {
+  const source = { width: 1_280, height: 720, durationMs: 12_000 };
+
+  it('starts at the source as recorded and is last in the spec, the wire order', () => {
+    const spec = createDefaultVideoEditSpec(12_000);
+    expect(spec.audio).toEqual({ level: VIDEO_EDIT_AUDIO_LEVEL_MAX, muted: false });
+    expect(Object.keys(spec).at(-1)).toBe('audio');
+    expect(DEFAULT_VIDEO_EDIT_AUDIO).toEqual({ level: 100, muted: false });
+  });
+
+  it('clamps the level to a whole percentage of the source, never a boost', () => {
+    expect(clampVideoEditAudioLevel(150)).toBe(100);
+    expect(clampVideoEditAudioLevel(-5)).toBe(0);
+    expect(clampVideoEditAudioLevel(33.6)).toBe(34);
+    expect(clampVideoEditAudioLevel(Number.NaN)).toBe(0);
+  });
+
+  it('turns level and mute into the one gain the render and the preview both apply', () => {
+    expect(videoEditAudioGain({ level: 100, muted: false })).toBe(1);
+    expect(videoEditAudioGain({ level: 25, muted: false })).toBe(0.25);
+    expect(videoEditAudioGain({ level: 25, muted: true })).toBe(0);
+    expect(videoEditAudioGain({ level: 250, muted: false })).toBe(1);
+  });
+
+  it('normalizes through the spec and keeps identity when nothing changed', () => {
+    const spec = { ...createDefaultVideoEditSpec(12_000), audio: { level: 140, muted: true } };
+    const normalized = normalizeVideoEditSpec(spec, source);
+    expect(normalized.audio).toEqual({ level: 100, muted: true });
+    expect(normalizeVideoEditAudio(normalized.audio)).toBe(normalized.audio);
+  });
+
+  it('is part of what makes two specs equal', () => {
+    const left = createDefaultVideoEditSpec(12_000);
+    expect(videoEditSpecsEqual(left, { ...left, audio: { level: 100, muted: true } })).toBe(false);
+    expect(videoEditSpecsEqual(left, { ...left, audio: { level: 60, muted: false } })).toBe(false);
+    expect(videoEditSpecsEqual(left, { ...left, audio: { ...left.audio } })).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import { Global, useTheme } from '@emotion/react';
 import {
+  VIDEO_EDIT_AUDIO_LEVEL_MAX,
   VIDEO_EDIT_CROP_PRESETS,
   VIDEO_EDIT_FILTERS,
   cropForVideoEditPreset,
@@ -73,6 +74,12 @@ const TOOLS: readonly Readonly<{
     icon: 'subtitles',
     description:
       'Timed text burned into the render, laid out exactly as the preview shows it. Subtitles may overlap; they stack.',
+  },
+  {
+    id: 'audio',
+    label: 'Audio',
+    icon: 'audio',
+    description: 'Set how loud the clip plays, or mute it.',
   },
 ];
 
@@ -243,6 +250,45 @@ const ToolSettings = ({
           Flip vertical
         </button>
       </div>
+    );
+  }
+
+  if (session.activeTool === 'audio') {
+    return (
+      <>
+        <EditRange
+          label="Level"
+          value={session.draft.audio.level}
+          minimum={0}
+          maximum={VIDEO_EDIT_AUDIO_LEVEL_MAX}
+          format={(value) => `${value}%`}
+          onStart={session.beginTransaction}
+          onChange={(value) =>
+            session.previewSpec({
+              ...session.draft,
+              audio: { ...session.draft.audio, level: value },
+            })
+          }
+          onCommit={session.commitTransaction}
+        />
+        <div css={optionGridStyles(theme, 1)}>
+          <button
+            type="button"
+            aria-pressed={session.draft.audio.muted}
+            onClick={() =>
+              session.applySpec({
+                ...session.draft,
+                audio: { ...session.draft.audio, muted: !session.draft.audio.muted },
+              })
+            }
+          >
+            {session.draft.audio.muted ? 'Muted' : 'Mute'}
+          </button>
+        </div>
+        <p css={{ margin: 0, fontSize: theme.fontSizes.metadata, color: theme.colors.textMuted }}>
+          Whether the saved video carries audio at all is chosen with its placement when you save.
+        </p>
+      </>
     );
   }
 

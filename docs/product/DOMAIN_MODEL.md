@@ -123,6 +123,12 @@ _Status: implemented for the single clip. `SubtitleCue` is a field of `VideoEdit
 editor's shared renderer in the preview and the export worker. Cues may overlap and stack. A
 composition-level track that applies across clips remains target work (D3)._
 
+_Status, audio (slice 2.2, 2026-09-04): the clip's own level is a field of `VideoEditSpec`
+(`audio`: a 0–100% level and a mute), persisted inside the revision's `localEdit`, applied to every
+sample by the render worker and mirrored onto the stage element while editing. It never drops the
+track; keep-or-drop stays with the placement chosen at a save. A boost above the source and the
+composition-level audio settings remain target work._
+
 ### Working media / current cut
 
 The media the Project's stage currently shows and the next edit starts from: the accepted source,

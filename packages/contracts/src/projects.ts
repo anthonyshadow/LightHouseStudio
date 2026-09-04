@@ -61,6 +61,8 @@ export const SUBTITLE_CUE_PLACEMENTS = ['top', 'middle', 'bottom'] as const;
 export const SUBTITLE_CUE_LIMIT = 200;
 export const SUBTITLE_CUE_TEXT_MAX_LENGTH = 200;
 export const SUBTITLE_CUE_MINIMUM_DURATION_MS = 100;
+/** Mirrors the domain's VIDEO_EDIT_AUDIO_LEVEL_MAX by hand; the parity suite holds the two together. */
+export const VIDEO_EDIT_AUDIO_LEVEL_MAX = 100;
 /** Mirrors the domain's LOCAL_VOICE_EFFECT_IDS by hand; the parity suite holds the two together. */
 export const LOCAL_VOICE_EFFECT_IDS = ['warm-studio', 'clear-presenter', 'robot'] as const;
 
@@ -185,6 +187,18 @@ export const projectVideoEditSpecSchema = z
      * may overlap; they must be listed in start order and each carry its own id.
      */
     subtitles: z.array(subtitleCueSchema).max(SUBTITLE_CUE_LIMIT).readonly().default([]),
+    /**
+     * Absent from every snapshot written before the audio level existed, and read back as the
+     * source as recorded: full level, not muted. Last on purpose — the wire mirrors the domain's
+     * key order, and equality elsewhere is a comparison of serialized snapshots.
+     */
+    audio: z
+      .object({
+        level: z.number().int().min(0).max(VIDEO_EDIT_AUDIO_LEVEL_MAX),
+        muted: z.boolean(),
+      })
+      .strict()
+      .default({ level: VIDEO_EDIT_AUDIO_LEVEL_MAX, muted: false }),
   })
   .strict()
   .superRefine((value, context) => {
@@ -806,25 +820,35 @@ export const projectConflictResponseSchema = z
  * defaults to an empty list, and the stored cues are overwritten by a client that never knew about
  * them. Requiring the key refuses that write instead, which a reload fixes and data loss does not.
  */
-const statesItsCueList = (value: unknown, context: z.RefinementCtx): void => {
-  if (value !== null && typeof value === 'object' && !('subtitles' in value)) {
-    context.addIssue({
-      code: 'custom',
-      path: ['subtitles'],
-      message: 'This tab is out of date and cannot describe subtitles. Reload and try again.',
-    });
+/**
+ * Every field a snapshot defaults on read, which a current client therefore always states on a
+ * write. A proposal missing one comes from a bundle that predates it, and letting the default fill
+ * it in would overwrite what is stored with what that bundle never knew about.
+ */
+const DEFAULTED_EDIT_FIELDS = ['subtitles', 'audio'] as const;
+
+const statesEveryDefaultedField = (value: unknown, context: z.RefinementCtx): void => {
+  if (value === null || typeof value !== 'object') return;
+  for (const field of DEFAULTED_EDIT_FIELDS) {
+    if (!(field in value)) {
+      context.addIssue({
+        code: 'custom',
+        path: [field],
+        message: 'This tab is out of date and cannot describe this edit. Reload and try again.',
+      });
+    }
   }
 };
 
 /** The same requirement where a specification is mandatory rather than nullable. */
 const requiredCueVideoEditSpecSchema = z
   .unknown()
-  .superRefine(statesItsCueList)
+  .superRefine(statesEveryDefaultedField)
   .pipe(projectVideoEditSpecSchema);
 
 const proposedVideoEditSpecSchema = z
   .unknown()
-  .superRefine(statesItsCueList)
+  .superRefine(statesEveryDefaultedField)
   .pipe(projectVideoEditSpecSchema.nullable());
 
 export const projectSessionProposalSchema = z

@@ -34,7 +34,12 @@ a provider, and replace the immutable source only after a validated export and e
 6. Hold **Compare** (or hold **C**) to bypass every draft transformation without seeking or changing
    undo history. **Split** keeps the original and edited render side by side on the same stage.
    Reset the active tool or all edits, and use the labelled 50-entry grouped Undo/Redo history.
-7. **Subtitles** adds timed text that is burned into the render. **Add subtitle at playhead**
+7. **Audio** sets how loud the clip's own audio is in the output, 0–100% of the source, and
+   **Mute** silences it without forgetting the level. The stage plays at that level while you edit,
+   and the render applies the same number to every sample, so what you hear is what the file
+   carries. Neither drops the track: whether a saved video carries audio at all stays the
+   placement's keep-or-drop, chosen when you save. A boost above the source is not offered.
+8. **Subtitles** adds timed text that is burned into the render. **Add subtitle at playhead**
    creates a cue from the playhead — two seconds long, or to the trim end — selected and ready to
    type. The inspector lists every cue and edits the selected one: text up to 200 characters on
    three lines, start and end at least 100 ms apart with **Set start/end to playhead**, a Top /
@@ -45,17 +50,17 @@ a provider, and replace the immutable source only after a validated export and e
    outside the trim is kept and marked, not rendered; an untyped cue is neither rendered nor
    counted as an edit. The stage draws subtitles exactly as the render burns them — same layout,
    same face — including inside the crop frame while Crop is active, and redraws on a paused frame.
-8. **Save edited video** starts one module worker. Studio announces local render/validation
+9. **Save edited video** starts one module worker. Studio announces local render/validation
    progress; cancellation terminates the work and preserves the pinned source and draft.
-9. After validation, the replacement dialog initially focuses **Cancel** and offers **Replace
-   Without Saving** or **Replace and Save**. The Save path prompts for an optional gallery name,
-   falling back to the existing generated artifact name when blank, and must finish publishing the
-   artifact that was displayed when this edit session began—including a prior visual or voiced
-   result—before replacement proceeds.
-10. A confirmed replacement creates an `edited` artifact whose `parentArtifactId` identifies that
+10. After validation, the replacement dialog initially focuses **Cancel** and offers **Replace
+    Without Saving** or **Replace and Save**. The Save path prompts for an optional gallery name,
+    falling back to the existing generated artifact name when blank, and must finish publishing the
+    artifact that was displayed when this edit session began—including a prior visual or voiced
+    result—before replacement proceeds.
+11. A confirmed replacement creates an `edited` artifact whose `parentArtifactId` identifies that
     pinned source, atomically makes it the immutable source, installs its matching audio sidecar,
     clears superseded visual/voice layers, and returns to **Use existing video**.
-11. **Save Video** can then save the edited artifact as a new gallery record after the same optional
+12. **Save Video** can then save the edited artifact as a new gallery record after the same optional
     naming prompt. If the source was loaded from Videos, the secondary confirmed Replace
     Existing action appends an immutable version using the captured saved video/version lineage.
 

@@ -4,6 +4,7 @@ import {
   getVideoEditOutputGeometry,
   normalizeVideoCrop,
   rotatedVideoEditDimensions,
+  videoEditAudioGain,
   type NormalizedVideoCrop,
   type VideoEditSpec,
 } from '@studio/domain';
@@ -225,6 +226,29 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
     previewScale,
     videoRef,
   ]);
+
+  /*
+   * What you hear is what you get, from the same number the worker applies. The stage element is
+   * the only thing playing audio during an edit, so its volume and mute are the preview. Compare
+   * plays the source as recorded, the way it shows the source frame instead of the edit canvas.
+   * Restored on the way out, because the element outlives the editor and the next playback must
+   * not inherit a mute.
+   */
+  const gain = contract.showingBefore ? 1 : videoEditAudioGain(previewSpec.audio);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.volume = gain;
+    video.muted = gain === 0;
+  }, [gain, videoRef]);
+  useEffect(() => {
+    const video = videoRef.current;
+    return () => {
+      if (!video) return;
+      video.volume = 1;
+      video.muted = false;
+    };
+  }, [videoRef]);
 
   // The draft changed: mirror it for the frame loop, and draw once if the video is paused — a
   // paused video presents no new frame, so a subtitle being typed or a slider moved would

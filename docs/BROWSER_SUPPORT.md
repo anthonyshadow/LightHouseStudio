@@ -158,7 +158,9 @@ the probe answers, the placement chooser is inert rather than declared unavailab
 editor's Save stays disabled without showing the unavailable notice. It does not use the limited-availability 2D canvas `filter` property.
 Preview and export share a WebGL shader for flips, curated filters, and manual lighting controls;
 MediaBunny performs trim, baked 90° rotation, crop, H.264 encode, and AAC audio preservation in the
-worker. There is no synchronous main-thread processing fallback. Subtitles are rasterized on a 2D
+worker; the edit's audio level is applied there as a per-sample multiply, and the preview applies
+the same number to the stage element's volume, so an engine that plays the element at all hears
+what the file will carry. There is no synchronous main-thread processing fallback. Subtitles are rasterized on a 2D
 canvas — an `OffscreenCanvas` in the worker, so the worker also needs 2D text (`fillText`,
 `measureText`, `roundRect`) — in the interface's sans-serif stack, and composited by the same
 shader. The same device therefore draws identical text in the preview and in the file; a different

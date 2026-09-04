@@ -3,9 +3,11 @@ import {
   getVideoEditOutputGeometry,
   outputSubtitleCues,
   rotatedVideoEditDimensions,
+  videoEditAudioGain,
   type VideoEditSpec,
 } from '@studio/domain';
 import { ensureAacEncodingSupport } from '../../adapters/media-processing/aacEncoding';
+import type { AudioSample, ConversionAudioOptions } from 'mediabunny';
 import { createSubtitleOverlaySync } from './subtitleRasterizer';
 import type { VideoEditWorkerRequest, VideoEditWorkerResponse } from './types';
 import {
@@ -13,6 +15,34 @@ import {
   VideoEditChunkAccumulator,
 } from './videoEditChunkAccumulator';
 import { createVideoEditFrameRenderer } from './videoEditShader';
+
+/**
+ * A per-sample multiply, in float so the arithmetic is exact and clipping is impossible below
+ * unity. The library owns both samples — it disposes the one it hands in once this returns, and
+ * the one returned once it has been encoded — so nothing here closes anything. At unity no hook
+ * is installed at all, which keeps the untouched path byte-identical to what it was.
+ */
+const audioGainProcessing = (
+  gain: number,
+  Sample: typeof AudioSample,
+): Pick<ConversionAudioOptions, 'process'> =>
+  gain === 1
+    ? {}
+    : {
+        process: (sample) => {
+          const frames = sample.numberOfFrames * sample.numberOfChannels;
+          const data = new Float32Array(frames);
+          sample.copyTo(data, { planeIndex: 0, format: 'f32' });
+          for (let index = 0; index < frames; index += 1) data[index]! *= gain;
+          return new Sample({
+            data,
+            format: 'f32',
+            numberOfChannels: sample.numberOfChannels,
+            sampleRate: sample.sampleRate,
+            timestamp: sample.timestamp,
+          });
+        },
+      };
 
 let activeOperationId: number | null = null;
 let activeConversion: { cancel: () => Promise<void> } | null = null;
@@ -52,6 +82,7 @@ const render = async (
   try {
     const {
       ALL_FORMATS,
+      AudioSample,
       BlobSource,
       Conversion,
       Input,
@@ -74,6 +105,8 @@ const render = async (
     if (!(await canEncodeVideo('avc'))) throw new Error('H.264 encoding is unavailable.');
     // A dropped track is never encoded, so its encoder support is not a precondition.
     const keptAudioTrack = request.includeAudio ? audioTrack : null;
+    // The level is the domain's one number, the same one the preview sets on the stage element.
+    const gain = videoEditAudioGain(request.spec.audio);
     if (keptAudioTrack) await ensureAacEncodingSupport(() => canEncodeAudio('aac'));
 
     const geometry = getVideoEditOutputGeometry(
@@ -163,7 +196,13 @@ const render = async (
         processedHeight: outputSize.height,
       },
       ...(keptAudioTrack
-        ? { audio: { codec: 'aac' as const, forceTranscode: true } }
+        ? {
+            audio: {
+              codec: 'aac' as const,
+              forceTranscode: true,
+              ...audioGainProcessing(gain, AudioSample),
+            },
+          }
         : audioTrack
           ? { audio: { discard: true } }
           : undefined),

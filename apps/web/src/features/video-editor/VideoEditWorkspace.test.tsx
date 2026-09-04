@@ -231,28 +231,54 @@ describe('VideoEditWorkspace', () => {
     ['rotate', 'Flip horizontal'],
     ['lighting', 'Brightness'],
     ['filters', 'Warm'],
+    ['audio', 'Level'],
+    ['audio', 'Mute'],
   ] as const)('applies %s control %s', (activeTool, controlName) => {
     const session = createSession({ activeTool });
     renderWorkspace(session);
-    const control =
-      controlName === 'Brightness'
-        ? screen.getByRole('slider', { name: controlName })
-        : screen.getByRole('button', { name: controlName });
+    const sliderPreview: Partial<Record<typeof controlName, Partial<VideoEditSpec>>> = {
+      Brightness: {
+        adjustments: expect.objectContaining({ brightness: 20 }) as VideoEditSpec['adjustments'],
+      },
+      Level: { audio: { level: 20, muted: false } },
+    };
+    const expected = sliderPreview[controlName];
+    const control = expected
+      ? screen.getByRole('slider', { name: controlName })
+      : screen.getByRole('button', { name: controlName });
 
-    if (controlName === 'Brightness') {
+    if (expected) {
       fireEvent.pointerDown(control);
       fireEvent.change(control, { target: { value: '20' } });
       fireEvent.pointerUp(control);
-      expect(session.previewSpec).toHaveBeenCalledWith(
-        expect.objectContaining({
-          adjustments: expect.objectContaining({ brightness: 20 }) as VideoEditSpec['adjustments'],
-        }),
-      );
+      expect(session.previewSpec).toHaveBeenCalledWith(expect.objectContaining(expected));
       expect(session.commitTransaction).toHaveBeenCalled();
     } else {
       fireEvent.click(control);
       expect(session.applySpec).toHaveBeenCalled();
     }
+  });
+
+  it('mutes without forgetting the level, and shows the muted state as pressed', () => {
+    const session = createSession({ activeTool: 'audio' });
+    renderWorkspace(session);
+    const mute = screen.getByRole('button', { name: 'Mute' });
+    expect(mute).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('slider', { name: 'Level' })).toHaveValue('100');
+
+    fireEvent.click(mute);
+    expect(session.applySpec).toHaveBeenCalledWith(
+      expect.objectContaining({ audio: { level: 100, muted: true } }),
+    );
+
+    const draft = {
+      ...createDefaultVideoEditSpec(source.metadata.durationMs),
+      audio: { level: 35, muted: true },
+    };
+    cleanup();
+    renderWorkspace(createSession({ activeTool: 'audio', draft }));
+    expect(screen.getByRole('button', { name: 'Muted' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('slider', { name: 'Level' })).toHaveValue('35');
   });
 
   it('announces progress and errors while preserving a usable unsupported state', () => {

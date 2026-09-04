@@ -104,6 +104,11 @@ recorded there.
   in both persistence modes, and the next write of that snapshot carries the empty list. No
   migration was needed — the snapshot stays version 2 and the `0018` check is untouched — and the
   file library format stays at version 7.
+- Audio level (slice 2.2, 2026-09-04) added `audio` inside the snapshot's `localEdit` the same way:
+  an additive field defaulting to the source as recorded (`level: 100, muted: false`), so every
+  revision written before it reads back unchanged and no migration ships. A write that omits either
+  defaulted field is refused rather than defaulted, because a client that predates a field must not
+  overwrite what it never knew about.
 - Additive migration `0019` adds processing-job result-asset/retry identity and Project-job
   result-revision fields, restrictive result relations, and recovery/history indexes. It does not
   assign legacy jobs to Projects, rewrite existing content, or apply automatically to production.

@@ -8,6 +8,8 @@ export type EditRangeProps = Readonly<{
   minimum: number;
   maximum: number;
   step?: number;
+  /** How the current value reads beside the label; time by default for coarse steps, else the number. */
+  format?: (value: number) => string;
   onStart: () => void;
   onChange: (value: number) => void;
   onCommit: () => void;
@@ -23,6 +25,7 @@ export const EditRange = ({
   minimum,
   maximum,
   step = 1,
+  format,
   onStart,
   onChange,
   onCommit,
@@ -32,7 +35,7 @@ export const EditRange = ({
     <label css={rangeFieldStyles(theme)}>
       <span>
         <span>{label}</span>
-        <output>{step >= 10 ? formatVideoEditTime(value) : value}</output>
+        <output>{format ? format(value) : step >= 10 ? formatVideoEditTime(value) : value}</output>
       </span>
       <input
         type="range"

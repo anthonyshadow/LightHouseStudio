@@ -53,6 +53,20 @@ export type VideoEditAdjustments = Readonly<{
   shadows: number;
 }>;
 
+/** The loudest the level goes: the source as recorded. A boost is a later slice, not this one. */
+export const VIDEO_EDIT_AUDIO_LEVEL_MAX = 100;
+
+/**
+ * How loud the clip's own audio is in the output. `level` is a whole percentage of the source,
+ * 0 to `VIDEO_EDIT_AUDIO_LEVEL_MAX`; `muted` silences it without forgetting the level, so a mute
+ * is one undo entry away from the number it hid. Neither drops the track — whether an output
+ * carries audio at all is the placement's keep-or-drop, decided at a save, not here.
+ */
+export type VideoEditAudio = Readonly<{
+  level: number;
+  muted: boolean;
+}>;
+
 export type VideoEditSpec = Readonly<{
   trim: Readonly<{ startMs: number; endMs: number }>;
   crop: Readonly<{ preset: VideoEditCropPreset; rectangle: NormalizedVideoCrop }>;
@@ -61,8 +75,10 @@ export type VideoEditSpec = Readonly<{
   flipVertical: boolean;
   adjustments: VideoEditAdjustments;
   filter: VideoEditFilter;
-  /** Sorted by start, then id. Last on purpose: the wire mirrors this order. */
+  /** Sorted by start, then id. The wire mirrors this order. */
   subtitles: readonly SubtitleCue[];
+  /** Last on purpose: the wire mirrors this order, and every field before it predates it. */
+  audio: VideoEditAudio;
 }>;
 
 export type VideoEditSourceGeometry = Readonly<{
