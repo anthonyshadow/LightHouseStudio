@@ -24,8 +24,8 @@ export type SavedVideoPlacementDownloadInput = Readonly<{
  * It owns no bytes of its own either: the Blob exists only for the length of the call that hands
  * it over, and only the render phase, a failure message and the in-flight controller are kept.
  */
-export const useSavedVideoPlacementDownload = () => {
-  const render = useExportPlacementRender();
+export const useSavedVideoPlacementDownload = (offersPlacements = true) => {
+  const render = useExportPlacementRender(offersPlacements);
   const fetchRef = useRef<AbortController | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 

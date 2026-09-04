@@ -591,7 +591,7 @@ export const VideoEditWorkspace = ({
         <Button
           variant="primary"
           busy={busy}
-          disabled={!session.dirty || session.supported !== true || busy}
+          disabled={!session.dirty || !session.supported || busy}
           onClick={() => void session.startRender()}
         >
           <AppIcon name="save" width="1.1rem" height="1.1rem" />

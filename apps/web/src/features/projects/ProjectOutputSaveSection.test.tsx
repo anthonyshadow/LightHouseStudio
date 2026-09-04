@@ -33,6 +33,7 @@ vi.mock('../video-editor/videoEditSupport', () => ({
   videoEditPreviewSupported: () => renderCapable(),
   videoEditRenderingApisPresent: () => true,
   videoEditExportSupported: () => Promise.resolve(renderCapable()),
+  videoEditSupported: () => Promise.resolve(renderCapable()),
 }));
 vi.mock('../video-editor/renderVideoEdit', () => ({
   renderVideoEdit: vi.fn(),

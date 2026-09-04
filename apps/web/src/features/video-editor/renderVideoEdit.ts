@@ -1,6 +1,6 @@
 import type { VideoEditSpec } from '@studio/domain';
 import type { VideoEditWorkerRequest, VideoEditWorkerResponse } from './types';
-import { videoEditRenderingApisPresent } from './videoEditSupport';
+import { videoEditExportSupported } from './videoEditSupport';
 
 export type RenderVideoEditInput = Readonly<{
   source: Blob;
@@ -24,7 +24,7 @@ export type RenderVideoEditResult = Readonly<{ blob: Blob; mimeType: 'video/mp4'
 
 let nextOperationId = 0;
 
-export const renderVideoEdit = ({
+export const renderVideoEdit = async ({
   source,
   spec,
   sourceWidth,
@@ -35,12 +35,11 @@ export const renderVideoEdit = ({
   signal,
   onProgress,
 }: RenderVideoEditInput): Promise<RenderVideoEditResult> => {
-  // The cheap half of the question. Whether the codec actually works is `videoEditExportSupported`,
-  // which the surfaces offering this ask before they offer it, and the worker asks again itself.
-  if (!videoEditRenderingApisPresent()) {
-    return Promise.reject(
-      new Error('This browser cannot render local video edits without blocking the Studio.'),
-    );
+  // The same question the surfaces asked before offering this, and the same memoized answer, so by
+  // the time anyone renders it costs nothing. Asking the weaker presence-only version here would
+  // let a browser that cannot encode get all the way to a worker before finding out.
+  if (!(await videoEditExportSupported())) {
+    throw new Error('This browser cannot render local video edits without blocking the Studio.');
   }
   const operationId = ++nextOperationId;
   const worker = new Worker(new URL('./videoEditRender.worker.ts', import.meta.url), {

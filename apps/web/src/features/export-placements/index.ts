@@ -6,7 +6,6 @@ export {
   exportSpecificationSummary,
 } from './placements';
 export {
-  exportPlacementRenderSupported,
   useExportPlacementRender,
   type ExportPlacementRenderPhase,
   type ExportPlacementRenderResult,

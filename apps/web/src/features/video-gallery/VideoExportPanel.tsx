@@ -98,7 +98,7 @@ export const VideoExportPanel = ({
           value={placement}
           source={{ width: version.width, height: version.height, durationMs: version.durationMs }}
           disabled={rendering}
-          unavailable={!render.supported}
+          supported={render.supported}
           onChange={setPlacement}
         />
         <ExportPlacementProgress

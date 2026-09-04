@@ -93,7 +93,10 @@ export const useStudioSavedVideoController = ({
   confirmation,
 }: UseStudioSavedVideoControllerOptions) => {
   const [pendingSave, setPendingSave] = useState<PendingVideoSave | null>(null);
-  const placementRender = useExportPlacementRender();
+  // The capability is shown only in the save dialog, which exists only while a save is pending, so
+  // that is when it is worth measuring. Probing on every Studio entry made the browser encode a
+  // 720p frame while the camera was still coming up, to answer a question nothing on screen asked.
+  const placementRender = useExportPlacementRender(pendingSave !== null);
   // Only an explicitly requested save records an outcome. The pre-edit save inside `commitVideoEdit`
   // also reaches `saved`, but it is a side effect of replacing the source, not a completed journey.
   const [saveOutcome, setSaveOutcome] = useState<SavedVideoDetail | null>(null);

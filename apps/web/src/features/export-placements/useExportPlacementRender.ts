@@ -6,18 +6,8 @@ import {
 } from '@studio/domain';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { renderVideoEdit } from '../video-editor/renderVideoEdit';
-import {
-  videoEditExportSupported,
-  videoEditPreviewSupported,
-} from '../video-editor/videoEditSupport';
-
-/**
- * The same capability gate the local editor applies, because this is the same render path — and
- * the same one the render worker applies to itself, so a placement is never offered on a browser
- * whose encoder would refuse it.
- */
-export const exportPlacementRenderSupported = async (): Promise<boolean> =>
-  videoEditPreviewSupported() && (await videoEditExportSupported());
+import { useVideoEditExportSupport } from '../video-editor/useVideoEditExportSupport';
+import { videoEditSupported } from '../video-editor/videoEditSupport';
 
 export type ExportPlacementRenderPhase = 'idle' | 'rendering' | 'error';
 
@@ -35,27 +25,18 @@ export type ExportPlacementRenderResult = Readonly<{ blob: Blob; filename: strin
  * Renders one placement through the local editor's worker, reporting progress and honouring a
  * cancel. It owns no bytes of its own: the caller keeps the source, and the rendered Blob is handed
  * straight back so nothing is pinned here beyond the render itself.
+ *
+ * `offersPlacements` says whether this caller will ever show the capability to anyone. A surface
+ * that only drives renders — Studio's save controller, a success panel with no placement to state —
+ * still gets `render`, which checks for itself, without making the browser encode a probe frame
+ * during camera acquisition to answer a question it never asks.
  */
-export const useExportPlacementRender = () => {
+export const useExportPlacementRender = (offersPlacements = true) => {
   const [phase, setPhase] = useState<ExportPlacementRenderPhase>('idle');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
-  /*
-   * A browser capability, not a property of any one render, so it is measured once — but measuring
-   * it means encoding a frame, so it arrives a beat later. `null` is "not yet known", which reads
-   * as neither an offer nor a warning until it resolves.
-   */
-  const [supported, setSupported] = useState<boolean | null>(null);
-  useEffect(() => {
-    let current = true;
-    void exportPlacementRenderSupported().then((value) => {
-      if (current) setSupported(value);
-    });
-    return () => {
-      current = false;
-    };
-  }, []);
+  const supported = useVideoEditExportSupport(offersPlacements);
 
   useEffect(() => () => controllerRef.current?.abort('unmount'), []);
 
@@ -82,7 +63,9 @@ export const useExportPlacementRender = () => {
       filename,
     }: ExportPlacementRenderInput): Promise<ExportPlacementRenderResult | null> => {
       if (controllerRef.current !== null) return null;
-      if (supported !== true) {
+      // Asked rather than read: a caller that never offers a placement never subscribed, and the
+      // answer is memoized, so by the time anyone renders this costs nothing.
+      if (!(await videoEditSupported())) {
         setError(
           'This browser cannot re-frame a video without blocking the Studio. It keeps its original shape.',
         );
@@ -133,7 +116,7 @@ export const useExportPlacementRender = () => {
         if (controllerRef.current === controller) controllerRef.current = null;
       }
     },
-    [supported],
+    [],
   );
 
   return { phase, progress, error, supported, render, cancel, reset } as const;

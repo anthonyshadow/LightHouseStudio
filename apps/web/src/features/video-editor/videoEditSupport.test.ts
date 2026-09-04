@@ -1,11 +1,16 @@
 // @vitest-environment jsdom
 
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  resetVideoEditExportSupportForTests,
-  videoEditExportSupported,
-  videoEditPreviewSupported,
-} from './videoEditSupport';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { videoEditPreviewSupported } from './videoEditSupport';
+
+/**
+ * The probe memoizes for the life of the page, which outlives one case, so each case imports a
+ * fresh module rather than the module exporting a reset nothing in production would ever call.
+ */
+const freshProbe = async () => {
+  vi.resetModules();
+  return (await import('./videoEditSupport')).videoEditExportSupported;
+};
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -93,17 +98,15 @@ const stubWebCodecs = (encoder: ReturnType<typeof encoderClass>) => {
 };
 
 describe('videoEditExportSupported', () => {
-  beforeEach(() => resetVideoEditExportSupportForTests());
-
   it('answers no when the browser is missing the classes an export needs', async () => {
-    await expect(videoEditExportSupported()).resolves.toBe(false);
+    await expect((await freshProbe())()).resolves.toBe(false);
   });
 
   it('asks the encoder for the profile MediaBunny will ask it for', async () => {
     const encoder = encoderClass('chunk');
     stubWebCodecs(encoder);
 
-    await expect(videoEditExportSupported()).resolves.toBe(true);
+    await expect((await freshProbe())()).resolves.toBe(true);
     expect(encoder.configured).toMatchObject({ codec: 'avc1.64001f', width: 1_280, height: 720 });
     expect(encoder.closed).toBe(1);
   });
@@ -113,7 +116,7 @@ describe('videoEditExportSupported', () => {
     encoder.configSupported = false;
     stubWebCodecs(encoder);
 
-    await expect(videoEditExportSupported()).resolves.toBe(false);
+    await expect((await freshProbe())()).resolves.toBe(false);
   });
 
   /*
@@ -123,20 +126,21 @@ describe('videoEditExportSupported', () => {
    */
   it('answers no when a claimed configuration cannot actually encode', async () => {
     stubWebCodecs(encoderClass('error'));
-    await expect(videoEditExportSupported()).resolves.toBe(false);
+    await expect((await freshProbe())()).resolves.toBe(false);
   });
 
   it('answers no when a frame is accepted but no chunk ever comes back', async () => {
     stubWebCodecs(encoderClass('silence'));
-    await expect(videoEditExportSupported()).resolves.toBe(false);
+    await expect((await freshProbe())()).resolves.toBe(false);
   });
 
   it('asks once and reuses the answer', async () => {
     const encoder = encoderClass('chunk');
     stubWebCodecs(encoder);
 
-    await Promise.all([videoEditExportSupported(), videoEditExportSupported()]);
-    await videoEditExportSupported();
+    const probe = await freshProbe();
+    await Promise.all([probe(), probe()]);
+    await probe();
     expect(encoder.closed).toBe(1);
   });
 });

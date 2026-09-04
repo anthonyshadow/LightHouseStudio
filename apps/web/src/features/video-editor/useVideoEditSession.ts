@@ -19,7 +19,7 @@ import {
   type VideoEditSource,
   type VideoEditTool,
 } from './types';
-import { videoEditExportSupported, videoEditPreviewSupported } from './videoEditSupport';
+import { videoEditSupported } from './videoEditSupport';
 
 type HistoryState = Readonly<{
   past: readonly VideoEditSpec[];
@@ -86,8 +86,6 @@ export const useVideoEditSession = () => {
   const transactionStartRef = useRef<VideoEditSpec | null>(null);
   const renderControllerRef = useRef<AbortController | null>(null);
   const generationRef = useRef(0);
-  /** Separate from the render generation: a reopened editor must not adopt a stale probe result. */
-  const capabilityGenerationRef = useRef(0);
 
   const sourceGeometry = useMemo(
     () =>
@@ -130,15 +128,8 @@ export const useVideoEditSession = () => {
      * would flash on every browser that can edit, and the control would invite a click the render
      * might not honour. It resolves in a frame or two, well before an untouched spec is dirty.
      */
-    if (videoEditPreviewSupported()) {
-      setSupported(null);
-      const generation = ++capabilityGenerationRef.current;
-      void videoEditExportSupported().then((canExport) => {
-        if (generation === capabilityGenerationRef.current) setSupported(canExport);
-      });
-    } else {
-      setSupported(false);
-    }
+    setSupported(null);
+    void videoEditSupported().then(setSupported);
     setPhase('editing');
   }, []);
 
@@ -251,7 +242,7 @@ export const useVideoEditSession = () => {
 
   const startRender = useCallback(async () => {
     if (!source || !sourceGeometry || !dirty || renderControllerRef.current) return;
-    if (supported !== true) {
+    if (!supported) {
       setError('This browser cannot render local video edits without blocking the Studio.');
       setPhase('error');
       return;

@@ -17,6 +17,7 @@ vi.mock('./videoEditSupport', () => ({
   videoEditPreviewSupported: () => true,
   videoEditRenderingApisPresent: () => true,
   videoEditExportSupported: () => Promise.resolve(true),
+  videoEditSupported: () => Promise.resolve(true),
 }));
 vi.mock('../existing-video/videoValidation', () => ({
   validateEditedVideoOutput: adapters.validateEditedVideoOutput,

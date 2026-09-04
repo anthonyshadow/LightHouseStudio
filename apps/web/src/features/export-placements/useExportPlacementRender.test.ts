@@ -15,8 +15,9 @@ vi.mock('../video-editor/renderVideoEdit', () => ({
 }));
 vi.mock('../video-editor/videoEditSupport', () => ({
   videoEditPreviewSupported: () => videoEditPreviewSupported(),
-  videoEditRenderingApisPresent: () => true,
   videoEditExportSupported: () => Promise.resolve(canExport()),
+  // Composed the way the real gate composes it, so a case that withdraws WebGL still gets a no.
+  videoEditSupported: () => Promise.resolve(videoEditPreviewSupported() && canExport()),
 }));
 
 const landscape = { width: 1_920, height: 1_080, durationMs: 12_000 } as const;

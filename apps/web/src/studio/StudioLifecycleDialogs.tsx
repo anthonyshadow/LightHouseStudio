@@ -61,6 +61,7 @@ export const StudioLifecycleDialogs = ({
           phase: savedVideo.placementRender.phase,
           progress: savedVideo.placementRender.progress,
           error: savedVideo.placementRender.error,
+          supported: savedVideo.placementRender.supported,
           onCancel: savedVideo.placementRender.cancel,
         }}
         onCancel={savedVideo.dismissPendingSave}

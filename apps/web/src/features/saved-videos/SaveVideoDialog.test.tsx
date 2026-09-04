@@ -2,22 +2,15 @@
 
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import { SaveVideoDialog } from './SaveVideoDialog';
 
-// jsdom has no WebGL, so the render capability is stated explicitly rather than inferred.
-const renderCapable = vi.fn(() => true);
-vi.mock('../video-editor/videoEditSupport', () => ({
-  videoEditPreviewSupported: () => renderCapable(),
-  videoEditRenderingApisPresent: () => true,
-  videoEditExportSupported: () => Promise.resolve(renderCapable()),
-}));
+// The dialog is handed the render capability by whoever measured it, so these cases state it as a
+// prop rather than mocking a probe the dialog no longer performs.
 vi.mock('../video-editor/renderVideoEdit', () => ({
   renderVideoEdit: vi.fn(),
 }));
-
-beforeEach(() => renderCapable.mockReturnValue(true));
 
 afterEach(cleanup);
 
@@ -140,6 +133,7 @@ describe('SaveVideoDialog', () => {
           fallbackName="Recorded take"
           source={{ width: 1_920, height: 1_080, durationMs: 12_000 }}
           placementRender={{
+            supported: true,
             phase: 'rendering',
             progress: 0.42,
             error: null,
@@ -160,13 +154,18 @@ describe('SaveVideoDialog', () => {
 
   it('saves in the original shape when the browser cannot re-frame', async () => {
     const user = userEvent.setup();
-    renderCapable.mockReturnValue(false);
     const { onSave } = renderDialog({
       source: { width: 1_920, height: 1_080, durationMs: 12_000 },
+      placementRender: {
+        phase: 'idle',
+        progress: 0,
+        error: null,
+        supported: false,
+        onCancel: vi.fn(),
+      },
     });
 
-    // The probe answers in an effect, so the notice arrives a tick after the first paint.
-    expect(await screen.findByText('Local editor unavailable')).toBeVisible();
+    expect(screen.getByText('Local editor unavailable')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Square post' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Save to Assets' }));
 
