@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { createDefaultVideoEditSpec } from '@studio/domain';
 import { KeyedLock } from '../../application/keyed-lock.js';
 import { FileProjectRepository } from './file-project-repository.js';
 import { ProjectService } from './project-service.js';
@@ -11,6 +12,26 @@ import { CampaignService } from '../campaigns/campaign-service.js';
 const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
 const otherOwnerUserId = '458c4aca-a9fa-4c25-a2c8-d218768216a1';
 const now = '2026-08-11T12:00:00.000Z';
+
+/** The creative half of a revision proposal, empty, so a case states only what it is about. */
+const emptyCreativeProposal = {
+  selectedCharacter: null,
+  selectedOutfit: null,
+  selectedVoice: null,
+  visualTreatment: { kind: 'none' as const },
+  creativeIntent: {
+    promptId: null,
+    promptLabel: null,
+    recipeId: null,
+    recipeLabel: null,
+    userIntent: '',
+    appliedPrompt: null,
+    referenceAssetId: null,
+    resourceRevision: null,
+  },
+  localEdit: null,
+  exportSpecification: null,
+};
 
 const metadataPaths = (directory: string, ownerId: string) => {
   const segment = createHash('sha256').update(ownerId).digest('hex');
@@ -244,6 +265,62 @@ describe('FileProjectRepository', () => {
     await expect(restarted.get(ownerUserId, one.current.project.id)).resolves.toMatchObject({
       project: { title: 'Renamed', status: 'draft', version: 4 },
     });
+  });
+
+  /*
+   * Slice 2.1 verification: cue data survives the file-backed mode as it does PostgreSQL, which is
+   * the half that was never covered — both read back through the same `projectSnapshotSchema`, so
+   * a field missing from one is a field silently dropped on the other. Asserted across a restart,
+   * because the risk is the on-disk round trip rather than the in-memory object.
+   */
+  it('round-trips subtitle cues through the on-disk snapshot and a restart', async () => {
+    const service = new ProjectService(new FileProjectRepository(directory));
+    const created = await service.create(ownerUserId, randomUUID(), 'Captioned');
+    if (!created.ok) throw new Error('Expected the Project to be created.');
+    const projectId = created.current.project.id;
+
+    const localEdit = {
+      ...createDefaultVideoEditSpec(12_000),
+      subtitles: [
+        {
+          id: '4d1f6a2b-9c3e-4f5a-8b7d-2e1c0a9f8b7e',
+          text: 'First line\nwrapped',
+          startMs: 1_000,
+          endMs: 2_500,
+          placement: 'top' as const,
+        },
+        {
+          id: '8e2c0b3d-1a4f-4c6b-9d8e-3f2a1b0c9d8e',
+          text: 'Second, overlapping',
+          startMs: 2_000,
+          endMs: 4_000,
+          placement: 'bottom' as const,
+        },
+      ],
+    };
+    const checkpointed = await service.checkpoint(ownerUserId, projectId, {
+      expectedVersion: 1,
+      expectedRevisionNumber: 1,
+      proposal: { ...emptyCreativeProposal, workflowPhase: 'review', liveMode: null, localEdit },
+    });
+    expect(checkpointed).toMatchObject({ ok: true });
+
+    const restarted = new ProjectService(new FileProjectRepository(directory));
+    const reopened = await restarted.get(ownerUserId, projectId);
+    expect(reopened.revision.snapshot.localEdit?.subtitles).toEqual(localEdit.subtitles);
+
+    // Straight off the disk, so a schema that accepted the write but dropped the field on read
+    // cannot pass by round-tripping through an in-memory aggregate.
+    const stored = JSON.parse(
+      await readFile(metadataPaths(directory, ownerUserId).primary, 'utf8'),
+    ) as {
+      projects: { revisions: { snapshot: { localEdit: { subtitles: unknown } | null } }[] }[];
+    };
+    const persisted = stored.projects
+      .flatMap(({ revisions }) => revisions)
+      .map(({ snapshot }) => snapshot.localEdit)
+      .filter((edit) => edit !== null);
+    expect(persisted.at(-1)?.subtitles).toEqual(localEdit.subtitles);
   });
 
   it('recovers a corrupt primary from the validated backup and fails closed if both are corrupt', async () => {
