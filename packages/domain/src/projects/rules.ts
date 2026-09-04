@@ -1367,6 +1367,14 @@ export const removeProjectSource = (
         workingMedia: null,
         presentedMedia: null,
         lastSuccessfulOutput: null,
+        /*
+         * The edit describes media that is going away, so it goes with it. A save keeps `localEdit`
+         * because the working media carries forward unchanged and the edit is that media's
+         * provenance; here there is no media left for it to describe. Left behind, it followed the
+         * next uploaded video around — stamping its Version as edited locally and telling the
+         * placement chooser about burned-in subtitles the new source never had.
+         */
+        localEdit: null,
         workflowPhase: 'source',
         updatedAt: now,
       },

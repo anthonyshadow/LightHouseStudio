@@ -176,6 +176,48 @@ describe('Project aggregate rules', () => {
     ).toThrow(ProjectRuleError);
   });
 
+  /*
+   * A save keeps `localEdit`, because the working media carries forward and the edit is its
+   * provenance. New bytes are the other case: left behind, the edit followed the next upload
+   * around, stamping its Version as edited locally and telling the placement chooser about
+   * burned-in subtitles the new source never had.
+   */
+  it('lets go of the edit when the media it describes is removed', () => {
+    const edited = appendProjectRevision(
+      emptyProject(),
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        snapshot: {
+          ...emptyProject().revisions[0]!.snapshot,
+          sourceAssetId,
+          workingMedia: { kind: 'asset', assetId: sourceAssetId },
+          presentedMedia: { kind: 'asset', assetId: sourceAssetId },
+          localEdit: createDefaultVideoEditSpec(12_000),
+          updatedAt: later,
+        },
+        author: { kind: 'user', authorId: ownerUserId },
+        source: 'user-edit',
+        facts: readyFacts,
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    if (!edited.ok) throw new Error('Expected the edited revision to be formed.');
+    expect(edited.value.revisions.at(-1)!.snapshot.localEdit).not.toBeNull();
+
+    const removed = removeProjectSource(
+      edited.value,
+      {
+        expectedProjectVersion: 2,
+        expectedRevisionNumber: 2,
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => '5354b1d3-4022-4c85-a7b6-b230b58ba10b' },
+    );
+    if (!removed.ok) throw new Error('Expected the source removal to be formed.');
+    expect(removed.value.revisions.at(-1)!.snapshot.localEdit).toBeNull();
+  });
+
   it('keeps the producing revision distinct from the completed post-save output revision', () => {
     const accepted = acceptProjectSource(
       emptyProject(),

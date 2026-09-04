@@ -116,8 +116,16 @@ export const subtitleBlockBox = (
 ): NormalizedVideoCrop => {
   const region = subtitleRegionBox(placement, frame);
   const lineHeight = SUBTITLE_LAYOUT.fontHeightRatio * SUBTITLE_LAYOUT.lineHeightRatio;
-  const height =
-    lineCount * lineHeight + Math.max(0, cueCount - 1) * SUBTITLE_LAYOUT.cueGapRatio * lineHeight;
+  /*
+   * Never taller than the region it sits in. The region is what the placement chooser measures
+   * against a crop, so a block that outgrew it made the chooser promise captions survive a shape
+   * that cuts them. Wrapping bounds one cue's lines; several cues stacked in one region can still
+   * sum past the limit, and this is the one statement both the renderer and the chooser read.
+   */
+  const height = Math.min(
+    region.height,
+    lineCount * lineHeight + Math.max(0, cueCount - 1) * SUBTITLE_LAYOUT.cueGapRatio * lineHeight,
+  );
   switch (placement) {
     case 'top':
       return { ...region, height };

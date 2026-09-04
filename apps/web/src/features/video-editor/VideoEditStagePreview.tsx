@@ -184,8 +184,15 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
             height: crop.height * canvas.height,
           }
         : { x: 0, y: 0, width: canvas.width, height: canvas.height };
+      // Separately, because a rasterization that fails is a frame without new caption pixels, not
+      // a frame without video. Sharing one attempt let an overlay throw stop the picture, which
+      // reads as a frozen preview rather than a missing subtitle.
       try {
         syncOverlay(spec.subtitles, video.currentTime * 1_000, frame);
+      } catch {
+        // The overlay keeps whatever it last drew; the next change of cue set tries again.
+      }
+      try {
         frameRenderer.render(video, spec);
       } catch {
         // A transient seek/frame gap is retried on the next animation frame.

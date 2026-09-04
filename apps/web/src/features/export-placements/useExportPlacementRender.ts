@@ -63,17 +63,24 @@ export const useExportPlacementRender = (offersPlacements = true) => {
       filename,
     }: ExportPlacementRenderInput): Promise<ExportPlacementRenderResult | null> => {
       if (controllerRef.current !== null) return null;
+      /*
+       * Claimed before the first await, not after. The capability question below suspends, and a
+       * guard that only holds across synchronous code is no guard at all once it does: two clicks
+       * in the same frame both passed the check and both spawned a worker, and only the second was
+       * cancellable.
+       */
+      const controller = new AbortController();
+      controllerRef.current = controller;
       // Asked rather than read: a caller that never offers a placement never subscribed, and the
       // answer is memoized, so by the time anyone renders this costs nothing.
       if (!(await videoEditSupported())) {
+        controllerRef.current = null;
         setError(
           'This browser cannot re-frame a video without blocking the Studio. It keeps its original shape.',
         );
         setPhase('error');
         return null;
       }
-      const controller = new AbortController();
-      controllerRef.current = controller;
       setError(null);
       setProgress(0);
       setPhase('rendering');

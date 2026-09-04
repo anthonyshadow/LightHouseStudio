@@ -11,6 +11,7 @@ import {
   isProjectExportPlacementAspect,
   projectExportFilename,
   projectMediaReferencesEqual,
+  outputSubtitleCues,
   subtitlePlacementsUsed,
   type ProjectExportSpecification,
 } from '@studio/domain';
@@ -36,6 +37,7 @@ import {
   useExportPlacementRender,
   type ExportPlacementRenderResult,
 } from '../export-placements';
+import { videoEditSupported } from '../video-editor/videoEditSupport';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { SavedVideoSuccessActions } from '../saved-videos/SavedVideoSuccessActions';
 import {
@@ -152,17 +154,27 @@ export const ProjectOutputSaveSection = ({
   const [message, setMessage] = useState<string | null>(null);
   const [savedVideo, setSavedVideo] = useState<SavedVideoDetail | null>(null);
   const [pendingAvailable, setPendingAvailable] = useState(false);
-  const placementRender = useExportPlacementRender();
+  const readyMedia = readyMediaFor(current);
+  // Gated like its two siblings. This section is mounted by the workspace whichever task is
+  // showing, so the exclusion is a Project with nothing ready to save — where the chooser can
+  // never appear and the probe's 720p trial encode would be answering a question nobody asked.
+  const placementRender = useExportPlacementRender(readyMedia !== null);
   const renditionOperation = useStableOperationKey();
   const renditionFetchRef = useRef<AbortController | null>(null);
-  const readyMedia = readyMediaFor(current);
   // The cut's frame, so the chooser can draw the crop and say what it does to burned-in subtitles
   // rather than describe them; one small read per revision, reused by the save itself.
   const currentCut = useProjectCurrentCut(current, readyMedia !== null);
-  // The cut's subtitles are pixels by now; the chooser says whether a shape keeps them, from the
-  // edit that produced this cut.
-  const subtitles = current.revision.snapshot.localEdit?.subtitles;
-  const subtitlePlacements = useMemo(() => subtitlePlacementsUsed(subtitles ?? []), [subtitles]);
+  /*
+   * The cut's subtitles are pixels by now; the chooser says whether a shape keeps them, from the
+   * edit that produced this cut. Through `outputSubtitleCues`, which is the one owner of "which
+   * cues actually reached the output": the domain deliberately keeps a cue that sits outside the
+   * trim, and the worker drops it, so reading the raw list warned about text the render never drew.
+   */
+  const localEdit = current.revision.snapshot.localEdit;
+  const subtitlePlacements = useMemo(
+    () => subtitlePlacementsUsed(localEdit === null ? [] : outputSubtitleCues(localEdit)),
+    [localEdit],
+  );
   // The chosen placement lives on the revision, so the snapshot is the value the control shows.
   const placement = current.revision.snapshot.exportSpecification;
   // A browser capability, measured once per mount rather than on every keystroke.
@@ -472,9 +484,13 @@ export const ProjectOutputSaveSection = ({
     // Produced before the receipt exists, so a recovered save replays bytes rather than making
     // them. Where the browser cannot render, the cut is stored in its own shape and the Version
     // records that no placement was applied — the notice above the control said so beforehand.
+    //
+    // Asked here rather than read off the rendered state: the capability resolves asynchronously,
+    // and a save pressed before it answers would otherwise take the same branch as a browser that
+    // genuinely cannot re-frame, silently writing a Version in the wrong shape with nothing said.
     const specification = renditionPlacement(latest.revision.snapshot.exportSpecification);
     let renditions: SaveProjectOutputRequest['renditions'] = [];
-    if (specification !== null && placementSupported) {
+    if (specification !== null && (await videoEditSupported())) {
       const produced = await produceRendition(latest, specification);
       if (produced === 'stopped') return;
       renditions = produced;

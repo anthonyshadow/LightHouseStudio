@@ -797,6 +797,36 @@ export const projectConflictResponseSchema = z
     conflict: projectConflictSchema,
   })
   .strict();
+/**
+ * The edit specification as a *proposal* rather than as something read back.
+ *
+ * `subtitles` carries a default so a snapshot written before the field existed still parses. A
+ * proposal is a write, and there the same default is lossy: a tab still running a pre-subtitles
+ * bundle echoes the whole specification back when it autosaves anything at all, the missing key
+ * defaults to an empty list, and the stored cues are overwritten by a client that never knew about
+ * them. Requiring the key refuses that write instead, which a reload fixes and data loss does not.
+ */
+const statesItsCueList = (value: unknown, context: z.RefinementCtx): void => {
+  if (value !== null && typeof value === 'object' && !('subtitles' in value)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['subtitles'],
+      message: 'This tab is out of date and cannot describe subtitles. Reload and try again.',
+    });
+  }
+};
+
+/** The same requirement where a specification is mandatory rather than nullable. */
+const requiredCueVideoEditSpecSchema = z
+  .unknown()
+  .superRefine(statesItsCueList)
+  .pipe(projectVideoEditSpecSchema);
+
+const proposedVideoEditSpecSchema = z
+  .unknown()
+  .superRefine(statesItsCueList)
+  .pipe(projectVideoEditSpecSchema.nullable());
+
 export const projectSessionProposalSchema = z
   .object({
     workflowPhase: projectWorkflowPhaseSchema,
@@ -806,7 +836,7 @@ export const projectSessionProposalSchema = z
     selectedVoice: projectVoiceSelectionSchema.nullable(),
     visualTreatment: projectVisualTreatmentSchema,
     creativeIntent: projectCreativeIntentSchema,
-    localEdit: projectVideoEditSpecSchema.nullable(),
+    localEdit: proposedVideoEditSpecSchema,
     exportSpecification: projectExportSpecificationSchema,
   })
   .strict()
@@ -871,7 +901,7 @@ export const projectWorkingMediaUploadMetadataSchema = z
     expectedVersion: z.number().int().positive(),
     expectedRevisionNumber: z.number().int().positive(),
     filename: z.string().trim().min(1).max(180),
-    localEdit: projectVideoEditSpecSchema,
+    localEdit: requiredCueVideoEditSpecSchema,
   })
   .strict();
 
@@ -880,7 +910,7 @@ export const adoptProjectWorkingMediaRequestSchema = z
     expectedVersion: z.number().int().positive(),
     expectedRevisionNumber: z.number().int().positive(),
     media: projectMediaReferenceSchema,
-    localEdit: projectVideoEditSpecSchema.nullable(),
+    localEdit: proposedVideoEditSpecSchema,
   })
   .strict();
 

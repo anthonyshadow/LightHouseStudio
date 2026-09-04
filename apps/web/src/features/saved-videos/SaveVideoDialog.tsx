@@ -60,9 +60,13 @@ export const SaveVideoDialog = ({
   const rendering = placementRender?.phase === 'rendering';
   // Re-framing needs both a measured frame and a browser that can render one.
   const placementOffered = source !== null;
-  // Absent where the caller drives no re-framing render of its own, which is not a reason to doubt
-  // the browser: an unstated capability reads as available, the same as before anyone measured.
-  const placementSupported = placementRender?.supported ?? true;
+  /*
+   * Three states, kept apart. No `placementRender` at all means this caller drives no re-framing
+   * render, which is not a reason to doubt the browser. A `placementRender` whose answer is still
+   * `null` means the probe has not finished, and `??` would have read that as available — offering
+   * a live chooser on an engine about to say no, then disabling it under the operator's hand.
+   */
+  const placementSupported = placementRender === undefined ? true : placementRender.supported;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();

@@ -6,6 +6,7 @@ import {
   projectConflictResponseSchema,
   projectCurrentResponseSchema,
   projectHistoryResponseSchema,
+  projectSessionProposalSchema,
   projectOutputHistoryResponseSchema,
   projectOutputLinkSchema,
   projectOutputSaveResultSchema,
@@ -691,5 +692,67 @@ describe('Project snapshot contract', () => {
         nextCursor: null,
       }),
     ).toMatchObject({ outputs: [{ savedVideo: { libraryStatus: 'removed' } }] });
+  });
+});
+
+describe('projectSessionProposalSchema', () => {
+  const proposal = (localEdit: unknown) => ({
+    workflowPhase: 'review' as const,
+    liveMode: null,
+    selectedCharacter: null,
+    selectedOutfit: null,
+    selectedVoice: null,
+    visualTreatment: { kind: 'none' as const },
+    creativeIntent: {
+      promptId: null,
+      promptLabel: null,
+      recipeId: null,
+      recipeLabel: null,
+      userIntent: '',
+      appliedPrompt: null,
+      referenceAssetId: null,
+      resourceRevision: null,
+    },
+    localEdit,
+    exportSpecification: null,
+  });
+
+  const spec = {
+    trim: { startMs: 0, endMs: 30_000 },
+    crop: { preset: 'original' as const, rectangle: { x: 0, y: 0, width: 1, height: 1 } },
+    rotation: 0 as const,
+    flipHorizontal: false,
+    flipVertical: false,
+    adjustments: {
+      brightness: 0,
+      contrast: 0,
+      saturation: 0,
+      temperature: 0,
+      highlights: 0,
+      shadows: 0,
+    },
+    filter: 'original' as const,
+    subtitles: [],
+  };
+
+  it('accepts a specification that states its cue list', () => {
+    expect(projectSessionProposalSchema.parse(proposal(spec))).toMatchObject({
+      localEdit: { subtitles: [] },
+    });
+    expect(projectSessionProposalSchema.parse(proposal(null)).localEdit).toBeNull();
+  });
+
+  /*
+   * A snapshot written before subtitles existed still reads back, because the field defaults. A
+   * proposal is a write: the same default let a tab running the old bundle echo the specification
+   * back without the key and quietly erase stored cues, so the write is refused instead.
+   */
+  it('refuses a specification from a client that cannot describe cues', () => {
+    const withoutCues: Record<string, unknown> = { ...spec };
+    delete withoutCues['subtitles'];
+    const result = projectSessionProposalSchema.safeParse(proposal(withoutCues));
+
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.at(0)?.message).toMatch(/out of date/u);
   });
 });

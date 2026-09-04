@@ -1,4 +1,5 @@
 import {
+  SUBTITLE_CUE_MAX_LINES,
   SUBTITLE_LAYOUT,
   stackSubtitleCues,
   subtitleBlockBox,
@@ -93,7 +94,16 @@ const wrapParagraph = (context: Canvas2D, paragraph: string, maxWidth: number): 
   return lines;
 };
 
-/** Greedy word wrap to a width, honouring the cue's own line breaks; a word wider than the box breaks by character. */
+/**
+ * Greedy word wrap to a width, honouring the cue's own line breaks; a word wider than the box
+ * breaks by character.
+ *
+ * Capped at the same line limit the layout reserves room for. The domain enforces that limit on
+ * the cue's own newlines, but wrapping can turn one long line into many, and the box the placement
+ * chooser measures against is always the limit's height — so an uncapped wrap draws a block taller
+ * than the region anyone reasoned about, and the chooser promises captions survive a crop that
+ * cuts them.
+ */
 export const wrapSubtitleText = (
   context: Canvas2D,
   text: string,
@@ -103,7 +113,8 @@ export const wrapSubtitleText = (
     .split('\n')
     .flatMap((paragraph) =>
       paragraph.trim() === '' ? [] : wrapParagraph(context, paragraph, maxWidth),
-    );
+    )
+    .slice(0, SUBTITLE_CUE_MAX_LINES);
 
 /**
  * Draws every active cue onto the canvas, region by region in `stackSubtitleCues` order: white
@@ -178,13 +189,17 @@ export const createSubtitleOverlaySync = (
     const active = subtitleCuesAt(cues, timeMs);
     const nextKey = subtitleOverlayKey(active, frame);
     if (nextKey === key) return;
-    key = nextKey;
     if (active.length === 0) {
       setOverlay(null);
+      key = nextKey;
       return;
     }
     canvas ??= createCanvas();
     rasterizeSubtitleCues(canvas, active, frame);
     setOverlay(canvas);
+    // Last, and only on the way out. Claiming the key first would make a frame that threw or drew
+    // nothing look done, and every later frame with the same cues would take the early return
+    // above — leaving the previous overlay composited for as long as the set holds.
+    key = nextKey;
   };
 };

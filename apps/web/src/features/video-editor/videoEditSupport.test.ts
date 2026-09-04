@@ -41,7 +41,7 @@ describe('videoEditPreviewSupported', () => {
  * chunk, reports an error, or accepts the frame and quietly produces nothing — the three ways a
  * browser answers this question, only one of which means the editor can save anything.
  */
-const encoderClass = (behaviour: 'chunk' | 'error' | 'silence') => {
+const encoderClass = (behaviour: 'chunk' | 'error' | 'silence' | 'silence-forever') => {
   class FakeVideoEncoder {
     static configSupported = true;
     static configured: VideoEncoderConfig | null = null;
@@ -66,7 +66,8 @@ const encoderClass = (behaviour: 'chunk' | 'error' | 'silence') => {
     }
 
     flush(): Promise<void> {
-      return Promise.resolve();
+      // 'silence-forever' models an encoder that neither emits, errors, nor ever finishes flushing.
+      return behaviour === 'silence-forever' ? new Promise<void>(() => {}) : Promise.resolve();
     }
 
     close(): void {
@@ -131,6 +132,43 @@ describe('videoEditExportSupported', () => {
 
   it('answers no when a frame is accepted but no chunk ever comes back', async () => {
     stubWebCodecs(encoderClass('silence'));
+    await expect((await freshProbe())()).resolves.toBe(false);
+  });
+
+  /*
+   * Silence is not consent. The engine this probe exists to catch accepts the frame and then does
+   * nothing at all, so a timeout that answered yes would memoize a guess and hand it the control.
+   */
+  it('answers no when the encoder accepts a frame and then goes quiet', async () => {
+    vi.useFakeTimers();
+    try {
+      stubWebCodecs(encoderClass('silence-forever'));
+      const probe = (await freshProbe())();
+      await vi.advanceTimersByTimeAsync(5_000);
+      await expect(probe).resolves.toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /*
+   * Every surface holds this one promise for the life of the page, so it must resolve rather than
+   * reject: a rejection would leave all of them waiting on an answer that can never arrive.
+   */
+  it('answers no, rather than rejecting, when the encoder cannot even be constructed', async () => {
+    stubWebCodecs(encoderClass('chunk'));
+    vi.stubGlobal(
+      'VideoEncoder',
+      Object.assign(
+        class {
+          constructor() {
+            throw new Error('refused');
+          }
+        },
+        { isConfigSupported: () => Promise.resolve({ supported: true }) },
+      ),
+    );
+
     await expect((await freshProbe())()).resolves.toBe(false);
   });
 
