@@ -330,6 +330,18 @@ test('Assets matches the responsive design matrix without clipping controls', as
     const format = filters.getByRole('combobox', { name: 'Video format' });
     const sort = filters.getByRole('combobox', { name: 'Sort by' });
     const footer = filters.locator('[data-filter-sheet-actions]').locator('..');
+    /*
+     * The sheet slides up from the bottom edge, and `boundingBox` waits for an element to be
+     * visible but not for it to have stopped moving — so this measured a frame of the animation
+     * and read the last control as overlapping the pinned footer by about a pixel. Finite
+     * animations only: a looping one would never settle and this would wait for the timeout.
+     */
+    await filters.evaluate(async (element) => {
+      const running = element
+        .getAnimations({ subtree: true })
+        .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity);
+      await Promise.all(running.map((animation) => animation.finished));
+    });
     const [clearBox, showBox, characterBox, formatBox, sortBox, footerBox] = await Promise.all([
       clear.boundingBox(),
       show.boundingBox(),
