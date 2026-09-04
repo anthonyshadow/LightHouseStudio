@@ -435,6 +435,36 @@ test('Project overview gives the title the full tablet content width', async ({ 
   expect(actionsBox!.y).toBeGreaterThan(titleBox!.y + titleBox!.height);
 });
 
+test('Project overview reaches its last section on a viewport shorter than the page', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 834, height: 600 });
+  await installSuccessfulStudioHarness(page);
+  await installProjectHarness(page, true);
+  await page.goto(`/projects/${TEST_PROJECT_ID}`);
+  await expect(page.getByRole('heading', { name: 'Untitled Project' })).toBeVisible();
+
+  /*
+   * The overview is longer than a laptop window well before a Project has anything in it, and the
+   * shell's `main` clips on purpose — so the route element is the only thing between the viewport
+   * and the page, and it has to be the scrollport. An element that is not one keeps a zero
+   * scrollTop however far it is pushed, which is exactly what "the page is cut off" looks like.
+   */
+  const route = page.locator('[data-project-route]');
+  const reach = await route.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    return {
+      longerThanTheViewport: element.scrollHeight > element.clientHeight + 1,
+      scrolled: element.scrollTop,
+    };
+  });
+  expect(reach.longerThanTheViewport).toBe(true);
+  expect(reach.scrolled).toBeGreaterThan(0);
+  // The last section on the page, so nothing between the masthead and it can be stranded either.
+  await expect(page.getByRole('heading', { name: 'Used in this Project' })).toBeInViewport();
+  await expectNoDocumentOverflow(page);
+});
+
 test('an uploaded Project source accepts once and resumes on the same stage after refresh', async ({
   page,
 }) => {

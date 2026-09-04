@@ -5,16 +5,6 @@ export const projectWorkspaceRouteStyles = (): CSSObject => ({
   display: 'contents',
 });
 
-export const projectOverviewRouteStyles = (theme: Theme): CSSObject => ({
-  minWidth: 0,
-  minHeight: 0,
-  height: '100%',
-  overscrollBehavior: 'contain',
-  background: theme.colors.canvas,
-  scrollbarGutter: 'stable',
-  containerType: 'inline-size',
-});
-
 export const workspaceInnerStyles = (theme: Theme): CSSObject => ({
   gridColumn: 2,
   gridRow: 2,
