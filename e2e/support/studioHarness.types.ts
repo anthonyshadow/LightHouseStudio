@@ -80,6 +80,8 @@ export type NetworkJourneyState = {
   providerSdkRequests: string[];
   blockedExternalRequests: string[];
   blockedExternalWebSockets: string[];
+  /** Uncaught errors the page threw, so a boot failure names itself instead of timing out mutely. */
+  uncaughtPageErrors: string[];
   setCapabilityFailuresRemaining(count: number): void;
 };
 

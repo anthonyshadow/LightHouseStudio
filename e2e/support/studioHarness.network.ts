@@ -183,6 +183,7 @@ export const installProviderNetworkDriver = async (
     providerSdkRequests: [],
     blockedExternalRequests: [],
     blockedExternalWebSockets: [],
+    uncaughtPageErrors: [],
     setCapabilityFailuresRemaining: (count) => {
       remainingCapabilityFailures = Math.max(0, Math.trunc(count));
     },
@@ -193,6 +194,16 @@ export const installProviderNetworkDriver = async (
   const outfitAssetsByRequestId = new Map<string, DerivedReferenceImageAsset>();
   let assetSequence = 0;
   let authenticated = options.initiallyAuthenticated ?? true;
+
+  /*
+   * An uncaught error while the app boots leaves every later step waiting for a control that will
+   * never appear, and the failure then reads as "waiting for Start camera" with no cause. Naming it
+   * on the page's own terms is what turns an engine-specific boot failure into something the run
+   * log explains rather than something a trace has to be downloaded for.
+   */
+  page.on('pageerror', (pageError) => {
+    network.uncaughtPageErrors.push(pageError.message);
+  });
 
   await page.routeWebSocket(
     (url) => !['127.0.0.1', 'localhost'].includes(url.hostname),

@@ -8,6 +8,7 @@ import {
   discardTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
+  expectNoUncaughtPageErrors,
   FIXED_WEBM_BASE64,
   installSuccessfulStudioHarness,
   openAiSettings,
@@ -236,6 +237,9 @@ test('@cross-browser focused media smoke reaches record, Voice, and review recov
   await page.goto('/studio/create');
 
   const controls = page.getByLabel('Studio session controls');
+  // A boot failure on another engine should name itself, not time out on the camera control.
+  expectNoUncaughtPageErrors(network);
+
   await startLocalPreview(page);
   const preview = page.getByLabel('Live local camera preview');
   await expect(preview).toBeVisible();
