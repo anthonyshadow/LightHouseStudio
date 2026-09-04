@@ -93,6 +93,11 @@ jobs:
           browsers: chromium webkit
       - run: bun run test:e2e
         env:
+          # The runner is a throwaway stack, not the development deployment, so it states its whole
+          # environment here and never sets LIGHTFRAME_ENV. That name carries the deployment's own
+          # contract — PostgreSQL plus the isolated private R2 bucket — which a runner cannot meet
+          # and does not want. `dev:ci` therefore starts the servers without it, and `dev` supplies
+          # it for a workstation.
           LIGHTFRAME_ENV_SOURCE: process
           NODE_ENV: development
           DATABASE_MODE: postgres
