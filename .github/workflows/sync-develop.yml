@@ -1,0 +1,88 @@
+name: Sync Develop
+
+# A `develop` → `main` pull request is merged with GitHub's rebase strategy, which replays every
+# commit onto `main` and therefore gives each one a new SHA. The content is identical but the
+# identifiers are not, so `develop` immediately reads as both ahead of and behind `main` by the
+# size of the release, and the gap compounds with every promotion. This workflow closes that gap by
+# moving `develop` onto the commits `main` actually kept, once each promotion lands.
+#
+# Release Source already restricts `main` to a same-repository `develop` → `main` pull request, so
+# `main` only ever advances from `develop` and the rewritten commits are always `develop`'s own.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Two promotions in quick succession must queue rather than cancel: a cancelled run would leave
+# `develop` stranded on the previous release.
+concurrency:
+  group: sync-develop
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  sync-develop:
+    name: Fast-forward develop onto main
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Move develop onto the promoted commits
+        env:
+          GIT_TERMINAL_PROMPT: '0'
+        run: |
+          set -euo pipefail
+
+          git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main \
+                                     +refs/heads/develop:refs/remotes/origin/develop
+
+          MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+          DEVELOP_SHA="$(git rev-parse refs/remotes/origin/develop)"
+
+          if [ "$MAIN_SHA" = "$DEVELOP_SHA" ]; then
+            echo "develop already points at main ($MAIN_SHA). Nothing to do."
+            echo "\`develop\` already matched \`main\` at \`${MAIN_SHA}\`." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # The guard that makes the force-push safe. `git cherry` compares by patch rather than by
+          # SHA, so a rebased copy of a commit counts as already present and prints `-`. A `+` means
+          # `develop` holds work that reached neither `main` nor its rewrite — someone pushed while
+          # the promotion was in flight — and resetting would destroy it.
+          UNMERGED="$(git cherry refs/remotes/origin/main refs/remotes/origin/develop | grep -c '^+' || true)"
+
+          if [ "$UNMERGED" -ne 0 ]; then
+            echo "::warning title=develop not synced::develop holds ${UNMERGED} commit(s) absent from main; leaving it untouched."
+            {
+              echo "### develop was left untouched"
+              echo
+              echo "It holds **${UNMERGED}** commit(s) that are not in \`main\` in any form, so this"
+              echo "workflow will not reset it. That is ordinary if work landed on \`develop\` while the"
+              echo "promotion was merging. Replay those commits onto the promoted history with:"
+              echo
+              echo '```bash'
+              echo "git fetch origin && git rebase --onto origin/main ${MAIN_SHA} develop"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # `--force-with-lease` pins the overwrite to the `develop` read above, so a push that
+          # arrives in the meantime rejects this one instead of being silently discarded.
+          git push --force-with-lease=refs/heads/develop:"$DEVELOP_SHA" \
+            origin "$MAIN_SHA":refs/heads/develop
+
+          echo "develop moved from $DEVELOP_SHA to $MAIN_SHA."
+          {
+            echo "### develop synced"
+            echo
+            echo "Moved \`develop\` from \`${DEVELOP_SHA}\` to \`${MAIN_SHA}\`, discarding only the"
+            echo "pre-rebase copies of commits \`main\` already carries."
+          } >> "$GITHUB_STEP_SUMMARY"
