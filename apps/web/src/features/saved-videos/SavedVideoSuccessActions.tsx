@@ -42,7 +42,7 @@ export const SavedVideoSuccessActions = ({
   // A placement can only be produced where the browser can render; elsewhere the original shape is
   // what the operator gets, and saying so is better than offering a control that cannot work.
   // Carrying the specification rather than a boolean lets the offer below narrow to it.
-  const reframing = render.supported ? exportSpecification : null;
+  const reframing = render.supported === true ? exportSpecification : null;
 
   return (
     <div css={{ display: 'grid', gap: theme.space.xs }} data-saved-video-success-actions="">
@@ -77,7 +77,8 @@ export const SavedVideoSuccessActions = ({
           </Button>
         ) : null}
       </div>
-      {exportSpecification !== null && !render.supported ? (
+      {/* Only once the probe has answered: an unknown capability is not a warning. */}
+      {exportSpecification !== null && render.supported === false ? (
         <StatusNotice tone="warning" title="Local editor unavailable">
           This browser cannot re-frame a video, so Download gives you the video in its original
           shape. The placement is still recorded on this Project.

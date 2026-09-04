@@ -38,6 +38,7 @@ beforeEach(() => {
   vi.stubGlobal('OffscreenCanvas', class {});
   vi.stubGlobal('VideoEncoder', class {});
   vi.stubGlobal('VideoDecoder', class {});
+  vi.stubGlobal('VideoFrame', class {});
 });
 
 afterEach(() => vi.unstubAllGlobals());

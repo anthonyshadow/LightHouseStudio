@@ -1,5 +1,6 @@
 import type { VideoEditSpec } from '@studio/domain';
 import type { VideoEditWorkerRequest, VideoEditWorkerResponse } from './types';
+import { videoEditRenderingApisPresent } from './videoEditSupport';
 
 export type RenderVideoEditInput = Readonly<{
   source: Blob;
@@ -23,12 +24,6 @@ export type RenderVideoEditResult = Readonly<{ blob: Blob; mimeType: 'video/mp4'
 
 let nextOperationId = 0;
 
-export const videoEditRenderingSupported = (): boolean =>
-  typeof Worker !== 'undefined' &&
-  typeof OffscreenCanvas !== 'undefined' &&
-  typeof VideoEncoder !== 'undefined' &&
-  typeof VideoDecoder !== 'undefined';
-
 export const renderVideoEdit = ({
   source,
   spec,
@@ -40,7 +35,9 @@ export const renderVideoEdit = ({
   signal,
   onProgress,
 }: RenderVideoEditInput): Promise<RenderVideoEditResult> => {
-  if (!videoEditRenderingSupported()) {
+  // The cheap half of the question. Whether the codec actually works is `videoEditExportSupported`,
+  // which the surfaces offering this ask before they offer it, and the worker asks again itself.
+  if (!videoEditRenderingApisPresent()) {
     return Promise.reject(
       new Error('This browser cannot render local video edits without blocking the Studio.'),
     );

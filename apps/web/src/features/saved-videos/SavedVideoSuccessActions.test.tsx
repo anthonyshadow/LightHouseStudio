@@ -21,10 +21,11 @@ const renderVideoEdit =
 const readSavedVideoContent = vi.fn<() => Promise<Blob>>();
 vi.mock('../video-editor/videoEditSupport', () => ({
   videoEditPreviewSupported: () => renderCapable(),
+  videoEditRenderingApisPresent: () => true,
+  videoEditExportSupported: () => Promise.resolve(renderCapable()),
 }));
 vi.mock('../video-editor/renderVideoEdit', () => ({
   renderVideoEdit: (input: Parameters<typeof renderVideoEdit>[0]) => renderVideoEdit(input),
-  videoEditRenderingSupported: () => renderCapable(),
 }));
 vi.mock('../../adapters/api-client/savedVideosApi', () => ({
   downloadSavedVideoUrl: (videoId: string, versionId?: string) =>
@@ -140,7 +141,9 @@ describe('SavedVideoSuccessActions placement download', () => {
       </StudioDesignProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: /Download Launch cut, Version 2, for/u }));
+    await user.click(
+      await screen.findByRole('button', { name: /Download Launch cut, Version 2, for/u }),
+    );
 
     await waitFor(() => expect(renderVideoEdit).toHaveBeenCalledOnce());
     const request = renderVideoEdit.mock.calls[0]![0];
@@ -159,7 +162,7 @@ describe('SavedVideoSuccessActions placement download', () => {
     click.mockRestore();
   });
 
-  it('falls back to the unchanged server download when the browser cannot re-frame', () => {
+  it('falls back to the unchanged server download when the browser cannot re-frame', async () => {
     renderCapable.mockReturnValue(false);
     render(
       <StudioDesignProvider>
@@ -171,7 +174,8 @@ describe('SavedVideoSuccessActions placement download', () => {
       </StudioDesignProvider>,
     );
 
-    expect(screen.getByText('Local editor unavailable')).toBeVisible();
+    // The probe answers in an effect, so the notice arrives a tick after the first paint.
+    expect(await screen.findByText('Local editor unavailable')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Download Launch cut, Version 2' })).toHaveAttribute(
       'download',
       'launch-cut.mp4',

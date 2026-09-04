@@ -324,21 +324,26 @@ test('@cross-browser provider-free Edit video edits on every engine, and renders
    * Everything above is engine-sensitive and runs everywhere: the upload, the editor, its tools,
    * the WebGL preview and the compare hold, and the reflow through every supported viewport.
    *
-   * The export below does not. It needs a working H.264 WebCodecs encode in a worker, and the
-   * Linux WebKit build the runners use defines `VideoEncoder`, `VideoDecoder` and `OffscreenCanvas`
-   * — so every presence check the app makes passes, and Save is offered — without ever completing
-   * an encode: the replace dialog does not arrive in sixty seconds, on any attempt. Tagging this
-   * journey cross-browser was verified on macOS WebKit, where the same code renders in about a
-   * second, and it has never passed on a runner.
+   * The export below does not: it needs a working H.264 encode, and engines differ. What every
+   * engine must do is tell the truth about that in advance, which is asserted here. The editor
+   * offers Save only where its probe encoded a frame, and where it could not it says so and leaves
+   * the video alone — the Linux WebKit build the runners use passes every presence check while
+   * never completing an encode, and used to be offered a control that led nowhere.
    *
-   * So the automated proof of the export stays where a runner can actually give it, and real
-   * Safari and Firefox export remains the manual release gate `docs/BROWSER_SUPPORT.md` already
-   * says it is. Reaching here at all is the cross-browser assertion: the editor is usable, and the
-   * edit is on screen.
+   * The export itself is then proved where a runner can prove it. Real Safari and Firefox export
+   * stays the manual release gate `docs/BROWSER_SUPPORT.md` says it is, because an engine that
+   * encodes one probe frame has still not been shown to encode a whole video.
    */
   const save = page.getByRole('button', { name: 'Save edited video' });
+  const unavailable = page.getByText('Local editor unavailable');
   await expect(save).toBeVisible();
+  // The spec is dirty by now, so Save's state is the capability and nothing else.
+  await expect(async () => {
+    if (await save.isEnabled()) await expect(unavailable).toHaveCount(0);
+    else await expect(unavailable).toBeVisible();
+  }).toPass({ timeout: 15_000 });
   if (browserName !== 'chromium') return;
+  await expect(save).toBeEnabled();
 
   await save.click();
   const replacement = page.getByRole('dialog', { name: 'Replace the current video?' });

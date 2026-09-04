@@ -12,10 +12,11 @@ const videoEditPreviewSupported = vi.fn(() => true);
 
 vi.mock('../video-editor/renderVideoEdit', () => ({
   renderVideoEdit: (input: RenderVideoEditInput) => renderVideoEdit(input),
-  videoEditRenderingSupported: () => videoEditRenderingSupported(),
 }));
 vi.mock('../video-editor/videoEditSupport', () => ({
   videoEditPreviewSupported: () => videoEditPreviewSupported(),
+  videoEditRenderingApisPresent: () => true,
+  videoEditExportSupported: () => Promise.resolve(videoEditRenderingSupported()),
 }));
 
 const landscape = { width: 1_920, height: 1_080, durationMs: 12_000 } as const;
@@ -36,11 +37,22 @@ beforeEach(() => {
 
 afterEach(() => vi.restoreAllMocks());
 
+/**
+ * The capability is probed in an effect now, because answering it honestly means asking the
+ * encoder to encode. A render requested before that answers is refused, exactly as it would be in
+ * a browser, so every case here waits for the probe the way the surfaces do.
+ */
+const mountedHook = async () => {
+  const view = renderHook(() => useExportPlacementRender());
+  await waitFor(() => expect(view.result.current.supported).not.toBeNull());
+  return view;
+};
+
 describe('useExportPlacementRender', () => {
   it('renders a placement as a centred crop scaled to its exact destination size', async () => {
     const blob = new Blob(['reframed'], { type: 'video/mp4' });
     renderVideoEdit.mockResolvedValue({ blob, mimeType: 'video/mp4' });
-    const { result } = renderHook(() => useExportPlacementRender());
+    const { result } = await mountedHook();
 
     const rendered = await act(() => result.current.render(input()));
 
@@ -60,7 +72,7 @@ describe('useExportPlacementRender', () => {
       blob: new Blob(['reframed'], { type: 'video/mp4' }),
       mimeType: 'video/mp4',
     });
-    const { result } = renderHook(() => useExportPlacementRender());
+    const { result } = await mountedHook();
 
     await act(() =>
       result.current.render(input(projectExportSpecificationForAspect('1:1', false)!)),
@@ -72,7 +84,7 @@ describe('useExportPlacementRender', () => {
   });
 
   it('never renders for the original shape', async () => {
-    const { result } = renderHook(() => useExportPlacementRender());
+    const { result } = await mountedHook();
 
     const rendered = await act(() =>
       result.current.render({
@@ -91,7 +103,7 @@ describe('useExportPlacementRender', () => {
   });
 
   it('surfaces the domain rule’s own message for a combination that cannot be produced', async () => {
-    const { result } = renderHook(() => useExportPlacementRender());
+    const { result } = await mountedHook();
 
     const rendered = await act(() =>
       result.current.render({
@@ -113,7 +125,7 @@ describe('useExportPlacementRender', () => {
 
   it('reports an unsupported browser without starting a render', async () => {
     videoEditPreviewSupported.mockReturnValue(false);
-    const { result } = renderHook(() => useExportPlacementRender());
+    const { result } = await mountedHook();
 
     expect(result.current.supported).toBe(false);
     const rendered = await act(() => result.current.render(input()));
@@ -135,7 +147,7 @@ describe('useExportPlacementRender', () => {
           );
         }),
     );
-    const { result } = renderHook(() => useExportPlacementRender());
+    const { result } = await mountedHook();
 
     let pending: Promise<unknown> | undefined;
     act(() => {
