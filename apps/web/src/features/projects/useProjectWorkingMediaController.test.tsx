@@ -41,6 +41,7 @@ const editSpec = {
   },
   filter: 'warm' as const,
   subtitles: [],
+  audio: { level: 100, muted: false },
 };
 
 const current = (adopted = false): ProjectCurrentResponse => ({

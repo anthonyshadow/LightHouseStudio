@@ -236,7 +236,9 @@ The retained suite protects:
   trade taken deliberately: the on-device render is the path whose engine differences matter most,
   and Chromium still exercises local rendering through the Project render-adoption journey and
   through the untagged subtitle journey in `existing-video.spec.ts`, which adds a cue on the
-  timeline and renders it.
+  timeline and renders it. The audio level needs no render to be heard: the cross-browser journey
+  sets it, mutes it and holds Compare, and reads the stage element's own volume and mute back on
+  every engine.
 
 ## Local MVP acceptance boundary
 

@@ -256,6 +256,24 @@ describe('useVideoEditSession', () => {
     expect(hook.result.current.selectedSubtitleId).toBeNull();
   });
 
+  it('resets the Audio tool to the baseline and leaves the rest of the draft alone', async () => {
+    const hook = await beginSession();
+    act(() => {
+      hook.result.current.setActiveTool('audio');
+      hook.result.current.applySpec({
+        ...hook.result.current.draft,
+        audio: { level: 30, muted: true },
+        flipHorizontal: true,
+      });
+    });
+    expect(hook.result.current.dirty).toBe(true);
+
+    act(() => hook.result.current.resetTool());
+    expect(hook.result.current.draft.audio).toEqual({ level: 100, muted: false });
+    expect(hook.result.current.draft.flipHorizontal).toBe(true);
+    expect(hook.result.current.dirty).toBe(true);
+  });
+
   it('ignores a stale completion after cancellation and leaves the draft intact', async () => {
     let finishRender: ((value: { blob: Blob; mimeType: 'video/mp4' }) => void) | null = null;
     adapters.renderVideoEdit.mockImplementation(
