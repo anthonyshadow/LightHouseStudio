@@ -7,7 +7,7 @@ import type { RenderVideoEditInput } from '../video-editor/renderVideoEdit';
 import { useExportPlacementRender } from './useExportPlacementRender';
 
 const renderVideoEdit = vi.fn<(input: RenderVideoEditInput) => Promise<unknown>>();
-const videoEditRenderingSupported = vi.fn(() => true);
+const canExport = vi.fn(() => true);
 const videoEditPreviewSupported = vi.fn(() => true);
 
 vi.mock('../video-editor/renderVideoEdit', () => ({
@@ -16,7 +16,7 @@ vi.mock('../video-editor/renderVideoEdit', () => ({
 vi.mock('../video-editor/videoEditSupport', () => ({
   videoEditPreviewSupported: () => videoEditPreviewSupported(),
   videoEditRenderingApisPresent: () => true,
-  videoEditExportSupported: () => Promise.resolve(videoEditRenderingSupported()),
+  videoEditExportSupported: () => Promise.resolve(canExport()),
 }));
 
 const landscape = { width: 1_920, height: 1_080, durationMs: 12_000 } as const;
@@ -31,7 +31,7 @@ const input = (specification = projectExportSpecificationForAspect('9:16')!) => 
 
 beforeEach(() => {
   renderVideoEdit.mockReset();
-  videoEditRenderingSupported.mockReturnValue(true);
+  canExport.mockReturnValue(true);
   videoEditPreviewSupported.mockReturnValue(true);
 });
 
