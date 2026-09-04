@@ -136,6 +136,31 @@ describe('parseEnvironment', () => {
     });
   });
 
+  /*
+   * The browser-journey runner: a real API over a service-container PostgreSQL, with bytes on the
+   * runner because it has no R2 credentials and must not write to the shared development bucket.
+   * It is a throwaway stack rather than the development deployment, so it names no LIGHTFRAME_ENV
+   * and states its whole environment in the process. Claiming that name instead cost a green
+   * suite: the API refused to start, `bun --watch` kept the dead process alive so nothing killed
+   * the web server beside it, and every API call answered 502 for the length of the run.
+   */
+  it('accepts a process-only stack that keeps its bytes on the machine running it', () => {
+    expect(
+      parseEnvironment({
+        LIGHTFRAME_ENV_SOURCE: 'process',
+        NODE_ENV: 'development',
+        DATABASE_MODE: 'postgres',
+        DATABASE_URL: 'postgresql://lightframe:local@127.0.0.1:5433/lightframe_development',
+        ASSET_STORE_PROVIDER: 'local',
+        AUTH_JWT_SECRET: 'lightframe-ci-signing-key-with-at-least-32-characters',
+      }),
+    ).toMatchObject({
+      nodeEnv: 'development',
+      databaseMode: 'postgres',
+      assetStoreProvider: 'local',
+    });
+  });
+
   it.each([
     [
       {

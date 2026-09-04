@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "LIGHTFRAME_ENV=development bun run --no-env-file --watch src/server.ts",
+    "dev": "bun run --no-env-file --watch src/server.ts",
     "build": "bun build src/server.ts --target=bun --format=esm --packages=external --sourcemap=external --outdir=dist",
     "start": "bun run --no-env-file dist/server.js",
     "start:production": "LIGHTFRAME_ENV=production bun run --no-env-file dist/server.js",

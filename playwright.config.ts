@@ -38,7 +38,15 @@ export default defineConfig({
     // CI supplies PostgreSQL as a service container, so the Docker Compose step inside `dev`
     // is neither needed nor available there.
     command: runningInCi ? 'bun run dev:ci' : 'bun run dev',
-    url: 'http://127.0.0.1:4173',
+    /*
+     * Ready means both servers. `dev` starts the API and Vite concurrently, and the web root
+     * answers as soon as Vite binds, whether or not the API is up yet — so the specs that
+     * authenticate against the real API rather than a route harness could begin against a stack
+     * that is only half started, and would report a 502 login as if it were a product failure.
+     * This path is served by Vite and answered by the API through its proxy, so it is 200 only
+     * once both are up. The production smoke config gates on the same endpoint.
+     */
+    url: 'http://127.0.0.1:4173/api/health',
     reuseExistingServer: !runningInCi,
     timeout: 120_000,
   },

@@ -235,6 +235,14 @@ test('provider-free upload previews and enters the existing take/save surface', 
 test('@cross-browser provider-free Edit video renders locally and atomically replaces the persistent source', async ({
   page,
 }) => {
+  /*
+   * This journey renders the whole video twice, and each wait below already budgets a minute for
+   * one render — a budget the default 30s test timeout made unreachable, so the test died at the
+   * test level while its own assertion was still within the time it asked for. A workstation
+   * finishes each render in about a second on a real GPU; a runner composites in software and
+   * does not, which is where the difference showed up.
+   */
+  test.setTimeout(180_000);
   await installCameraSentinel(page);
   const network = await installProviderNetworkDriver(page);
   await page.goto('/studio/create');

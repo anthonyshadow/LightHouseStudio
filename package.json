@@ -31,7 +31,7 @@
     "build:packages": "bun run --filter @studio/domain build && bun run --filter @studio/contracts build",
     "dev:ports": "node scripts/free-development-ports.mjs",
     "dev:servers": "bun run dev:ports && concurrently -k -n api,web -c blue,magenta \"bun run --filter @studio/api dev\" \"bun run --filter @studio/web dev\"",
-    "dev": "bun run db:development:up && bun run db:migrate:development && bun run build:packages && bun run dev:servers",
+    "dev": "bun run db:development:up && bun run db:migrate:development && bun run build:packages && LIGHTFRAME_ENV=development bun run dev:servers",
     "dev:ci": "bun run db:migrate:development && bun run build:packages && bun run dev:servers",
     "build": "bun run build:packages && bun run --filter @studio/web build && bun run --filter @studio/api build",
     "start": "bun run --filter @studio/api start",
