@@ -29,7 +29,8 @@ import {
   restoreProject,
   saveProjectOutput,
   PROJECT_EXPORT_PLACEMENT_ASPECTS,
-  projectOutputPrimaryPlacement,
+  projectOutputPlacementSet,
+  type ProjectExportSpecification,
   validateProjectExportPlacementSet,
   validateProjectExportSpecification,
   validateProjectSnapshot,
@@ -1196,45 +1197,56 @@ describe('Project export specifications', () => {
     ).toThrow(/at most 4 placements/u);
   });
 
-  it('leads a set with the placement the revision chose', () => {
-    const set = projectOutputPrimaryPlacement(placement('9:16'), [
-      placement('1:1'),
+  const aspectOf = (specification: ProjectExportSpecification) => specification;
+  const aspects = (set: { readonly order: readonly ProjectExportSpecification[] }) =>
+    set.order.map(({ aspect }) => aspect);
+
+  it('writes the siblings in canonical order and the chosen placement last', () => {
+    const set = projectOutputPlacementSet(
       placement('9:16'),
-      placement('4:5'),
-    ]);
-    expect(set.order.map(({ aspect }) => aspect)).toEqual(['9:16', '1:1', '4:5']);
-    expect(set.order[set.primary!]!.aspect).toBe('9:16');
+      [placement('1:1'), placement('9:16'), placement('4:5')],
+      aspectOf,
+    );
+    expect(aspects(set)).toEqual(['1:1', '4:5', '9:16']);
+    expect(set.primary?.aspect).toBe('9:16');
+    // The caller's own items come back, not copies: nothing has to be re-joined afterwards.
+    expect(set.order.every((item) => item === set.primary || item !== set.primary)).toBe(true);
   });
 
   it('leads with the cut when no placement was chosen, or when none was produced', () => {
-    // `primary === null` is the one statement that the cut itself is what this save stores.
-    const kept = projectOutputPrimaryPlacement(null, [placement('9:16'), placement('1:1')]);
+    // `primary === null` is the one statement that the cut itself is what this save stores; the
+    // members then stay in canonical order for the caller to write the cut after them.
+    const kept = projectOutputPlacementSet(null, [placement('9:16'), placement('1:1')], aspectOf);
     expect(kept.primary).toBeNull();
-    expect(kept.order).toHaveLength(2);
-    expect(projectOutputPrimaryPlacement(placement('16:9'), []).primary).toBeNull();
-    expect(projectOutputPrimaryPlacement(null, []).primary).toBeNull();
+    expect(aspects(kept)).toEqual(['9:16', '1:1']);
+    expect(projectOutputPlacementSet(placement('16:9'), [], aspectOf).primary).toBeNull();
+    expect(projectOutputPlacementSet(null, [], aspectOf).primary).toBeNull();
   });
 
-  it('still leads a set whose chosen placement failed, and presents nothing', () => {
-    const set = projectOutputPrimaryPlacement(placement('9:16'), [
-      placement('16:9'),
-      placement('1:1'),
-    ]);
-    // Last in canonical order, so the choice is stable however the browser ordered its attempt.
-    expect(set.order[set.primary!]!.aspect).toBe('1:1');
+  it('still leads a set whose chosen placement failed, with the last canonical member', () => {
+    const set = projectOutputPlacementSet(
+      placement('9:16'),
+      [placement('16:9'), placement('1:1')],
+      aspectOf,
+    );
+    // Stable however the browser ordered its attempt, and written last like any primary.
+    expect(set.primary?.aspect).toBe('1:1');
+    expect(aspects(set)).toEqual(['16:9', '1:1']);
   });
 
   it('never stores the cut again when a later save joins a set', () => {
-    const joined = projectOutputPrimaryPlacement(null, [placement('4:5')], { joining: true });
-    expect(joined.primary).toBe(0);
-
-    const chosen = projectOutputPrimaryPlacement(placement('1:1'), [placement('1:1')], {
+    const joined = projectOutputPlacementSet(null, [placement('4:5')], aspectOf, {
       joining: true,
     });
-    expect(chosen.order[chosen.primary!]!.aspect).toBe('1:1');
-    expect(() => projectOutputPrimaryPlacement(placement('1:1'), [], { joining: true })).toThrow(
-      /at least one placement/u,
-    );
+    expect(joined.primary?.aspect).toBe('4:5');
+
+    const chosen = projectOutputPlacementSet(placement('1:1'), [placement('1:1')], aspectOf, {
+      joining: true,
+    });
+    expect(chosen.primary?.aspect).toBe('1:1');
+    expect(() =>
+      projectOutputPlacementSet(placement('1:1'), [], aspectOf, { joining: true }),
+    ).toThrow(/at least one placement/u);
   });
 
   it('treats the original shape as the absence of a specification', () => {

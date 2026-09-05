@@ -102,16 +102,26 @@ export type SaveVideoOptions = Readonly<{
 export type ReplaceVideoOptions = Omit<SaveVideoOptions, 'source'>;
 
 export const useSaveVideo = (
-  directMultipartUpload = false,
+  directMultipartUpload: boolean,
   /**
    * Whose uploads these are. Passed in rather than read from context so this hook stays a plain
-   * piece of the save flow; without it an upload still works, it just cannot be resumed after a
-   * reload, because a key remembered for nobody could be replayed by the next person to sign in.
+   * piece of the save flow, and required rather than optional because a key remembered for nobody
+   * could be replayed by the next person to sign in — a caller that cannot name the owner has no
+   * business saving.
    */
-  ownerUserId: string | null = null,
+  ownerUserId: string,
 ) => {
   const queryClient = useQueryClient();
   const [state, setState] = useState<SaveVideoState>({ status: 'idle' });
+  /**
+   * The key each artifact is saving under, for this session.
+   *
+   * Not the same memory as the remembered keys below, and not redundant with it: this one keeps
+   * "one take, one save" true within a session — pressing Save twice on the same take reuses the
+   * key and so cannot make two Videos — while the remembered copy exists only to survive a reload
+   * and is deliberately forgotten once the bytes land, so that the same file picked again in a
+   * later session is a new upload rather than a replay of one that finished.
+   */
   const keys = useRef(new Map<string, string>());
 
   /**
@@ -138,18 +148,16 @@ export const useSaveVideo = (
     ): { key: string; fingerprint: string } => {
       const keyId = `${artifactId}:${operation}`;
       const fingerprint = uploadFingerprint(media, filename, operation);
-      const remembered =
+      const key =
         keys.current.get(keyId) ??
-        (ownerUserId === null ? null : rememberedUploadKey(ownerUserId, fingerprint, Date.now()));
-      const key = remembered ?? crypto.randomUUID();
+        rememberedUploadKey(ownerUserId, fingerprint, Date.now()) ??
+        crypto.randomUUID();
       keys.current.set(keyId, key);
-      if (ownerUserId !== null) {
-        rememberUploadKey(ownerUserId, {
-          fingerprint,
-          idempotencyKey: key,
-          mintedAt: new Date().toISOString(),
-        });
-      }
+      rememberUploadKey(ownerUserId, {
+        fingerprint,
+        idempotencyKey: key,
+        mintedAt: new Date().toISOString(),
+      });
       return { key, fingerprint };
     },
     [ownerUserId],
@@ -164,9 +172,7 @@ export const useSaveVideo = (
    * in a later session is a new upload, not a replay of one that finished.
    */
   const forgetKey = useCallback(
-    (fingerprint: string) => {
-      if (ownerUserId !== null) forgetUploadKey(ownerUserId, fingerprint);
-    },
+    (fingerprint: string) => forgetUploadKey(ownerUserId, fingerprint),
     [ownerUserId],
   );
   const controller = useRef<AbortController | null>(null);

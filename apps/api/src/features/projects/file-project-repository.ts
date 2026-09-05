@@ -73,7 +73,9 @@ import type {
   ProjectWorkingMediaAdoptionResult,
   ProjectWorkingMediaRead,
   ProjectWorkingMediaRecord,
+  ProjectRenditionRecord,
 } from './project-repository.js';
+import { projectOutputCommitInconsistency } from './project-repository.js';
 import {
   appendStoredVideoVersions,
   type StoredVideoVersion,
@@ -115,6 +117,7 @@ import {
   type ProjectJournal,
   type ProjectLibrary,
   type StoredProjectAggregate,
+  storedProjectRenditionSchema,
 } from './file-project-persistence-schema.js';
 import {
   projectMediaReferencesEqual,
@@ -1857,6 +1860,44 @@ export class FileProjectRepository
     });
   }
 
+  async recordRendition(input: ProjectRenditionRecord): Promise<void> {
+    const record = storedProjectRenditionSchema.parse(input) as ProjectRenditionRecord;
+    await this.#withOwnerLock(record.ownerUserId, async () => {
+      const library = await this.#read(record.ownerUserId);
+      // One accepted upload, one entry: a replayed commit finds its own and changes nothing.
+      if (
+        library.projects.some(({ renditions }) =>
+          renditions.some(({ assetId }) => assetId === record.assetId),
+        )
+      ) {
+        return;
+      }
+      const index = library.projects.findIndex(({ project }) => project.id === record.projectId);
+      const aggregate = library.projects[index];
+      if (aggregate === undefined || aggregate.project.deletedAt !== null) {
+        throw new Error('A rendition was recorded for a Project that is not stored.');
+      }
+      const projects = [...library.projects];
+      projects[index] = storedAggregateSchema.parse({
+        ...aggregate,
+        renditions: [...aggregate.renditions, record],
+      });
+      await this.#write(
+        library,
+        librarySchema.parse({ ...library, revision: library.revision + 1, projects }),
+      );
+    });
+  }
+
+  async getRendition(ownerUserId: string, assetId: string): Promise<ProjectRenditionRecord | null> {
+    const library = await this.#read(ownerUserId);
+    for (const aggregate of library.projects) {
+      const record = aggregate.renditions.find((candidate) => candidate.assetId === assetId);
+      if (record !== undefined) return record;
+    }
+    return null;
+  }
+
   async adoptWorkingMedia(
     input: AdoptProjectWorkingMediaPersistenceInput,
   ): Promise<ProjectWorkingMediaAdoptionResult> {
@@ -2323,82 +2364,25 @@ export class FileProjectRepository
         input.savedVideo.kind === 'create'
           ? input.savedVideo.aggregate.versions
           : input.savedVideo.versions;
-      // The primary: the Version written last, which is the one every single-output pointer names.
-      const committedVersion = committedVersions.at(-1)!;
       const savedVideoId =
         input.savedVideo.kind === 'create'
           ? input.savedVideo.aggregate.video.id
           : input.savedVideo.videoId;
-      const videoVersionId = committedVersion.id;
-      /*
-       * The record hydrates whatever the post-save revision presents, which is the produced Version
-       * only when that Version is the cut itself. A save that re-framed for a placement keeps
-       * presenting the cut it came from, so the record describes that instead — and either way
-       * every field it states has to describe the same bytes its reference names.
-       */
-      const presentsOutput =
-        input.media.mediaReference.kind === 'saved-video-version' &&
-        input.media.mediaReference.savedVideoId === savedVideoId &&
-        input.media.mediaReference.videoVersionId === videoVersionId;
-      const hydratesPresentedMedia = presentsOutput
-        ? input.media.kind === 'saved-video-version' &&
-          input.media.assetId === committedVersion.assetId &&
-          input.media.savedVideoId === savedVideoId &&
-          input.media.videoVersionId === videoVersionId &&
-          input.media.mimeType === committedVersion.mimeType &&
-          input.media.filename === committedVersion.filename &&
-          input.media.sizeBytes === committedVersion.sizeBytes &&
-          input.media.durationMs === committedVersion.durationMs &&
-          input.media.width === committedVersion.width &&
-          input.media.height === committedVersion.height
-        : // Not the output: it must not claim the output's identity, and its lineage columns have
-          // to agree with the reference it does name.
-          !committedVersions.some((candidate) => input.media.videoVersionId === candidate.id) &&
-          (input.media.mediaReference.kind === 'saved-video-version'
-            ? input.media.kind === 'saved-video-version' &&
-              input.media.savedVideoId === input.media.mediaReference.savedVideoId &&
-              input.media.videoVersionId === input.media.mediaReference.videoVersionId
-            : input.media.kind !== 'saved-video-version' &&
-              input.media.savedVideoId === null &&
-              input.media.videoVersionId === null &&
-              input.media.assetId === input.media.mediaReference.assetId);
-      const valid =
-        input.receipt.projectId === aggregate.project.id &&
-        input.receipt.savedVideoId === savedVideoId &&
-        input.receipt.videoVersionId === videoVersionId &&
-        input.receipt.resultRevisionId === revision.id &&
-        input.receipt.resultRevisionNumber === revision.revisionNumber &&
-        input.projectRevision.ownerUserId === input.ownerUserId &&
-        input.projectRevision.nextProject.ownerUserId === input.ownerUserId &&
-        input.projectRevision.nextProject.id === aggregate.project.id &&
-        input.projectRevision.nextProject.version === aggregate.project.version + 1 &&
-        revision.projectId === aggregate.project.id &&
-        revision.ownerUserId === input.ownerUserId &&
-        revision.parentRevisionId === aggregate.project.currentRevisionId &&
-        revision.parentRevisionNumber === aggregate.project.currentRevisionNumber &&
-        revision.revisionNumber === aggregate.project.currentRevisionNumber + 1 &&
-        outputs.length === committedVersions.length &&
-        outputs.every(
-          (link, index) =>
-            link.projectId === aggregate.project.id &&
-            link.ownerUserId === input.ownerUserId &&
-            link.savedVideoId === savedVideoId &&
-            link.videoVersionId === committedVersions[index]!.id &&
-            link.producingRevisionId === aggregate.project.currentRevisionId &&
-            link.producingRevisionNumber === aggregate.project.currentRevisionNumber,
-        ) &&
-        input.media.projectId === aggregate.project.id &&
-        input.media.ownerUserId === input.ownerUserId &&
-        input.media.adoptedRevisionId === revision.id &&
-        input.media.adoptedRevisionNumber === revision.revisionNumber &&
-        input.media.operationKey === input.receipt.operationId &&
-        input.media.requestFingerprint === input.receipt.requestFingerprint &&
-        projectMediaReferencesEqual(input.media.mediaReference, revision.snapshot.workingMedia) &&
-        projectMediaReferencesEqual(input.media.mediaReference, revision.snapshot.presentedMedia) &&
-        hydratesPresentedMedia &&
-        revision.snapshot.lastSuccessfulOutput?.savedVideoId === savedVideoId &&
-        revision.snapshot.lastSuccessfulOutput.videoVersionId === videoVersionId;
-      if (!valid) throw new Error('The local Project output transaction is inconsistent.');
+      // The Saved Video revision the receipt should record: a create starts at 1; an append moves
+      // the target's revision by one, whatever it was before this commit read it.
+      const savedVideoRevision =
+        input.savedVideo.kind === 'create'
+          ? 1
+          : (savedLibrary.videos.find(({ video }) => video.id === savedVideoId)?.revision ?? 0) + 1;
+      // The one rule both persistence modes hold a save to, over what the service composed.
+      const inconsistency = projectOutputCommitInconsistency(
+        { ...input, outputs },
+        aggregate.project,
+        { versions: committedVersions, savedVideoId, savedVideoRevision },
+      );
+      if (inconsistency !== null) {
+        throw new Error(`The local Project output transaction is inconsistent: ${inconsistency}`);
+      }
       const committedIds = new Set(committedVersions.map(({ id }) => id));
       if (
         library.projects.some(({ outputLinks }) =>

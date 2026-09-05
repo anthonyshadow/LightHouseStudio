@@ -237,21 +237,23 @@ export const validateProjectExportPlacementSet = (
   );
 };
 
-export interface ProjectOutputPlacementSet {
-  /** Every placement this save produces, in canonical order — the order they are written in. */
-  readonly order: readonly ProjectExportSpecification[];
+export interface ProjectOutputPlacementSet<T> {
   /**
-   * Which member's Version is written last, or `null` when the cut itself is that Version.
+   * Every placement this save produces, in the order it is written: the siblings in canonical
+   * order, then the primary — the member whose Version is written last and so becomes the Saved
+   * Video's current one, the receipt's scalar, the Project's `lastSuccessfulOutput` and the
+   * result's `output`. Naming that member here, once, is what lets every one of those pointers keep
+   * the meaning and the validator it already had.
    *
-   * The last Version written is the Saved Video's current one, the receipt's scalar, the Project's
-   * `lastSuccessfulOutput` and the result's `output`. Naming it here, once, is what lets every one
-   * of those keep the meaning and the validator it already had.
+   * When the cut itself leads there is no such member: `primary` is `null`, `order` holds every
+   * member in canonical order, and the caller writes the cut after them.
    */
-  readonly primary: number | null;
+  readonly order: readonly T[];
+  readonly primary: T | null;
 }
 
 /**
- * Which placement of a set is the primary, given what the revision chose.
+ * Which placement of a set leads, and the order the set is written in, given what the revision chose.
  *
  * The revision records the operator's intent — one chosen placement, or none. The set that a save
  * actually produced is the Versions it wrote, each carrying its own specification. This rule is the
@@ -259,30 +261,39 @@ export interface ProjectOutputPlacementSet {
  * chosen or none was produced, and a set whose chosen member failed still has a leader rather than
  * no save at all.
  *
+ * Generic over the caller's own items so that nothing has to be re-joined afterwards: the caller
+ * hands in whatever carries a specification and gets those same items back, ordered.
+ *
  * `joining` is a save that adds members to a set that already exists. The cut is never stored a
  * second time there — it is already a Version of that Saved Video — so a join with nothing to add
  * is refused rather than quietly re-saving the original.
  */
-export const projectOutputPrimaryPlacement = (
+export const projectOutputPlacementSet = <T>(
   chosen: ProjectExportSpecification | null,
-  specifications: readonly ProjectExportSpecification[],
+  items: readonly T[],
+  specificationOf: (item: T) => ProjectExportSpecification,
   options: { readonly joining?: boolean } = {},
-): ProjectOutputPlacementSet => {
-  const order = validateProjectExportPlacementSet(specifications);
+): ProjectOutputPlacementSet<T> => {
+  const canonical = validateProjectExportPlacementSet(items.map(specificationOf));
+  // Distinct by aspect, so each canonical specification names exactly one of the caller's items.
+  const ordered = canonical.map((specification) =>
+    items.find((item) => specificationOf(item).aspect === specification.aspect)!,
+  );
   const joining = options.joining === true;
-  if (joining && order.length === 0) {
+  if (joining && ordered.length === 0) {
     throw new ProjectRuleError(
       'invalid-transition',
       'Adding to a set of placements needs at least one placement to add.',
     );
   }
   const chosenAspect = projectExportAspectOf(chosen);
-  if (!joining && (order.length === 0 || !isProjectExportPlacementAspect(chosenAspect))) {
+  if (!joining && (ordered.length === 0 || !isProjectExportPlacementAspect(chosenAspect))) {
     // The cut itself is what this save stores: either nothing was re-framed, or nothing could be.
-    return { order, primary: null };
+    return { order: ordered, primary: null };
   }
-  const matching = order.findIndex(({ aspect }) => aspect === chosenAspect);
-  return { order, primary: matching >= 0 ? matching : order.length - 1 };
+  const matching = ordered.findIndex((item) => specificationOf(item).aspect === chosenAspect);
+  const primary = ordered[matching >= 0 ? matching : ordered.length - 1]!;
+  return { order: [...ordered.filter((item) => item !== primary), primary], primary };
 };
 
 const requireExportDimension = (value: number, label: string): void => {
@@ -1639,3 +1650,81 @@ export const promoteProjectJobResult = (
     ? { kind: 'promoted', value: appended.value }
     : { kind: 'conflict', conflict: appended.conflict };
 };
+
+/**
+ * What a surface needs to know about a Version to place it in a set: its identity, its position,
+ * the set it was saved with, and the placement it holds. Structural, so the wire Version and any
+ * stored shape both qualify without conversion.
+ */
+export interface VariantSetMember {
+  readonly id: string;
+  readonly ordinal: number;
+  readonly variantSetId: string | null;
+  readonly exportSpecification: ProjectExportSpecification | null;
+}
+
+export interface VariantSetRun<T extends VariantSetMember> {
+  /** The set these Versions were saved with, or `null` for a Version that belongs to none. */
+  readonly variantSetId: string | null;
+  readonly versions: readonly T[];
+}
+
+/**
+ * Whether two Versions were saved together — the one product rule every surface asks.
+ *
+ * A set id is shared only by the placements one save produced, so sharing a non-null one is the
+ * whole test. A Version that belongs to no set was saved together with nothing, and a Version is
+ * not saved together with itself.
+ */
+export const savedTogether = (left: VariantSetMember, right: VariantSetMember): boolean =>
+  left.id !== right.id && left.variantSetId !== null && left.variantSetId === right.variantSetId;
+
+/**
+ * A Version list split into runs of neighbours saved together, in the order given.
+ *
+ * A set is always written at consecutive ordinals, so a run of neighbours sharing a non-null id is
+ * the whole of it. A single Version carries a set id too — a Project save that produced one
+ * placement — and one Version was not saved *together* with anything, so a run of one is exactly
+ * the plain row it has always been.
+ */
+export const variantSetRuns = <T extends VariantSetMember>(
+  versions: readonly T[],
+): readonly VariantSetRun<T>[] => {
+  const runs: { variantSetId: string | null; versions: T[] }[] = [];
+  for (const version of versions) {
+    const open = runs.at(-1);
+    if (
+      open !== undefined &&
+      open.versions[0] !== undefined &&
+      savedTogether(open.versions[0], version)
+    ) {
+      open.versions.push(version);
+    } else {
+      runs.push({ variantSetId: version.variantSetId, versions: [version] });
+    }
+  }
+  return runs;
+};
+
+/** Every Version saved together with `version`, in the order given; empty for a set of one. */
+export const variantSetOf = <T extends VariantSetMember>(
+  versions: readonly T[],
+  version: VariantSetMember,
+): readonly T[] => versions.filter((candidate) => savedTogether(version, candidate));
+
+/**
+ * The Version saved together with `version` that already holds a placement of this aspect.
+ *
+ * Only within one set: without that, choosing a placement on a Version that belongs to none
+ * would offer some other save's file as if it were a re-frame of this one.
+ */
+export const variantSetSiblingFor = <T extends VariantSetMember>(
+  versions: readonly T[],
+  version: VariantSetMember,
+  aspect: ProjectExportAspect,
+): T | null =>
+  isProjectExportPlacementAspect(aspect)
+    ? (variantSetOf(versions, version).find(
+        (candidate) => projectExportAspectOf(candidate.exportSpecification) === aspect,
+      ) ?? null)
+    : null;

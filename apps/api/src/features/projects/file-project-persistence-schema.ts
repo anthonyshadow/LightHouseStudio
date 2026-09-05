@@ -12,6 +12,7 @@ import {
   videoInputMimeTypeSchema,
   videoJobErrorCodeSchema,
   videoOutputResolutionSchema,
+  projectExportSpecificationValueSchema,
 } from '@studio/contracts';
 import { z } from 'zod';
 import { persistedTimestampSchema } from '../../application/timestamps.js';
@@ -205,6 +206,32 @@ export const storedProjectSourceSchema = z
     }
   });
 
+/**
+ * What an accepted rendition upload learned about its bytes, kept beside the Project so the save
+ * that names the asset can trust the inspection. One entry per accepted asset.
+ */
+export const storedProjectRenditionSchema = z
+  .object({
+    projectId: projectIdSchema,
+    ownerUserId: ownerIdSchema,
+    assetId: z.uuid(),
+    operationKey: z.uuid(),
+    specification: projectExportSpecificationValueSchema,
+    mimeType: videoInputMimeTypeSchema,
+    filename: z.string().trim().min(1).max(180),
+    sizeBytes: z.number().int().positive().max(300_000_000),
+    checksumSha256: z.string().regex(/^[a-f0-9]{64}$/u),
+    container: z.enum(['mp4', 'quicktime', 'webm']),
+    videoCodec: z.enum(['avc', 'vp8']),
+    audioCodec: z.string().trim().min(1).max(32).nullable(),
+    durationMs: z.number().int().positive().max(300_000),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    hasAudio: z.boolean(),
+    uploadedAt: persistedTimestampSchema,
+  })
+  .strict();
+
 export const storedProjectWorkingMediaSchema = z
   .object({
     projectId: projectIdSchema,
@@ -263,6 +290,7 @@ export const storedAggregateSchema = z
     outputLinks: z.array(storedOutputLinkSchema),
     source: storedProjectSourceSchema.nullable().default(null),
     workingMediaAdoptions: z.array(storedProjectWorkingMediaSchema).default([]),
+    renditions: z.array(storedProjectRenditionSchema).default([]),
   })
   .strict()
   .superRefine((aggregate, context) => {
@@ -280,7 +308,8 @@ export const storedAggregateSchema = z
       !aggregate.versionReferenceLinks.every(owned) ||
       !aggregate.jobLinks.every(owned) ||
       !aggregate.outputLinks.every(owned) ||
-      !aggregate.workingMediaAdoptions.every(owned)
+      !aggregate.workingMediaAdoptions.every(owned) ||
+      !aggregate.renditions.every(owned)
     ) {
       context.addIssue({
         code: 'custom',

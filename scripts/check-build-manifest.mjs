@@ -70,7 +70,12 @@ export const BUILD_CLOSURE_BUDGETS = {
   // the surfaces that recognise siblings (the gallery's grouping, the overview card's per-member
   // rows, History's placement summaries). `FORBIDDEN_CLOSURE_DEPENDENCIES` still passes, so no
   // provider, media or capture module entered a surface that outlives it.
-  'src/app/shell/AuthenticatedShell.tsx': 743_000,
+  // Raised from 743_000 on 2026-09-05 for the findings the cleanup pass deferred, measured
+  // 742_876 → 743_276. The render hook now shows progress once per animation frame (a pending
+  // value, its frame and the cancellation of both), and "saved together" became one domain relation
+  // that the gallery, the export panel and the Project surfaces share instead of each comparing set
+  // ids by hand — the shared code is a little larger than the four comparisons it replaced.
+  'src/app/shell/AuthenticatedShell.tsx': 744_000,
   // Shell plus capture graph, which is what a Studio route costs. Looser, because a Studio route is
   // where media code belongs; `FORBIDDEN_CLOSURE_DEPENDENCIES` is what keeps it from leaking out.
   //
@@ -88,7 +93,10 @@ export const BUILD_CLOSURE_BUDGETS = {
   // branch with the copy that explains it. The encoder itself is not new here — `useRecording`
   // already put it in this closure — so deferring its import moves nothing but split overhead,
   // measured at 171 bytes worse.
-  'src/studio/StudioApp.tsx': 1_081_000,
+  // Raised from 1_081_000 on 2026-09-05 for the deferred findings, measured 1_080_798 → 1_081_561:
+  // the shell's growth above, carried here too, plus the save hook taking its owner as a parameter
+  // and looking up a remembered upload key for that owner rather than for nobody.
+  'src/studio/StudioApp.tsx': 1_082_000,
 };
 
 /**

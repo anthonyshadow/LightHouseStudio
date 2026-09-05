@@ -85,8 +85,29 @@ export class ProjectRenditionService {
         now: this.#now().toISOString(),
         conflictMessage:
           'That rendition operation was already used for a different re-framed video.',
-        commit: (manifest) =>
-          Promise.resolve({
+        commit: async (manifest) => {
+          // What was learned here is kept beside the bytes, so the save that names this asset
+          // can trust the inspection instead of copying the file out to repeat it.
+          await this.projects.recordRendition({
+            projectId: current.project.id,
+            ownerUserId: input.ownerUserId,
+            assetId: manifest.assetId,
+            operationKey: input.operationKey,
+            specification: input.specification,
+            mimeType: inspected.mimeType,
+            filename: manifest.filename,
+            sizeBytes: inspected.sizeBytes,
+            checksumSha256: manifest.checksumSha256,
+            container: inspected.container,
+            videoCodec: inspected.videoCodec,
+            audioCodec: inspected.audioCodec,
+            durationMs: Math.max(1, Math.round(inspected.durationMs)),
+            width: inspected.width,
+            height: inspected.height,
+            hasAudio: inspected.hasAudio,
+            uploadedAt: manifest.createdAt,
+          });
+          return {
             ok: true as const,
             response: projectRenditionUploadResponseSchema.parse({
               media: { kind: 'asset', assetId: manifest.assetId },
@@ -100,7 +121,8 @@ export class ProjectRenditionService {
               height: inspected.height,
               hasAudio: inspected.hasAudio,
             }),
-          } satisfies { ok: true; response: ProjectRenditionUploadResponse }),
+          } satisfies { ok: true; response: ProjectRenditionUploadResponse };
+        },
         discard: async (assetId) => {
           if (await this.options.projectRetention?.retainsAsset(input.ownerUserId, assetId)) return;
           await this.bytes.delete(input.ownerUserId, assetId).catch(() => undefined);

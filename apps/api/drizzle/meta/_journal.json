@@ -169,6 +169,13 @@
       "when": 1788625344825,
       "tag": "0023_wise_maddog",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1788635203352,
+      "tag": "0024_pale_doomsday",
+      "breakpoints": true
     }
   ]
 }

@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createDefaultVideoEditSpec, projectExportSpecificationForAspect } from '@studio/domain';
 import { KeyedLock } from '../../application/keyed-lock.js';
 import { LocalAssetByteStore } from '../../storage/asset-byte-store.js';
@@ -189,6 +189,46 @@ describe('ProjectOutputService local composite authority', () => {
       sizeBytes: renditionBytes.byteLength,
       exportSpecification: phonePlacement,
     });
+  });
+
+  it('trusts the inspection the upload kept, and inspects the bytes itself only when no record describes them', async () => {
+    const inspect = vi.fn(inspectByContent);
+    // A fresh Project, placement and rendition per save: a save moves the Project on.
+    const saveWith = async (repository: FileProjectRepository) => {
+      const created = await createReadyProject();
+      const current = await choosePhonePlacement(created.current);
+      const rendition = await storeRendition();
+      inspect.mockClear();
+      return new ProjectOutputService(repository, repository, savedVideos, bytes, {
+        now: () => new Date('2026-08-13T12:02:00.000Z'),
+        inspect,
+      }).save(ownerUserId, current.project.id, randomUUID(), {
+        expectedVersion: current.project.version,
+        expectedRevisionNumber: current.revision.revisionNumber,
+        media: current.revision.snapshot.workingMedia!,
+        target: { kind: 'new', title: 'Phone master' },
+        renditions: [{ media: rendition.media, specification: phonePlacement }],
+      });
+    };
+
+    // The cut is still inspected — the save is a statement about that exact file — but the
+    // rendition's bytes were inspected when they arrived, and that record is what is read now.
+    expect((await saveWith(projects)).ok).toBe(true);
+    expect(inspect).toHaveBeenCalledTimes(1);
+
+    // The same save against a store that kept no record opens the rendition too.
+    const unrecorded = new Proxy(projects, {
+      get: (target, property) => {
+        if (property === 'getRendition') return () => Promise.resolve(null);
+        const value: unknown = Reflect.get(target, property);
+        // A bound method keeps the real repository's private state reachable.
+        return typeof value === 'function'
+          ? (value as (...args: unknown[]) => unknown).bind(target)
+          : value;
+      },
+    });
+    expect((await saveWith(unrecorded)).ok).toBe(true);
+    expect(inspect).toHaveBeenCalledTimes(2);
   });
 
   it('keeps presenting the cut a placement was produced from, so a second save re-frames the original', async () => {
