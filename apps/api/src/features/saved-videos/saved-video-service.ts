@@ -72,6 +72,7 @@ export const publicSavedVideoVersion = (version: StoredVideoVersion) => ({
   width: version.width,
   height: version.height,
   exportSpecification: version.exportSpecification,
+  variantSetId: version.variantSetId,
   createdAt: version.createdAt,
 });
 
@@ -275,6 +276,8 @@ export class SavedVideoService {
        * what for. Recording that is the Assets-side work, not this one.
        */
       exportSpecification: null,
+      // A Studio save makes one Version at a time, so it belongs to no set of placements.
+      variantSetId: null,
       createdAt,
     };
   }

@@ -28,6 +28,9 @@ import {
   renameProject,
   restoreProject,
   saveProjectOutput,
+  PROJECT_EXPORT_PLACEMENT_ASPECTS,
+  projectOutputPrimaryPlacement,
+  validateProjectExportPlacementSet,
   validateProjectExportSpecification,
   validateProjectSnapshot,
 } from './index';
@@ -216,6 +219,76 @@ describe('Project aggregate rules', () => {
     );
     if (!removed.ok) throw new Error('Expected the source removal to be formed.');
     expect(removed.value.revisions.at(-1)!.snapshot.localEdit).toBeNull();
+  });
+
+  it('gives every placement of one save its own provenance from the one producing revision', () => {
+    const accepted = acceptProjectSource(
+      emptyProject(),
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        assetId: sourceAssetId,
+        mediaReference: { kind: 'asset', assetId: sourceAssetId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    if (!accepted.ok) throw new Error('Expected the source to be accepted.');
+    const savedVideoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
+    const siblings = [
+      'b276694b-58c4-40d3-8fb6-315e32b66fd0',
+      'c3871a52-6d1b-4f0e-9d18-2f4a6b8c0e11',
+    ] as const;
+    const primary = 'd48f2c63-7e2c-4a1f-8e29-3a5b7c9d1f22';
+    const input = {
+      expectedProjectVersion: 2,
+      expectedRevisionNumber: 2,
+      savedVideoId,
+      videoVersionId: primary,
+      siblingVersionIds: siblings,
+      presentsOutput: false,
+      author: { kind: 'user' as const, authorId: ownerUserId },
+    };
+
+    const saved = saveProjectOutput(accepted.value, input, {
+      now: latest,
+      createId: () => '5354b1d3-4022-4c85-a7b6-b230b58ba10b',
+    });
+    if (!saved.ok) throw new Error('Expected the set to be saved.');
+
+    // Three links, one revision, and the primary last — which is what makes `outputLinks.at(-1)`
+    // the Version every single-output pointer already names.
+    expect(saved.value.outputLinks.map(({ videoVersionId }) => videoVersionId)).toEqual([
+      ...siblings,
+      primary,
+    ]);
+    expect(new Set(saved.value.outputLinks.map((link) => link.producingRevisionId))).toEqual(
+      new Set([secondRevisionId]),
+    );
+    expect(saved.value.revisions).toHaveLength(3);
+    const snapshot = saved.value.revisions.at(-1)!.snapshot;
+    // One pointer, naming the primary; a re-framed save keeps presenting the cut it came from.
+    expect(snapshot.lastSuccessfulOutput).toEqual({ savedVideoId, videoVersionId: primary });
+    expect(snapshot.presentedMedia).toEqual({ kind: 'asset', assetId: sourceAssetId });
+
+    // A sibling that already has provenance is refused exactly as the primary would be.
+    expect(() =>
+      saveProjectOutput(
+        saved.value,
+        { ...input, expectedProjectVersion: 3, expectedRevisionNumber: 3 },
+        {
+          now: latest,
+          createId: () => '6465c2e4-5133-4d96-b8c7-c341c69cb21c',
+        },
+      ),
+    ).toThrow(/already has producing Project provenance/u);
+    expect(() =>
+      saveProjectOutput(
+        accepted.value,
+        { ...input, siblingVersionIds: [primary] },
+        { now: latest, createId: () => '6465c2e4-5133-4d96-b8c7-c341c69cb21c' },
+      ),
+    ).toThrow(/same Video Version twice/u);
   });
 
   it('keeps the producing revision distinct from the completed post-save output revision', () => {
@@ -1076,6 +1149,102 @@ describe('Project aggregate rules', () => {
 
 describe('Project export specifications', () => {
   const landscapeSource = { width: 1_920, height: 1_080, durationMs: 12_000 } as const;
+
+  const placement = (aspect: '16:9' | '9:16' | '1:1' | '4:5') =>
+    projectExportSpecificationForAspect(aspect)!;
+
+  it('names the four placements a save can produce, in one canonical order', () => {
+    expect(PROJECT_EXPORT_PLACEMENT_ASPECTS).toEqual(['16:9', '9:16', '1:1', '4:5']);
+    expect(PROJECT_EXPORT_PLACEMENT_ASPECTS).not.toContain('source');
+  });
+
+  it('returns a set in canonical order however it was offered', () => {
+    expect(
+      validateProjectExportPlacementSet([
+        placement('4:5'),
+        placement('16:9'),
+        placement('1:1'),
+      ]).map(({ aspect }) => aspect),
+    ).toEqual(['16:9', '1:1', '4:5']);
+    expect(validateProjectExportPlacementSet([])).toEqual([]);
+  });
+
+  it('refuses a set that repeats a placement, keeps the original shape, or exceeds the four', () => {
+    expect(() => validateProjectExportPlacementSet([placement('9:16'), placement('9:16')])).toThrow(
+      /same placement twice/u,
+    );
+    // Same aspect, different size: still one file name, still ambiguous on every surface.
+    expect(() =>
+      validateProjectExportPlacementSet([
+        placement('16:9'),
+        { ...placement('16:9'), resolution: { width: 1_280, height: 720 } },
+      ]),
+    ).toThrow(/same placement twice/u);
+    expect(() =>
+      validateProjectExportPlacementSet([
+        { container: 'video/mp4', aspect: 'source', resolution: null, includeAudio: true },
+      ]),
+    ).toThrow(/not a placement/u);
+    expect(() =>
+      validateProjectExportPlacementSet([
+        placement('16:9'),
+        placement('9:16'),
+        placement('1:1'),
+        placement('4:5'),
+        placement('16:9'),
+      ]),
+    ).toThrow(/at most 4 placements/u);
+  });
+
+  it('leads a set with the placement the revision chose', () => {
+    const set = projectOutputPrimaryPlacement(placement('9:16'), [
+      placement('1:1'),
+      placement('9:16'),
+      placement('4:5'),
+    ]);
+    expect(set.order.map(({ aspect }) => aspect)).toEqual(['9:16', '1:1', '4:5']);
+    expect(set.order[set.primary!]!.aspect).toBe('9:16');
+    expect(set.presentsOutput).toBe(false);
+  });
+
+  it('leads with the cut when no placement was chosen, or when none was produced', () => {
+    const kept = projectOutputPrimaryPlacement(null, [placement('9:16'), placement('1:1')]);
+    expect(kept.primary).toBeNull();
+    expect(kept.presentsOutput).toBe(true);
+    expect(kept.order).toHaveLength(2);
+
+    const degraded = projectOutputPrimaryPlacement(placement('16:9'), []);
+    expect(degraded.primary).toBeNull();
+    expect(degraded.presentsOutput).toBe(true);
+
+    const plain = projectOutputPrimaryPlacement(null, []);
+    expect(plain.primary).toBeNull();
+    expect(plain.presentsOutput).toBe(true);
+  });
+
+  it('still leads a set whose chosen placement failed, and presents nothing', () => {
+    const set = projectOutputPrimaryPlacement(placement('9:16'), [
+      placement('16:9'),
+      placement('1:1'),
+    ]);
+    // Last in canonical order, so the choice is stable however the browser ordered its attempt.
+    expect(set.order[set.primary!]!.aspect).toBe('1:1');
+    expect(set.presentsOutput).toBe(false);
+  });
+
+  it('never stores the cut again when a later save joins a set', () => {
+    const joined = projectOutputPrimaryPlacement(null, [placement('4:5')], { joining: true });
+    expect(joined.primary).toBe(0);
+    expect(joined.presentsOutput).toBe(false);
+
+    const chosen = projectOutputPrimaryPlacement(placement('1:1'), [placement('1:1')], {
+      joining: true,
+    });
+    expect(chosen.order[chosen.primary!]!.aspect).toBe('1:1');
+    expect(() => projectOutputPrimaryPlacement(placement('1:1'), [], { joining: true })).toThrow(
+      /at least one placement/u,
+    );
+  });
 
   it('treats the original shape as the absence of a specification', () => {
     expect(projectExportSpecificationForAspect('source')).toBeNull();

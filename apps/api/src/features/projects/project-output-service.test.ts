@@ -31,14 +31,35 @@ const inspected = {
   hasAudio: true,
 };
 
-const renditionBytes = Buffer.from('synthetic-reframed-phone-video');
-const renditionChecksum = createHash('sha256').update(renditionBytes).digest('hex');
 const phonePlacement = {
   container: 'video/mp4' as const,
   aspect: '9:16' as const,
   resolution: { width: 1_080, height: 1_920 },
   includeAudio: true,
 };
+const squarePlacement = {
+  container: 'video/mp4' as const,
+  aspect: '1:1' as const,
+  resolution: { width: 1_080, height: 1_080 },
+  includeAudio: true,
+};
+const widePlacement = {
+  container: 'video/mp4' as const,
+  aspect: '16:9' as const,
+  resolution: { width: 1_920, height: 1_080 },
+  includeAudio: true,
+};
+
+/** One distinguishable file per placement, so the inspection stub can answer each its own shape. */
+const renditionFixtures = [phonePlacement, squarePlacement, widePlacement].map((specification) => {
+  const bytes = Buffer.from(`synthetic-reframed-${specification.aspect}-video`);
+  return {
+    specification,
+    bytes,
+    checksum: createHash('sha256').update(bytes).digest('hex'),
+  };
+});
+const renditionBytes = renditionFixtures[0]!.bytes;
 
 describe('ProjectOutputService local composite authority', () => {
   let currentProjectId: string;
@@ -96,10 +117,18 @@ describe('ProjectOutputService local composite authority', () => {
     });
 
   /** Distinguishes the two assets by their bytes, because both are inspected through a temp copy. */
-  const inspectByContent = async (filePath: string) =>
-    (await readFile(filePath)).equals(renditionBytes)
-      ? { ...inspected, sizeBytes: renditionBytes.byteLength, width: 1_080, height: 1_920 }
-      : inspected;
+  const inspectByContent = async (filePath: string) => {
+    const content = await readFile(filePath);
+    const fixture = renditionFixtures.find(({ bytes: candidate }) => content.equals(candidate));
+    return fixture === undefined
+      ? inspected
+      : {
+          ...inspected,
+          sizeBytes: fixture.bytes.byteLength,
+          width: fixture.specification.resolution.width,
+          height: fixture.specification.resolution.height,
+        };
+  };
 
   const outputServiceWithRenditions = () =>
     new ProjectOutputService(projects, projects, savedVideos, bytes, {
@@ -124,9 +153,14 @@ describe('ProjectOutputService local composite authority', () => {
     return checkpoint.current;
   };
 
-  const storeRendition = async () => {
-    const renditionPath = path.join(directory, 'rendition.mp4');
-    await writeFile(renditionPath, renditionBytes);
+  const storeRendition = async (
+    specification: (typeof renditionFixtures)[number]['specification'] = phonePlacement,
+  ) => {
+    const fixture = renditionFixtures.find(
+      (candidate) => candidate.specification.aspect === specification.aspect,
+    )!;
+    const renditionPath = path.join(directory, `rendition-${specification.aspect}.mp4`);
+    await writeFile(renditionPath, fixture.bytes);
     return new ProjectRenditionService(projects, bytes, {
       now: () => new Date('2026-08-13T12:01:30.000Z'),
       inspect: inspectByContent,
@@ -136,9 +170,9 @@ describe('ProjectOutputService local composite authority', () => {
       projectId: (await projects.getCurrent(ownerUserId, currentProjectId))!.project.id,
       operationKey: randomUUID(),
       sourcePath: renditionPath,
-      checksumSha256: renditionChecksum,
+      checksumSha256: fixture.checksum,
       filename: 'reframed.mp4',
-      specification: phonePlacement,
+      specification,
     });
   };
 
@@ -305,25 +339,298 @@ describe('ProjectOutputService local composite authority', () => {
     );
   });
 
-  it('refuses a rendition made for a placement the Project has not chosen', async () => {
+  it('names the rendition for the chosen placement as the output and the rest as siblings', async () => {
+    const created = await createReadyProject();
+    const current = await choosePhonePlacement(created.current);
+    const [phone, square, wide] = await Promise.all([
+      storeRendition(phonePlacement),
+      storeRendition(squarePlacement),
+      storeRendition(widePlacement),
+    ]);
+
+    const saved = await outputServiceWithRenditions().save(
+      ownerUserId,
+      current.project.id,
+      randomUUID(),
+      {
+        expectedVersion: current.project.version,
+        expectedRevisionNumber: current.revision.revisionNumber,
+        media: current.revision.snapshot.workingMedia!,
+        target: { kind: 'new', title: 'Launch set' },
+        // Offered out of order on purpose: the answer is canonical, not the order it arrived in.
+        renditions: [
+          { media: square.media, specification: squarePlacement },
+          { media: phone.media, specification: phonePlacement },
+          { media: wide.media, specification: widePlacement },
+        ],
+      },
+    );
+    if (!saved.ok) throw new Error('Expected the set to be saved.');
+
+    const versions = saved.response.savedVideo.versions;
+    expect(versions.map(({ ordinal }) => ordinal)).toEqual([1, 2, 3]);
+    // Canonical order for the siblings, and the chosen placement written last so it leads.
+    expect(versions.map(({ exportSpecification }) => exportSpecification?.aspect)).toEqual([
+      '16:9',
+      '1:1',
+      '9:16',
+    ]);
+    expect(saved.response.savedVideo.currentVersion.exportSpecification?.aspect).toBe('9:16');
+    expect(saved.response.output.videoVersionId).toBe(saved.response.savedVideo.currentVersion.id);
+    // One set, one id, shared by every member — and every Version has its own bytes.
+    const setIds = new Set(versions.map(({ variantSetId }) => variantSetId));
+    expect(setIds.size).toBe(1);
+    expect([...setIds][0]).not.toBeNull();
+    expect(new Set(versions.map(({ id }) => id)).size).toBe(3);
+    // A re-framed save still presents the cut it came from, so the next save starts where this did.
+    expect(saved.response.revision.snapshot.presentedMedia).toEqual(
+      current.revision.snapshot.workingMedia,
+    );
+
+    const outputs = await projects.listLinkHistory(ownerUserId, current.project.id, {
+      kind: 'output',
+      pageSize: 10,
+    });
+    // Three links, all from the one producing revision — provenance per Version, not per save.
+    expect(outputs?.links).toHaveLength(3);
+    expect(
+      new Set(
+        outputs?.links.map((link) =>
+          'producingRevisionNumber' in link ? link.producingRevisionNumber : null,
+        ),
+      ),
+    ).toEqual(new Set([current.revision.revisionNumber]));
+  });
+
+  it('leads with the cut when the Project kept its shape, and adds the placements beside it', async () => {
+    const created = await createReadyProject();
+    const [square, wide] = await Promise.all([
+      storeRendition(squarePlacement),
+      storeRendition(widePlacement),
+    ]);
+
+    const saved = await outputServiceWithRenditions().save(
+      ownerUserId,
+      created.current.project.id,
+      randomUUID(),
+      {
+        expectedVersion: created.current.project.version,
+        expectedRevisionNumber: created.current.revision.revisionNumber,
+        media: created.current.revision.snapshot.workingMedia!,
+        target: { kind: 'new', title: 'Original and two' },
+        renditions: [
+          { media: square.media, specification: squarePlacement },
+          { media: wide.media, specification: widePlacement },
+        ],
+      },
+    );
+    if (!saved.ok) throw new Error('Expected the set to be saved.');
+
+    const versions = saved.response.savedVideo.versions;
+    expect(
+      versions.map(({ exportSpecification }) => exportSpecification?.aspect ?? 'source'),
+    ).toEqual(['16:9', '1:1', 'source']);
+    // The cut leads, so it is what the Project presents — the one member that is not a deliverable.
+    expect(saved.response.savedVideo.currentVersion.exportSpecification).toBeNull();
+    expect(saved.response.revision.snapshot.presentedMedia).toEqual({
+      kind: 'saved-video-version',
+      savedVideoId: saved.response.savedVideo.id,
+      videoVersionId: saved.response.savedVideo.currentVersion.id,
+    });
+  });
+
+  it('still leads a set whose chosen placement failed, and presents nothing', async () => {
+    const created = await createReadyProject();
+    const current = await choosePhonePlacement(created.current);
+    const [square, wide] = await Promise.all([
+      storeRendition(squarePlacement),
+      storeRendition(widePlacement),
+    ]);
+
+    const saved = await outputServiceWithRenditions().save(
+      ownerUserId,
+      current.project.id,
+      randomUUID(),
+      {
+        expectedVersion: current.project.version,
+        expectedRevisionNumber: current.revision.revisionNumber,
+        media: current.revision.snapshot.workingMedia!,
+        target: { kind: 'new', title: 'Phone failed' },
+        renditions: [
+          { media: square.media, specification: squarePlacement },
+          { media: wide.media, specification: widePlacement },
+        ],
+      },
+    );
+    if (!saved.ok) throw new Error('Expected the produced subset to be saved.');
+    // The chosen placement is absent, so the last canonical member leads and the cut is not stored.
+    expect(saved.response.savedVideo.versions).toHaveLength(2);
+    expect(saved.response.savedVideo.currentVersion.exportSpecification?.aspect).toBe('1:1');
+    expect(saved.response.revision.snapshot.presentedMedia).toEqual(
+      current.revision.snapshot.workingMedia,
+    );
+  });
+
+  it('adds a missing placement to the set a save already made, and refuses one that has moved on', async () => {
+    const created = await createReadyProject();
+    const current = await choosePhonePlacement(created.current);
+    const [phone, square, wide] = await Promise.all([
+      storeRendition(phonePlacement),
+      storeRendition(squarePlacement),
+      storeRendition(widePlacement),
+    ]);
+    const service = outputServiceWithRenditions();
+    const first = await service.save(ownerUserId, current.project.id, randomUUID(), {
+      expectedVersion: current.project.version,
+      expectedRevisionNumber: current.revision.revisionNumber,
+      media: current.revision.snapshot.workingMedia!,
+      target: { kind: 'new', title: 'Partial set' },
+      renditions: [
+        { media: square.media, specification: squarePlacement },
+        { media: phone.media, specification: phonePlacement },
+      ],
+    });
+    if (!first.ok) throw new Error('Expected the first set to be saved.');
+    const variantSetId = first.response.savedVideo.currentVersion.variantSetId!;
+    const afterFirst = (await projects.getCurrent(ownerUserId, current.project.id))!;
+
+    // The retry: only the placement that was missing, joining the set the first save started.
+    const joined = await service.save(ownerUserId, current.project.id, randomUUID(), {
+      expectedVersion: afterFirst.project.version,
+      expectedRevisionNumber: afterFirst.revision.revisionNumber,
+      media: afterFirst.revision.snapshot.workingMedia!,
+      target: {
+        kind: 'version',
+        savedVideoId: first.response.savedVideo.id,
+        expectedVersionId: first.response.savedVideo.currentVersion.id,
+      },
+      variantSetId,
+      renditions: [{ media: wide.media, specification: widePlacement }],
+    });
+    if (!joined.ok) throw new Error('Expected the retry to join the set.');
+
+    const versions = joined.response.savedVideo.versions;
+    expect(versions).toHaveLength(3);
+    // One set, consecutive ordinals, and the retried placement is now the current Version.
+    expect(versions.every((version) => version.variantSetId === variantSetId)).toBe(true);
+    expect(versions.map(({ ordinal }) => ordinal)).toEqual([1, 2, 3]);
+    expect(joined.response.savedVideo.currentVersion.exportSpecification?.aspect).toBe('16:9');
+    // The cut is not stored a second time: three Versions, three placements, no source-shaped one.
+    expect(versions.filter(({ exportSpecification }) => exportSpecification === null)).toHaveLength(
+      0,
+    );
+
+    const afterJoin = (await projects.getCurrent(ownerUserId, current.project.id))!;
+    const joinRequest = {
+      expectedVersion: afterJoin.project.version,
+      expectedRevisionNumber: afterJoin.revision.revisionNumber,
+      media: afterJoin.revision.snapshot.workingMedia!,
+      target: {
+        kind: 'version' as const,
+        savedVideoId: joined.response.savedVideo.id,
+        expectedVersionId: joined.response.savedVideo.currentVersion.id,
+      },
+      variantSetId,
+    };
+    // A placement the set already holds is refused before anything is written.
+    await expect(
+      service.save(ownerUserId, current.project.id, randomUUID(), {
+        ...joinRequest,
+        renditions: [{ media: square.media, specification: squarePlacement }],
+      }),
+    ).rejects.toThrow(/already has a Version for the 1:1 placement/u);
+
+    // Move the Project on materially: that clears its output pointer, so the set it made is no
+    // longer the set this Project is saving, and a retry has to start a new one.
+    const moved = await new ProjectService(projects, {
+      now: () => new Date('2026-08-13T12:03:00.000Z'),
+    }).checkpoint(ownerUserId, current.project.id, {
+      expectedVersion: afterJoin.project.version,
+      expectedRevisionNumber: afterJoin.revision.revisionNumber,
+      proposal: { ...afterJoin.revision.snapshot, exportSpecification: squarePlacement },
+    });
+    if (!moved.ok) throw new Error('Expected the placement change to be accepted.');
+    await expect(
+      service.save(ownerUserId, current.project.id, randomUUID(), {
+        ...joinRequest,
+        expectedVersion: moved.current.project.version,
+        expectedRevisionNumber: moved.current.revision.revisionNumber,
+        media: moved.current.revision.snapshot.workingMedia!,
+        renditions: [{ media: square.media, specification: squarePlacement }],
+      }),
+    ).rejects.toThrow(/changed since those placements were saved/u);
+  });
+
+  it('replays a multi-placement save without producing a second set', async () => {
+    const created = await createReadyProject();
+    const current = await choosePhonePlacement(created.current);
+    const [phone, square] = await Promise.all([
+      storeRendition(phonePlacement),
+      storeRendition(squarePlacement),
+    ]);
+    const operationId = randomUUID();
+    const request = {
+      expectedVersion: current.project.version,
+      expectedRevisionNumber: current.revision.revisionNumber,
+      media: current.revision.snapshot.workingMedia!,
+      target: { kind: 'new' as const, title: 'Replayed set' },
+      renditions: [
+        { media: square.media, specification: squarePlacement },
+        { media: phone.media, specification: phonePlacement },
+      ],
+    };
+    const service = outputServiceWithRenditions();
+    const first = await service.save(ownerUserId, current.project.id, operationId, request);
+    const again = await service.save(ownerUserId, current.project.id, operationId, request);
+    if (!first.ok || !again.ok) throw new Error('Expected both attempts to be answered.');
+
+    expect(again.response.replayed).toBe(true);
+    expect(again.response.savedVideo.versions.map(({ id }) => id)).toEqual(
+      first.response.savedVideo.versions.map(({ id }) => id),
+    );
+    // A different order of the same set is a different request, not the same one replayed.
+    await expect(
+      service.save(ownerUserId, current.project.id, operationId, {
+        ...request,
+        renditions: [request.renditions[1]!, request.renditions[0]!],
+      }),
+    ).resolves.toMatchObject({ ok: false, conflict: { kind: 'operation-key' } });
+  });
+
+  it('refuses a malformed set before it opens a single asset', async () => {
     const created = await createReadyProject();
     const current = await choosePhonePlacement(created.current);
     const rendition = await storeRendition();
-
-    await expect(
+    const save = (renditions: unknown[]) =>
       outputServiceWithRenditions().save(ownerUserId, current.project.id, randomUUID(), {
         expectedVersion: current.project.version,
         expectedRevisionNumber: current.revision.revisionNumber,
         media: current.revision.snapshot.workingMedia!,
-        target: { kind: 'new', title: 'Mismatched' },
-        renditions: [
-          {
-            media: rendition.media,
-            specification: { ...phonePlacement, resolution: { width: 1_920, height: 1_080 } },
-          },
-        ],
-      }),
-    ).rejects.toThrow(/made for a different placement/u);
+        target: { kind: 'new', title: 'Refused' },
+        renditions: renditions as never,
+      });
+
+    // A specification that is not the shape it claims: refused as a specification, not as bytes.
+    await expect(
+      save([
+        {
+          media: rendition.media,
+          specification: { ...phonePlacement, resolution: { width: 1_920, height: 1_080 } },
+        },
+      ]),
+    ).rejects.toThrow(/is not a 9:16 shape/u);
+    await expect(
+      save([
+        { media: rendition.media, specification: phonePlacement },
+        { media: rendition.media, specification: phonePlacement },
+      ]),
+    ).rejects.toThrow(/same placement twice/u);
+    // Nothing was written by either refusal.
+    const outputs = await projects.listLinkHistory(ownerUserId, current.project.id, {
+      kind: 'output',
+      pageSize: 10,
+    });
+    expect(outputs?.links).toHaveLength(0);
   });
 
   it('saves new and appended immutable Versions with distinct producer and post-save revisions', async () => {

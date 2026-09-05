@@ -162,6 +162,13 @@
       "when": 1787886311991,
       "tag": "0022_gigantic_doctor_strange",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1788625344825,
+      "tag": "0023_wise_maddog",
+      "breakpoints": true
     }
   ]
 }

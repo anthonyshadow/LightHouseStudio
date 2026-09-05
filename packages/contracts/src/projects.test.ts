@@ -611,6 +611,7 @@ describe('Project snapshot contract', () => {
           width: 1_280,
           height: 720,
           exportSpecification: null,
+          variantSetId: null,
           createdAt: now,
         },
         sourceVideoId: null,
@@ -648,6 +649,49 @@ describe('Project snapshot contract', () => {
         target: { kind: 'version', savedVideoId: videoId },
       }).success,
     ).toBe(false);
+
+    const rendition = (aspect: '16:9' | '9:16' | '1:1' | '4:5' | 'source') => ({
+      media: { kind: 'asset' as const, assetId },
+      specification: {
+        container: 'video/mp4' as const,
+        aspect,
+        resolution: aspect === 'source' ? null : { width: 1_080, height: 1_080 },
+        includeAudio: true,
+      },
+    });
+    const save = (renditions: unknown[], extra: Record<string, unknown> = {}) =>
+      saveProjectOutputRequestSchema.safeParse({
+        expectedVersion: 2,
+        expectedRevisionNumber: 2,
+        media: { kind: 'asset', assetId },
+        target: { kind: 'new', title: 'Launch cut' },
+        renditions,
+        ...extra,
+      });
+
+    expect(
+      save([rendition('16:9'), rendition('9:16'), rendition('1:1'), rendition('4:5')]).success,
+    ).toBe(true);
+    // One more than the placements that exist means one of them twice.
+    expect(
+      save([
+        rendition('16:9'),
+        rendition('9:16'),
+        rendition('1:1'),
+        rendition('4:5'),
+        rendition('16:9'),
+      ]).success,
+    ).toBe(false);
+    expect(save([rendition('1:1'), rendition('1:1')]).error?.issues.at(0)?.message).toMatch(
+      /same placement twice/u,
+    );
+    expect(save([rendition('source')]).error?.issues.at(0)?.message).toMatch(/not a placement/u);
+
+    // Optional with no default: an ordinary save parses to a body without the key, because the
+    // replay fingerprint hashes the parsed body and every pre-slice receipt omits it.
+    const ordinary = save([rendition('16:9')]);
+    expect(ordinary.success && 'variantSetId' in ordinary.data).toBe(false);
+    expect(save([rendition('16:9')], { variantSetId: videoId }).success).toBe(true);
     expect(
       projectHistoryResponseSchema.parse({
         revisions: [

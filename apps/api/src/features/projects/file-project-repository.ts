@@ -75,7 +75,7 @@ import type {
   ProjectWorkingMediaRecord,
 } from './project-repository.js';
 import {
-  appendStoredVideoVersion,
+  appendStoredVideoVersions,
   FileSavedVideoRepository,
   savedVideoLibrarySchema,
   storedSavedVideoAggregateSchema,
@@ -219,20 +219,28 @@ const appendSavedVideoForOutput = (
     } => {
   if (input.kind === 'create') {
     const aggregate = storedSavedVideoAggregateSchema.parse(input.aggregate);
-    const version = aggregate.versions[0];
+    // One save writes one Version per placement, in write order, the primary last. Mirrored line
+    // for line in the relational repository, and held to it by one shared fixture.
+    const versions = aggregate.versions;
+    const primary = versions.at(-1);
     if (
-      aggregate.versions.length !== 1 ||
-      version === undefined ||
+      versions.length === 0 ||
+      primary === undefined ||
       aggregate.video.ownerUserId !== library.ownerUserId ||
-      aggregate.video.currentVersionId !== version.id ||
+      aggregate.video.currentVersionId !== primary.id ||
       aggregate.video.status !== 'ready' ||
       aggregate.video.deletedAt !== null ||
       aggregate.revision !== 1 ||
-      version.ownerUserId !== library.ownerUserId ||
-      version.videoId !== aggregate.video.id ||
-      version.ordinal !== 1 ||
+      versions.some(
+        (candidate, index) =>
+          candidate.ownerUserId !== library.ownerUserId ||
+          candidate.videoId !== aggregate.video.id ||
+          candidate.ordinal !== index + 1,
+      ) ||
       library.videos.some(({ video }) => video.id === aggregate.video.id) ||
-      library.videos.some(({ versions }) => versions.some(({ id }) => id === version.id))
+      library.videos.some(({ versions: existing }) =>
+        existing.some(({ id }) => versions.some((candidate) => candidate.id === id)),
+      )
     ) {
       throw new Error('The local Project output Saved Video create is inconsistent.');
     }
@@ -246,7 +254,7 @@ const appendSavedVideoForOutput = (
     };
   }
 
-  const version = storedVideoVersionSchema.parse(input.version);
+  const versions = input.versions.map((candidate) => storedVideoVersionSchema.parse(candidate));
   const index = library.videos.findIndex(
     ({ video }) => video.id === input.videoId && video.deletedAt === null,
   );
@@ -269,16 +277,22 @@ const appendSavedVideoForOutput = (
   }
   if (
     current.video.ownerUserId !== library.ownerUserId ||
-    version.videoId !== input.videoId ||
-    version.ownerUserId !== library.ownerUserId ||
-    version.ordinal !== current.versions.length + 1 ||
-    version.sourceVersionId !== input.expectedVersionId ||
-    library.videos.some(({ versions }) => versions.some(({ id }) => id === version.id))
+    versions.length === 0 ||
+    versions.some(
+      (candidate, offset) =>
+        candidate.videoId !== input.videoId ||
+        candidate.ownerUserId !== library.ownerUserId ||
+        candidate.ordinal !== current.versions.length + 1 + offset ||
+        candidate.sourceVersionId !== input.expectedVersionId,
+    ) ||
+    library.videos.some(({ versions: existing }) =>
+      existing.some(({ id }) => versions.some((candidate) => candidate.id === id)),
+    )
   ) {
     throw new Error('The local Project output Version append is inconsistent.');
   }
   const nextAggregate = storedSavedVideoAggregateSchema.parse(
-    appendStoredVideoVersion(current, version),
+    appendStoredVideoVersions(current, versions),
   );
   const videos = [...library.videos];
   videos[index] = nextAggregate;
@@ -2290,11 +2304,15 @@ export class FileProjectRepository
       }
 
       const revision = input.projectRevision.revision;
-      const output = storedOutputLinkSchema.parse(input.output) as ProjectOutputLink;
-      const committedVersion =
+      const outputs = input.outputs.map(
+        (link) => storedOutputLinkSchema.parse(link) as ProjectOutputLink,
+      );
+      const committedVersions =
         input.savedVideo.kind === 'create'
-          ? input.savedVideo.aggregate.versions[0]!
-          : input.savedVideo.version;
+          ? input.savedVideo.aggregate.versions
+          : input.savedVideo.versions;
+      // The primary: the Version written last, which is the one every single-output pointer names.
+      const committedVersion = committedVersions.at(-1)!;
       const savedVideoId =
         input.savedVideo.kind === 'create'
           ? input.savedVideo.aggregate.video.id
@@ -2323,7 +2341,7 @@ export class FileProjectRepository
           input.media.height === committedVersion.height
         : // Not the output: it must not claim the output's identity, and its lineage columns have
           // to agree with the reference it does name.
-          input.media.videoVersionId !== videoVersionId &&
+          !committedVersions.some((candidate) => input.media.videoVersionId === candidate.id) &&
           (input.media.mediaReference.kind === 'saved-video-version'
             ? input.media.kind === 'saved-video-version' &&
               input.media.savedVideoId === input.media.mediaReference.savedVideoId &&
@@ -2347,12 +2365,16 @@ export class FileProjectRepository
         revision.parentRevisionId === aggregate.project.currentRevisionId &&
         revision.parentRevisionNumber === aggregate.project.currentRevisionNumber &&
         revision.revisionNumber === aggregate.project.currentRevisionNumber + 1 &&
-        output.projectId === aggregate.project.id &&
-        output.ownerUserId === input.ownerUserId &&
-        output.savedVideoId === savedVideoId &&
-        output.videoVersionId === videoVersionId &&
-        output.producingRevisionId === aggregate.project.currentRevisionId &&
-        output.producingRevisionNumber === aggregate.project.currentRevisionNumber &&
+        outputs.length === committedVersions.length &&
+        outputs.every(
+          (link, index) =>
+            link.projectId === aggregate.project.id &&
+            link.ownerUserId === input.ownerUserId &&
+            link.savedVideoId === savedVideoId &&
+            link.videoVersionId === committedVersions[index]!.id &&
+            link.producingRevisionId === aggregate.project.currentRevisionId &&
+            link.producingRevisionNumber === aggregate.project.currentRevisionNumber,
+        ) &&
         input.media.projectId === aggregate.project.id &&
         input.media.ownerUserId === input.ownerUserId &&
         input.media.adoptedRevisionId === revision.id &&
@@ -2367,7 +2389,9 @@ export class FileProjectRepository
       if (!valid) throw new Error('The local Project output transaction is inconsistent.');
       if (
         library.projects.some(({ outputLinks }) =>
-          outputLinks.some(({ videoVersionId: existingId }) => existingId === videoVersionId),
+          outputLinks.some(({ videoVersionId: existingId }) =>
+            committedVersions.some((candidate) => candidate.id === existingId),
+          ),
         )
       ) {
         throw new Error('That Video Version already has Project output provenance.');
@@ -2382,7 +2406,7 @@ export class FileProjectRepository
           ...aggregate.versionReferenceLinks,
           ...projectVersionReferenceLinksForRevision(revision),
         ],
-        outputLinks: [...aggregate.outputLinks, output],
+        outputLinks: [...aggregate.outputLinks, ...outputs],
         workingMediaAdoptions: [...aggregate.workingMediaAdoptions, input.media],
       });
       const projects = [...library.projects];

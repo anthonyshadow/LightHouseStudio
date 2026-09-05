@@ -323,6 +323,11 @@ export interface ProjectOutputMetadataUnitOfWork {
     readonly ownerUserId: string;
     readonly receipt: ProjectOutputOperationReceipt;
     readonly savedVideo:
+      /**
+       * One save writes one Version per placement it produced, in write order, with the primary
+       * last — so the Saved Video's current Version, the receipt's scalars and the result's single
+       * `output` all name the primary without any of them learning what a set is.
+       */
       | {
           readonly kind: 'create';
           readonly aggregate: StoredSavedVideoAggregate;
@@ -339,10 +344,11 @@ export interface ProjectOutputMetadataUnitOfWork {
            * as a durably recorded stale token.
            */
           readonly expectedRevision: number;
-          readonly version: StoredVideoVersion;
+          readonly versions: readonly StoredVideoVersion[];
         };
     readonly projectRevision: AppendProjectRevisionPersistenceInput;
-    readonly output: ProjectOutputLink;
+    /** One link per written Version, in the same order — every placement of one save has its own. */
+    readonly outputs: readonly ProjectOutputLink[];
     /**
      * Hydration record for whatever the post-save revision presents: the Saved Video Version when
      * that Version is the cut itself, and the cut it was produced from when the Version holds bytes

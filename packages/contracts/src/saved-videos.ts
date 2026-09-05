@@ -79,6 +79,14 @@ export const savedVideoVersionSchema = z
      * it already had — including where the browser could not re-frame it.
      */
     exportSpecification: projectExportSpecificationValueSchema.nullable(),
+    /**
+     * The set of placements this Version was saved with, or `null` when it belongs to none —
+     * every Version written before this field, and every Version a Studio save writes.
+     *
+     * Defaulted rather than merely nullable: a stored save receipt is replayed by re-parsing its
+     * whole result through this schema, so a Version without the key must still parse.
+     */
+    variantSetId: z.uuid().nullable().default(null),
     createdAt: z.iso.datetime(),
   })
   .strict()

@@ -268,6 +268,7 @@ describe('DrizzleSavedVideoRepository', () => {
     width: 1_280,
     height: 720,
     exportSpecification: null,
+    variantSetId: null,
     createdAt: now,
   };
   const nextVersion = {

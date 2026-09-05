@@ -65,6 +65,7 @@ const savedVideo = (): SavedVideoDetail => ({
     width: 1280,
     height: 720,
     exportSpecification: null,
+    variantSetId: null,
     createdAt: now,
   },
   versions: [],

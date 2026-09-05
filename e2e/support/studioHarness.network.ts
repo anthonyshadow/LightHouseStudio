@@ -319,6 +319,7 @@ export const installProviderNetworkDriver = async (
         width: 1_280,
         height: 720,
         exportSpecification: null,
+        variantSetId: null,
         createdAt,
       };
       const savedVideo = {
