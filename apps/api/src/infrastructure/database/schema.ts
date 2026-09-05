@@ -258,6 +258,14 @@ export const videoVersions = pgTable(
     height: integer('height').notNull(),
     /** The placement these bytes were produced for; null where the cut was stored as it was. */
     exportSpecification: jsonb('export_specification'),
+    /**
+     * The set of placements one save produced together, or null where this Version belongs to none.
+     *
+     * No index: siblings are only ever read with their own Saved Video, whose aggregate read
+     * already returns every Version of it. A cross-video lookup would need `(owner_user_id,
+     * variant_set_id)` and does not exist.
+     */
+    variantSetId: uuid('variant_set_id'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
       .notNull()
       .defaultNow(),

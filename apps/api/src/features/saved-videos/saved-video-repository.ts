@@ -37,6 +37,9 @@ const legacyVersionSchema = z
 const versionV2Schema = legacyVersionSchema.extend({
   characterName: savedVideoCharacterNameSchema.nullable(),
 });
+/** How many Versions one Saved Video holds. Named because a save that makes several approaches it. */
+export const SAVED_VIDEO_VERSION_LIMIT = 100;
+
 const versionSchema = versionV2Schema.extend({
   durationMs: z.number().int().positive().max(300_000),
 });
@@ -48,6 +51,12 @@ export const storedVideoVersionSchema = versionSchema.extend({
    * what `null` says.
    */
   exportSpecification: projectExportSpecificationValueSchema.nullable().default(null),
+  /**
+   * The set of placements one save produced together, or `null` for a Version that belongs to
+   * none. Defaulted for the same reason as the placement above: every Version stored before one
+   * save could make several belongs to no set, which is exactly what `null` says.
+   */
+  variantSetId: z.uuid().nullable().default(null),
 });
 
 const videoSchema = z
@@ -78,7 +87,7 @@ const aggregateV3Schema = legacyAggregateSchema.extend({
   versions: z.array(versionSchema).min(1).max(100),
 });
 export const storedSavedVideoAggregateSchema = legacyAggregateSchema.extend({
-  versions: z.array(storedVideoVersionSchema).min(1).max(100),
+  versions: z.array(storedVideoVersionSchema).min(1).max(SAVED_VIDEO_VERSION_LIMIT),
 });
 const receiptSchema = z
   .object({
@@ -126,6 +135,32 @@ export const appendStoredVideoVersion = (
   versions: [...current.versions, version],
   revision: current.revision + 1,
 });
+
+/**
+ * Appends the Versions one save produced, in write order.
+ *
+ * The revision moves by one however many Versions arrive, because it counts changes to the video
+ * rather than Versions in it: one save is one change, and the CAS token a caller recorded has to
+ * stay true. The last Version written becomes the current one — which is why the primary of a set
+ * is written last.
+ */
+export const appendStoredVideoVersions = (
+  current: StoredSavedVideoAggregate,
+  versions: readonly StoredVideoVersion[],
+): StoredSavedVideoAggregate => {
+  const last = versions.at(-1);
+  if (last === undefined) return current;
+  return {
+    video: {
+      ...current.video,
+      currentVersionId: last.id,
+      status: 'ready',
+      updatedAt: last.createdAt,
+    },
+    versions: [...current.versions, ...versions],
+    revision: current.revision + 1,
+  };
+};
 
 export interface StoredVideoVersionRead {
   readonly video: StoredSavedVideoAggregate['video'];

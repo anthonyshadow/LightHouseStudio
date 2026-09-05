@@ -3372,23 +3372,28 @@ export class DrizzleProjectRepository
       }
 
       let savedVideoId: string;
-      let version: StoredVideoVersion;
+      // The Versions this save writes, in write order; the primary — the one every single-output
+      // pointer names — is the last of them. Mirrored line for line in the file repository.
+      let versions: readonly StoredVideoVersion[];
       let createAggregate: StoredSavedVideoAggregate | null = null;
       let appendCurrent: typeof savedVideos.$inferSelect | null = null;
       if (input.savedVideo.kind === 'create') {
         createAggregate = storedSavedVideoAggregateSchema.parse(input.savedVideo.aggregate);
-        version = createAggregate.versions[0]!;
+        versions = createAggregate.versions;
         savedVideoId = createAggregate.video.id;
         if (
-          createAggregate.versions.length !== 1 ||
+          versions.length === 0 ||
           createAggregate.video.ownerUserId !== input.ownerUserId ||
-          createAggregate.video.currentVersionId !== version.id ||
+          createAggregate.video.currentVersionId !== versions.at(-1)!.id ||
           createAggregate.video.status !== 'ready' ||
           createAggregate.video.deletedAt !== null ||
           createAggregate.revision !== 1 ||
-          version.ownerUserId !== input.ownerUserId ||
-          version.videoId !== savedVideoId ||
-          version.ordinal !== 1
+          versions.some(
+            (candidate, index) =>
+              candidate.ownerUserId !== input.ownerUserId ||
+              candidate.videoId !== savedVideoId ||
+              candidate.ordinal !== index + 1,
+          )
         ) {
           throw new ProjectPersistenceError(
             'invalid-aggregate',
@@ -3396,8 +3401,9 @@ export class DrizzleProjectRepository
           );
         }
       } else {
-        version = storedVideoVersionSchema.parse(input.savedVideo.version);
-        savedVideoId = input.savedVideo.videoId;
+        const append = input.savedVideo;
+        versions = append.versions.map((candidate) => storedVideoVersionSchema.parse(candidate));
+        savedVideoId = append.videoId;
         const [target] = await tx
           .select()
           .from(savedVideos)
@@ -3444,10 +3450,14 @@ export class DrizzleProjectRepository
           .limit(1);
         if (
           currentVersion === undefined ||
-          version.videoId !== savedVideoId ||
-          version.ownerUserId !== input.ownerUserId ||
-          version.sourceVersionId !== input.savedVideo.expectedVersionId ||
-          version.ordinal !== currentVersion.ordinal + 1
+          versions.length === 0 ||
+          versions.some(
+            (candidate, index) =>
+              candidate.videoId !== savedVideoId ||
+              candidate.ownerUserId !== input.ownerUserId ||
+              candidate.sourceVersionId !== append.expectedVersionId ||
+              candidate.ordinal !== currentVersion.ordinal + 1 + index,
+          )
         ) {
           throw new ProjectPersistenceError(
             'invalid-aggregate',
@@ -3456,12 +3466,13 @@ export class DrizzleProjectRepository
         }
         appendCurrent = target;
       }
+      const version = versions.at(-1)!;
+      const outputs = input.outputs;
 
       const revision: ProjectRevision = {
         ...input.projectRevision.revision,
         snapshot: projectSnapshotSchema.parse(input.projectRevision.revision.snapshot),
       };
-      const output = input.output;
       const nextProject = input.projectRevision.nextProject;
       /*
        * The record hydrates whatever the post-save revision presents, which is the produced Version
@@ -3479,7 +3490,9 @@ export class DrizzleProjectRepository
           input.media.assetId === version.assetId &&
           input.media.savedVideoId === savedVideoId &&
           input.media.videoVersionId === version.id
-        : input.media.videoVersionId !== version.id &&
+        : // No Version this save wrote, sibling or primary, may be claimed by a record that does
+          // not present it.
+          !versions.some((candidate) => input.media.videoVersionId === candidate.id) &&
           (input.media.mediaReference.kind === 'saved-video-version'
             ? input.media.kind === 'saved-video-version' &&
               input.media.savedVideoId === input.media.mediaReference.savedVideoId &&
@@ -3513,12 +3526,16 @@ export class DrizzleProjectRepository
         revision.parentRevisionNumber === current.currentRevisionNumber &&
         revision.revisionNumber === current.currentRevisionNumber + 1 &&
         revision.source === 'output-save' &&
-        output.projectId === current.id &&
-        output.ownerUserId === current.ownerUserId &&
-        output.savedVideoId === savedVideoId &&
-        output.videoVersionId === version.id &&
-        output.producingRevisionId === current.currentRevisionId &&
-        output.producingRevisionNumber === current.currentRevisionNumber &&
+        outputs.length === versions.length &&
+        outputs.every(
+          (link, index) =>
+            link.projectId === current.id &&
+            link.ownerUserId === current.ownerUserId &&
+            link.savedVideoId === savedVideoId &&
+            link.videoVersionId === versions[index]!.id &&
+            link.producingRevisionId === current.currentRevisionId &&
+            link.producingRevisionNumber === current.currentRevisionNumber,
+        ) &&
         input.media.projectId === current.id &&
         input.media.ownerUserId === current.ownerUserId &&
         hydratesPresentedMedia &&
@@ -3537,7 +3554,10 @@ export class DrizzleProjectRepository
         );
       }
       assertRevisionAssetLinks(revision, input.projectRevision.assetLinks);
-      const [asset] = await tx
+      // One row per Version this save writes: a set is only as sound as its least ready member,
+      // and a missing sibling asset must stop the whole transaction rather than land a Version
+      // whose bytes are not there. One statement, so a four-placement set is not four round trips.
+      const versionAssets = await tx
         .select({
           id: mediaAssets.id,
           status: mediaAssets.status,
@@ -3548,16 +3568,29 @@ export class DrizzleProjectRepository
         })
         .from(mediaAssets)
         .where(
-          and(eq(mediaAssets.id, version.assetId), eq(mediaAssets.ownerUserId, input.ownerUserId)),
+          and(
+            inArray(
+              mediaAssets.id,
+              versions.map((candidate) => candidate.assetId),
+            ),
+            eq(mediaAssets.ownerUserId, input.ownerUserId),
+          ),
         )
-        .for('share')
-        .limit(1);
+        .for('share');
+      const assetFor = new Map(versionAssets.map((row) => [row.id, row]));
+      const asset = assetFor.get(version.assetId);
       if (
+        versions.some((candidate) => {
+          const row = assetFor.get(candidate.assetId);
+          return (
+            row === undefined ||
+            row.status !== 'ready' ||
+            row.mimeType !== candidate.mimeType ||
+            row.filename !== candidate.filename ||
+            row.sizeBytes !== candidate.sizeBytes
+          );
+        }) ||
         asset === undefined ||
-        asset.status !== 'ready' ||
-        asset.mimeType !== version.mimeType ||
-        asset.filename !== version.filename ||
-        asset.sizeBytes !== version.sizeBytes ||
         // Only the record that presents the Version describes the Version's bytes. One presenting
         // the cut it came from names a different asset, and its own row is checked instead.
         (presentsOutput &&
@@ -3627,7 +3660,7 @@ export class DrizzleProjectRepository
       if (createAggregate !== null) {
         await tx.insert(savedVideos).values(savedVideoValues(createAggregate));
       }
-      await tx.insert(videoVersions).values(savedVideoVersionValues(version));
+      await tx.insert(videoVersions).values(versions.map(savedVideoVersionValues));
       if (appendCurrent !== null) {
         await tx
           .update(savedVideos)
@@ -3644,15 +3677,17 @@ export class DrizzleProjectRepository
             ),
           );
       }
-      await tx.insert(projectOutputs).values({
-        projectId: output.projectId,
-        ownerUserId: output.ownerUserId,
-        savedVideoId: output.savedVideoId,
-        videoVersionId: output.videoVersionId,
-        producingRevisionId: output.producingRevisionId,
-        producingRevisionNumber: output.producingRevisionNumber,
-        createdAt: toIsoTimestamp(output.createdAt),
-      });
+      await tx.insert(projectOutputs).values(
+        outputs.map((link) => ({
+          projectId: link.projectId,
+          ownerUserId: link.ownerUserId,
+          savedVideoId: link.savedVideoId,
+          videoVersionId: link.videoVersionId,
+          producingRevisionId: link.producingRevisionId,
+          producingRevisionNumber: link.producingRevisionNumber,
+          createdAt: toIsoTimestamp(link.createdAt),
+        })),
+      );
       const versionReferenceLinks = projectVersionReferenceLinksForRevision(revision);
       await assertReadyAssets(tx, input.ownerUserId, input.projectRevision.assetLinks);
       await assertReadyVersionReferences(tx, input.ownerUserId, versionReferenceLinks);

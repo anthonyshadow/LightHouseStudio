@@ -189,6 +189,7 @@ describe('Projects API adapter', () => {
           resolution: { width: 1_920, height: 1_080 },
           includeAudio: true,
         },
+        variantSetId: null,
         createdAt: now,
       },
       referenceRevision: null,

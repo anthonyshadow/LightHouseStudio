@@ -9,10 +9,14 @@ import {
 } from '@studio/contracts';
 import {
   normalizeSavedVideoTitle,
+  isProjectExportPlacementAspect,
+  projectExportAspectOf,
   projectExportMatchesFrame,
+  projectOutputPrimaryPlacement,
   ProjectRuleError,
   saveProjectOutput,
   type ProjectConflict,
+  type ProjectExportPlacementAspect,
   type ProjectMediaReference,
   type ProjectOutputLink,
 } from '@studio/domain';
@@ -21,7 +25,8 @@ import { AppError } from '../../http/app-error.js';
 import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
 import { inspectSavedVideoFile } from '../saved-videos/saved-video-inspection.js';
 import {
-  appendStoredVideoVersion,
+  appendStoredVideoVersions,
+  SAVED_VIDEO_VERSION_LIMIT,
   type SavedVideoRepository,
   type StoredSavedVideoAggregate,
   type StoredVideoVersion,
@@ -59,7 +64,17 @@ interface ReadyProjectMedia {
 const projectOutputId = (
   ownerUserId: string,
   operationId: string,
-  purpose: 'saved-video' | 'video-version' | 'project-revision',
+  /**
+   * `video-version` is the Version holding the cut; a rendition's Version is named by its
+   * placement, so the id is the same however the browser ordered its attempt and whichever member
+   * turned out to lead. Every purpose that existed before a save could make several is unchanged,
+   * which is what keeps an older receipt reproducing the ids it already recorded.
+   */
+  purpose:
+    | 'saved-video'
+    | 'video-version'
+    | 'project-revision'
+    | `video-version:${ProjectExportPlacementAspect}`,
 ): string =>
   deterministicUuid(`lightframe:project-output:v1:${ownerUserId}:${operationId}:${purpose}`);
 
@@ -249,48 +264,144 @@ export class ProjectOutputService {
   }
 
   /**
-   * The bytes a Version is actually made of.
+   * Which placements this save produced, in canonical order, and which of them leads.
    *
-   * With no rendition the stored cut is used unchanged, which is what "Keep as it is" means and
-   * what every save did before placements were produced. With one, its asset supplies the bytes —
-   * the stage's own media is still resolved and checked first, because the save is still a
-   * statement about that exact cut.
+   * Every refusal that can be made from metadata alone is made here, before a single asset is
+   * streamed: a malformed set, a join that no longer holds, a video that would pass its Version
+   * cap. The revision's own placement is the operator's intent, not a gate — a save may carry
+   * placements it did not choose, and a set whose chosen member failed still has a leader.
    */
-  async #resolveRendition(
-    ownerUserId: string,
+  #placementSet(
     current: ProjectCurrentRead,
     request: SaveProjectOutputRequest,
-  ): Promise<{
-    asset: AssetReadHandle;
-    inspected: InspectedVideo;
-    specification: ProjectExportSpecificationValue;
-  } | null> {
-    const rendition = request.renditions.at(0);
-    if (rendition === undefined) return null;
-    // A save states what the revision chose. Bytes produced for some other placement would put a
-    // shape on the Version that Project History never records, so the two are held together here.
-    const chosen = current.revision.snapshot.exportSpecification;
-    if (chosen === null || JSON.stringify(chosen) !== JSON.stringify(rendition.specification)) {
+    targetAggregate: StoredSavedVideoAggregate | null,
+  ): {
+    readonly members: readonly {
+      readonly specification: ProjectExportSpecificationValue;
+      readonly assetId: string;
+    }[];
+    readonly primary: number | null;
+    readonly presentsOutput: boolean;
+    readonly joinedTo: StoredVideoVersion | null;
+  } {
+    const joining = request.variantSetId !== undefined;
+    let set;
+    try {
+      set = projectOutputPrimaryPlacement(
+        current.revision.snapshot.exportSpecification,
+        request.renditions.map(({ specification }) => specification),
+        { joining },
+      );
+    } catch (error) {
+      if (error instanceof ProjectRuleError) throw new AppError(409, 'conflict', error.message);
+      throw error;
+    }
+    // The set is distinct by aspect, so each canonical member names exactly one of the renditions.
+    const members = set.order.map((specification) => ({
+      specification,
+      assetId: request.renditions.find(
+        (rendition) => rendition.specification.aspect === specification.aspect,
+      )!.media.assetId,
+    }));
+
+    let joinedTo: StoredVideoVersion | null = null;
+    if (joining) {
+      const currentVersion =
+        targetAggregate?.versions.find(({ id }) => id === targetAggregate.video.currentVersionId) ??
+        null;
+      const reference = current.revision.snapshot.lastSuccessfulOutput;
+      /*
+       * One comparison saying three things: the set exists on this owner's own video, the Project
+       * has not moved on since that set was saved, and no unrelated Version has landed in between.
+       * The last is what keeps a set's members at consecutive ordinals, which is all the surfaces
+       * need to show them together. The set id arrives in the body and is never trusted on its
+       * own — it is only ever checked against what this owner's session can already reach.
+       */
+      if (
+        targetAggregate === null ||
+        currentVersion === null ||
+        currentVersion.variantSetId !== request.variantSetId ||
+        reference === null ||
+        reference.savedVideoId !== targetAggregate.video.id ||
+        reference.videoVersionId !== currentVersion.id
+      ) {
+        throw new AppError(
+          409,
+          'conflict',
+          'This Project has changed since those placements were saved. Save again to make new ones.',
+        );
+      }
+      const held = new Set(
+        targetAggregate.versions
+          .filter(({ variantSetId }) => variantSetId === request.variantSetId)
+          .map(({ exportSpecification }) => projectExportAspectOf(exportSpecification)),
+      );
+      const clash = members.find(({ specification }) => held.has(specification.aspect));
+      if (clash !== undefined) {
+        throw new AppError(
+          409,
+          'conflict',
+          `This video already has a Version for the ${clash.specification.aspect} placement.`,
+        );
+      }
+      joinedTo = currentVersion;
+    }
+
+    // The cut is stored as its own Version exactly when it leads; a join never stores it again.
+    const writes = members.length + (set.primary === null ? 1 : 0);
+    if ((targetAggregate?.versions.length ?? 0) + writes > SAVED_VIDEO_VERSION_LIMIT) {
       throw new AppError(
         409,
         'conflict',
-        'The re-framed video was made for a different placement than this Project has chosen.',
+        `A video holds at most ${SAVED_VIDEO_VERSION_LIMIT} Versions. Save these placements to a new video.`,
       );
     }
-    const asset = await this.bytes.open(ownerUserId, rendition.media.assetId);
-    if (asset === null) {
-      throw new AppError(404, 'asset_missing', 'The re-framed video for this save is unavailable.');
+    return { members, primary: set.primary, presentsOutput: set.presentsOutput, joinedTo };
+  }
+
+  /**
+   * The bytes each placement of this save is made of.
+   *
+   * One member at a time: inspecting an asset streams the whole file to a private temp copy that
+   * the inspection removes before the next member opens one, so a four-placement save costs one
+   * asset copy on disk at a time rather than four. The stage's own media is still resolved and
+   * checked separately, because the save is still a statement about that exact cut.
+   */
+  async #resolveRenditions(
+    ownerUserId: string,
+    members: readonly {
+      readonly specification: ProjectExportSpecificationValue;
+      readonly assetId: string;
+    }[],
+  ): Promise<
+    readonly {
+      asset: AssetReadHandle;
+      inspected: InspectedVideo;
+      specification: ProjectExportSpecificationValue;
+    }[]
+  > {
+    const resolved = [];
+    for (const { specification, assetId } of members) {
+      const asset = await this.bytes.open(ownerUserId, assetId);
+      if (asset === null) {
+        throw new AppError(
+          404,
+          'asset_missing',
+          `The re-framed video for the ${specification.aspect} placement is unavailable.`,
+        );
+      }
+      const inspected = await inspectStoredProjectMedia(asset, this.#inspect);
+      assertManifestMatchesInspection(asset, inspected);
+      if (!projectExportMatchesFrame(specification, inspected)) {
+        throw new AppError(
+          409,
+          'conflict',
+          `The re-framed video no longer matches the ${specification.aspect} placement it was saved for.`,
+        );
+      }
+      resolved.push({ asset, inspected, specification });
     }
-    const inspected = await inspectStoredProjectMedia(asset, this.#inspect);
-    assertManifestMatchesInspection(asset, inspected);
-    if (!projectExportMatchesFrame(rendition.specification, inspected)) {
-      throw new AppError(
-        409,
-        'conflict',
-        'The re-framed video no longer matches the placement it was saved for.',
-      );
-    }
-    return { asset, inspected, specification: rendition.specification };
+    return resolved;
   }
 
   async save(
@@ -336,31 +447,6 @@ export class ProjectOutputService {
         'Save the exact current ready Project media after all pending changes finish.',
       );
     }
-    // Independent reads, each of which streams a whole asset out of storage to inspect it. Run
-    // together so a placement save costs one asset read's wall-clock rather than two.
-    const [media, rendition] = await Promise.all([
-      this.#resolveReadyMedia(ownerUserId, current, request.media),
-      this.#resolveRendition(ownerUserId, current, request),
-    ]);
-    // What the operator receives: the re-framed file when one was produced, the cut itself when
-    // not — and, either way, the placement that describes it.
-    const stored = rendition ?? {
-      asset: media.asset,
-      inspected: media.inspected,
-      specification: null,
-    };
-    /*
-     * A re-framed file is a deliverable, not the next thing to work from. Presenting it would make
-     * the stage show the crop and make every later save re-frame an already-re-framed video, while
-     * the Project still holds the untouched cut it came from.
-     */
-    const presentsOutput = rendition === null;
-    const now = this.#now().toISOString();
-    const savedVideoId =
-      request.target.kind === 'new'
-        ? projectOutputId(ownerUserId, operationId, 'saved-video')
-        : request.target.savedVideoId;
-    const versionId = projectOutputId(ownerUserId, operationId, 'video-version');
     const targetAggregate =
       request.target.kind === 'version'
         ? await this.savedVideos.get(ownerUserId, request.target.savedVideoId)
@@ -368,33 +454,109 @@ export class ProjectOutputService {
     if (request.target.kind === 'version' && targetAggregate === null) {
       throw new AppError(404, 'not_found', 'That Saved Video is unavailable.');
     }
-    const attribution = outputAttribution(current, media);
-    const version: StoredVideoVersion = {
-      id: versionId,
+    // Everything a refusal can be decided from without reading bytes is decided first.
+    const placement = this.#placementSet(current, request, targetAggregate);
+    // Independent reads, each of which streams a whole asset out of storage to inspect it. Run
+    // together so a placement save costs one asset read's wall-clock rather than two, while the
+    // members themselves stay serial so only one rendition copy exists on disk at a time.
+    const [media, renditions] = await Promise.all([
+      this.#resolveReadyMedia(ownerUserId, current, request.media),
+      this.#resolveRenditions(ownerUserId, placement.members),
+    ]);
+    /*
+     * A re-framed file is a deliverable, not the next thing to work from. Presenting it would make
+     * the stage show the crop and make every later save re-frame an already-re-framed video, while
+     * the Project still holds the untouched cut it came from. So the Project presents what it
+     * stored only when the cut itself is what led this save.
+     */
+    const presentsOutput = placement.presentsOutput;
+    const now = this.#now().toISOString();
+    const savedVideoId =
+      request.target.kind === 'new'
+        ? projectOutputId(ownerUserId, operationId, 'saved-video')
+        : request.target.savedVideoId;
+    /*
+     * A join takes its attribution from the set it joins rather than from the producing revision,
+     * whose creative selections the save that made that set already cleared. Copying keeps every
+     * member of one set naming the same Character.
+     */
+    const attribution =
+      placement.joinedTo === null
+        ? outputAttribution(current, media)
+        : {
+            characterName: placement.joinedTo.characterName,
+            characterVariantName: placement.joinedTo.characterVariantName,
+          };
+    const sourceVersionId =
+      request.target.kind === 'version'
+        ? request.target.expectedVersionId
+        : media.reference.kind === 'saved-video-version'
+          ? media.reference.videoVersionId
+          : null;
+    /**
+     * The set this save's Versions belong to. Its own operation id when it starts one, so any
+     * Project-saved Version can later be joined, and the id it was handed when it joins one.
+     */
+    const variantSetId = request.variantSetId ?? operationId;
+    const versionFor = (
+      bytes: { asset: AssetReadHandle; inspected: InspectedVideo },
+      specification: ProjectExportSpecificationValue | null,
+      ordinal: number,
+    ): StoredVideoVersion => ({
+      id: projectOutputId(
+        ownerUserId,
+        operationId,
+        specification === null || !isProjectExportPlacementAspect(specification.aspect)
+          ? 'video-version'
+          : `video-version:${specification.aspect}`,
+      ),
       videoId: savedVideoId,
       ownerUserId,
-      ordinal: targetAggregate === null ? 1 : targetAggregate.versions.length + 1,
+      ordinal,
       origin: outputOrigin(current, media),
       ...attribution,
-      sourceVersionId:
-        request.target.kind === 'version'
-          ? request.target.expectedVersionId
-          : media.reference.kind === 'saved-video-version'
-            ? media.reference.videoVersionId
-            : null,
-      assetId: stored.asset.manifest.assetId,
+      sourceVersionId,
+      assetId: bytes.asset.manifest.assetId,
       thumbnailAssetId: null,
-      mimeType: stored.inspected.mimeType,
-      filename: stored.asset.manifest.filename,
-      sizeBytes: stored.inspected.sizeBytes,
-      durationMs: Math.max(1, Math.round(stored.inspected.durationMs)),
-      width: stored.inspected.width,
-      height: stored.inspected.height,
+      mimeType: bytes.inspected.mimeType,
+      filename: bytes.asset.manifest.filename,
+      sizeBytes: bytes.inspected.sizeBytes,
+      durationMs: Math.max(1, Math.round(bytes.inspected.durationMs)),
+      width: bytes.inspected.width,
+      height: bytes.inspected.height,
       // The placement these bytes were produced for, so the Version states its own shape rather
       // than borrowing the intent recorded on the revision, which the two can outlive separately.
-      exportSpecification: stored.specification,
+      exportSpecification: specification,
+      variantSetId,
       createdAt: now,
-    };
+    });
+    /*
+     * Write order: the siblings, then the primary. Because the primary is written last it is the
+     * Saved Video's current Version, the receipt's scalar, the Project's `lastSuccessfulOutput`
+     * and the result's one `output` — so every pointer and validator that predates sets keeps the
+     * meaning it had. The ordinal a member receives therefore follows write order, not the order
+     * the browser rendered them in.
+     */
+    const cut = { asset: media.asset, inspected: media.inspected };
+    const stored = placement.primary === null ? cut : renditions[placement.primary]!;
+    const ordered: readonly {
+      readonly bytes: { readonly asset: AssetReadHandle; readonly inspected: InspectedVideo };
+      readonly specification: ProjectExportSpecificationValue | null;
+    }[] = [
+      ...renditions
+        .filter((_, index) => index !== placement.primary)
+        .map((member) => ({ bytes: member, specification: member.specification })),
+      {
+        bytes: stored,
+        specification:
+          placement.primary === null ? null : renditions[placement.primary]!.specification,
+      },
+    ];
+    const firstOrdinal = (targetAggregate?.versions.length ?? 0) + 1;
+    const versions = ordered.map(({ bytes, specification }, index) =>
+      versionFor(bytes, specification, firstOrdinal + index),
+    );
+    const version = versions.at(-1)!;
     const nextSavedVideo: StoredSavedVideoAggregate =
       targetAggregate === null
         ? {
@@ -414,10 +576,10 @@ export class ProjectOutputService {
               updatedAt: now,
               deletedAt: null,
             },
-            versions: [version],
+            versions,
             revision: 1,
           }
-        : appendStoredVideoVersion(targetAggregate, version);
+        : appendStoredVideoVersions(targetAggregate, versions);
 
     let transition;
     try {
@@ -428,6 +590,7 @@ export class ProjectOutputService {
           expectedRevisionNumber: request.expectedRevisionNumber,
           savedVideoId,
           videoVersionId: version.id,
+          siblingVersionIds: versions.slice(0, -1).map(({ id }) => id),
           presentsOutput,
           author: { kind: 'user', authorId: ownerUserId },
         },
@@ -444,7 +607,9 @@ export class ProjectOutputService {
     }
     if (!transition.ok) return { ok: false, conflict: transition.conflict };
     const revision = transition.value.revisions.at(-1)!;
-    const output = transition.value.outputLinks.at(-1)!;
+    // One link per Version this save wrote, in the same order; the primary's is the last of them.
+    const outputs = transition.value.outputLinks.slice(-versions.length);
+    const output = outputs.at(-1)!;
     const result = projectOutputSaveResultSchema.parse({
       operationId,
       ...publicProjectCurrent({ project: transition.value.project, revision }),
@@ -513,7 +678,7 @@ export class ProjectOutputService {
               // The receipt above serializes this read's revision + 1 as the video's new token;
               // the commit CASes on it so the recorded value is the written value, never a guess.
               expectedRevision: targetAggregate!.revision,
-              version,
+              versions,
             },
       projectRevision: {
         ownerUserId,
@@ -524,7 +689,7 @@ export class ProjectOutputService {
         revision,
         assetLinks: projectAssetLinksForRevision(revision),
       },
-      output,
+      outputs,
       media: outputMedia,
     });
     if (committed.kind === 'not-found') {

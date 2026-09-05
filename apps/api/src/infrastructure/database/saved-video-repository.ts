@@ -48,6 +48,7 @@ const toVersion = (row: VersionRow): StoredVideoVersion => ({
     row.exportSpecification === null
       ? null
       : projectExportSpecificationValueSchema.parse(row.exportSpecification),
+  variantSetId: row.variantSetId,
   createdAt: toIsoTimestamp(row.createdAt),
 });
 
@@ -92,6 +93,7 @@ export const savedVideoVersionValues = (
   width: version.width,
   height: version.height,
   exportSpecification: version.exportSpecification,
+  variantSetId: version.variantSetId,
   createdAt: toIsoTimestamp(version.createdAt),
 });
 

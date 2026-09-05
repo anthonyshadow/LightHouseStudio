@@ -737,6 +737,7 @@ const directVideoVersion: SavedVideoDetail['currentVersion'] = {
   width: 1_280,
   height: 720,
   exportSpecification: null,
+  variantSetId: null,
   createdAt: '2026-08-11T16:00:00.000Z',
 };
 const directSavedVideo: SavedVideoDetail = {
