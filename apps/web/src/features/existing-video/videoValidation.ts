@@ -31,18 +31,14 @@ export const firstExistingVideoValidationIssue = (
   );
 
 /**
- * A source this product cannot publish as it stands, but this browser can convert.
+ * What an inspection found: a usable source, or one this browser could convert into a usable one.
  *
- * Carried as an error rather than a return value because it is raised from the middle of a long
- * inspection that otherwise only ever throws or succeeds; the caller catches it, converts, and
- * inspects the result exactly as it would inspect any other file.
+ * Stated as a value rather than thrown, so the outcome is visible to the type system and cannot be
+ * swallowed by a `catch` added inside the inspection later.
  */
-class ConvertibleSourceError extends Error {
-  constructor(readonly hasAudio: boolean) {
-    super('This video needs converting before it can be used.');
-    this.name = 'ConvertibleSourceError';
-  }
-}
+type InspectedSource =
+  | { readonly kind: 'validated'; readonly value: ValidatedExistingVideo }
+  | { readonly kind: 'convertible'; readonly hasAudio: boolean };
 
 /** The same name, said as the MP4 the conversion produces. */
 const convertedFilename = (filename: string): string => {
@@ -149,8 +145,9 @@ const inspectExistingVideo = async (
   includesVton: boolean,
   signal: AbortSignal,
   validationContext: 'source' | 'server-approved-result',
+  /** False on the second pass: one conversion is the offer, and its result is a source like any. */
   convertible: boolean,
-): Promise<ValidatedExistingVideo> => {
+): Promise<InspectedSource> => {
   if (!(file instanceof File) || file.size <= 0) {
     throw new Error('Choose a non-empty video file.');
   }
@@ -204,7 +201,7 @@ const inspectExistingVideo = async (
           `${firstIssue.message} This browser cannot convert it either — convert it to H.264 MP4 and choose it again.`,
         );
       }
-      throw new ConvertibleSourceError(audioTrack !== null);
+      return { kind: 'convertible', hasAudio: audioTrack !== null };
     }
     signal.throwIfAborted();
     await waitForPlayableVideo(file, signal);
@@ -243,11 +240,14 @@ const inspectExistingVideo = async (
       hasAudio: facts.hasAudio,
     };
     return {
-      file,
-      metadata,
-      mimeType: formatDetails.mimeType,
-      audioSidecar,
-      audioUnavailableReason,
+      kind: 'validated',
+      value: {
+        file,
+        metadata,
+        mimeType: formatDetails.mimeType,
+        audioSidecar,
+        audioUnavailableReason,
+      },
     };
   } finally {
     input.dispose();
@@ -270,31 +270,34 @@ export const validateExistingVideo = async (
   validationContext: 'source' | 'server-approved-result' = 'source',
   options: { readonly onConvert?: () => void } = {},
 ): Promise<ValidatedExistingVideo> => {
-  try {
-    return await inspectExistingVideo(
-      file,
-      includesVton,
-      signal,
-      validationContext,
-      validationContext === 'source',
-    );
-  } catch (error) {
-    if (!(error instanceof ConvertibleSourceError)) throw error;
-    options.onConvert?.();
-    const converted = await transcodeRecordingToMp4(file, {
-      requireAudio: error.hasAudio,
-      signal,
-    });
-    signal.throwIfAborted();
-    // Inspected like any other file, and no longer convertible: one conversion is the offer.
-    return inspectExistingVideo(
-      new File([converted.blob], convertedFilename(file.name), { type: converted.mimeType }),
-      includesVton,
-      signal,
-      validationContext,
-      false,
-    );
+  const inspected = await inspectExistingVideo(
+    file,
+    includesVton,
+    signal,
+    validationContext,
+    validationContext === 'source',
+  );
+  if (inspected.kind === 'validated') return inspected.value;
+
+  options.onConvert?.();
+  const converted = await transcodeRecordingToMp4(file, {
+    requireAudio: inspected.hasAudio,
+    signal,
+  });
+  signal.throwIfAborted();
+  // Inspected like any other file, and no longer convertible: one conversion is the offer, so a
+  // second `convertible` outcome cannot arise and the result is a validated source or a refusal.
+  const reinspected = await inspectExistingVideo(
+    new File([converted.blob], convertedFilename(file.name), { type: converted.mimeType }),
+    includesVton,
+    signal,
+    validationContext,
+    false,
+  );
+  if (reinspected.kind !== 'validated') {
+    throw new Error('The converted video could not be validated.');
   }
+  return reinspected.value;
 };
 
 export const validateEditedVideoOutput = async (

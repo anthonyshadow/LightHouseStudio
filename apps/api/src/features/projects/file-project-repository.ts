@@ -76,6 +76,7 @@ import type {
 } from './project-repository.js';
 import {
   appendStoredVideoVersions,
+  type StoredVideoVersion,
   FileSavedVideoRepository,
   savedVideoLibrarySchema,
   storedSavedVideoAggregateSchema,
@@ -205,6 +206,22 @@ const attemptsForProject = (
 
 type ProjectOutputCommitInput = Parameters<ProjectOutputMetadataUnitOfWork['commit']>[0];
 
+/**
+ * Whether the library already holds any of these Version ids.
+ *
+ * One pass with a set rather than a scan inside a scan inside a scan: a save now writes up to five
+ * Versions, and the library it is checked against holds every video this owner has.
+ */
+const libraryHoldsAnyVersion = (
+  library: SavedVideoLibrary,
+  versions: readonly StoredVideoVersion[],
+): boolean => {
+  const incoming = new Set(versions.map(({ id }) => id));
+  return library.videos.some(({ versions: existing }) =>
+    existing.some(({ id }) => incoming.has(id)),
+  );
+};
+
 const appendSavedVideoForOutput = (
   library: SavedVideoLibrary,
   input: ProjectOutputCommitInput['savedVideo'],
@@ -224,7 +241,6 @@ const appendSavedVideoForOutput = (
     const versions = aggregate.versions;
     const primary = versions.at(-1);
     if (
-      versions.length === 0 ||
       primary === undefined ||
       aggregate.video.ownerUserId !== library.ownerUserId ||
       aggregate.video.currentVersionId !== primary.id ||
@@ -238,9 +254,7 @@ const appendSavedVideoForOutput = (
           candidate.ordinal !== index + 1,
       ) ||
       library.videos.some(({ video }) => video.id === aggregate.video.id) ||
-      library.videos.some(({ versions: existing }) =>
-        existing.some(({ id }) => versions.some((candidate) => candidate.id === id)),
-      )
+      libraryHoldsAnyVersion(library, versions)
     ) {
       throw new Error('The local Project output Saved Video create is inconsistent.');
     }
@@ -285,9 +299,7 @@ const appendSavedVideoForOutput = (
         candidate.ordinal !== current.versions.length + 1 + offset ||
         candidate.sourceVersionId !== input.expectedVersionId,
     ) ||
-    library.videos.some(({ versions: existing }) =>
-      existing.some(({ id }) => versions.some((candidate) => candidate.id === id)),
-    )
+    libraryHoldsAnyVersion(library, versions)
   ) {
     throw new Error('The local Project output Version append is inconsistent.');
   }
@@ -2387,11 +2399,10 @@ export class FileProjectRepository
         revision.snapshot.lastSuccessfulOutput?.savedVideoId === savedVideoId &&
         revision.snapshot.lastSuccessfulOutput.videoVersionId === videoVersionId;
       if (!valid) throw new Error('The local Project output transaction is inconsistent.');
+      const committedIds = new Set(committedVersions.map(({ id }) => id));
       if (
         library.projects.some(({ outputLinks }) =>
-          outputLinks.some(({ videoVersionId: existingId }) =>
-            committedVersions.some((candidate) => candidate.id === existingId),
-          ),
+          outputLinks.some(({ videoVersionId }) => committedIds.has(videoVersionId)),
         )
       ) {
         throw new Error('That Video Version already has Project output provenance.');

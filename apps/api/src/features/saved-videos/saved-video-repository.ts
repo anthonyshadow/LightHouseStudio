@@ -122,20 +122,6 @@ export const savedVideoLibrarySchema = legacyLibrarySchema.extend({
 export type StoredVideoVersion = z.infer<typeof storedVideoVersionSchema>;
 export type StoredSavedVideoAggregate = z.infer<typeof storedSavedVideoAggregateSchema>;
 
-export const appendStoredVideoVersion = (
-  current: StoredSavedVideoAggregate,
-  version: StoredVideoVersion,
-): StoredSavedVideoAggregate => ({
-  video: {
-    ...current.video,
-    currentVersionId: version.id,
-    status: 'ready',
-    updatedAt: version.createdAt,
-  },
-  versions: [...current.versions, version],
-  revision: current.revision + 1,
-});
-
 /**
  * Appends the Versions one save produced, in write order.
  *
@@ -472,7 +458,7 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
       if (current === undefined || current.video.currentVersionId !== expectedVersionId)
         return 'conflict';
       const next = storedSavedVideoAggregateSchema.parse(
-        appendStoredVideoVersion(current, version),
+        appendStoredVideoVersions(current, [version]),
       );
       const videos = [...library.videos];
       videos[index] = next;

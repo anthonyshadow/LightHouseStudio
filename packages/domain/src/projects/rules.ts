@@ -248,8 +248,6 @@ export interface ProjectOutputPlacementSet {
    * of those keep the meaning and the validator it already had.
    */
   readonly primary: number | null;
-  /** Whether the Project presents what this save stored — exactly when the cut is the primary. */
-  readonly presentsOutput: boolean;
 }
 
 /**
@@ -271,22 +269,20 @@ export const projectOutputPrimaryPlacement = (
   options: { readonly joining?: boolean } = {},
 ): ProjectOutputPlacementSet => {
   const order = validateProjectExportPlacementSet(specifications);
+  const joining = options.joining === true;
+  if (joining && order.length === 0) {
+    throw new ProjectRuleError(
+      'invalid-transition',
+      'Adding to a set of placements needs at least one placement to add.',
+    );
+  }
   const chosenAspect = projectExportAspectOf(chosen);
-  const matching = order.findIndex(({ aspect }) => aspect === chosenAspect);
-  if (options.joining === true) {
-    if (order.length === 0) {
-      throw new ProjectRuleError(
-        'invalid-transition',
-        'Adding to a set of placements needs at least one placement to add.',
-      );
-    }
-    return { order, primary: matching >= 0 ? matching : order.length - 1, presentsOutput: false };
-  }
-  if (!isProjectExportPlacementAspect(chosenAspect) || order.length === 0) {
+  if (!joining && (order.length === 0 || !isProjectExportPlacementAspect(chosenAspect))) {
     // The cut itself is what this save stores: either nothing was re-framed, or nothing could be.
-    return { order, primary: null, presentsOutput: true };
+    return { order, primary: null };
   }
-  return { order, primary: matching >= 0 ? matching : order.length - 1, presentsOutput: false };
+  const matching = order.findIndex(({ aspect }) => aspect === chosenAspect);
+  return { order, primary: matching >= 0 ? matching : order.length - 1 };
 };
 
 const requireExportDimension = (value: number, label: string): void => {

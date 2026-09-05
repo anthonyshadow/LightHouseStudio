@@ -44,6 +44,11 @@ export const useExportPlacementRender = (offersPlacements = true) => {
    * was. This is that caller's copy.
    */
   const failureRef = useRef<string | null>(null);
+  /** The one place the two channels are set, so they cannot drift apart. */
+  const fail = useCallback((message: string | null) => {
+    failureRef.current = message;
+    setError(message);
+  }, []);
   const supported = useVideoEditExportSupport(offersPlacements);
 
   useEffect(() => () => controllerRef.current?.abort('unmount'), []);
@@ -52,15 +57,15 @@ export const useExportPlacementRender = (offersPlacements = true) => {
     controllerRef.current?.abort('cancelled');
     controllerRef.current = null;
     setProgress(0);
-    setError(null);
+    fail(null);
     setPhase('idle');
-  }, []);
+  }, [fail]);
 
   const reset = useCallback(() => {
-    setError(null);
+    fail(null);
     setProgress(0);
     setPhase('idle');
-  }, []);
+  }, [fail]);
 
   const render = useCallback(
     async ({
@@ -83,14 +88,13 @@ export const useExportPlacementRender = (offersPlacements = true) => {
       // answer is memoized, so by the time anyone renders this costs nothing.
       if (!(await videoEditSupported())) {
         controllerRef.current = null;
-        failureRef.current =
-          'This browser cannot re-frame a video without blocking the Studio. It keeps its original shape.';
-        setError(failureRef.current);
+        fail(
+          'This browser cannot re-frame a video without blocking the Studio. It keeps its original shape.',
+        );
         setPhase('error');
         return null;
       }
-      setError(null);
-      failureRef.current = null;
+      fail(null);
       setProgress(0);
       setPhase('rendering');
       try {
@@ -121,18 +125,18 @@ export const useExportPlacementRender = (offersPlacements = true) => {
         };
       } catch (renderError) {
         if (controller.signal.aborted) return null;
-        failureRef.current =
+        fail(
           renderError instanceof Error
             ? renderError.message
-            : 'The browser could not re-frame this video. Your video is unchanged.';
-        setError(failureRef.current);
+            : 'The browser could not re-frame this video. Your video is unchanged.',
+        );
         setPhase('error');
         return null;
       } finally {
         if (controllerRef.current === controller) controllerRef.current = null;
       }
     },
-    [],
+    [fail],
   );
 
   /** Why the last render failed, without waiting for a re-render. */
