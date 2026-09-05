@@ -7,7 +7,7 @@ import type {
   SavedVideoVersion,
   SavedVideosResponse,
 } from '@studio/contracts';
-import { formatDateTime } from '@studio/domain';
+import { formatDateTime, projectExportAspectOf } from '@studio/domain';
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -42,6 +42,7 @@ import {
 } from '../../ui';
 import { LoadingPlaceholder } from '../../ui/primitives/LoadingPlaceholder';
 import { Skeleton } from '../../ui/primitives/Skeleton';
+import { exportPlacementLabel } from '../export-placements';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import { VideoPlayer } from '../video-player/VideoPlayer';
 import { AddVideoToProjectDialog } from '../projects/AddVideoToProjectDialog';
@@ -141,6 +142,38 @@ const formatForDimensions = ({
   height,
 }: Pick<SavedVideoVersion, 'width' | 'height'>): SavedVideoFormat => {
   return width === height ? 'square' : width > height ? 'landscape' : 'portrait';
+};
+
+/** `Version 3 · Square post` — the ordinal identifies it, the placement says what it is for. */
+const versionLabel = (version: SavedVideoVersion): string =>
+  `Version ${version.ordinal} · ${exportPlacementLabel(projectExportAspectOf(version.exportSpecification))}`;
+
+interface SavedTogetherGroup {
+  readonly variantSetId: string | null;
+  readonly versions: SavedVideoVersion[];
+}
+
+/**
+ * The Version list split into the runs one save produced together.
+ *
+ * A set is always written at consecutive ordinals, so a run of neighbours sharing a non-null id is
+ * the whole of it. A single Version carries a set id too — a Project save that produced one
+ * placement — and one Version was not saved *together* with anything, so a run of one stays exactly
+ * the plain row it has always been.
+ */
+const savedTogetherGroups = (
+  versions: readonly SavedVideoVersion[],
+): readonly SavedTogetherGroup[] => {
+  const groups: SavedTogetherGroup[] = [];
+  for (const version of versions) {
+    const open = groups.at(-1);
+    if (open && version.variantSetId !== null && open.variantSetId === version.variantSetId) {
+      open.versions.push(version);
+    } else {
+      groups.push({ variantSetId: version.variantSetId, versions: [version] });
+    }
+  }
+  return groups;
 };
 
 const VideoGallerySkeleton = () => {
@@ -702,8 +735,31 @@ export const VideoGallery = ({
     previewDetail?.versions.find((version) => version.id === selectedVersionId) ??
     previewVideo?.currentVersion ??
     null;
-  const selectedIsCurrent =
-    selectedVersion?.id === (previewDetail?.currentVersion.id ?? previewVideo?.currentVersion.id);
+  const currentVersion: SavedVideoVersion | null =
+    previewDetail?.currentVersion ?? previewVideo?.currentVersion ?? null;
+  const selectedIsCurrent = selectedVersion?.id === currentVersion?.id;
+  // Not older, and not current: another placement of the same save. Saying "Older Version" of a
+  // Version written seconds before the current one, from the same cut, would be a lie of emphasis.
+  const selectedSavedTogetherWithCurrent =
+    !selectedIsCurrent &&
+    selectedVersion !== null &&
+    selectedVersion.variantSetId !== null &&
+    selectedVersion.variantSetId === currentVersion?.variantSetId;
+  const selectVersionButton = (version: SavedVideoVersion) => (
+    <Button
+      key={version.id}
+      size="small"
+      variant={version.id === selectedVersion?.id ? 'primary' : 'secondary'}
+      aria-pressed={version.id === selectedVersion?.id}
+      onClick={() => {
+        setPreviewError(false);
+        setSelectedVersionId(version.id);
+      }}
+    >
+      {versionLabel(version)}
+      {version.id === currentVersion?.id ? ' · Current' : ''}
+    </Button>
+  );
 
   if (!libraryHasVideos) {
     return (
@@ -1036,22 +1092,35 @@ export const VideoGallery = ({
                 }}
               >
                 <legend>Versions</legend>
-                <div css={{ display: 'flex', flexWrap: 'wrap', gap: theme.space.sm }}>
-                  {previewDetail.versions.map((version) => (
-                    <Button
-                      key={version.id}
-                      size="small"
-                      variant={version.id === selectedVersion?.id ? 'primary' : 'secondary'}
-                      aria-pressed={version.id === selectedVersion?.id}
-                      onClick={() => {
-                        setPreviewError(false);
-                        setSelectedVersionId(version.id);
-                      }}
-                    >
-                      Version {version.ordinal}
-                      {version.id === previewDetail.currentVersion.id ? ' · Current' : ''}
-                    </Button>
-                  ))}
+                <div
+                  css={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'flex-start',
+                    gap: theme.space.sm,
+                  }}
+                >
+                  {savedTogetherGroups(previewDetail.versions).map((group) =>
+                    group.versions.length > 1 ? (
+                      <fieldset
+                        key={group.versions[0]!.id}
+                        css={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: theme.space.sm,
+                          margin: 0,
+                          padding: theme.space.sm,
+                          border: `1px dashed ${theme.colors.border}`,
+                          borderRadius: theme.radii.medium,
+                        }}
+                      >
+                        <legend css={{ fontSize: theme.fontSizes.metadata }}>Saved together</legend>
+                        {group.versions.map(selectVersionButton)}
+                      </fieldset>
+                    ) : (
+                      selectVersionButton(group.versions[0]!)
+                    ),
+                  )}
                 </div>
               </fieldset>
             ) : null}
@@ -1075,8 +1144,14 @@ export const VideoGallery = ({
             ) : null}
             {selectedVersion ? (
               <div css={previewMetadataStyles(theme)}>
-                <span>Version {selectedVersion.ordinal}</span>
-                <span>{selectedIsCurrent ? 'Current Version' : 'Older Version'}</span>
+                <span>{versionLabel(selectedVersion)}</span>
+                <span>
+                  {selectedIsCurrent
+                    ? 'Current Version'
+                    : selectedSavedTogetherWithCurrent
+                      ? 'Saved together with the current Version'
+                      : 'Older Version'}
+                </span>
                 <span>{STATUS_LABELS[previewVideo.status]}</span>
                 <span>{duration(selectedVersion.durationMs)} duration</span>
                 <span>
@@ -1103,8 +1178,9 @@ export const VideoGallery = ({
             ) : null}
             {!selectedIsCurrent && selectedVersion ? (
               <p>
-                Use this older version from the history of a Project that kept it. Viewing or
-                downloading here does not choose where the Project’s next saved Version goes.
+                {selectedSavedTogetherWithCurrent
+                  ? 'This is another placement of the same save as the current Version. Viewing or downloading it here does not change which Version is current.'
+                  : 'Use this older version from the history of a Project that kept it. Viewing or downloading here does not choose where the Project’s next saved Version goes.'}
               </p>
             ) : null}
           </div>
@@ -1115,6 +1191,7 @@ export const VideoGallery = ({
         <VideoExportPanel
           video={previewVideo}
           version={selectedVersion}
+          versions={previewDetail?.versions ?? []}
           returnFocusRef={exportTriggerRef}
           onClose={() => setExportOpen(false)}
         />

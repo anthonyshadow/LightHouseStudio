@@ -539,6 +539,67 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   expectNoExternalProviderTraffic(network);
 });
 
+test('one Project save makes three placements and saves them as siblings of one video', async ({
+  page,
+}) => {
+  // Three real re-frames in the browser, one after another, each budgeting a minute of its own.
+  test.setTimeout(240_000);
+  await installSuccessfulStudioHarness(page);
+  const projects = await installProjectHarness(page, true);
+  const fixture = await loadDecodableH264VideoFixture();
+  await page.goto(`/projects/${TEST_PROJECT_ID}/workspace`);
+  await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
+    name: 'project-output-source.mp4',
+    mimeType: 'video/mp4',
+    buffer: fixture,
+  });
+  await openProjectTask(page, 'Save');
+  await expect(page.getByRole('heading', { name: 'Current cut' })).toBeVisible();
+
+  // The revision records one chosen placement; the rest are asked for at save time.
+  const chooser = page.getByRole('group', { name: 'Where is this going?' });
+  await chooser.getByRole('button', { name: 'Phone, full screen' }).click();
+  await expect(page.getByText(/Phone, full screen/u).first()).toBeVisible();
+
+  const form = await openProjectSaveDestination(page);
+  await form.getByLabel('Video title').fill('Launch set');
+  const extras = form.getByRole('group', { name: 'Also save for' });
+  await extras.getByRole('checkbox', { name: 'Square post' }).click();
+  await extras.getByRole('checkbox', { name: 'Widescreen' }).click();
+  await page.getByRole('button', { name: 'Save video · New video' }).click();
+
+  // Each placement states itself while it is made, and the run says how far it has come.
+  const progress = page.locator('[data-placement-set-progress]');
+  await expect(progress).toContainText('Phone, full screen');
+  await expect(progress).toContainText('Square post');
+  await expect(progress).toContainText('Widescreen');
+
+  await expect(page.getByText(/Saved “Launch set”/u)).toBeVisible({ timeout: 200_000 });
+  // One request carrying all three, and the chosen placement was made first.
+  expect(projects.outputRequests).toHaveLength(1);
+  expect(projects.outputRequests[0]?.renditions).toHaveLength(3);
+  expect(projects.renditionUploads[0]?.aspect).toBe('9:16');
+  expect(new Set(projects.renditionUploads.map(({ aspect }) => aspect))).toEqual(
+    new Set(['9:16', '1:1', '16:9']),
+  );
+  // Distinct bytes per placement: no member overwrote another's upload.
+  expect(new Set(projects.outputRequests[0]?.renditions.map((r) => r.media.assetId)).size).toBe(3);
+
+  await openProjectTask(page, 'History');
+  const versionHistory = page.getByRole('list', { name: 'Saved video Version history' });
+  // Three sibling Versions from one save, each naming the placement it was made for, and the
+  // chosen one written last so it is the video's current Version.
+  await expect(versionHistory.getByRole('listitem')).toHaveCount(3);
+  await expect(versionHistory).toContainText('Widescreen');
+  await expect(versionHistory).toContainText('Square post');
+  await expect(versionHistory).toContainText('Version 3 · Current in Videos');
+  for (const ordinal of [1, 2, 3]) {
+    await expect(
+      versionHistory.getByRole('link', { name: `Download Launch set, Version ${ordinal}` }),
+    ).toBeVisible();
+  }
+});
+
 test('a Project saves exact Versions, reconciles response loss, and retains truthful history', async ({
   page,
 }) => {

@@ -61,14 +61,27 @@ export const BUILD_CLOSURE_BUDGETS = {
   // module has entered a surface that outlives it. This ceiling is a measurement of the bundler's
   // new granularity, not permission for the graph to grow — recovering the split is worth its own
   // change, and these numbers go back down when it lands.
-  'src/app/shell/AuthenticatedShell.tsx': 736_000,
+  //
+  // Raised from 736_000 on 2026-09-05 for slice 2.3 (variant sets), measured 735_408 → 742_865.
+  // The save flow itself stays out of this closure — the loop, its preparation record and the
+  // per-placement progress list are in `ProjectRouteSurface`'s own chunk — but three things the
+  // slice adds are carried by every authenticated route: the domain's placement-set rules and
+  // primary derivation, the contract's raised rendition cap with its distinctness refinement, and
+  // the surfaces that recognise siblings (the gallery's grouping, the overview card's per-member
+  // rows, History's placement summaries). `FORBIDDEN_CLOSURE_DEPENDENCIES` still passes, so no
+  // provider, media or capture module entered a surface that outlives it.
+  'src/app/shell/AuthenticatedShell.tsx': 743_000,
   // Shell plus capture graph, which is what a Studio route costs. Looser, because a Studio route is
   // where media code belongs; `FORBIDDEN_CLOSURE_DEPENDENCIES` is what keeps it from leaking out.
   //
   // Raised from 910_000 on 2026-09-04. Two causes, kept apart: the chunking change above accounts
   // for 166_066 bytes of it, and the local editor's honest export probe for 942 — measured by
   // building this tree against the pre-bump lockfile, where every budget still passes.
-  'src/studio/StudioApp.tsx': 1_078_000,
+  //
+  // Raised from 1_078_000 on 2026-09-05 for slice 2.3, measured 1_077_504 → 1_078_171. The Studio
+  // save dialog makes one placement at a time and is untouched by the slice; what it carries is
+  // the same shared domain and contract growth the shell closure records above.
+  'src/studio/StudioApp.tsx': 1_079_000,
 };
 
 /**

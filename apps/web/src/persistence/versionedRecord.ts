@@ -17,6 +17,8 @@ export interface VersionedRecordStore<T> {
   readonly load: (ownerUserId: string) => T | null;
   /** False when storage refused the write — a full quota or a blocked origin, never a throw. */
   readonly save: (ownerUserId: string, value: T) => boolean;
+  /** Forgets the record. Absent or unreadable storage is already "forgotten", so it never throws. */
+  readonly remove: (ownerUserId: string) => void;
 }
 
 interface VersionedRecordOptions<T> {
@@ -61,6 +63,13 @@ export const createVersionedRecordStore = <T>({
         return true;
       } catch {
         return false;
+      }
+    },
+    remove: (ownerUserId) => {
+      try {
+        window.localStorage.removeItem(storageKey(ownerUserId));
+      } catch {
+        // Nothing to do: a store that cannot be written to holds nothing to forget.
       }
     },
   };

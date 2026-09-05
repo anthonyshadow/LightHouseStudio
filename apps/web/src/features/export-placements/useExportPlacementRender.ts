@@ -36,6 +36,14 @@ export const useExportPlacementRender = (offersPlacements = true) => {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
+  /**
+   * The reason the last render failed, readable the moment it fails.
+   *
+   * State reaches a component on its next render; a caller producing several placements in a loop
+   * is inside one render for all of them, and would record every reason as whatever the first one
+   * was. This is that caller's copy.
+   */
+  const failureRef = useRef<string | null>(null);
   const supported = useVideoEditExportSupport(offersPlacements);
 
   useEffect(() => () => controllerRef.current?.abort('unmount'), []);
@@ -75,13 +83,14 @@ export const useExportPlacementRender = (offersPlacements = true) => {
       // answer is memoized, so by the time anyone renders this costs nothing.
       if (!(await videoEditSupported())) {
         controllerRef.current = null;
-        setError(
-          'This browser cannot re-frame a video without blocking the Studio. It keeps its original shape.',
-        );
+        failureRef.current =
+          'This browser cannot re-frame a video without blocking the Studio. It keeps its original shape.';
+        setError(failureRef.current);
         setPhase('error');
         return null;
       }
       setError(null);
+      failureRef.current = null;
       setProgress(0);
       setPhase('rendering');
       try {
@@ -112,11 +121,11 @@ export const useExportPlacementRender = (offersPlacements = true) => {
         };
       } catch (renderError) {
         if (controller.signal.aborted) return null;
-        setError(
+        failureRef.current =
           renderError instanceof Error
             ? renderError.message
-            : 'The browser could not re-frame this video. Your video is unchanged.',
-        );
+            : 'The browser could not re-frame this video. Your video is unchanged.';
+        setError(failureRef.current);
         setPhase('error');
         return null;
       } finally {
@@ -126,5 +135,8 @@ export const useExportPlacementRender = (offersPlacements = true) => {
     [],
   );
 
-  return { phase, progress, error, supported, render, cancel, reset } as const;
+  /** Why the last render failed, without waiting for a re-render. */
+  const lastFailure = useCallback(() => failureRef.current, []);
+
+  return { phase, progress, error, supported, render, cancel, reset, lastFailure } as const;
 };

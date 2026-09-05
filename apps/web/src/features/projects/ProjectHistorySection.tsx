@@ -160,6 +160,16 @@ export const ProjectHistorySection = ({
               savedVideoId: item.savedVideo.id,
               videoVersionId: item.version.id,
             };
+            // Said only where the sibling is on screen to be seen. A save that produced one
+            // placement carries a set id too, and a set split across a page boundary states itself
+            // once the rest is loaded — neither is a claim this row can make on its own.
+            const savedTogether =
+              item.version.variantSetId !== null &&
+              outputItems.some(
+                (other) =>
+                  other.version.id !== item.version.id &&
+                  other.version.variantSetId === item.version.variantSetId,
+              );
             return (
               <li key={item.version.id} css={itemStyles}>
                 <strong>
@@ -173,6 +183,10 @@ export const ProjectHistorySection = ({
                   <time dateTime={item.version.createdAt}>
                     {formatDateTime(item.version.createdAt)}
                   </time>
+                </span>
+                <span>
+                  {exportSpecificationSummary(item.version.exportSpecification)}
+                  {savedTogether ? ' · Saved together' : ''}
                 </span>
                 <span>
                   Saved at change {item.output.producingRevisionNumber}

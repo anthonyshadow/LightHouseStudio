@@ -24,6 +24,7 @@ import { StudioDesignProvider } from '../../ui';
 import { renderVideoEdit } from '../video-editor/renderVideoEdit';
 import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
 import { projectOutputOperationStorageKey } from './projectOutputOperationStorage';
+import { projectOutputRenditionPreparationStore } from './projectOutputRenditionPreparationStorage';
 import type { ProjectSessionPort } from './useProjectSession';
 
 // jsdom has no WebGL, so the render capability is stated explicitly rather than left to the
@@ -938,6 +939,13 @@ describe('ProjectOutputSaveSection placement', () => {
     includeAudio: true,
   };
   const renditionAssetId = 'f5d1a6ce-1a5e-4a2f-9df0-6f2b6b0f3d21';
+  /** One stable asset id per placement, so a set's members are told apart on the wire. */
+  const assetIdForAspect = (aspect: string) =>
+    ({
+      '16:9': 'a1d1a6ce-1a5e-4a2f-9df0-6f2b6b0f3d22',
+      '1:1': 'a2d1a6ce-1a5e-4a2f-9df0-6f2b6b0f3d23',
+      '4:5': 'a3d1a6ce-1a5e-4a2f-9df0-6f2b6b0f3d24',
+    })[aspect] ?? renditionAssetId;
 
   const placedCurrent = (): ProjectCurrentResponse => {
     const placed = current();
@@ -1001,18 +1009,28 @@ describe('ProjectOutputSaveSection placement', () => {
         }),
       ),
       http.post(`*/api/projects/${projectId}/outputs/renditions`, ({ request }) => {
-        uploads.push(request.headers.get('x-lightframe-project-rendition'));
+        const header = request.headers.get('x-lightframe-project-rendition');
+        uploads.push(header);
+        // Answer for the placement that was asked for, so a set yields distinguishable bytes and
+        // a test can tell which member a save actually carried.
+        const asked = JSON.parse(decodeURIComponent(header ?? '')) as {
+          specification: typeof phoneSpecification;
+        };
+        const assetId =
+          asked.specification.aspect === phoneSpecification.aspect
+            ? renditionAssetId
+            : assetIdForAspect(asked.specification.aspect);
         return HttpResponse.json(
           {
-            media: { kind: 'asset', assetId: renditionAssetId },
-            assetId: renditionAssetId,
-            specification: phoneSpecification,
-            filename: 'cut-phone.mp4',
+            media: { kind: 'asset', assetId },
+            assetId,
+            specification: asked.specification,
+            filename: `cut-${asked.specification.aspect.replace(':', 'x')}.mp4`,
             sizeBytes: 12,
             checksumSha256: 'b'.repeat(64),
             durationMs: 8_000,
-            width: 1_080,
-            height: 1_920,
+            width: asked.specification.resolution?.width ?? 1_080,
+            height: asked.specification.resolution?.height ?? 1_920,
             hasAudio: true,
           },
           { status: 201 },
@@ -1050,6 +1068,200 @@ describe('ProjectOutputSaveSection placement', () => {
         { media: { kind: 'asset', assetId: renditionAssetId }, specification: phoneSpecification },
       ],
     });
+  });
+
+  it('makes every ticked placement from one read of the cut, in order, and saves them together', async () => {
+    const user = userEvent.setup();
+    const uploads = installPlacementProduction();
+    let posted: unknown = null;
+    let cutReads = 0;
+    mockApiServer.use(
+      http.get(`*/api/projects/${projectId}/working-media/${producingRevisionId}/content`, () => {
+        cutReads += 1;
+        return HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4' },
+        });
+      }),
+      http.get(`*/api/projects/${projectId}/source/content`, () => {
+        cutReads += 1;
+        return HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4' },
+        });
+      }),
+      http.post(`*/api/projects/${projectId}/outputs`, async ({ request }) => {
+        posted = await request.json();
+        return HttpResponse.json(outputResponse(crypto.randomUUID()), { status: 201 });
+      }),
+    );
+    renderSection(session(), { currentValue: placedCurrent() });
+
+    await openSaveDestination(user);
+    const tick = async (name: string) =>
+      user.click(
+        within(screen.getByRole('group', { name: 'Also save for' })).getByRole('checkbox', {
+          name,
+        }),
+      );
+    await tick('Square post');
+    await tick('Widescreen');
+    await user.click(screen.getByRole('button', { name: /^Save video ·/u }));
+
+    await waitFor(() => expect(posted).not.toBeNull());
+    // Three placements, one download of the cut: the source is read once and re-framed three times.
+    expect(cutReads).toBe(1);
+    expect(vi.mocked(renderVideoEdit)).toHaveBeenCalledTimes(3);
+    expect(uploads).toHaveLength(3);
+    // The chosen placement is made first, so the one the revision records fails fast.
+    const attempted = uploads.map(
+      (header) =>
+        (
+          JSON.parse(decodeURIComponent(String(header))) as {
+            specification: { aspect: string };
+          }
+        ).specification.aspect,
+    );
+    expect(attempted[0]).toBe(phoneSpecification.aspect);
+    expect(new Set(attempted)).toEqual(new Set(['9:16', '1:1', '16:9']));
+    // Every upload has its own key, so no member's bytes are stored twice or overwritten.
+    expect(new Set(uploads).size).toBe(3);
+    const body = posted as { renditions: { specification: { aspect: string } }[] };
+    expect(body.renditions).toHaveLength(3);
+    expect(body).not.toHaveProperty('variantSetId');
+  });
+
+  it('saves the placements it made when one fails, and offers the failed one again', async () => {
+    const user = userEvent.setup();
+    installPlacementProduction();
+    let posted: { renditions: { specification: { aspect: string } }[] } | null = null;
+    mockApiServer.use(
+      http.post(`*/api/projects/${projectId}/outputs`, async ({ request }) => {
+        posted = (await request.json()) as typeof posted;
+        return HttpResponse.json(outputResponse(crypto.randomUUID()), { status: 201 });
+      }),
+    );
+    // The second placement's render refuses; the first is already stored and the third follows it.
+    vi.mocked(renderVideoEdit)
+      .mockResolvedValueOnce({
+        blob: new Blob([new Uint8Array(12)], { type: 'video/mp4' }),
+        width: 1_080,
+        height: 1_920,
+        durationMs: 8_000,
+      } as unknown as Awaited<ReturnType<typeof renderVideoEdit>>)
+      .mockRejectedValueOnce(new Error('The browser could not re-frame this video.'))
+      .mockResolvedValue({
+        blob: new Blob([new Uint8Array(12)], { type: 'video/mp4' }),
+        width: 1_920,
+        height: 1_080,
+        durationMs: 8_000,
+      } as unknown as Awaited<ReturnType<typeof renderVideoEdit>>);
+    renderSection(session(), { currentValue: placedCurrent() });
+
+    await openSaveDestination(user);
+    const tick = async (name: string) =>
+      user.click(
+        within(screen.getByRole('group', { name: 'Also save for' })).getByRole('checkbox', {
+          name,
+        }),
+      );
+    await tick('Square post');
+    await tick('Widescreen');
+    await user.click(screen.getByRole('button', { name: /^Save video ·/u }));
+
+    await waitFor(() => expect(posted).not.toBeNull());
+    // Two of three made: the save carries them rather than throwing the finished work away.
+    expect(posted!.renditions).toHaveLength(2);
+    expect(posted!.renditions.map(({ specification }) => specification.aspect)).not.toContain(
+      '1:1',
+    );
+    // And the one that failed is named, with a way to ask for exactly it.
+    expect(await screen.findByText(/Square post — /u)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Make this placement' })).toBeEnabled();
+  });
+
+  it('resumes an interrupted run without re-making the placement that already landed', async () => {
+    const user = userEvent.setup();
+    const uploads = installPlacementProduction();
+    let posted: { renditions: { specification: { aspect: string } }[] } | null = null;
+    mockApiServer.use(
+      http.post(`*/api/projects/${projectId}/outputs`, async ({ request }) => {
+        posted = (await request.json()) as typeof posted;
+        return HttpResponse.json(outputResponse(crypto.randomUUID()), { status: 201 });
+      }),
+    );
+    // What a reload leaves behind: the square placement is already stored under its own key.
+    const preparation = projectOutputRenditionPreparationStore(projectId);
+    const squareSpecification = {
+      container: 'video/mp4' as const,
+      aspect: '1:1' as const,
+      resolution: { width: 1_080, height: 1_080 },
+      includeAudio: true,
+    };
+    preparation.save(ownerUserId, {
+      attemptId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      projectId,
+      basis: {
+        expectedVersion: placedCurrent().project.version,
+        expectedRevisionNumber: placedCurrent().project.currentRevisionNumber,
+        media: placedCurrent().revision.snapshot.workingMedia!,
+      },
+      variantSetId: null,
+      members: [
+        {
+          specification: phoneSpecification,
+          operationKey: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          outcome: 'pending',
+          assetId: null,
+          reason: null,
+        },
+        {
+          specification: squareSpecification,
+          operationKey: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          outcome: 'stored',
+          assetId: assetIdForAspect('1:1'),
+          reason: null,
+        },
+      ],
+    });
+    renderSection(session(), { currentValue: placedCurrent() });
+
+    await openSaveDestination(user);
+    await user.click(
+      within(screen.getByRole('group', { name: 'Also save for' })).getByRole('checkbox', {
+        name: 'Square post',
+      }),
+    );
+    await user.click(screen.getByRole('button', { name: /^Save video ·/u }));
+
+    await waitFor(() => expect(posted).not.toBeNull());
+    // One render and one upload: the finished placement is carried through, not made again.
+    expect(vi.mocked(renderVideoEdit)).toHaveBeenCalledTimes(1);
+    expect(uploads).toHaveLength(1);
+    expect(posted!.renditions).toHaveLength(2);
+    expect(posted!.renditions.map(({ specification }) => specification.aspect).sort()).toEqual([
+      '1:1',
+      '9:16',
+    ]);
+  });
+
+  it('offers no extra placements at all where the browser cannot re-frame one', async () => {
+    const user = userEvent.setup();
+    installPlacementProduction();
+    renderCapable.mockReturnValue(false);
+    renderSection(session(), { currentValue: placedCurrent() });
+
+    await openSaveDestination(user);
+    // The group is still stated, so the operator can see what a capable browser would offer, but
+    // nothing in it can be ticked — a set is exactly what this browser cannot make.
+    // The capability answers asynchronously, so the group is inert until it does and disabled after.
+    await waitFor(() => {
+      const extras = screen.getByRole('group', { name: 'Also save for' });
+      for (const checkbox of within(extras).getAllByRole('checkbox')) {
+        expect(checkbox).toBeDisabled();
+      }
+    });
+    await user.click(screen.getByRole('button', { name: /^Save video ·/u }));
+    // The single-placement degrade is untouched: the cut is saved in the shape it already has.
+    await waitFor(() => expect(vi.mocked(renderVideoEdit)).not.toHaveBeenCalled());
   });
 
   it('replays a recovered save without re-framing or storing a second rendition', async () => {

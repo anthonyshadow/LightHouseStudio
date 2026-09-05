@@ -28,10 +28,18 @@ import { WorkPosterTile } from './WorkPosterTile';
 const ProjectDeliverableCard = ({
   projectId,
   item,
+  savedTogether,
 }: {
   readonly projectId: string;
   readonly item: ProjectOutputHistoryItem;
+  /**
+   * Every Version the same save produced, in the order they were written, when it produced more
+   * than one. The card shows one poster — they are one save of one cut — and one line per
+   * placement.
+   */
+  readonly savedTogether: readonly ProjectOutputHistoryItem[];
 }) => {
+  const theme = useTheme();
   const navigate = useNavigate();
   const missing = item.savedVideo.libraryStatus === 'missing';
   const removed = item.savedVideo.libraryStatus === 'removed';
@@ -83,8 +91,58 @@ const ProjectDeliverableCard = ({
             You have changed this Project since. Save again to add the next Version.
           </p>
         )}
+        {savedTogether.length > 1 ? (
+          <div
+            css={{ display: 'grid', gap: theme.space.xs }}
+            data-project-deliverable-placements=""
+          >
+            <h4 css={{ margin: 0, fontSize: theme.fontSizes.metadata }}>Saved together</h4>
+            <ul
+              aria-label="Placements saved together"
+              css={{
+                listStyle: 'none',
+                margin: 0,
+                padding: 0,
+                display: 'grid',
+                gap: theme.space.xs,
+              }}
+            >
+              {savedTogether.map((member) => (
+                <li
+                  key={member.version.id}
+                  css={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: theme.space.sm,
+                    color: theme.colors.textMuted,
+                    fontSize: theme.fontSizes.metadata,
+                  }}
+                >
+                  <span>
+                    {exportPlacementLabel(
+                      projectExportAspectOf(member.version.exportSpecification),
+                    )}{' '}
+                    · Version {member.version.ordinal} · {member.version.width}×
+                    {member.version.height}
+                  </span>
+                  {missing ? null : (
+                    <LinkButton
+                      size="small"
+                      href={projectOutputContentUrl(projectId, member.version.id, true)}
+                      download={member.version.filename}
+                      aria-label={`Download ${member.savedVideo.title}, Version ${member.version.ordinal}`}
+                    >
+                      Download
+                    </LinkButton>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <div data-project-deliverable-actions="">
-          {missing ? null : (
+          {missing || savedTogether.length > 1 ? null : (
             <LinkButton
               variant="primary"
               href={projectOutputContentUrl(projectId, item.version.id, true)}
@@ -128,10 +186,24 @@ export const ProjectDeliverableSection = ({
   const navigate = useNavigate();
   const projectId = current.project.id;
   const canSaveNext = !archived && current.revision.snapshot.sourceAssetId !== null;
+  // One save can write several Versions — one per placement — and the card shows all of them, so
+  // it asks for enough rows to hold the largest set a save can produce rather than only the newest.
   const outputs = useQuery({
     queryKey: projectQueryKeys.latestOutput(projectId),
-    queryFn: ({ signal }) => getProjectOutputs({ projectId, pageSize: 1, signal }),
+    queryFn: ({ signal }) => getProjectOutputs({ projectId, pageSize: 5, signal }),
   });
+  const rows = outputs.data?.outputs ?? [];
+  const latest = rows[0];
+  // The rows one save produced together, in write order. A set is written at consecutive ordinals
+  // and the newest row is its primary, so the members are the neighbours carrying its id — and a
+  // save that produced a single placement carries one too, which is a set of one and shows as the
+  // single output it has always been.
+  const savedTogether =
+    latest === undefined || latest.version.variantSetId === null
+      ? []
+      : rows
+          .filter((row) => row.version.variantSetId === latest.version.variantSetId)
+          .sort((left, right) => left.version.ordinal - right.version.ordinal);
 
   const body = () => {
     if (outputs.isPending) {
@@ -156,7 +228,6 @@ export const ProjectDeliverableSection = ({
         </StatusNotice>
       );
     }
-    const latest = outputs.data.outputs[0];
     return latest === undefined ? (
       // Deliberately outside the two-column body: with no poster beside it, this copy would be
       // reading itself into the narrow column the poster would have occupied.
@@ -175,7 +246,7 @@ export const ProjectDeliverableSection = ({
         </div>
       </div>
     ) : (
-      <ProjectDeliverableCard projectId={projectId} item={latest} />
+      <ProjectDeliverableCard projectId={projectId} item={latest} savedTogether={savedTogether} />
     );
   };
 
@@ -191,8 +262,9 @@ export const ProjectDeliverableSection = ({
       <header>
         <h2 id="project-deliverable-heading">Saved output</h2>
         <p>
-          The video this Project has saved. Saving again adds the next one; this keeps showing the
-          most recent.
+          {savedTogether.length > 1
+            ? 'What this Project last saved, in every placement that save produced. Saving again adds the next one; this keeps showing the most recent.'
+            : 'The video this Project has saved. Saving again adds the next one; this keeps showing the most recent.'}
         </p>
       </header>
       {body()}

@@ -86,6 +86,48 @@ const detail = (summary: SavedVideoSummary, versions = [summary.currentVersion])
   versions,
 });
 
+const placement = (aspect: '1:1' | '9:16', width: number, height: number) => ({
+  container: 'video/mp4' as const,
+  aspect,
+  resolution: { width, height },
+  includeAudio: true,
+});
+
+/**
+ * A video holding both kinds of Version: a Studio recording that belongs to no set, and the two
+ * placements one Project save wrote together at consecutive ordinals.
+ */
+const savedTogetherVideo = () => {
+  const variantSetId = '5b2d9e14-6c3a-4f81-9b27-3d5e7a0c1f92';
+  const studio = video().currentVersion;
+  const square = {
+    ...studio,
+    id: '3edb9c78-efb2-43a4-8074-acba56158245',
+    ordinal: 2,
+    origin: 'editor' as const,
+    filename: 'morning-square.mp4',
+    width: 1_080,
+    height: 1_080,
+    exportSpecification: placement('1:1', 1_080, 1_080),
+    variantSetId,
+    createdAt: '2026-08-06T12:00:00.000Z',
+  };
+  const phone = {
+    ...square,
+    id: '7c1f2b64-3f9a-4b2e-9d51-0a8c6e2f4b10',
+    ordinal: 3,
+    filename: 'morning-phone.mp4',
+    width: 1_080,
+    height: 1_920,
+    exportSpecification: placement('9:16', 1_080, 1_920),
+  };
+  return {
+    summary: video({ versionCount: 3, currentVersion: phone }),
+    versions: [studio, square, phone],
+    square,
+  };
+};
+
 const page = (videos: readonly SavedVideoSummary[]) => ({
   videos,
   nextCursor: null,
@@ -353,6 +395,113 @@ describe('VideoGallery', () => {
     ).toBeVisible();
   });
 
+  it('groups the Versions one save wrote together and names every placement', async () => {
+    const set = savedTogetherVideo();
+    mockGalleryPages({ '': page([set.summary]) });
+    mockApiServer.use(
+      jsonScenario('GET', `/api/videos/${set.summary.id}`, {
+        body: detail(set.summary, set.versions),
+      }),
+    );
+    renderGallery();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Preview Morning take' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Morning take' });
+    const group = await within(dialog).findByRole('group', { name: 'Saved together' });
+    expect(within(group).getByRole('button', { name: 'Version 2 · Square post' })).toBeVisible();
+    expect(
+      within(group).getByRole('button', { name: 'Version 3 · Phone, full screen · Current' }),
+    ).toBeVisible();
+    // The Studio recording was not part of that save, so it stays outside the group entirely.
+    expect(within(group).queryByRole('button', { name: 'Version 1 · Keep as it is' })).toBeNull();
+    expect(within(dialog).getByRole('button', { name: 'Version 1 · Keep as it is' })).toBeVisible();
+
+    fireEvent.click(within(group).getByRole('button', { name: 'Version 2 · Square post' }));
+    expect(within(dialog).getByText('Saved together with the current Version')).toBeVisible();
+    expect(within(dialog).queryByText('Older Version')).toBeNull();
+    expect(within(dialog).getByText(/another placement of the same save/u)).toBeVisible();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Version 1 · Keep as it is' }));
+    expect(within(dialog).getByText('Older Version')).toBeVisible();
+    expect(within(dialog).queryByText('Saved together with the current Version')).toBeNull();
+
+    // The gating that decides what may be taken back into the Studio is unchanged: current only.
+    fireEvent.click(within(dialog).getByLabelText('More actions for Morning take'));
+    expect(within(dialog).queryByRole('menuitem', { name: 'Open in Studio' })).toBeNull();
+    expect(within(dialog).getByRole('menuitem', { name: 'Export' })).toBeVisible();
+  });
+
+  it('offers the stored file of a Version saved together instead of re-framing that placement', async () => {
+    const set = savedTogetherVideo();
+    mockGalleryPages({ '': page([set.summary]) });
+    mockApiServer.use(
+      jsonScenario('GET', `/api/videos/${set.summary.id}`, {
+        body: detail(set.summary, set.versions),
+      }),
+    );
+    renderGallery();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Preview Morning take' }));
+    const preview = await screen.findByRole('dialog', { name: 'Morning take' });
+    fireEvent.click(within(preview).getByLabelText('More actions for Morning take'));
+    fireEvent.click(within(preview).getByRole('menuitem', { name: 'Export' }));
+    const exportPanel = await screen.findByRole('dialog', { name: 'Export video' });
+
+    fireEvent.click(within(exportPanel).getByRole('button', { name: 'Square post' }));
+    const stored = await within(exportPanel).findByRole('link', {
+      name: 'Download Morning take, Version 2',
+    });
+    expect(stored).toHaveAttribute(
+      'href',
+      `/api/videos/${set.summary.id}/versions/${set.square.id}/content?download=true`,
+    );
+    expect(within(exportPanel).getByText(/was saved together with this one/u)).toBeVisible();
+    expect(editor.renderVideoEdit).not.toHaveBeenCalled();
+
+    // A placement that save did not produce is still re-framed here, from this Version's bytes.
+    fireEvent.click(within(exportPanel).getByRole('button', { name: 'Tall feed post' }));
+    expect(
+      await within(exportPanel).findByRole('button', {
+        name: 'Download Morning take, Version 3, for Tall feed post',
+      }),
+    ).toBeVisible();
+    expect(within(exportPanel).queryByText(/was saved together with this one/u)).toBeNull();
+  });
+
+  it('re-frames a Version that belongs to no set, on a video that holds one', async () => {
+    const set = savedTogetherVideo();
+    mockGalleryPages({ '': page([set.summary]) });
+    mockApiServer.use(
+      jsonScenario('GET', `/api/videos/${set.summary.id}`, {
+        body: detail(set.summary, set.versions),
+      }),
+    );
+    renderGallery();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Preview Morning take' }));
+    const preview = await screen.findByRole('dialog', { name: 'Morning take' });
+    fireEvent.click(
+      await within(preview).findByRole('button', { name: 'Version 1 · Keep as it is' }),
+    );
+    fireEvent.click(within(preview).getByLabelText('More actions for Morning take'));
+    fireEvent.click(within(preview).getByRole('menuitem', { name: 'Export' }));
+    const exportPanel = await screen.findByRole('dialog', { name: 'Export video' });
+
+    fireEvent.click(within(exportPanel).getByRole('button', { name: 'Square post' }));
+
+    // Set 1's square file is a different cut. This Version belongs to no set, so it is re-framed
+    // here rather than answered with someone else's bytes.
+    expect(
+      await within(exportPanel).findByRole('button', {
+        name: 'Download Morning take, Version 1, for Square post',
+      }),
+    ).toBeVisible();
+    expect(
+      within(exportPanel).queryByRole('link', { name: 'Download Morning take, Version 2' }),
+    ).toBeNull();
+    expect(within(exportPanel).queryByText(/saved together/iu)).toBeNull();
+  });
+
   it('selects, previews, and downloads an exact older Version without using or changing current', async () => {
     const current = video({
       versionCount: 2,
@@ -376,7 +525,15 @@ describe('VideoGallery', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Preview Morning take' }));
     const dialog = await screen.findByRole('dialog', { name: 'Morning take' });
-    fireEvent.click(await within(dialog).findByRole('button', { name: 'Version 1' }));
+    // Every Version names the placement its bytes were produced for; one stored in the shape it
+    // already had says so rather than leaving the question open.
+    fireEvent.click(
+      await within(dialog).findByRole('button', { name: 'Version 1 · Keep as it is' }),
+    );
+    expect(
+      within(dialog).getByRole('button', { name: 'Version 2 · Keep as it is · Current' }),
+    ).toBeVisible();
+    expect(within(dialog).queryByRole('group', { name: 'Saved together' })).toBeNull();
 
     expect(within(dialog).getByLabelText('Preview of Morning take, Version 1')).toHaveAttribute(
       'src',

@@ -2,6 +2,7 @@ import type {
   AdoptProjectWorkingMediaRequest,
   AppendProjectRevisionRequest,
   ProjectCurrentResponse,
+  ProjectExportSpecificationValue as ProjectExportSpecification,
   ProjectHistoryResponse,
   ProjectOutputHistoryItem,
   ProjectProcessingAttempt,
@@ -106,10 +107,17 @@ export const installProjectHarness = async (
   const processingProviderIntents: string[] = [];
   const outputOperationKeys: string[] = [];
   const outputRequests: SaveProjectOutputRequest[] = [];
+  /** Every placement the browser asked to store, in the order it asked. */
+  const renditionUploads: ProjectExportSpecification[] = [];
   const reuseOperationKeys: string[] = [];
   const outputReceipts = new Map<
     string,
-    { readonly fingerprint: string; readonly response: SaveProjectOutputResponse }
+    {
+      readonly fingerprint: string;
+      readonly response: SaveProjectOutputResponse;
+      /** Every Version that save wrote, primary last. */
+      readonly versionIds?: readonly string[];
+    }
   >();
   const outputSavedVideos = new Map<string, SavedVideoDetail>();
   const removedSavedVideoIds = new Set<string>();
@@ -234,23 +242,26 @@ export const installProjectHarness = async (
     const outputItems = (): ProjectOutputHistoryItem[] => {
       const seen = new Set<string>();
       return [...outputReceipts.values()]
-        .map(({ response }) => response)
-        .filter(({ output }) => {
-          if (seen.has(output.videoVersionId)) return false;
-          seen.add(output.videoVersionId);
+        .flatMap(({ response, versionIds }) =>
+          (versionIds ?? [response.output.videoVersionId]).map((videoVersionId) => ({
+            response,
+            videoVersionId,
+          })),
+        )
+        .filter(({ videoVersionId }) => {
+          if (seen.has(videoVersionId)) return false;
+          seen.add(videoVersionId);
           return true;
         })
         .reverse()
-        .flatMap((response) => {
+        .flatMap(({ response, videoVersionId }) => {
           const savedVideo = outputSavedVideos.get(response.output.savedVideoId);
-          const version = savedVideo?.versions.find(
-            ({ id }) => id === response.output.videoVersionId,
-          );
+          const version = savedVideo?.versions.find(({ id }) => id === videoVersionId);
           if (!savedVideo || !version) return [];
           return [
             {
               kind: 'saved-video-version' as const,
-              output: response.output,
+              output: { ...response.output, videoVersionId },
               savedVideo: {
                 id: savedVideo.id,
                 title: savedVideo.title,
@@ -340,6 +351,32 @@ export const installProjectHarness = async (
       }
       return;
     }
+    if (url.pathname === `${outputPath}/renditions` && method === 'POST') {
+      // The server derives the asset id from the operation key, which is what makes an upload
+      // replayable; the simulator does the same, so a resumed run reaches the same bytes.
+      const assetId = request.headers()['idempotency-key'] ?? '';
+      const stated = JSON.parse(
+        decodeURIComponent(request.headers()['x-lightframe-project-rendition'] ?? '{}'),
+      ) as { filename: string; specification: ProjectExportSpecification };
+      renditionUploads.push(stated.specification);
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          media: { kind: 'asset', assetId },
+          assetId,
+          specification: stated.specification,
+          filename: stated.filename,
+          sizeBytes: 12,
+          checksumSha256: '3'.repeat(64),
+          durationMs: 1_000,
+          width: stated.specification.resolution?.width ?? 1_080,
+          height: stated.specification.resolution?.height ?? 1_920,
+          hasAudio: false,
+        }),
+      });
+      return;
+    }
     if (url.pathname === outputPath && method === 'POST' && current && source && sourceBytes) {
       const operationId = request.headers()['idempotency-key'] ?? '';
       const body = request.postDataJSON() as SaveProjectOutputRequest;
@@ -399,32 +436,65 @@ export const installProjectHarness = async (
         target.kind === 'new' ? '93117242-ccf5-4fa5-bcee-5831039119c9' : target.savedVideoId;
       const revisionNumber = previous.revision.revisionNumber + 1;
       const revisionId = `99117242-ccf5-4fa5-bcee-${revisionNumber.toString().padStart(12, '0')}`;
-      const ordinal = existing === undefined ? 1 : existing.versionCount + 1;
-      const versionId = `94117242-ccf5-4fa5-bcee-${ordinal.toString().padStart(12, '0')}`;
-      const createdAt = `2030-01-01T00:${(7 + ordinal).toString().padStart(2, '0')}:00.000Z`;
-      const version = {
-        id: versionId,
-        videoId: savedVideoId,
-        ordinal,
-        origin: 'uploaded' as const,
-        characterName: null,
-        characterVariantName: null,
-        sourceVersionId:
-          target.kind === 'version'
-            ? target.expectedVersionId
-            : body.media.kind === 'saved-video-version'
-              ? body.media.videoVersionId
-              : null,
-        mimeType: source.source.mimeType,
-        filename: source.source.filename,
-        sizeBytes: source.source.sizeBytes,
-        durationMs: source.source.durationMs,
-        width: source.source.width,
-        height: source.source.height,
-        exportSpecification: null,
-        variantSetId: null,
-        createdAt,
-      };
+      const firstOrdinal = existing === undefined ? 1 : existing.versionCount + 1;
+      /*
+       * One Version per placement, in the order the server writes them: the siblings first and the
+       * primary last, so the video's current Version is the placement the revision chose. With no
+       * renditions the cut itself is the one Version, exactly as before placements existed.
+       */
+      const chosenAspect = previous.revision.snapshot.exportSpecification?.aspect ?? 'source';
+      const primaryIndex = body.renditions.findIndex(
+        ({ specification }) => specification.aspect === chosenAspect,
+      );
+      const primaryAt =
+        body.renditions.length === 0
+          ? -1
+          : primaryIndex >= 0
+            ? primaryIndex
+            : body.renditions.length - 1;
+      const writeOrder: (ProjectExportSpecification | null)[] =
+        primaryAt < 0
+          ? [null]
+          : [
+              ...body.renditions
+                .filter((_, index) => index !== primaryAt)
+                .map(({ specification }) => specification),
+              body.renditions[primaryAt]!.specification,
+            ];
+      const cut = source.source;
+      const versions = writeOrder.map((specification, offset) => {
+        const at = firstOrdinal + offset;
+        return {
+          id: `94117242-ccf5-4fa5-bcee-${at.toString().padStart(12, '0')}`,
+          videoId: savedVideoId,
+          ordinal: at,
+          origin: 'uploaded' as const,
+          characterName: null,
+          characterVariantName: null,
+          sourceVersionId:
+            target.kind === 'version'
+              ? target.expectedVersionId
+              : body.media.kind === 'saved-video-version'
+                ? body.media.videoVersionId
+                : null,
+          mimeType: cut.mimeType,
+          filename:
+            specification === null
+              ? cut.filename
+              : cut.filename.replace(/\.mp4$/u, `-${specification.aspect.replace(':', 'x')}.mp4`),
+          sizeBytes: cut.sizeBytes,
+          durationMs: cut.durationMs,
+          width: specification?.resolution?.width ?? cut.width,
+          height: specification?.resolution?.height ?? cut.height,
+          exportSpecification: specification,
+          variantSetId: body.variantSetId ?? operationId,
+          createdAt: `2030-01-01T00:${(7 + at).toString().padStart(2, '0')}:00.000Z`,
+        };
+      });
+      const version = versions.at(-1)!;
+      const versionId = version.id;
+      const ordinal = version.ordinal;
+      const createdAt = version.createdAt;
       const savedVideo: SavedVideoDetail =
         existing === undefined
           ? {
@@ -435,22 +505,31 @@ export const installProjectHarness = async (
               currentVersion: version,
               sourceVideoId:
                 body.media.kind === 'saved-video-version' ? body.media.savedVideoId : null,
-              versionCount: 1,
+              versionCount: versions.length,
               thumbnailAvailable: false,
               assignment: 'project-output',
               createdAt,
               updatedAt: createdAt,
-              versions: [version],
+              versions,
             }
           : {
               ...existing,
               currentVersion: version,
               versionCount: ordinal,
               updatedAt: createdAt,
-              versions: [...existing.versions, version],
+              versions: [...existing.versions, ...versions],
             };
       outputSavedVideos.set(savedVideoId, savedVideo);
       const outputReference = { savedVideoId, videoVersionId: versionId };
+      /*
+       * A re-framed file is a deliverable, not the next thing to work from, so the Project keeps
+       * presenting the cut it came from — and the save result contract refuses a response that
+       * says otherwise. Only a Version that *is* the cut becomes what the Project presents.
+       */
+      const presentsOutput = version.exportSpecification === null;
+      const presented = presentsOutput
+        ? ({ kind: 'saved-video-version', ...outputReference } as const)
+        : previous.revision.snapshot.workingMedia!;
       current = {
         project: {
           ...previous.project,
@@ -468,8 +547,8 @@ export const installProjectHarness = async (
           parentRevisionNumber: previous.revision.revisionNumber,
           snapshot: {
             ...previous.revision.snapshot,
-            workingMedia: { kind: 'saved-video-version', ...outputReference },
-            presentedMedia: { kind: 'saved-video-version', ...outputReference },
+            workingMedia: presented,
+            presentedMedia: presented,
             lastSuccessfulOutput: outputReference,
             workflowPhase: 'complete',
             updatedAt: createdAt,
@@ -522,7 +601,13 @@ export const installProjectHarness = async (
         contentUrl: `${outputPath}/${versionId}/content`,
         replayed: false,
       };
-      outputReceipts.set(operationId, { fingerprint, response });
+      // Every Version this save wrote, so the output history lists one row apiece — a set of
+      // placements is several outputs of one producing revision, not one.
+      outputReceipts.set(operationId, {
+        fingerprint,
+        response,
+        versionIds: versions.map(({ id }) => id),
+      });
       if (target.kind === 'version' && loseAppendOutputResponse) {
         loseAppendOutputResponse = false;
         await route.abort('failed');
@@ -822,11 +907,14 @@ export const installProjectHarness = async (
           sizeBytes: sourceBytes.byteLength,
           container: 'mp4',
           videoCodec: 'avc',
-          audioCodec: 'aac',
+          // The fixture this simulator serves is video only, and a placement render asks the
+          // worker for the audio the spec says to keep — so claiming a track the bytes do not
+          // have makes every re-frame fail on a file the browser can otherwise handle.
+          audioCodec: null,
           durationMs: 1_000,
           width: 1_280,
           height: 720,
-          hasAudio: true,
+          hasAudio: false,
           acceptedAt: '2030-01-01T00:03:00.000Z',
           contentUrl: sourceContentPath,
         },
@@ -1220,6 +1308,7 @@ export const installProjectHarness = async (
     processingProviderIntents,
     outputOperationKeys,
     outputRequests,
+    renditionUploads,
     reuseOperationKeys,
     get processingReconcileCount() {
       return processingReconcileCount;
