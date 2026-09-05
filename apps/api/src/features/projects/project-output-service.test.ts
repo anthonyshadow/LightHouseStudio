@@ -3,7 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createDefaultVideoEditSpec } from '@studio/domain';
+import { createDefaultVideoEditSpec, projectExportSpecificationForAspect } from '@studio/domain';
 import { KeyedLock } from '../../application/keyed-lock.js';
 import { LocalAssetByteStore } from '../../storage/asset-byte-store.js';
 import { FileSavedVideoRepository } from '../saved-videos/saved-video-repository.js';
@@ -31,24 +31,11 @@ const inspected = {
   hasAudio: true,
 };
 
-const phonePlacement = {
-  container: 'video/mp4' as const,
-  aspect: '9:16' as const,
-  resolution: { width: 1_080, height: 1_920 },
-  includeAudio: true,
-};
-const squarePlacement = {
-  container: 'video/mp4' as const,
-  aspect: '1:1' as const,
-  resolution: { width: 1_080, height: 1_080 },
-  includeAudio: true,
-};
-const widePlacement = {
-  container: 'video/mp4' as const,
-  aspect: '16:9' as const,
-  resolution: { width: 1_920, height: 1_080 },
-  includeAudio: true,
-};
+// Built by the domain, so a change to a placement's canonical size fails these tests instead of
+// leaving them asserting a size the product no longer produces.
+const phonePlacement = projectExportSpecificationForAspect('9:16')!;
+const squarePlacement = projectExportSpecificationForAspect('1:1')!;
+const widePlacement = projectExportSpecificationForAspect('16:9')!;
 
 /** One distinguishable file per placement, so the inspection stub can answer each its own shape. */
 const renditionFixtures = [phonePlacement, squarePlacement, widePlacement].map((specification) => {
@@ -125,8 +112,9 @@ describe('ProjectOutputService local composite authority', () => {
       : {
           ...inspected,
           sizeBytes: fixture.bytes.byteLength,
-          width: fixture.specification.resolution.width,
-          height: fixture.specification.resolution.height,
+          // Every placement the domain builds names a size; `source` is not among these fixtures.
+          width: fixture.specification.resolution!.width,
+          height: fixture.specification.resolution!.height,
         };
   };
 

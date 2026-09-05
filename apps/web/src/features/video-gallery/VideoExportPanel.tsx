@@ -1,6 +1,10 @@
 import { useTheme } from '@emotion/react';
 import type { SavedVideoSummary, SavedVideoVersion } from '@studio/contracts';
-import { projectExportSpecificationsEqual, type ProjectExportSpecification } from '@studio/domain';
+import {
+  projectExportAspectOf,
+  projectExportSpecificationsEqual,
+  type ProjectExportSpecification,
+} from '@studio/domain';
 import { useState, type RefObject } from 'react';
 import { downloadSavedVideoUrl } from '../../adapters/api-client/savedVideosApi';
 import { Button, LinkButton, OverlayPanel, StatusNotice } from '../../ui';
@@ -22,7 +26,7 @@ import { previewFooterStyles } from './VideoGallery.styles';
 export const VideoExportPanel = ({
   video,
   version,
-  versions = [],
+  versions,
   returnFocusRef,
   onClose,
 }: {
@@ -33,7 +37,7 @@ export const VideoExportPanel = ({
    * saved together with this one. Empty while that read is loading or failed: the placement is then
    * re-framed here, which is what happens for a video that has no set anyway.
    */
-  readonly versions?: readonly SavedVideoVersion[];
+  readonly versions: readonly SavedVideoVersion[];
   readonly returnFocusRef: RefObject<HTMLElement | null>;
   readonly onClose: () => void;
 }) => {
@@ -92,14 +96,17 @@ export const VideoExportPanel = ({
           <Button variant="quiet" disabled={rendering} onClick={close}>
             Cancel
           </Button>
-          {savedTogether && placement ? (
+          {savedTogether !== null ? (
             <LinkButton
               variant="primary"
               href={downloadSavedVideoUrl(video.id, savedTogether.id)}
               download={savedTogether.filename}
               aria-label={`Download ${video.title}, Version ${savedTogether.ordinal}`}
             >
-              Download for {exportPlacementLabel(placement.aspect).toLowerCase()}
+              Download for{' '}
+              {exportPlacementLabel(
+                projectExportAspectOf(savedTogether.exportSpecification),
+              ).toLowerCase()}
             </LinkButton>
           ) : reframing ? (
             <Button

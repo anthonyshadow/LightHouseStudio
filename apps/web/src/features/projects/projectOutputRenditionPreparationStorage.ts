@@ -1,5 +1,13 @@
-import { projectExportSpecificationValueSchema } from '@studio/contracts';
-import type { ProjectExportSpecification, ProjectMediaReference } from '@studio/domain';
+import {
+  projectExportSpecificationValueSchema,
+  projectMediaReferenceSchema,
+} from '@studio/contracts';
+import {
+  isRecord,
+  projectMediaReferencesEqual,
+  type ProjectExportSpecification,
+  type ProjectMediaReference,
+} from '@studio/domain';
 import { createVersionedRecordStore } from '../../persistence/versionedRecord';
 
 export type ProjectOutputRenditionOutcome = 'pending' | 'stored' | 'failed' | 'cancelled';
@@ -42,28 +50,6 @@ export interface ProjectOutputRenditionPreparation {
 }
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
-
-const parseMedia = (value: unknown): ProjectMediaReference | null => {
-  if (!isRecord(value)) return null;
-  if (value['kind'] === 'asset' && typeof value['assetId'] === 'string') {
-    return { kind: 'asset', assetId: value['assetId'] };
-  }
-  if (
-    value['kind'] === 'saved-video-version' &&
-    typeof value['savedVideoId'] === 'string' &&
-    typeof value['videoVersionId'] === 'string'
-  ) {
-    return {
-      kind: 'saved-video-version',
-      savedVideoId: value['savedVideoId'],
-      videoVersionId: value['videoVersionId'],
-    };
-  }
-  return null;
-};
 
 const parseMember = (value: unknown): ProjectOutputRenditionMember | null => {
   if (!isRecord(value)) return null;
@@ -126,19 +112,26 @@ export const projectOutputRenditionPreparationStore = (projectId: string) =>
       ) {
         return null;
       }
-      const media = parseMedia(basis['media']);
-      const members = payload['members'].map(parseMember);
-      if (media === null || members.some((member) => member === null)) return null;
+      // The wire schema already says what a media reference is; a second hand-written parser here
+      // would be a second answer to that question, and a looser one.
+      const media = projectMediaReferenceSchema.safeParse(basis['media']);
+      const members: ProjectOutputRenditionMember[] = [];
+      for (const candidate of payload['members']) {
+        const member = parseMember(candidate);
+        if (member === null) return null;
+        members.push(member);
+      }
+      if (!media.success) return null;
       return {
         attemptId: payload['attemptId'],
         projectId,
         basis: {
           expectedVersion: basis['expectedVersion'],
           expectedRevisionNumber: basis['expectedRevisionNumber'],
-          media,
+          media: media.data,
         },
         variantSetId: payload['variantSetId'],
-        members: members as ProjectOutputRenditionMember[],
+        members,
       };
     },
   });
@@ -154,5 +147,6 @@ export const preparationMatchesBasis = (
 ): boolean =>
   preparation.basis.expectedVersion === latest.expectedVersion &&
   preparation.basis.expectedRevisionNumber === latest.expectedRevisionNumber &&
-  latest.media !== null &&
-  JSON.stringify(preparation.basis.media) === JSON.stringify(latest.media);
+  // The domain's own rule rather than a stringify: a reference whose keys serialize in another
+  // order is the same reference, and calling it a different one throws away a resumable attempt.
+  projectMediaReferencesEqual(preparation.basis.media, latest.media);

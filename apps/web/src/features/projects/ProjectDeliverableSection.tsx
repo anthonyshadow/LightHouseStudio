@@ -263,8 +263,9 @@ export const ProjectDeliverableSection = ({
         <h2 id="project-deliverable-heading">Saved output</h2>
         <p>
           {savedTogether.length > 1
-            ? 'What this Project last saved, in every placement that save produced. Saving again adds the next one; this keeps showing the most recent.'
-            : 'The video this Project has saved. Saving again adds the next one; this keeps showing the most recent.'}
+            ? 'What this Project last saved, in every placement that save produced.'
+            : 'The video this Project has saved.'}{' '}
+          Saving again adds the next one; this keeps showing the most recent.
         </p>
       </header>
       {body()}

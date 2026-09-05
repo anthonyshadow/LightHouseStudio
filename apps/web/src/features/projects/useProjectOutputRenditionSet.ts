@@ -1,6 +1,6 @@
 import type { ProjectCurrentResponse, SaveProjectOutputRequest } from '@studio/contracts';
 import { projectExportFilename, type ProjectExportSpecification } from '@studio/domain';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import { ApiClientError } from '../../adapters/api-client/apiClient';
 import { readProjectWorkingMediaContent, uploadProjectRendition } from './projectsApi';
@@ -9,7 +9,6 @@ import {
   preparationMatchesBasis,
   projectOutputRenditionPreparationStore,
   type ProjectOutputRenditionMember,
-  type ProjectOutputRenditionPreparation,
 } from './projectOutputRenditionPreparationStorage';
 import type { useExportPlacementRender } from '../export-placements';
 
@@ -61,20 +60,8 @@ export const useProjectOutputRenditionSet = (
   const [status, setStatus] = useState<ProjectOutputRenditionSetStatus>('idle');
   const [members, setMembers] = useState<readonly ProjectOutputRenditionMember[]>([]);
   const [active, setActive] = useState<number>(-1);
-  const store = useRef(projectOutputRenditionPreparationStore(projectId));
+  const store = useMemo(() => projectOutputRenditionPreparationStore(projectId), [projectId]);
   const attemptRef = useRef<string | null>(null);
-
-  const reset = useCallback(() => {
-    setStatus('idle');
-    setMembers([]);
-    setActive(-1);
-  }, []);
-
-  /** The record this attempt owns, or nothing — another tab's record is never touched. */
-  const owned = useCallback((ownerUserId: string): ProjectOutputRenditionPreparation | null => {
-    const stored = store.current.load(ownerUserId);
-    return stored !== null && stored.attemptId === attemptRef.current ? stored : null;
-  }, []);
 
   const produce = useCallback(
     async ({
@@ -89,7 +76,7 @@ export const useProjectOutputRenditionSet = (
         expectedRevisionNumber: latest.project.currentRevisionNumber,
         media: latest.revision.snapshot.workingMedia,
       };
-      const stored = store.current.load(ownerUserId);
+      const stored = store.load(ownerUserId);
       /*
        * An interrupted attempt for exactly this work is resumed rather than restarted: its members
        * keep the keys their uploads used, so a finished one is skipped and a half-finished one
@@ -115,10 +102,10 @@ export const useProjectOutputRenditionSet = (
       const persist = (next: readonly ProjectOutputRenditionMember[]): boolean => {
         current = next;
         setMembers(next);
-        const existing = store.current.load(ownerUserId);
+        const existing = store.load(ownerUserId);
         // Read-compare-write: a record another attempt owns is left exactly as it is.
         if (existing !== null && existing.attemptId !== attemptId) return true;
-        return store.current.save(ownerUserId, {
+        return store.save(ownerUserId, {
           attemptId,
           projectId,
           basis: { ...basis, media: basis.media! },
@@ -158,10 +145,11 @@ export const useProjectOutputRenditionSet = (
         }
         if (member.outcome === 'stored') continue;
         setActive(index);
-        const at = (next: Partial<ProjectOutputRenditionMember>) =>
+        const at = (next: Partial<ProjectOutputRenditionMember>): void => {
           persist(
             current.map((entry, position) => (position === index ? { ...entry, ...next } : entry)),
           );
+        };
         try {
           const rendered = await placementRender.render({
             media: source,
@@ -220,8 +208,7 @@ export const useProjectOutputRenditionSet = (
       }
       setActive(-1);
       setStatus('settled');
-      const settled = current;
-      const renditions = settled.flatMap((entry) =>
+      const renditions = current.flatMap((entry) =>
         entry.outcome === 'stored' && entry.assetId !== null
           ? [
               {
@@ -232,20 +219,22 @@ export const useProjectOutputRenditionSet = (
           : [],
       );
       // Nothing was made and nothing landed: there is no interrupted attempt worth resuming.
-      if (renditions.length === 0) store.current.remove(ownerUserId);
-      return { members: settled, renditions, cancelled };
+      if (renditions.length === 0) store.remove(ownerUserId);
+      return { members: current, renditions, cancelled };
     },
-    [placementRender, projectId, queryClient],
+    [placementRender, projectId, queryClient, store],
   );
 
   /** Called once the save receipt exists: the receipt replays the whole request from there. */
   const clear = useCallback(
     (ownerUserId: string) => {
-      if (owned(ownerUserId) !== null) store.current.remove(ownerUserId);
+      // Only this attempt's own record: another tab running its own loop keeps its.
+      const stored = store.load(ownerUserId);
+      if (stored !== null && stored.attemptId === attemptRef.current) store.remove(ownerUserId);
       attemptRef.current = null;
     },
-    [owned],
+    [store],
   );
 
-  return { status, members, active, produce, reset, clear } as const;
+  return { status, members, active, produce, clear } as const;
 };

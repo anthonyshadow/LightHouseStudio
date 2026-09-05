@@ -125,17 +125,19 @@ export const useSaveVideo = (
    */
   const keyFor = useCallback(
     (
-      keyId: string,
+      artifactId: string,
       /**
-       * What this upload is, in terms that survive a reload: the operation and the file, never the
-       * artifact — a reload mints a new artifact id for the same picked file, and a fingerprint
-       * that included it could never match the upload it is meant to resume.
+       * What this upload is, in terms that survive a reload: the operation, never the artifact — a
+       * reload mints a new artifact id for the same picked file, so a fingerprint that included it
+       * could never match the upload it is meant to resume. The in-session key adds the artifact
+       * id, because within one session two takes of one operation are two uploads.
        */
-      scope: string,
+      operation: string,
       media: Blob,
       filename: string,
     ): { key: string; fingerprint: string } => {
-      const fingerprint = uploadFingerprint(media, filename, scope);
+      const keyId = `${artifactId}:${operation}`;
+      const fingerprint = uploadFingerprint(media, filename, operation);
       const remembered =
         keys.current.get(keyId) ??
         (ownerUserId === null ? null : rememberedUploadKey(ownerUserId, fingerprint, Date.now()));
@@ -195,10 +197,9 @@ export const useSaveVideo = (
       }: SaveVideoOptions = {},
     ) => {
       if (controller.current !== null) return null;
-      const keyId = keyScope === undefined ? artifact.id : `${artifact.id}:${keyScope}`;
       const retained = media?.blob ?? artifact.media;
       const { key: idempotencyKey, fingerprint } = keyFor(
-        keyId,
+        artifact.id,
         keyScope === undefined ? 'save' : `save:${keyScope}`,
         retained,
         artifact.filename,
@@ -252,9 +253,8 @@ export const useSaveVideo = (
       }: ReplaceVideoOptions = {},
     ) => {
       if (controller.current !== null) return null;
-      const keyId = `${artifact.id}:replace:${target.videoId}:${target.currentVersionId}`;
       const { key: idempotencyKey, fingerprint } = keyFor(
-        keyId,
+        artifact.id,
         `replace:${target.videoId}:${target.currentVersionId}`,
         artifact.media,
         artifact.filename,

@@ -61,6 +61,12 @@ interface ReadyProjectMedia {
   readonly source: ProjectSourceRecord | null;
 }
 
+/** A placement this save produces, and the bytes the browser already stored for it. */
+interface PlacementMember {
+  readonly specification: ProjectExportSpecificationValue;
+  readonly assetId: string;
+}
+
 const projectOutputId = (
   ownerUserId: string,
   operationId: string,
@@ -276,12 +282,9 @@ export class ProjectOutputService {
     request: SaveProjectOutputRequest,
     targetAggregate: StoredSavedVideoAggregate | null,
   ): {
-    readonly members: readonly {
-      readonly specification: ProjectExportSpecificationValue;
-      readonly assetId: string;
-    }[];
+    readonly members: readonly PlacementMember[];
+    /** Which member leads, or `null` when the cut itself is what this save stores. */
     readonly primary: number | null;
-    readonly presentsOutput: boolean;
     readonly joinedTo: StoredVideoVersion | null;
   } {
     const joining = request.variantSetId !== undefined;
@@ -356,7 +359,7 @@ export class ProjectOutputService {
         `A video holds at most ${SAVED_VIDEO_VERSION_LIMIT} Versions. Save these placements to a new video.`,
       );
     }
-    return { members, primary: set.primary, presentsOutput: set.presentsOutput, joinedTo };
+    return { members, primary: set.primary, joinedTo };
   }
 
   /**
@@ -369,10 +372,7 @@ export class ProjectOutputService {
    */
   async #resolveRenditions(
     ownerUserId: string,
-    members: readonly {
-      readonly specification: ProjectExportSpecificationValue;
-      readonly assetId: string;
-    }[],
+    members: readonly PlacementMember[],
   ): Promise<
     readonly {
       asset: AssetReadHandle;
@@ -432,8 +432,18 @@ export class ProjectOutputService {
           };
     }
 
-    const current = await this.projects.getCurrent(ownerUserId, projectId);
+    // Independent metadata reads: the target is named by the request, not found through the
+    // Project, so waiting for one before starting the other buys nothing.
+    const [current, targetAggregate] = await Promise.all([
+      this.projects.getCurrent(ownerUserId, projectId),
+      request.target.kind === 'version'
+        ? this.savedVideos.get(ownerUserId, request.target.savedVideoId)
+        : Promise.resolve(null),
+    ]);
     if (current === null) throw new AppError(404, 'not_found', 'That Project is unavailable.');
+    if (request.target.kind === 'version' && targetAggregate === null) {
+      throw new AppError(404, 'not_found', 'That Saved Video is unavailable.');
+    }
     const { workingMedia, presentedMedia } = current.revision.snapshot;
     if (
       workingMedia === null ||
@@ -446,13 +456,6 @@ export class ProjectOutputService {
         'conflict',
         'Save the exact current ready Project media after all pending changes finish.',
       );
-    }
-    const targetAggregate =
-      request.target.kind === 'version'
-        ? await this.savedVideos.get(ownerUserId, request.target.savedVideoId)
-        : null;
-    if (request.target.kind === 'version' && targetAggregate === null) {
-      throw new AppError(404, 'not_found', 'That Saved Video is unavailable.');
     }
     // Everything a refusal can be decided from without reading bytes is decided first.
     const placement = this.#placementSet(current, request, targetAggregate);
@@ -467,9 +470,10 @@ export class ProjectOutputService {
      * A re-framed file is a deliverable, not the next thing to work from. Presenting it would make
      * the stage show the crop and make every later save re-frame an already-re-framed video, while
      * the Project still holds the untouched cut it came from. So the Project presents what it
-     * stored only when the cut itself is what led this save.
+     * stored exactly when the cut itself is what led this save — which is what `primary === null`
+     * says, and the only place that is turned into a word.
      */
-    const presentsOutput = placement.presentsOutput;
+    const presentsOutput = placement.primary === null;
     const now = this.#now().toISOString();
     const savedVideoId =
       request.target.kind === 'new'
@@ -538,19 +542,14 @@ export class ProjectOutputService {
      * the browser rendered them in.
      */
     const cut = { asset: media.asset, inspected: media.inspected };
-    const stored = placement.primary === null ? cut : renditions[placement.primary]!;
-    const ordered: readonly {
-      readonly bytes: { readonly asset: AssetReadHandle; readonly inspected: InspectedVideo };
-      readonly specification: ProjectExportSpecificationValue | null;
-    }[] = [
+    // The member that leads, or nothing when the cut leads — asked once, used everywhere below.
+    const lead = placement.primary === null ? null : renditions[placement.primary]!;
+    const stored = lead ?? cut;
+    const ordered = [
       ...renditions
         .filter((_, index) => index !== placement.primary)
         .map((member) => ({ bytes: member, specification: member.specification })),
-      {
-        bytes: stored,
-        specification:
-          placement.primary === null ? null : renditions[placement.primary]!.specification,
-      },
+      { bytes: stored, specification: lead?.specification ?? null },
     ];
     const firstOrdinal = (targetAggregate?.versions.length ?? 0) + 1;
     const versions = ordered.map(({ bytes, specification }, index) =>

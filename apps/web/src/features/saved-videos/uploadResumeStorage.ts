@@ -1,3 +1,4 @@
+import { isRecord, isTimestamp } from '@studio/domain';
 import { createVersionedRecordStore } from '../../persistence/versionedRecord';
 
 /** How long a remembered key is worth replaying. The server's staged upload expires before this. */
@@ -13,9 +14,6 @@ export interface RememberedUploadKey {
 }
 
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /**
  * Names the bytes an upload is for, so the same file picked again after a reload is recognised.
@@ -50,8 +48,7 @@ export const uploadResumeStore = createVersionedRecordStore<readonly RememberedU
         entry['fingerprint'].length > 0 &&
         typeof entry['idempotencyKey'] === 'string' &&
         uuidPattern.test(entry['idempotencyKey']) &&
-        typeof entry['mintedAt'] === 'string' &&
-        !Number.isNaN(Date.parse(entry['mintedAt'])),
+        isTimestamp(entry['mintedAt']),
     );
     return entries.length === payload.length ? entries : null;
   },

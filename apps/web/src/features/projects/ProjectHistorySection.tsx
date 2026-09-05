@@ -1,7 +1,7 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectCurrentResponse, ProjectOutputHistoryItem } from '@studio/contracts';
 import { formatDateTime } from '@studio/domain';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Button, LinkButton, OverlayPanel, StatusNotice } from '../../ui';
 import { LoadingPlaceholder } from '../../ui/primitives/LoadingPlaceholder';
@@ -82,7 +82,25 @@ export const ProjectHistorySection = ({
   });
 
   const revisionItems = revisions.data?.pages.flatMap((page) => page.revisions) ?? [];
-  const outputItems = outputs.data?.pages.flatMap((page) => page.outputs) ?? [];
+  const outputItems = useMemo(
+    () => outputs.data?.pages.flatMap((page) => page.outputs) ?? [],
+    [outputs.data],
+  );
+  /**
+   * How many loaded rows each set has, counted once.
+   *
+   * A row says "Saved together" only where a sibling is on screen to be seen, and variant sets make
+   * this list grow several times faster — asking that question per row against the whole list is
+   * quadratic in exactly the case the slice makes common.
+   */
+  const setSizes = useMemo(() => {
+    const sizes = new Map<string, number>();
+    for (const { version } of outputItems) {
+      if (version.variantSetId === null) continue;
+      sizes.set(version.variantSetId, (sizes.get(version.variantSetId) ?? 0) + 1);
+    }
+    return sizes;
+  }, [outputItems]);
   const processingItems = processing.data?.pages.flatMap((page) => page.attempts) ?? [];
   const panelStyles = {
     display: 'grid',
@@ -165,11 +183,7 @@ export const ProjectHistorySection = ({
             // once the rest is loaded — neither is a claim this row can make on its own.
             const savedTogether =
               item.version.variantSetId !== null &&
-              outputItems.some(
-                (other) =>
-                  other.version.id !== item.version.id &&
-                  other.version.variantSetId === item.version.variantSetId,
-              );
+              (setSizes.get(item.version.variantSetId) ?? 0) > 1;
             return (
               <li key={item.version.id} css={itemStyles}>
                 <strong>
