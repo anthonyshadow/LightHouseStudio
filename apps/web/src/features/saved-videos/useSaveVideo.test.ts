@@ -177,6 +177,51 @@ describe('useSaveVideo', () => {
     expect(api.saveSavedVideoThumbnail).toHaveBeenCalledTimes(6);
   });
 
+  it('resumes an interrupted upload under the key the browser already used', async () => {
+    const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
+    // The upload that was interrupted: it never completed, so its key is still remembered.
+    api.saveVideo.mockRejectedValueOnce(new Error('The connection dropped.'));
+    const interrupted = renderHook(() => useSaveVideo(false, ownerUserId));
+    const source = artifact();
+    await act(async () => {
+      await interrupted.result.current.save(source);
+    });
+    const firstKey = api.saveVideo.mock.calls[0]?.[0].idempotencyKey;
+    expect(firstKey).toBeTypeOf('string');
+
+    // A reload: a new hook, a new artifact id, the same file. The key has to be the same one, or
+    // the server stages a second upload and the parts already sent are wasted.
+    interrupted.unmount();
+    const resumed = renderHook(() => useSaveVideo(false, ownerUserId));
+    await act(async () => {
+      await resumed.result.current.save({ ...source, id: crypto.randomUUID() });
+    });
+    expect(api.saveVideo.mock.calls[1]?.[0].idempotencyKey).toBe(firstKey);
+
+    // Once it lands, the hint is dropped: picking the same file again is a new upload.
+    const later = renderHook(() => useSaveVideo(false, ownerUserId));
+    await act(async () => {
+      await later.result.current.save({ ...source, id: crypto.randomUUID() });
+    });
+    expect(api.saveVideo.mock.calls[2]?.[0].idempotencyKey).not.toBe(firstKey);
+  });
+
+  it('does not remember a key for nobody, so no one inherits another upload', async () => {
+    const anonymous = renderHook(() => useSaveVideo());
+    const source = artifact();
+    await act(async () => {
+      await anonymous.result.current.save(source);
+    });
+    anonymous.unmount();
+    const next = renderHook(() => useSaveVideo());
+    await act(async () => {
+      await next.result.current.save({ ...source, id: crypto.randomUUID() });
+    });
+    expect(api.saveVideo.mock.calls[1]?.[0].idempotencyKey).not.toBe(
+      api.saveVideo.mock.calls[0]?.[0].idempotencyKey,
+    );
+  });
+
   it('saves a visual result under the tool that produced it', async () => {
     const { result } = renderHook(() => useSaveVideo());
 
