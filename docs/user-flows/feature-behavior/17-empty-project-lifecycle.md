@@ -210,11 +210,11 @@ provider work.
 ## Boundaries
 
 This story includes bounded semantic creative/edit checkpoints, working-media adoption, recoverable
-visual processing, atomic Saved Video output save, one recorded placement per revision, duplication
-into an independent Project, bounded history categories, and exact-Version preview/reuse/Download,
-but no Campaign expansion, restore/rollback, batch or multi-variant creation, templates or saved
-presets, several placements from one save, server-side rendering, generic Export record, or
-IndexedDB Project data. Project source selection, session hydration, configuration,
+visual processing, atomic Saved Video output save, one recorded placement per revision with the
+placements one save produced recorded on the Versions it wrote, duplication into an independent
+Project, bounded history categories, and exact-Version preview/reuse/Download, but no Campaign
+expansion, restore/rollback, batch or multi-variant creation, templates or saved presets,
+server-side rendering, generic Export record, or IndexedDB Project data. Project source selection, session hydration, configuration,
 local adoption, history viewing, and output save start no provider.
 Standalone existing-video behavior retains its separate save/replace contract. Project
 server/repository authority, retention, and cleanup remain as documented in Architecture.

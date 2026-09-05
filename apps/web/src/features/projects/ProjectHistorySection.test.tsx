@@ -120,6 +120,53 @@ const output: ProjectOutputHistoryItem = {
   contentUrl: `/api/projects/${projectId}/outputs/${versionId}/content`,
 };
 
+const variantSetId = '5b2d9e14-6c3a-4f81-9b27-3d5e7a0c1f92';
+const siblingVersionId = '7c1f2b64-3f9a-4b2e-9d51-0a8c6e2f4b10';
+
+/** One save, two placements: consecutive ordinals under one set id, the primary written last. */
+const savedTogetherOutputs: readonly ProjectOutputHistoryItem[] = [
+  {
+    ...output,
+    savedVideo: { ...output.savedVideo, libraryStatus: 'ready', currentVersionId: versionId },
+    version: {
+      ...output.version,
+      ordinal: 2,
+      width: 1_080,
+      height: 1_920,
+      exportSpecification: {
+        container: 'video/mp4',
+        aspect: '9:16',
+        resolution: { width: 1_080, height: 1_920 },
+        includeAudio: true,
+      },
+      variantSetId,
+    },
+    isCurrentForProject: true,
+  },
+  {
+    ...output,
+    savedVideo: { ...output.savedVideo, libraryStatus: 'ready', currentVersionId: versionId },
+    version: {
+      ...output.version,
+      id: siblingVersionId,
+      ordinal: 1,
+      width: 1_080,
+      height: 1_080,
+      filename: 'removed-master-square.mp4',
+      exportSpecification: {
+        container: 'video/mp4',
+        aspect: '1:1',
+        resolution: { width: 1_080, height: 1_080 },
+        includeAudio: true,
+      },
+      variantSetId,
+    },
+    // The post-save revision points at the primary, so a sibling states only where it was saved.
+    referenceRevision: null,
+    isCurrentForProject: false,
+  },
+];
+
 const staleAttempt: ProjectProcessingAttempt = {
   operationId,
   projectId,
@@ -320,6 +367,54 @@ describe('ProjectHistorySection', () => {
       }),
     );
     expect(await screen.findByText(/the video.s current version were not changed/u)).toBeVisible();
+  });
+
+  it('states each saved Version’s placement and marks the ones one save wrote together', async () => {
+    mockApiServer.use(
+      http.get(`*/api/projects/${projectId}/outputs`, () =>
+        HttpResponse.json({ outputs: savedTogetherOutputs, nextCursor: null }),
+      ),
+      http.get(`*/api/projects/${projectId}/history`, () =>
+        HttpResponse.json({ revisions: [], nextCursor: null }),
+      ),
+      http.get(`*/api/projects/${projectId}/processing/history`, () =>
+        HttpResponse.json({ attempts: [], nextCursor: null }),
+      ),
+    );
+    const session: ProjectSessionPort = {
+      projectId,
+      phase: 'saved',
+      current,
+      proposal: null,
+      hasLocalProposal: false,
+      message: null,
+      getCurrent: () => current,
+      flush: () => Promise.resolve(true),
+      acceptCurrent: vi.fn(),
+      propose: () => true,
+      retry: () => Promise.resolve(true),
+      discard: () => true,
+    };
+    render(
+      <StudioDesignProvider>
+        <RemoteStateTestProvider>
+          <ProjectHistorySection current={current} session={session} archived={false} />
+        </RemoteStateTestProvider>
+      </StudioDesignProvider>,
+    );
+
+    expect(
+      await screen.findByText('Phone, full screen · 9:16 · 1080×1920 · Saved together'),
+    ).toBeVisible();
+    expect(screen.getByText('Square post · 1:1 · 1080×1080 · Saved together')).toBeVisible();
+    // The primary is the one the Project was moved onto; the sibling says only where it was saved.
+    expect(screen.getByText(/Saved at change 1; made current at change 2/u)).toBeVisible();
+    const sibling = screen
+      .getByRole('link', { name: 'Download Removed master, Version 1' })
+      .closest('li');
+    expect(sibling).not.toBeNull();
+    expect(within(sibling!).getByText('Saved at change 1')).toBeVisible();
+    expect(within(sibling!).queryByText(/Current in this Project/u)).toBeNull();
   });
 
   it('retries each independent history feed and reaches its empty state', async () => {

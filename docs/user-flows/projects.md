@@ -338,10 +338,16 @@ the app:
    sheet. **New video** shows the proposed title (`defaultProjectOutputTitle`). **New version of an
    existing video** loads the shared exact-Version picker inside that same surface, then names the
    selected video and current Version directly. There is no picker-to-confirmation modal chain.
-   Both choices restate the recorded placement.
+   Both choices restate the recorded placement, and an **Also save for** group offers the other
+   placements: save-time input, not Project state, so leaving before saving forgets them.
 5. `begin()` flushes any pending session checkpoint, re-fetches the authoritative project, re-checks
-   that ready media still matches, mints an operation id, **persists the pending operation to
-   `localStorage`**, and only then posts `/api/projects/{id}/outputs`.
+   that ready media still matches, then makes each placement in turn — the chosen one first — from
+   one read of the cut, rendering and storing it before the next begins. Each member's upload key
+   is persisted before the first render, so a reload never re-renders or re-uploads one that
+   landed. A member that fails does not stop the run: what was made is saved and the rest are named
+   with a control that asks for exactly them again. Only then does it mint an operation id,
+   **persist the pending operation to `localStorage`**, and post `/api/projects/{id}/outputs` once,
+   carrying every placement it made.
 6. On reload, a stored pending operation is replayed in "reconciling" mode so a lost response can
    never produce a duplicate save (`:163-170`).
 7. Client failures (4xx/conflict) clear the pending record and refresh authoritative state;

@@ -918,10 +918,41 @@ saves, the Continue-save resume, the checkbox group in the destination form, the
 pointers, the id purposes — is a routine call made the way the nearest existing code makes it, and
 prompt 18 proceeds on those defaults.
 
-## 6. Validation (prompt 18)
+## 6. Validation (prompt 18), 2026-09-05
 
-Left for prompt 18's own validation report, since the slice has no verification prompt: the
-render-time and memory measurements against the budget stated in §3, the shell and Studio closure
-sizes before and after, cross-mode persistence of `variantSetId` (Postgres against the throwaway
-database, file mode with a reopened library), the three interruption hooks with three renditions,
-and what was not established.
+Implemented in two commits, in the deploy order §3 requires: the server half first, then the
+browser half.
+
+- **Closure sizes.** `AuthenticatedShell` 735_408 → 742_865 bytes, `StudioApp` 1_077_504 →
+  1_078_171; both ceilings raised with the measurement and the cause in
+  `scripts/check-build-manifest.mjs`. The save flow itself stayed out of both closures — the loop,
+  its preparation record and the per-placement progress list are in `ProjectRouteSurface`'s own
+  chunk — so what grew is the shared domain rules, the contract's raised cap, and the surfaces that
+  recognise siblings. `FORBIDDEN_CLOSURE_DEPENDENCIES` still passes on every closure.
+- **Cross-mode persistence of `variantSetId`.** File mode through the output-service suite;
+  Postgres through the ten integration suites (64 tests) against a throwaway database on compose
+  5433, with migration `0023` applied there and, separately, to the developer database the
+  real-stack journey runs against.
+- **Both unit-of-work implementations** were widened by hand and are held together by the shared
+  three-rendition fixture; the file journal was not changed, as §3 said it need not be.
+- **`bun run quality`** passes: typecheck, lint, format, dead code, module graph, docs, retired
+  program, 2_251 unit tests, build, the raised budgets, and the Storybook build.
+- **End-to-end**: 90 journeys pass, including the new untagged Chromium one-save-three-placements
+  journey and the real-stack deliverable journey.
+
+Deviations from §3, both deliberate:
+
+- **No Continue-save / Discard prompt on return.** §3 proposed one so a return to the Project would
+  not start a multi-minute render. Nothing starts a render on mount — rendering begins only when
+  Save is pressed — so the prompt guarded a state that cannot occur. An ordinary Save with a
+  matching basis reuses the record, skips what already landed, and is covered by a component test.
+- **A join takes its set id from the response's current Version**, not from a remembered client
+  value, which is one less thing to keep true across a reload.
+
+Not established, and stated rather than implied:
+
+- **Render time for a set was not measured** against the reference clip. The journey's three
+  placements complete inside its budget, which is evidence that it works, not a measurement of
+  what it costs.
+- **The 100-Version refusal is server-side only.** §3 also proposed refusing it in the destination
+  form; that check is not implemented, so an operator learns at the save rather than before it.

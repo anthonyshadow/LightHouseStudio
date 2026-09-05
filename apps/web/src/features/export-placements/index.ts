@@ -8,5 +8,4 @@ export {
 export {
   useExportPlacementRender,
   type ExportPlacementRenderPhase,
-  type ExportPlacementRenderResult,
 } from './useExportPlacementRender';

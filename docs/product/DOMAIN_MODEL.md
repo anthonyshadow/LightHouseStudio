@@ -170,7 +170,10 @@ re-framed for a **placement** — the destination shape the media is going to (k
 widescreen 16:9, phone 9:16, square 1:1, tall 4:5) at a fixed resolution. A placement chosen at
 save time is rendered into real bytes and recorded on the Version. Export variants are sibling
 placements of one deliverable.
-_Status: implemented one placement per save; multi-placement variant sets are target work (D10)._
+_Status (slice 2.3, 2026-09-05): one save produces up to the four placements, rendered one after
+another in the browser and stored as sibling Versions of one Saved Video. Each carries its own
+placement and the `variantSetId` of the save that made them; the placement the revision chose is
+written last, so it is the video's current Version and the one the Project points at._
 
 ### Archive
 
@@ -181,15 +184,16 @@ _Status: implemented._
 
 ## Supporting terms (kept, with their exact meanings)
 
-| Term                                    | Meaning                                                                                                                                            |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Saved Video**                         | A Library video record: title, status, append-only Versions, current-Version pointer, Project provenance when known ("No Project" chip otherwise). |
-| **Take**                                | A just-recorded, in-memory camera capture under review; it becomes durable only by saving (to a Library or a Project).                             |
-| **Placement**                           | The destination shape a video is produced for. A placement is not delivery; nothing is sent anywhere.                                              |
-| **Library**                             | An account-level collection surface: Videos, Characters, Outfits, Voices.                                                                          |
-| **Character / Wardrobe variant**        | A reusable creative identity (prompt + reference image) and its saved outfit variants.                                                             |
-| **Membership ("Used in this Project")** | A non-owning organizational link from a Project to Library items it uses. Removing it never deletes anything.                                      |
-| **Recording session**                   | The live camera stage lifecycle: camera off by default, explicit start, optional live AI, take review.                                             |
+| Term                                    | Meaning                                                                                                                                                                                                                 |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Saved Video**                         | A Library video record: title, status, append-only Versions, current-Version pointer, Project provenance when known ("No Project" chip otherwise).                                                                      |
+| **Take**                                | A just-recorded, in-memory camera capture under review; it becomes durable only by saving (to a Library or a Project).                                                                                                  |
+| **Placement**                           | The destination shape a video is produced for. A placement is not delivery; nothing is sent anywhere.                                                                                                                   |
+| **Library**                             | An account-level collection surface: Videos, Characters, Outfits, Voices.                                                                                                                                               |
+| **Variant set**                         | The placements one save produced together — sibling Versions of one Saved Video sharing a `variantSetId`. Shown as "Saved together"; never called a variant in the interface, where that word means a Wardrobe variant. |
+| **Character / Wardrobe variant**        | A reusable creative identity (prompt + reference image) and its saved outfit variants.                                                                                                                                  |
+| **Membership ("Used in this Project")** | A non-owning organizational link from a Project to Library items it uses. Removing it never deletes anything.                                                                                                           |
+| **Recording session**                   | The live camera stage lifecycle: camera off by default, explicit start, optional live AI, take review.                                                                                                                  |
 
 ## Deprecated names (do not use in new UI, code, or docs)
 
