@@ -1204,22 +1204,15 @@ describe('Project export specifications', () => {
     ]);
     expect(set.order.map(({ aspect }) => aspect)).toEqual(['9:16', '1:1', '4:5']);
     expect(set.order[set.primary!]!.aspect).toBe('9:16');
-    expect(set.presentsOutput).toBe(false);
   });
 
   it('leads with the cut when no placement was chosen, or when none was produced', () => {
+    // `primary === null` is the one statement that the cut itself is what this save stores.
     const kept = projectOutputPrimaryPlacement(null, [placement('9:16'), placement('1:1')]);
     expect(kept.primary).toBeNull();
-    expect(kept.presentsOutput).toBe(true);
     expect(kept.order).toHaveLength(2);
-
-    const degraded = projectOutputPrimaryPlacement(placement('16:9'), []);
-    expect(degraded.primary).toBeNull();
-    expect(degraded.presentsOutput).toBe(true);
-
-    const plain = projectOutputPrimaryPlacement(null, []);
-    expect(plain.primary).toBeNull();
-    expect(plain.presentsOutput).toBe(true);
+    expect(projectOutputPrimaryPlacement(placement('16:9'), []).primary).toBeNull();
+    expect(projectOutputPrimaryPlacement(null, []).primary).toBeNull();
   });
 
   it('still leads a set whose chosen placement failed, and presents nothing', () => {
@@ -1229,13 +1222,11 @@ describe('Project export specifications', () => {
     ]);
     // Last in canonical order, so the choice is stable however the browser ordered its attempt.
     expect(set.order[set.primary!]!.aspect).toBe('1:1');
-    expect(set.presentsOutput).toBe(false);
   });
 
   it('never stores the cut again when a later save joins a set', () => {
     const joined = projectOutputPrimaryPlacement(null, [placement('4:5')], { joining: true });
     expect(joined.primary).toBe(0);
-    expect(joined.presentsOutput).toBe(false);
 
     const chosen = projectOutputPrimaryPlacement(placement('1:1'), [placement('1:1')], {
       joining: true,

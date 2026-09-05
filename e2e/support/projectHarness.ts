@@ -491,10 +491,9 @@ export const installProjectHarness = async (
           createdAt: `2030-01-01T00:${(7 + at).toString().padStart(2, '0')}:00.000Z`,
         };
       });
+      // The primary: written last, so it is the video's current Version.
       const version = versions.at(-1)!;
-      const versionId = version.id;
-      const ordinal = version.ordinal;
-      const createdAt = version.createdAt;
+      const { id: versionId, ordinal, createdAt } = version;
       const savedVideo: SavedVideoDetail =
         existing === undefined
           ? {

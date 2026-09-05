@@ -492,10 +492,6 @@ export const ProjectOutputSaveSection = ({
     // Produced before the receipt exists, so a recovered save replays bytes rather than making
     // them. Where the browser cannot render, the cut is stored in its own shape and the Version
     // records that no placement was applied — the notice above the control said so beforehand.
-    //
-    // Asked here rather than read off the rendered state: the capability resolves asynchronously,
-    // and a save pressed before it answers would otherwise take the same branch as a browser that
-    // genuinely cannot re-frame, silently writing a Version in the wrong shape with nothing said.
     const chosen = renditionPlacement(latest.revision.snapshot.exportSpecification);
     /*
      * The chosen placement first, so the one the revision records fails fast rather than after the
@@ -509,32 +505,28 @@ export const ProjectOutputSaveSection = ({
         (specification) => (specification === null ? [] : [specification]),
       );
     let renditions: SaveProjectOutputRequest['renditions'] = [];
-    if (members.length > 0) {
-      if (!(await videoEditSupported())) {
-        /*
-         * Asked here rather than read off the rendered state: the capability resolves
-         * asynchronously, and a save pressed before it answers would otherwise take the same
-         * branch as a browser that genuinely cannot re-frame. One placement degrades to the cut in
-         * its own shape, as it always has; a set cannot, because saving one video where several
-         * were asked for is not the request.
-         */
-        if (members.length > 1) {
-          setPhase('error');
-          setMessage(
-            'This browser cannot re-frame a video, so these placements cannot be made. Nothing was saved.',
-          );
-          return;
-        }
-      } else {
-        const produced = await produceRenditions(
-          ownerUserId,
-          latest,
-          members,
-          options.variantSetId ?? null,
-        );
-        if (produced === 'stopped') return;
-        renditions = produced;
-      }
+    /*
+     * Asked here rather than read off the rendered state: the capability resolves asynchronously,
+     * and a save pressed before it answers would otherwise take the same branch as a browser that
+     * genuinely cannot re-frame. One placement then degrades to the cut in its own shape, as it
+     * always has; a set cannot, because saving one video where several were asked for is not the
+     * request that was made.
+     */
+    if (members.length > 0 && (await videoEditSupported())) {
+      const produced = await produceRenditions(
+        ownerUserId,
+        latest,
+        members,
+        options.variantSetId ?? null,
+      );
+      if (produced === 'stopped') return;
+      renditions = produced;
+    } else if (members.length > 1) {
+      setPhase('error');
+      setMessage(
+        'This browser cannot re-frame a video, so these placements cannot be made. Nothing was saved.',
+      );
+      return;
     }
     const pending: PendingProjectOutputOperation = {
       schemaVersion: 1,

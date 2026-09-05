@@ -37,15 +37,15 @@ const headerStyles = (theme: Theme): CSSObject => ({
 
 const stateLabel = (
   member: ProjectOutputRenditionMember,
-  index: number,
-  active: number,
+  position: number,
   total: number,
+  running: boolean,
 ): string => {
   if (member.outcome === 'stored') return 'Made';
   if (member.outcome === 'failed')
     return `Not made — ${member.reason ?? 'it could not be re-framed'}`;
   if (member.outcome === 'cancelled') return 'Not made — stopped';
-  return index === active ? `Re-framing ${index + 1} of ${total}` : 'Waiting';
+  return running ? `Re-framing ${position} of ${total}` : 'Waiting';
 };
 
 /**
@@ -73,7 +73,8 @@ export const ProjectPlacementSetProgress = ({
   if (members.length === 0) return null;
   const made = members.filter(({ outcome }) => outcome === 'stored').length;
   const running = active >= 0;
-  const overall = members.length === 0 ? 0 : (made + (running ? progress : 0)) / members.length;
+  const showCancel = running && onCancelRemaining !== undefined;
+  const overall = (made + (running ? progress : 0)) / members.length;
 
   return (
     <div role="status" aria-live="polite" data-placement-set-progress="">
@@ -83,24 +84,27 @@ export const ProjectPlacementSetProgress = ({
             ? `Making ${members.length} placements — ${made} of ${members.length} made`
             : `${made} of ${members.length} placements made`}
         </span>
-        {running && onCancelRemaining !== undefined ? (
+        {showCancel ? (
           <Button size="small" variant="secondary" onClick={onCancelRemaining}>
             Cancel remaining
           </Button>
         ) : null}
       </p>
       <ul css={listStyles(theme)}>
-        {members.map((member, index) => (
-          <li key={member.specification.aspect}>
-            <span>{exportPlacementLabel(projectExportAspectOf(member.specification))}</span>
-            <span data-state={member.outcome}>
-              {stateLabel(member, index, active, members.length)}
-              {index === active ? ` · ${Math.round(progress * 100)}%` : ''}
-            </span>
-          </li>
-        ))}
+        {members.map((member, index) => {
+          const isActive = index === active;
+          return (
+            <li key={member.specification.aspect}>
+              <span>{exportPlacementLabel(projectExportAspectOf(member.specification))}</span>
+              <span data-state={member.outcome}>
+                {stateLabel(member, index + 1, members.length, isActive)}
+                {isActive ? ` · ${Math.round(progress * 100)}%` : ''}
+              </span>
+            </li>
+          );
+        })}
       </ul>
-      {running && onCancelRemaining !== undefined ? (
+      {showCancel ? (
         <p
           css={{
             margin: `${theme.space.xs} 0 0`,
