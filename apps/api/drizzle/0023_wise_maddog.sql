@@ -1,0 +1,1 @@
+ALTER TABLE "video_versions" ADD COLUMN "variant_set_id" uuid;

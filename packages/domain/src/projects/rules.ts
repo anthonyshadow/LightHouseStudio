@@ -189,6 +189,106 @@ export const projectExportAspectOf = (
   specification: ProjectExportSpecification | null,
 ): ProjectExportAspect => specification?.aspect ?? 'source';
 
+/**
+ * The placements a save can actually produce, in the one order every set is written, sent and
+ * shown. `source` is not among them: it is the absence of a placement, not a member of a set.
+ */
+export const PROJECT_EXPORT_PLACEMENT_ASPECTS: readonly ProjectExportPlacementAspect[] =
+  PROJECT_EXPORT_ASPECTS.filter(isProjectExportPlacementAspect);
+
+/**
+ * The placements one save may produce, returned in canonical order.
+ *
+ * Distinctness is by aspect rather than by whole specification because the filename tag is the
+ * aspect alone (`projectExportFilename`), so two members of one aspect would land as one name; and
+ * because every surface that groups siblings names them by placement, which two members of one
+ * aspect would make ambiguous. The cap is the number of placements that exist — asking for more
+ * than four means asking for one of them twice.
+ */
+export const validateProjectExportPlacementSet = (
+  specifications: readonly ProjectExportSpecification[],
+): readonly ProjectExportSpecification[] => {
+  if (specifications.length > PROJECT_EXPORT_PLACEMENT_ASPECTS.length) {
+    throw new ProjectRuleError(
+      'invalid-export-specification',
+      `One save produces at most ${PROJECT_EXPORT_PLACEMENT_ASPECTS.length} placements.`,
+    );
+  }
+  const seen = new Set<ProjectExportAspect>();
+  for (const specification of specifications) {
+    validateProjectExportSpecification(specification);
+    if (!isProjectExportPlacementAspect(specification.aspect)) {
+      throw new ProjectRuleError(
+        'invalid-export-specification',
+        'Keeping the original shape is not a placement. It is what a save does with no placement at all.',
+      );
+    }
+    if (seen.has(specification.aspect)) {
+      throw new ProjectRuleError(
+        'invalid-export-specification',
+        'One save cannot produce the same placement twice.',
+      );
+    }
+    seen.add(specification.aspect);
+  }
+  // Built from the canonical list rather than sorted, so the result is canonical by construction.
+  return PROJECT_EXPORT_PLACEMENT_ASPECTS.flatMap((aspect) =>
+    specifications.filter((specification) => specification.aspect === aspect),
+  );
+};
+
+export interface ProjectOutputPlacementSet {
+  /** Every placement this save produces, in canonical order — the order they are written in. */
+  readonly order: readonly ProjectExportSpecification[];
+  /**
+   * Which member's Version is written last, or `null` when the cut itself is that Version.
+   *
+   * The last Version written is the Saved Video's current one, the receipt's scalar, the Project's
+   * `lastSuccessfulOutput` and the result's `output`. Naming it here, once, is what lets every one
+   * of those keep the meaning and the validator it already had.
+   */
+  readonly primary: number | null;
+  /** Whether the Project presents what this save stored — exactly when the cut is the primary. */
+  readonly presentsOutput: boolean;
+}
+
+/**
+ * Which placement of a set is the primary, given what the revision chose.
+ *
+ * The revision records the operator's intent — one chosen placement, or none. The set that a save
+ * actually produced is the Versions it wrote, each carrying its own specification. This rule is the
+ * one place the two meet: the member matching the intent leads, the cut leads when no placement was
+ * chosen or none was produced, and a set whose chosen member failed still has a leader rather than
+ * no save at all.
+ *
+ * `joining` is a save that adds members to a set that already exists. The cut is never stored a
+ * second time there — it is already a Version of that Saved Video — so a join with nothing to add
+ * is refused rather than quietly re-saving the original.
+ */
+export const projectOutputPrimaryPlacement = (
+  chosen: ProjectExportSpecification | null,
+  specifications: readonly ProjectExportSpecification[],
+  options: { readonly joining?: boolean } = {},
+): ProjectOutputPlacementSet => {
+  const order = validateProjectExportPlacementSet(specifications);
+  const chosenAspect = projectExportAspectOf(chosen);
+  const matching = order.findIndex(({ aspect }) => aspect === chosenAspect);
+  if (options.joining === true) {
+    if (order.length === 0) {
+      throw new ProjectRuleError(
+        'invalid-transition',
+        'Adding to a set of placements needs at least one placement to add.',
+      );
+    }
+    return { order, primary: matching >= 0 ? matching : order.length - 1, presentsOutput: false };
+  }
+  if (!isProjectExportPlacementAspect(chosenAspect) || order.length === 0) {
+    // The cut itself is what this save stores: either nothing was re-framed, or nothing could be.
+    return { order, primary: null, presentsOutput: true };
+  }
+  return { order, primary: matching >= 0 ? matching : order.length - 1, presentsOutput: false };
+};
+
 const requireExportDimension = (value: number, label: string): void => {
   if (!Number.isInteger(value) || value % 2 !== 0) {
     throw new ProjectRuleError(
@@ -988,7 +1088,17 @@ export interface SaveProjectOutputInput {
   readonly expectedProjectVersion: number;
   readonly expectedRevisionNumber: number;
   readonly savedVideoId: string;
+  /** The Version written last, which is the one every existing single-output pointer names. */
   readonly videoVersionId: string;
+  /**
+   * The other Versions this one save wrote, in write order, each a placement of the same cut.
+   *
+   * They receive producing provenance exactly as the primary does — one output link each, from
+   * this one producing revision — and nothing else: `lastSuccessfulOutput` names the primary
+   * alone, because a Project points at one Version and the siblings are found through the set it
+   * belongs to.
+   */
+  readonly siblingVersionIds?: readonly string[];
   readonly author: ProjectRevisionAuthor;
   /**
    * Whether the produced Version is the cut itself, and so becomes what the Project presents.
@@ -1066,7 +1176,18 @@ export const saveProjectOutput = (
 
   const savedVideoId = requireId(input.savedVideoId, 'Saved video');
   const videoVersionId = requireId(input.videoVersionId, 'Video version');
-  if (aggregate.outputLinks.some((link) => link.videoVersionId === videoVersionId)) {
+  // Write order, which is also link order: the siblings, then the primary last.
+  const versionIds = [
+    ...(input.siblingVersionIds ?? []).map((id) => requireId(id, 'Video version')),
+    videoVersionId,
+  ];
+  if (new Set(versionIds).size !== versionIds.length) {
+    throw new ProjectRuleError(
+      'invalid-snapshot',
+      'One save cannot write the same Video Version twice.',
+    );
+  }
+  if (versionIds.some((id) => aggregate.outputLinks.some((link) => link.videoVersionId === id))) {
     throw new ProjectRuleError(
       'invalid-snapshot',
       'That Video Version already has producing Project provenance.',
@@ -1093,14 +1214,15 @@ export const saveProjectOutput = (
     workflowPhase: 'complete',
     updatedAt: now,
   });
-  const output: ProjectOutputLink = {
+  const outputs: readonly ProjectOutputLink[] = versionIds.map((id) => ({
     projectId: project.id,
     ownerUserId: project.ownerUserId,
-    ...outputReference,
+    savedVideoId,
+    videoVersionId: id,
     producingRevisionId: producingRevision.id,
     producingRevisionNumber: producingRevision.revisionNumber,
     createdAt: now,
-  };
+  }));
   const revision: ProjectRevision = {
     id: revisionId,
     projectId: project.id,
@@ -1132,7 +1254,7 @@ export const saveProjectOutput = (
         updatedAt: now,
       },
       revisions: [...aggregate.revisions, revision],
-      outputLinks: [...aggregate.outputLinks, output],
+      outputLinks: [...aggregate.outputLinks, ...outputs],
     },
   };
 };

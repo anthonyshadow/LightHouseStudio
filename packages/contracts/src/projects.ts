@@ -950,6 +950,13 @@ export const projectOutputSaveTargetSchema = z.discriminatedUnion('kind', [
 ]);
 
 /**
+ * How many placements one save may produce: the number of placement aspects the domain defines.
+ * Mirrored by hand because contracts cannot import the domain; `shared-contract-parity` holds the
+ * two together.
+ */
+export const PROJECT_EXPORT_PLACEMENT_COUNT = 4;
+
+/**
  * Re-framed bytes already uploaded for this save, and the placement they were produced for.
  *
  * The reference is separate from `media` on purpose: `media` still names the exact cut that was on
@@ -970,11 +977,49 @@ export const saveProjectOutputRequestSchema = z
     media: projectMediaReferenceSchema,
     target: projectOutputSaveTargetSchema,
     /**
-     * A list because a save is one day expected to produce several placements at once. Exactly one
-     * is produced today, and an empty list means the cut is stored in the shape it already has.
+     * Every placement this save produced, in canonical aspect order. An empty list means the cut is
+     * stored in the shape it already has — "Keep as it is", or a browser that could not re-frame.
      * Defaulted so a save receipt written before this field existed still replays.
+     *
+     * The cap is the number of placements that exist (`PROJECT_EXPORT_PLACEMENT_ASPECTS` in the
+     * domain, mirrored here because contracts cannot import it and held by the parity suite), and
+     * the members are distinct by aspect: the filename tag is the aspect alone, so two members of
+     * one aspect would land as one name and read as one placement on every surface.
      */
-    renditions: z.array(projectOutputRenditionSchema).max(1).default([]),
+    renditions: z
+      .array(projectOutputRenditionSchema)
+      .max(PROJECT_EXPORT_PLACEMENT_COUNT)
+      .default([])
+      .superRefine((renditions, context) => {
+        const seen = new Set<string>();
+        renditions.forEach(({ specification }, index) => {
+          if (specification.aspect === 'source') {
+            context.addIssue({
+              code: 'custom',
+              path: [index, 'specification', 'aspect'],
+              message: 'Keeping the original shape is not a placement a save produces.',
+            });
+            return;
+          }
+          if (seen.has(specification.aspect)) {
+            context.addIssue({
+              code: 'custom',
+              path: [index, 'specification', 'aspect'],
+              message: 'One save cannot produce the same placement twice.',
+            });
+          }
+          seen.add(specification.aspect);
+        });
+      }),
+    /**
+     * The set these placements join, when this save adds members to one that already exists.
+     *
+     * Optional with no default, and omitted rather than sent as null on an ordinary save: the
+     * replay fingerprint hashes the parsed body, so a defaulted key would turn every receipt
+     * written before this field into an operation-key conflict. It is identity from the body and is
+     * never trusted on its own — the server accepts it only against the session owner's own target.
+     */
+    variantSetId: z.uuid().optional(),
   })
   .strict();
 
