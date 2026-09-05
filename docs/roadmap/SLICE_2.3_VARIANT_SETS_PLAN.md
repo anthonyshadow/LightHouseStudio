@@ -5,9 +5,9 @@
 it once approved; the slice has no separate verification prompt (prompts 17, 18 and 19 are A, B, B),
 so §6 is left for prompt 18's own validation report. Findings PCD-3, DC-14 and db-11 are in the
 [current-state audit](../audits/CURRENT_STATE_AUDIT.md); D10 is in
-[Decisions required](../DECISIONS_REQUIRED.md). No code was changed by this prompt. **Approval:**
-pending — the product owner answers §5; the D10 record, in the D4 format, is added to Decisions
-required in the same commit as the approval.
+[Decisions required](../DECISIONS_REQUIRED.md). No code was changed by this prompt. **Approved
+2026-09-05** with every recommendation in §5 taken as the answer; D10 is recorded as decided in the
+same commit.
 
 **In one paragraph.** One save is already shaped for several placements — the request carries a
 `renditions` list and every Version records its own placement — but exactly one is let through, at
@@ -860,7 +860,12 @@ the same way.
 ## 5. Questions whose answers change the implementation
 
 Only these five change what prompt 18 builds; each carries a recommendation and what the other
-answer costs. The D10 record (D4 format, dated, linked here) is added when they are answered.
+answer costs. **Answered 2026-09-05: every recommendation is approved as written** — the set travels
+on the save request (Q1), "Keep as it is" may be the presented primary of a set (Q2), a later save
+may join a set under a validated `variantSetId` (Q3), a failed member leaves the produced subset
+saved and is named with Retry (Q4), and the journey runs untagged on Chromium (Q5). Prompt 18
+implements exactly those answers; D10 is recorded as decided in
+[Decisions required](../DECISIONS_REQUIRED.md) in the same commit.
 
 **Q1 — Where does the set live: on the save request, with the revision keeping one chosen
 placement as intent and the primary derived server-side (recommended), or on the revision
