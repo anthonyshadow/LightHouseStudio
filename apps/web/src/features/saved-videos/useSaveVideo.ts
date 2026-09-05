@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SavedVideoDetail, SavedVideoOrigin } from '@studio/contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  forgetUploadKey,
+  rememberedUploadKey,
+  rememberUploadKey,
+  uploadFingerprint,
+} from './uploadResumeStorage';
+import {
   appendSavedVideoVersion,
   appendSavedVideoVersionDirect,
   saveSavedVideoThumbnail,
@@ -95,10 +101,72 @@ export type SaveVideoOptions = Readonly<{
 /** The same, for a replacement — whose target names the source, so it carries none. */
 export type ReplaceVideoOptions = Omit<SaveVideoOptions, 'source'>;
 
-export const useSaveVideo = (directMultipartUpload = false) => {
+export const useSaveVideo = (
+  directMultipartUpload = false,
+  /**
+   * Whose uploads these are. Passed in rather than read from context so this hook stays a plain
+   * piece of the save flow; without it an upload still works, it just cannot be resumed after a
+   * reload, because a key remembered for nobody could be replayed by the next person to sign in.
+   */
+  ownerUserId: string | null = null,
+) => {
   const queryClient = useQueryClient();
   const [state, setState] = useState<SaveVideoState>({ status: 'idle' });
   const keys = useRef(new Map<string, string>());
+
+  /**
+   * The idempotency key these bytes are already uploading under, minted once and remembered.
+   *
+   * A key is what lets the server replay a staged upload instead of starting a second one, and it
+   * used to live only in the ref below — so a reload lost it and a large upload began again from
+   * zero, even though the parts it had already sent were still on the server. It is remembered
+   * against what the browser can say about the file without reading it, so the same file picked
+   * again after a reload continues rather than repeats.
+   */
+  const keyFor = useCallback(
+    (
+      keyId: string,
+      /**
+       * What this upload is, in terms that survive a reload: the operation and the file, never the
+       * artifact — a reload mints a new artifact id for the same picked file, and a fingerprint
+       * that included it could never match the upload it is meant to resume.
+       */
+      scope: string,
+      media: Blob,
+      filename: string,
+    ): { key: string; fingerprint: string } => {
+      const fingerprint = uploadFingerprint(media, filename, scope);
+      const remembered =
+        keys.current.get(keyId) ??
+        (ownerUserId === null ? null : rememberedUploadKey(ownerUserId, fingerprint, Date.now()));
+      const key = remembered ?? crypto.randomUUID();
+      keys.current.set(keyId, key);
+      if (ownerUserId !== null) {
+        rememberUploadKey(ownerUserId, {
+          fingerprint,
+          idempotencyKey: key,
+          mintedAt: new Date().toISOString(),
+        });
+      }
+      return { key, fingerprint };
+    },
+    [ownerUserId],
+  );
+
+  /**
+   * Drops the remembered key once the bytes are durably stored.
+   *
+   * Only the remembered copy: within this session the same artifact keeps reusing its key, which
+   * is what stops a second Save of one take from making a second Video. What is dropped is the
+   * hint that survives a reload, because there is nothing left to resume — and a file picked again
+   * in a later session is a new upload, not a replay of one that finished.
+   */
+  const forgetKey = useCallback(
+    (fingerprint: string) => {
+      if (ownerUserId !== null) forgetUploadKey(ownerUserId, fingerprint);
+    },
+    [ownerUserId],
+  );
   const controller = useRef<AbortController | null>(null);
 
   const completeSave = useCallback(
@@ -128,9 +196,13 @@ export const useSaveVideo = (directMultipartUpload = false) => {
     ) => {
       if (controller.current !== null) return null;
       const keyId = keyScope === undefined ? artifact.id : `${artifact.id}:${keyScope}`;
-      const idempotencyKey = keys.current.get(keyId) ?? crypto.randomUUID();
-      keys.current.set(keyId, idempotencyKey);
       const retained = media?.blob ?? artifact.media;
+      const { key: idempotencyKey, fingerprint } = keyFor(
+        keyId,
+        keyScope === undefined ? 'save' : `save:${keyScope}`,
+        retained,
+        artifact.filename,
+      );
       const active = new AbortController();
       controller.current = active;
       setState({ status: 'saving', artifactId: artifact.id });
@@ -151,6 +223,7 @@ export const useSaveVideo = (directMultipartUpload = false) => {
         // previewed by the shape it replaced.
         const saved = await saveThumbnailWhenAvailable(video, retained, active.signal, thumbnail);
         if (active.signal.aborted) return null;
+        forgetKey(fingerprint);
         completeSave(artifact.id, saved);
         return saved;
       } catch (error) {
@@ -165,7 +238,7 @@ export const useSaveVideo = (directMultipartUpload = false) => {
         if (controller.current === active) controller.current = null;
       }
     },
-    [completeSave, directMultipartUpload],
+    [completeSave, directMultipartUpload, forgetKey, keyFor],
   );
 
   const replace = useCallback(
@@ -180,8 +253,12 @@ export const useSaveVideo = (directMultipartUpload = false) => {
     ) => {
       if (controller.current !== null) return null;
       const keyId = `${artifact.id}:replace:${target.videoId}:${target.currentVersionId}`;
-      const idempotencyKey = keys.current.get(keyId) ?? crypto.randomUUID();
-      keys.current.set(keyId, idempotencyKey);
+      const { key: idempotencyKey, fingerprint } = keyFor(
+        keyId,
+        `replace:${target.videoId}:${target.currentVersionId}`,
+        artifact.media,
+        artifact.filename,
+      );
       const active = new AbortController();
       controller.current = active;
       setState({ status: 'saving', artifactId: artifact.id });
@@ -208,6 +285,7 @@ export const useSaveVideo = (directMultipartUpload = false) => {
           thumbnail,
         );
         if (active.signal.aborted) return null;
+        forgetKey(fingerprint);
         completeSave(artifact.id, saved);
         return saved;
       } catch (error) {
@@ -222,7 +300,7 @@ export const useSaveVideo = (directMultipartUpload = false) => {
         if (controller.current === active) controller.current = null;
       }
     },
-    [completeSave, directMultipartUpload],
+    [completeSave, directMultipartUpload, forgetKey, keyFor],
   );
 
   const reset = useCallback(() => {
