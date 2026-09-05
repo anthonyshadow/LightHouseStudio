@@ -257,7 +257,8 @@ result-state blind spot on presenting saves (DC-13).
 ### 7.6 Media pipeline and storage
 
 P2: no orphan sweep for byte assets (STOR-1); uploads not resumable across reload — idempotency
-keys live in a ref (STOR-2); poster center-crop contradiction (STOR-3); full-object copy on every
+keys live in a ref (STOR-2, _the saved-video upload half closed by slice 2.4: keys are remembered
+against a file fingerprint and replayed_); poster center-crop contradiction (STOR-3); full-object copy on every
 re-verification (STOR-4); local-mode delete never frees bytes (STOR-5 = SEC-1, D14). P3: `.webm`
 extension for PNGs (STOR-12); video-jobs content route bypasses the shared ranged-byte owner
 (STOR-10); reference-image purge fires only on creative-library route hits (STOR-11 =
