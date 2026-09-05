@@ -119,13 +119,18 @@ config so "production" cannot be misread.
 **Blocks:** nothing in Phases 1–5; blocks any team/collaboration ambition. **Decide by:** whenever
 a second user matters — explicitly, not by drift.
 
-## D10 — Multi-placement variant sets in one save?
+## D10 — Multi-placement variant sets in one save? — **decided**
 
 **Question:** The save contract already accepts a renditions array but caps it at one; producing
 16:9 + 9:16 + 1:1 of one deliverable takes three save rounds that each clear the setup.
-**Recommendation: yes** — raise the cap and render placements serially in the browser with
-per-placement progress. This is the marketing persona's core job.
-**Blocks:** Phase 2 slice. **Decide by:** before that slice.
+**Decision (2026-09-05):** yes — one save accepts up to the four placement aspects, rendered
+serially in the browser with per-placement progress and cancel-remaining. The set travels on the
+save request while the revision keeps its one chosen placement as intent; the server derives which
+member is primary and writes it last, so every existing pointer keeps its meaning. Sibling Versions
+are recognizable by a nullable `variantSetId` carried on each Version, added by one expand-first
+migration. A failed member leaves the produced ones saved and is named with a retry that joins the
+same set. Design and consequences in the
+[slice 2.3 plan](roadmap/SLICE_2.3_VARIANT_SETS_PLAN.md); implemented in slice 2.3.
 
 ## D11 — HEVC intake?
 
