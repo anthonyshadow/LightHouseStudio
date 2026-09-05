@@ -51,7 +51,17 @@ export const useExistingVideoSourceCoordinator = ({
         detail: 'Validating playback, duration, orientation, tracks, and codec locally.',
       });
       try {
-        const validated = await validateExistingVideo(file, false, controller.signal);
+        const validated = await validateExistingVideo(file, false, controller.signal, 'source', {
+          // A conversion is minutes, not the moment the "Checking…" notice promises, so it says
+          // what it is doing rather than leaving the operator watching an unexplained wait.
+          onConvert: () =>
+            recording.beginProcessing({
+              kind: 'source-validation',
+              title: 'Converting this video…',
+              detail:
+                'This video is in a format this app cannot publish, so it is being converted to H.264 here. Nothing is uploaded while it converts.',
+            }),
+        });
         if (controller.signal.aborted) {
           if (generation === generationRef.current) recording.cancelProcessing();
           return;
