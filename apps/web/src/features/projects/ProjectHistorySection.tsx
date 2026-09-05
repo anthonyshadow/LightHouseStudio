@@ -1,6 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectCurrentResponse, ProjectOutputHistoryItem } from '@studio/contracts';
-import { formatDateTime } from '@studio/domain';
+import { formatDateTime, variantSetRuns } from '@studio/domain';
 import { useMemo, useRef, useState } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Button, LinkButton, OverlayPanel, StatusNotice } from '../../ui';
@@ -87,19 +87,19 @@ export const ProjectHistorySection = ({
     [outputs.data],
   );
   /**
-   * How many loaded rows each set has, counted once.
+   * The Versions on screen that were saved together with at least one other Version on screen.
    *
-   * A row says "Saved together" only where a sibling is on screen to be seen, and variant sets make
-   * this list grow several times faster — asking that question per row against the whole list is
-   * quadratic in exactly the case the slice makes common.
+   * A set is written at consecutive ordinals and listed newest first, so its members are adjacent
+   * here: one pass over the runs, rather than a scan per row against the whole list — quadratic in
+   * exactly the case variant sets make common. A set split across a page boundary states itself
+   * once the rest is loaded; a save that produced one placement never claims it.
    */
-  const setSizes = useMemo(() => {
-    const sizes = new Map<string, number>();
-    for (const { version } of outputItems) {
-      if (version.variantSetId === null) continue;
-      sizes.set(version.variantSetId, (sizes.get(version.variantSetId) ?? 0) + 1);
+  const savedTogetherIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const run of variantSetRuns(outputItems.map(({ version }) => version))) {
+      if (run.versions.length > 1) for (const { id } of run.versions) ids.add(id);
     }
-    return sizes;
+    return ids;
   }, [outputItems]);
   const processingItems = processing.data?.pages.flatMap((page) => page.attempts) ?? [];
   const panelStyles = {
@@ -181,9 +181,7 @@ export const ProjectHistorySection = ({
             // Said only where the sibling is on screen to be seen. A save that produced one
             // placement carries a set id too, and a set split across a page boundary states itself
             // once the rest is loaded — neither is a claim this row can make on its own.
-            const savedTogether =
-              item.version.variantSetId !== null &&
-              (setSizes.get(item.version.variantSetId) ?? 0) > 1;
+            const savedTogether = savedTogetherIds.has(item.version.id);
             return (
               <li key={item.version.id} css={itemStyles}>
                 <strong>

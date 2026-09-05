@@ -152,7 +152,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   const { availability, state: capabilityState, retry: retryProviderAvailability } = provider;
   const savedVideoSave = useSaveVideo(
     Boolean(availability.directSavedVideoUploadAvailable),
-    auth.session?.user.id ?? null,
+    auth.session!.user.id,
   );
 
   const contextualProjectId = useProjectVideoCreationContext({

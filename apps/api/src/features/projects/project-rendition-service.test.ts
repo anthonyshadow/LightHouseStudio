@@ -93,6 +93,32 @@ describe('ProjectRenditionService', () => {
       specification: phonePlacement,
     });
 
+  it('keeps what it learned about the bytes beside the Project, once, for the save to trust', async () => {
+    const operationKey = randomUUID();
+    const response = await upload(operationKey);
+
+    // The placement it was rendered for and the inspection of these exact bytes, keyed by the
+    // checksum the stored manifest still carries.
+    await expect(projects.getRendition(ownerUserId, response.assetId)).resolves.toMatchObject({
+      projectId,
+      ownerUserId,
+      assetId: response.assetId,
+      operationKey,
+      specification: phonePlacement,
+      checksumSha256,
+      width: 1_080,
+      height: 1_920,
+      hasAudio: inspected.hasAudio,
+    });
+
+    // A replayed upload commits nothing new: the same asset, the same one record.
+    const replayed = await upload(operationKey);
+    expect(replayed.assetId).toBe(response.assetId);
+    const record = await projects.getRendition(ownerUserId, response.assetId);
+    expect(record?.operationKey).toBe(operationKey);
+    await expect(projects.getRendition(ownerUserId, randomUUID())).resolves.toBeNull();
+  });
+
   it('stores re-framed bytes without touching the Project revision', async () => {
     const before = await projects.getCurrent(ownerUserId, projectId);
     const response = await upload(randomUUID());

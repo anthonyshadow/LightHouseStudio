@@ -11,7 +11,9 @@ import type {
   ProjectRevision,
   ProjectSourceKind,
   ProjectVersionReferenceLink,
+  ProjectExportSpecification,
 } from '@studio/domain';
+import { projectMediaReferencesEqual } from '@studio/domain';
 import type {
   StoredSavedVideoAggregate,
   StoredVideoVersion,
@@ -115,6 +117,36 @@ export interface ProjectSourceRecord {
 }
 
 export type ProjectWorkingMediaKind = 'local-render' | 'media-asset' | 'saved-video-version';
+
+/**
+ * What the server learned about a re-framed video when it accepted the upload, kept so the save
+ * that names it later can trust the bytes it is about to record without opening them again.
+ *
+ * One record per accepted asset. The specification is the placement the browser said it rendered
+ * for, already checked against the frame at upload time; the rest is the inspection of those
+ * bytes, keyed by the checksum the manifest still carries so a save can tell the record describes
+ * the asset it is looking at.
+ */
+export interface ProjectRenditionRecord {
+  readonly projectId: string;
+  readonly ownerUserId: string;
+  readonly assetId: string;
+  /** The upload's idempotency key: one accepted upload, one record. */
+  readonly operationKey: string;
+  readonly specification: ProjectExportSpecification;
+  readonly mimeType: 'video/mp4' | 'video/quicktime' | 'video/webm';
+  readonly filename: string;
+  readonly sizeBytes: number;
+  readonly checksumSha256: string;
+  readonly container: 'mp4' | 'quicktime' | 'webm';
+  readonly videoCodec: 'avc' | 'vp8';
+  readonly audioCodec: string | null;
+  readonly durationMs: number;
+  readonly width: number;
+  readonly height: number;
+  readonly hasAudio: boolean;
+  readonly uploadedAt: string;
+}
 
 export interface ProjectWorkingMediaRecord {
   readonly projectId: string;
@@ -358,6 +390,135 @@ export interface ProjectOutputMetadataUnitOfWork {
   }): Promise<ProjectOutputMetadataCommitResult>;
 }
 
+/**
+ * Why a Project output commit would not continue the aggregate it was composed against — or
+ * `null` when it would.
+ *
+ * The one rule both persistence modes hold a save to, stated once. Each mode still reads its own
+ * current state under its own lock and raises its own error type; what they share is this
+ * predicate over what the service composed: the Versions in write order with the primary last,
+ * one output link per Version in the same order, the receipt naming the primary, the post-save
+ * revision continuing the current one, and a hydration record that describes the bytes its
+ * reference names — the Version when that Version is the cut, and never a re-framed deliverable.
+ */
+export const projectOutputCommitInconsistency = (
+  input: Parameters<ProjectOutputMetadataUnitOfWork['commit']>[0],
+  current: Pick<Project, 'id' | 'ownerUserId' | 'version' | 'archivedAt'> & {
+    /** A stored row may hold no revision yet; a save always continues one. */
+    readonly currentRevisionId: string | null;
+    readonly currentRevisionNumber: number | null;
+  },
+  written: {
+    /** Every Version this save writes, in write order; the last is the primary. */
+    readonly versions: readonly StoredVideoVersion[];
+    readonly savedVideoId: string;
+    /** The Saved Video revision the receipt should record: 1 for a create, current + 1 for an append. */
+    readonly savedVideoRevision: number;
+  },
+): string | null => {
+  const { receipt, outputs, media, projectRevision } = input;
+  const revision = projectRevision.revision;
+  const nextProject = projectRevision.nextProject;
+  const primary = written.versions.at(-1);
+  if (primary === undefined) return 'A Project output save writes at least one Version.';
+  const { savedVideoId } = written;
+  const presentsOutput =
+    media.mediaReference.kind === 'saved-video-version' &&
+    media.mediaReference.savedVideoId === savedVideoId &&
+    media.mediaReference.videoVersionId === primary.id;
+  const hydratesPresentedMedia = presentsOutput
+    ? media.kind === 'saved-video-version' &&
+      media.assetId === primary.assetId &&
+      media.savedVideoId === savedVideoId &&
+      media.videoVersionId === primary.id &&
+      media.mimeType === primary.mimeType &&
+      media.filename === primary.filename &&
+      media.sizeBytes === primary.sizeBytes &&
+      media.durationMs === primary.durationMs &&
+      media.width === primary.width &&
+      media.height === primary.height
+    : // No Version this save wrote, sibling or primary, may be claimed by a record that does not
+      // present it; and its lineage columns have to agree with the reference it does name.
+      !written.versions.some((candidate) => media.videoVersionId === candidate.id) &&
+      (media.mediaReference.kind === 'saved-video-version'
+        ? media.kind === 'saved-video-version' &&
+          media.savedVideoId === media.mediaReference.savedVideoId &&
+          media.videoVersionId === media.mediaReference.videoVersionId
+        : media.kind !== 'saved-video-version' &&
+          media.savedVideoId === null &&
+          media.videoVersionId === null &&
+          media.assetId === media.mediaReference.assetId);
+  if (current.archivedAt !== null) return 'The Project is archived.';
+  if (current.currentRevisionId === null || current.currentRevisionNumber === null) {
+    return 'The Project has no current revision to continue.';
+  }
+  if (
+    receipt.projectId !== current.id ||
+    receipt.savedVideoId !== savedVideoId ||
+    receipt.videoVersionId !== primary.id ||
+    receipt.resultRevisionId !== revision.id ||
+    receipt.resultRevisionNumber !== revision.revisionNumber ||
+    receipt.result.project.version !== nextProject.version ||
+    receipt.result.revision.id !== revision.id ||
+    receipt.result.output.videoVersionId !== primary.id ||
+    receipt.result.savedVideo.currentVersion.id !== primary.id ||
+    receipt.result.savedVideo.revision !== written.savedVideoRevision
+  ) {
+    return 'The receipt does not name what this save writes.';
+  }
+  if (
+    projectRevision.ownerUserId !== current.ownerUserId ||
+    nextProject.id !== current.id ||
+    nextProject.ownerUserId !== current.ownerUserId ||
+    nextProject.version !== current.version + 1 ||
+    nextProject.status !== 'completed' ||
+    nextProject.currentRevisionId !== revision.id ||
+    nextProject.currentRevisionNumber !== revision.revisionNumber ||
+    revision.projectId !== current.id ||
+    revision.ownerUserId !== current.ownerUserId ||
+    revision.parentRevisionId !== current.currentRevisionId ||
+    revision.parentRevisionNumber !== current.currentRevisionNumber ||
+    revision.revisionNumber !== current.currentRevisionNumber + 1 ||
+    revision.source !== 'output-save'
+  ) {
+    return 'The post-save revision does not continue the current Project.';
+  }
+  if (
+    outputs.length !== written.versions.length ||
+    !outputs.every(
+      (link, index) =>
+        link.projectId === current.id &&
+        link.ownerUserId === current.ownerUserId &&
+        link.savedVideoId === savedVideoId &&
+        link.videoVersionId === written.versions[index]!.id &&
+        link.producingRevisionId === current.currentRevisionId &&
+        link.producingRevisionNumber === current.currentRevisionNumber,
+    )
+  ) {
+    return 'The output links do not name the Versions this save writes, in order.';
+  }
+  if (
+    media.projectId !== current.id ||
+    media.ownerUserId !== current.ownerUserId ||
+    !hydratesPresentedMedia ||
+    media.adoptedRevisionId !== revision.id ||
+    media.adoptedRevisionNumber !== revision.revisionNumber ||
+    media.operationKey !== receipt.operationId ||
+    media.requestFingerprint !== receipt.requestFingerprint ||
+    !projectMediaReferencesEqual(media.mediaReference, revision.snapshot.workingMedia) ||
+    !projectMediaReferencesEqual(media.mediaReference, revision.snapshot.presentedMedia)
+  ) {
+    return 'The hydration record does not describe what the post-save revision presents.';
+  }
+  if (
+    revision.snapshot.lastSuccessfulOutput?.savedVideoId !== savedVideoId ||
+    revision.snapshot.lastSuccessfulOutput.videoVersionId !== primary.id
+  ) {
+    return 'The post-save revision does not point at the primary Version.';
+  }
+  return null;
+};
+
 export const isProjectOutputMetadataUnitOfWork = (
   value: unknown,
 ): value is ProjectOutputMetadataUnitOfWork =>
@@ -452,6 +613,14 @@ export interface ProjectRepository {
   adoptWorkingMedia(
     input: AdoptProjectWorkingMediaPersistenceInput,
   ): Promise<ProjectWorkingMediaAdoptionResult>;
+  /**
+   * Keep what an accepted rendition upload learned about its bytes. Recording the same asset
+   * again is a no-op: an upload replay commits nothing new.
+   */
+  recordRendition(record: ProjectRenditionRecord): Promise<void>;
+  /** The record for one of this owner's accepted rendition assets, or `null` if none was kept. */
+  getRendition(ownerUserId: string, assetId: string): Promise<ProjectRenditionRecord | null>;
+
   updateMetadata(
     ownerUserId: string,
     expectedVersion: number,

@@ -7,7 +7,12 @@ import type {
   SavedVideoVersion,
   SavedVideosResponse,
 } from '@studio/contracts';
-import { formatDateTime, projectExportAspectOf } from '@studio/domain';
+import {
+  formatDateTime,
+  projectExportAspectOf,
+  savedTogether,
+  variantSetRuns,
+} from '@studio/domain';
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -147,34 +152,6 @@ const formatForDimensions = ({
 /** `Version 3 · Square post` — the ordinal identifies it, the placement says what it is for. */
 const versionLabel = (version: SavedVideoVersion): string =>
   `Version ${version.ordinal} · ${exportPlacementLabel(projectExportAspectOf(version.exportSpecification))}`;
-
-interface SavedTogetherGroup {
-  readonly variantSetId: string | null;
-  readonly versions: SavedVideoVersion[];
-}
-
-/**
- * The Version list split into the runs one save produced together.
- *
- * A set is always written at consecutive ordinals, so a run of neighbours sharing a non-null id is
- * the whole of it. A single Version carries a set id too — a Project save that produced one
- * placement — and one Version was not saved *together* with anything, so a run of one stays exactly
- * the plain row it has always been.
- */
-const savedTogetherGroups = (
-  versions: readonly SavedVideoVersion[],
-): readonly SavedTogetherGroup[] => {
-  const groups: SavedTogetherGroup[] = [];
-  for (const version of versions) {
-    const open = groups.at(-1);
-    if (open && version.variantSetId !== null && open.variantSetId === version.variantSetId) {
-      open.versions.push(version);
-    } else {
-      groups.push({ variantSetId: version.variantSetId, versions: [version] });
-    }
-  }
-  return groups;
-};
 
 const VideoGallerySkeleton = () => {
   const theme = useTheme();
@@ -741,10 +718,10 @@ export const VideoGallery = ({
   // Not older, and not current: another placement of the same save. Saying "Older Version" of a
   // Version written seconds before the current one, from the same cut, would be a lie of emphasis.
   const selectedSavedTogetherWithCurrent =
-    !selectedIsCurrent &&
     selectedVersion !== null &&
-    selectedVersion.variantSetId !== null &&
-    selectedVersion.variantSetId === currentVersion?.variantSetId;
+    currentVersion !== undefined &&
+    currentVersion !== null &&
+    savedTogether(selectedVersion, currentVersion);
   const selectVersionButton = (version: SavedVideoVersion) => (
     <Button
       key={version.id}
@@ -1100,7 +1077,7 @@ export const VideoGallery = ({
                     gap: theme.space.sm,
                   }}
                 >
-                  {savedTogetherGroups(previewDetail.versions).map((group) =>
+                  {variantSetRuns(previewDetail.versions).map((group) =>
                     group.versions.length > 1 ? (
                       <fieldset
                         key={group.versions[0]!.id}

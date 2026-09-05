@@ -1,6 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectCurrentResponse, ProjectOutputHistoryItem } from '@studio/contracts';
-import { formatDateTime, projectExportAspectOf } from '@studio/domain';
+import { formatDateTime, projectExportAspectOf, savedTogether } from '@studio/domain';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router';
 import { savedVideoThumbnailUrl } from '../../adapters/api-client/savedVideosApi';
@@ -28,7 +28,7 @@ import { WorkPosterTile } from './WorkPosterTile';
 const ProjectDeliverableCard = ({
   projectId,
   item,
-  savedTogether,
+  savedTogetherRows,
 }: {
   readonly projectId: string;
   readonly item: ProjectOutputHistoryItem;
@@ -37,7 +37,7 @@ const ProjectDeliverableCard = ({
    * than one. The card shows one poster — they are one save of one cut — and one line per
    * placement.
    */
-  readonly savedTogether: readonly ProjectOutputHistoryItem[];
+  readonly savedTogetherRows: readonly ProjectOutputHistoryItem[];
 }) => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -91,7 +91,7 @@ const ProjectDeliverableCard = ({
             You have changed this Project since. Save again to add the next Version.
           </p>
         )}
-        {savedTogether.length > 1 ? (
+        {savedTogetherRows.length > 1 ? (
           <div
             css={{ display: 'grid', gap: theme.space.xs }}
             data-project-deliverable-placements=""
@@ -107,7 +107,7 @@ const ProjectDeliverableCard = ({
                 gap: theme.space.xs,
               }}
             >
-              {savedTogether.map((member) => (
+              {savedTogetherRows.map((member) => (
                 <li
                   key={member.version.id}
                   css={{
@@ -142,7 +142,7 @@ const ProjectDeliverableCard = ({
           </div>
         ) : null}
         <div data-project-deliverable-actions="">
-          {missing || savedTogether.length > 1 ? null : (
+          {missing || savedTogetherRows.length > 1 ? null : (
             <LinkButton
               variant="primary"
               href={projectOutputContentUrl(projectId, item.version.id, true)}
@@ -198,12 +198,12 @@ export const ProjectDeliverableSection = ({
   // and the newest row is its primary, so the members are the neighbours carrying its id — and a
   // save that produced a single placement carries one too, which is a set of one and shows as the
   // single output it has always been.
-  const savedTogether =
-    latest === undefined || latest.version.variantSetId === null
+  const savedTogetherRows =
+    latest === undefined
       ? []
-      : rows
-          .filter((row) => row.version.variantSetId === latest.version.variantSetId)
-          .sort((left, right) => left.version.ordinal - right.version.ordinal);
+      : [latest, ...rows.filter((row) => savedTogether(latest.version, row.version))].sort(
+          (left, right) => left.version.ordinal - right.version.ordinal,
+        );
 
   const body = () => {
     if (outputs.isPending) {
@@ -246,7 +246,11 @@ export const ProjectDeliverableSection = ({
         </div>
       </div>
     ) : (
-      <ProjectDeliverableCard projectId={projectId} item={latest} savedTogether={savedTogether} />
+      <ProjectDeliverableCard
+        projectId={projectId}
+        item={latest}
+        savedTogetherRows={savedTogetherRows}
+      />
     );
   };
 
@@ -262,7 +266,7 @@ export const ProjectDeliverableSection = ({
       <header>
         <h2 id="project-deliverable-heading">Saved output</h2>
         <p>
-          {savedTogether.length > 1
+          {savedTogetherRows.length > 1
             ? 'What this Project last saved, in every placement that save produced.'
             : 'The video this Project has saved.'}{' '}
           Saving again adds the next one; this keeps showing the most recent.

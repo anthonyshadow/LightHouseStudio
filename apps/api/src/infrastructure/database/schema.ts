@@ -926,6 +926,53 @@ export const projectSources = pgTable(
   ],
 );
 
+/**
+ * What the server learned about a re-framed video when it accepted the upload: the placement it
+ * was rendered for and the inspection of its bytes, so the save that names it can trust them
+ * without opening the asset again. One row per accepted asset.
+ */
+export const projectRenditions = pgTable(
+  'project_renditions',
+  {
+    projectId: uuid('project_id').notNull(),
+    ownerUserId: uuid('owner_user_id').notNull(),
+    assetId: uuid('asset_id').notNull(),
+    operationKey: uuid('operation_key').notNull(),
+    specification: jsonb('specification').notNull(),
+    mimeType: text('mime_type').notNull(),
+    filename: text('filename').notNull(),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+    checksumSha256: text('checksum_sha256').notNull(),
+    container: text('container').notNull(),
+    videoCodec: text('video_codec').notNull(),
+    audioCodec: text('audio_codec'),
+    durationMs: integer('duration_ms').notNull(),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    hasAudio: boolean('has_audio').notNull(),
+    uploadedAt: timestamp('uploaded_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.ownerUserId, table.assetId] }),
+    uniqueIndex('project_renditions_owner_operation_unique').on(
+      table.ownerUserId,
+      table.operationKey,
+    ),
+    foreignKey({
+      name: 'project_renditions_project_owner_fk',
+      columns: [table.projectId, table.ownerUserId],
+      foreignColumns: [projects.id, projects.ownerUserId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_renditions_asset_owner_fk',
+      columns: [table.assetId, table.ownerUserId],
+      foreignColumns: [mediaAssets.id, mediaAssets.ownerUserId],
+    }).onDelete('restrict'),
+  ],
+);
+
 export const projectWorkingMediaAdoptions = pgTable(
   'project_working_media_adoptions',
   {

@@ -14,7 +14,7 @@ import {
   promoteProjectJobResult,
   type ProjectAssetLink,
 } from '@studio/domain';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createPostgresDatabase, type DatabaseConnection } from './client.js';
 import { DrizzleAssetLifecycleRegistry } from './asset-lifecycle-registry.js';
@@ -29,6 +29,7 @@ import type { ProjectProcessingAttemptRecord } from '../../features/projects/pro
 import type {
   ProjectSourceRecord,
   ProjectWorkingMediaRecord,
+  ProjectRenditionRecord,
 } from '../../features/projects/project-repository.js';
 import {
   projectAssetLinksForRevision,
@@ -36,6 +37,7 @@ import {
 } from '../../features/projects/project-snapshot-relations.js';
 import {
   mediaAssets,
+  projectRenditions,
   processingJobs,
   projectAssets,
   projectJobs,
@@ -1243,6 +1245,9 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
         .delete(projectOutputOperationReceipts)
         .where(eq(projectOutputOperationReceipts.projectId, projectId));
       await connection.db
+        .delete(projectRenditions)
+        .where(eq(projectRenditions.projectId, projectId));
+      await connection.db
         .delete(projectWorkingMediaAdoptions)
         .where(eq(projectWorkingMediaAdoptions.projectId, projectId));
       await connection.db
@@ -1839,6 +1844,51 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
           expect.objectContaining({ role: 'presented', revisionId: resultRevisionId }),
         ]),
       );
+
+      // What an accepted rendition upload learned is kept per asset, once, for the save to read.
+      const renditionAssetId = randomUUID();
+      await connection.db.insert(mediaAssets).values({
+        id: renditionAssetId,
+        ownerUserId,
+        storageProvider: 'local',
+        storageKey: renditionAssetId,
+        status: 'ready',
+        mimeType: 'video/mp4',
+        filename: 'reframed.mp4',
+        sizeBytes: 640,
+        checksumSha256: '9'.repeat(64),
+      });
+      const rendition: ProjectRenditionRecord = {
+        projectId,
+        ownerUserId,
+        assetId: renditionAssetId,
+        operationKey: randomUUID(),
+        specification: {
+          container: 'video/mp4',
+          aspect: '9:16',
+          resolution: { width: 1_080, height: 1_920 },
+          includeAudio: true,
+        },
+        mimeType: 'video/mp4',
+        filename: 'reframed.mp4',
+        sizeBytes: 640,
+        checksumSha256: '9'.repeat(64),
+        container: 'mp4',
+        videoCodec: 'avc',
+        audioCodec: 'aac',
+        durationMs: 11_000,
+        width: 1_080,
+        height: 1_920,
+        hasAudio: true,
+        uploadedAt: adoptedAt,
+      };
+      await repository.recordRendition(rendition);
+      // A replayed commit records nothing new, whatever it now says about the frame.
+      await repository.recordRendition({ ...rendition, width: 1 });
+      await expect(repository.getRendition(ownerUserId, renditionAssetId)).resolves.toEqual(
+        rendition,
+      );
+      await expect(repository.getRendition(randomUUID(), renditionAssetId)).resolves.toBeNull();
       await expect(
         connection.db.select().from(savedVideos).where(eq(savedVideos.ownerUserId, ownerUserId)),
       ).resolves.toEqual([]);
@@ -1847,6 +1897,14 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
       await connection.db
         .delete(processingJobs)
         .where(eq(processingJobs.id, processingOperationId));
+      await connection.db
+        .delete(projectRenditions)
+        .where(eq(projectRenditions.projectId, projectId));
+      await connection.db
+        .delete(mediaAssets)
+        .where(
+          and(eq(mediaAssets.ownerUserId, ownerUserId), eq(mediaAssets.filename, 'reframed.mp4')),
+        );
       await connection.db
         .delete(projectWorkingMediaAdoptions)
         .where(eq(projectWorkingMediaAdoptions.projectId, projectId));

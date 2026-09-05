@@ -956,3 +956,25 @@ Not established, and stated rather than implied:
   what it costs.
 - **The 100-Version refusal is server-side only.** §3 also proposed refusing it in the destination
   form; that check is not implemented, so an operator learns at the save rather than before it.
+
+### Settled after the cleanup pass (2026-09-05)
+
+The review that followed the implementation left eight findings that were design changes rather
+than cleanup. They were audited, planned and applied together, and three of them change what this
+plan describes:
+
+- `projectOutputPrimaryPlacement` became `projectOutputPlacementSet<T>`: the domain returns the
+  write order itself — siblings in canonical order, then the primary, or every member and then the
+  cut when the cut leads — over the caller's own items, so the service no longer maps an index back
+  across the boundary.
+- The save no longer copies each rendition out to inspect it again. A rendition upload keeps what
+  it learned as a Project rendition record (`project_renditions`, migration `0024`; a defaulted
+  `renditions` list on the file-mode aggregate), and the save reads that record where it agrees
+  with the stored manifest, inspecting the bytes itself only when no record describes them.
+- "Saved together" is one relation in the domain (`savedTogether`, `variantSetRuns`,
+  `variantSetOf`, `variantSetSiblingFor`), and every surface asks it rather than comparing set ids.
+
+The other five stayed inside their files: one commit predicate on the port for both persistence
+modes, the rendition loop's cancellation derived from the signal, progress shown once per animation
+frame, the save hook's owner required, and a parity test holding the Version cap to the
+repository's limit.

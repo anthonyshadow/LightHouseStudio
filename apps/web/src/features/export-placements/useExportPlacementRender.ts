@@ -34,6 +34,32 @@ export type ExportPlacementRenderResult = Readonly<{ blob: Blob; filename: strin
 export const useExportPlacementRender = (offersPlacements = true) => {
   const [phase, setPhase] = useState<ExportPlacementRenderPhase>('idle');
   const [progress, setProgress] = useState(0);
+  /**
+   * Progress arrives per encoded packet, and a component re-render per packet is work nobody can
+   * see: the number is shown rounded to a percent. One update per animation frame carries the
+   * latest value, and a final value is written at once so a completed render never waits a frame
+   * to say so.
+   */
+  const pendingProgressRef = useRef<{ value: number; frame: number } | null>(null);
+  const showProgress = useCallback((value: number, immediate = false) => {
+    const pending = pendingProgressRef.current;
+    if (immediate || typeof requestAnimationFrame !== 'function') {
+      if (pending !== null) cancelAnimationFrame(pending.frame);
+      pendingProgressRef.current = null;
+      setProgress(value);
+      return;
+    }
+    if (pending !== null) {
+      pending.value = value;
+      return;
+    }
+    const frame = requestAnimationFrame(() => {
+      const latest = pendingProgressRef.current;
+      pendingProgressRef.current = null;
+      if (latest !== null) setProgress(latest.value);
+    });
+    pendingProgressRef.current = { value, frame };
+  }, []);
   const [error, setError] = useState<string | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
   /**
@@ -51,21 +77,28 @@ export const useExportPlacementRender = (offersPlacements = true) => {
   }, []);
   const supported = useVideoEditExportSupport(offersPlacements);
 
-  useEffect(() => () => controllerRef.current?.abort('unmount'), []);
+  useEffect(
+    () => () => {
+      controllerRef.current?.abort('unmount');
+      const pending = pendingProgressRef.current;
+      if (pending !== null) cancelAnimationFrame(pending.frame);
+    },
+    [],
+  );
 
   const cancel = useCallback(() => {
     controllerRef.current?.abort('cancelled');
     controllerRef.current = null;
-    setProgress(0);
+    showProgress(0, true);
     fail(null);
     setPhase('idle');
-  }, [fail]);
+  }, [fail, showProgress]);
 
   const reset = useCallback(() => {
     fail(null);
-    setProgress(0);
+    showProgress(0, true);
     setPhase('idle');
-  }, [fail]);
+  }, [fail, showProgress]);
 
   const render = useCallback(
     async ({
@@ -95,7 +128,7 @@ export const useExportPlacementRender = (offersPlacements = true) => {
         return null;
       }
       fail(null);
-      setProgress(0);
+      showProgress(0, true);
       setPhase('rendering');
       try {
         // The domain rule decides whether this placement can be produced at all, and its message is
@@ -114,10 +147,10 @@ export const useExportPlacementRender = (offersPlacements = true) => {
           targetResolution: specification.resolution,
           includeAudio: specification.includeAudio,
           signal: controller.signal,
-          onProgress: setProgress,
+          onProgress: showProgress,
         });
         if (controller.signal.aborted) return null;
-        setProgress(1);
+        showProgress(1, true);
         setPhase('idle');
         return {
           blob: rendered.blob,
@@ -136,7 +169,7 @@ export const useExportPlacementRender = (offersPlacements = true) => {
         if (controllerRef.current === controller) controllerRef.current = null;
       }
     },
-    [fail],
+    [fail, showProgress],
   );
 
   /** Why the last render failed, without waiting for a re-render. */

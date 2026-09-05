@@ -3,6 +3,7 @@ import type { SavedVideoSummary, SavedVideoVersion } from '@studio/contracts';
 import {
   projectExportAspectOf,
   projectExportSpecificationsEqual,
+  variantSetSiblingFor,
   type ProjectExportSpecification,
 } from '@studio/domain';
 import { useState, type RefObject } from 'react';
@@ -66,14 +67,9 @@ export const VideoExportPanel = ({
   // Square post on a Studio-saved Version would offer some other save's square file — a different
   // cut, presented as the re-frame of this one.
   const savedTogether =
-    placement === null || isStoredShape || version.variantSetId === null
+    placement === null || isStoredShape
       ? null
-      : (versions.find(
-          (candidate) =>
-            candidate.id !== version.id &&
-            candidate.variantSetId === version.variantSetId &&
-            candidate.exportSpecification?.aspect === placement.aspect,
-        ) ?? null);
+      : variantSetSiblingFor(versions, version, placement.aspect);
 
   const close = () => {
     cancel();

@@ -137,10 +137,8 @@ export const useProjectOutputRenditionSet = (
         throw readError;
       }
 
-      let cancelled = false;
       for (const [index, member] of current.entries()) {
         if (signal.aborted) {
-          cancelled = true;
           break;
         }
         if (member.outcome === 'stored') continue;
@@ -159,7 +157,6 @@ export const useProjectOutputRenditionSet = (
             filename: cut.filename,
           });
           if (signal.aborted) {
-            cancelled = true;
             break;
           }
           if (rendered === null) {
@@ -180,13 +177,11 @@ export const useProjectOutputRenditionSet = (
             signal,
           });
           if (signal.aborted) {
-            cancelled = true;
             break;
           }
           at({ outcome: 'stored', assetId: uploaded.media.assetId, reason: null });
         } catch (error) {
           if (signal.aborted) {
-            cancelled = true;
             break;
           }
           at({
@@ -199,13 +194,19 @@ export const useProjectOutputRenditionSet = (
         }
       }
 
-      if (cancelled) {
+      /*
+       * A member still pending once the loop has ended was never attempted, which only a stop can
+       * cause. "Cancelled" is then read off the members rather than off a flag: a stop that landed
+       * after the last member finished cancelled nothing, and the copy must not say it did.
+       */
+      if (signal.aborted) {
         persist(
           current.map((entry) =>
             entry.outcome === 'pending' ? { ...entry, outcome: 'cancelled' as const } : entry,
           ),
         );
       }
+      const cancelled = current.some(({ outcome }) => outcome === 'cancelled');
       setActive(-1);
       setStatus('settled');
       const renditions = current.flatMap((entry) =>

@@ -1,3 +1,4 @@
+import type { ProjectExportSpecification } from '@studio/domain';
 import {
   projectMediaReferenceSchema,
   projectOutputReferenceSchema,
@@ -18,6 +19,7 @@ import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestam
 import type {
   ProjectSourceRecord,
   ProjectWorkingMediaRecord,
+  ProjectRenditionRecord,
 } from '../../features/projects/project-repository.js';
 import { projectPosterReferenceForSnapshot } from '../../features/projects/project-snapshot-relations.js';
 import { ProjectPersistenceError } from './project-persistence-errors.js';
@@ -30,6 +32,7 @@ import type {
   projectWorkingMediaAdoptions,
   projectVersionReferences,
   projects,
+  projectRenditions,
 } from './schema.js';
 
 type ProjectRow = typeof projects.$inferSelect;
@@ -178,6 +181,50 @@ export const toProjectWorkingMedia = (row: ProjectWorkingMediaRow): ProjectWorki
   height: row.height,
   hasAudio: row.hasAudio,
   adoptedAt: toIsoTimestamp(row.adoptedAt),
+});
+
+type ProjectRenditionRow = typeof projectRenditions.$inferSelect;
+
+export const toProjectRendition = (row: ProjectRenditionRow): ProjectRenditionRecord => ({
+  projectId: row.projectId,
+  ownerUserId: row.ownerUserId,
+  assetId: row.assetId,
+  operationKey: row.operationKey,
+  specification: row.specification as ProjectExportSpecification,
+  mimeType: row.mimeType as ProjectRenditionRecord['mimeType'],
+  filename: row.filename,
+  sizeBytes: row.sizeBytes,
+  checksumSha256: row.checksumSha256,
+  container: row.container as ProjectRenditionRecord['container'],
+  videoCodec: row.videoCodec as ProjectRenditionRecord['videoCodec'],
+  audioCodec: row.audioCodec,
+  durationMs: row.durationMs,
+  width: row.width,
+  height: row.height,
+  hasAudio: row.hasAudio,
+  uploadedAt: toIsoTimestamp(row.uploadedAt),
+});
+
+export const projectRenditionValues = (
+  record: ProjectRenditionRecord,
+): typeof projectRenditions.$inferInsert => ({
+  projectId: record.projectId,
+  ownerUserId: record.ownerUserId,
+  assetId: record.assetId,
+  operationKey: record.operationKey,
+  specification: record.specification,
+  mimeType: record.mimeType,
+  filename: record.filename,
+  sizeBytes: record.sizeBytes,
+  checksumSha256: record.checksumSha256,
+  container: record.container,
+  videoCodec: record.videoCodec,
+  audioCodec: record.audioCodec,
+  durationMs: record.durationMs,
+  width: record.width,
+  height: record.height,
+  hasAudio: record.hasAudio,
+  uploadedAt: toIsoTimestamp(record.uploadedAt),
 });
 
 export const projectWorkingMediaValues = (
