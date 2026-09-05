@@ -136,7 +136,8 @@ sequence accurately.
 tall), destination (new Video or next Version of an owned one), and after saving, the Project
 overview shows **the final deliverable** — poster, placement, Download, View in Assets
 **(gap — today saving still marks the Project "completed")**.
-**Does:** saves one or several placements in one pass **(gap — today one per save)**.
+**Does:** saves one or several placements in one pass — the chosen placement plus any others
+ticked under "Also save for", made one after another with per-placement progress.
 **System:** placements are rendered into real bytes and recorded on the Version; saving never ends
 the Project — the user continues editing and later saves supersede.
 

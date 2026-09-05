@@ -9,10 +9,13 @@ import {
 import {
   defaultProjectOutputTitle,
   isProjectExportPlacementAspect,
-  projectExportFilename,
+  PROJECT_EXPORT_PLACEMENT_ASPECTS,
+  projectExportAspectOf,
+  projectExportSpecificationForAspect,
   projectMediaReferencesEqual,
   outputSubtitleCues,
   subtitlePlacementsUsed,
+  type ProjectExportPlacementAspect,
   type ProjectExportSpecification,
 } from '@studio/domain';
 import { useQueryClient } from '@tanstack/react-query';
@@ -35,7 +38,6 @@ import {
   exportPlacementLabel,
   exportPlacementShortLabel,
   useExportPlacementRender,
-  type ExportPlacementRenderResult,
 } from '../export-placements';
 import { videoEditSupported } from '../video-editor/videoEditSupport';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
@@ -60,16 +62,12 @@ import {
   storePendingProjectOutput,
   type PendingProjectOutputOperation,
 } from './projectOutputOperationStorage';
-import {
-  getProject,
-  ProjectApiConflictError,
-  readProjectWorkingMediaContent,
-  saveProjectOutput,
-  uploadProjectRendition,
-} from './projectsApi';
-import { ensureCurrentCut, useProjectCurrentCut, type CurrentCut } from './useProjectCurrentCut';
+import { getProject, ProjectApiConflictError, saveProjectOutput } from './projectsApi';
+import { useProjectCurrentCut } from './useProjectCurrentCut';
+import { useProjectOutputRenditionSet } from './useProjectOutputRenditionSet';
+import type { ProjectOutputRenditionMember } from './projectOutputRenditionPreparationStorage';
+import { ProjectPlacementSetProgress } from './ProjectPlacementSetProgress';
 import type { ProjectSessionPort } from './useProjectSession';
-import { useStableOperationKey } from './useStableOperationKey';
 import { projectQueryKeys } from './useProjectsController';
 import { generateSavedVideoPreview } from '../saved-videos/useGenerateSavedVideoPreview';
 import { DEFAULT_SAVED_VIDEO_THUMBNAIL_CHOICE } from '../saved-videos/thumbnailSource';
@@ -154,13 +152,29 @@ export const ProjectOutputSaveSection = ({
   const [message, setMessage] = useState<string | null>(null);
   const [savedVideo, setSavedVideo] = useState<SavedVideoDetail | null>(null);
   const [pendingAvailable, setPendingAvailable] = useState(false);
+  /**
+   * The placements this save makes besides the one the revision chose.
+   *
+   * Save-time input like the title, not Project state: the revision records the operator's one
+   * chosen placement, and these say what else to make from the same cut in the same pass. A reload
+   * before Save forgets them, which the form says.
+   */
+  const [extras, setExtras] = useState<readonly ProjectExportPlacementAspect[]>([]);
+  /** Placements a run could not make, kept so the operator can ask for exactly those again. */
+  const [missing, setMissing] = useState<readonly ProjectOutputRenditionMember[]>([]);
   const readyMedia = readyMediaFor(current);
   // Gated like its two siblings. This section is mounted by the workspace whichever task is
   // showing, so the exclusion is a Project with nothing ready to save — where the chooser can
   // never appear and the probe's 720p trial encode would be answering a question nobody asked.
   const placementRender = useExportPlacementRender(readyMedia !== null);
-  const renditionOperation = useStableOperationKey();
   const renditionFetchRef = useRef<AbortController | null>(null);
+  // One owner of "make these placements from this cut": the loop, its per-placement keys, and the
+  // record that lets a reload resume it. The section keeps the one render hook and hands it over.
+  const renditionSet = useProjectOutputRenditionSet(
+    current.project.id,
+    placementRender,
+    queryClient,
+  );
   // The cut's frame, so the chooser can draw the crop and say what it does to burned-in subtitles
   // rather than describe them; one small read per revision, reused by the save itself.
   const currentCut = useProjectCurrentCut(current, readyMedia !== null);
@@ -177,6 +191,14 @@ export const ProjectOutputSaveSection = ({
   );
   // The chosen placement lives on the revision, so the snapshot is the value the control shows.
   const placement = current.revision.snapshot.exportSpecification;
+  /** The placements a save can also make: every one except whichever the revision already chose. */
+  const alsoAvailable = useMemo(
+    () =>
+      PROJECT_EXPORT_PLACEMENT_ASPECTS.filter(
+        (aspect) => aspect !== projectExportAspectOf(placement),
+      ),
+    [placement],
+  );
   // A browser capability, measured once per mount rather than on every keystroke.
   // The render hook already measured this; probing again would cost a second WebGL context.
   const placementSupported = placementRender.supported;
@@ -339,113 +361,99 @@ export const ProjectOutputSaveSection = ({
   };
 
   /**
-   * Produces the chosen placement and stores its bytes, returning the reference a save can carry.
+   * Makes every placement this save asked for and stores their bytes, returning what the request
+   * should carry.
    *
    * This runs before the save receipt is written, and that ordering is the whole idempotency
    * argument: nothing durable exists until the bytes do, so a save recovered after a reload
-   * replays a request that already names them and never renders again. `null` means the cut is
-   * stored in the shape it already has; `'stopped'` means the operator cancelled or it failed, and
-   * the message they need is already on screen.
+   * replays a request that already names them and never renders again. `'stopped'` means there is
+   * nothing to save and the operator has already been told why.
    */
-  const produceRendition = async (
+  const produceRenditions = async (
+    owner: string,
     latest: ProjectCurrentResponse,
-    specification: ProjectExportSpecification,
+    members: readonly ProjectExportSpecification[],
+    variantSetId: string | null,
   ): Promise<SaveProjectOutputRequest['renditions'] | 'stopped'> => {
     const controller = new AbortController();
     renditionFetchRef.current = controller;
-    const fail = (fallback: string, error: unknown) => {
-      setPhase('error');
-      setMessage(error instanceof ApiClientError ? error.message : fallback);
-      return 'stopped' as const;
-    };
     setPhase('saving');
-    setMessage('Reading this cut to re-frame it for the placement.');
-
-    let cut: CurrentCut;
-    let rendered: ExportPlacementRenderResult | null;
+    setMessage(
+      members.length === 1
+        ? 'Reading this cut to re-frame it for the placement.'
+        : `Reading this cut to make ${members.length} placements.`,
+    );
+    let produced;
     try {
-      // Usually a cache hit — the stage's hydration or the chooser asked already. A miss is two
-      // metadata reads the query owns outright; cancelling them is not worth a second path.
-      cut = await ensureCurrentCut(queryClient, latest);
-      /*
-       * Scoped to this block deliberately. The render consumes the source and the block ends, so
-       * the only large Blob still reachable while the result uploads is the result — holding both
-       * across a network-bound minute is the difference between one and two.
-       */
-      const media = await readProjectWorkingMediaContent({
-        contentUrl: cut.contentUrl,
-        mimeType: cut.mimeType,
+      produced = await renditionSet.produce({
+        ownerUserId: owner,
+        latest,
+        members,
+        variantSetId,
         signal: controller.signal,
       });
-      setMessage(null);
-      rendered = await placementRender.render({
-        media,
-        specification,
-        source: { width: cut.width, height: cut.height, durationMs: cut.durationMs },
-        hasAudio: cut.hasAudio,
-        filename: cut.filename,
-      });
     } catch (error) {
-      // `render` reports its own failures by returning null; only the reads throw.
       if (controller.signal.aborted) return 'stopped';
-      return fail('This cut could not be read to re-frame it. Nothing was saved.', error);
-    }
-    if (rendered === null) {
-      // The render hook owns the reason, and `ExportPlacementProgress` is already showing it —
-      // including the size ceiling, which `VideoEditChunkAccumulator` refuses at the 300 MB it
-      // names, before there is a blob to upload at all. Nothing to re-check here.
-      setPhase('idle');
-      setMessage(null);
+      setPhase('error');
+      setMessage(
+        error instanceof ApiClientError
+          ? error.message
+          : 'This cut could not be read to re-frame it. Nothing was saved.',
+      );
       return 'stopped';
-    }
-
-    setMessage('Storing the re-framed video before saving it.');
-    try {
-      const uploaded = await uploadProjectRendition({
-        projectId: latest.project.id,
-        file: new File([rendered.blob], projectExportFilename(cut.filename, specification), {
-          type: rendered.blob.type,
-        }),
-        /*
-         * Stable across retries of the same attempt: the asset id *is* this key on the server, so
-         * pressing Save again after a failure re-uses the bytes already stored instead of leaving
-         * another copy behind. It rotates when the cut, the placement or the Project moves on.
-         */
-        operationKey: renditionOperation.keyFor(
-          JSON.stringify({
-            projectId: latest.project.id,
-            expectedVersion: latest.project.version,
-            expectedRevisionNumber: latest.project.currentRevisionNumber,
-            media: latest.revision.snapshot.workingMedia,
-            specification,
-          }),
-        ),
-        specification,
-        signal: controller.signal,
-      });
-      if (controller.signal.aborted) return 'stopped';
-      // Durably stored, so the next attempt is a new operation even at an identical signature.
-      renditionOperation.reset();
-      return [{ media: uploaded.media, specification }];
-    } catch (error) {
-      if (controller.signal.aborted) return 'stopped';
-      return fail('The re-framed video could not be stored. Nothing was saved.', error);
     } finally {
       if (renditionFetchRef.current === controller) renditionFetchRef.current = null;
     }
+    if (produced === null) {
+      setPhase('error');
+      setMessage(
+        'This browser cannot store the record that keeps a long save resumable, so nothing was saved.',
+      );
+      return 'stopped';
+    }
+    setMissing(produced.members.filter(({ outcome }) => outcome !== 'stored'));
+    if (produced.renditions.length === 0) {
+      /*
+       * Every placement failed or was stopped. Saving the cut in its own shape here would answer a
+       * request nobody made — the operator asked for placements — so nothing is saved and the rows
+       * say which ones are missing and why, each with a way to ask again.
+       */
+      setPhase('error');
+      setMessage(
+        produced.cancelled
+          ? 'Stopped before any placement was made. Nothing was saved.'
+          : 'None of these placements could be made. Nothing was saved.',
+      );
+      return 'stopped';
+    }
+    setMessage(null);
+    return produced.renditions;
   };
 
+  /**
+   * Stops the run at the placement in flight and keeps what is already made.
+   *
+   * The loop resolves with the stored members, so the save that follows carries them — cancelling
+   * discards the remaining work, never the finished work.
+   */
   const cancelPreparation = () => {
     renditionFetchRef.current?.abort('cancelled');
     renditionFetchRef.current = null;
     placementRender.cancel();
-    setPhase('idle');
-    setMessage(null);
   };
 
-  const begin = async (target: SaveProjectOutputRequest['target']) => {
+  const begin = async (
+    target: SaveProjectOutputRequest['target'],
+    options: {
+      /** The placements to make. Defaults to the chosen one plus whatever else was ticked. */
+      readonly members?: readonly ProjectExportSpecification[];
+      /** Set when this save adds members to a set an earlier save already made. */
+      readonly variantSetId?: string;
+    } = {},
+  ) => {
     restoreFocusRef.current = true;
     setDestinationOpen(false);
+    setMissing([]);
     if (ownerUserId === undefined) {
       setPhase('error');
       setMessage('Your account could not be confirmed for this save.');
@@ -488,12 +496,45 @@ export const ProjectOutputSaveSection = ({
     // Asked here rather than read off the rendered state: the capability resolves asynchronously,
     // and a save pressed before it answers would otherwise take the same branch as a browser that
     // genuinely cannot re-frame, silently writing a Version in the wrong shape with nothing said.
-    const specification = renditionPlacement(latest.revision.snapshot.exportSpecification);
+    const chosen = renditionPlacement(latest.revision.snapshot.exportSpecification);
+    /*
+     * The chosen placement first, so the one the revision records fails fast rather than after the
+     * extras have spent minutes each. A retry passes its own list instead: the post-save revision
+     * keeps the chosen placement, so re-deriving it here would re-make a placement the set already
+     * holds and the server would refuse the join after a full upload.
+     */
+    const members =
+      options.members ??
+      [chosen, ...extras.map((aspect) => projectExportSpecificationForAspect(aspect))].flatMap(
+        (specification) => (specification === null ? [] : [specification]),
+      );
     let renditions: SaveProjectOutputRequest['renditions'] = [];
-    if (specification !== null && (await videoEditSupported())) {
-      const produced = await produceRendition(latest, specification);
-      if (produced === 'stopped') return;
-      renditions = produced;
+    if (members.length > 0) {
+      if (!(await videoEditSupported())) {
+        /*
+         * Asked here rather than read off the rendered state: the capability resolves
+         * asynchronously, and a save pressed before it answers would otherwise take the same
+         * branch as a browser that genuinely cannot re-frame. One placement degrades to the cut in
+         * its own shape, as it always has; a set cannot, because saving one video where several
+         * were asked for is not the request.
+         */
+        if (members.length > 1) {
+          setPhase('error');
+          setMessage(
+            'This browser cannot re-frame a video, so these placements cannot be made. Nothing was saved.',
+          );
+          return;
+        }
+      } else {
+        const produced = await produceRenditions(
+          ownerUserId,
+          latest,
+          members,
+          options.variantSetId ?? null,
+        );
+        if (produced === 'stopped') return;
+        renditions = produced;
+      }
     }
     const pending: PendingProjectOutputOperation = {
       schemaVersion: 1,
@@ -506,6 +547,10 @@ export const ProjectOutputSaveSection = ({
         media,
         target,
         renditions,
+        // Omitted, never null, on a save that starts its own set: the replay fingerprint hashes
+        // the parsed body, and a key that is always present would make every receipt written
+        // before this field an operation-key conflict.
+        ...(options.variantSetId === undefined ? {} : { variantSetId: options.variantSetId }),
       },
       createdAt: new Date().toISOString(),
     };
@@ -518,6 +563,9 @@ export const ProjectOutputSaveSection = ({
     }
     setPendingAvailable(true);
     recoveredRef.current = pending.operationId;
+    // The receipt replays the whole request from here, so the record that kept the run resumable
+    // has nothing left to answer for.
+    renditionSet.clear(ownerUserId);
     await runOperation(pending, false);
   };
 
@@ -541,6 +589,32 @@ export const ProjectOutputSaveSection = ({
     if (ownerUserId === undefined) return;
     const pending = loadPendingProjectOutput(ownerUserId, current.project.id);
     if (pending !== null) void runOperation(pending, true);
+  };
+
+  /**
+   * Makes exactly the placements the last run could not, and adds them to the set it made.
+   *
+   * A fresh save, not a resumed one: it takes its own operation and its own CAS pair. It joins the
+   * set only when the Version that set left current is still the video's current Version — the
+   * server refuses a join that has moved on, and asking first is what keeps a refusal from costing
+   * the operator another few minutes of rendering.
+   */
+  const retryMissing = () => {
+    const specifications = missing.map(({ specification }) => specification);
+    const joined = savedVideo;
+    if (specifications.length === 0 || joined === null) return;
+    const variantSetId = joined.currentVersion.variantSetId;
+    void begin(
+      {
+        kind: 'version',
+        savedVideoId: joined.id,
+        expectedVersionId: joined.currentVersion.id,
+      },
+      {
+        members: specifications,
+        ...(variantSetId === null ? {} : { variantSetId }),
+      },
+    );
   };
 
   if (current.revision.snapshot.sourceAssetId === null) return null;
@@ -578,6 +652,58 @@ export const ProjectOutputSaveSection = ({
           </h4>
           <p>Make this a new library video, or add one exact Version to a video you own.</p>
         </header>
+      ) : null}
+      {alsoAvailable.length > 0 ? (
+        <fieldset
+          disabled={busy || placementSupported === false}
+          data-placement-extras=""
+          css={{
+            minWidth: 0,
+            display: 'grid',
+            gap: theme.space.xs,
+            margin: 0,
+            padding: 0,
+            border: 0,
+            '& > legend': {
+              marginBlockEnd: theme.space.xs,
+              padding: 0,
+              color: theme.colors.textMuted,
+              fontSize: theme.fontSizes.metadata,
+              fontWeight: 700,
+            },
+            '& label': {
+              display: 'flex',
+              alignItems: 'baseline',
+              gap: theme.space.xs,
+              fontSize: theme.fontSizes.metadata,
+            },
+          }}
+        >
+          <legend>Also save for</legend>
+          {alsoAvailable.map((aspect) => (
+            <label key={aspect}>
+              <input
+                type="checkbox"
+                checked={extras.includes(aspect)}
+                onChange={(event) => {
+                  // Read before the updater runs: by then React has released the event and
+                  // `currentTarget` is null.
+                  const { checked } = event.currentTarget;
+                  setExtras((current) =>
+                    checked
+                      ? [...current, aspect]
+                      : current.filter((candidate) => candidate !== aspect),
+                  );
+                }}
+              />
+              <span>{exportPlacementLabel(aspect)}</span>
+            </label>
+          ))}
+          <small css={{ color: theme.colors.textFaint, fontSize: theme.fontSizes.caption }}>
+            Each is made from this cut, one after another, and saved as its own Version. They are
+            not remembered if you leave before saving.
+          </small>
+        </fieldset>
       ) : null}
       <fieldset
         disabled={busy}
@@ -746,6 +872,23 @@ export const ProjectOutputSaveSection = ({
                   onOpenInAssets={() => void navigate(savedVideoLibraryPath(savedVideo.id))}
                 />
               ) : null}
+              {missing.length > 0 ? (
+                <div data-placements-missing="">
+                  <ul css={{ margin: `${theme.space.xs} 0`, paddingInlineStart: theme.space.md }}>
+                    {missing.map((member) => (
+                      <li key={member.specification.aspect}>
+                        {exportPlacementLabel(projectExportAspectOf(member.specification))} —{' '}
+                        {member.reason ?? 'stopped before it was made'}
+                      </li>
+                    ))}
+                  </ul>
+                  <Button size="small" onClick={retryMissing}>
+                    {missing.length === 1
+                      ? 'Make this placement'
+                      : `Make these ${missing.length} placements`}
+                  </Button>
+                </div>
+              ) : null}
               {phase === 'error' && pendingAvailable ? (
                 <Button size="small" onClick={retryPending}>
                   Check this save
@@ -776,12 +919,23 @@ export const ProjectOutputSaveSection = ({
             placement that would need a render — before this control is ever pressed.
             Re-framing states its own progress; storing states itself in the notice above.
           */}
-          <ExportPlacementProgress
-            phase={placementRender.phase}
-            progress={placementRender.progress}
-            error={placementRender.error}
-            onCancel={cancelPreparation}
-          />
+          {renditionSet.members.length > 1 ? (
+            <ProjectPlacementSetProgress
+              members={renditionSet.members}
+              active={renditionSet.active}
+              progress={placementRender.progress}
+              onCancelRemaining={
+                renditionSet.status === 'producing' ? cancelPreparation : undefined
+              }
+            />
+          ) : (
+            <ExportPlacementProgress
+              phase={placementRender.phase}
+              progress={placementRender.progress}
+              error={placementRender.error}
+              onCancel={cancelPreparation}
+            />
+          )}
 
           {inlineDestinationOpen ? renderDestinationForm(true, false) : null}
 

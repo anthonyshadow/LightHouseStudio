@@ -104,6 +104,12 @@ recorded there.
   in both persistence modes, and the next write of that snapshot carries the empty list. No
   migration was needed — the snapshot stays version 2 and the `0018` check is untouched — and the
   file library format stays at version 7.
+- Variant sets (slice 2.3, 2026-09-05) added `video_versions.variant_set_id` (nullable `uuid`,
+  migration `0023`, no index and no backfill) and the matching defaulted `variantSetId` on the
+  file-mode Version record, which keeps the saved-video library at schema version 4. Null means the
+  Version belongs to no set: every Version written before the slice, and every Version a Studio
+  save writes. Rolling back means leaving the column in place — the mappers name their columns, so
+  an older API ignores it — and no down-migration is written or run.
 - Audio level (slice 2.2, 2026-09-04) added `audio` inside the snapshot's `localEdit` the same way:
   an additive field defaulting to the source as recorded (`level: 100, muted: false`), so every
   revision written before it reads back unchanged and no migration ships. A write that omits either

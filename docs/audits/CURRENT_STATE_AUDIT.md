@@ -120,9 +120,11 @@ material flow problems are of shape, not breakage:
    memory, single-shot-downloaded server-side, with no unload guard; walk away and it is gone —
    and **paid jobs progress only while a client polls** (prov-2): close the browser after
    submitting and the provider bills, the result expires unretrieved after an hour.
-6. **One placement per save** (PCD-3, DC-14): a marketing user producing 16:9+9:16+1:1 runs three
-   save rounds, each clearing the creative setup; the gallery re-export chooser also forgets the
-   Version's recorded placement (prod-9).
+6. **One placement per save** (PCD-3, DC-14): _closed by slice 2.3 (2026-09-05)._ One save now
+   makes up to four placements, rendered one after another in the browser and stored as sibling
+   Versions of one Saved Video. The gallery re-export chooser opens on the Version's recorded
+   placement (prod-9 closed earlier); a Studio-saved re-framed Version still records none, which
+   is the remaining prod-9 residue.
 7. **Organize doesn't feed edit** (PCD-5): "Used in this Project" renders only on the overview;
    workspace pickers list the whole library and ignore memberships.
 8. **Small silent dead ends:** unknown URLs silently redirect to the dashboard (shell-4); the
@@ -247,7 +249,8 @@ creation path and decorative plan enum (db-9 = SEC-4, D9); file-mode single-proc
 assumption (db-10); saved-video wire status enum diverges from domain and persistence (DC-4);
 creative-library endpoints bypass the contracts package (DC-5); hand-mirrored constant sets with
 partial parity coverage (DC-6). P3: dead `outbox`/`resource_references` tables (db-5); no variant
-grouping (db-11); stale schema-test oracle (db-12); write-only-null `deleted_at` column (db-13);
+grouping (db-11, _closed by slice 2.3: `video_versions.variant_set_id`_); stale schema-test
+oracle (db-12); write-only-null `deleted_at` column (db-13);
 `markReady` not owner-scoped (db-14 = STOR-6); speculative enum members with no writers (DC-7);
 result-state blind spot on presenting saves (DC-13).
 
@@ -372,7 +375,7 @@ finding under its current deployment posture.
 | 12  | No consent/likeness/rights capture for face/voice transforms             | SEC-5                                       | P2       | 1 (decision D15)               |
 | 13  | Content-safety posture env-toggleable, "uncensored" default model        | prov-5                                      | P2       | 1 (decision D15)               |
 | 14  | No AI cost visibility or ledger                                          | prov-3/prod-7/tci-5                         | P2       | 2                              |
-| 15  | One placement per save; re-export forgets placement                      | PCD-3/prod-9/DC-14                          | P2       | 2                              |
+| 15  | One placement per save; re-export forgets placement (closed, slice 2.3)  | PCD-3/prod-9/DC-14                          | P2       | 2                              |
 | 16  | Upload not resumable across reload; HEVC rejected                        | STOR-2/ev-2                                 | P2       | 2                              |
 | 17  | Orphaned rendition/failed bytes never swept                              | STOR-1/api-4                                | P2       | 5                              |
 | 18  | Creative library browser-local with destructive sync recovery            | assets-1/assets-2/assets-11                 | P2       | 5 (D7)                         |
