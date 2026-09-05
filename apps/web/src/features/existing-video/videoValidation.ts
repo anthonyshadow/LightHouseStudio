@@ -1,4 +1,6 @@
 import { validateUploadedVideoFacts } from '@studio/domain';
+import { transcodeRecordingToMp4 } from '../../adapters/media-processing/transcodeRecording';
+import { videoDecoderSupportsConfig } from '../../adapters/media-processing/videoDecodeSupport';
 import type { AudioCodec } from 'mediabunny';
 import type { UploadedTakeMetadata } from '../recording/types';
 
@@ -27,6 +29,26 @@ export const firstExistingVideoValidationIssue = (
     (issue) =>
       validationContext !== 'server-approved-result' || issue.code !== 'unsupported-aspect-ratio',
   );
+
+/**
+ * A source this product cannot publish as it stands, but this browser can convert.
+ *
+ * Carried as an error rather than a return value because it is raised from the middle of a long
+ * inspection that otherwise only ever throws or succeeds; the caller catches it, converts, and
+ * inspects the result exactly as it would inspect any other file.
+ */
+class ConvertibleSourceError extends Error {
+  constructor(readonly hasAudio: boolean) {
+    super('This video needs converting before it can be used.');
+    this.name = 'ConvertibleSourceError';
+  }
+}
+
+/** The same name, said as the MP4 the conversion produces. */
+const convertedFilename = (filename: string): string => {
+  const separator = filename.lastIndexOf('.');
+  return `${separator > 0 ? filename.slice(0, separator) : filename}.mp4`;
+};
 
 const waitForPlayableVideo = async (blob: Blob, signal: AbortSignal): Promise<void> => {
   const objectUrl = URL.createObjectURL(blob);
@@ -122,11 +144,12 @@ export const extractExistingVideoAudioSidecar = async (
   }
 };
 
-export const validateExistingVideo = async (
+const inspectExistingVideo = async (
   file: File,
   includesVton: boolean,
   signal: AbortSignal,
-  validationContext: 'source' | 'server-approved-result' = 'source',
+  validationContext: 'source' | 'server-approved-result',
+  convertible: boolean,
 ): Promise<ValidatedExistingVideo> => {
   if (!(file instanceof File) || file.size <= 0) {
     throw new Error('Choose a non-empty video file.');
@@ -163,7 +186,26 @@ export const validateExistingVideo = async (
       hasAudio: audioTrack !== null,
     };
     const firstIssue = firstExistingVideoValidationIssue(facts, includesVton, validationContext);
-    if (firstIssue) throw new Error(firstIssue.message);
+    if (firstIssue) {
+      /*
+       * A codec this product cannot publish is the one refusal worth a second question: iPhone
+       * footage is HEVC by default, and where this browser can decode it the file can be converted
+       * here instead of somewhere else. Asked with the file's own decoder configuration, so the
+       * answer is about these bytes on this device.
+       */
+      if (firstIssue.code !== 'unsupported-codec' || !convertible)
+        throw new Error(firstIssue.message);
+      // A file whose configuration cannot even be read is one this browser certainly cannot
+      // convert, and saying that is better than surfacing a decoder's own words.
+      const decoderConfig = await videoTrack.getDecoderConfig().catch(() => null);
+      signal.throwIfAborted();
+      if (decoderConfig === null || !(await videoDecoderSupportsConfig(decoderConfig))) {
+        throw new Error(
+          `${firstIssue.message} This browser cannot convert it either — convert it to H.264 MP4 and choose it again.`,
+        );
+      }
+      throw new ConvertibleSourceError(audioTrack !== null);
+    }
     signal.throwIfAborted();
     await waitForPlayableVideo(file, signal);
 
@@ -209,6 +251,49 @@ export const validateExistingVideo = async (
     };
   } finally {
     input.dispose();
+  }
+};
+
+/**
+ * Turns a picked file into a source this product can work with, converting it once where that is
+ * what stands in the way.
+ *
+ * A conversion is a real cost — it decodes and re-encodes the whole video — so it happens only for
+ * a source whose codec is the single thing wrong with it, only when the browser has said it can
+ * decode that codec, and never for a file the server has already approved. `onConvert` is how the
+ * surface says what is happening, because the wait is long enough to need explaining.
+ */
+export const validateExistingVideo = async (
+  file: File,
+  includesVton: boolean,
+  signal: AbortSignal,
+  validationContext: 'source' | 'server-approved-result' = 'source',
+  options: { readonly onConvert?: () => void } = {},
+): Promise<ValidatedExistingVideo> => {
+  try {
+    return await inspectExistingVideo(
+      file,
+      includesVton,
+      signal,
+      validationContext,
+      validationContext === 'source',
+    );
+  } catch (error) {
+    if (!(error instanceof ConvertibleSourceError)) throw error;
+    options.onConvert?.();
+    const converted = await transcodeRecordingToMp4(file, {
+      requireAudio: error.hasAudio,
+      signal,
+    });
+    signal.throwIfAborted();
+    // Inspected like any other file, and no longer convertible: one conversion is the offer.
+    return inspectExistingVideo(
+      new File([converted.blob], convertedFilename(file.name), { type: converted.mimeType }),
+      includesVton,
+      signal,
+      validationContext,
+      false,
+    );
   }
 };
 

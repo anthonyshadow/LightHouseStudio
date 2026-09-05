@@ -127,9 +127,12 @@ and offers **Edit video** after upload to crop to either ratio. Only sources wit
 Download without provider contact.
 
 The browser performs an early metadata and decode check, but the server's streamed byte inspection
-is authoritative before provider contact. HEVC, ProRes, VP9, AV1, container aliases, and
-undocumented codecs are rejected with H.264 export guidance; Studio does not silently transcode
-them. Visual processing remains available without source audio, but Voice is disabled if a usable
+is authoritative before provider contact. A source whose codec this product cannot publish —
+HEVC and ProRes above all, which is what an iPhone records by default — is converted to H.264 MP4
+in the browser when `VideoDecoder.isConfigSupported` says this browser can decode it, announced
+while it happens rather than done silently, and inspected again afterwards. Where the browser
+cannot decode it, and for container aliases and undocumented codecs, the file is refused with
+H.264 export guidance that says the browser cannot convert it either. Visual processing remains available without source audio, but Voice is disabled if a usable
 immutable audio sidecar cannot be extracted. Provider results must be 1280×720 or 720×1280, retain
 the source orientation, and differ from the input duration by no more than 500 ms when Decart owns
 the operation. Pruna Character Swap uses its documented approximate 1 MP/2 MP class and accepts

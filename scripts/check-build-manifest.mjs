@@ -81,7 +81,14 @@ export const BUILD_CLOSURE_BUDGETS = {
   // Raised from 1_078_000 on 2026-09-05 for slice 2.3, measured 1_077_504 → 1_078_171. The Studio
   // save dialog makes one placement at a time and is untouched by the slice; what it carries is
   // the same shared domain and contract growth the shell closure records above.
-  'src/studio/StudioApp.tsx': 1_079_000,
+  //
+  // Raised again from 1_079_000 on 2026-09-05 for slice 2.4 (resilient intake), measured
+  // 1_078_171 → 1_080_920. Two things a Studio route now carries: the remembered upload keys that
+  // let a reload resume an upload instead of restarting it, and the intake's convert-or-refuse
+  // branch with the copy that explains it. The encoder itself is not new here — `useRecording`
+  // already put it in this closure — so deferring its import moves nothing but split overhead,
+  // measured at 171 bytes worse.
+  'src/studio/StudioApp.tsx': 1_081_000,
 };
 
 /**
