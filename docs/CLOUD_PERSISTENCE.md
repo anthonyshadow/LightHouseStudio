@@ -110,6 +110,14 @@ recorded there.
   Version belongs to no set: every Version written before the slice, and every Version a Studio
   save writes. Rolling back means leaving the column in place — the mappers name their columns, so
   an older API ignores it — and no down-migration is written or run.
+- Rendition records (2026-09-05) added the `project_renditions` table (migration `0024`, additive,
+  no backfill): what the server learned about a re-framed video when it accepted the upload — the
+  placement it was rendered for and the inspection of its bytes — keyed by owner and asset, and a
+  matching defaulted `renditions` list on the file-mode Project aggregate, which keeps the Project
+  library at schema version 7. A save reads the record instead of copying the asset out to inspect
+  it again, and only when the record agrees with the stored manifest on checksum, size, type, name
+  and placement; a rendition uploaded before the table exists has no record and is inspected as
+  before. Rolling back means leaving the table in place; no down-migration is written or run.
 - Audio level (slice 2.2, 2026-09-04) added `audio` inside the snapshot's `localEdit` the same way:
   an additive field defaulting to the source as recorded (`level: 100, muted: false`), so every
   revision written before it reads back unchanged and no migration ships. A write that omits either

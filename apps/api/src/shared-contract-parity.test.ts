@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { savedVideoStatus } from './infrastructure/database/schema.js';
+import { SAVED_VIDEO_VERSION_LIMIT } from './features/saved-videos/saved-video-repository.js';
 import {
   CAMPAIGN_STATUSES as CONTRACT_CAMPAIGN_STATUSES,
   CHARACTER_REFERENCE_FRAMINGS,
@@ -22,6 +23,7 @@ import {
   SUBTITLE_CUE_TEXT_MAX_LENGTH as CONTRACT_SUBTITLE_CUE_TEXT_MAX_LENGTH,
   VIDEO_EDIT_AUDIO_LEVEL_MAX as CONTRACT_VIDEO_EDIT_AUDIO_LEVEL_MAX,
   PROJECT_EXPORT_PLACEMENT_COUNT,
+  savedVideoDetailSchema,
   SUPPORTED_MODEL_IDS,
   VIDEO_EDIT_CROP_PRESETS as CONTRACT_VIDEO_EDIT_CROP_PRESETS,
   VIDEO_EDIT_FILTERS as CONTRACT_VIDEO_EDIT_FILTERS,
@@ -154,4 +156,27 @@ it('mirrors the audio level ceiling between the contract and the domain', () => 
 
 it('keeps the number of placements one save may produce in parity with the domain', () => {
   expect(PROJECT_EXPORT_PLACEMENT_COUNT).toBe(PROJECT_EXPORT_PLACEMENT_ASPECTS.length);
+});
+
+/**
+ * Zod keeps an array's bound in its check list rather than on the schema, so the parity read goes
+ * through that list: the one check that is a `max_length` names the number the wire refuses past.
+ */
+const arrayMaximum = (schema: {
+  readonly def: { readonly checks?: readonly unknown[] };
+}): number => {
+  for (const check of schema.def.checks ?? []) {
+    const definition = (check as { readonly _zod?: { readonly def?: Record<string, unknown> } })
+      ._zod?.def;
+    if (definition?.['check'] === 'max_length' && typeof definition['maximum'] === 'number') {
+      return definition['maximum'];
+    }
+  }
+  throw new Error('The schema states no maximum length.');
+};
+
+it('keeps how many Versions a video holds in parity between the wire and the store', () => {
+  // The service refuses a save that would pass this number; the wire refuses a video that already
+  // has. One number stated in two places, because contracts cannot import the store it lives in.
+  expect(arrayMaximum(savedVideoDetailSchema.shape.versions)).toBe(SAVED_VIDEO_VERSION_LIMIT);
 });

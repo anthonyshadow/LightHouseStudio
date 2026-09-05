@@ -59,7 +59,9 @@ import type {
   ProjectWorkingMediaAdoptionResult,
   ProjectWorkingMediaRead,
   ProjectWorkingMediaRecord,
+  ProjectRenditionRecord,
 } from '../../features/projects/project-repository.js';
+import { projectOutputCommitInconsistency } from '../../features/projects/project-repository.js';
 import type {
   StoredSavedVideoAggregate,
   StoredVideoVersion,
@@ -115,6 +117,8 @@ import {
   toProjectWorkingMedia,
   toRevision,
   versionReferenceValues,
+  toProjectRendition,
+  projectRenditionValues,
 } from './project-repository-mappers.js';
 import {
   campaigns,
@@ -134,6 +138,7 @@ import {
   projects,
   savedVideos,
   videoVersions,
+  projectRenditions,
 } from './schema.js';
 
 type DatabaseExecutor = Parameters<Parameters<LightframeDatabase['transaction']>[0]>[0];
@@ -2044,6 +2049,25 @@ export class DrizzleProjectRepository
     });
   }
 
+  async recordRendition(record: ProjectRenditionRecord): Promise<void> {
+    // One accepted upload, one row: a replayed commit finds its own row and changes nothing.
+    await this.db
+      .insert(projectRenditions)
+      .values(projectRenditionValues(record))
+      .onConflictDoNothing();
+  }
+
+  async getRendition(ownerUserId: string, assetId: string): Promise<ProjectRenditionRecord | null> {
+    const [row] = await this.db
+      .select()
+      .from(projectRenditions)
+      .where(
+        and(eq(projectRenditions.ownerUserId, ownerUserId), eq(projectRenditions.assetId, assetId)),
+      )
+      .limit(1);
+    return row === undefined ? null : toProjectRendition(row);
+  }
+
   async adoptWorkingMedia(
     input: AdoptProjectWorkingMediaPersistenceInput,
   ): Promise<ProjectWorkingMediaAdoptionResult> {
@@ -3468,91 +3492,32 @@ export class DrizzleProjectRepository
       }
       const version = versions.at(-1)!;
       const outputs = input.outputs;
-
       const revision: ProjectRevision = {
         ...input.projectRevision.revision,
         snapshot: projectSnapshotSchema.parse(input.projectRevision.revision.snapshot),
       };
       const nextProject = input.projectRevision.nextProject;
-      /*
-       * The record hydrates whatever the post-save revision presents, which is the produced Version
-       * only when that Version is the cut itself. A save that re-framed for a placement keeps
-       * presenting the cut it came from, so the record describes that instead — and either way
-       * every field it states has to describe the same bytes its reference names. Kept
-       * behaviourally identical to the file repository's copy of this rule.
-       */
+      // The one rule both persistence modes hold a save to, over what the service composed; the
+      // asset rows below are the part only this store can check.
+      const inconsistency = projectOutputCommitInconsistency(
+        { ...input, projectRevision: { ...input.projectRevision, revision } },
+        current,
+        {
+          versions,
+          savedVideoId,
+          savedVideoRevision: createAggregate !== null ? 1 : appendCurrent!.revision + 1,
+        },
+      );
+      if (inconsistency !== null) {
+        throw new ProjectPersistenceError(
+          'invalid-aggregate',
+          `The Project output transaction does not continue the locked aggregate: ${inconsistency}`,
+        );
+      }
       const presentsOutput =
         input.media.mediaReference.kind === 'saved-video-version' &&
         input.media.mediaReference.savedVideoId === savedVideoId &&
         input.media.mediaReference.videoVersionId === version.id;
-      const hydratesPresentedMedia = presentsOutput
-        ? input.media.kind === 'saved-video-version' &&
-          input.media.assetId === version.assetId &&
-          input.media.savedVideoId === savedVideoId &&
-          input.media.videoVersionId === version.id
-        : // No Version this save wrote, sibling or primary, may be claimed by a record that does
-          // not present it.
-          !versions.some((candidate) => input.media.videoVersionId === candidate.id) &&
-          (input.media.mediaReference.kind === 'saved-video-version'
-            ? input.media.kind === 'saved-video-version' &&
-              input.media.savedVideoId === input.media.mediaReference.savedVideoId &&
-              input.media.videoVersionId === input.media.mediaReference.videoVersionId
-            : input.media.kind !== 'saved-video-version' &&
-              input.media.savedVideoId === null &&
-              input.media.videoVersionId === null &&
-              input.media.assetId === input.media.mediaReference.assetId);
-      const validNextState =
-        current.archivedAt === null &&
-        receipt.projectId === current.id &&
-        receipt.savedVideoId === savedVideoId &&
-        receipt.videoVersionId === version.id &&
-        receipt.resultRevisionId === revision.id &&
-        receipt.resultRevisionNumber === revision.revisionNumber &&
-        receipt.result.project.version === nextProject.version &&
-        receipt.result.revision.id === revision.id &&
-        receipt.result.output.videoVersionId === version.id &&
-        receipt.result.savedVideo.currentVersion.id === version.id &&
-        receipt.result.savedVideo.revision ===
-          (createAggregate !== null ? 1 : appendCurrent!.revision + 1) &&
-        nextProject.id === current.id &&
-        nextProject.ownerUserId === current.ownerUserId &&
-        nextProject.version === current.version + 1 &&
-        nextProject.status === 'completed' &&
-        nextProject.currentRevisionId === revision.id &&
-        nextProject.currentRevisionNumber === revision.revisionNumber &&
-        revision.projectId === current.id &&
-        revision.ownerUserId === current.ownerUserId &&
-        revision.parentRevisionId === current.currentRevisionId &&
-        revision.parentRevisionNumber === current.currentRevisionNumber &&
-        revision.revisionNumber === current.currentRevisionNumber + 1 &&
-        revision.source === 'output-save' &&
-        outputs.length === versions.length &&
-        outputs.every(
-          (link, index) =>
-            link.projectId === current.id &&
-            link.ownerUserId === current.ownerUserId &&
-            link.savedVideoId === savedVideoId &&
-            link.videoVersionId === versions[index]!.id &&
-            link.producingRevisionId === current.currentRevisionId &&
-            link.producingRevisionNumber === current.currentRevisionNumber,
-        ) &&
-        input.media.projectId === current.id &&
-        input.media.ownerUserId === current.ownerUserId &&
-        hydratesPresentedMedia &&
-        input.media.adoptedRevisionId === revision.id &&
-        input.media.adoptedRevisionNumber === revision.revisionNumber &&
-        input.media.operationKey === receipt.operationId &&
-        input.media.requestFingerprint === receipt.requestFingerprint &&
-        projectMediaReferencesEqual(input.media.mediaReference, revision.snapshot.workingMedia) &&
-        projectMediaReferencesEqual(input.media.mediaReference, revision.snapshot.presentedMedia) &&
-        revision.snapshot.lastSuccessfulOutput?.savedVideoId === savedVideoId &&
-        revision.snapshot.lastSuccessfulOutput.videoVersionId === version.id;
-      if (!validNextState) {
-        throw new ProjectPersistenceError(
-          'invalid-aggregate',
-          'The Project output transaction does not continue the locked aggregate.',
-        );
-      }
       assertRevisionAssetLinks(revision, input.projectRevision.assetLinks);
       // One row per Version this save writes: a set is only as sound as its least ready member,
       // and a missing sibling asset must stop the whole transaction rather than land a Version

@@ -12,13 +12,14 @@ import {
   isProjectExportPlacementAspect,
   projectExportAspectOf,
   projectExportMatchesFrame,
-  projectOutputPrimaryPlacement,
+  projectOutputPlacementSet,
   ProjectRuleError,
   saveProjectOutput,
   type ProjectConflict,
   type ProjectExportPlacementAspect,
   type ProjectMediaReference,
   type ProjectOutputLink,
+  projectExportSpecificationsEqual,
 } from '@studio/domain';
 import { deterministicUuid } from './deterministic-uuid';
 import { AppError } from '../../http/app-error.js';
@@ -282,30 +283,28 @@ export class ProjectOutputService {
     request: SaveProjectOutputRequest,
     targetAggregate: StoredSavedVideoAggregate | null,
   ): {
-    readonly members: readonly PlacementMember[];
-    /** Which member leads, or `null` when the cut itself is what this save stores. */
-    readonly primary: number | null;
+    /** Every member in write order — siblings first, then the primary when a member leads. */
+    readonly order: readonly PlacementMember[];
+    /** The member written last, or `null` when the cut itself is what this save stores. */
+    readonly primary: PlacementMember | null;
     readonly joinedTo: StoredVideoVersion | null;
   } {
     const joining = request.variantSetId !== undefined;
     let set;
     try {
-      set = projectOutputPrimaryPlacement(
+      set = projectOutputPlacementSet(
         current.revision.snapshot.exportSpecification,
-        request.renditions.map(({ specification }) => specification),
+        request.renditions.map((rendition) => ({
+          specification: rendition.specification,
+          assetId: rendition.media.assetId,
+        })),
+        ({ specification }) => specification,
         { joining },
       );
     } catch (error) {
       if (error instanceof ProjectRuleError) throw new AppError(409, 'conflict', error.message);
       throw error;
     }
-    // The set is distinct by aspect, so each canonical member names exactly one of the renditions.
-    const members = set.order.map((specification) => ({
-      specification,
-      assetId: request.renditions.find(
-        (rendition) => rendition.specification.aspect === specification.aspect,
-      )!.media.assetId,
-    }));
 
     let joinedTo: StoredVideoVersion | null = null;
     if (joining) {
@@ -339,7 +338,7 @@ export class ProjectOutputService {
           .filter(({ variantSetId }) => variantSetId === request.variantSetId)
           .map(({ exportSpecification }) => projectExportAspectOf(exportSpecification)),
       );
-      const clash = members.find(({ specification }) => held.has(specification.aspect));
+      const clash = set.order.find(({ specification }) => held.has(specification.aspect));
       if (clash !== undefined) {
         throw new AppError(
           409,
@@ -351,7 +350,7 @@ export class ProjectOutputService {
     }
 
     // The cut is stored as its own Version exactly when it leads; a join never stores it again.
-    const writes = members.length + (set.primary === null ? 1 : 0);
+    const writes = set.order.length + (set.primary === null ? 1 : 0);
     if ((targetAggregate?.versions.length ?? 0) + writes > SAVED_VIDEO_VERSION_LIMIT) {
       throw new AppError(
         409,
@@ -359,7 +358,42 @@ export class ProjectOutputService {
         `A video holds at most ${SAVED_VIDEO_VERSION_LIMIT} Versions. Save these placements to a new video.`,
       );
     }
-    return { members, primary: set.primary, joinedTo };
+    return { order: set.order, primary: set.primary, joinedTo };
+  }
+
+  /**
+   * What is known about a rendition's bytes: the record the upload kept, when it describes the
+   * asset the manifest names — same checksum, size, type, name and placement — and otherwise a
+   * fresh inspection of a temporary copy. A record that disagrees with the manifest on any of
+   * those is not evidence about these bytes and is ignored rather than trusted.
+   */
+  async #inspectRendition(
+    ownerUserId: string,
+    asset: AssetReadHandle,
+    specification: ProjectExportSpecificationValue,
+  ): Promise<InspectedVideo> {
+    const record = await this.projects.getRendition(ownerUserId, asset.manifest.assetId);
+    if (
+      record !== null &&
+      record.checksumSha256 === asset.manifest.checksumSha256 &&
+      record.sizeBytes === asset.manifest.sizeBytes &&
+      record.mimeType === asset.manifest.mimeType &&
+      record.filename === asset.manifest.filename &&
+      projectExportSpecificationsEqual(record.specification, specification)
+    ) {
+      return {
+        mimeType: record.mimeType,
+        container: record.container,
+        videoCodec: record.videoCodec,
+        audioCodec: record.audioCodec,
+        durationMs: record.durationMs,
+        width: record.width,
+        height: record.height,
+        sizeBytes: record.sizeBytes,
+        hasAudio: record.hasAudio,
+      };
+    }
+    return inspectStoredProjectMedia(asset, this.#inspect);
   }
 
   /**
@@ -390,7 +424,7 @@ export class ProjectOutputService {
           `The re-framed video for the ${specification.aspect} placement is unavailable.`,
         );
       }
-      const inspected = await inspectStoredProjectMedia(asset, this.#inspect);
+      const inspected = await this.#inspectRendition(ownerUserId, asset, specification);
       assertManifestMatchesInspection(asset, inspected);
       if (!projectExportMatchesFrame(specification, inspected)) {
         throw new AppError(
@@ -464,7 +498,7 @@ export class ProjectOutputService {
     // members themselves stay serial so only one rendition copy exists on disk at a time.
     const [media, renditions] = await Promise.all([
       this.#resolveReadyMedia(ownerUserId, current, request.media),
-      this.#resolveRenditions(ownerUserId, placement.members),
+      this.#resolveRenditions(ownerUserId, placement.order),
     ]);
     /*
      * A re-framed file is a deliverable, not the next thing to work from. Presenting it would make
@@ -542,14 +576,14 @@ export class ProjectOutputService {
      * the browser rendered them in.
      */
     const cut = { asset: media.asset, inspected: media.inspected };
-    // The member that leads, or nothing when the cut leads — asked once, used everywhere below.
-    const lead = placement.primary === null ? null : renditions[placement.primary]!;
-    const stored = lead ?? cut;
+    /*
+     * Write order is the domain's: siblings first, then the primary — or every member and then the
+     * cut, when the cut leads. `#resolveRenditions` keeps that order, so the last entry here is the
+     * Version every single-output pointer will name.
+     */
     const ordered = [
-      ...renditions
-        .filter((_, index) => index !== placement.primary)
-        .map((member) => ({ bytes: member, specification: member.specification })),
-      { bytes: stored, specification: lead?.specification ?? null },
+      ...renditions.map((member) => ({ bytes: member, specification: member.specification })),
+      ...(placement.primary === null ? [{ bytes: cut, specification: null }] : []),
     ];
     const firstOrdinal = (targetAggregate?.versions.length ?? 0) + 1;
     const versions = ordered.map(({ bytes, specification }, index) =>

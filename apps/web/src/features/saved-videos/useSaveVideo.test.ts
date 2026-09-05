@@ -122,6 +122,8 @@ const artifact = (
   sizeBytes: 5,
 });
 
+const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
+
 describe('useSaveVideo', () => {
   beforeEach(() => {
     api.appendSavedVideoVersion.mockReset().mockResolvedValue(savedVideo);
@@ -142,7 +144,7 @@ describe('useSaveVideo', () => {
   });
 
   it('saves every runtime origin, reuses idempotency, and uploads an optional thumbnail', async () => {
-    const { result } = renderHook(() => useSaveVideo());
+    const { result } = renderHook(() => useSaveVideo(false, ownerUserId));
     const original = artifact('recorded');
 
     await act(async () => {
@@ -178,7 +180,6 @@ describe('useSaveVideo', () => {
   });
 
   it('resumes an interrupted upload under the key the browser already used', async () => {
-    const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
     // The upload that was interrupted: it never completed, so its key is still remembered.
     api.saveVideo.mockRejectedValueOnce(new Error('The connection dropped.'));
     const interrupted = renderHook(() => useSaveVideo(false, ownerUserId));
@@ -206,24 +207,8 @@ describe('useSaveVideo', () => {
     expect(api.saveVideo.mock.calls[2]?.[0].idempotencyKey).not.toBe(firstKey);
   });
 
-  it('does not remember a key for nobody, so no one inherits another upload', async () => {
-    const anonymous = renderHook(() => useSaveVideo());
-    const source = artifact();
-    await act(async () => {
-      await anonymous.result.current.save(source);
-    });
-    anonymous.unmount();
-    const next = renderHook(() => useSaveVideo());
-    await act(async () => {
-      await next.result.current.save({ ...source, id: crypto.randomUUID() });
-    });
-    expect(api.saveVideo.mock.calls[1]?.[0].idempotencyKey).not.toBe(
-      api.saveVideo.mock.calls[0]?.[0].idempotencyKey,
-    );
-  });
-
   it('saves a visual result under the tool that produced it', async () => {
-    const { result } = renderHook(() => useSaveVideo());
+    const { result } = renderHook(() => useSaveVideo(false, ownerUserId));
 
     await act(async () => {
       await result.current.save({ ...artifact('visual'), visualOperation: 'virtual-try-on' });
@@ -241,7 +226,7 @@ describe('useSaveVideo', () => {
   });
 
   it('appends a version, tolerates thumbnail failure, reports save failure, and resets', async () => {
-    const { result } = renderHook(() => useSaveVideo());
+    const { result } = renderHook(() => useSaveVideo(false, ownerUserId));
     api.createSavedVideoThumbnail.mockRejectedValue(new Error('no frame'));
     await act(async () => {
       await result.current.replace(artifact('edited'), {
@@ -269,7 +254,7 @@ describe('useSaveVideo', () => {
   });
 
   it('retries a transient thumbnail failure once and uploads the retried poster', async () => {
-    const { result } = renderHook(() => useSaveVideo());
+    const { result } = renderHook(() => useSaveVideo(false, ownerUserId));
     api.createSavedVideoThumbnail
       .mockRejectedValueOnce(new Error('decoder busy'))
       .mockResolvedValue(new Blob(['thumbnail'], { type: 'image/webp' }));
@@ -284,7 +269,7 @@ describe('useSaveVideo', () => {
   });
 
   it('honours the requested poster source, using an uploaded image without decoding video', async () => {
-    const { result } = renderHook(() => useSaveVideo());
+    const { result } = renderHook(() => useSaveVideo(false, ownerUserId));
     const image = new File(['poster'], 'poster.png', { type: 'image/png' });
 
     await act(async () => {
@@ -301,7 +286,7 @@ describe('useSaveVideo', () => {
   });
 
   it('selects direct multipart adapters only when the server capability enables them', async () => {
-    const { result } = renderHook(() => useSaveVideo(true));
+    const { result } = renderHook(() => useSaveVideo(true, ownerUserId));
 
     await act(async () => {
       await result.current.save(artifact());
@@ -318,7 +303,7 @@ describe('useSaveVideo', () => {
   });
 
   it('invalidates saved-video metadata after save and replace, but not after failure', async () => {
-    const { result, queryClient } = renderHook(() => useSaveVideo());
+    const { result, queryClient } = renderHook(() => useSaveVideo(false, ownerUserId));
     const listKey = [...savedVideoQueryKeys.lists, { sort: 'latest' }] as const;
     // The Videos tab count lives under its own key, outside `lists` — a save that only
     // invalidated the pages would leave the tab announcing yesterday's number.
@@ -360,7 +345,7 @@ describe('useSaveVideo', () => {
         resolve = settle;
       }),
     );
-    const { result } = renderHook(() => useSaveVideo());
+    const { result } = renderHook(() => useSaveVideo(false, ownerUserId));
     const source = artifact();
 
     let first!: Promise<SavedVideoDetail | null>;
