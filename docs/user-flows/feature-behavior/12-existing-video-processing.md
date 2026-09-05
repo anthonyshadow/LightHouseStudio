@@ -156,7 +156,14 @@ source, then edit either base, save, start over, or discard.
 - Standalone sidecar extraction losslessly copies playable audio packets and excludes MP4 AAC
   encoder-priming packets before timestamp zero. A saved original is re-inspected and receives a
   fresh sidecar when reopened, so this normalization also applies to videos saved before the fix.
-- HEVC, ProRes, aliases, and undocumented codecs are blocked with export guidance. When the active
+- A codec this product cannot publish is converted here when the browser can decode it (slice 2.4):
+  the intake asks `VideoDecoder.isConfigSupported` with the file's own decoder configuration, and
+  where the answer is yes it converts the file to H.264 MP4 through the same worker a recording
+  uses, says so while it works, and inspects the result like any other file. One conversion is the
+  offer — the converted file is not converted again. Where the answer is no, the refusal says both
+  things: the codec is not one this product publishes, and this browser cannot convert it either.
+  Aliases and undocumented codecs are blocked with export guidance. A file the server has already
+  approved is never converted. When the active
   Character Swap capability requires H.264 MP4, H.264 MOV or VP8 WebM is converted locally only
   at explicit Start. The converted Blob is revalidated, remains ephemeral, and never replaces the
   immutable source. MP4 passes through.

@@ -138,7 +138,9 @@ material flow problems are of shape, not breakage:
 10. **First-touch identity mismatch** (prod-5): entry page and `index.html` sell AI restyling and
     "realtime creative video"; the README sells a marketing-asset workspace; the in-app explainer
     says a third thing (the best one).
-11. **HEVC/iPhone footage fails at upload** (ev-2) with a corrective message but no in-app remedy;
+11. **HEVC/iPhone footage fails at upload** (ev-2): _closed by slice 2.4 (2026-09-05)_ — the file
+    is converted to H.264 in the browser where the browser can decode it, and refused with copy
+    that says so where it cannot;
     uploads do not survive a page reload despite full server-side replay support (STOR-2).
 12. **Recording is one-shot** (studio-2): the camera is released after every take; there is no
     retake loop, pause/resume, or multi-take comparison.
