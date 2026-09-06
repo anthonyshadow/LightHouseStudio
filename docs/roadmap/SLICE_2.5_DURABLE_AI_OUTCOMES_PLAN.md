@@ -1273,3 +1273,258 @@ write point per synchronous provider call, a synthetic id, and an `operation` en
 Everything else in §3, the field list, the coalesce rule, the interval default, the reconciler
 cadence, the 50-row page, the copy, is a routine call made the way the nearest existing code makes
 it, and prompt 21 proceeds on those defaults.
+
+## 6. Verification evidence (prompt 22)
+
+Prompt 22 (`IMPLEMENTATION_PROMPTS.md:263-266`) ran against the implementation of this plan. Every
+provider was a local fake and the shared test setup denies outbound fetch, so nothing contacted a
+live service at any step. Each criterion below gives the case that establishes it, the command that
+was run and what it printed, and a file and line for every claim made about the code. Three
+adversarial passes then tried to break the result, one per criterion group, and all three returned
+partly verified rather than verified. What they could not rule out is in the second list at the end
+rather than left implicit.
+
+### 6.1 Submit, close the client, retrieve the result inside the deadline
+
+**The case.** `apps/api/src/features/video-jobs/durable-ai-outcomes.verification.test.ts:236`,
+"progresses an accepted job to a retrievable, retained result with no client watching". It builds
+the app through `createApp` with a scripted provider and `videoJobProgressionIntervalMs: 5`, submits
+through `PUT /api/video-jobs/:jobId`, and never asks the job for its status. The absence of a status
+request is enforced rather than assumed: the test registers an `onRequest` hook and asserts that no
+`GET /api/video-jobs/<id>` was served, both before and after the content reads (`:267`, `:273`).
+Readiness is read from the durable trace rather than from the API. Both content reads answer 200
+with the fixture bytes while `provider.downloads` stays at 1 (`:262-275`).
+
+**The control that makes the tick load-bearing.** `:278`, "leaves the same job where it was when the
+deployment runs no tick", runs the same scenario with the interval at 0. The trace is still `queued`
+after the grace period, with zero status reads and zero downloads. `progressDueJobs` has one
+non-test caller, the tick (`video-job-progression.ts:159`), and the tick is constructed only when
+the interval is positive (`app.ts:469`).
+
+**The code the retention half rests on.** `#settleDelivery` requests cleanup only for a delivered
+Project-linked job (`video-job-service.ts:1534`), so a standalone job takes the flush branch and
+stays admissible. The deadline is anchored at creation and written once,
+`expiresAtMs = createdAtMs + VIDEO_JOB_TTL_MS` (`video-job-service.ts:517`), where the TTL is sixty
+minutes (`packages/contracts/src/video-jobs.ts:26`).
+
+**Where the deadline itself is proved.** Not in the app-level case above, but at the service layer
+with a manual clock: `video-job-service.test.ts:1349` expires a retained standalone result at its
+deadline, and `:1321` serves a delivered standalone result again after an interrupted delivery. The
+route layer holds the same pair at `apps/api/src/features/video-jobs/routes.test.ts:453` and `:473`.
+
+**Command.**
+`bunx vitest run apps/api/src/features/video-jobs/durable-ai-outcomes.verification.test.ts` printed
+`Test Files 1 passed (1)` and `Tests 5 passed (5)` in 6.87 s.
+
+### 6.2 One ledger row per submission, idempotent under tick and poll races
+
+**The case.** `durable-ai-outcomes.verification.test.ts:300`, "writes one usage row per submission
+under a tick and client racing for the same job". The tick runs at 5 ms while the client polls every
+10 ms, so both reach the same job through the coalescing refresh, which is where a duplicate row
+would appear. Exactly one row is read back through a fresh file repository, its outcome is
+`succeeded`, and the window counts report one succeeded row and nothing else. The stored
+`submittedAt` is the opener's instant and not the closer's, separated by a wrapper that records
+every `record()` call. A restart over the same data directory leaves the row byte-identical, and an
+explicit reconciler pass over the same stores returns 0.
+
+**The negatives in the same file.** `:377` records a refused submission once, as `failed`, and does
+not submit it again. `:407` shows that when the ledger refuses the open write nothing is submitted
+at all and the job fails as `provider_unavailable`, which is the no-row-no-spend ordering at
+`video-job-service.ts:1199`.
+
+**The rule that makes racing writers converge.** One domain rule owns every merge
+(`packages/domain/src/ai-usage/rules.ts:58-66`): a settled row is never reopened, re-closed or
+re-timed, and an incoming row that is itself still open writes nothing.
+
+**Postgres cannot hold two rows for one submission.** Read back from the throwaway database on
+compose 5433 after applying the migrations:
+`ai_usage_ledger_owner_user_id_job_id_pk | PRIMARY KEY (owner_user_id, job_id)` and
+`ai_usage_ledger_outcome_completed_consistent | CHECK (((outcome IS NULL) = (completed_at IS NULL)))`.
+A refutation pass replayed the repository's own statement sequence in two interleaved psql sessions.
+With two closers, the second writer's locking read returned the row the first had already settled,
+so the rule dropped its write. With a closer arriving while the opener's insert was uncommitted, the
+closer's insert blocked for about three seconds, inserted nothing, and then closed the opener's row,
+leaving one row carrying the opener's `submitted_at`.
+
+**File mode.** All four writer orderings settle on the first terminal outcome
+(`apps/api/src/features/ai-usage/file-ai-usage-ledger-repository.test.ts:118`), and the same holds
+across two repositories over one directory when the writes are sequential (`:186`).
+
+**Commands.** `bunx vitest run apps/api/src/features/ai-usage`
+`apps/api/src/features/video-jobs/video-job-progression.test.ts`
+`apps/api/src/features/video-jobs/video-job-service.test.ts packages/domain/src/ai-usage` printed
+`Test Files 6 passed (6)` and `Tests 100 passed (100)`. The file ledger suite on its own printed
+`Tests 14 passed (14)`.
+
+### 6.3 No automatic paid retry, audited on the tick path
+
+**The rules audited**, read where they live: `CLAUDE.md:95`, `AGENTS.md:85`, `DOMAIN_MODEL.md:227`
+and `PRODUCT_VISION.md:96`.
+
+**Three provider call sites exist in the service**, and a grep over the file returns exactly them:
+`video-job-service.ts:1225` (`submit`), `:1298` (`download`) and `:1363` (`status`).
+
+**The tick reaches two of the three, and both are reads.** `progressDueJobs` awaits the constructor
+promise, expires due jobs, filters, slices to the batch limit and then makes one outbound call,
+`Promise.allSettled(due.map((job) => this.#refresh(job)))` (`:1429-1449`). `#refresh` calls
+`status`, and only a `completed` answer launches `#retrieve`, which calls `download`. The single
+`submit` call site sits inside `#submitProvider`, whose only callers are `startPrelinked` and
+`#submit`, both driven by a request. The tick's view of each service is narrowed by type to
+`Pick<VideoJobService, 'available' | 'progressDueJobs'>` (`video-job-progression.ts:43`) and
+`Pick<ProjectProcessingService, 'retainResult'>` (`:46`).
+
+**Retention and reconciliation touch no provider.** `ProjectProcessingService.retainResult`
+(`project-processing-service.ts:639`) reads the attempt, checks the byte store, takes a local
+content lease and stores bytes. The reconciler reads open rows, reads durable outcomes and writes
+the ledger (`ai-usage-reconciler.ts:108`, `:120`, `:133`).
+
+**Terminal and ambiguous jobs are excluded twice**, by `#ownsMutableJob` and by the explicit
+`queued`/`processing` filter (`video-job-service.ts:1436-1437`), and each pass expires first
+(`:1430`). `listResumable`, which mutates durable rows, has one call site and runs once per process
+at construction (`:310`, `:317`).
+
+**The bounds, as configured.** Four provider reads a pass, from `videoJobMaxActivePerProvider`
+(default 4, `environment.ts:35`, wired at `app.ts:479`). A five second default interval, and no tick
+object at all when the interval is 0 (`environment.ts:36`, `app.ts:469`). Three downloads per job
+per process lifetime: the counter is incremented before the download (`video-job-service.ts:1289`),
+guarded at `< 3` (`:1327`) and never reset mid-life. Twenty-five ledger rows a sweep, at most one
+sweep a minute (`video-job-progression.ts:6`, `:13`). Retention retries back off to a five minute
+ceiling (`:16`).
+
+**Assertions.** `video-job-service.test.ts:1960` holds `provider.submissions` to one across three
+concurrent passes and two status calls, and `:1963` holds `listResumable` to a single call. The two
+app-level negatives are §6.2's `:377` and `:407`.
+
+**Command.** The tick, reconciler and service suites are inside the 100-test run recorded in §6.2.
+
+### 6.4 Migration 0025 verified in both modes
+
+**Postgres.** `apps/api/src/infrastructure/database/ai-usage-ledger.postgres.integration.test.ts:98`
+applies every migration to a throwaway database, applies them a second time, and asserts that the
+journal rows and the whole table catalogue are unchanged. It then asserts the primary key, the
+check, the foreign key and both indexes as rendered definitions, exercises the three rejections, and
+drives the repository through concurrent writers, paging, window counts and the open sweep. It is
+registered in CI at `.github/workflows/quality.yml:163`, one line later than the range §3 predicted,
+and documented at `docs/TESTING.md:75-79`.
+
+**Commands and their output.** `bun run db:migrate:development` against the throwaway
+`lightframe_x_test` on compose 5433 printed `[✓] migrations applied successfully!` and exited 0. The
+gated vitest run printed `Test Files 1 passed (1)` and `Tests 1 passed (1)`. Reading the live
+catalogue back with psql returned exactly the primary key, the check, the foreign key and the two
+indexes the test asserts, plus 26 rows in `drizzle.__drizzle_migrations` against 26 files in
+`apps/api/drizzle/`. The developer's own database was never targeted.
+
+**File mode needs no migration**, and the two cases §3 named exist.
+`file-ai-usage-ledger-repository.test.ts:380` constructs the four sibling file repositories over a
+directory that already holds the ledger and asserts their reads are exactly what they were without
+it. `:411` shows the strict parse refusing an unknown `schemaVersion`, leaving the journal
+unrepaired, and the sweep still serving the other owner. `:436` extends that to a fault that never
+reaches the schema at all.
+
+**Command.** The 14-test file ledger run recorded in §6.2.
+
+### What is established
+
+- A job that is submitted and then left alone reaches a retrievable result with no client request,
+  and the tick, rather than anything else in the process, is what moves it.
+- A delivered standalone result is served again from the same process, and the creation-anchored
+  deadline still expires it.
+- One row per submission survives a tick and a poll racing, a restart over the same data directory,
+  and an explicit reconciler sweep.
+- A refused submission and a refused ledger write each leave exactly one honest outcome and no
+  second provider call.
+- Neither store can hold two rows for one submission, and one domain rule decides every merge.
+- The tick reaches only `status` and `download`, the single paid `submit` call site is request-driven
+  on both paths, download attempts are capped at three per job per process, and the whole tick is
+  switched off by `VIDEO_JOB_PROGRESSION_INTERVAL_MS=0`.
+- Migration 0025 applies to an empty database, re-applies as a no-op, and produces exactly the
+  primary key, check, foreign key and two indexes this plan specifies. File mode adds a directory
+  the other file repositories do not see.
+
+### What verification found and changed
+
+Verification is worth running only if it is allowed to fail, and this pass failed four times. Each
+defect below was found by prompt 22, fixed in the source, and pinned by a regression test that the
+old code does not satisfy. They are recorded here rather than quietly repaired, because the plan
+claimed some of them could not happen.
+
+- **Two ledger repositories over one data directory lost a whole row.** The per-owner write chain
+  was a field on the instance, so two repositories read, modified and renamed the same journal and
+  the later write erased the earlier row. The chain is now keyed by the journal's own resolved path
+  at module level, which is still deliberately not the shared owner lock a ledger write must never
+  nest inside. A probe reproduced the loss five times out of five before the fix and none after, and
+  `file-ai-usage-ledger-repository.test.ts` now opens two submissions from two instances at once and
+  asserts both survive.
+- **A terminal transition landing inside the open write left the row open.** The row was marked
+  opened only after the write resolved, so a job that expired or was abandoned in that window was
+  never closed by the process that did the work. The mark now happens before the write and is put
+  back only when the write fails, so the close always fires and a submission that never reached the
+  provider still leaves no row. `video-job-service.test.ts` holds the open write, expires the job
+  and asserts one closed row.
+- **The paid call was made against state one ledger round trip stale.** The ownership check ran
+  before the ledger write and not again after it, so an abandon that arrived during the write landed
+  after the provider had already been paid. Both submission paths now re-check after the write.
+  Two cases assert the provider was never asked to submit.
+- **A shadow mirror that threw before returning a promise failed the write the journal had already
+  accepted.** The guard was attached to the returned promise. The call now goes through a resolved
+  promise first, so a rehearsal store cannot fail a real write, which is the one thing it must never
+  do.
+
+### What is not established, or is assumed
+
+- **The billing assumption stands as an assumption.** Verified: both adapters' `status` and
+  `download` calls are plain authenticated GETs, and only `submit` sets a method
+  (`decart/video-job-provider.ts:136`, `pruna/video-replace-provider.ts:226`). Not verified: that
+  these providers do not meter status polls or result egress. If they do, the tick's unattended
+  traffic is the exposure, bounded at four reads a pass every five seconds and switchable off.
+- **The tick adds unattended provider traffic**, which `AGENTS.md:85` names alongside paid retry. It
+  is bounded and disclosed above, so this is not "no new traffic". A restart also re-downloads a
+  `ready` result on the restore path (`video-job-service.ts:380`), which is a re-retrieval of work
+  already paid for, not a resubmission, and the tick makes it more likely by driving more jobs to
+  `ready` unattended.
+- **The app-level "within TTL" assertion is vacuous.** The whole case runs in about a tenth of a
+  second against a one-hour deadline (`durable-ai-outcomes.verification.test.ts:265`), so it would
+  pass even if the anchor moved. The creation anchor is established only by the service-layer case
+  with a manual clock.
+- **Retrievability across a restart inside the TTL is untested.** The service wipes its temp root at
+  construction (`video-job-service.ts:307`), so a restart destroys the retained bytes and recovery
+  re-downloads them, and the owner's next submission is refused while the restored job is
+  non-terminal.
+- **The second retention case §3 named was not implemented**: a restart after a delivered download
+  asserting the re-download, the `generation_in_progress` refusal and the refusal clearing. The
+  operator-visible cost of retention is therefore unverified.
+- **The standalone criterion is met as a server capability, not as a user journey.** The browser
+  holds the standalone job id in memory alone, which §3 records as accepted exception Q4, and the
+  verification test mints the id itself.
+- **The no-status-request guard is not self-validating.** Nothing asserts that any request was
+  recorded, so plumbing that stopped invoking the hook would leave both assertions passing on an
+  empty list.
+- **Cross-process journal writing remains unguarded.** The fix above serializes every writer inside
+  one process. Two processes on one data directory would still interleave a read, a modify and a
+  rename, and nothing prevents that; prov-7 excludes the configuration rather than the failure, and
+  Postgres is immune because its write is one transaction.
+- **The bounded download retry is now self-driving and untested.** A retryable download failure
+  requeues the job to `queued` (`video-job-service.ts:1329`) and the tick re-enters it with nobody
+  watching, capped at three attempts. The cap was established by reading the code, not by a test.
+- **Shadow mode is verified in neither direction.** The Postgres case constructs the relational
+  repository standalone and the file case's mirror is a fake that always rejects, so the
+  configuration where both stores are live (`persistence-factory.ts:120`) is untested. In it, the
+  mirror's arrival order is not guaranteed to match the journal's chosen winner, which a refutation
+  pass called plausible and could not demonstrate.
+- **The migration test calls the programmatic migrator, not the shipped `drizzle-kit migrate`.** The
+  shipped command was run by hand against the throwaway database and the catalogue read back
+  matches, so the fact holds while the test's own coverage does not reach the deployment command.
+- **The gated Postgres file skips silently in ordinary local validation.** Run without the gate it
+  printed `Test Files 1 skipped (1)` and `Tests 1 skipped (1)`. It does run in CI.
+- **The Postgres two-terminal-writer case asserts survival, not a winner.** Which concurrent writer
+  lands first is decided by row-lock arrival and is not observable from the test, so that case
+  asserts one surviving row with one writer's coherent pair. First-terminal-wins itself is proved by
+  the two deterministic cases beside it.
+- **Criteria 1, 2 and 3 came back partly verified** on the first pass, and criterion 4 with the
+  shadow and deployment-path gaps above. The four defects that made them partly verified are fixed
+  and listed above; the bullets that remain in this list are coverage gaps and assumptions, not
+  known defects. Nothing here was reported as passing that was skipped or blocked.
+
+Verification ran on 2026-09-06 against commit `b4ab68b9`. The four defects it found were fixed
+in the commit that carries this section, and the counts above are from the suites as they stand
+after those fixes.

@@ -67,9 +67,21 @@ LIGHTFRAME_RUN_PROJECT_POSTGRES_TEST=true node --env-file=.env.development \
   apps/api/src/infrastructure/database/project-repository.postgres.integration.test.ts
 ```
 
-Campaign and Project-processing migration/repository integration cases use the same isolated
-database gate and run with the Project case when `LIGHTFRAME_RUN_PROJECT_POSTGRES_TEST=true`;
-ordinary tests never contact Neon or a provider.
+Campaign, Project-processing and AI usage ledger migration/repository integration cases use the
+same isolated database gate and run with the Project case when
+`LIGHTFRAME_RUN_PROJECT_POSTGRES_TEST=true`; ordinary tests never contact Neon or a provider. The
+gated files, which are also the list the CI database job runs, are:
+
+- `apps/api/src/infrastructure/database/project-migration.postgres.integration.test.ts`;
+- `apps/api/src/infrastructure/database/project-repository.postgres.integration.test.ts`;
+- `apps/api/src/infrastructure/database/campaign-migration.postgres.integration.test.ts`;
+- `apps/api/src/infrastructure/database/campaign-repository.postgres.integration.test.ts`; and
+- `apps/api/src/infrastructure/database/ai-usage-ledger.postgres.integration.test.ts`.
+
+The three migration files build their own throwaway database from `DATABASE_URL`'s server and drop
+it again; the two repository files write into the database `DATABASE_URL` names and clean up after
+themselves. Point `DATABASE_URL` at an isolated database either way — never the one you develop
+against.
 
 **Never run Vitest and Playwright at the same time.** Both saturate the machine, and the
 `apps/web/src/studio` suite — `StudioApp.test.tsx` above all — asserts across lazy `Suspense`

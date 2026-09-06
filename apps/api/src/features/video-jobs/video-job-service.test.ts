@@ -87,16 +87,32 @@ class RecordingUsageLedger implements AiUsageLedgerRepository {
   readonly rows = new Map<string, AiUsageEntry>();
   readonly writes: AiUsageEntry[] = [];
   rejectOpen = false;
+  /**
+   * Holds the open write of a submission until a test lets it land.
+   *
+   * The interval between marking a submission and having recorded it is where an abandon or a
+   * deadline can arrive, and it is the ordering several tests exist to pin. A store that always
+   * answers within the same tick has no such interval to aim at, so the test has to be able to
+   * hold one open itself. A close is never held: it is the write racing the open one.
+   */
+  openGate: Promise<void> | null = null;
 
   record(entry: AiUsageEntry): Promise<void> {
     if (this.rejectOpen && entry.outcome === null) {
       return Promise.reject(new Error('private ledger failure'));
     }
+    // Recorded at the call, not at the landing, so a test can see that the write is in flight.
     this.writes.push(entry);
+    const gate = entry.outcome === null ? this.openGate : null;
+    if (gate !== null) return gate.then(() => this.#apply(entry));
+    this.#apply(entry);
+    return Promise.resolve();
+  }
+
+  #apply(entry: AiUsageEntry): void {
     const key = `${entry.ownerUserId}:${entry.jobId}`;
     const next = applyAiUsageTransition(this.rows.get(key) ?? null, entry);
     if (next !== null) this.rows.set(key, next);
-    return Promise.resolve();
   }
 
   listOpen(limit: number): Promise<readonly AiUsageEntry[]> {
@@ -1657,6 +1673,10 @@ describe('VideoJobService', () => {
       }),
     );
     expect(provider.submissions).toHaveLength(0);
+    // Not one write, and so not one row: the submission is marked as recorded before the write is
+    // attempted, and that mark is put back when the write fails. Its own failure must not become
+    // the close of a row that was never opened, because nothing was ever submitted to count.
+    expect(ledger.writes).toEqual([]);
     expect(ledger.rows.size).toBe(0);
     expect(traces.map((trace) => trace.status)).toEqual(['validating', 'submitting', 'failed']);
     expect(warning).toHaveBeenCalledWith('[video-jobs] AI usage row could not be opened.', {
@@ -1694,6 +1714,92 @@ describe('VideoJobService', () => {
     expect(ledger.rows.size).toBe(0);
     expect(await pathExists(paths.directory)).toBe(false);
     warning.mockRestore();
+  });
+
+  it('closes the row of a job the deadline expired while its open write was in flight', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-ledger-open-race-'));
+    const provider = new FakeVideoProvider();
+    const ledger = new RecordingUsageLedger();
+    const openWrite = deferred<void>();
+    ledger.openGate = openWrite.promise;
+    const clock = new ManualDeadlineScheduler();
+    const service = createService(provider, root, {
+      usageLedger: ledger,
+      now: clock.now,
+      scheduleDeadline: clock.scheduleDeadline,
+    });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-ledger-open-race';
+
+    await startJob(service, jobId, ownerId);
+    await vi.waitFor(() => expect(ledger.writes).toHaveLength(1));
+
+    // The submission counts as recorded from the moment the write is issued, not from the moment
+    // it lands. A job that goes terminal inside that interval — this deadline, or an abandon — is
+    // closed by the process that did the work; waiting for the write would leave the row open, and
+    // only the reconciler would ever come back for it.
+    await clock.advanceTo(clock.nowMs + VIDEO_JOB_TTL_MS);
+    openWrite.resolve();
+    await service.close();
+
+    expect(ledger.writes.map((write) => write.outcome)).toEqual([null, 'expired']);
+    // Two writes, one row: the open write lands last and the rule drops it, rather than reopening
+    // a submission that is already accounted for.
+    expect([...ledger.rows.values()]).toMatchObject([{ jobId, outcome: 'expired' }]);
+  });
+
+  it('stops a standalone submission abandoned while its open ledger write was in flight', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-ledger-abandon-'));
+    const provider = new FakeVideoProvider();
+    const ledger = new RecordingUsageLedger();
+    const openWrite = deferred<void>();
+    ledger.openGate = openWrite.promise;
+    const service = createService(provider, root, { usageLedger: ledger });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-ledger-abandon';
+
+    await startJob(service, jobId, ownerId);
+    await vi.waitFor(() => expect(ledger.writes).toHaveLength(1));
+
+    await service.abandon(jobId, ownerId);
+    openWrite.resolve();
+    // Closing waits out the submission chain, so what follows says the provider was never called
+    // rather than that it had not been called yet.
+    await service.close();
+
+    // The ownership check taken before the ledger write is not enough on its own: that write is
+    // what gives the interval its width, so the money is spent on the far side of it and the
+    // abandon has to be read again there.
+    expect(provider.submissions).toHaveLength(0);
+    expect([...ledger.rows.values()]).toMatchObject([{ jobId, outcome: 'cancelled' }]);
+  });
+
+  it('stops a Project-linked submission abandoned while its open ledger write was in flight', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-ledger-abandon-project-'));
+    const provider = new FakeVideoProvider();
+    const ledger = new RecordingUsageLedger();
+    const openWrite = deferred<void>();
+    ledger.openGate = openWrite.promise;
+    const service = createService(provider, root, { usageLedger: ledger });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = crypto.randomUUID();
+
+    // The Project-linked path opens the same row in front of the same paid call, so it owes the
+    // abandon the same second reading; it differs only in awaiting the submission inline.
+    const starting = startPrelinkedJob(service, jobId, ownerId, crypto.randomUUID());
+    await vi.waitFor(() => expect(ledger.writes).toHaveLength(1));
+
+    await service.abandon(jobId, ownerId);
+    openWrite.resolve();
+
+    const { status } = await starting;
+    expect(status).toMatchObject({ status: 'cancelled' });
+    await service.close();
+    expect(provider.submissions).toHaveLength(0);
+    expect([...ledger.rows.values()]).toMatchObject([{ jobId, outcome: 'cancelled' }]);
   });
 
   it('opens one ledger row per submission and keeps its first terminal outcome', async () => {
