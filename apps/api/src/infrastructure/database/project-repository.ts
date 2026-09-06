@@ -73,6 +73,7 @@ import {
 import { savedVideoValues, savedVideoVersionValues } from './saved-video-repository.js';
 import type { StoredAssetManifest } from '../../storage/asset-byte-store.js';
 import {
+  durableProcessingJobOutcome,
   projectProcessingAttemptMatchesTrace,
   projectProcessingResultInputMatchesAttempt,
   retainedProjectProcessingResultMatches,
@@ -86,6 +87,7 @@ import {
   type ProjectProcessingResultRetentionResult,
 } from '../../features/projects/project-processing-repository.js';
 import type {
+  DurableProcessingJobOutcome,
   ResumableVideoProcessingJob,
   VideoProcessingJobTrace,
 } from '../../features/processing-jobs/file-processing-job-repository.js';
@@ -2551,6 +2553,39 @@ export class DrizzleProjectRepository
       )
       .limit(1);
     return row === undefined ? null : toProjectProcessingAttempt(row.job, row.link);
+  }
+
+  async findProjectAttemptOutcomes(
+    ownerUserId: string,
+    jobIds: readonly string[],
+  ): Promise<ReadonlyMap<string, DurableProcessingJobOutcome>> {
+    const outcomes = new Map<string, DurableProcessingJobOutcome>();
+    if (jobIds.length === 0) return outcomes;
+    // The link join is what makes an id a Project attempt; no row lock, because this reader only
+    // observes and must not block the writers that settle these rows.
+    const rows = await this.db
+      .select({
+        id: processingJobs.id,
+        status: processingJobs.status,
+        completedAt: processingJobs.completedAt,
+        updatedAt: processingJobs.updatedAt,
+      })
+      .from(processingJobs)
+      .innerJoin(projectJobs, processingJobMatchesProjectLink)
+      .where(
+        and(eq(processingJobs.ownerUserId, ownerUserId), inArray(processingJobs.id, [...jobIds])),
+      );
+    for (const row of rows) {
+      outcomes.set(
+        row.id,
+        durableProcessingJobOutcome({
+          status: row.status,
+          completedAt: nullableIsoTimestamp(row.completedAt),
+          updatedAt: toIsoTimestamp(row.updatedAt),
+        }),
+      );
+    }
+    return outcomes;
   }
 
   async getCurrentProjectAuthority(

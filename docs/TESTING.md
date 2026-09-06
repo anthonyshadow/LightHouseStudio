@@ -218,6 +218,13 @@ The retained suite protects:
 - the read-only account panel and the static "How Lightframe works" explainer, including their
   mutual exclusion with the status menu, and Saved Video preview generation from a frame or an
   uploaded image without touching saved Versions;
+- durable AI outcomes: the domain's first-terminal-outcome-wins transition and its status mapping;
+  the ledger's file journal and its owner-scoped paging; the reconciler closing rows whose jobs
+  settled unobserved; the progression tick polling due jobs without overlapping itself, retaining
+  ready Project results without promoting them, and never letting one failed step cost the others
+  their pass; a submission failed before provider contact when its ledger row cannot be opened;
+  a delivered standalone result still retrievable; and the account usage route's window cap,
+  criteria-bound cursor and owner scoping;
 - creative-library export to a file and import back, including the replace confirmation and the
   file carrying records rather than reference bytes;
 - one media stage per Studio visit, shared overlay focus/inert/Escape behavior, dominant recording Stop,

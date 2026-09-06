@@ -7,6 +7,7 @@ import {
   REFERENCE_IMAGE_MODEL_ID,
   REFERENCE_IMAGE_QUALITY,
   PRUNA_IMAGE_TRY_ON_MODEL,
+  VIDEO_JOB_TTL_MS,
 } from '@studio/contracts';
 
 export const DEFAULT_API_PORT = 4100;
@@ -32,6 +33,7 @@ export const DEFAULT_AUTH_SESSION_TTL_SECONDS = 24 * 60 * 60;
 export const DEFAULT_AUTH_COOKIE_NAME = 'lightframe_session';
 export const DEFAULT_VIDEO_JOB_MAX_ACTIVE = 8;
 export const DEFAULT_VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER = 4;
+export const DEFAULT_VIDEO_JOB_PROGRESSION_INTERVAL_MS = 5_000;
 export const DEVELOPMENT_R2_BUCKET = 'lightframe-studio-development';
 
 export const databaseUrlUsesEncryptedTransport = (value: string): boolean => {
@@ -78,6 +80,16 @@ const positiveLimitSchema = (defaultValue: number) =>
   z.preprocess(
     (value) => (value === undefined || value === '' ? defaultValue : value),
     z.coerce.number().int().min(1).max(100),
+  );
+
+/**
+ * A schedule in milliseconds where zero is a meaning rather than a mistake: it switches the schedule
+ * off. `positiveLimitSchema` cannot serve that, and its ceiling of 100 is a count, not a duration.
+ */
+const nonNegativeIntervalSchema = (defaultValue: number, maximumMs: number) =>
+  z.preprocess(
+    (value) => (value === undefined || value === '' ? defaultValue : value),
+    z.coerce.number().int().min(0).max(maximumMs),
   );
 
 const samplingRatioSchema = z.preprocess(
@@ -181,6 +193,11 @@ const environmentSchema = z
     VIDEO_JOB_MAX_ACTIVE: positiveLimitSchema(DEFAULT_VIDEO_JOB_MAX_ACTIVE),
     VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER: positiveLimitSchema(
       DEFAULT_VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER,
+    ),
+    // Bounded by the job deadline: an interval longer than that could never reach a job in time.
+    VIDEO_JOB_PROGRESSION_INTERVAL_MS: nonNegativeIntervalSchema(
+      DEFAULT_VIDEO_JOB_PROGRESSION_INTERVAL_MS,
+      VIDEO_JOB_TTL_MS,
     ),
     REALTIME_VIDEO_BETA_ENABLED: strictBooleanSchema(false),
     DECART_API_KEY: optionalSecretSchema,
@@ -455,6 +472,8 @@ export interface RuntimeConfig {
   readonly otelTraceSampleRatio: number;
   readonly videoJobMaxActive: number;
   readonly videoJobMaxActivePerProvider: number;
+  /** How often accepted jobs are moved along without a client watching. Zero runs no timer. */
+  readonly videoJobProgressionIntervalMs: number;
   readonly realtimeVideoBetaEnabled: boolean;
   readonly decartApiKey?: string;
   readonly existingVideoCharacterSwapProvider: 'decart' | 'pruna';
@@ -602,6 +621,7 @@ export const parseEnvironment = (
     otelTraceSampleRatio: result.data.OTEL_TRACE_SAMPLE_RATIO,
     videoJobMaxActive: result.data.VIDEO_JOB_MAX_ACTIVE,
     videoJobMaxActivePerProvider: result.data.VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER,
+    videoJobProgressionIntervalMs: result.data.VIDEO_JOB_PROGRESSION_INTERVAL_MS,
     realtimeVideoBetaEnabled: result.data.REALTIME_VIDEO_BETA_ENABLED,
     ...(result.data.DECART_API_KEY === undefined
       ? {}

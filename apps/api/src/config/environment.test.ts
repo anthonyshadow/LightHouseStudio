@@ -7,6 +7,7 @@ import {
   DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS,
   DEFAULT_VIDEO_JOB_MAX_ACTIVE,
   DEFAULT_VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER,
+  DEFAULT_VIDEO_JOB_PROGRESSION_INTERVAL_MS,
   DEFAULT_WIRO_REFERENCE_IMAGE_TIMEOUT_MS,
   DEVELOPMENT_R2_BUCKET,
   EnvironmentValidationError,
@@ -16,6 +17,23 @@ import {
 } from './environment.js';
 
 describe('parseEnvironment', () => {
+  /*
+   * Zero is the one value that has to survive: it is how a deployment says "no progression timer",
+   * and every value above it starts unattended provider reads. A schema that quietly replaced it
+   * with the default would switch that traffic back on without anyone asking.
+   */
+  it('accepts a zero progression interval as switching the timer off, and rejects a negative one', () => {
+    expect(parseEnvironment({ VIDEO_JOB_PROGRESSION_INTERVAL_MS: '0' })).toMatchObject({
+      videoJobProgressionIntervalMs: 0,
+    });
+    expect(parseEnvironment({ VIDEO_JOB_PROGRESSION_INTERVAL_MS: '15000' })).toMatchObject({
+      videoJobProgressionIntervalMs: 15_000,
+    });
+    expect(() => parseEnvironment({ VIDEO_JOB_PROGRESSION_INTERVAL_MS: '-1' })).toThrow(
+      EnvironmentValidationError,
+    );
+  });
+
   it('uses safe local defaults without requiring provider credentials', () => {
     expect(parseEnvironment({})).toMatchObject({
       nodeEnv: 'development',
@@ -25,6 +43,7 @@ describe('parseEnvironment', () => {
       assetStoreProvider: 'local',
       r2KeyPrefix: 'media/v1',
       videoJobMaxActive: DEFAULT_VIDEO_JOB_MAX_ACTIVE,
+      videoJobProgressionIntervalMs: DEFAULT_VIDEO_JOB_PROGRESSION_INTERVAL_MS,
       videoJobMaxActivePerProvider: DEFAULT_VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER,
       realtimeVideoBetaEnabled: false,
       existingVideoCharacterSwapProvider: 'decart',

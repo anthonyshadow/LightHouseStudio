@@ -2,8 +2,17 @@ import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { VIDEO_JOB_TTL_MS } from '@studio/contracts';
+import { VIDEO_JOB_TTL_MS, type InspectedVideo } from '@studio/contracts';
+import {
+  applyAiUsageTransition,
+  type AiUsageEntry,
+  type AiUsageOutcomeCounts,
+} from '@studio/domain';
 import { VideoJobService } from './video-job-service.js';
+import type {
+  AiUsageLedgerPage,
+  AiUsageLedgerRepository,
+} from '../ai-usage/ai-usage-ledger-repository.js';
 import type {
   DurableProcessingJobRepository,
   ProcessingJobAdmissionResult,
@@ -29,6 +38,8 @@ class FakeVideoProvider implements ExistingVideoJobProvider {
   nextStatus: VideoJobProviderStatus = 'pending';
   nextFailureReason: VideoJobProviderFailureReason | undefined;
   statusCalls = 0;
+  /** Provider job ids in the order they were read, so a poll order can be asserted. */
+  readonly statusRequests: string[] = [];
 
   submit(
     input: Parameters<ExistingVideoJobProvider['submit']>[0],
@@ -44,11 +55,12 @@ class FakeVideoProvider implements ExistingVideoJobProvider {
     });
   }
 
-  status(): Promise<{
+  status(providerJobId?: string): Promise<{
     status: VideoJobProviderStatus;
     failureReason?: VideoJobProviderFailureReason;
   }> {
     this.statusCalls += 1;
+    if (providerJobId !== undefined) this.statusRequests.push(providerJobId);
     return Promise.resolve({
       status: this.nextStatus,
       ...(this.nextFailureReason === undefined ? {} : { failureReason: this.nextFailureReason }),
@@ -64,6 +76,48 @@ class FakeVideoProvider implements ExistingVideoJobProvider {
       flag: 'wx',
       mode: 0o600,
     });
+  }
+}
+
+/**
+ * An in-memory ledger that applies the one domain rule the real stores apply, so a test can ask
+ * how many rows one submission produced rather than how many writes it made.
+ */
+class RecordingUsageLedger implements AiUsageLedgerRepository {
+  readonly rows = new Map<string, AiUsageEntry>();
+  readonly writes: AiUsageEntry[] = [];
+  rejectOpen = false;
+
+  record(entry: AiUsageEntry): Promise<void> {
+    if (this.rejectOpen && entry.outcome === null) {
+      return Promise.reject(new Error('private ledger failure'));
+    }
+    this.writes.push(entry);
+    const key = `${entry.ownerUserId}:${entry.jobId}`;
+    const next = applyAiUsageTransition(this.rows.get(key) ?? null, entry);
+    if (next !== null) this.rows.set(key, next);
+    return Promise.resolve();
+  }
+
+  listOpen(limit: number): Promise<readonly AiUsageEntry[]> {
+    return Promise.resolve(
+      [...this.rows.values()].filter((row) => row.outcome === null).slice(0, limit),
+    );
+  }
+
+  listForOwner(ownerUserId: string): Promise<AiUsageLedgerPage> {
+    return Promise.resolve({
+      entries: [...this.rows.values()].filter((row) => row.ownerUserId === ownerUserId),
+      nextCursor: null,
+    });
+  }
+
+  countByOutcome(ownerUserId: string): Promise<AiUsageOutcomeCounts> {
+    const counts = { running: 0, succeeded: 0, failed: 0, ambiguous: 0, expired: 0, cancelled: 0 };
+    for (const row of this.rows.values()) {
+      if (row.ownerUserId === ownerUserId) counts[row.outcome ?? 'running'] += 1;
+    }
+    return Promise.resolve(counts);
   }
 }
 
@@ -156,6 +210,49 @@ const startJob = async (
   return { paths, status };
 };
 
+const INSPECTED_FIXTURE: InspectedVideo = {
+  mimeType: 'video/mp4',
+  container: 'mp4',
+  videoCodec: 'avc',
+  audioCodec: null,
+  durationMs: 1_000,
+  width: 1_280,
+  height: 720,
+  sizeBytes: Buffer.from(VIDEO_FIXTURE_BASE64, 'base64').byteLength,
+  hasAudio: false,
+};
+
+const startPrelinkedJob = async (
+  service: VideoJobService,
+  jobId: string,
+  ownerId: string,
+  projectId: string,
+) => {
+  const paths = await service.prepareJobDirectory(jobId);
+  await writeFile(paths.inputPath, Buffer.from(VIDEO_FIXTURE_BASE64, 'base64'), {
+    flag: 'wx',
+    mode: 0o600,
+  });
+  const status = await service.startPrelinked({
+    jobId,
+    ownerId,
+    projectId,
+    requestFingerprint: 'a'.repeat(64),
+    recipe: {
+      operation: 'character-swap',
+      prompt: 'Change the lighting',
+      enhancePrompt: false,
+      hasReferenceImage: false,
+    },
+    inspectedInput: INSPECTED_FIXTURE,
+    directory: paths.directory,
+    inputPath: paths.inputPath,
+    referencePath: null,
+    referenceMimeType: null,
+  });
+  return { paths, status };
+};
+
 const makeReady = async (
   service: VideoJobService,
   provider: FakeVideoProvider,
@@ -235,6 +332,7 @@ describe('VideoJobService', () => {
         {
           jobId,
           ownerUserId: ownerId,
+          projectId: null,
           operation: 'character-swap' as const,
           provider: 'decart',
           providerJobId: 'provider-restored',
@@ -250,6 +348,7 @@ describe('VideoJobService', () => {
         },
       ]),
       upsert: vi.fn().mockResolvedValue(undefined),
+      findOutcomes: vi.fn().mockResolvedValue(new Map()),
     };
     const service = createService(provider, root, {
       now: () => now,
@@ -273,6 +372,7 @@ describe('VideoJobService', () => {
     const durableRepository: DurableProcessingJobRepository = {
       admit: vi.fn(() => admission.promise),
       listResumable: vi.fn().mockResolvedValue([]),
+      findOutcomes: vi.fn().mockResolvedValue(new Map()),
       upsert: vi.fn((trace: VideoProcessingJobTrace) => {
         traces.push(trace);
         return trace.status === 'submitting' ? submittingTrace.promise : Promise.resolve();
@@ -321,6 +421,7 @@ describe('VideoJobService', () => {
     const started = await service.startPrelinked({
       jobId,
       ownerId,
+      projectId: crypto.randomUUID(),
       requestFingerprint: 'a'.repeat(64),
       recipe: {
         operation: 'virtual-try-on',
@@ -366,6 +467,7 @@ describe('VideoJobService', () => {
       const durableRepository: DurableProcessingJobRepository = {
         admit: vi.fn().mockResolvedValue(admissionResult),
         listResumable: vi.fn().mockResolvedValue([]),
+        findOutcomes: vi.fn().mockResolvedValue(new Map()),
         upsert: vi.fn().mockResolvedValue(undefined),
       };
       const service = createService(provider, root, { durableJobRepository: durableRepository });
@@ -391,6 +493,7 @@ describe('VideoJobService', () => {
         return Promise.resolve('admitted');
       }),
       listResumable: vi.fn().mockResolvedValue([]),
+      findOutcomes: vi.fn().mockResolvedValue(new Map()),
       upsert: vi.fn().mockResolvedValue(undefined),
     };
     const firstService = createService(provider, firstRoot, {
@@ -428,6 +531,7 @@ describe('VideoJobService', () => {
     const durableRepository: DurableProcessingJobRepository = {
       admit: vi.fn().mockResolvedValue('admitted' as const),
       listResumable: vi.fn().mockResolvedValue([]),
+      findOutcomes: vi.fn().mockResolvedValue(new Map()),
       upsert: vi.fn((trace: VideoProcessingJobTrace) => {
         writtenStatuses.push(trace.status);
         return trace.status === 'queued' ? queuedTrace.promise : Promise.resolve();
@@ -497,9 +601,10 @@ describe('VideoJobService', () => {
     });
     services.push(service);
     const jobId = crypto.randomUUID();
-    const ownerId = 'owner-cleanup-retry';
+    const ownerId = crypto.randomUUID();
 
-    await startJob(service, jobId, ownerId);
+    // Project-linked, because only a delivery whose bytes are already durable cleans on delivery.
+    await startPrelinkedJob(service, jobId, ownerId, crypto.randomUUID());
     await makeReady(service, provider, jobId, ownerId);
     const content = await service.content(jobId, ownerId);
     await content.settle(true);
@@ -1213,7 +1318,7 @@ describe('VideoJobService', () => {
     expect((await service.existing(jobId, ownerId))?.status).toBe('expired');
   });
 
-  it('keeps an interrupted pre-deadline delivery retryable and removes a delivered result once', async () => {
+  it('keeps an interrupted delivery retryable and serves a delivered standalone result again', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-retry-'));
     const provider = new FakeVideoProvider();
     const service = createService(provider, root);
@@ -1227,12 +1332,80 @@ describe('VideoJobService', () => {
     await interrupted.settle(false);
     expect(await pathExists(interrupted.path)).toBe(true);
 
-    const retry = await service.content(jobId, ownerId);
-    await retry.settle(true);
-    await retry.settle(true);
+    const delivered = await service.content(jobId, ownerId);
+    const deliveredBytes = await readFile(delivered.path);
+    await delivered.settle(true);
+    await delivered.settle(true);
+
+    // The client that lost this response is the only place a standalone result can go, so the
+    // bytes stay until the deadline instead of being consumed by the first successful delivery.
+    expect(await pathExists(paths.directory)).toBe(true);
+    expect((await service.existing(jobId, ownerId))?.status).toBe('ready');
+    const again = await service.content(jobId, ownerId);
+    expect(await readFile(again.path)).toEqual(deliveredBytes);
+    await again.settle(true);
+  });
+
+  it('expires a retained standalone result at its deadline', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-retained-expiry-'));
+    const provider = new FakeVideoProvider();
+    const clock = new ManualDeadlineScheduler();
+    const service = createService(provider, root, {
+      now: clock.now,
+      scheduleDeadline: clock.scheduleDeadline,
+    });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-retained-expiry';
+    const { paths, status: accepted } = await startJob(service, jobId, ownerId);
+    await makeReady(service, provider, jobId, ownerId);
+    const delivered = await service.content(jobId, ownerId);
+    await delivered.settle(true);
+
+    await clock.advanceTo(Date.parse(accepted.expiresAt));
 
     expect(await pathExists(paths.directory)).toBe(false);
-    expect(await service.existing(jobId, ownerId)).toBeNull();
+    await expect(service.content(jobId, ownerId)).rejects.toMatchObject({
+      statusCode: 410,
+      code: 'job_expired',
+    });
+  });
+
+  it('cleans a delivered Project-linked result at once and leaves the owner free to submit', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-project-delivery-'));
+    const provider = new FakeVideoProvider();
+    const service = createService(provider, root);
+    services.push(service);
+    const projectJobId = crypto.randomUUID();
+    const ownerId = crypto.randomUUID();
+    const { paths } = await startPrelinkedJob(service, projectJobId, ownerId, crypto.randomUUID());
+    await makeReady(service, provider, projectJobId, ownerId);
+
+    const delivered = await service.content(projectJobId, ownerId);
+    await delivered.settle(true);
+
+    expect(await pathExists(paths.directory)).toBe(false);
+    expect(await service.existing(projectJobId, ownerId)).toBeNull();
+  });
+
+  it('does not let a retained standalone result block the next submission for that owner', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-retained-capacity-'));
+    const provider = new FakeVideoProvider();
+    const service = createService(provider, root);
+    services.push(service);
+    const retainedJobId = crypto.randomUUID();
+    const ownerId = 'owner-retained-capacity';
+    await startJob(service, retainedJobId, ownerId);
+    await makeReady(service, provider, retainedJobId, ownerId);
+    const delivered = await service.content(retainedJobId, ownerId);
+    await delivered.settle(true);
+
+    provider.nextStatus = 'pending';
+    const nextJobId = crypto.randomUUID();
+    await expect(startJob(service, nextJobId, ownerId)).resolves.toBeDefined();
+
+    await vi.waitFor(() => expect(provider.submissions).toHaveLength(2));
+    expect((await service.existing(retainedJobId, ownerId))?.status).toBe('ready');
   });
 
   it('owner-scopes and explicitly releases ready output before its deadline', async () => {
@@ -1455,6 +1628,341 @@ describe('VideoJobService', () => {
     });
     expect(provider.download).not.toHaveBeenCalled();
     expect(await pathExists(paths.directory)).toBe(false);
+  });
+
+  it('fails a standalone submission the ledger could not record, before any provider spend', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-ledger-open-'));
+    const provider = new FakeVideoProvider();
+    const ledger = new RecordingUsageLedger();
+    ledger.rejectOpen = true;
+    const traces: VideoProcessingJobTrace[] = [];
+    const traceWriter = {
+      upsert: vi.fn((trace: VideoProcessingJobTrace) => {
+        traces.push(trace);
+        return Promise.resolve();
+      }),
+    };
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const service = createService(provider, root, { usageLedger: ledger, traceWriter });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-ledger-open';
+
+    const { paths } = await startJob(service, jobId, ownerId);
+
+    await vi.waitFor(async () =>
+      expect(await service.existing(jobId, ownerId)).toMatchObject({
+        status: 'failed',
+        error: { code: 'provider_unavailable' },
+      }),
+    );
+    expect(provider.submissions).toHaveLength(0);
+    expect(ledger.rows.size).toBe(0);
+    expect(traces.map((trace) => trace.status)).toEqual(['validating', 'submitting', 'failed']);
+    expect(warning).toHaveBeenCalledWith('[video-jobs] AI usage row could not be opened.', {
+      jobId,
+    });
+    expect(await pathExists(paths.directory)).toBe(false);
+    warning.mockRestore();
+  });
+
+  it('fails a Project-linked submission the ledger could not record instead of calling it ambiguous', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-ledger-open-project-'));
+    const provider = new FakeVideoProvider();
+    const ledger = new RecordingUsageLedger();
+    ledger.rejectOpen = true;
+    const traces: VideoProcessingJobTrace[] = [];
+    const traceWriter = {
+      upsert: vi.fn((trace: VideoProcessingJobTrace) => {
+        traces.push(trace);
+        return Promise.resolve();
+      }),
+    };
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const service = createService(provider, root, { usageLedger: ledger, traceWriter });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = crypto.randomUUID();
+
+    const { paths, status } = await startPrelinkedJob(service, jobId, ownerId, crypto.randomUUID());
+
+    // Nothing was submitted, so the attempt is a plain failure: naming it ambiguous would ask the
+    // operator to acknowledge a cost that was never incurred.
+    expect(status).toMatchObject({ status: 'failed', error: { code: 'provider_unavailable' } });
+    expect(traces.map((trace) => trace.status)).toEqual(['submitting', 'failed']);
+    expect(provider.submissions).toHaveLength(0);
+    expect(ledger.rows.size).toBe(0);
+    expect(await pathExists(paths.directory)).toBe(false);
+    warning.mockRestore();
+  });
+
+  it('opens one ledger row per submission and keeps its first terminal outcome', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-ledger-rows-'));
+    const provider = new FakeVideoProvider();
+    const ledger = new RecordingUsageLedger();
+    const clock = new ManualDeadlineScheduler();
+    const service = createService(provider, root, {
+      usageLedger: ledger,
+      now: clock.now,
+      scheduleDeadline: clock.scheduleDeadline,
+    });
+    services.push(service);
+    const readyJobId = crypto.randomUUID();
+    const failedJobId = crypto.randomUUID();
+    const cancelledJobId = crypto.randomUUID();
+
+    await startJob(service, readyJobId, 'owner-ledger-ready');
+    await makeReady(service, provider, readyJobId, 'owner-ledger-ready');
+    const delivered = await service.content(readyJobId, 'owner-ledger-ready');
+    await delivered.settle(true);
+
+    provider.nextStatus = 'failed';
+    provider.nextFailureReason = 'rejected';
+    await startJob(service, failedJobId, 'owner-ledger-failed');
+    await waitFor(service, failedJobId, 'owner-ledger-failed', 'failed');
+
+    provider.nextStatus = 'pending';
+    provider.nextFailureReason = undefined;
+    await startJob(service, cancelledJobId, 'owner-ledger-cancelled');
+    await waitFor(service, cancelledJobId, 'owner-ledger-cancelled', 'queued');
+    await service.abandon(cancelledJobId, 'owner-ledger-cancelled');
+
+    await vi.waitFor(() => expect(ledger.rows.size).toBe(3));
+    expect(
+      [...ledger.rows.values()].map((row) => ({ jobId: row.jobId, outcome: row.outcome })),
+    ).toEqual([
+      { jobId: readyJobId, outcome: 'succeeded' },
+      { jobId: failedJobId, outcome: 'failed' },
+      { jobId: cancelledJobId, outcome: 'cancelled' },
+    ]);
+    expect([...ledger.rows.values()].every((row) => row.provider === 'decart')).toBe(true);
+
+    // The retained result expires later; the row keeps the outcome that was observed closest to
+    // the submission rather than the last thing that happened to the job.
+    await clock.advanceTo(clock.nowMs + VIDEO_JOB_TTL_MS);
+
+    await vi.waitFor(() =>
+      expect(ledger.writes.filter((write) => write.jobId === readyJobId)).toHaveLength(3),
+    );
+    expect(ledger.rows.size).toBe(3);
+    expect(ledger.rows.get(`owner-ledger-ready:${readyJobId}`)?.outcome).toBe('succeeded');
+  });
+
+  it('closes the ledger row of a restored job with the instant its submission was created', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-ledger-restore-'));
+    const provider = new FakeVideoProvider();
+    provider.nextStatus = 'failed';
+    provider.nextFailureReason = 'rejected';
+    const ledger = new RecordingUsageLedger();
+    const now = Date.parse('2026-08-07T12:00:00.000Z');
+    const jobId = crypto.randomUUID();
+    const ownerId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
+    const durableRepository = {
+      admit: vi.fn().mockResolvedValue('admitted' as const),
+      listResumable: vi.fn().mockResolvedValue([
+        {
+          jobId,
+          ownerUserId: ownerId,
+          projectId: null,
+          operation: 'character-swap' as const,
+          provider: 'decart',
+          providerJobId: 'provider-restored',
+          requestFingerprint: 'a'.repeat(64),
+          status: 'queued' as const,
+          outputResolution: '720p' as const,
+          providerOutputLocation: null,
+          sourceDurationMs: 1_000,
+          sourceOrientation: 'landscape' as const,
+          createdAt: '2026-08-07T11:59:00.000Z',
+          updatedAt: '2026-08-07T11:59:30.000Z',
+          expiresAt: '2026-08-07T13:00:00.000Z',
+        },
+      ]),
+      upsert: vi.fn().mockResolvedValue(undefined),
+      findOutcomes: vi.fn().mockResolvedValue(new Map()),
+    };
+    const service = createService(provider, root, {
+      now: () => now,
+      durableJobRepository: durableRepository,
+      traceWriter: durableRepository,
+      usageLedger: ledger,
+    });
+    services.push(service);
+
+    await expect(service.status(jobId, ownerId)).resolves.toMatchObject({ status: 'failed' });
+
+    await vi.waitFor(() => expect(ledger.rows.size).toBe(1));
+    expect(ledger.rows.get(`${ownerId}:${jobId}`)).toEqual({
+      ownerUserId: ownerId,
+      jobId,
+      operation: 'character-swap',
+      provider: 'decart',
+      outcome: 'failed',
+      // The row was opened before the restart, so this close supplies the submission instant only
+      // because the in-memory ledger had none.
+      submittedAt: '2026-08-07T11:59:00.000Z',
+      completedAt: new Date(now).toISOString(),
+    });
+    expect(provider.submissions).toHaveLength(0);
+  });
+
+  it('carries a queued job to ready without a client status request', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-progression-'));
+    const provider = new FakeVideoProvider();
+    const service = createService(provider, root);
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-progression';
+
+    await startJob(service, jobId, ownerId);
+    await vi.waitFor(async () =>
+      expect((await service.existing(jobId, ownerId))?.status).toBe('queued'),
+    );
+    provider.nextStatus = 'completed';
+
+    const progressed = await service.progressDueJobs({ maxProviderPolls: 4 });
+
+    expect(progressed).toEqual({ polled: 1, retrievalsStarted: 1, readyProjectLinked: [] });
+    await vi.waitFor(async () =>
+      expect((await service.existing(jobId, ownerId))?.status).toBe('ready'),
+    );
+    expect(provider.statusCalls).toBe(1);
+    expect(provider.submissions).toHaveLength(1);
+  });
+
+  it('polls Project-linked work first and reports it ready for retention', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-progression-order-'));
+    const provider = new FakeVideoProvider();
+    const service = createService(provider, root);
+    services.push(service);
+    const standaloneJobId = crypto.randomUUID();
+    const projectJobId = crypto.randomUUID();
+    const projectOwnerId = crypto.randomUUID();
+    const projectId = crypto.randomUUID();
+
+    await startJob(service, standaloneJobId, 'owner-progression-standalone');
+    await vi.waitFor(() => expect(provider.submissions).toHaveLength(1));
+    await startPrelinkedJob(service, projectJobId, projectOwnerId, projectId);
+    await vi.waitFor(() => expect(provider.submissions).toHaveLength(2));
+    await vi.waitFor(async () =>
+      expect((await service.existing(projectJobId, projectOwnerId))?.status).toBe('queued'),
+    );
+    provider.nextStatus = 'completed';
+
+    const first = await service.progressDueJobs({ maxProviderPolls: 1 });
+
+    // The standalone job was accepted first; the Project-linked one is polled first anyway.
+    expect(first.polled).toBe(1);
+    expect(provider.statusRequests).toEqual(['provider-2']);
+    await vi.waitFor(async () =>
+      expect((await service.existing(projectJobId, projectOwnerId))?.status).toBe('ready'),
+    );
+
+    const second = await service.progressDueJobs({ maxProviderPolls: 4 });
+
+    expect(second.readyProjectLinked).toEqual([
+      { jobId: projectJobId, ownerId: projectOwnerId, projectId },
+    ]);
+  });
+
+  it('never polls more jobs in one pass than the batch bound allows', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-progression-bound-'));
+    const provider = new FakeVideoProvider();
+    const service = createService(provider, root);
+    services.push(service);
+
+    for (const ownerId of ['owner-bound-one', 'owner-bound-two', 'owner-bound-three']) {
+      await startJob(service, crypto.randomUUID(), ownerId);
+    }
+    await vi.waitFor(() => expect(provider.submissions).toHaveLength(3));
+
+    const first = await service.progressDueJobs({ maxProviderPolls: 2 });
+
+    expect(first.polled).toBe(2);
+    expect(provider.statusCalls).toBe(2);
+
+    const second = await service.progressDueJobs({ maxProviderPolls: 2 });
+
+    expect(second.polled).toBe(2);
+    expect(provider.statusCalls).toBe(4);
+  });
+
+  it('skips a job inside its provider backoff window', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-progression-backoff-'));
+    const provider = new FakeVideoProvider();
+    const clock = new ManualDeadlineScheduler();
+    const service = new VideoJobService(providerRegistry(provider), root, {
+      now: clock.now,
+      scheduleDeadline: clock.scheduleDeadline,
+    });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-progression-backoff';
+
+    await startJob(service, jobId, ownerId);
+    await vi.waitFor(async () =>
+      expect((await service.existing(jobId, ownerId))?.status).toBe('queued'),
+    );
+
+    await expect(service.progressDueJobs({ maxProviderPolls: 4 })).resolves.toMatchObject({
+      polled: 1,
+    });
+    expect(provider.statusCalls).toBe(1);
+
+    await expect(service.progressDueJobs({ maxProviderPolls: 4 })).resolves.toMatchObject({
+      polled: 0,
+    });
+    expect(provider.statusCalls).toBe(1);
+
+    await clock.advanceTo(clock.nowMs + 3_000);
+
+    await expect(service.progressDueJobs({ maxProviderPolls: 4 })).resolves.toMatchObject({
+      polled: 1,
+    });
+    expect(provider.statusCalls).toBe(2);
+  });
+
+  it('submits once across repeated passes and concurrent reads without re-reading durable rows', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-progression-once-'));
+    const provider = new FakeVideoProvider();
+    const ledger = new RecordingUsageLedger();
+    const durableRepository: DurableProcessingJobRepository = {
+      admit: vi.fn().mockResolvedValue('admitted' as const),
+      listResumable: vi.fn().mockResolvedValue([]),
+      findOutcomes: vi.fn().mockResolvedValue(new Map()),
+      upsert: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = createService(provider, root, {
+      durableJobRepository: durableRepository,
+      usageLedger: ledger,
+    });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = crypto.randomUUID();
+
+    await startJob(service, jobId, ownerId);
+    await vi.waitFor(async () =>
+      expect((await service.existing(jobId, ownerId))?.status).toBe('queued'),
+    );
+    provider.nextStatus = 'completed';
+
+    await Promise.all([
+      service.progressDueJobs({ maxProviderPolls: 4 }),
+      service.progressDueJobs({ maxProviderPolls: 4 }),
+      service.progressDueJobs({ maxProviderPolls: 4 }),
+      service.status(jobId, ownerId),
+      service.status(jobId, ownerId),
+    ]);
+    await vi.waitFor(async () =>
+      expect((await service.existing(jobId, ownerId))?.status).toBe('ready'),
+    );
+
+    expect(provider.submissions).toHaveLength(1);
+    // Restart recovery transitions durable rows; a pass that called it would rewrite state nobody
+    // asked it to touch.
+    expect(durableRepository.listResumable).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(ledger.rows.size).toBe(1));
+    expect([...ledger.rows.values()]).toMatchObject([{ jobId, outcome: 'succeeded' }]);
   });
 
   it('purges the temp root without a provider and waits out late work during idempotent close', async () => {

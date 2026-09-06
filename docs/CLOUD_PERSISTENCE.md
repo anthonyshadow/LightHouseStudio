@@ -123,6 +123,17 @@ recorded there.
   revision written before it reads back unchanged and no migration ships. A write that omits either
   defaulted field is refused rather than defaulted, because a client that predates a field must not
   overwrite what it never knew about.
+- AI usage ledger (slice 2.5, 2026-09-06) added the `ai_usage_ledger` table and its
+  `ai_usage_outcome` enum (migration `0025`, additive, no backfill): one row per paid video
+  submission, keyed by owner and app job id, holding the operation kind, the provider name, the
+  outcome and the submitted/completed instants — never a prompt, a filename, media or a charge. A
+  check constraint keeps `outcome` and `completed_at` set together, one index serves the
+  newest-first owner page and a partial index finds the rows still open. The file-mode equivalent is
+  an owner-scoped journal at `metadata/v1/ai-usage/<ownerUserId>.json` at schema version 1; neither
+  store owns the first-terminal-outcome-wins rule, which lives in the domain and is applied under a
+  row lock. An account with no rows reads as an empty month rather than an error, so a deployment
+  that predates the ledger needs no backfill. Rolling back means leaving the table in place; no
+  down-migration is written or run.
 - Additive migration `0019` adds processing-job result-asset/retry identity and Project-job
   result-revision fields, restrictive result relations, and recovery/history indexes. It does not
   assign legacy jobs to Projects, rewrite existing content, or apply automatically to production.
@@ -148,8 +159,13 @@ recorded there.
   results are retained as Media Assets and `job-result` revisions; obsolete paid successes remain
   owner-bound historical `job-output` assets. Neither path creates a Saved Video/Version.
 - Global and per-provider admission limits in addition to the existing one-active-job-per-owner
-  rule. Durable rows enforce one active job per owner across server instances. Limits are set by
-  `VIDEO_JOB_MAX_ACTIVE` and `VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER`.
+  rule. Only the per-owner rule is durable: a unique index enforces it wherever the rows live. The
+  global and per-provider ceilings are counted in process memory and therefore bound one process,
+  not a cluster; they are set by `VIDEO_JOB_MAX_ACTIVE` and `VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER`. The
+  deployment model assumes one process per data directory and per database (D9), which is also what
+  the video-job progression tick assumes: it takes no lock, and its per-pass provider budget is the
+  per-provider ceiling above. `VIDEO_JOB_PROGRESSION_INTERVAL_MS=0` switches the tick off, leaving
+  jobs to move only while a client watches them.
 - An account creative-library sync seam. IndexedDB remains the immediate local-first cache and
   configured local-development fallback; authoritative Neon stores normalized owner rows behind a
   revision compare-and-swap. A fresh signed-in session hydrates from that account snapshot.
@@ -182,6 +198,14 @@ recorded there.
 | `shadow`        | Local files remain authoritative, including Campaigns/Projects | Local-authority Project jobs; Neon trace writes are best-effort side effects                  | `local`, or new saved-video writes to both R2 and local with R2-first/local-fallback reads |
 | `postgres`      | Local PostgreSQL Drizzle repositories                          | Durable local sessions and resumable accepted jobs                                            | Registered local objects or the isolated development R2 bucket                             |
 | `neon`          | Neon Drizzle repositories                                      | Durable Neon sessions and resumable accepted jobs                                             | Registered local objects or private R2, selected at startup                                |
+
+The AI usage ledger follows metadata authority rather than the trace writer: the owner-scoped file
+journal is the ledger in `local` **and in `shadow`**, and the `ai_usage_ledger` table is the ledger
+in `postgres` and `neon`. Shadow mode writes no relational mirror of it, deliberately — files are
+authoritative there, so a relational copy could only be a best-effort shadow beneath the journal,
+and a mirror that silently does nothing is worse than no mirror. A shadow deployment that later
+becomes authoritative therefore starts its table empty; the months it spent in shadow stay in the
+journal.
 
 `ASSET_STORE_PROVIDER=r2` requires `DATABASE_MODE=shadow`, `postgres`, or `neon`. Reference-image
 and creative metadata stay local in `shadow`; their database adapters become authoritative in
@@ -270,7 +294,11 @@ configuration fail closed before opening a pool otherwise.
    transaction conflicts. It prints a second verification record after writes complete.
 
 10. Run in `shadow`, exercise save/range/playback/reference/voice flows, and reconcile counts and
-    checksums. Switch to `neon` only after that evidence is clean.
+    checksums. Reconcile the AI usage ledger counts too: submit one transformation, let it settle,
+    and check that Account's AI activity shows exactly one row for it with a terminal outcome and no
+    duplicate. In `shadow` that row is in the file journal — the table is expected to be empty — so
+    read the same counts again after switching, and expect the pre-switch months to stay behind in
+    the journal. Switch to `neon` only after that evidence is clean.
 
 If the application later becomes geographically distributed, test R2 Local Uploads as a separate
 bucket-setting experiment. It requires no application package and does not change the authorization,

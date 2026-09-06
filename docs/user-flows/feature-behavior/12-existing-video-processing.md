@@ -197,10 +197,13 @@ source, then edit either base, save, start over, or discard.
 - Every generated result is revalidated after transcoding for a non-empty MP4, H.264 video, AAC
   when audio is required, duration, orientation, and playable tracks. An unconverted fallback is
   never published.
-- A generated result is held in the browser and nowhere else: the server hands the bytes over once
-  and retains nothing, so getting the same result back means paying for it again. While one is held
-  and unsaved, a hard unload raises the browser's own leave-site warning. In-app navigation was
-  already guarded by the temporary-work discard prompt.
+- A generated result is held in the browser, and the server keeps its own copy until the job's
+  deadline: delivery no longer deletes it, so a download interrupted at the last moment can be asked
+  for again without paying for a second submission. What the browser does not keep is the way back —
+  the job id lives in page memory alone and the queue lists only jobs that are still running — so
+  after a reload the result is unreachable even though it is still there. While a result is held and
+  unsaved, a hard unload raises the browser's own leave-site warning. In-app navigation was already
+  guarded by the temporary-work discard prompt.
 - Remote reference import accepts public HTTPS only, rejects credentials/private/link-local/mixed
   DNS and unsafe redirects, pins DNS per hop, caps redirects/bytes, validates actual decoded
   JPEG/PNG/WebP contents, supports abort, and never persists, logs, echoes, or forwards the URL.
@@ -215,6 +218,10 @@ source, then edit either base, save, start over, or discard.
   provider-neutral guidance. Provider billing/credit failure is a distinct terminal class with
   account-recovery guidance; terminal status waits for its durable Project trace before the browser
   receives it, so reconciliation stops polling. No class triggers an automatic submission retry.
+- A submission that cannot be written to the account's AI usage ledger fails before the provider is
+  contacted, under the existing `provider_unavailable` code with copy that says nothing was
+  submitted. The ledger row is opened immediately before the paid call for exactly this reason: no
+  row, no spend. Retrying is an ordinary explicit new submission.
 - Original/variant identity stays local metadata until explicit selection. Character Swap hydrates
   the exact selected asset; Virtual Try-On outfit/input selection remains unchanged.
 - Selecting an exact saved character version initially leaves Character Swap Prompt empty so its
@@ -238,14 +245,19 @@ source, then edit either base, save, start over, or discard.
 
 ## Temporary and cost boundaries
 
-The workflow is tab/process-temporary. Refresh, crash, or API restart does not recover it. The
-server stores generated paths and safe job state only while validating, submitting, polling, or
-retrieving; it never persists prompts or original filenames. Cleanup is local and does not claim
-provider cancellation or provider-side deletion.
+The browser workflow is tab-temporary: refresh, crash, or closing the tab does not recover it,
+because the panel state and the job id live in page memory alone. The server side is different — an
+accepted job whose provider job id was recorded is restored after an API restart and resumes status
+or retrieval without a second submission, and a job that had already reached ready is re-driven to
+retrieving so its bytes come back. What no restart recovers is the browser's route into it. The
+server stores generated paths and safe job state through validating, submitting, polling,
+retrieving, and a ready result until its deadline; it never persists prompts or original filenames.
+Cleanup is local and does not claim provider cancellation or provider-side deletion.
 
-The broker assigns one immutable deadline when it accepts the job, exactly
-`acceptedAt + 60 minutes`, and the same deadline covers every active state and ready output without
-sliding. Successful delivery, explicit release, or shutdown may remove local state earlier. If a
+The broker assigns one immutable deadline when it creates the job, exactly
+`createdAt + 60 minutes` — before the provider is contacted, not when the provider accepts — and the
+same deadline covers every active state and ready output without sliding. Explicit release, the
+acknowledged abandon action, or shutdown may remove local state earlier. If a
 content stream starts before the deadline, it may finish after the deadline; no new content stream
 may start at or after it. Expiry preserves a safe process-memory tombstone to prevent the same job
 ID from creating another provider submission, while removing its local media. None of these local
@@ -253,8 +265,10 @@ events means provider cancellation or provider-side deletion. Pruna uploads expi
 approximately 30 minutes and generated delivery content is typically available for 24 hours;
 Lightframe relies on no documented Pruna cancellation/deletion endpoint.
 Pruna terminal failures retain their safe status until the creator explicitly discards/replaces the
-video or the fixed local deadline expires. Successful content delivery cleans its local job without
-a follow-up browser DELETE. Decart terminal-failure release behavior remains automatic.
+video or the fixed local deadline expires. Successful content delivery issues no follow-up browser
+DELETE and no longer removes the server's copy: the standalone result stays admissible until the
+deadline, so the same download can be repeated. Decart terminal-failure release behavior remains
+automatic.
 Cleanup waits for any admitted delivery stream, retries transient filesystem failures, and retains
 pending cleanup state. If retries are exhausted, the server emits one safe diagnostic containing
 only the application job ID; it never logs temporary paths or provider data.
@@ -266,6 +280,12 @@ persisted. Neither path exposes a Recipe card, Shelf, chooser, or route.
 
 The UI reports one planned submission, not credits or currency. Every provider submission remains
 an explicit, potentially billable action with no automatic retry or fallback.
+
+A bounded server-side progression tick polls accepted jobs when no tab is watching, so a submission
+keeps moving after the browser closes and a result is retrieved rather than left to expire
+unretrieved. The tick never submits anything. Every submission is recorded in the account's AI usage
+ledger, which Account shows as counts and outcomes for the current month — what ran, how it settled
+and how long it took, never what it cost.
 
 An explicit **Use Saved Video** action inside an empty Project is a separate source command, not
 this editing workflow. It selects the exact current Version, verifies same-owner active lineage,

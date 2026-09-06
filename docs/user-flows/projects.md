@@ -437,8 +437,12 @@ Distinct from the standalone Studio path because it must survive reload.
    (`project-processing-routes.ts:38-45`). The response is `202` for a new operation, `200` for a
    replay.
 3. The operation is linked to the exact initiating revision (`ProjectJobLink`).
-4. `useProjectProcessingController` polls `/processing/current`.
-5. On success, `promoteProjectJobResult` (`rules.ts:1262-1308`) advances working/presented media —
+4. `useProjectProcessingController` loads `/processing/current` when it opens, then drives the
+   attempt on a timer that calls `POST /processing/reconcile` at the server's own next-poll hint
+   (`useProjectProcessingController.ts:605-620`). A server-side progression tick polls the same jobs
+   when nobody is watching and retains a ready result into the owner byte store; it does not promote,
+   so the next visit is still what adopts it.
+5. On success, `promoteProjectJobResult` (`rules.ts:1606-1652`) advances working/presented media —
    **only** if the operation is still current and the initiating revision is still head. Otherwise
    the result is retained as `stale` and the UI explains it "cannot replace the current media"
    (`ProjectProcessingStatusPanel.tsx:41-46`).

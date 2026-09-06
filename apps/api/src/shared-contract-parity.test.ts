@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { savedVideoStatus } from './infrastructure/database/schema.js';
+import { aiUsageOutcome, savedVideoStatus } from './infrastructure/database/schema.js';
 import { SAVED_VIDEO_VERSION_LIMIT } from './features/saved-videos/saved-video-repository.js';
 import {
   CAMPAIGN_STATUSES as CONTRACT_CAMPAIGN_STATUSES,
@@ -27,6 +27,7 @@ import {
   SUPPORTED_MODEL_IDS,
   VIDEO_EDIT_CROP_PRESETS as CONTRACT_VIDEO_EDIT_CROP_PRESETS,
   VIDEO_EDIT_FILTERS as CONTRACT_VIDEO_EDIT_FILTERS,
+  aiUsageOutcomeSchema,
   capabilitySchema,
   projectExportSpecificationValueSchema,
   referenceImageMimeTypeSchema,
@@ -34,6 +35,7 @@ import {
   userPlanIdSchema,
 } from '@studio/contracts';
 import {
+  AI_USAGE_OUTCOMES,
   CAMPAIGN_STATUSES,
   CHARACTER_REFERENCE_PROMPT_FRAMINGS,
   IMAGE_MIME_TYPES,
@@ -117,6 +119,15 @@ describe('independent domain and wire value sets', () => {
     );
   });
 
+  it('keeps AI usage outcomes in parity across the domain, the wire and the store', () => {
+    // Three statements of one vocabulary: the domain owns the rule that produces an outcome, the
+    // contract copies the list by hand because it may not import the domain, and the stored enum
+    // is what a row is written as. A member added to any one of them fails here until all three
+    // agree.
+    expect(AI_USAGE_OUTCOMES).toEqual(aiUsageOutcomeSchema.options);
+    expect(aiUsageOutcomeSchema.options).toEqual(aiUsageOutcome.enumValues);
+  });
+
   it('keeps Campaign statuses, plan ids and capability ids in parity', () => {
     expect(CAMPAIGN_STATUSES).toEqual(CONTRACT_CAMPAIGN_STATUSES);
     expect(USER_PLAN_IDS).toEqual(userPlanIdSchema.options);
@@ -145,8 +156,10 @@ describe('independent domain and wire value sets', () => {
    * 'voice' while the domain's VideoTransformOperationId does not (voice treatment is a processing
    * capability, not a realtime transform); SAVED_VIDEO_FORMATS describes a saved Version's derived
    * orientation while the domain's captureFormat describes recording intent ('square' vs
-   * 'freeform'); and the campaigns lifecycle query enum excludes 'deleted' because it is a list
-   * filter, not the status set.
+   * 'freeform'); the campaigns lifecycle query enum excludes 'deleted' because it is a list
+   * filter, not the status set; and `ai_usage_outcome` is deliberately not `operation_status`,
+   * because it records what came back from the provider rather than where an operation sits in its
+   * lifecycle — the stored status enum keeps in-flight members the ledger has no use for.
    */
 });
 

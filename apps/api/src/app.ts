@@ -11,9 +11,17 @@ import {
   InMemorySessionRepository,
   type SessionRepository,
 } from './features/auth/session-repository.js';
+import type { AiUsageLedgerRepository } from './features/ai-usage/ai-usage-ledger-repository.js';
+import { AiUsageReconciler } from './features/ai-usage/ai-usage-reconciler.js';
+import { FileAiUsageLedgerRepository } from './features/ai-usage/file-ai-usage-ledger-repository.js';
+import { registerAiUsageRoutes } from './features/ai-usage/routes.js';
 import { registerRealtimeRoutes } from './features/realtime/routes.js';
 import { registerSystemRoutes } from './features/system/routes.js';
 import { registerVideoJobRoutes } from './features/video-jobs/routes.js';
+import {
+  AI_USAGE_RECONCILE_BATCH,
+  VideoJobProgressionTick,
+} from './features/video-jobs/video-job-progression.js';
 import { VideoJobService } from './features/video-jobs/video-job-service.js';
 import {
   LocalReferenceImageAssetStore,
@@ -118,6 +126,7 @@ export interface AppPersistenceDependencies {
   readonly referenceImages?: ReferenceImageAssetStore;
   readonly processingJobTraces?: ProcessingJobTraceWriter;
   readonly processingJobs?: DurableProcessingJobRepository;
+  readonly aiUsageLedger?: AiUsageLedgerRepository;
   readonly projects?: ProjectRepository;
   readonly projectProcessing?: ProjectProcessingRepository;
   readonly campaigns?: CampaignRepository;
@@ -305,6 +314,11 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
   );
   const savedVideoRepository =
     dependencies.persistence?.savedVideos ?? fallbackSavedVideoRepository;
+  // The ledger always exists. It is the only record of what an account spent on AI, and a
+  // deployment that keeps its metadata in files still has to be able to answer for that.
+  const aiUsageLedger =
+    dependencies.persistence?.aiUsageLedger ??
+    new FileAiUsageLedgerRepository(dependencies.config.lightframeDataDir);
   const projectRepository =
     dependencies.persistence?.projects ??
     (dependencies.config.databaseMode === 'local' || dependencies.config.databaseMode === 'shadow'
@@ -351,8 +365,30 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
         : { durableJobRepository: durableProcessingJobs }),
       maximumActiveJobs: dependencies.config.videoJobMaxActive,
       maximumActiveJobsPerProvider: dependencies.config.videoJobMaxActivePerProvider,
+      usageLedger: aiUsageLedger,
     },
   );
+  const videoJobProgressionLog = app.log.child({ component: 'video-job-progression' });
+  const aiUsageReconciler =
+    durableProcessingJobs === undefined
+      ? undefined
+      : new AiUsageReconciler(aiUsageLedger, durableProcessingJobs, {
+          log: videoJobProgressionLog,
+        });
+  // One sweep at boot, and only after restore has settled: a crash leaves rows saying a submission
+  // is still running, and restore is what decides what actually became of those jobs. It runs even
+  // with the timer switched off, so those rows close at the next start rather than never.
+  const startupLedgerReconciliation =
+    aiUsageReconciler === undefined
+      ? undefined
+      : videoJobService
+          .ready()
+          .then(async () => {
+            await aiUsageReconciler.reconcile(Date.now(), AI_USAGE_RECONCILE_BATCH);
+          })
+          // A sweep reports its own faults through the logger above; a failed restore is already
+          // the failure every request against this service will see.
+          .catch(() => undefined);
   const projectRetention =
     dependencies.persistence?.projectRetention ??
     (projectRepository instanceof FileProjectRepository ? projectRepository : undefined);
@@ -427,6 +463,23 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
           assetBytes,
           referenceImageAssetStore,
         );
+  // No provider means there is nothing to poll, and an interval of zero is how a deployment says it
+  // wants jobs to move only while a client is watching them.
+  const videoJobProgression =
+    videoJobService.available && dependencies.config.videoJobProgressionIntervalMs > 0
+      ? new VideoJobProgressionTick({
+          videoJobs: videoJobService,
+          ...(projectProcessingService === undefined
+            ? {}
+            : { projectProcessing: projectProcessingService }),
+          ...(aiUsageReconciler === undefined ? {} : { reconciler: aiUsageReconciler }),
+          intervalMs: dependencies.config.videoJobProgressionIntervalMs,
+          // One pass reads at most what one provider may have active, so the tick can never exceed
+          // the concurrency the deployment already allows itself.
+          maxProviderPolls: dependencies.config.videoJobMaxActivePerProvider,
+          log: videoJobProgressionLog,
+        })
+      : undefined;
   const directSavedVideoUploads = dependencies.persistence?.directVideoUploads;
   const directSavedVideoUploadService =
     directSavedVideoUploads === undefined
@@ -438,6 +491,9 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
         );
 
   registerAuthRoutes(app, authService, dependencies.config);
+  // The reader half only: a request may read one account's spend and can reach neither the sweep
+  // across owners nor a write.
+  registerAiUsageRoutes(app, aiUsageLedger);
   registerSystemRoutes(app, {
     decartAvailable: decartProvider !== null,
     realtimeVideoBetaEnabled: dependencies.config.realtimeVideoBetaEnabled,
@@ -501,6 +557,10 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
   });
   registerVoiceRoutes(app, voiceService, savedVoiceRepository);
   app.addHook('onClose', async () => {
+    // First, and awaited: the tick drives the job service and Project retention, so neither may
+    // start closing underneath a pass that is still using it.
+    await videoJobProgression?.close();
+    await startupLedgerReconciliation;
     await directSavedVideoUploadService?.close();
     await videoJobService.close();
     await dependencies.persistence?.close?.();

@@ -15,7 +15,7 @@ import {
   type VideoTransformOperationId,
   type VideoTransformRecipe,
 } from '@studio/contracts';
-import type { ImageMimeType } from '@studio/domain';
+import { aiUsageOutcomeForJobStatus, type ImageMimeType } from '@studio/domain';
 import { AppError } from '../../http/app-error.js';
 import { withWorkflowSpan } from '../../observability/telemetry.js';
 import {
@@ -24,6 +24,7 @@ import {
   VideoJobProviderError,
 } from '../../providers/video-jobs/video-job-provider.js';
 import { inspectVideoFile } from './media-inspection.js';
+import type { AiUsageLedgerRepository } from '../ai-usage/ai-usage-ledger-repository.js';
 import type {
   DurableProcessingJobRepository,
   ProcessingJobAdmissionResult,
@@ -53,11 +54,26 @@ interface VideoJobServiceOptions {
   readonly maximumActiveJobs?: number;
   readonly maximumActiveJobsPerProvider?: number;
   readonly durableJobRepository?: DurableProcessingJobRepository;
+  readonly usageLedger?: AiUsageLedgerRepository;
+}
+
+/** What one progression pass did, for the runner that has to log and bound its own work. */
+export interface VideoJobProgressionResult {
+  /** Records this pass refreshed. A refresh already in flight for a client is shared, not repeated. */
+  readonly polled: number;
+  readonly retrievalsStarted: number;
+  readonly readyProjectLinked: readonly {
+    readonly jobId: string;
+    readonly ownerId: string;
+    readonly projectId: string;
+  }[];
 }
 
 type VideoJobRecord = {
   readonly jobId: string;
   readonly ownerId: string;
+  /** Null for a standalone job; a Project-linked one carries the Project its result belongs to. */
+  readonly projectId: string | null;
   readonly operation: VideoTransformOperationId;
   readonly providerId: string;
   readonly binding: ExistingVideoOperationBinding;
@@ -93,6 +109,8 @@ type VideoJobRecord = {
   cleanupPending: boolean;
   deleteAfterCleanup: boolean;
   cleanupFailureReported: boolean;
+  /** True once this submission has a ledger row, and therefore something to close on an outcome. */
+  ledgerOpened: boolean;
 };
 
 interface VideoJobContentLease {
@@ -129,6 +147,7 @@ type NewVideoJob = Pick<
   VideoJobRecord,
   | 'jobId'
   | 'ownerId'
+  | 'projectId'
   | 'operation'
   | 'providerId'
   | 'binding'
@@ -248,6 +267,7 @@ export class VideoJobService {
   readonly #removePath: NonNullable<VideoJobServiceOptions['removePath']>;
   readonly #traceWriter: ProcessingJobTraceWriter | undefined;
   readonly #durableJobRepository: DurableProcessingJobRepository | undefined;
+  readonly #usageLedger: AiUsageLedgerRepository | undefined;
   readonly #operations = new Set<Promise<void>>();
   readonly #traceTails = new Map<string, Promise<void>>();
   readonly #admissions = new Map<string, Promise<void>>();
@@ -273,6 +293,7 @@ export class VideoJobService {
     this.#scheduleDeadline = options.scheduleDeadline ?? scheduleSystemDeadline;
     this.#traceWriter = options.traceWriter ?? options.durableJobRepository;
     this.#durableJobRepository = options.durableJobRepository;
+    this.#usageLedger = options.usageLedger;
     this.#maximumExpiredTombstones = Math.max(
       1,
       Math.floor(options.maximumExpiredTombstones ?? DEFAULT_MAXIMUM_EXPIRED_TOMBSTONES),
@@ -309,6 +330,7 @@ export class VideoJobService {
       const job: VideoJobRecord = {
         jobId: record.jobId,
         ownerId: record.ownerUserId,
+        projectId: record.projectId,
         operation: record.operation,
         providerId: record.provider,
         binding,
@@ -344,6 +366,9 @@ export class VideoJobService {
         cleanupPending: false,
         deleteAfterCleanup: false,
         cleanupFailureReported: false,
+        // A resumable record always carries a provider job id, so this submission was recorded
+        // before it was sent: the row it opened is still open and this process must close it.
+        ledgerOpened: true,
       };
       this.#jobs.set(job.jobId, job);
       this.#activeJobByOwner.set(job.ownerId, job.jobId);
@@ -377,12 +402,38 @@ export class VideoJobService {
       updatedAt,
       completedAt: updatedAt,
     });
+    // This path never reaches `#touch`, so it owes the ledger the close its own outcome implies.
+    // The row was opened before the crash that left this record resumable.
+    await this.#usageLedger
+      ?.record({
+        ownerUserId: record.ownerUserId,
+        jobId: record.jobId,
+        operation: record.operation,
+        provider: record.provider,
+        outcome: 'failed',
+        submittedAt: record.createdAt,
+        completedAt: updatedAt,
+      })
+      .catch(() => {
+        console.warn('[video-jobs] AI usage row could not be closed.', {
+          jobId: record.jobId,
+          status: 'failed',
+        });
+      });
   }
 
   get available(): boolean {
     return (
       this.#providers.virtualTryOn !== null || Object.keys(this.#providers.characterSwap).length > 0
     );
+  }
+
+  /**
+   * Settles once restore has finished, for a caller outside a request that must not observe the
+   * job map before the durable rows are back in it.
+   */
+  ready(): Promise<void> {
+    return this.#ready;
   }
 
   #bindingFor(
@@ -489,6 +540,7 @@ export class VideoJobService {
       cleanupPending: false,
       deleteAfterCleanup: false,
       cleanupFailureReported: false,
+      ledgerOpened: false,
     };
     this.#jobs.set(job.jobId, job);
     this.#activeJobByOwner.set(job.ownerId, job.jobId);
@@ -618,7 +670,80 @@ export class VideoJobService {
     } else {
       this.#activeJobByOwner.set(job.ownerId, job.jobId);
     }
-    return this.#trace(job, requireTrace);
+    const traced = this.#trace(job, requireTrace);
+    if (terminal(status)) this.#closeUsageRow(job, status);
+    return traced;
+  }
+
+  /**
+   * No row, no spend: this is the last step before a paid submission, so a ledger that cannot
+   * record the attempt fails it here rather than letting it be paid for unaccounted.
+   *
+   * Answers whether the provider may now be contacted; the failure path has already made the job
+   * terminal and cleaned up after it.
+   */
+  async #openUsageRow(job: VideoJobRecord): Promise<boolean> {
+    const ledger = this.#usageLedger;
+    if (ledger === undefined) return true;
+    try {
+      await ledger.record({
+        ownerUserId: job.ownerId,
+        jobId: job.jobId,
+        operation: job.operation,
+        provider: job.providerId,
+        outcome: null,
+        submittedAt: new Date(this.#now()).toISOString(),
+        completedAt: null,
+      });
+      job.ledgerOpened = true;
+      return true;
+    } catch {
+      console.warn('[video-jobs] AI usage row could not be opened.', { jobId: job.jobId });
+      if (!this.#ownsMutableJob(job)) {
+        await this.#cleanupFiles(job);
+        return false;
+      }
+      job.error = {
+        code: 'provider_unavailable',
+        message:
+          'Visual processing is unavailable because this submission could not be recorded. Nothing was submitted.',
+      };
+      // Required and awaited, unlike the fire-and-forget failures elsewhere: the durable row has to
+      // leave `submitting` before this returns, so a crash in the next instant cannot leave a
+      // provider-less row that a restart would have to call ambiguous.
+      await this.#touch(job, 'failed', true).catch(() => undefined);
+      await this.#cleanupFiles(job);
+      return false;
+    }
+  }
+
+  /**
+   * Closes the row on the first terminal outcome. Tracked, so `close()` waits for it, and
+   * warn-only, because a ledger that is down must not change what the operator's job did.
+   */
+  #closeUsageRow(job: VideoJobRecord, status: VideoJobStatus): void {
+    const ledger = this.#usageLedger;
+    if (ledger === undefined || !job.ledgerOpened) return;
+    this.#track(
+      ledger
+        .record({
+          ownerUserId: job.ownerId,
+          jobId: job.jobId,
+          operation: job.operation,
+          provider: job.providerId,
+          outcome: aiUsageOutcomeForJobStatus(status),
+          // Only reached when the row is absent — a job that was submitted before the ledger
+          // existed. An open row keeps the instant its opener recorded.
+          submittedAt: job.createdAt,
+          completedAt: job.updatedAt,
+        })
+        .catch(() => {
+          console.warn('[video-jobs] AI usage row could not be closed.', {
+            jobId: job.jobId,
+            status,
+          });
+        }),
+    );
   }
 
   #trace(job: VideoJobRecord, required = false): Promise<void> {
@@ -916,6 +1041,7 @@ export class VideoJobService {
     const job = this.#createJob({
       jobId: input.jobId,
       ownerId: input.ownerId,
+      projectId: null,
       operation: input.recipe.operation,
       providerId,
       binding,
@@ -955,6 +1081,7 @@ export class VideoJobService {
   async startPrelinked(input: {
     readonly jobId: string;
     readonly ownerId: string;
+    readonly projectId: string;
     readonly requestFingerprint: string;
     readonly recipe: VideoTransformRecipe;
     readonly inspectedInput: InspectedVideo;
@@ -1008,6 +1135,7 @@ export class VideoJobService {
     const job = this.#createJob({
       jobId: input.jobId,
       ownerId: input.ownerId,
+      projectId: input.projectId,
       operation: input.recipe.operation,
       providerId: resolved.providerId,
       binding,
@@ -1034,6 +1162,7 @@ export class VideoJobService {
       await this.#cleanupFiles(job);
       return this.#snapshot(job);
     }
+    if (!(await this.#openUsageRow(job))) return this.#snapshot(job);
     this.#track(this.#submitProvider(job, input.recipe, input.inspectedInput));
     return this.#snapshot(job);
   }
@@ -1067,6 +1196,7 @@ export class VideoJobService {
         await this.#cleanupFiles(job);
         return;
       }
+      if (!(await this.#openUsageRow(job))) return;
       await this.#submitProvider(job, recipe, inspected);
     } catch (error) {
       if (!this.#ownsMutableJob(job)) {
@@ -1286,6 +1416,58 @@ export class VideoJobService {
     return job.refreshPromise;
   }
 
+  /**
+   * Moves accepted jobs along without a client watching them, from memory only.
+   *
+   * It reads what a client poll would have read and nothing more: no submission, no durable
+   * recovery sweep, and never more than `maxProviderPolls` provider reads in one pass. Project
+   * work is polled first, because its result has somewhere durable to land.
+   */
+  async progressDueJobs(options: {
+    readonly maxProviderPolls: number;
+  }): Promise<VideoJobProgressionResult> {
+    await this.#ready;
+    await this.#expireDueJobs();
+    const limit = Math.max(0, Math.floor(options.maxProviderPolls));
+    const now = this.#now();
+    const due = [...this.#jobs.values()]
+      .filter(
+        (job) =>
+          this.#ownsMutableJob(job) &&
+          (job.status === 'queued' || job.status === 'processing') &&
+          (!job.hasPolledProvider || now >= job.nextProviderPollAtMs),
+      )
+      .sort(
+        (left, right) =>
+          (left.projectId === null ? 1 : 0) - (right.projectId === null ? 1 : 0) ||
+          left.nextProviderPollAtMs - right.nextProviderPollAtMs,
+      )
+      .slice(0, limit);
+    // `#retrieve` increments this before its first await, so the delta is the downloads this pass
+    // launched rather than the ones that happened to finish inside it.
+    const retrievalsBefore = new Map(due.map((job) => [job.jobId, job.retrievalAttempts]));
+    await Promise.allSettled(due.map((job) => this.#refresh(job)));
+    const readyProjectLinked = this.#closed
+      ? []
+      : [...this.#jobs.values()]
+          .flatMap((job) =>
+            job.projectId === null ||
+            job.status !== 'ready' ||
+            job.admissionsClosed ||
+            job.activeDeliveries > 0
+              ? []
+              : [{ jobId: job.jobId, ownerId: job.ownerId, projectId: job.projectId }],
+          )
+          .slice(0, limit);
+    return {
+      polled: due.length,
+      retrievalsStarted: due.filter(
+        (job) => job.retrievalAttempts > (retrievalsBefore.get(job.jobId) ?? 0),
+      ).length,
+      readyProjectLinked,
+    };
+  }
+
   async status(jobId: string, ownerId: string): Promise<VideoJobStatusResponse> {
     await this.#ready;
     await this.#expireDueJobs();
@@ -1346,7 +1528,10 @@ export class VideoJobService {
       await this.#expireJob(job);
     }
     job.activeDeliveries = Math.max(0, job.activeDeliveries - 1);
-    if (delivered && job.status !== 'expired') {
+    // A Project-linked result is already in the owner's byte store by the time its delivery
+    // settles, so a second copy here would be waste. A standalone result has nowhere else to live:
+    // it stays admissible until its deadline, so a client that lost the response can ask again.
+    if (delivered && job.status !== 'expired' && job.projectId !== null) {
       await this.#requestCleanup(job, true);
     } else {
       await this.#flushCleanup(job);
