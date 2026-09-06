@@ -1,4 +1,5 @@
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import type * as NodeFileSystem from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { AiUsageEntry } from '@studio/domain';
@@ -12,6 +13,35 @@ import { FileSavedVideoRepository } from '../saved-videos/saved-video-repository
 import { FileSavedVoiceRepository } from '../voices/saved-voice-repository.js';
 import type { AiUsageLedgerRepository } from './ai-usage-ledger-repository.js';
 import { FileAiUsageLedgerRepository } from './file-ai-usage-ledger-repository.js';
+
+/**
+ * A seam in `readFile`, armed by one case and inert for every other.
+ *
+ * One journal read has to be suspended partway through — after its bytes are in hand and before its
+ * caller has done anything with them — and a built-in module's namespace cannot be spied on. So the
+ * module is replaced by itself, with `readFile` wrapped: while `path` names a file, the first read
+ * of that file waits on `held` before returning, and nothing else about the module changes.
+ */
+const journalReadHold = vi.hoisted(() => ({
+  path: null as string | null,
+  held: null as Promise<void> | null,
+}));
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof NodeFileSystem>();
+  const readFile = async (
+    file: Parameters<typeof actual.readFile>[0],
+    options: Parameters<typeof actual.readFile>[1],
+  ): Promise<string | Buffer> => {
+    const held = journalReadHold.path === file ? journalReadHold.held : null;
+    // Cleared before the await, so the write that follows this read is not held behind it too.
+    if (held !== null) journalReadHold.path = null;
+    const contents = await actual.readFile(file, options);
+    if (held !== null) await held;
+    return contents;
+  };
+  return { ...actual, readFile };
+});
 
 const OWNER = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
 const OTHER_OWNER = '5f2f1f0e-6a48-4f2f-9c2b-1f3d6f0b8a11';
@@ -74,6 +104,9 @@ const trace = (): VideoProcessingJobTrace => ({
 describe('FileAiUsageLedgerRepository', () => {
   afterEach(async () => {
     vi.restoreAllMocks();
+    // Disarmed rather than restored: the seam is the module itself, so it outlives a mock reset.
+    journalReadHold.path = null;
+    journalReadHold.held = null;
     await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
   });
 
@@ -283,6 +316,50 @@ describe('FileAiUsageLedgerRepository', () => {
     });
   });
 
+  it('mirrors the row the journal accepted, and mirrors nothing the journal refused', async () => {
+    const root = temporaryRoot();
+    const mirrored: AiUsageEntry[] = [];
+    const shadow: Pick<AiUsageLedgerRepository, 'record'> = {
+      record: (candidate) => {
+        mirrored.push(candidate);
+        return Promise.resolve();
+      },
+    };
+    const repository = new FileAiUsageLedgerRepository(root, { shadow });
+
+    // Padded names and an instant spelled in another zone: what the journal stores is the row the
+    // schema made of them, and a mirror that exists to make a cutover truthful has to hold that
+    // same row rather than the one the caller happened to offer.
+    await repository.record(
+      entry({
+        operation: '  character-swap  ',
+        provider: 'decart ',
+        outcome: 'succeeded',
+        submittedAt: '2026-09-05T12:00:00.000+02:00',
+        completedAt: '2026-09-05T12:04:00.000+02:00',
+      }),
+    );
+
+    const settled = entry({ outcome: 'succeeded', completedAt: COMPLETED_AT });
+    expect(mirrored).toEqual([settled]);
+    expect(await readJournal(root)).toMatchObject({
+      entries: [
+        {
+          operation: 'character-swap',
+          provider: 'decart',
+          submittedAt: SUBMITTED_AT,
+          completedAt: COMPLETED_AT,
+        },
+      ],
+    });
+
+    // The rule drops a second close on a settled row, so the journal wrote nothing — and a mirror
+    // handed that write anyway would be copying a row no store has.
+    await repository.record(entry({ outcome: 'failed', completedAt: '2026-09-05T10:06:00.000Z' }));
+
+    expect(mirrored).toEqual([settled]);
+  });
+
   it('never lets one account read or count another account rows', async () => {
     const root = temporaryRoot();
     const repository = new FileAiUsageLedgerRepository(root);
@@ -449,6 +526,39 @@ describe('FileAiUsageLedgerRepository', () => {
     // And a second repository over the same directory sweeps it too: what is remembered belongs to
     // the journal, exactly as the write chain does, not to the instance that happened to write it.
     await expect(new FileAiUsageLedgerRepository(root).listOpen(10)).resolves.toEqual([opened]);
+  });
+
+  it('lets no unlocked read leave a later sweep blind to a row opened under it', async () => {
+    const root = temporaryRoot();
+    const repository = new FileAiUsageLedgerRepository(root);
+    const settled = entry({ outcome: 'succeeded', completedAt: COMPLETED_AT });
+    await repository.record(settled);
+    await expect(repository.listOpen(10)).resolves.toEqual([]);
+
+    /*
+     * The window this has to survive lives inside one read: the journal's bytes are already in
+     * hand, and the row that opens next has not been written yet. A reader that counted from there
+     * would record what it saw after the write had recorded what it wrote, and that stale zero
+     * would make every later sweep skip an account with an open row — silently, and for good.
+     *
+     * The interleaving is therefore held by hand rather than timed: the read and the write share
+     * one event loop, so a delay would only be racing it, and which of the two the scheduler
+     * resumed first would decide whether the case passed.
+     */
+    let releaseRead!: () => void;
+    journalReadHold.held = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    journalReadHold.path = journalPath(root);
+
+    const read = repository.listForOwner(OWNER, { since: SUBMITTED_AT, pageSize: 10 });
+    const opened = entry({ jobId: OTHER_JOB, submittedAt: '2026-09-05T10:02:00.000Z' });
+    await repository.record(opened);
+    releaseRead();
+    // The read really did happen against the journal as it stood before the row was opened.
+    await expect(read).resolves.toEqual({ entries: [settled], nextCursor: null });
+
+    await expect(repository.listOpen(10)).resolves.toEqual([opened]);
   });
 
   it('reads an account with no journal as an empty ledger', async () => {

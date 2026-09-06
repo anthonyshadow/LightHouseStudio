@@ -16,8 +16,12 @@ import {
   type ExistingVideoJobProvider,
   VideoJobProviderError,
 } from '../../providers/video-jobs/video-job-provider.js';
+import { LocalAssetByteStore } from '../../storage/asset-byte-store.js';
 import { testConfig } from '../../test/fakes.js';
+import { LocalReferenceImageAssetStore } from '../reference-images/asset-store.js';
+import { VideoJobService } from '../video-jobs/video-job-service.js';
 import { FileProjectRepository } from './file-project-repository.js';
+import { ProjectProcessingService } from './project-processing-service.js';
 
 const ownerDigest = createHash('sha256').update('localhost:5173').digest('hex');
 const ownerUserId = `${ownerDigest.slice(0, 8)}-${ownerDigest.slice(8, 12)}-4${ownerDigest.slice(13, 16)}-a${ownerDigest.slice(17, 20)}-${ownerDigest.slice(20, 32)}`;
@@ -198,8 +202,6 @@ describe('Project processing route authority', () => {
 
   const submitStandalone = (app: ReturnType<typeof createApp>, jobId: string) => {
     const form = new FormData();
-    const bytes = new Uint8Array(fixture.byteLength);
-    bytes.set(fixture);
     form.append(
       'request',
       JSON.stringify({
@@ -211,7 +213,11 @@ describe('Project processing route authority', () => {
         outputResolution: '720p',
       }),
     );
-    form.append('data', new Blob([bytes], { type: 'video/mp4' }), 'standalone-source.mp4');
+    form.append(
+      'data',
+      new Blob([new Uint8Array(fixture)], { type: 'video/mp4' }),
+      'standalone-source.mp4',
+    );
     return app.inject({
       method: 'PUT',
       url: `/api/video-jobs/${jobId}`,
@@ -538,6 +544,66 @@ describe('Project processing route authority', () => {
       isCurrent: false,
       result: { state: 'current' },
     });
+  });
+
+  it('releases a temporary result whose bytes are already durable, so no later pass offers it again', async () => {
+    const provider = new DeterministicVideoProvider();
+    const { app, repository } = application(provider);
+    const { projectId } = await prepareProject(app);
+    const operationId = randomUUID();
+
+    expect((await submit(app, projectId, operationId)).statusCode).toBe(202);
+    const attempt = await vi.waitFor(async () => {
+      const admitted = await repository.getProjectAttempt(ownerUserId, projectId, operationId);
+      if (admitted?.providerJobId !== 'provider-job-1') {
+        throw new Error('The attempt has no recoverable provider identity yet.');
+      }
+      return admitted;
+    });
+    // Nothing has promoted it, so the durable copy below is the only thing that can make the next
+    // retention redundant — and the only reason the release under test is safe.
+    expect(attempt.outputAssetId).toBeNull();
+
+    // What a retention that stored its bytes and then lost its process leaves behind: the result is
+    // durable under the id the attempt preallocated, and nothing has promoted it. The next
+    // retention therefore has nothing to copy — and if it stops there, the job stays ready and
+    // admissible, so every pass for the rest of its hour offers the same finished work again.
+    const bytes = new LocalAssetByteStore(directory);
+    await bytes.storeBytes({
+      assetId: attempt.resultAssetId,
+      ownerUserId,
+      bytes: new Uint8Array(fixture),
+      mimeType: 'video/mp4',
+      filename: 'character-swap-result.mp4',
+      createdAt: new Date().toISOString(),
+    });
+
+    // Retention with nobody watching is the tick's call rather than a request's, so it is made here
+    // directly against the service that owns it: routing it through the unattended timer would buy
+    // nothing but the provider's poll backoff. The job service stands in only for the release,
+    // which is the whole behaviour — and if the durable copy stopped being noticed, the fetch it
+    // would fall through to has no job here to fetch.
+    const videoJobs = new VideoJobService(
+      { characterSwap: {}, defaultCharacterSwapProvider: 'decart', virtualTryOn: null },
+      path.join(directory, 'unattended-retention'),
+    );
+    const release = vi.spyOn(videoJobs, 'release').mockResolvedValue(undefined);
+    const retention = new ProjectProcessingService(
+      repository,
+      repository,
+      videoJobs,
+      bytes,
+      new LocalReferenceImageAssetStore(directory),
+    );
+
+    await retention.retainResultBytes(ownerUserId, projectId, operationId);
+
+    expect(release).toHaveBeenCalledWith(operationId, ownerUserId);
+    // The temporary copy is what goes; the durable one it was a duplicate of is what makes letting
+    // it go safe, and an operator's next visit still has a paid result to promote.
+    await expect(bytes.exists(ownerUserId, attempt.resultAssetId)).resolves.toBe(true);
+    expect(provider.submissions).toBe(1);
+    await videoJobs.close();
   });
 
   it('enforces session ownership, provider intent, and strict processing bodies before submission', async () => {

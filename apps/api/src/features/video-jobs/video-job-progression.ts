@@ -70,6 +70,7 @@ const scheduleSystemInterval = (
 const NOTHING_PROGRESSED: VideoJobProgressionResult = {
   polled: 0,
   retrievalsStarted: 0,
+  readyTruncated: false,
   readyProjectLinked: [],
 };
 
@@ -157,7 +158,7 @@ export class VideoJobProgressionTick {
       // The sweep below reads a different store and answers a different question; it keeps its pass.
       this.#log.warn({ errorClass: errorClassOf(error) }, PROGRESSION_FAILED);
     }
-    const retained = await this.#retain(progression.readyProjectLinked);
+    const retained = await this.#retain(progression);
     const ledgerReconciled = await this.#reconcileLedger();
     const skippedOverlap = this.#skippedOverlap;
     this.#skippedOverlap = 0;
@@ -193,12 +194,20 @@ export class VideoJobProgressionTick {
    * a Project that moved under it, a byte store that will not take the file — is held back for
    * growing intervals instead of costing a lock acquisition every pass for the rest of its hour.
    */
-  async #retain(ready: VideoJobProgressionResult['readyProjectLinked']): Promise<number> {
-    // A job absent from this pass has landed, expired, or fallen outside the pass's own bound.
-    // None of those is a state a record of past refusals should outlive.
-    const stillReady = new Set(ready.map((entry) => entry.jobId));
-    for (const jobId of [...this.#retentionBackoff.keys()]) {
-      if (!stillReady.has(jobId)) this.#retentionBackoff.delete(jobId);
+  async #retain(progression: VideoJobProgressionResult): Promise<number> {
+    const ready = progression.readyProjectLinked;
+    /*
+     * A job absent from this pass has landed or expired, and a record of its past refusals should
+     * not outlive it. Except when the pass was cut short by its own bound: an absence then can also
+     * mean the job simply did not fit, and forgetting a refusal for that reason would hand a job
+     * that cannot land a fresh full-rate retry every pass, which is what the backoff exists to
+     * stop. A truncated pass forgets nothing; the next complete one does the pruning.
+     */
+    if (!progression.readyTruncated) {
+      const stillReady = new Set(ready.map((entry) => entry.jobId));
+      for (const jobId of [...this.#retentionBackoff.keys()]) {
+        if (!stillReady.has(jobId)) this.#retentionBackoff.delete(jobId);
+      }
     }
     const projectProcessing = this.#projectProcessing;
     if (projectProcessing === undefined) return 0;

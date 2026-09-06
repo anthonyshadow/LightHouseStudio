@@ -634,7 +634,8 @@ export class ProjectProcessingService {
    * the attempt keeps a null output asset and the `saving-result` phase until the next visit runs
    * {@link ProjectProcessingService.reconcile}, which promotes it exactly as it does today. It
    * shares the reconcile lock, so a client arriving mid-copy waits rather than fetching the same
-   * result twice, and it is idempotent because a second entrant finds the bytes already stored.
+   * result twice, and a second entrant finds the bytes already stored and releases the temporary
+   * copy instead of making another.
    */
   async retainResultBytes(
     ownerUserId: string,
@@ -643,8 +644,21 @@ export class ProjectProcessingService {
   ): Promise<void> {
     await this.#lock.run(`${ownerUserId}:${operationId}:reconcile`, async () => {
       const attempt = await this.processing.getProjectAttempt(ownerUserId, projectId, operationId);
-      if (attempt === null || attempt.outputAssetId !== null) return;
-      if (await this.bytes.exists(ownerUserId, attempt.resultAssetId)) return;
+      if (attempt === null) return;
+      /*
+       * Already durable, by an earlier pass or by an operator's visit. The temporary copy is then
+       * redundant, and letting it stand is not free: the job stays ready and admissible, so the
+       * progression tick offers it again on every pass for the rest of its hour, taking this lock
+       * each time to learn the same thing. Releasing it is what tells the tick the work is done,
+       * and it is safe precisely because the bytes it holds already exist somewhere durable.
+       */
+      if (
+        attempt.outputAssetId !== null ||
+        (await this.bytes.exists(ownerUserId, attempt.resultAssetId))
+      ) {
+        await this.videoJobs.release(operationId, ownerUserId).catch(() => undefined);
+        return;
+      }
       const lease = await this.videoJobs.content(operationId, ownerUserId);
       try {
         await this.#storeLeasedResult(attempt, lease);
@@ -712,6 +726,12 @@ export class ProjectProcessingService {
         asset = await this.bytes.open(attempt.ownerUserId, manifest.assetId);
         if (asset === null) throw new Error('Retained Project result could not be reopened.');
       } else {
+        // Already durable, so the job's temporary copy is redundant. Released here for the same
+        // reason the retain-only path releases it: left alone it stays ready and admissible, and
+        // the progression tick would offer it on every pass for the rest of its hour.
+        await this.videoJobs
+          .release(attempt.operationId, attempt.ownerUserId)
+          .catch(() => undefined);
         inspected = await inspectStoredProjectMedia(asset, (filePath) =>
           inspectVideoFile(filePath, attempt.capability as 'character-swap' | 'virtual-try-on', {
             requireProviderOutputSize: true,

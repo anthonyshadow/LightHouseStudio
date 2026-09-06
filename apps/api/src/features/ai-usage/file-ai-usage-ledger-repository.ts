@@ -94,18 +94,20 @@ const journalWrites = new KeyedLock();
  * How many rows each journal holds open, keyed by that same resolved path.
  *
  * `listOpen` sweeps every account once a minute and almost always finds nothing; without this it
- * would read and validate every account's entire spend history to learn that. A count is recorded
- * whenever a journal is read or written, and a journal known to hold nothing open is skipped. A
- * path with no recorded count is still read, so the first sweep after a boot sees all of disk.
+ * would read and validate every account's entire spend history to learn that. A path with no
+ * recorded count is still read, so the first sweep after a boot sees all of disk.
  *
- * Believing the count means believing nothing else edits these files behind us, which is the
- * assumption the store already runs on — one process owns a data directory, the same thing that
- * lets the saved-video journal answer reads out of its in-memory cache.
+ * Only a writer records a count, and only the sweep's own read does so under the same key: an
+ * unlocked reader can have opened the file before a write and finish parsing after it, and a stale
+ * zero written from there would skip a journal that does hold an open row, permanently and
+ * silently. Believing a count taken under the key still means believing nothing outside this
+ * process edits these files, which is the assumption the store already runs on.
  */
 const openRowCounts = new Map<string, number>();
 
-const openRowsIn = (rows: readonly JournalRow[]): number =>
-  rows.filter((row) => row.outcome === null).length;
+const isOpen = (row: { readonly outcome: unknown }): boolean => row.outcome === null;
+
+const openRowsIn = (rows: readonly JournalRow[]): number => rows.filter(isOpen).length;
 
 /**
  * The local-mode AI usage ledger: one JSON journal per owner beside the processing-job traces.
@@ -137,7 +139,6 @@ export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
     const file = this.#file(ownerUserId);
     try {
       const journal = journalSchema.parse(JSON.parse(await readFile(file, 'utf8')) as unknown);
-      openRowCounts.set(file, openRowsIn(journal.entries));
       return journal.entries.map((entry) => ({ ownerUserId, ...entry }));
     } catch (error) {
       if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return [];
@@ -152,6 +153,9 @@ export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
    */
   async #write(ownerUserId: string, entries: readonly AiUsageEntry[]): Promise<void> {
     const journal = { schemaVersion: 1, entries: entries.map(toJournalRow) };
+    // Re-asserted per write, as every sibling file store does: two syscalls against a directory that
+    // already exists are cheaper than a memo that would stop a removed root ever being remade, and
+    // that keeps the mode true rather than merely true once.
     await mkdir(this.#root, { recursive: true, mode: 0o700 });
     await chmod(this.#root, 0o700);
     const file = this.#file(ownerUserId);
@@ -173,7 +177,7 @@ export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
   }
 
   /** Keyed by the journal's own path, so every writer over one file queues behind the same key. */
-  #serialize(ownerUserId: string, work: () => Promise<void>): Promise<void> {
+  #serialize<Result>(ownerUserId: string, work: () => Promise<Result>): Promise<Result> {
     return journalWrites.run(this.#file(ownerUserId), work);
   }
 
@@ -187,17 +191,18 @@ export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
     };
     // The read and the write are one step: two writers reaching the same row would otherwise each
     // decide against a journal the other has already replaced.
-    await this.#serialize(ownerUserId, async () => {
+    const written = await this.#serialize(ownerUserId, async () => {
       const stored = await this.#read(ownerUserId);
       const existing = stored.find((candidate) => candidate.jobId === incoming.jobId) ?? null;
       const next = applyAiUsageTransition(existing, incoming);
-      if (next === null) return;
+      if (next === null) return null;
       await this.#write(
         ownerUserId,
         existing === null
           ? [...stored, next]
           : stored.map((candidate) => (candidate.jobId === next.jobId ? next : candidate)),
       );
+      return next;
     });
     /*
      * Shadow mode only: the journal above is the authority and this is a best-effort copy into the
@@ -207,15 +212,18 @@ export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
      * that decides what a row becomes has one owner and both stores already apply it.
      */
     const shadow = this.#shadow;
-    if (shadow !== undefined) {
+    // The row the journal accepted, not the one the caller offered: it is the trimmed, normalized
+    // one, and a mirror meant to make a cutover truthful must hold what the authority holds. A write
+    // the rule dropped is mirrored as nothing at all, because there is nothing to copy.
+    if (shadow !== undefined && written !== null) {
       // Called through `Promise.resolve().then` rather than awaited directly: a mirror whose
       // `record` threw before returning a promise would otherwise escape the guard and fail a write
       // the journal has already accepted, which is the one thing a rehearsal store must never do.
       await Promise.resolve()
-        .then(() => shadow.record(entry))
+        .then(() => shadow.record(written))
         .catch(() => {
           console.warn('[ai-usage] Shadow AI usage row could not be mirrored.', {
-            jobId: entry.jobId,
+            jobId: written.jobId,
           });
         });
     }
@@ -273,12 +281,17 @@ export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
       if (!/^[0-9a-f-]{36}\.json$/iu.test(file)) continue;
       // Nothing open means nothing for this sweep, and a count already taken answers that without
       // reading the account's history back. A journal never read is not skipped: it has no count.
-      if (openRowCounts.get(path.join(this.#root, file)) === 0) continue;
+      const journalPath = path.join(this.#root, file);
+      if (openRowCounts.get(journalPath) === 0) continue;
       const ownerUserId = file.slice(0, -5);
       try {
-        for (const entry of await this.#read(ownerUserId)) {
-          if (entry.outcome === null) unsettled.push(entry);
-        }
+        // Under the journal's own key, so the count this read records cannot be overtaken by a
+        // write that has already finished. A sweep is the one reader that both counts and skips.
+        await this.#serialize(ownerUserId, async () => {
+          const open = (await this.#read(ownerUserId)).filter(isOpen);
+          openRowCounts.set(journalPath, open.length);
+          unsettled.push(...open);
+        });
       } catch (error) {
         // The reconciler sweeps every account. One unreadable journal is one account's problem, and
         // must not leave every other account's unfinished submissions unclosed.

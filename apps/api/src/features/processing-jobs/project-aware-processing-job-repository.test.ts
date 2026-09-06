@@ -78,15 +78,21 @@ const projectRepository = (
   ...overrides,
 });
 
+const standaloneRepository = (
+  overrides: Partial<DurableProcessingJobRepository>,
+): DurableProcessingJobRepository => ({
+  admit: unstubbed('admit'),
+  upsert: unstubbed('upsert'),
+  listResumable: unstubbed('listResumable'),
+  findOutcomes: unstubbed('findOutcomes'),
+  ...overrides,
+});
+
 describe('ProjectAwareProcessingJobRepository', () => {
   it('keeps the Project repository authoritative when a shadow trace fails', async () => {
     const updateProjectAttemptTrace = vi.fn().mockResolvedValue(true);
-    const standalone: DurableProcessingJobRepository = {
-      admit: vi.fn().mockResolvedValue('admitted'),
-      upsert: vi.fn().mockResolvedValue(undefined),
-      listResumable: vi.fn().mockResolvedValue([]),
-      findOutcomes: vi.fn().mockResolvedValue(new Map()),
-    };
+    const standaloneUpsert = vi.fn().mockResolvedValue(undefined);
+    const standalone = standaloneRepository({ upsert: standaloneUpsert });
     const shadow: ProcessingJobTraceWriter = {
       upsert: vi.fn().mockRejectedValue(new Error('shadow unavailable')),
     };
@@ -99,7 +105,7 @@ describe('ProjectAwareProcessingJobRepository', () => {
 
     await expect(repository.upsert(trace)).resolves.toBeUndefined();
     expect(updateProjectAttemptTrace).toHaveBeenCalledWith(trace);
-    expect(standalone.upsert).not.toHaveBeenCalled();
+    expect(standaloneUpsert).not.toHaveBeenCalled();
     expect(shadow.upsert).toHaveBeenCalledWith(trace);
     expect(warning).toHaveBeenCalledOnce();
     warning.mockRestore();
@@ -113,9 +119,7 @@ describe('ProjectAwareProcessingJobRepository', () => {
         return Promise.resolve([resumable]);
       }),
     });
-    const standalone: DurableProcessingJobRepository = {
-      admit: vi.fn().mockResolvedValue('admitted'),
-      upsert: vi.fn().mockResolvedValue(undefined),
+    const standalone = standaloneRepository({
       listResumable: vi.fn(() => {
         order.push('standalone');
         return Promise.resolve([
@@ -123,8 +127,7 @@ describe('ProjectAwareProcessingJobRepository', () => {
           { ...resumable, jobId: '4efcc6c3-e82c-419a-8807-c0026170fb75' },
         ]);
       }),
-      findOutcomes: vi.fn().mockResolvedValue(new Map()),
-    };
+    });
     const repository = new ProjectAwareProcessingJobRepository(projects, standalone);
 
     await expect(repository.listResumable('2026-08-13T12:02:00.000Z')).resolves.toEqual([
@@ -139,15 +142,9 @@ describe('ProjectAwareProcessingJobRepository', () => {
       .fn()
       .mockResolvedValue(new Map([[linkedJobId, linkedOutcome]]));
     const findOutcomes = vi.fn().mockResolvedValue(new Map([[standaloneJobId, standaloneOutcome]]));
-    const standalone: DurableProcessingJobRepository = {
-      admit: vi.fn().mockResolvedValue('admitted'),
-      upsert: vi.fn().mockResolvedValue(undefined),
-      listResumable: vi.fn().mockResolvedValue([]),
-      findOutcomes,
-    };
     const repository = new ProjectAwareProcessingJobRepository(
       projectRepository({ findProjectAttemptOutcomes }),
-      standalone,
+      standaloneRepository({ findOutcomes }),
     );
 
     const outcomes = await repository.findOutcomes(trace.ownerUserId, [
@@ -166,21 +163,33 @@ describe('ProjectAwareProcessingJobRepository', () => {
     ]);
   });
 
+  it('asks the Project store for an empty list and still leaves the standalone store alone', async () => {
+    const findProjectAttemptOutcomes = vi.fn().mockResolvedValue(new Map());
+    const findOutcomes = vi.fn();
+    const repository = new ProjectAwareProcessingJobRepository(
+      projectRepository({ findProjectAttemptOutcomes }),
+      standaloneRepository({ findOutcomes }),
+    );
+
+    await expect(repository.findOutcomes(trace.ownerUserId, [])).resolves.toEqual(new Map());
+
+    // No guard of its own in front of the Project read: an empty ask is the Project store's to
+    // answer like any other, and asking it twice or not at all would be the composite deciding
+    // something the store already decides. What the empty answer does settle is that nothing is
+    // left unlinked, and the standalone store exists only for what is.
+    expect(findProjectAttemptOutcomes).toHaveBeenCalledExactlyOnceWith(trace.ownerUserId, []);
+    expect(findOutcomes).not.toHaveBeenCalled();
+  });
+
   it('leaves the standalone store alone when every id is a Project attempt', async () => {
     const findOutcomes = vi.fn();
-    const standalone: DurableProcessingJobRepository = {
-      admit: vi.fn().mockResolvedValue('admitted'),
-      upsert: vi.fn().mockResolvedValue(undefined),
-      listResumable: vi.fn().mockResolvedValue([]),
-      findOutcomes,
-    };
     const repository = new ProjectAwareProcessingJobRepository(
       projectRepository({
         findProjectAttemptOutcomes: vi
           .fn()
           .mockResolvedValue(new Map([[linkedJobId, linkedOutcome]])),
       }),
-      standalone,
+      standaloneRepository({ findOutcomes }),
     );
 
     await expect(repository.findOutcomes(trace.ownerUserId, [linkedJobId])).resolves.toEqual(
