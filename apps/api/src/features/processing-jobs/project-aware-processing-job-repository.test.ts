@@ -188,23 +188,4 @@ describe('ProjectAwareProcessingJobRepository', () => {
     );
     expect(findOutcomes).not.toHaveBeenCalled();
   });
-
-  it('reads neither store when asked about no jobs at all', async () => {
-    const findProjectAttemptOutcomes = vi.fn();
-    const findOutcomes = vi.fn();
-    const standalone: DurableProcessingJobRepository = {
-      admit: vi.fn().mockResolvedValue('admitted'),
-      upsert: vi.fn().mockResolvedValue(undefined),
-      listResumable: vi.fn().mockResolvedValue([]),
-      findOutcomes,
-    };
-    const repository = new ProjectAwareProcessingJobRepository(
-      projectRepository({ findProjectAttemptOutcomes }),
-      standalone,
-    );
-
-    await expect(repository.findOutcomes(trace.ownerUserId, [])).resolves.toEqual(new Map());
-    expect(findProjectAttemptOutcomes).not.toHaveBeenCalled();
-    expect(findOutcomes).not.toHaveBeenCalled();
-  });
 });

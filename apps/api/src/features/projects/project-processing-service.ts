@@ -606,15 +606,6 @@ export class ProjectProcessingService {
   }
 
   /**
-   * Puts a finished result's bytes where they survive, and stops there.
-   *
-   * This is retention without an operator present, so it must not decide what the Project shows:
-   * the attempt keeps a null output asset and the `saving-result` phase until the next visit runs
-   * {@link ProjectProcessingService.reconcile}, which promotes it exactly as it does today. It
-   * shares the reconcile lock, so a client arriving mid-copy waits rather than fetching the same
-   * result twice, and it is idempotent because a second entrant finds the bytes already stored.
-   */
-  /**
    * Copy a job's temporary result into the owner's store under the id the attempt preallocated.
    *
    * The one owner of where a retained result lands and what it is called. Both paths reach it: the
@@ -636,7 +627,20 @@ export class ProjectProcessingService {
     });
   }
 
-  async retainResult(ownerUserId: string, projectId: string, operationId: string): Promise<void> {
+  /**
+   * Puts a finished result's bytes where they survive, and stops there.
+   *
+   * This is retention without an operator present, so it must not decide what the Project shows:
+   * the attempt keeps a null output asset and the `saving-result` phase until the next visit runs
+   * {@link ProjectProcessingService.reconcile}, which promotes it exactly as it does today. It
+   * shares the reconcile lock, so a client arriving mid-copy waits rather than fetching the same
+   * result twice, and it is idempotent because a second entrant finds the bytes already stored.
+   */
+  async retainResultBytes(
+    ownerUserId: string,
+    projectId: string,
+    operationId: string,
+  ): Promise<void> {
     await this.#lock.run(`${ownerUserId}:${operationId}:reconcile`, async () => {
       const attempt = await this.processing.getProjectAttempt(ownerUserId, projectId, operationId);
       if (attempt === null || attempt.outputAssetId !== null) return;

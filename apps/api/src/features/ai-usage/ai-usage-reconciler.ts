@@ -1,10 +1,18 @@
 import { VIDEO_JOB_TTL_MS } from '@studio/contracts';
 import { aiUsageOutcomeForJobStatus, type AiUsageEntry } from '@studio/domain';
+import { errorClassOf } from '../../http/errors.js';
 import type {
   DurableProcessingJobOutcome,
   DurableProcessingJobRepository,
 } from '../processing-jobs/file-processing-job-repository.js';
 import type { AiUsageLedgerRepository } from './ai-usage-ledger-repository.js';
+
+/**
+ * How many open usage rows one sweep may close, wherever the sweep is driven from. The bound is the
+ * ledger's own policy rather than any one runner's, so the startup sweep and the periodic one cannot
+ * drift into two different budgets.
+ */
+export const AI_USAGE_RECONCILE_BATCH = 25;
 
 /**
  * The reconciler's only way to say something went wrong: ids and an error class, never a provider
@@ -16,19 +24,17 @@ export interface AiUsageReconcilerLog {
 }
 
 export interface AiUsageReconcilerOptions {
-  readonly now?: () => number;
   readonly log?: AiUsageReconcilerLog;
 }
 
 /**
  * One line for every reconciliation failure, whichever pass produced it. It names the runner rather
  * than this module because both passes an operator can see — the one at startup and the periodic
- * one — belong to video job progression, and one string should find all of them.
+ * one — belong to video job progression, and one string should find all of them. Exported so the
+ * runner writes this exact line for the sweeps it could not even start, rather than keeping a copy
+ * that only a convention holds equal.
  */
-const RECONCILIATION_FAILED = '[video-job-progression] Ledger reconciliation failed.';
-
-const errorClassOf = (error: unknown): string =>
-  error instanceof Error ? error.constructor.name : 'Error';
+export const RECONCILIATION_FAILED = '[video-job-progression] Ledger reconciliation failed.';
 
 /**
  * What a pass built without a logger writes to. A sweep that fails every minute in silence is
@@ -73,7 +79,6 @@ const byOwner = (
 export class AiUsageReconciler {
   readonly #ledger: AiUsageLedgerRepository;
   readonly #durable: DurableProcessingJobRepository;
-  readonly #now: () => number;
   readonly #log: AiUsageReconcilerLog;
 
   constructor(
@@ -83,7 +88,6 @@ export class AiUsageReconciler {
   ) {
     this.#ledger = ledger;
     this.#durable = durable;
-    this.#now = options.now ?? Date.now;
     this.#log = options.log ?? consoleLog;
   }
 
@@ -93,10 +97,11 @@ export class AiUsageReconciler {
    * outcome for, which is the work it did rather than a claim about the store: a write whose row a
    * closer settled first is dropped by the transition rule, correctly and invisibly.
    *
-   * Two instants, deliberately. `nowMs` is when the pass was taken and is the only thing the
+   * One instant for the whole pass. `nowMs` is when the pass was taken: it is the only thing a
    * deadline is judged against, so a pass spanning several owners' reads cannot close a row that was
-   * still inside its hour when the pass began. The injected clock stamps what the pass writes, read
-   * at the write: the ambiguity is discovered now, not when the sweep started.
+   * still inside its hour when the pass began, and it is what dates the rows this pass calls
+   * ambiguous, so the instant that found a deadline passed is the instant the row is stamped with. A
+   * row closed from a durable trace is dated by that trace instead, which watched the job end.
    *
    * Nothing here abandons the pass. One owner's unreadable store, or one row's failed write, costs
    * that owner or that row and no more — the alternative leaves every other account's finished
@@ -170,6 +175,6 @@ export class AiUsageReconciler {
     // rather than being called ambiguous over a parse failure.
     const deadlineMs = Date.parse(entry.submittedAt) + VIDEO_JOB_TTL_MS;
     if (Number.isNaN(deadlineMs) || deadlineMs > nowMs) return null;
-    return { ...entry, outcome: 'ambiguous', completedAt: new Date(this.#now()).toISOString() };
+    return { ...entry, outcome: 'ambiguous', completedAt: new Date(nowMs).toISOString() };
   }
 }

@@ -12,6 +12,17 @@ import { AppError } from './app-error.js';
 
 export { AppError } from './app-error.js';
 
+/**
+ * The one safe name for an error in a log line.
+ *
+ * The redaction boundary: a store's or a provider's own message may carry a URL, a key or an
+ * upstream code, and none of those belong in a log. The class name says what kind of thing went
+ * wrong and nothing about what it said, so every diagnostic reaches for this rather than spelling
+ * it out again.
+ */
+export const errorClassOf = (error: unknown): string =>
+  error instanceof Error ? error.constructor.name : 'Error';
+
 export interface ErrorDiagnostic {
   readonly errorClass: string;
   readonly reason?: string;

@@ -46,14 +46,22 @@ describe('AI usage ledger contracts', () => {
     );
   });
 
-  it('serves a provider the wire has no enum for, so one stored row cannot fail the page', () => {
+  it('serves an operation and a provider the wire has no enum for, so one stored row cannot fail the page', () => {
     expect(
-      aiUsageLedgerEntrySchema.parse({ ...entry, provider: 'retired-provider' }),
-    ).toMatchObject({ provider: 'retired-provider' });
+      aiUsageLedgerEntrySchema.parse({
+        ...entry,
+        operation: 'retired-operation',
+        provider: 'retired-provider',
+      }),
+    ).toMatchObject({ operation: 'retired-operation', provider: 'retired-provider' });
     expect(aiUsageLedgerEntrySchema.safeParse({ ...entry, provider: '' }).success).toBe(false);
     expect(aiUsageLedgerEntrySchema.safeParse({ ...entry, provider: 'x'.repeat(81) }).success).toBe(
       false,
     );
+    expect(aiUsageLedgerEntrySchema.safeParse({ ...entry, operation: '' }).success).toBe(false);
+    expect(
+      aiUsageLedgerEntrySchema.safeParse({ ...entry, operation: 'x'.repeat(81) }).success,
+    ).toBe(false);
   });
 
   it('refuses a page larger than the ledger promises and any undeclared field', () => {

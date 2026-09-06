@@ -1,9 +1,11 @@
-import type { AiUsageReconciler } from '../ai-usage/ai-usage-reconciler.js';
+import { errorClassOf } from '../../http/errors.js';
+import {
+  AI_USAGE_RECONCILE_BATCH,
+  RECONCILIATION_FAILED,
+  type AiUsageReconciler,
+} from '../ai-usage/ai-usage-reconciler.js';
 import type { ProjectProcessingService } from '../projects/project-processing-service.js';
 import type { VideoJobProgressionResult, VideoJobService } from './video-job-service.js';
-
-/** How many open usage rows one sweep may close, wherever the sweep is driven from. */
-export const AI_USAGE_RECONCILE_BATCH = 25;
 
 /**
  * The sweep runs on its own clock rather than the tick's, because the two answer different
@@ -18,11 +20,6 @@ const MAXIMUM_RETENTION_BACKOFF_MS = 5 * 60 * 1_000;
 const PROGRESSION_FAILED = '[video-job-progression] Progression pass failed.';
 const RETENTION_FAILED = '[video-job-progression] Project result retention failed.';
 const PASS_COMPLETED = '[video-job-progression] Progression pass.';
-/**
- * Deliberately the same string the reconciler writes for a failure it handled itself: whether a
- * sweep failed row by row or refused to run at all, one search should find every occurrence.
- */
-const RECONCILIATION_FAILED = '[video-job-progression] Ledger reconciliation failed.';
 
 /** Cancelling is all the runner ever asks of its schedule; one interval lives for one runner. */
 export interface ScheduledVideoJobProgression {
@@ -43,7 +40,7 @@ export interface VideoJobProgressionLog {
 type ProgressableVideoJobs = Pick<VideoJobService, 'available' | 'progressDueJobs'>;
 
 /** Retention only. The tick must never be able to promote a result nobody asked for. */
-type ProjectResultRetention = Pick<ProjectProcessingService, 'retainResult'>;
+type ProjectResultRetention = Pick<ProjectProcessingService, 'retainResultBytes'>;
 
 type LedgerReconciliation = Pick<AiUsageReconciler, 'reconcile'>;
 
@@ -69,9 +66,6 @@ const scheduleSystemInterval = (
   timer.unref?.();
   return { cancel: () => clearInterval(timer) };
 };
-
-const errorClassOf = (error: unknown): string =>
-  error instanceof Error ? error.constructor.name : 'Error';
 
 const NOTHING_PROGRESSED: VideoJobProgressionResult = {
   polled: 0,
@@ -212,34 +206,37 @@ export class VideoJobProgressionTick {
     const due = ready.filter(
       (entry) => (this.#retentionBackoff.get(entry.jobId)?.nextAttemptAtMs ?? 0) <= now,
     );
-    // Started together and read one at a time: `allSettled` is what keeps a refusal from reaching
-    // the process as an unhandled rejection, and the pairing is what lets it name its own job.
-    const attempts = due.map((entry) => ({
-      entry,
-      retention: projectProcessing.retainResult(entry.ownerId, entry.projectId, entry.jobId),
-    }));
-    await Promise.allSettled(attempts.map(({ retention }) => retention));
+    // Started together, then read as results rather than re-awaited: `allSettled` is what keeps a
+    // refusal from reaching the process as an unhandled rejection, and it answers one result per
+    // input in input order, which is what lets each answer name the job it belongs to.
+    const settled = await Promise.allSettled(
+      due.map((entry) =>
+        projectProcessing.retainResultBytes(entry.ownerId, entry.projectId, entry.jobId),
+      ),
+    );
 
     let retained = 0;
-    for (const { entry, retention } of attempts) {
-      try {
-        await retention;
+    for (const [index, result] of settled.entries()) {
+      const entry = due[index];
+      // One result per attempt, so this only narrows the index rather than skipping anything.
+      if (entry === undefined) continue;
+      if (result.status === 'fulfilled') {
         this.#retentionBackoff.delete(entry.jobId);
         retained += 1;
-      } catch (error) {
-        const failures = (this.#retentionBackoff.get(entry.jobId)?.attempts ?? 0) + 1;
-        this.#retentionBackoff.set(entry.jobId, {
-          attempts: failures,
-          // The first refusal already costs a whole pass: a job that cannot land should stop
-          // competing with the ones that can immediately, not after several more attempts.
-          nextAttemptAtMs:
-            this.#now() + Math.min(this.#intervalMs * 2 ** failures, MAXIMUM_RETENTION_BACKOFF_MS),
-        });
-        this.#log.warn(
-          { jobId: entry.jobId, projectId: entry.projectId, errorClass: errorClassOf(error) },
-          RETENTION_FAILED,
-        );
+        continue;
       }
+      const failures = (this.#retentionBackoff.get(entry.jobId)?.attempts ?? 0) + 1;
+      this.#retentionBackoff.set(entry.jobId, {
+        attempts: failures,
+        // The first refusal already costs a whole pass: a job that cannot land should stop
+        // competing with the ones that can immediately, not after several more attempts.
+        nextAttemptAtMs:
+          this.#now() + Math.min(this.#intervalMs * 2 ** failures, MAXIMUM_RETENTION_BACKOFF_MS),
+      });
+      this.#log.warn(
+        { jobId: entry.jobId, projectId: entry.projectId, errorClass: errorClassOf(result.reason) },
+        RETENTION_FAILED,
+      );
     }
     return retained;
   }

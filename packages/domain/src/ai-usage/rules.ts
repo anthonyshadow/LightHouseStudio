@@ -9,7 +9,8 @@
  */
 
 import type { ProjectProcessingJobStatus } from '../video-processing/types';
-import type { AiUsageEntry, AiUsageOutcome } from './types';
+import { AI_USAGE_OUTCOMES } from './types';
+import type { AiUsageEntry, AiUsageOutcome, AiUsageOutcomeCounts } from './types';
 
 /**
  * The outcome a status settles, or null while the submission is still in flight.
@@ -82,3 +83,23 @@ export const aiUsageDurationMs = (
   if (!Number.isFinite(submittedMs) || !Number.isFinite(completedMs)) return null;
   return Math.max(0, completedMs - submittedMs);
 };
+
+/** Every outcome at zero: the seed both stores start a window's counts from. */
+export const emptyAiUsageOutcomeCounts = (): Record<'running' | AiUsageOutcome, number> => ({
+  running: 0,
+  succeeded: 0,
+  failed: 0,
+  ambiguous: 0,
+  expired: 0,
+  cancelled: 0,
+});
+
+/**
+ * How many submissions a window holds.
+ *
+ * Every row is one submission, whatever became of it, so the total is the sum of all six counts.
+ * It lives here rather than in the surface that shows it, because "what counts as a submission" is
+ * the ledger's own statement and a screen adding six fields by hand would quietly stop matching it.
+ */
+export const aiUsageSubmittedTotal = (counts: AiUsageOutcomeCounts): number =>
+  counts.running + AI_USAGE_OUTCOMES.reduce((total, outcome) => total + counts[outcome], 0);

@@ -1,37 +1,45 @@
 import { randomUUID } from 'node:crypto';
 import { chmod, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
+import { videoJobRecordedNameSchema } from '@studio/contracts';
 import { z } from 'zod';
 import {
   AI_USAGE_OUTCOMES,
   applyAiUsageTransition,
+  emptyAiUsageOutcomeCounts,
   type AiUsageEntry,
-  type AiUsageOutcome,
   type AiUsageOutcomeCounts,
 } from '@studio/domain';
+import { KeyedLock } from '../../application/keyed-lock.js';
 import { persistedTimestampSchema } from '../../application/timestamps.js';
+import { errorClassOf } from '../../http/errors.js';
 import type {
   AiUsageLedgerCursor,
   AiUsageLedgerPage,
   AiUsageLedgerRepository,
 } from './ai-usage-ledger-repository.js';
 
+const ownerIdSchema = z.uuid();
+
 /**
- * `operation` and `provider` are bounded strings rather than the unions the wire uses. A journal is
- * a record of what was already spent: a row naming an operation kind this build has renamed, or a
- * provider it has retired, must still parse, or one historical row would make the whole account's
- * spend unreadable.
+ * `operation` and `provider` are recorded names, not the unions the wire uses to choose one. A
+ * journal is a record of what was already spent: a row naming an operation kind this build has
+ * renamed, or a provider it has retired, must still parse, or one historical row would make the
+ * whole account's spend unreadable. The bound is the contract's, so the stored shape and the wire
+ * shape cannot drift apart on what a recorded name may be.
  */
 const journalEntrySchema = z
   .object({
     jobId: z.uuid(),
-    operation: z.string().trim().min(1).max(80),
-    provider: z.string().trim().min(1).max(80),
+    operation: videoJobRecordedNameSchema,
+    provider: videoJobRecordedNameSchema,
     outcome: z.enum(AI_USAGE_OUTCOMES).nullable(),
     submittedAt: persistedTimestampSchema,
     completedAt: persistedTimestampSchema.nullable(),
   })
   .strict();
+
+type JournalRow = z.infer<typeof journalEntrySchema>;
 
 /** The owner is the file name, so it is deliberately not repeated inside every row. */
 const journalSchema = z
@@ -40,6 +48,16 @@ const journalSchema = z
     entries: z.array(journalEntrySchema),
   })
   .strict();
+
+/** A ledger row as the journal spells it: everything but the owner, which the file name carries. */
+const toJournalRow = (entry: AiUsageEntry): JournalRow => ({
+  jobId: entry.jobId,
+  operation: entry.operation,
+  provider: entry.provider,
+  outcome: entry.outcome,
+  submittedAt: entry.submittedAt,
+  completedAt: entry.completedAt,
+});
 
 type LedgerKey = Pick<AiUsageEntry, 'submittedAt' | 'jobId'>;
 
@@ -58,31 +76,45 @@ const compareNewestFirst = (a: LedgerKey, b: LedgerKey): number => {
   return a.jobId > b.jobId ? -1 : 1;
 };
 
-const errorClassOf = (error: unknown): string =>
-  error instanceof Error ? error.constructor.name : 'Error';
+/**
+ * The write lock, keyed by the journal's own resolved path rather than held per instance.
+ *
+ * A journal is a file, and a read-modify-write of it is only serial if every writer in the process
+ * queues on the same key. Two repositories over one data directory is not hypothetical — a test
+ * builds a second one to prove a restart, and a mode that mirrors builds one beside another — and
+ * with a per-instance lock the later rename simply erases the row the other had just written. The
+ * loss is silent, and a row that was never written is invisible to the reconciler that exists to
+ * catch open rows. It is deliberately its own instance rather than the shared owner lock the
+ * Project and saved-video journals take: a ledger write happens in the middle of work that may
+ * already hold that lock, and a private module-level instance nests inside nothing.
+ */
+const journalWrites = new KeyedLock();
+
+/**
+ * How many rows each journal holds open, keyed by that same resolved path.
+ *
+ * `listOpen` sweeps every account once a minute and almost always finds nothing; without this it
+ * would read and validate every account's entire spend history to learn that. A count is recorded
+ * whenever a journal is read or written, and a journal known to hold nothing open is skipped. A
+ * path with no recorded count is still read, so the first sweep after a boot sees all of disk.
+ *
+ * Believing the count means believing nothing else edits these files behind us, which is the
+ * assumption the store already runs on — one process owns a data directory, the same thing that
+ * lets the saved-video journal answer reads out of its in-memory cache.
+ */
+const openRowCounts = new Map<string, number>();
+
+const openRowsIn = (rows: readonly JournalRow[]): number =>
+  rows.filter((row) => row.outcome === null).length;
 
 /**
  * The local-mode AI usage ledger: one JSON journal per owner beside the processing-job traces.
  *
- * Writes are serialized by a private per-owner chain rather than the shared owner lock the Project
- * and saved-video journals take. A ledger row is opened in the middle of work that may already hold
- * that lock, and a ledger write is never part of a Project's transaction — it must not be able to
- * nest inside one.
+ * Alone among the owner-keyed file stores, the file is named for the owner id itself rather than a
+ * hash of it, as the Project and saved-video journals are: `listOpen` reaches every account by
+ * reading the directory, and the name is the only place the owner of an unfinished row can come
+ * from once a journal has been found that way.
  */
-/**
- * The write chains, keyed by the journal's own resolved path rather than held per instance.
- *
- * A journal is a file, and a read-modify-write of it is only serial if every writer in the process
- * queues on the same chain. Two repositories over one data directory is not hypothetical — a test
- * builds a second one to prove a restart, and a mode that mirrors builds one beside another — and
- * with a per-instance chain the later rename simply erases the row the other had just written. The
- * loss is silent, and a row that was never written is invisible to the reconciler that exists to
- * catch open rows. Keying by path is deliberately not the shared owner lock the Project and
- * saved-video journals take: a ledger write happens in the middle of work that may already hold
- * that lock, so it must never be able to nest inside one.
- */
-const journalWrites = new Map<string, Promise<void>>();
-
 export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
   readonly #root: string;
 
@@ -97,15 +129,15 @@ export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
   }
 
   #file(ownerUserId: string): string {
-    return path.join(this.#root, `${z.uuid().parse(ownerUserId)}.json`);
+    return path.join(this.#root, `${ownerIdSchema.parse(ownerUserId)}.json`);
   }
 
   /** An absent journal is an empty ledger; anything else — a bad schema included — is a fault. */
   async #read(ownerUserId: string): Promise<readonly AiUsageEntry[]> {
+    const file = this.#file(ownerUserId);
     try {
-      const journal = journalSchema.parse(
-        JSON.parse(await readFile(this.#file(ownerUserId), 'utf8')) as unknown,
-      );
+      const journal = journalSchema.parse(JSON.parse(await readFile(file, 'utf8')) as unknown);
+      openRowCounts.set(file, openRowsIn(journal.entries));
       return journal.entries.map((entry) => ({ ownerUserId, ...entry }));
     } catch (error) {
       if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return [];
@@ -113,18 +145,13 @@ export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
     }
   }
 
+  /**
+   * The rows go to disk as they stand. Every one of them either came back from `#read`, which
+   * validated it, or is the single row `record` validated as it entered — so parsing the array
+   * again here would spend an account's whole history to check what is already known good.
+   */
   async #write(ownerUserId: string, entries: readonly AiUsageEntry[]): Promise<void> {
-    const journal = journalSchema.parse({
-      schemaVersion: 1,
-      entries: entries.map((entry) => ({
-        jobId: entry.jobId,
-        operation: entry.operation,
-        provider: entry.provider,
-        outcome: entry.outcome,
-        submittedAt: entry.submittedAt,
-        completedAt: entry.completedAt,
-      })),
-    });
+    const journal = { schemaVersion: 1, entries: entries.map(toJournalRow) };
     await mkdir(this.#root, { recursive: true, mode: 0o700 });
     await chmod(this.#root, 0o700);
     const file = this.#file(ownerUserId);
@@ -142,34 +169,28 @@ export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
       await rm(temporary, { force: true }).catch(() => undefined);
       throw error;
     }
+    openRowCounts.set(file, openRowsIn(journal.entries));
   }
 
-  async #serialize(ownerUserId: string, work: () => Promise<void>): Promise<void> {
-    const key = this.#file(ownerUserId);
-    const prior = journalWrites.get(key) ?? Promise.resolve();
-    let release!: () => void;
-    const barrier = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const chain = prior.then(() => barrier);
-    journalWrites.set(key, chain);
-    await prior;
-    try {
-      await work();
-    } finally {
-      release();
-      if (journalWrites.get(key) === chain) journalWrites.delete(key);
-    }
+  /** Keyed by the journal's own path, so every writer over one file queues behind the same key. */
+  #serialize(ownerUserId: string, work: () => Promise<void>): Promise<void> {
+    return journalWrites.run(this.#file(ownerUserId), work);
   }
 
   async record(entry: AiUsageEntry): Promise<void> {
-    const ownerUserId = z.uuid().parse(entry.ownerUserId);
+    const { ownerUserId } = entry;
+    // The only row a write can add anything unchecked to the journal through, so it is checked
+    // here, once, where it enters — rather than again for every row already on disk.
+    const incoming: AiUsageEntry = {
+      ownerUserId,
+      ...journalEntrySchema.parse(toJournalRow(entry)),
+    };
     // The read and the write are one step: two writers reaching the same row would otherwise each
     // decide against a journal the other has already replaced.
     await this.#serialize(ownerUserId, async () => {
       const stored = await this.#read(ownerUserId);
-      const existing = stored.find((candidate) => candidate.jobId === entry.jobId) ?? null;
-      const next = applyAiUsageTransition(existing, entry);
+      const existing = stored.find((candidate) => candidate.jobId === incoming.jobId) ?? null;
+      const next = applyAiUsageTransition(existing, incoming);
       if (next === null) return;
       await this.#write(
         ownerUserId,
@@ -231,14 +252,7 @@ export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
 
   async countByOutcome(ownerUserId: string, since: string): Promise<AiUsageOutcomeCounts> {
     const sinceMs = Date.parse(since);
-    const counts: Record<'running' | AiUsageOutcome, number> = {
-      running: 0,
-      succeeded: 0,
-      failed: 0,
-      ambiguous: 0,
-      expired: 0,
-      cancelled: 0,
-    };
+    const counts = emptyAiUsageOutcomeCounts();
     for (const entry of await this.#read(ownerUserId)) {
       if (Date.parse(entry.submittedAt) < sinceMs) continue;
       counts[entry.outcome ?? 'running'] += 1;
@@ -257,6 +271,9 @@ export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
     const unsettled: AiUsageEntry[] = [];
     for (const file of files) {
       if (!/^[0-9a-f-]{36}\.json$/iu.test(file)) continue;
+      // Nothing open means nothing for this sweep, and a count already taken answers that without
+      // reading the account's history back. A journal never read is not skipped: it has no count.
+      if (openRowCounts.get(path.join(this.#root, file)) === 0) continue;
       const ownerUserId = file.slice(0, -5);
       try {
         for (const entry of await this.#read(ownerUserId)) {

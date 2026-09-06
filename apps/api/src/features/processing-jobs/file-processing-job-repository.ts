@@ -7,7 +7,12 @@ import {
   videoJobStatusSchema,
   videoOutputResolutionSchema,
 } from '@studio/contracts';
-import { persistedTimestampSchema } from '../../application/timestamps.js';
+import type { ProjectProcessingJobStatus } from '@studio/domain';
+import {
+  nullableIsoTimestamp,
+  persistedTimestampSchema,
+  toIsoTimestamp,
+} from '../../application/timestamps.js';
 
 const traceSchema = z
   .object({
@@ -61,12 +66,43 @@ export interface ResumableVideoProcessingJob {
 export type ProcessingJobAdmissionResult =
   'admitted' | 'duplicate' | 'request-conflict' | 'owner-conflict' | 'owner-mismatch';
 
-/** What a durable row says about a job, for a reader that only needs to know how it ended. */
+/**
+ * What a durable row says about a job, for a reader that only needs to know how it ended.
+ *
+ * The status is the persisted lifecycle verbatim, wider than the wire vocabulary a trace speaks:
+ * a Project-linked row can also say `pending` or `accepted`. Reporting it untranslated is what
+ * makes a thirteenth status a compile error in `aiUsageOutcomeForJobStatus` — the only reader of
+ * this field — rather than something a mapping table quietly answers for.
+ */
 export interface DurableProcessingJobOutcome {
-  readonly status: VideoProcessingJobTrace['status'];
+  readonly status: ProjectProcessingJobStatus;
   readonly completedAt: string | null;
   readonly updatedAt: string;
 }
+
+/**
+ * The outcome map both relational readers return. They select the same four columns and differ
+ * only in the join that decides which rows they are allowed to see, so the timestamp conversions
+ * live here rather than once per store, two thousand lines apart.
+ */
+export const durableProcessingJobOutcomes = (
+  rows: readonly {
+    readonly id: string;
+    readonly status: ProjectProcessingJobStatus;
+    readonly completedAt: string | Date | null;
+    readonly updatedAt: string | Date;
+  }[],
+): ReadonlyMap<string, DurableProcessingJobOutcome> => {
+  const outcomes = new Map<string, DurableProcessingJobOutcome>();
+  for (const row of rows) {
+    outcomes.set(row.id, {
+      status: row.status,
+      completedAt: nullableIsoTimestamp(row.completedAt),
+      updatedAt: toIsoTimestamp(row.updatedAt),
+    });
+  }
+  return outcomes;
+};
 
 export interface DurableProcessingJobRepository extends ProcessingJobTraceWriter {
   admit(trace: VideoProcessingJobTrace): Promise<ProcessingJobAdmissionResult>;
@@ -183,12 +219,12 @@ export class FileProcessingJobRepository implements DurableProcessingJobReposito
     ownerUserId: string,
     jobIds: readonly string[],
   ): Promise<ReadonlyMap<string, DurableProcessingJobOutcome>> {
-    const outcomes = new Map<string, DurableProcessingJobOutcome>();
-    if (jobIds.length === 0) return outcomes;
     // One file per id rather than a directory scan: the caller asks about a bounded handful of
-    // jobs, while the store holds every trace this process has ever written.
-    for (const jobId of new Set(jobIds)) {
-      const trace = await this.#read(jobId);
+    // jobs, while the store holds every trace this process has ever written. The reads answer
+    // independently, so they go out together; the results keep the order they were asked in.
+    const traces = await Promise.all([...new Set(jobIds)].map((jobId) => this.#read(jobId)));
+    const outcomes = new Map<string, DurableProcessingJobOutcome>();
+    for (const trace of traces) {
       if (trace === null || trace.ownerUserId !== ownerUserId) continue;
       outcomes.set(trace.jobId, {
         status: trace.status,

@@ -415,6 +415,42 @@ describe('FileAiUsageLedgerRepository', () => {
     ]);
   });
 
+  it('stops reading a journal once it knows every row in it is settled', async () => {
+    const root = temporaryRoot();
+    const repository = new FileAiUsageLedgerRepository(root);
+    await repository.record(entry());
+    await repository.record(entry({ outcome: 'succeeded', completedAt: COMPLETED_AT }));
+
+    // The close left the account with no open work, and the sweep says so.
+    await expect(repository.listOpen(10)).resolves.toEqual([]);
+
+    // A later sweep does not open the file again. Bytes no reader could parse stand in for the
+    // read: the empty result alone proves nothing, but a sweep that had touched this journal would
+    // have failed on it and warned, and the sweep below does neither.
+    await writeFile(journalPath(root), 'not a journal\n', 'utf8');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(repository.listOpen(10)).resolves.toEqual([]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('sweeps a settled journal again as soon as a row opens in it', async () => {
+    const root = temporaryRoot();
+    const repository = new FileAiUsageLedgerRepository(root);
+    await repository.record(entry({ outcome: 'succeeded', completedAt: COMPLETED_AT }));
+    await expect(repository.listOpen(10)).resolves.toEqual([]);
+
+    // What a sweep skips is a journal holding nothing open, not a journal it has already visited:
+    // the write that opens a row is what makes the next sweep read the file again.
+    const opened = entry({ jobId: OTHER_JOB, submittedAt: '2026-09-05T10:02:00.000Z' });
+    await repository.record(opened);
+
+    await expect(repository.listOpen(10)).resolves.toEqual([opened]);
+    // And a second repository over the same directory sweeps it too: what is remembered belongs to
+    // the journal, exactly as the write chain does, not to the instance that happened to write it.
+    await expect(new FileAiUsageLedgerRepository(root).listOpen(10)).resolves.toEqual([opened]);
+  });
+
   it('reads an account with no journal as an empty ledger', async () => {
     const repository = new FileAiUsageLedgerRepository(temporaryRoot());
 

@@ -87,7 +87,6 @@ import {
   type SavedVideoLibrary,
 } from '../saved-videos/saved-video-repository.js';
 import {
-  durableProcessingJobOutcome,
   projectProcessingAttemptMatchesTrace,
   projectProcessingResultInputMatchesAttempt,
   retainedProjectProcessingResultMatches,
@@ -937,7 +936,6 @@ export class FileProjectRepository
     jobIds: readonly string[],
   ): Promise<ReadonlyMap<string, DurableProcessingJobOutcome>> {
     const outcomes = new Map<string, DurableProcessingJobOutcome>();
-    if (jobIds.length === 0) return outcomes;
     const wanted = new Set(jobIds);
     // One library read, then a single pass: the owner's whole journal already holds every attempt,
     // so asking it per id would re-read the same file. A deleted Project is not filtered out —
@@ -945,7 +943,11 @@ export class FileProjectRepository
     const library = await this.#read(ownerUserId);
     for (const attempt of library.processingJobs) {
       if (!wanted.has(attempt.operationId)) continue;
-      outcomes.set(attempt.operationId, durableProcessingJobOutcome(attempt));
+      outcomes.set(attempt.operationId, {
+        status: attempt.status,
+        completedAt: attempt.completedAt,
+        updatedAt: attempt.updatedAt,
+      });
     }
     return outcomes;
   }

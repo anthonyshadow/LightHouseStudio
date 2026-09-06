@@ -41,7 +41,6 @@ export class ProjectAwareProcessingJobRepository implements DurableProcessingJob
     ownerUserId: string,
     jobIds: readonly string[],
   ): Promise<ReadonlyMap<string, DurableProcessingJobOutcome>> {
-    if (jobIds.length === 0) return new Map();
     // Project authority answers first, for the same reason it recovers first: in relational mode
     // both stores read one table, and only the Project read knows an id is a Project attempt.
     const linked = await this.projects.findProjectAttemptOutcomes(ownerUserId, jobIds);

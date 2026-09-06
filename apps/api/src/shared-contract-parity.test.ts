@@ -27,6 +27,7 @@ import {
   SUPPORTED_MODEL_IDS,
   VIDEO_EDIT_CROP_PRESETS as CONTRACT_VIDEO_EDIT_CROP_PRESETS,
   VIDEO_EDIT_FILTERS as CONTRACT_VIDEO_EDIT_FILTERS,
+  aiUsageLedgerCountsSchema,
   aiUsageOutcomeSchema,
   capabilitySchema,
   projectExportSpecificationValueSchema,
@@ -126,6 +127,15 @@ describe('independent domain and wire value sets', () => {
     // agree.
     expect(AI_USAGE_OUTCOMES).toEqual(aiUsageOutcomeSchema.options);
     expect(aiUsageOutcomeSchema.options).toEqual(aiUsageOutcome.enumValues);
+  });
+
+  it('keeps the usage counts one key per outcome, plus the open rows', () => {
+    // The lists above can agree on a sixth outcome while this schema — spelled out by hand, and
+    // strict — still rejects the counts the stores would then produce, which is a 500 on the usage
+    // page rather than a failing test. The counts are the same vocabulary, so they are bound to it.
+    expect(Object.keys(aiUsageLedgerCountsSchema.shape).sort()).toEqual(
+      ['running', ...AI_USAGE_OUTCOMES].sort(),
+    );
   });
 
   it('keeps Campaign statuses, plan ids and capability ids in parity', () => {
