@@ -685,6 +685,15 @@ export class VideoJobService {
   async #openUsageRow(job: VideoJobRecord): Promise<boolean> {
     const ledger = this.#usageLedger;
     if (ledger === undefined) return true;
+    /*
+     * Marked before the write, not after. A job can go terminal while this write is in flight — an
+     * abandon, or the deadline — and the close runs from `#touch`, which would read a flag that is
+     * still false and leave the row open for the reconciler to find much later. Marking first makes
+     * the close fire; the two calls serialize in either store and the transition rule keeps the
+     * first terminal outcome, so whichever lands first is the one that stands. The flag is put back
+     * only when the write fails, so a submission that never reached the provider leaves no row.
+     */
+    job.ledgerOpened = true;
     try {
       await ledger.record({
         ownerUserId: job.ownerId,
@@ -695,9 +704,9 @@ export class VideoJobService {
         submittedAt: new Date(this.#now()).toISOString(),
         completedAt: null,
       });
-      job.ledgerOpened = true;
       return true;
     } catch {
+      job.ledgerOpened = false;
       console.warn('[video-jobs] AI usage row could not be opened.', { jobId: job.jobId });
       if (!this.#ownsMutableJob(job)) {
         await this.#cleanupFiles(job);
@@ -1163,6 +1172,12 @@ export class VideoJobService {
       return this.#snapshot(job);
     }
     if (!(await this.#openUsageRow(job))) return this.#snapshot(job);
+    // The same re-check as the standalone path: an abandon during the ledger write must land before
+    // the provider is paid, not after.
+    if (!this.#ownsMutableJob(job)) {
+      await this.#cleanupFiles(job);
+      return this.#snapshot(job);
+    }
     this.#track(this.#submitProvider(job, input.recipe, input.inspectedInput));
     return this.#snapshot(job);
   }
@@ -1197,6 +1212,13 @@ export class VideoJobService {
         return;
       }
       if (!(await this.#openUsageRow(job))) return;
+      // Re-checked after the ledger round trip: the money is spent on the next line, and an abandon
+      // that arrived while the row was being written must stop it. The check before the write is
+      // not enough, because it is the write that gives the gap its width.
+      if (!this.#ownsMutableJob(job)) {
+        await this.#cleanupFiles(job);
+        return;
+      }
       await this.#submitProvider(job, recipe, inspected);
     } catch (error) {
       if (!this.#ownsMutableJob(job)) {

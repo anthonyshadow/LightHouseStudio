@@ -69,9 +69,22 @@ const errorClassOf = (error: unknown): string =>
  * that lock, and a ledger write is never part of a Project's transaction — it must not be able to
  * nest inside one.
  */
+/**
+ * The write chains, keyed by the journal's own resolved path rather than held per instance.
+ *
+ * A journal is a file, and a read-modify-write of it is only serial if every writer in the process
+ * queues on the same chain. Two repositories over one data directory is not hypothetical — a test
+ * builds a second one to prove a restart, and a mode that mirrors builds one beside another — and
+ * with a per-instance chain the later rename simply erases the row the other had just written. The
+ * loss is silent, and a row that was never written is invisible to the reconciler that exists to
+ * catch open rows. Keying by path is deliberately not the shared owner lock the Project and
+ * saved-video journals take: a ledger write happens in the middle of work that may already hold
+ * that lock, so it must never be able to nest inside one.
+ */
+const journalWrites = new Map<string, Promise<void>>();
+
 export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
   readonly #root: string;
-  readonly #writes = new Map<string, Promise<void>>();
 
   readonly #shadow: Pick<AiUsageLedgerRepository, 'record'> | undefined;
 
@@ -132,19 +145,20 @@ export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
   }
 
   async #serialize(ownerUserId: string, work: () => Promise<void>): Promise<void> {
-    const prior = this.#writes.get(ownerUserId) ?? Promise.resolve();
+    const key = this.#file(ownerUserId);
+    const prior = journalWrites.get(key) ?? Promise.resolve();
     let release!: () => void;
     const barrier = new Promise<void>((resolve) => {
       release = resolve;
     });
     const chain = prior.then(() => barrier);
-    this.#writes.set(ownerUserId, chain);
+    journalWrites.set(key, chain);
     await prior;
     try {
       await work();
     } finally {
       release();
-      if (this.#writes.get(ownerUserId) === chain) this.#writes.delete(ownerUserId);
+      if (journalWrites.get(key) === chain) journalWrites.delete(key);
     }
   }
 
@@ -171,11 +185,19 @@ export class FileAiUsageLedgerRepository implements AiUsageLedgerRepository {
      * must never be able to fail a submission — and it mirrors `record` alone, because the rule
      * that decides what a row becomes has one owner and both stores already apply it.
      */
-    await this.#shadow?.record(entry).catch(() => {
-      console.warn('[ai-usage] Shadow AI usage row could not be mirrored.', {
-        jobId: entry.jobId,
-      });
-    });
+    const shadow = this.#shadow;
+    if (shadow !== undefined) {
+      // Called through `Promise.resolve().then` rather than awaited directly: a mirror whose
+      // `record` threw before returning a promise would otherwise escape the guard and fail a write
+      // the journal has already accepted, which is the one thing a rehearsal store must never do.
+      await Promise.resolve()
+        .then(() => shadow.record(entry))
+        .catch(() => {
+          console.warn('[ai-usage] Shadow AI usage row could not be mirrored.', {
+            jobId: entry.jobId,
+          });
+        });
+    }
   }
 
   async listForOwner(
