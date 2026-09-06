@@ -160,6 +160,7 @@ jobs:
           apps/api/src/infrastructure/database/project-repository.postgres.integration.test.ts
           apps/api/src/infrastructure/database/campaign-migration.postgres.integration.test.ts
           apps/api/src/infrastructure/database/campaign-repository.postgres.integration.test.ts
+          apps/api/src/infrastructure/database/ai-usage-ledger.postgres.integration.test.ts
 
   visual:
     name: Curated visual regression

@@ -10,6 +10,7 @@ import {
 import { FileProjectRepository } from '../projects/file-project-repository.js';
 import { FileSavedVideoRepository } from '../saved-videos/saved-video-repository.js';
 import { FileSavedVoiceRepository } from '../voices/saved-voice-repository.js';
+import type { AiUsageLedgerRepository } from './ai-usage-ledger-repository.js';
 import { FileAiUsageLedgerRepository } from './file-ai-usage-ledger-repository.js';
 
 const OWNER = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
@@ -114,6 +115,26 @@ describe('FileAiUsageLedgerRepository', () => {
     expect(await readdir(journalDirectory(root))).toEqual([`${OWNER}.json`]);
   });
 
+  it('serializes two repositories over one directory onto the journal own chain', async () => {
+    const root = temporaryRoot();
+    const first = new FileAiUsageLedgerRepository(root);
+    const second = new FileAiUsageLedgerRepository(root);
+
+    // The chain belongs to the journal, not to the instance that happens to hold it. Two
+    // repositories over one data directory is ordinary — a mode that mirrors builds one beside
+    // another, and a restart builds a second over what the first wrote — and if each queued only
+    // on itself, both would read the same absent journal in the same instant and each rename a
+    // one-row file into place. The row that lost is a paid submission nothing can find again.
+    await Promise.all([
+      first.record(entry()),
+      second.record(entry({ jobId: OTHER_JOB, submittedAt: '2026-09-05T10:02:00.000Z' })),
+    ]);
+
+    expect(await readJournal(root)).toMatchObject({
+      entries: [{ jobId: JOB }, { jobId: OTHER_JOB }],
+    });
+  });
+
   it('lets the first terminal outcome stand however the writers are ordered', async () => {
     const succeeded = entry({ outcome: 'succeeded', completedAt: COMPLETED_AT });
     const failed = entry({ outcome: 'failed', completedAt: '2026-09-05T10:06:00.000Z' });
@@ -150,6 +171,116 @@ describe('FileAiUsageLedgerRepository', () => {
     await closeThenOpenAgain.record(entry());
     await closeThenOpenAgain.record(entry());
     expect(await only(closeThenOpenAgain)).toEqual([settled]);
+  });
+
+  it('reads back the journal a previous process left on disk', async () => {
+    const root = temporaryRoot();
+    const settled = entry({
+      jobId: OTHER_JOB,
+      outcome: 'failed',
+      submittedAt: '2026-09-05T10:02:00.000Z',
+      completedAt: COMPLETED_AT,
+    });
+    const before = new FileAiUsageLedgerRepository(root);
+    await before.record(entry());
+    await before.record(settled);
+
+    // A restarted API is a new repository over the same directory. Nothing about the ledger lives
+    // in the instance that wrote it, so what the next one reads is what the journal says.
+    const after = new FileAiUsageLedgerRepository(root);
+    await expect(after.listForOwner(OWNER, { since: SUBMITTED_AT, pageSize: 10 })).resolves.toEqual(
+      { entries: [settled, entry()], nextCursor: null },
+    );
+    await expect(after.countByOutcome(OWNER, SUBMITTED_AT)).resolves.toEqual({
+      running: 1,
+      succeeded: 0,
+      failed: 1,
+      ambiguous: 0,
+      expired: 0,
+      cancelled: 0,
+    });
+    // And the reconciler that runs after the restart still finds the submission nobody closed.
+    await expect(after.listOpen(10)).resolves.toEqual([entry()]);
+  });
+
+  it('lets the first terminal outcome stand across two repositories over one directory', async () => {
+    const root = temporaryRoot();
+    const opener = new FileAiUsageLedgerRepository(root);
+    const closer = new FileAiUsageLedgerRepository(root);
+    const succeeded = entry({ outcome: 'succeeded', completedAt: COMPLETED_AT });
+
+    await opener.record(entry());
+    await closer.record(succeeded);
+    // The chain orders writers; it remembers nothing about them. Every write re-applies the rule
+    // against what is on disk, so it is the journal, not the chain, that makes the outcome already
+    // recorded win.
+    await opener.record(entry({ outcome: 'failed', completedAt: '2026-09-05T10:06:00.000Z' }));
+    await closer.record(entry());
+
+    await expect(
+      new FileAiUsageLedgerRepository(root).listForOwner(OWNER, {
+        since: SUBMITTED_AT,
+        pageSize: 10,
+      }),
+    ).resolves.toEqual({ entries: [succeeded], nextCursor: null });
+  });
+
+  it('mirrors every write to the shadow store without letting a broken one cost a row', async () => {
+    const root = temporaryRoot();
+    const succeeded = entry({ outcome: 'succeeded', completedAt: COMPLETED_AT });
+    const mirrored: AiUsageEntry[] = [];
+    const shadow: Pick<AiUsageLedgerRepository, 'record'> = {
+      // A rejection rather than a synchronous throw, because the mirror this stands in for is the
+      // relational repository's own async `record`, and that is the shape its failures arrive in.
+      record: (candidate) => {
+        mirrored.push(candidate);
+        return Promise.reject(new Error('rehearsal store unavailable'));
+      },
+    };
+    const repository = new FileAiUsageLedgerRepository(root, { shadow });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    // The journal is the authority in shadow mode. A rehearsal store that is down may not fail a
+    // submission the account has already paid for, nor lose the row that records it.
+    await expect(repository.record(entry())).resolves.toBeUndefined();
+    await expect(repository.record(succeeded)).resolves.toBeUndefined();
+
+    await expect(
+      repository.listForOwner(OWNER, { since: SUBMITTED_AT, pageSize: 10 }),
+    ).resolves.toEqual({ entries: [succeeded], nextCursor: null });
+    // The close is mirrored as much as the open, or a cutover would inherit rows that never finish.
+    expect(mirrored).toEqual([entry(), succeeded]);
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenLastCalledWith('[ai-usage] Shadow AI usage row could not be mirrored.', {
+      jobId: JOB,
+    });
+  });
+
+  it('survives a shadow store that throws before it has returned a promise', async () => {
+    const root = temporaryRoot();
+    const mirrored: AiUsageEntry[] = [];
+    const shadow: Pick<AiUsageLedgerRepository, 'record'> = {
+      // Neither an async function nor a rejection, unlike the mirror above: a store can fail while
+      // it is still assembling the write — a closed pool, a configuration it rejects on sight — and
+      // that failure arrives as a throw at the call itself. A guard attached to the returned
+      // promise never sees it, because there is no returned promise to attach it to.
+      record: (candidate) => {
+        mirrored.push(candidate);
+        throw new Error('rehearsal store unavailable');
+      },
+    };
+    const repository = new FileAiUsageLedgerRepository(root, { shadow });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    // The journal is the authority and it accepted this row before the mirror was ever called, so
+    // the one thing the rehearsal store may not do is fail the write that already happened.
+    await expect(repository.record(entry())).resolves.toBeUndefined();
+
+    expect(await readJournal(root)).toMatchObject({ entries: [{ jobId: JOB, outcome: null }] });
+    expect(mirrored).toEqual([entry()]);
+    expect(warn).toHaveBeenCalledWith('[ai-usage] Shadow AI usage row could not be mirrored.', {
+      jobId: JOB,
+    });
   });
 
   it('never lets one account read or count another account rows', async () => {
@@ -346,6 +477,26 @@ describe('FileAiUsageLedgerRepository', () => {
     expect(warn).toHaveBeenCalledWith('[ai-usage] Usage journal could not be read.', {
       ownerUserId: OWNER,
       errorClass: 'ZodError',
+    });
+  });
+
+  it('sweeps past a journal it cannot read at all, not only one it cannot parse', async () => {
+    const root = temporaryRoot();
+    const repository = new FileAiUsageLedgerRepository(root);
+    const open = entry({ ownerUserId: OTHER_OWNER, jobId: OTHER_JOB });
+    await repository.record(open);
+    // A fault that never reaches the schema: only a missing journal is an empty ledger, so the
+    // guard has to sit around the read itself and not merely around the parse.
+    await mkdir(journalPath(root, OWNER), { recursive: true });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(
+      repository.listForOwner(OWNER, { since: SUBMITTED_AT, pageSize: 10 }),
+    ).rejects.toThrow();
+    await expect(repository.listOpen(10)).resolves.toEqual([open]);
+    expect(warn).toHaveBeenCalledWith('[ai-usage] Usage journal could not be read.', {
+      ownerUserId: OWNER,
+      errorClass: 'Error',
     });
   });
 });
