@@ -73,7 +73,6 @@ import {
 import { savedVideoValues, savedVideoVersionValues } from './saved-video-repository.js';
 import type { StoredAssetManifest } from '../../storage/asset-byte-store.js';
 import {
-  durableProcessingJobOutcome,
   projectProcessingAttemptMatchesTrace,
   projectProcessingResultInputMatchesAttempt,
   retainedProjectProcessingResultMatches,
@@ -86,10 +85,11 @@ import {
   type ProjectProcessingRepository,
   type ProjectProcessingResultRetentionResult,
 } from '../../features/projects/project-processing-repository.js';
-import type {
-  DurableProcessingJobOutcome,
-  ResumableVideoProcessingJob,
-  VideoProcessingJobTrace,
+import {
+  durableProcessingJobOutcomes,
+  type DurableProcessingJobOutcome,
+  type ResumableVideoProcessingJob,
+  type VideoProcessingJobTrace,
 } from '../../features/processing-jobs/file-processing-job-repository.js';
 import {
   createSavedVideoProjectMembership,
@@ -2559,8 +2559,8 @@ export class DrizzleProjectRepository
     ownerUserId: string,
     jobIds: readonly string[],
   ): Promise<ReadonlyMap<string, DurableProcessingJobOutcome>> {
-    const outcomes = new Map<string, DurableProcessingJobOutcome>();
-    if (jobIds.length === 0) return outcomes;
+    // Load-bearing: `inArray` cannot express an empty set, so an empty ask has to be answered here.
+    if (jobIds.length === 0) return new Map();
     // The link join is what makes an id a Project attempt; no row lock, because this reader only
     // observes and must not block the writers that settle these rows.
     const rows = await this.db
@@ -2575,17 +2575,7 @@ export class DrizzleProjectRepository
       .where(
         and(eq(processingJobs.ownerUserId, ownerUserId), inArray(processingJobs.id, [...jobIds])),
       );
-    for (const row of rows) {
-      outcomes.set(
-        row.id,
-        durableProcessingJobOutcome({
-          status: row.status,
-          completedAt: nullableIsoTimestamp(row.completedAt),
-          updatedAt: toIsoTimestamp(row.updatedAt),
-        }),
-      );
-    }
-    return outcomes;
+    return durableProcessingJobOutcomes(rows);
   }
 
   async getCurrentProjectAuthority(

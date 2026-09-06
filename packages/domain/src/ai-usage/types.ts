@@ -33,12 +33,10 @@ export interface AiUsageEntry {
   readonly completedAt: string | null;
 }
 
-/** `running` is the open rows; the other five are the terminal outcomes they settle into. */
-export interface AiUsageOutcomeCounts {
-  readonly running: number;
-  readonly succeeded: number;
-  readonly failed: number;
-  readonly ambiguous: number;
-  readonly expired: number;
-  readonly cancelled: number;
-}
+/**
+ * `running` is the open rows; the rest are the terminal outcomes they settle into.
+ *
+ * Derived from the outcome list rather than spelled out, so a sixth outcome is a compile error
+ * everywhere the counts are built or read instead of a key that silently goes missing.
+ */
+export type AiUsageOutcomeCounts = Readonly<Record<'running' | AiUsageOutcome, number>>;

@@ -192,6 +192,33 @@ describe('AiUsageSection', () => {
     expect(screen.getByText(FOOTER)).toBeVisible();
   });
 
+  it('names an operation it has no label for by the id the row recorded', async () => {
+    mockApiServer.use(
+      http.get('*/api/account/ai-usage', () =>
+        HttpResponse.json({
+          since: '2026-09-01T00:00:00.000Z',
+          counts: { ...NO_COUNTS, succeeded: 1 },
+          entries: [ledgerEntry('1', { operation: 'retired-operation' })],
+          nextCursor: null,
+        }),
+      ),
+    );
+
+    renderSection();
+
+    // A row is history. An operation kind renamed or dropped since it was written still has to
+    // appear, under the name it was recorded with rather than blank or off the month entirely.
+    expect(
+      await screen.findByText(
+        'This month: 1 submitted. 1 succeeded, 0 failed, 0 acceptance unknown, 0 expired, 0 cancelled.',
+      ),
+    ).toBeVisible();
+    const rows = usageRows();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent('retired-operation');
+    expect(rows[0]).toHaveTextContent('Succeeded: the result was ready to download.');
+  });
+
   it('appends the next page under the same window from Show earlier', async () => {
     const requested: string[] = [];
     mockApiServer.use(

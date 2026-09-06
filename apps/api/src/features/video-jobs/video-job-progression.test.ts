@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { AI_USAGE_RECONCILE_BATCH } from '../ai-usage/ai-usage-reconciler.js';
 import type { ProjectProcessingService } from '../projects/project-processing-service.js';
 import {
-  AI_USAGE_RECONCILE_BATCH,
   VideoJobProgressionTick,
   type ScheduledVideoJobProgression,
   type VideoJobProgressionLog,
@@ -61,7 +61,7 @@ const recordingLog = (): {
   warn: vi.fn<VideoJobProgressionLog['warn']>(),
 });
 
-const retention = () => vi.fn<ProjectProcessingService['retainResult']>();
+const retention = () => vi.fn<ProjectProcessingService['retainResultBytes']>();
 
 /** The details last logged under one message, so an assertion names the line it means. */
 const lastLine = <Details>(
@@ -172,14 +172,14 @@ describe('VideoJobProgressionTick', () => {
   it('retains a ready Project result with no client present', async () => {
     const schedule = new ManualProgressionSchedule();
     const log = recordingLog();
-    const retainResult = retention().mockResolvedValue(undefined);
+    const retainResultBytes = retention().mockResolvedValue(undefined);
     const tick = new VideoJobProgressionTick({
       videoJobs: {
         available: true,
         progressDueJobs: () =>
           Promise.resolve({ polled: 1, retrievalsStarted: 1, readyProjectLinked: [readyEntry] }),
       },
-      projectProcessing: { retainResult },
+      projectProcessing: { retainResultBytes },
       intervalMs: INTERVAL_MS,
       maxProviderPolls: 4,
       schedule: schedule.schedule,
@@ -191,7 +191,7 @@ describe('VideoJobProgressionTick', () => {
 
     // Owner, Project, operation: the same call a Project reconcile makes for a browser that is
     // open, and nothing beyond it — the result is stored, never adopted.
-    expect(retainResult).toHaveBeenCalledWith(OWNER, PROJECT, JOB);
+    expect(retainResultBytes).toHaveBeenCalledWith(OWNER, PROJECT, JOB);
     expect(lastLine(log.info.mock.calls, PASS_COMPLETED)).toMatchObject({
       retained: 1,
       retentionBackoffs: 0,
@@ -202,7 +202,7 @@ describe('VideoJobProgressionTick', () => {
   it('holds a refused retention back for a growing interval and forgets it once it lands', async () => {
     const schedule = new ManualProgressionSchedule();
     const log = recordingLog();
-    const retainResult = retention()
+    const retainResultBytes = retention()
       .mockRejectedValueOnce(new TypeError('the Project moved'))
       .mockRejectedValueOnce(new TypeError('the Project moved'))
       .mockResolvedValue(undefined);
@@ -212,7 +212,7 @@ describe('VideoJobProgressionTick', () => {
         progressDueJobs: () =>
           Promise.resolve({ polled: 1, retrievalsStarted: 0, readyProjectLinked: [readyEntry] }),
       },
-      projectProcessing: { retainResult },
+      projectProcessing: { retainResultBytes },
       intervalMs: INTERVAL_MS,
       maxProviderPolls: 4,
       schedule: schedule.schedule,
@@ -221,7 +221,7 @@ describe('VideoJobProgressionTick', () => {
     });
 
     await tick.run();
-    expect(retainResult).toHaveBeenCalledTimes(1);
+    expect(retainResultBytes).toHaveBeenCalledTimes(1);
     expect(lastLine(log.warn.mock.calls, RETENTION_FAILED)).toEqual({
       jobId: JOB,
       projectId: PROJECT,
@@ -235,20 +235,20 @@ describe('VideoJobProgressionTick', () => {
     // One refusal already costs a pass, so the next one does not even take the lock.
     schedule.nowMs += INTERVAL_MS;
     await tick.run();
-    expect(retainResult).toHaveBeenCalledTimes(1);
+    expect(retainResultBytes).toHaveBeenCalledTimes(1);
 
     schedule.nowMs += INTERVAL_MS;
     await tick.run();
-    expect(retainResult).toHaveBeenCalledTimes(2);
+    expect(retainResultBytes).toHaveBeenCalledTimes(2);
 
     // The second refusal doubles the wait, so the pass halfway through it is skipped too.
     schedule.nowMs += INTERVAL_MS * 2;
     await tick.run();
-    expect(retainResult).toHaveBeenCalledTimes(2);
+    expect(retainResultBytes).toHaveBeenCalledTimes(2);
 
     schedule.nowMs += INTERVAL_MS * 2;
     await tick.run();
-    expect(retainResult).toHaveBeenCalledTimes(3);
+    expect(retainResultBytes).toHaveBeenCalledTimes(3);
     expect(lastLine(log.info.mock.calls, PASS_COMPLETED)).toMatchObject({
       retained: 1,
       retentionBackoffs: 0,
@@ -258,7 +258,7 @@ describe('VideoJobProgressionTick', () => {
 
   it('forgets a job that leaves the ready set, so its history cannot outlive it', async () => {
     const schedule = new ManualProgressionSchedule();
-    const retainResult = retention()
+    const retainResultBytes = retention()
       .mockRejectedValueOnce(new TypeError('the Project moved'))
       .mockResolvedValue(undefined);
     let ready: VideoJobProgressionResult['readyProjectLinked'] = [readyEntry];
@@ -268,7 +268,7 @@ describe('VideoJobProgressionTick', () => {
         progressDueJobs: () =>
           Promise.resolve({ polled: 1, retrievalsStarted: 0, readyProjectLinked: ready }),
       },
-      projectProcessing: { retainResult },
+      projectProcessing: { retainResultBytes },
       intervalMs: INTERVAL_MS,
       maxProviderPolls: 4,
       schedule: schedule.schedule,
@@ -277,7 +277,7 @@ describe('VideoJobProgressionTick', () => {
     });
 
     await tick.run();
-    expect(retainResult).toHaveBeenCalledTimes(1);
+    expect(retainResultBytes).toHaveBeenCalledTimes(1);
 
     ready = [];
     schedule.nowMs += INTERVAL_MS;
@@ -287,7 +287,7 @@ describe('VideoJobProgressionTick', () => {
     // job that returns is a different attempt at the same id, not the one that was refused.
     ready = [readyEntry];
     await tick.run();
-    expect(retainResult).toHaveBeenCalledTimes(2);
+    expect(retainResultBytes).toHaveBeenCalledTimes(2);
     await tick.close();
   });
 

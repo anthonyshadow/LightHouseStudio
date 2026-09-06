@@ -36,9 +36,12 @@ export const registerAiUsageRoutes = (
     if (!query.success) {
       throw new AppError(400, 'validation_error', 'Ask for a valid AI usage window.');
     }
-    // Normalized once, so two spellings of the same instant are one window and one cursor criteria.
-    const since = new Date(query.data.since).toISOString();
-    if (Date.now() - new Date(since).valueOf() > MAX_WINDOW_MS) {
+    // Parsed once, so two spellings of the same instant are one window, one cursor criteria and one
+    // bound: the string is what the ledger and the token are keyed on, the instant is what the
+    // ceiling is measured against.
+    const sinceInstant = new Date(query.data.since);
+    const since = sinceInstant.toISOString();
+    if (Date.now() - sinceInstant.valueOf() > MAX_WINDOW_MS) {
       // The counts cover the whole window rather than the page; this ceiling is what bounds them.
       throw new AppError(
         400,
