@@ -63,6 +63,20 @@ const details: AccountDetailsSource = {
   capabilityFootnote: 'Configuration does not verify live provider health.',
 };
 
+/**
+ * The Account panel reads this month's AI usage as soon as it opens, and msw fails an unhandled
+ * request — so every test that opens the panel has to answer this route, even the ones whose
+ * subject is the menu around it.
+ */
+const emptyAiUsage = http.get('*/api/account/ai-usage', () =>
+  HttpResponse.json({
+    since: '2026-08-01T00:00:00.000Z',
+    counts: { running: 0, succeeded: 0, failed: 0, ambiguous: 0, expired: 0, cancelled: 0 },
+    entries: [],
+    nextCursor: null,
+  }),
+);
+
 type HarnessProps = Omit<ComponentProps<typeof AccountMenu>, 'open' | 'onOpenChange'>;
 
 const AccountMenuHarness = (props: HarnessProps) => {
@@ -114,6 +128,7 @@ describe('AccountMenu', () => {
           ],
         }),
       ),
+      emptyAiUsage,
     );
     const userInput = userEvent.setup();
     render(
@@ -139,9 +154,7 @@ describe('AccountMenu', () => {
       within(panel).getByText('Configuration does not verify live provider health.'),
     ).toBeVisible();
     expect(await within(panel).findByText('1 AI job is running right now.')).toBeVisible();
-    expect(
-      within(panel).getByText(/does not keep a lifetime total across Projects/u),
-    ).toBeVisible();
+    expect(await within(panel).findByText('No video transformations this month.')).toBeVisible();
 
     await userInput.click(within(panel).getByRole('button', { name: 'Close panel' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -149,7 +162,10 @@ describe('AccountMenu', () => {
   });
 
   it('states honestly when the running job count is unavailable', async () => {
-    mockApiServer.use(http.get('*/api/video-jobs', () => HttpResponse.error()));
+    mockApiServer.use(
+      http.get('*/api/video-jobs', () => HttpResponse.error()),
+      emptyAiUsage,
+    );
     const userInput = userEvent.setup();
     render(
       <StudioDesignProvider>

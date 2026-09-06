@@ -31,7 +31,11 @@ import {
 import { KeyedLock } from '../../application/keyed-lock.js';
 import { AppError } from '../../http/app-error.js';
 import { decodePageCursor, encodePageCursor } from '../../http/page-cursor.js';
-import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
+import type {
+  AssetByteStore,
+  AssetReadHandle,
+  StoredAssetManifest,
+} from '../../storage/asset-byte-store.js';
 import type { ReferenceImageAssetStore } from '../reference-images/asset-store.js';
 import { inspectStoredProjectMedia } from './project-media-inspection.js';
 import {
@@ -513,6 +517,7 @@ export class ProjectProcessingService {
             await this.videoJobs.startPrelinked({
               jobId: input.operationId,
               ownerId: input.ownerUserId,
+              projectId: input.projectId,
               requestFingerprint,
               recipe,
               inspectedInput: inspected,
@@ -600,6 +605,54 @@ export class ProjectProcessingService {
     });
   }
 
+  /**
+   * Puts a finished result's bytes where they survive, and stops there.
+   *
+   * This is retention without an operator present, so it must not decide what the Project shows:
+   * the attempt keeps a null output asset and the `saving-result` phase until the next visit runs
+   * {@link ProjectProcessingService.reconcile}, which promotes it exactly as it does today. It
+   * shares the reconcile lock, so a client arriving mid-copy waits rather than fetching the same
+   * result twice, and it is idempotent because a second entrant finds the bytes already stored.
+   */
+  /**
+   * Copy a job's temporary result into the owner's store under the id the attempt preallocated.
+   *
+   * The one owner of where a retained result lands and what it is called. Both paths reach it: the
+   * retain-only one the progression tick drives, which stops as soon as the bytes are safe, and the
+   * promotion one below, which holds its lease open until the repository has committed. The lease's
+   * lifetime is each caller's own; the placement is not.
+   */
+  async #storeLeasedResult(
+    attempt: ProjectProcessingAttemptRecord,
+    lease: Awaited<ReturnType<VideoJobService['content']>>,
+  ): Promise<StoredAssetManifest> {
+    return this.bytes.storeFile({
+      assetId: attempt.resultAssetId,
+      ownerUserId: attempt.ownerUserId,
+      sourcePath: lease.path,
+      mimeType: lease.media.mimeType,
+      filename: `${attempt.capability}-result.mp4`,
+      createdAt: this.#now().toISOString(),
+    });
+  }
+
+  async retainResult(ownerUserId: string, projectId: string, operationId: string): Promise<void> {
+    await this.#lock.run(`${ownerUserId}:${operationId}:reconcile`, async () => {
+      const attempt = await this.processing.getProjectAttempt(ownerUserId, projectId, operationId);
+      if (attempt === null || attempt.outputAssetId !== null) return;
+      if (await this.bytes.exists(ownerUserId, attempt.resultAssetId)) return;
+      const lease = await this.videoJobs.content(operationId, ownerUserId);
+      try {
+        await this.#storeLeasedResult(attempt, lease);
+      } catch (error) {
+        // The temporary copy is the only one there is until the store accepts it.
+        await lease.settle(false).catch(() => undefined);
+        throw error;
+      }
+      await lease.settle(true);
+    });
+  }
+
   async #reconcile(
     ownerUserId: string,
     projectId: string,
@@ -651,14 +704,7 @@ export class ProjectProcessingService {
       if (asset === null) {
         lease = await this.videoJobs.content(attempt.operationId, attempt.ownerUserId);
         inspected = lease.media;
-        const manifest = await this.bytes.storeFile({
-          assetId: attempt.resultAssetId,
-          ownerUserId: attempt.ownerUserId,
-          sourcePath: lease.path,
-          mimeType: inspected.mimeType,
-          filename: `${attempt.capability}-result.mp4`,
-          createdAt: this.#now().toISOString(),
-        });
+        const manifest = await this.#storeLeasedResult(attempt, lease);
         asset = await this.bytes.open(attempt.ownerUserId, manifest.assetId);
         if (asset === null) throw new Error('Retained Project result could not be reopened.');
       } else {

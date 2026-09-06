@@ -75,7 +75,12 @@ export const BUILD_CLOSURE_BUDGETS = {
   // value, its frame and the cancellation of both), and "saved together" became one domain relation
   // that the gallery, the export panel and the Project surfaces share instead of each comparing set
   // ids by hand — the shared code is a little larger than the four comparisons it replaced.
-  'src/app/shell/AuthenticatedShell.tsx': 744_000,
+  // Raised from 744_000 on 2026-09-06 for slice 2.5 (durable AI outcomes), measured 743_276 →
+  // 749_287. The Account panel is reachable from every authenticated route, so its new AI activity
+  // section is carried by all of them: the ledger contract, the query and its five states with the
+  // copy each outcome needs. The tick, the reconciler and the ledger stores are server-side and
+  // add nothing here. `FORBIDDEN_CLOSURE_DEPENDENCIES` still passes.
+  'src/app/shell/AuthenticatedShell.tsx': 750_000,
   // Shell plus capture graph, which is what a Studio route costs. Looser, because a Studio route is
   // where media code belongs; `FORBIDDEN_CLOSURE_DEPENDENCIES` is what keeps it from leaking out.
   //
@@ -96,7 +101,9 @@ export const BUILD_CLOSURE_BUDGETS = {
   // Raised from 1_081_000 on 2026-09-05 for the deferred findings, measured 1_080_798 → 1_081_561:
   // the shell's growth above, carried here too, plus the save hook taking its owner as a parameter
   // and looking up a remembered upload key for that owner rather than for nobody.
-  'src/studio/StudioApp.tsx': 1_082_000,
+  // Raised from 1_082_000 on 2026-09-06 for slice 2.5, measured 1_081_561 → 1_086_995: the shell's
+  // growth above, carried here too, and nothing else. A Studio route mounts the same Account panel.
+  'src/studio/StudioApp.tsx': 1_087_000,
 };
 
 /**

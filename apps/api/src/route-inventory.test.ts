@@ -16,6 +16,7 @@ const alwaysRegisteredRoutes: readonly Route[] = [
   'POST /api/auth/login',
   'GET /api/auth/me',
   'POST /api/auth/logout',
+  'GET /api/account/ai-usage',
   'GET /api/health',
   'GET /api/capabilities',
   'GET /api/campaigns',

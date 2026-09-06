@@ -13,4 +13,5 @@ export * from './recording';
 export * from './session';
 export * from './voice';
 export * from './video-processing';
+export * from './ai-usage';
 export * from './video-editing';

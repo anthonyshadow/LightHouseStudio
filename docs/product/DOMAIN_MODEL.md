@@ -86,11 +86,15 @@ _Status: implemented as specified._
 One explicit, cost-aware unit of AI work: character swap, virtual try-on, voice treatment, or a
 future generative operation. A transformation has a full lifecycle — queued/submitting, accepted,
 processing, ready, delivered, failed, cancelled, expired, and **ambiguous** (acceptance unknown;
-reconciled, never silently resubmitted). Project transformations are durable: they link to the
-revision that initiated them, retain their results server-side, and their outputs can be adopted
+reconciled, never silently resubmitted). `delivered` is the one word in that list no store holds:
+neither the wire status list nor the stored `operation_status` enum has it, because delivery is a
+fact about one download of a result, not a state the result moves into. A delivered result stays
+`ready` and stays retrievable until its deadline. Project transformations are durable: they link to
+the revision that initiated them, retain their results server-side, and their outputs can be adopted
 as the current cut or re-adopted later from History.
 _Status: implemented for character swap and virtual try-on in Projects; voice transformations are
-standalone-only today (a known gap)._
+standalone-only today (a known gap). Since slice 2.5 (2026-09-06) a **progression tick** moves an
+accepted transformation with no client watching it._
 
 ### Composition
 
@@ -184,16 +188,18 @@ _Status: implemented._
 
 ## Supporting terms (kept, with their exact meanings)
 
-| Term                                    | Meaning                                                                                                                                                                                                                 |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Saved Video**                         | A Library video record: title, status, append-only Versions, current-Version pointer, Project provenance when known ("No Project" chip otherwise).                                                                      |
-| **Take**                                | A just-recorded, in-memory camera capture under review; it becomes durable only by saving (to a Library or a Project).                                                                                                  |
-| **Placement**                           | The destination shape a video is produced for. A placement is not delivery; nothing is sent anywhere.                                                                                                                   |
-| **Library**                             | An account-level collection surface: Videos, Characters, Outfits, Voices.                                                                                                                                               |
-| **Variant set**                         | The placements one save produced together — sibling Versions of one Saved Video sharing a `variantSetId`. Shown as "Saved together"; never called a variant in the interface, where that word means a Wardrobe variant. |
-| **Character / Wardrobe variant**        | A reusable creative identity (prompt + reference image) and its saved outfit variants.                                                                                                                                  |
-| **Membership ("Used in this Project")** | A non-owning organizational link from a Project to Library items it uses. Removing it never deletes anything.                                                                                                           |
-| **Recording session**                   | The live camera stage lifecycle: camera off by default, explicit start, optional live AI, take review.                                                                                                                  |
+| Term                                    | Meaning                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Saved Video**                         | A Library video record: title, status, append-only Versions, current-Version pointer, Project provenance when known ("No Project" chip otherwise).                                                                                                                                                                                                                                                                                                                                                     |
+| **Take**                                | A just-recorded, in-memory camera capture under review; it becomes durable only by saving (to a Library or a Project).                                                                                                                                                                                                                                                                                                                                                                                 |
+| **Placement**                           | The destination shape a video is produced for. A placement is not delivery; nothing is sent anywhere.                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **Library**                             | An account-level collection surface: Videos, Characters, Outfits, Voices.                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Variant set**                         | The placements one save produced together — sibling Versions of one Saved Video sharing a `variantSetId`. Shown as "Saved together"; never called a variant in the interface, where that word means a Wardrobe variant.                                                                                                                                                                                                                                                                                |
+| **Character / Wardrobe variant**        | A reusable creative identity (prompt + reference image) and its saved outfit variants.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **Membership ("Used in this Project")** | A non-owning organizational link from a Project to Library items it uses. Removing it never deletes anything.                                                                                                                                                                                                                                                                                                                                                                                          |
+| **Recording session**                   | The live camera stage lifecycle: camera off by default, explicit start, optional live AI, take review.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **AI usage ledger**                     | The account's record of what AI ran: one row per paid video submission, opened immediately before the provider call and closed on its first terminal **outcome** — `succeeded` (the job reached `ready`), `failed`, `ambiguous`, `expired` or `cancelled`; an open row means the submission is still running. A row carries the `operation` (the transformation kind, named as the video-job contracts name it), the provider, and the submitted/completed instants — never a prompt, a cost or media. |
+| **Progression tick**                    | The server-side pass that moves accepted transformations when no client is watching: it polls what is due (Project work first) and retains the results that became ready. It never promotes a result into a Project's current cut, and it never submits anything.                                                                                                                                                                                                                                      |
 
 ## Deprecated names (do not use in new UI, code, or docs)
 
@@ -204,6 +210,10 @@ _Status: implemented._
 | "Recipe" (user-facing)                                                                                    | Saved prompt / Outfit                             |
 | "Deliverables" (user-facing)                                                                              | Videos (the approved UI name)                     |
 | Provider names as user-facing choices ("Decart API", "Pruna API")                                         | Capability names (Character Swap, Virtual Try-On) |
+
+One exception, and only one: the AI usage ledger in Account shows the provider a submission actually
+went to, as a muted fact beside a row that has already happened. It is the operator's own record of
+what ran, never an option to pick.
 
 ## Invariants that hold across the model
 

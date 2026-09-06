@@ -11,6 +11,7 @@ import type {
   ProjectMediaReference,
 } from '@studio/domain';
 import type {
+  DurableProcessingJobOutcome,
   ResumableVideoProcessingJob,
   VideoProcessingJobTrace,
 } from '../processing-jobs/file-processing-job-repository.js';
@@ -34,6 +35,38 @@ export type PersistedProcessingJobStatus =
   | 'failed'
   | 'expired'
   | 'cancelled';
+
+/**
+ * The persisted lifecycle carries two states the job wire vocabulary never names: `pending`, which
+ * precedes validation, and `accepted`, which the resumable mappers already read as `queued`. Both
+ * are non-terminal either way, so an outcome reader sees the same "still open" answer.
+ */
+const OUTCOME_STATUS: Readonly<
+  Record<PersistedProcessingJobStatus, VideoProcessingJobTrace['status']>
+> = {
+  pending: 'validating',
+  validating: 'validating',
+  submitting: 'submitting',
+  accepted: 'queued',
+  ambiguous: 'ambiguous',
+  queued: 'queued',
+  processing: 'processing',
+  retrieving: 'retrieving',
+  ready: 'ready',
+  failed: 'failed',
+  expired: 'expired',
+  cancelled: 'cancelled',
+};
+
+export const durableProcessingJobOutcome = (attempt: {
+  readonly status: PersistedProcessingJobStatus;
+  readonly completedAt: string | null;
+  readonly updatedAt: string;
+}): DurableProcessingJobOutcome => ({
+  status: OUTCOME_STATUS[attempt.status],
+  completedAt: attempt.completedAt,
+  updatedAt: attempt.updatedAt,
+});
 
 export interface ProjectProcessingAttemptRecord {
   readonly operationId: string;
@@ -122,6 +155,15 @@ export interface ProjectProcessingRepository {
     projectId: string,
     operationId: string,
   ): Promise<ProjectProcessingAttemptRecord | null>;
+  /**
+   * The durable state of several of this owner's attempts at once, keyed by operation id and
+   * holding only the ids that are Project-linked attempts of theirs. Read-only, and not scoped to
+   * one Project: the caller has job ids, not the Projects they belong to.
+   */
+  findProjectAttemptOutcomes(
+    ownerUserId: string,
+    jobIds: readonly string[],
+  ): Promise<ReadonlyMap<string, DurableProcessingJobOutcome>>;
   getCurrentProjectAuthority(
     ownerUserId: string,
     projectId: string,
@@ -211,6 +253,7 @@ export const resumableProjectProcessingAttempt = (
   return {
     jobId: attempt.operationId,
     ownerUserId: attempt.ownerUserId,
+    projectId: attempt.projectId,
     operation: attempt.capability,
     provider: attempt.provider,
     providerJobId: attempt.providerJobId,
