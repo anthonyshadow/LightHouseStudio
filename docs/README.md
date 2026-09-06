@@ -5,21 +5,22 @@ every relative link and anchor in `README.md`, `AGENTS.md`, and everything under
 
 ## Canonical sources (the canon)
 
-| Topic                                                             | Canonical document                                                                 |
-| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Product vision, principles, MVP boundary, non-goals               | [`product/PRODUCT_VISION.md`](product/PRODUCT_VISION.md)                           |
-| Product terminology, domain model, lifecycles, deprecated names   | [`product/DOMAIN_MODEL.md`](product/DOMAIN_MODEL.md)                               |
-| Target user flows and information architecture                    | [`product/TARGET_USER_FLOWS.md`](product/TARGET_USER_FLOWS.md)                     |
-| Target architecture and current→target migration strategy         | [`architecture/TARGET_ARCHITECTURE.md`](architecture/TARGET_ARCHITECTURE.md)       |
-| Audit findings (current state, evidence, priorities)              | [`audits/CURRENT_STATE_AUDIT.md`](audits/CURRENT_STATE_AUDIT.md)                   |
-| Roadmap (phases, slices, acceptance criteria)                     | [`roadmap/PRODUCT_ROADMAP.md`](roadmap/PRODUCT_ROADMAP.md)                         |
-| Implementation prompts (numbered, copy-paste)                     | [`roadmap/IMPLEMENTATION_PROMPTS.md`](roadmap/IMPLEMENTATION_PROMPTS.md)           |
-| Open product/architecture decisions                               | [`DECISIONS_REQUIRED.md`](DECISIONS_REQUIRED.md)                                   |
-| Documentation dispositions and the deletion manifest              | [`audits/DOCUMENTATION_PRUNING_REPORT.md`](audits/DOCUMENTATION_PRUNING_REPORT.md) |
-| Phase 1 acceptance record (criteria, gates, evidence, follow-ups) | [`audits/PHASE_1_VERIFICATION.md`](audits/PHASE_1_VERIFICATION.md)                 |
-| Slice 2.1 subtitles audit and approved plan (prompt 13 → 14)      | [`roadmap/SLICE_2.1_SUBTITLES_PLAN.md`](roadmap/SLICE_2.1_SUBTITLES_PLAN.md)       |
-| Slice 2.3 variant sets audit and plan (prompt 17 → 18)            | [`roadmap/SLICE_2.3_VARIANT_SETS_PLAN.md`](roadmap/SLICE_2.3_VARIANT_SETS_PLAN.md) |
-| Engineering instructions for agents                               | [`../CLAUDE.md`](../CLAUDE.md) (routing) → [`../AGENTS.md`](../AGENTS.md) (policy) |
+| Topic                                                             | Canonical document                                                                               |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Product vision, principles, MVP boundary, non-goals               | [`product/PRODUCT_VISION.md`](product/PRODUCT_VISION.md)                                         |
+| Product terminology, domain model, lifecycles, deprecated names   | [`product/DOMAIN_MODEL.md`](product/DOMAIN_MODEL.md)                                             |
+| Target user flows and information architecture                    | [`product/TARGET_USER_FLOWS.md`](product/TARGET_USER_FLOWS.md)                                   |
+| Target architecture and current→target migration strategy         | [`architecture/TARGET_ARCHITECTURE.md`](architecture/TARGET_ARCHITECTURE.md)                     |
+| Audit findings (current state, evidence, priorities)              | [`audits/CURRENT_STATE_AUDIT.md`](audits/CURRENT_STATE_AUDIT.md)                                 |
+| Roadmap (phases, slices, acceptance criteria)                     | [`roadmap/PRODUCT_ROADMAP.md`](roadmap/PRODUCT_ROADMAP.md)                                       |
+| Implementation prompts (numbered, copy-paste)                     | [`roadmap/IMPLEMENTATION_PROMPTS.md`](roadmap/IMPLEMENTATION_PROMPTS.md)                         |
+| Open product/architecture decisions                               | [`DECISIONS_REQUIRED.md`](DECISIONS_REQUIRED.md)                                                 |
+| Documentation dispositions and the deletion manifest              | [`audits/DOCUMENTATION_PRUNING_REPORT.md`](audits/DOCUMENTATION_PRUNING_REPORT.md)               |
+| Phase 1 acceptance record (criteria, gates, evidence, follow-ups) | [`audits/PHASE_1_VERIFICATION.md`](audits/PHASE_1_VERIFICATION.md)                               |
+| Slice 2.1 subtitles audit and approved plan (prompt 13 → 14)      | [`roadmap/SLICE_2.1_SUBTITLES_PLAN.md`](roadmap/SLICE_2.1_SUBTITLES_PLAN.md)                     |
+| Slice 2.3 variant sets audit and plan (prompt 17 → 18)            | [`roadmap/SLICE_2.3_VARIANT_SETS_PLAN.md`](roadmap/SLICE_2.3_VARIANT_SETS_PLAN.md)               |
+| Slice 2.5 durable AI outcomes audit and plan (prompt 20 → 21)     | [`roadmap/SLICE_2.5_DURABLE_AI_OUTCOMES_PLAN.md`](roadmap/SLICE_2.5_DURABLE_AI_OUTCOMES_PLAN.md) |
+| Engineering instructions for agents                               | [`../CLAUDE.md`](../CLAUDE.md) (routing) → [`../AGENTS.md`](../AGENTS.md) (policy)               |
 
 Product direction (vision, roadmap) never overrides implementation authority: the code, the
 current-system docs below, and the user-flow docs describe what exists today.
