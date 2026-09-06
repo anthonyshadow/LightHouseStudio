@@ -6,6 +6,7 @@ import type { RefObject } from 'react';
 import { activeVideoJobsQueryOptions } from '../../adapters/api-client/videoJobsApi';
 import type { StudioAvailabilityRow } from '../../studio/studioAvailabilityPresentation';
 import { OverlayPanel } from '../../ui/primitives/OverlayPanel';
+import { AiUsageSection } from './AiUsageSection';
 
 /** One integration row, using exactly the wording the header's status menu already shows. */
 export type AccountCapabilityRow = StudioAvailabilityRow;
@@ -40,10 +41,10 @@ interface AccountPanelProps {
 }
 
 /**
- * A read-only account summary built entirely from data the product already holds: the session in
- * memory, the capability wording the header already derives, and the bounded active-jobs list.
- * It adds no polling — the jobs query runs only while the panel is open and shares the cache the
- * Dashboard already maintains.
+ * A read-only account summary: the session in memory, the capability wording the header already
+ * derives, the bounded active-jobs list, and this month's AI usage ledger.
+ * It adds no polling — both reads run only while the panel is open, and the jobs query shares the
+ * cache the Dashboard already maintains.
  */
 export const AccountPanel = ({
   open,
@@ -221,10 +222,7 @@ export const AccountPanel = ({
                   ? '1 AI job is running right now.'
                   : `${activeJobCount} AI jobs are running right now.`}
           </p>
-          <p>
-            Each Project keeps its own record of completed AI runs — open a Project and check its
-            History. Lightframe does not keep a lifetime total across Projects.
-          </p>
+          <AiUsageSection ownerUserId={user.id} open={open} />
         </section>
       </div>
     </OverlayPanel>

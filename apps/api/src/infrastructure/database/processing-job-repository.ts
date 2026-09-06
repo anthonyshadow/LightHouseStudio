@@ -1,13 +1,15 @@
 import { VIDEO_JOB_TTL_MS } from '@studio/contracts';
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lte, notExists, sql } from 'drizzle-orm';
-import { toIsoTimestamp } from '../../application/timestamps.js';
+import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestamps.js';
 import type {
+  DurableProcessingJobOutcome,
   DurableProcessingJobRepository,
   ProcessingJobAdmissionResult,
   ProcessingJobTraceWriter,
   ResumableVideoProcessingJob,
   VideoProcessingJobTrace,
 } from '../../features/processing-jobs/file-processing-job-repository.js';
+import { durableProcessingJobOutcome } from '../../features/projects/project-processing-repository.js';
 import type { LightframeDatabase } from './client.js';
 import { processingJobs, projectJobs } from './schema.js';
 
@@ -139,6 +141,38 @@ export class DrizzleProcessingJobTraceWriter
           updatedAt: trace.updatedAt,
         },
       });
+  }
+
+  async findOutcomes(
+    ownerUserId: string,
+    jobIds: readonly string[],
+  ): Promise<ReadonlyMap<string, DurableProcessingJobOutcome>> {
+    const outcomes = new Map<string, DurableProcessingJobOutcome>();
+    if (jobIds.length === 0) return outcomes;
+    // Deliberately without `#standaloneScope()`: this reader reports what a row says rather than
+    // deciding who recovers it, and in the shared table a Project-linked row is still an answer.
+    const rows = await this.db
+      .select({
+        id: processingJobs.id,
+        status: processingJobs.status,
+        completedAt: processingJobs.completedAt,
+        updatedAt: processingJobs.updatedAt,
+      })
+      .from(processingJobs)
+      .where(
+        and(eq(processingJobs.ownerUserId, ownerUserId), inArray(processingJobs.id, [...jobIds])),
+      );
+    for (const row of rows) {
+      outcomes.set(
+        row.id,
+        durableProcessingJobOutcome({
+          status: row.status,
+          completedAt: nullableIsoTimestamp(row.completedAt),
+          updatedAt: toIsoTimestamp(row.updatedAt),
+        }),
+      );
+    }
+    return outcomes;
   }
 
   async listResumable(now: string): Promise<readonly ResumableVideoProcessingJob[]> {
@@ -277,6 +311,7 @@ export class DrizzleProcessingJobTraceWriter
       resumable.push({
         jobId: row.id,
         ownerUserId: row.ownerUserId,
+        projectId: null,
         operation: row.operation,
         provider: row.provider,
         providerJobId: row.providerJobId,

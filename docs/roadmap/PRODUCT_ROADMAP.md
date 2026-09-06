@@ -89,9 +89,14 @@ through the WebGL/canvas render path (D4). Cues persist in the revision's `local
 renders with per-placement progress; sibling-variant identity on Versions) (D10, db-11).
 2.4 Resilient intake: persist upload idempotency keys/upload ids for cross-reload resume
 (STOR-2); HEVC local transcode-on-upload where decodable, honest fallback otherwise (D11).
-2.5 Durable AI outcomes: server-side progression tick for accepted jobs; retain results past
-first download until TTL; per-account AI usage ledger (submissions, provider, outcome, duration)
-surfaced in Account (prov-2/3/6, prod-7).
+2.5 Durable AI outcomes — **implemented 2026-09-06**: a bounded in-process progression tick moves
+accepted jobs and retains ready Project results with no client watching; delivery no longer deletes
+a standalone result, which now lives to its deadline; a per-account AI usage ledger (submissions,
+provider, outcome, duration) is written at the paid call and read back in Account
+(prov-2/3/6, prod-7 closed). Retention of a Project result is retain-only — the operator's next
+visit still adopts it — and a retained standalone result has no browser surface in this slice, which
+leaves the standalone re-attach to Phase 4. Design, and the six answered questions, in the
+[slice 2.5 plan](SLICE_2.5_DURABLE_AI_OUTCOMES_PLAN.md).
 2.6 Capture iteration: "Record another take" loop; keep release-on-review as the default privacy
 posture (studio-2).
 **Non-goals:** multi-clip anything; sidecar caption files (burn-in first per D4); server-side
@@ -108,8 +113,10 @@ path; all off the UI thread; object-URL and memory checks per slice.
 full-object copies (respect STOR-4 — reuse recorded checksums where possible).
 **Acceptance criteria:** muted-autoplay-ready captioned vertical ad produced from a phone-shot
 HEVC clip, in three placements, from one save; a reload mid-upload resumes; a submitted swap
-completes and is retrievable after closing the browser; Account answers "what did AI run this
-month".
+completes and is retrievable after closing the browser — read as the Project path, where the result
+lands in the owner byte store and the workspace shows it on return; the standalone path is durable
+on the server but has no browser route back to a result, which is Phase 4 (D5, slice 2.5 Q4);
+Account answers "what did AI run this month".
 **Required tests:** domain rules for cues/gain; worker render tests; contract tests for extended
 schemas; API tests for ledger + retention; e2e: caption-and-export journey; migration
 verification prompts run.

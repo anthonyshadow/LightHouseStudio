@@ -176,6 +176,13 @@
       "when": 1788635203352,
       "tag": "0024_pale_doomsday",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1788694513049,
+      "tag": "0025_thick_captain_universe",
+      "breakpoints": true
     }
   ]
 }

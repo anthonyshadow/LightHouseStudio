@@ -74,6 +74,19 @@ parallel pipeline whose AI results are ephemeral (1-hour TTL, manual save) and w
 time-to-first-result and worth keeping — but as a thin entry to the same engine, not a second
 engine.
 **Blocks:** Phase 4 convergence scope. **Decide by:** Phase 4 design.
+**Slice 2.5 note (2026-09-06):** the slice took the recommended answer to all six of its design
+questions ([plan](roadmap/SLICE_2.5_DURABLE_AI_OUTCOMES_PLAN.md) §5), and three of them land here.
+A delivered standalone result is no longer deleted the instant its stream completes: delivery
+settles the lease and stops, so the bytes stay admissible until the job's deadline and a download
+that was lost can be asked for again without a second submission (Q3 kept Project retention
+retain-only; Q5 kept the deadline anchored at creation). What did not change is the operator's
+reach — **there is no browser surface for a retained standalone result** (Q4): the queue lists only
+non-terminal jobs, and the standalone workflow holds its job id in memory alone, so a returning
+operator still cannot get back to it. The path is therefore durable on the server and still
+session-only in the browser; convergence remains the Phase 4 question this entry asks. The two
+remaining answers: `provider` travels on the usage ledger as a bounded-string fact and is shown
+muted, never as a choice (Q2, see the domain model's deprecated names); and the ledger covers video
+jobs only, because synchronous image and voice calls carry no job id (Q6).
 
 ## D6 — Voice in Projects: build or remove the affordance?
 
@@ -118,6 +131,12 @@ the standing decision (matching the existing deferred-infrastructure gates), and
 config so "production" cannot be misread.
 **Blocks:** nothing in Phases 1–5; blocks any team/collaboration ambition. **Decide by:** whenever
 a second user matters — explicitly, not by drift.
+**Slice 2.5 note (2026-09-06):** the standing single-process reading was taken as the answer for the
+server-side progression tick (plan §5 Q1). The tick holds no lock and writes no lock code: one data
+directory, and one database, is assumed to have exactly one Lightframe process behind it. Two
+processes on the same `LIGHTFRAME_DATA_DIR` remain a misconfiguration nothing defends against
+(prov-7) — a data-directory lock, or a per-job compare-and-set lease for several hosts, is work this
+decision has to authorize before it is written.
 
 ## D10 — Multi-placement variant sets in one save? — **decided**
 
@@ -164,6 +183,13 @@ the "Remove from Assets — its file is not erased" copy is false in R2 mode.
 assets (folding in the reference-image purge), terminal-job/receipt retention horizon, truthful
 delete copy per deployment mode, and a stated local-mode reclamation story.
 **Blocks:** Phase 5 hygiene slice (the copy fix is Phase 1). **Decide by:** Phase 5.
+**Slice 2.5 note (2026-09-06):** the horizon this entry asks about is untouched — terminal jobs,
+receipts and snapshots are still never purged, and no sweep was added. One narrower thing changed:
+a delivered standalone result now lives out its existing one-hour deadline instead of being deleted
+when its stream completes, and that deadline is anchored at job creation, not at provider
+acceptance (plan §5 Q5). The AI usage ledger the slice added is itself a new never-purged
+per-account record and belongs to whatever horizon this decision settles; it holds counts, outcomes
+and two instants per submission, never prompts or media.
 
 ## D15 — Content-safety posture for generation providers
 

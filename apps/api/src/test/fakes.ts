@@ -38,6 +38,8 @@ export const testConfig = (overrides: Partial<RuntimeConfig> = {}): RuntimeConfi
   otelTraceSampleRatio: 0.1,
   videoJobMaxActive: 8,
   videoJobMaxActivePerProvider: 4,
+  // No suite grows a background timer by building an app; a test that wants one asks for it.
+  videoJobProgressionIntervalMs: 0,
   realtimeVideoBetaEnabled: true,
   existingVideoCharacterSwapProvider: 'decart',
   prunaVideoReplaceEnabled: false,

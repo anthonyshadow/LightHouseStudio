@@ -116,10 +116,16 @@ material flow problems are of shape, not breakage:
    it; export lives only inside the workspace and Assets.
 4. **Voice is a configurable dead end inside Projects** (ev-1, PCD-4): selectable and attachable,
    but Start is disabled and a local voice result has neither save nor adopt.
-5. **Standalone AI results are session-only** (ev-3, prov-6): a paid result lives in browser
-   memory, single-shot-downloaded server-side, with no unload guard; walk away and it is gone —
-   and **paid jobs progress only while a client polls** (prov-2): close the browser after
-   submitting and the provider bills, the result expires unretrieved after an hour.
+5. **Standalone AI results are session-only** (ev-3): _prov-6 and prov-2 closed by slice 2.5
+   (2026-09-06)._ The server no longer deletes a result the moment its stream completes — a
+   delivered standalone result stays retrievable until its deadline (prov-6) — and a bounded
+   server-side progression tick polls accepted jobs and retains Project results with no client
+   watching, so closing the browser no longer means paying for an output that expires unretrieved
+   (prov-2). Two corrections to what this item said: there **is** an unload guard —
+   `unsavedProviderResult` is one of the conditions that arms `beforeunload` in `StudioExitGuard` —
+   and the result is no longer single-shot. ev-3 itself stands: the browser holds the job id in
+   memory alone and the queue lists only running jobs, so a reload still loses the way back to a
+   result the server is still keeping. Re-attachment is Phase 4.
 6. **One placement per save** (PCD-3, DC-14): _closed by slice 2.3 (2026-09-05)._ One save now
    makes up to four placements, rendered one after another in the browser and stored as sibling
    Versions of one Saved Video. The gallery re-export chooser opens on the Version's recorded
@@ -270,11 +276,19 @@ transcode/thumbnails/renditions, resumable multipart for Projects, dedupe, quota
 ### 7.7 AI integrations
 
 P1: standalone outputs bypass Projects (prov-1); paid jobs progress only under client polling —
-walk away and paid output expires unretrieved (prov-2). P2: no cost visibility or budget caps —
-only Wiro/BFL even report cost, persisted but never surfaced (prov-3 = prod-7); client disconnect
+walk away and paid output expires unretrieved (prov-2, _closed by slice 2.5 (2026-09-06): a bounded
+in-process progression tick polls due jobs and retains Project results with no client watching_).
+P2: no cost visibility or budget caps —
+only Wiro/BFL even report cost, persisted but never surfaced (prov-3 = prod-7, _closed by slice 2.5
+(2026-09-06): a per-account AI usage ledger records one row per paid video submission and Account
+reads it back as counts, outcomes and durations for the month; budget caps remain absent and no
+charge is recorded, which the panel's own copy states_); client disconnect
 aborts accepted image generations (prov-4); provider-inconsistent, env-toggleable content-safety
 posture, including an "uncensored" default reference-image model (prov-5, D15). P3: single-shot
-delete-after-download results (prov-6); single-process job assumptions (prov-7); hardcoded 30 s
+delete-after-download results (prov-6, _closed by slice 2.5 (2026-09-06): delivery no longer deletes
+a standalone result, which stays retrievable until its deadline_); single-process job assumptions
+(prov-7, reaffirmed as the standing assumption under D9 rather than fixed — the tick takes no lock);
+hardcoded 30 s
 ElevenLabs timeout spanning conversions (prov-8); internal jargon in user-facing provider errors
 (prov-10); demo-owner default parameter in VoiceService (prov-11 = SEC-2); legacy fingerprint
 shims (prov-12). Strengths: optionality, gating, normalization, and cost discipline are genuinely
@@ -301,7 +315,10 @@ in-page simulator re-implements the server contract, asserted by nothing but its
 P2: coverage thresholds gate nothing on PRs (tci-1); visual regression is dispatch-only and
 self-blinding between runs (tci-4); no metrics, no AI cost/failure accounting, no default trace
 backend — deliberate local-first privacy, but incompatible with the paid-AI product needs (tci-5 =
-prov-3); production smoke never touches save/export (tci-6); the vitest-vs-Playwright CPU
+prov-3; _partly addressed by slice 2.5 (2026-09-06): AI failure accounting now exists as the usage
+ledger, and the progression tick logs counted pass metrics, but there is still no metrics pipeline,
+no default trace backend, and no recorded charge_); production smoke never touches save/export
+(tci-6); the vitest-vs-Playwright CPU
 contention hazard is documented only in a personal memory file (tci-3). P3: one WebKit journey
 (tci-8); five `.styles.test.ts` suites pin CSS objects (tci-9); serial 13-step quality gate with a
 storybook build nothing publishes (tci-10); dead vitest include (tci-11); unexplained audit waiver
@@ -362,28 +379,28 @@ re-render profiling (web-3 note); light theme.
 P0: none found. The product has no data-loss, corruption, security-breach, or broken-critical-path
 finding under its current deployment posture.
 
-| #   | Finding                                                                  | IDs                                         | Priority | Phase                          |
-| --- | ------------------------------------------------------------------------ | ------------------------------------------- | -------- | ------------------------------ |
-| 1   | Single-source Projects foreclose the vision's core flow                  | db-1/STOR-7/PCD-1/studio-3/DC-2             | P1       | 3                              |
-| 2   | No composition/subtitle/audio primitives anywhere                        | db-2/edit-1/edit-2/web-7/DC-1/prod-1/prod-2 | P1       | 2–4                            |
-| 3   | Paid jobs progress only while a client polls; results expire unretrieved | prov-2                                      | P1       | 2                              |
-| 4   | Standalone AI outputs bypass Projects and are one-shot/ephemeral         | prov-1/prov-6/ev-3                          | P1       | 4                              |
-| 5   | Fresh take cannot reach the manual editor                                | studio-1                                    | P1       | 1                              |
-| 6   | Voice inside Projects is a configurable dead end                         | ev-1/PCD-4/studio-6                         | P1       | 1 (honesty) / 4 (build)        |
-| 7   | `/studio/<uuid>` outside the exit guard — silent loss of dirty edits     | shell-1                                     | P1       | 1                              |
-| 8   | e2e bypasses the real stack CI already provisions                        | tci-2                                       | P1       | 1                              |
-| 9   | "Current" audit documents deny their own implementation                  | DOCS-1                                      | P1       | resolved by this audit's canon |
-| 10  | AI-round model: save forces `completed`; AI selections structural        | db-3/prod-4                                 | P2       | 3                              |
-| 11  | Delete copy false in R2 mode; local delete keeps bytes                   | assets-3/SEC-1/STOR-5                       | P2       | 1 (copy) / 5 (GC)              |
-| 12  | No consent/likeness/rights capture for face/voice transforms             | SEC-5                                       | P2       | 1 (decision D15)               |
-| 13  | Content-safety posture env-toggleable, "uncensored" default model        | prov-5                                      | P2       | 1 (decision D15)               |
-| 14  | No AI cost visibility or ledger                                          | prov-3/prod-7/tci-5                         | P2       | 2                              |
-| 15  | One placement per save; re-export forgets placement (closed, slice 2.3)  | PCD-3/prod-9/DC-14                          | P2       | 2                              |
-| 16  | Upload not resumable across reload; HEVC rejected                        | STOR-2/ev-2                                 | P2       | 2                              |
-| 17  | Orphaned rendition/failed bytes never swept                              | STOR-1/api-4                                | P2       | 5                              |
-| 18  | Creative library browser-local with destructive sync recovery            | assets-1/assets-2/assets-11                 | P2       | 5 (D7)                         |
-| 19  | Terminology sprawl (library names, "version", editor names)              | DC-8/assets-7/ev-6                          | P2       | 1–2                            |
-| 20  | Editor reachable only through AI wizard; IA restyle-first                | arch-1/shell-10/prod-5                      | P2       | 1                              |
+| #   | Finding                                                                 | IDs                                         | Priority | Phase                          |
+| --- | ----------------------------------------------------------------------- | ------------------------------------------- | -------- | ------------------------------ |
+| 1   | Single-source Projects foreclose the vision's core flow                 | db-1/STOR-7/PCD-1/studio-3/DC-2             | P1       | 3                              |
+| 2   | No composition/subtitle/audio primitives anywhere                       | db-2/edit-1/edit-2/web-7/DC-1/prod-1/prod-2 | P1       | 2–4                            |
+| 3   | Paid jobs progress only while a client polls (closed, slice 2.5)        | prov-2                                      | P1       | 2                              |
+| 4   | Standalone AI outputs bypass Projects; ephemeral (prov-6 closed, 2.5)   | prov-1/prov-6/ev-3                          | P1       | 4                              |
+| 5   | Fresh take cannot reach the manual editor                               | studio-1                                    | P1       | 1                              |
+| 6   | Voice inside Projects is a configurable dead end                        | ev-1/PCD-4/studio-6                         | P1       | 1 (honesty) / 4 (build)        |
+| 7   | `/studio/<uuid>` outside the exit guard — silent loss of dirty edits    | shell-1                                     | P1       | 1                              |
+| 8   | e2e bypasses the real stack CI already provisions                       | tci-2                                       | P1       | 1                              |
+| 9   | "Current" audit documents deny their own implementation                 | DOCS-1                                      | P1       | resolved by this audit's canon |
+| 10  | AI-round model: save forces `completed`; AI selections structural       | db-3/prod-4                                 | P2       | 3                              |
+| 11  | Delete copy false in R2 mode; local delete keeps bytes                  | assets-3/SEC-1/STOR-5                       | P2       | 1 (copy) / 5 (GC)              |
+| 12  | No consent/likeness/rights capture for face/voice transforms            | SEC-5                                       | P2       | 1 (decision D15)               |
+| 13  | Content-safety posture env-toggleable, "uncensored" default model       | prov-5                                      | P2       | 1 (decision D15)               |
+| 14  | No AI cost visibility or ledger (closed, slice 2.5; tci-5 partly)       | prov-3/prod-7/tci-5                         | P2       | 2                              |
+| 15  | One placement per save; re-export forgets placement (closed, slice 2.3) | PCD-3/prod-9/DC-14                          | P2       | 2                              |
+| 16  | Upload not resumable across reload; HEVC rejected                       | STOR-2/ev-2                                 | P2       | 2                              |
+| 17  | Orphaned rendition/failed bytes never swept                             | STOR-1/api-4                                | P2       | 5                              |
+| 18  | Creative library browser-local with destructive sync recovery           | assets-1/assets-2/assets-11                 | P2       | 5 (D7)                         |
+| 19  | Terminology sprawl (library names, "version", editor names)             | DC-8/assets-7/ev-6                          | P2       | 1–2                            |
+| 20  | Editor reachable only through AI wizard; IA restyle-first               | arch-1/shell-10/prod-5                      | P2       | 1                              |
 
 (Full P2/P3 inventory: sections 7.2–7.10 above; every ID resolves to a finding with evidence,
 impact, recommendation, effort, and confidence in the per-area audit reports retained by the lead.)

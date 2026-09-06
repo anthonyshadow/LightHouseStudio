@@ -7,6 +7,8 @@ import { LocalAssetByteStore, type AssetByteStore } from '../storage/asset-byte-
 import { ManagedLocalAssetByteStore } from '../storage/managed-asset-byte-store.js';
 import { R2AssetByteStore } from '../storage/r2-asset-byte-store.js';
 import { ShadowAssetByteStore } from '../storage/shadow-asset-byte-store.js';
+import { FileAiUsageLedgerRepository } from '../features/ai-usage/file-ai-usage-ledger-repository.js';
+import { DrizzleAiUsageLedgerRepository } from './database/ai-usage-ledger-repository.js';
 import { DrizzleAssetLifecycleRegistry } from './database/asset-lifecycle-registry.js';
 import { DrizzleSessionRepository, DrizzleUserRepository } from './database/auth-repositories.js';
 import { createPostgresDatabase } from './database/client.js';
@@ -105,11 +107,19 @@ export const createConfiguredPersistence = async (
       excludeProjectLinkedJobs: config.databaseMode !== 'shadow',
     });
 
+    const aiUsageLedger = new DrizzleAiUsageLedgerRepository(connection.db);
+
     if (config.databaseMode === 'shadow') {
       return {
         ...createLocalMetadataPersistence(config.lightframeDataDir),
         ...(config.assetStoreProvider === 'r2' ? { assetBytes } : {}),
         processingJobTraces,
+        // Files stay the authority for metadata in this mode, so the journal is the ledger and the
+        // relational table is the best-effort mirror beneath it, exactly as the trace writer above.
+        // Without the mirror a cutover would begin with an empty ledger, because nothing backfills.
+        aiUsageLedger: new FileAiUsageLedgerRepository(config.lightframeDataDir, {
+          shadow: aiUsageLedger,
+        }),
         close: () => connection.close(),
       };
     }
@@ -130,6 +140,7 @@ export const createConfiguredPersistence = async (
       referenceImages,
       processingJobTraces,
       processingJobs: processingJobTraces,
+      aiUsageLedger,
       projects,
       projectProcessing: projects,
       projectOutputMetadata: projects,

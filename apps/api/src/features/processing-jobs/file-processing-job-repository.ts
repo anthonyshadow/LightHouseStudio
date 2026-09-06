@@ -42,6 +42,8 @@ export interface ProcessingJobTraceWriter {
 export interface ResumableVideoProcessingJob {
   readonly jobId: string;
   readonly ownerUserId: string;
+  /** Null for a standalone job; a Project-linked one carries the id its attempt belongs to. */
+  readonly projectId: string | null;
   readonly operation: 'character-swap' | 'virtual-try-on';
   readonly provider: string;
   readonly providerJobId: string;
@@ -59,9 +61,25 @@ export interface ResumableVideoProcessingJob {
 export type ProcessingJobAdmissionResult =
   'admitted' | 'duplicate' | 'request-conflict' | 'owner-conflict' | 'owner-mismatch';
 
+/** What a durable row says about a job, for a reader that only needs to know how it ended. */
+export interface DurableProcessingJobOutcome {
+  readonly status: VideoProcessingJobTrace['status'];
+  readonly completedAt: string | null;
+  readonly updatedAt: string;
+}
+
 export interface DurableProcessingJobRepository extends ProcessingJobTraceWriter {
   admit(trace: VideoProcessingJobTrace): Promise<ProcessingJobAdmissionResult>;
   listResumable(now: string): Promise<readonly ResumableVideoProcessingJob[]>;
+  /**
+   * The durable state of several jobs at once, keyed by job id and holding only the ids that exist
+   * for this owner. Read-only: unlike `listResumable` it transitions nothing, so a caller that is
+   * merely observing outcomes cannot disturb restart recovery.
+   */
+  findOutcomes(
+    ownerUserId: string,
+    jobIds: readonly string[],
+  ): Promise<ReadonlyMap<string, DurableProcessingJobOutcome>>;
 }
 
 const activeStatus = (status: VideoProcessingJobTrace['status']): boolean =>
@@ -161,6 +179,26 @@ export class FileProcessingJobRepository implements DurableProcessingJobReposito
     }
   }
 
+  async findOutcomes(
+    ownerUserId: string,
+    jobIds: readonly string[],
+  ): Promise<ReadonlyMap<string, DurableProcessingJobOutcome>> {
+    const outcomes = new Map<string, DurableProcessingJobOutcome>();
+    if (jobIds.length === 0) return outcomes;
+    // One file per id rather than a directory scan: the caller asks about a bounded handful of
+    // jobs, while the store holds every trace this process has ever written.
+    for (const jobId of new Set(jobIds)) {
+      const trace = await this.#read(jobId);
+      if (trace === null || trace.ownerUserId !== ownerUserId) continue;
+      outcomes.set(trace.jobId, {
+        status: trace.status,
+        completedAt: trace.completedAt,
+        updatedAt: trace.updatedAt,
+      });
+    }
+    return outcomes;
+  }
+
   async listResumable(now: string): Promise<readonly ResumableVideoProcessingJob[]> {
     const nowMs = Date.parse(now);
     const resumable: ResumableVideoProcessingJob[] = [];
@@ -228,6 +266,7 @@ export class FileProcessingJobRepository implements DurableProcessingJobReposito
       resumable.push({
         jobId: trace.jobId,
         ownerUserId: trace.ownerUserId,
+        projectId: null,
         operation: trace.operation,
         provider: trace.provider,
         providerJobId: trace.providerJobId,

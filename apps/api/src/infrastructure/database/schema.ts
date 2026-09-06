@@ -61,6 +61,17 @@ export const operationStatus = pgEnum('operation_status', [
   'expired',
   'cancelled',
 ]);
+/**
+ * Deliberately not `operation_status`: this records what came back from the provider — the
+ * outcome — and not where an operation currently sits in its lifecycle.
+ */
+export const aiUsageOutcome = pgEnum('ai_usage_outcome', [
+  'succeeded',
+  'failed',
+  'ambiguous',
+  'expired',
+  'cancelled',
+]);
 export const outboxStatus = pgEnum('outbox_status', [
   'pending',
   'processing',
@@ -1280,5 +1291,48 @@ export const resourceReferences = pgTable(
       ],
     }),
     index('resource_references_target_idx').on(table.ownerUserId, table.targetAssetId),
+  ],
+);
+
+/**
+ * One row per AI submission an owner made, so the account can still answer "what did I ask for,
+ * and how did it end" after the job trace behind it has been swept. The row is opened immediately
+ * before the provider is contacted and closed once, on the first terminal status.
+ *
+ * It deliberately never holds prompts, media, asset ids, the provider's own job id, cost or
+ * credits, or the project id. It records that work happened and how it ended, never the work.
+ * There is no foreign key to `processing_jobs` for the same reason: the ledger has to outlive the
+ * trace it was opened alongside.
+ */
+export const aiUsageLedger = pgTable(
+  'ai_usage_ledger',
+  {
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    jobId: uuid('job_id').notNull(),
+    operation: text('operation').notNull(),
+    provider: text('provider').notNull(),
+    outcome: aiUsageOutcome('outcome'),
+    submittedAt: timestamp('submitted_at', { withTimezone: true, mode: 'string' }).notNull(),
+    completedAt: timestamp('completed_at', { withTimezone: true, mode: 'string' }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.ownerUserId, table.jobId] }),
+    // Both columns descend so the index serves the newest-first page order and the keyset
+    // comparison on the same pair.
+    index('ai_usage_ledger_owner_submitted_idx').on(
+      table.ownerUserId,
+      table.submittedAt.desc(),
+      table.jobId.desc(),
+    ),
+    // The reconciler sweeps open rows across every owner, so this one is not owner-scoped.
+    index('ai_usage_ledger_open_idx')
+      .on(table.submittedAt)
+      .where(sql`${table.outcome} is null`),
+    check(
+      'ai_usage_ledger_outcome_completed_consistent',
+      sql`(${table.outcome} is null) = (${table.completedAt} is null)`,
+    ),
   ],
 );

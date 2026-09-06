@@ -8,7 +8,12 @@ import { ApplicationRuntime, type HttpRequest } from '../../application/applicat
 import { installErrorHandling } from '../../http/errors.js';
 import { testConfig } from '../../test/fakes.js';
 import { registerVideoJobRoutes } from './routes.js';
-import type { VideoJobService } from './video-job-service.js';
+import { VideoJobService } from './video-job-service.js';
+import type {
+  ExistingVideoJobProvider,
+  ExistingVideoProviderRegistry,
+  VideoJobProviderStatus,
+} from '../../providers/video-jobs/video-job-provider.js';
 import { createPhaseOneEntitlements } from '@studio/domain';
 
 const trustedHeaders = {
@@ -42,15 +47,104 @@ const installRouteTestAuth = (app: ApplicationRuntime) => {
   });
 };
 
+/** A provider that answers from memory and hands back the shared decodable fixture. */
+class DeliverableVideoProvider implements ExistingVideoJobProvider {
+  nextStatus: VideoJobProviderStatus = 'pending';
+
+  submit(): Promise<{ providerJobId: string; status: VideoJobProviderStatus }> {
+    return Promise.resolve({ providerJobId: 'provider-route-job', status: 'pending' });
+  }
+
+  status(): Promise<{ status: VideoJobProviderStatus }> {
+    return Promise.resolve({ status: this.nextStatus });
+  }
+
+  async download(_providerJobId: string, destinationPath: string): Promise<void> {
+    await writeFile(destinationPath, await videoFixture(), { flag: 'wx', mode: 0o600 });
+  }
+}
+
+const videoFixture = async (): Promise<Buffer> =>
+  Buffer.from(
+    (
+      await readFile(
+        new URL('../../../../../e2e/fixtures/decodable-h264-video.base64', import.meta.url),
+        'utf8',
+      )
+    ).replaceAll(/\s/gu, ''),
+    'base64',
+  );
+
+const providerRegistry = (provider: ExistingVideoJobProvider): ExistingVideoProviderRegistry => {
+  const binding = {
+    provider,
+    outputResolutions: ['720p'] as const,
+    defaultOutputResolution: '720p' as const,
+    outputSizing: 'exact-canonical' as const,
+    inputPreparation: 'none' as const,
+    referencePolicy: 'optional' as const,
+    promptInput: 'editable' as const,
+    promptEnhancement: true,
+  };
+  return {
+    characterSwap: { decart: binding },
+    defaultCharacterSwapProvider: 'decart',
+    virtualTryOn: binding,
+  };
+};
+
 describe('video job route boundary', () => {
   const apps: ReturnType<typeof createApp>[] = [];
   const directories: string[] = [];
+  const services: VideoJobService[] = [];
+  const ownerId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
   afterEach(async () => {
     await Promise.all(apps.splice(0).map((app) => app.close()));
+    await Promise.all(services.splice(0).map((service) => service.close()));
     await Promise.all(
       directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
     );
   });
+
+  /** A real service holding one ready result, reached the way a submission reaches it. */
+  const readyJob = async (provider: DeliverableVideoProvider) => {
+    const dataDirectory = await mkdtemp(path.join(tmpdir(), 'lightframe-video-route-ready-'));
+    directories.push(dataDirectory);
+    const service = new VideoJobService(providerRegistry(provider), dataDirectory, {
+      providerPollBackoffMs: [0, 0, 0, 0, 0],
+    });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const paths = await service.prepareJobDirectory(jobId);
+    await writeFile(paths.inputPath, await videoFixture(), { flag: 'wx', mode: 0o600 });
+    await service.start({
+      jobId,
+      ownerId,
+      recipe: {
+        operation: 'character-swap',
+        prompt: 'Change the lighting',
+        enhancePrompt: false,
+        hasReferenceImage: false,
+      },
+      directory: paths.directory,
+      inputPath: paths.inputPath,
+      referencePath: null,
+      referenceMimeType: null,
+    });
+    await vi.waitFor(async () =>
+      expect((await service.existing(jobId, ownerId))?.status).toBe('queued'),
+    );
+    provider.nextStatus = 'completed';
+    await service.status(jobId, ownerId);
+    await vi.waitFor(async () =>
+      expect((await service.existing(jobId, ownerId))?.status).toBe('ready'),
+    );
+    const app = new ApplicationRuntime();
+    installRouteTestAuth(app);
+    registerVideoJobRoutes(app, service);
+    apps.push(app);
+    return { app, jobId };
+  };
 
   it('requires the exact trusted loopback origin on submit, status, content, and cleanup', async () => {
     const app = createApp({ config: testConfig(), decartVideoProvider: null });
@@ -354,6 +448,45 @@ describe('video job route boundary', () => {
     expect(response.headers['content-length']).toBe('12');
     expect(settle).toHaveBeenCalledOnce();
     expect(settle).toHaveBeenCalledWith(true);
+  });
+
+  it('serves a retained result to a second download of the same job', async () => {
+    const { app, jobId } = await readyJob(new DeliverableVideoProvider());
+
+    const first = await app.inject({
+      method: 'GET',
+      url: `/api/video-jobs/${jobId}/content`,
+      headers: trustedHeaders,
+    });
+    const second = await app.inject({
+      method: 'GET',
+      url: `/api/video-jobs/${jobId}/content`,
+      headers: trustedHeaders,
+    });
+
+    expect(first.statusCode).toBe(200);
+    expect(second.statusCode).toBe(200);
+    expect(second.rawPayload).toEqual(first.rawPayload);
+    expect(second.rawPayload.byteLength).toBeGreaterThan(0);
+  });
+
+  it('stops serving a released result', async () => {
+    const { app, jobId } = await readyJob(new DeliverableVideoProvider());
+
+    const released = await app.inject({
+      method: 'DELETE',
+      url: `/api/video-jobs/${jobId}`,
+      headers: trustedHeaders,
+    });
+    const afterRelease = await app.inject({
+      method: 'GET',
+      url: `/api/video-jobs/${jobId}/content`,
+      headers: trustedHeaders,
+    });
+
+    expect(released.statusCode).toBe(204);
+    expect(afterRelease.statusCode).toBe(404);
+    expect(afterRelease.json<ApiErrorResponse>().error.code).toBe('not_found');
   });
 
   it('returns an expired duplicate tombstone before allocating or parsing another upload', async () => {

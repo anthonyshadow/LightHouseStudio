@@ -25,6 +25,7 @@ import {
   matchesSearchTerm,
 } from '@studio/domain';
 import type {
+  DurableProcessingJobOutcome,
   ResumableVideoProcessingJob,
   VideoProcessingJobTrace,
 } from '../processing-jobs/file-processing-job-repository.js';
@@ -86,6 +87,7 @@ import {
   type SavedVideoLibrary,
 } from '../saved-videos/saved-video-repository.js';
 import {
+  durableProcessingJobOutcome,
   projectProcessingAttemptMatchesTrace,
   projectProcessingResultInputMatchesAttempt,
   retainedProjectProcessingResultMatches,
@@ -928,6 +930,24 @@ export class FileProjectRepository
       ({ project: candidate }) => candidate.id === projectId && candidate.deletedAt === null,
     );
     return project === undefined ? null : attempt;
+  }
+
+  async findProjectAttemptOutcomes(
+    ownerUserId: string,
+    jobIds: readonly string[],
+  ): Promise<ReadonlyMap<string, DurableProcessingJobOutcome>> {
+    const outcomes = new Map<string, DurableProcessingJobOutcome>();
+    if (jobIds.length === 0) return outcomes;
+    const wanted = new Set(jobIds);
+    // One library read, then a single pass: the owner's whole journal already holds every attempt,
+    // so asking it per id would re-read the same file. A deleted Project is not filtered out —
+    // its attempts still ended, and hiding them would read as "no such job".
+    const library = await this.#read(ownerUserId);
+    for (const attempt of library.processingJobs) {
+      if (!wanted.has(attempt.operationId)) continue;
+      outcomes.set(attempt.operationId, durableProcessingJobOutcome(attempt));
+    }
+    return outcomes;
   }
 
   async getCurrentProjectAuthority(
