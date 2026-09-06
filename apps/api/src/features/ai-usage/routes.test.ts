@@ -304,12 +304,17 @@ describe('AI usage route boundary', () => {
     });
   });
 
-  it('refuses a missing window, an oversized window, and an unreadable cursor without reading', async () => {
+  it('refuses a missing, impossible or oversized window, and an unreadable cursor, without reading', async () => {
     const ledger = new FakeLedgerReader([entry()]);
     const app = appFor(ledger);
 
     for (const url of [
       '/api/account/ai-usage',
+      // One millisecond past the largest instant a `Date` holds. The window is what every later
+      // step is measured against, and the schema is what refuses it: nothing downstream is ever
+      // handed a `Date` that is not a time, so an impossible ask is a window fault like any other
+      // rather than this server failing while formatting it.
+      usageUrl('+275760-09-13T00:00:00.001Z'),
       usageUrl(since(AI_USAGE_LEDGER_MAX_WINDOW_DAYS + 1)),
       usageUrl('2026-08-01T00:00:00.000Z', 'not-a-cursor'),
     ]) {

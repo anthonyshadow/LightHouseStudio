@@ -50,10 +50,18 @@ export class DrizzleAiUsageLedgerRepository implements AiUsageLedgerRepository {
   constructor(private readonly db: LightframeDatabase) {}
 
   /**
-   * One transaction of three statements. The insert creates the row and loses harmlessly to whoever
-   * created it first; the locking read serializes the writers that reached the same submission; the
-   * update carries whatever `applyAiUsageTransition` decided. Nothing here re-states that rule in
-   * SQL — no `coalesce`, no `where outcome is null` — so the domain stays its only owner.
+   * One transaction of three statements. The insert creates the row, or waits for whoever created it
+   * first and leaves it as it stands; the locking read serializes the writers that reached the same
+   * submission; the update carries whatever `applyAiUsageTransition` decided. Nothing here re-states
+   * that rule in SQL — no `coalesce`, no `where outcome is null` — so the domain stays its only
+   * owner.
+   *
+   * The conflict clause assigns the owner to itself rather than doing nothing, because the two are
+   * not the same under concurrency: `do nothing` may decline a row another transaction has inserted
+   * but not yet committed, and the locking read that follows cannot see that row either, so a close
+   * racing an open would find nothing to update and be dropped in silence. Conflicting into an
+   * update makes this statement wait for that transaction and take the row's lock, which is the
+   * whole point of the read below.
    */
   async record(entry: AiUsageEntry): Promise<void> {
     await this.db.transaction(async (tx) => {
@@ -68,7 +76,11 @@ export class DrizzleAiUsageLedgerRepository implements AiUsageLedgerRepository {
           submittedAt: entry.submittedAt,
           completedAt: entry.completedAt,
         })
-        .onConflictDoNothing();
+        .onConflictDoUpdate({
+          target: [aiUsageLedger.ownerUserId, aiUsageLedger.jobId],
+          // A self-assignment: it changes nothing, and what it is here for is the wait and the lock.
+          set: { ownerUserId: sql`excluded.owner_user_id` },
+        });
       const [row] = await tx
         .select(selection)
         .from(aiUsageLedger)
@@ -80,8 +92,8 @@ export class DrizzleAiUsageLedgerRepository implements AiUsageLedgerRepository {
         )
         .for('update')
         .limit(1);
-      // The insert above guarantees a row, so an absent one means it was removed underneath us and
-      // there is nothing this write should resurrect.
+      // The insert above guarantees a row this transaction can see, so an absent one means it was
+      // removed underneath us and there is nothing this write should resurrect.
       if (row === undefined) return;
       const next = applyAiUsageTransition(toEntry(row), entry);
       // Given a stored row, the rule returns either nothing or a settled row, so a result here is

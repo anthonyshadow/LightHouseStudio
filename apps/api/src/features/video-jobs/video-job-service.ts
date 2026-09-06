@@ -62,6 +62,12 @@ export interface VideoJobProgressionResult {
   /** Records this pass refreshed. A refresh already in flight for a client is shared, not repeated. */
   readonly polled: number;
   readonly retrievalsStarted: number;
+  /**
+   * Whether the list below was cut short by the pass's own bound. Said rather than inferred: only
+   * this pass knows, and a caller comparing a length against a bound it also holds would be
+   * re-deriving a fact across a boundary, differently normalized on each side.
+   */
+  readonly readyTruncated: boolean;
   readonly readyProjectLinked: readonly {
     readonly jobId: string;
     readonly ownerId: string;
@@ -674,15 +680,6 @@ export class VideoJobService {
   }
 
   /**
-   * No row, no spend: this is the last step before a paid submission, so a ledger that cannot
-   * record the attempt fails it here rather than letting it be paid for unaccounted.
-   *
-   * Answers whether the provider may now be contacted, which is why the ownership re-check the
-   * round trip makes necessary lives here rather than in each caller: the guarantee is the order of
-   * these steps, and it is only worth as much as the one place that states it. Every false answer
-   * has already cleaned up after the job, and made it terminal where that was this method's to say.
-   */
-  /**
    * Whether the job is still this method's to submit, cleaning up after it when it is not.
    *
    * The last thing checked before money is spent, so it is stated once and both answers of
@@ -694,6 +691,15 @@ export class VideoJobService {
     return false;
   }
 
+  /**
+   * No row, no spend: this is the last step before a paid submission, so a ledger that cannot
+   * record the attempt fails it here rather than letting it be paid for unaccounted.
+   *
+   * Answers whether the provider may now be contacted, which is why the ownership re-check the
+   * round trip makes necessary lives here rather than in each caller: the guarantee is the order of
+   * these steps, and it is only worth as much as the one place that states it. Every false answer
+   * has already cleaned up after the job, and made it terminal where that was this method's to say.
+   */
   async #openUsageRow(job: VideoJobRecord): Promise<boolean> {
     const ledger = this.#usageLedger;
     // Checked on this path too, even though nothing is awaited before it. An unconfigured ledger is
@@ -1508,9 +1514,13 @@ export class VideoJobService {
       ownerId: string;
       projectId: string;
     }[] = [];
+    let readyTruncated = false;
     if (!this.#closed) {
       for (const job of this.#jobs.values()) {
-        if (readyProjectLinked.length >= limit) break;
+        if (readyProjectLinked.length >= limit) {
+          readyTruncated = true;
+          break;
+        }
         if (
           job.projectId !== null &&
           job.status === 'ready' &&
@@ -1530,6 +1540,7 @@ export class VideoJobService {
       retrievalsStarted: due.filter(
         (job) => job.retrievalAttempts > (retrievalsBefore.get(job.jobId) ?? 0),
       ).length,
+      readyTruncated,
       readyProjectLinked,
     };
   }

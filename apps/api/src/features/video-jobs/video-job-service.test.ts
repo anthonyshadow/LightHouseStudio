@@ -1997,7 +1997,12 @@ describe('VideoJobService', () => {
 
     const progressed = await service.progressDueJobs({ maxProviderPolls: 4 });
 
-    expect(progressed).toEqual({ polled: 1, retrievalsStarted: 1, readyProjectLinked: [] });
+    expect(progressed).toEqual({
+      polled: 1,
+      retrievalsStarted: 1,
+      readyTruncated: false,
+      readyProjectLinked: [],
+    });
     await vi.waitFor(async () =>
       expect((await service.existing(jobId, ownerId))?.status).toBe('ready'),
     );
