@@ -11,6 +11,8 @@ import type { VideoJobProgressionResult } from './video-job-service.js';
 const OWNER = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
 const PROJECT = '0f0f2a2d-2f4b-4d1a-9a1e-9b1c2d3e4f50';
 const JOB = '720620f6-446b-4987-828e-bc23470e613d';
+const OTHER_JOB = '9826fc75-4759-47cc-b07d-d7325ce0ad14';
+const THIRD_JOB = '3f1c6a70-2b4e-4c2a-9d5f-8e7a6b5c4d31';
 const INTERVAL_MS = 5_000;
 
 const PASS_COMPLETED = '[video-job-progression] Progression pass.';
@@ -20,10 +22,14 @@ const PROGRESSION_FAILED = '[video-job-progression] Progression pass failed.';
 const nothing: VideoJobProgressionResult = {
   polled: 0,
   retrievalsStarted: 0,
+  readyTruncated: false,
   readyProjectLinked: [],
 };
 
 const readyEntry = { jobId: JOB, ownerId: OWNER, projectId: PROJECT };
+
+/** Another job of the same owner and Project, for the cases whose ready list names more than one. */
+const readyFor = (jobId: string) => ({ jobId, ownerId: OWNER, projectId: PROJECT });
 
 /**
  * A clock the test moves by hand and a schedule that keeps its callback instead of arming a timer.
@@ -84,7 +90,7 @@ describe('VideoJobProgressionTick', () => {
     });
     const progressDueJobs = vi.fn(async (): Promise<VideoJobProgressionResult> => {
       await held;
-      return { polled: 2, retrievalsStarted: 1, readyProjectLinked: [] };
+      return { polled: 2, retrievalsStarted: 1, readyTruncated: false, readyProjectLinked: [] };
     });
     const tick = new VideoJobProgressionTick({
       videoJobs: { available: true, progressDueJobs },
@@ -177,7 +183,12 @@ describe('VideoJobProgressionTick', () => {
       videoJobs: {
         available: true,
         progressDueJobs: () =>
-          Promise.resolve({ polled: 1, retrievalsStarted: 1, readyProjectLinked: [readyEntry] }),
+          Promise.resolve({
+            polled: 1,
+            retrievalsStarted: 1,
+            readyTruncated: false,
+            readyProjectLinked: [readyEntry],
+          }),
       },
       projectProcessing: { retainResultBytes },
       intervalMs: INTERVAL_MS,
@@ -210,7 +221,12 @@ describe('VideoJobProgressionTick', () => {
       videoJobs: {
         available: true,
         progressDueJobs: () =>
-          Promise.resolve({ polled: 1, retrievalsStarted: 0, readyProjectLinked: [readyEntry] }),
+          Promise.resolve({
+            polled: 1,
+            retrievalsStarted: 0,
+            readyTruncated: false,
+            readyProjectLinked: [readyEntry],
+          }),
       },
       projectProcessing: { retainResultBytes },
       intervalMs: INTERVAL_MS,
@@ -266,11 +282,16 @@ describe('VideoJobProgressionTick', () => {
       videoJobs: {
         available: true,
         progressDueJobs: () =>
-          Promise.resolve({ polled: 1, retrievalsStarted: 0, readyProjectLinked: ready }),
+          Promise.resolve({
+            polled: 1,
+            retrievalsStarted: 0,
+            readyTruncated: false,
+            readyProjectLinked: ready,
+          }),
       },
       projectProcessing: { retainResultBytes },
       intervalMs: INTERVAL_MS,
-      maxProviderPolls: 4,
+      maxProviderPolls: 2,
       schedule: schedule.schedule,
       now: schedule.now,
       log: recordingLog(),
@@ -279,7 +300,10 @@ describe('VideoJobProgressionTick', () => {
     await tick.run();
     expect(retainResultBytes).toHaveBeenCalledTimes(1);
 
-    ready = [];
+    // A pass that ran to the end of what was due — one job under a cap of two, and another job at
+    // that — is the whole answer: absence from it means the job landed or expired, so what it
+    // refused before goes with it. Empty is only one shape of that, and the rarer one.
+    ready = [readyFor(OTHER_JOB)];
     schedule.nowMs += INTERVAL_MS;
     await tick.run();
 
@@ -287,7 +311,59 @@ describe('VideoJobProgressionTick', () => {
     // job that returns is a different attempt at the same id, not the one that was refused.
     ready = [readyEntry];
     await tick.run();
-    expect(retainResultBytes).toHaveBeenCalledTimes(2);
+    expect(retainResultBytes.mock.calls.filter(([, , jobId]) => jobId === JOB)).toHaveLength(2);
+    await tick.close();
+  });
+
+  it('keeps a refused retention held back across a pass that was cut short without it', async () => {
+    const schedule = new ManualProgressionSchedule();
+    const log = recordingLog();
+    // Only the job that refuses is scripted; the two that fill the cap land as any other would.
+    const retainResultBytes = retention().mockImplementation((_owner, _project, jobId) =>
+      jobId === JOB ? Promise.reject(new TypeError('the Project moved')) : Promise.resolve(),
+    );
+    let ready: VideoJobProgressionResult['readyProjectLinked'] = [readyEntry];
+    const tick = new VideoJobProgressionTick({
+      videoJobs: {
+        available: true,
+        progressDueJobs: () =>
+          Promise.resolve({
+            polled: 1,
+            retrievalsStarted: 0,
+            readyTruncated: true,
+            readyProjectLinked: ready,
+          }),
+      },
+      projectProcessing: { retainResultBytes },
+      intervalMs: INTERVAL_MS,
+      maxProviderPolls: 2,
+      schedule: schedule.schedule,
+      now: schedule.now,
+      log,
+    });
+
+    await tick.run();
+    expect(retainResultBytes).toHaveBeenCalledTimes(1);
+
+    // A pass that says it was cut short says nothing about the jobs it does not name: they may
+    // simply not have fit. Forgetting the refusal on that evidence would hand a job that cannot
+    // land a full-rate retry on every pass, which is what the backoff is for.
+    // Half an interval at a time: one refusal already buys a wait of two, so both passes below
+    // fall inside the window, and it is the pruning rule alone that decides what happens in them.
+    ready = [readyFor(OTHER_JOB), readyFor(THIRD_JOB)];
+    schedule.nowMs += INTERVAL_MS / 2;
+    await tick.run();
+    expect(retainResultBytes).toHaveBeenCalledTimes(3);
+    expect(lastLine(log.info.mock.calls, PASS_COMPLETED)).toMatchObject({
+      retained: 2,
+      retentionBackoffs: 1,
+    });
+
+    // And back inside its window it is still held, rather than tried as a job never refused.
+    ready = [readyEntry];
+    schedule.nowMs += INTERVAL_MS / 2;
+    await tick.run();
+    expect(retainResultBytes).toHaveBeenCalledTimes(3);
     await tick.close();
   });
 
@@ -310,7 +386,12 @@ describe('VideoJobProgressionTick', () => {
       videoJobs: {
         available: true,
         progressDueJobs: () =>
-          Promise.resolve({ polled: 3, retrievalsStarted: 1, readyProjectLinked: [] }),
+          Promise.resolve({
+            polled: 3,
+            retrievalsStarted: 1,
+            readyTruncated: false,
+            readyProjectLinked: [],
+          }),
       },
       reconciler: { reconcile: () => Promise.resolve(2) },
       intervalMs: INTERVAL_MS,
