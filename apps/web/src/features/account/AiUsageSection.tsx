@@ -1,6 +1,6 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import type { AiUsageLedgerCounts, AiUsageOutcome } from '@studio/contracts';
-import { formatDateTime, formatDuration } from '@studio/domain';
+import { aiUsageSubmittedTotal, formatDateTime, formatDuration } from '@studio/domain';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import {
@@ -25,25 +25,31 @@ const OUTCOME_COPY: Readonly<Record<AiUsageOutcome, string>> = {
 
 const RUNNING_COPY = 'Running. See the Dashboard queue.';
 
+/** The labels cover the operations this build offers; a ledger row may name one it does not. */
+const OPERATION_LABELS = new Map<string, string>(Object.entries(VIDEO_TRANSFORM_OPERATION_LABELS));
+
 /**
- * The month line, summed rather than read from a field.
+ * What to call the operation a row recorded, falling back to the recorded id itself.
  *
- * `counts.running` is deliberately only ever a *term* of this sum and never a number of its own on
+ * A row outlives the vocabulary it was written in: an operation kind that has since been renamed or
+ * dropped has no label here, and the reader is still owed what ran. Saying the id is honest —
+ * inventing a friendly name for it, or leaving the line blank, would not be.
+ */
+const operationLabel = (operation: string): string => OPERATION_LABELS.get(operation) ?? operation;
+
+/**
+ * The month line. What counts as a submission is the ledger's own statement, so the total comes
+ * from `aiUsageSubmittedTotal` rather than from six fields added up here: a sixth outcome would
+ * otherwise leave this line quietly under-reporting while both stores refused to compile.
+ *
+ * `counts.running` is deliberately only ever a *term* of that sum and never a number of its own on
  * screen. The section sits directly under the running-jobs line, which counts the live queue; the
  * ledger counts rows nothing has closed yet, and the two legitimately differ by every submission a
  * crash orphaned before the reconciler reached it. One panel saying "running" twice with two
  * different values would read as a defect rather than as the two different facts it is.
  */
-const monthSummary = (counts: AiUsageLedgerCounts): string => {
-  const submitted =
-    counts.running +
-    counts.succeeded +
-    counts.failed +
-    counts.ambiguous +
-    counts.expired +
-    counts.cancelled;
-  return `This month: ${submitted} submitted. ${counts.succeeded} succeeded, ${counts.failed} failed, ${counts.ambiguous} acceptance unknown, ${counts.expired} expired, ${counts.cancelled} cancelled.`;
-};
+const monthSummary = (counts: AiUsageLedgerCounts): string =>
+  `This month: ${aiUsageSubmittedTotal(counts)} submitted. ${counts.succeeded} succeeded, ${counts.failed} failed, ${counts.ambiguous} acceptance unknown, ${counts.expired} expired, ${counts.cancelled} cancelled.`;
 
 /**
  * The panel's own grid styles every `ul`, `li` and trailing `span` inside it, which is right for
@@ -114,9 +120,13 @@ export const AiUsageSection = ({ ownerUserId, open }: AiUsageSectionProps) => {
     staleTime: 30_000,
   });
 
-  const pages = usage.data?.pages ?? [];
-  const entries = pages.flatMap((page) => page.entries);
-  const counts = pages[0]?.counts ?? null;
+  const pages = usage.data?.pages;
+  // Flattened per page rather than per render: this section re-renders with the panel around it,
+  // and the list it draws only changes when a page actually arrives.
+  const entries = useMemo(() => pages?.flatMap((page) => page.entries) ?? [], [pages]);
+  // The window's counts cover the whole window, so every page states the same ones; the first page
+  // is simply the one that is always there once anything has loaded.
+  const counts = pages?.[0]?.counts ?? null;
 
   return (
     <div css={usageStyles(theme)}>
@@ -140,22 +150,22 @@ export const AiUsageSection = ({ ownerUserId, open }: AiUsageSectionProps) => {
         </StatusNotice>
       ) : null}
 
-      {counts && entries.length === 0 ? (
+      {/* One guard, two branches: a loaded month either has submissions or is empty, and nothing
+          should be able to drift the two conditions apart into showing both or neither. */}
+      {counts === null ? null : entries.length === 0 ? (
         <>
           <p>No video transformations this month.</p>
           <LinkButton size="small" href={APP_PATHS.assets}>
             Open Assets
           </LinkButton>
         </>
-      ) : null}
-
-      {counts && entries.length > 0 ? (
+      ) : (
         <>
           <p>{monthSummary(counts)}</p>
           <ul data-ai-usage-list aria-label="AI transformations this month">
             {entries.map((entry) => (
               <li key={entry.jobId} data-ai-usage-row>
-                <strong>{VIDEO_TRANSFORM_OPERATION_LABELS[entry.operation]}</strong>
+                <strong>{operationLabel(entry.operation)}</strong>
                 <span>
                   <time dateTime={entry.submittedAt}>{formatDateTime(entry.submittedAt)}</time> ·{' '}
                   <small>{entry.provider}</small>
@@ -185,7 +195,7 @@ export const AiUsageSection = ({ ownerUserId, open }: AiUsageSectionProps) => {
             </Button>
           ) : null}
         </>
-      ) : null}
+      )}
 
       <small>
         Counts and outcomes for video transformations only. Lightframe does not record what the

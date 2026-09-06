@@ -384,6 +384,9 @@ export class VideoJobService {
 
   async #markRestoreFailed(record: ResumableVideoProcessingJob): Promise<void> {
     const updatedAt = new Date(this.#now()).toISOString();
+    // One decision recorded in two places: the durable status below is also what the ledger close
+    // derives its outcome from, so the row and the job it belongs to cannot come to disagree.
+    const status = 'failed';
     await this.#durableJobRepository?.upsert({
       schemaVersion: 1,
       jobId: record.jobId,
@@ -396,7 +399,7 @@ export class VideoJobService {
       providerOutputLocation: record.providerOutputLocation,
       sourceDurationMs: record.sourceDurationMs,
       sourceOrientation: record.sourceOrientation,
-      status: 'failed',
+      status,
       safeErrorCode: 'provider_unavailable',
       createdAt: record.createdAt,
       updatedAt,
@@ -404,22 +407,17 @@ export class VideoJobService {
     });
     // This path never reaches `#touch`, so it owes the ledger the close its own outcome implies.
     // The row was opened before the crash that left this record resumable.
-    await this.#usageLedger
-      ?.record({
-        ownerUserId: record.ownerUserId,
-        jobId: record.jobId,
-        operation: record.operation,
-        provider: record.provider,
-        outcome: 'failed',
-        submittedAt: record.createdAt,
-        completedAt: updatedAt,
-      })
-      .catch(() => {
-        console.warn('[video-jobs] AI usage row could not be closed.', {
-          jobId: record.jobId,
-          status: 'failed',
-        });
-      });
+    await this.#recordUsageClose({
+      ownerUserId: record.ownerUserId,
+      jobId: record.jobId,
+      operation: record.operation,
+      provider: record.provider,
+      status,
+      // The row was opened before the restart, so this only supplies a submission instant to a
+      // store that has none of its own.
+      submittedAt: record.createdAt,
+      completedAt: updatedAt,
+    });
   }
 
   get available(): boolean {
@@ -679,12 +677,29 @@ export class VideoJobService {
    * No row, no spend: this is the last step before a paid submission, so a ledger that cannot
    * record the attempt fails it here rather than letting it be paid for unaccounted.
    *
-   * Answers whether the provider may now be contacted; the failure path has already made the job
-   * terminal and cleaned up after it.
+   * Answers whether the provider may now be contacted, which is why the ownership re-check the
+   * round trip makes necessary lives here rather than in each caller: the guarantee is the order of
+   * these steps, and it is only worth as much as the one place that states it. Every false answer
+   * has already cleaned up after the job, and made it terminal where that was this method's to say.
    */
+  /**
+   * Whether the job is still this method's to submit, cleaning up after it when it is not.
+   *
+   * The last thing checked before money is spent, so it is stated once and both answers of
+   * `#openUsageRow` reach it.
+   */
+  async #stillOwnedForSubmission(job: VideoJobRecord): Promise<boolean> {
+    if (this.#ownsMutableJob(job)) return true;
+    await this.#cleanupFiles(job);
+    return false;
+  }
+
   async #openUsageRow(job: VideoJobRecord): Promise<boolean> {
     const ledger = this.#usageLedger;
-    if (ledger === undefined) return true;
+    // Checked on this path too, even though nothing is awaited before it. An unconfigured ledger is
+    // a configuration, not a different guarantee, and the line after this method's every caller is
+    // the paid one; a guard that holds only when a store happens to be wired is not a guard.
+    if (ledger === undefined) return this.#stillOwnedForSubmission(job);
     /*
      * Marked before the write, not after. A job can go terminal while this write is in flight — an
      * abandon, or the deadline — and the close runs from `#touch`, which would read a flag that is
@@ -704,7 +719,6 @@ export class VideoJobService {
         submittedAt: new Date(this.#now()).toISOString(),
         completedAt: null,
       });
-      return true;
     } catch {
       job.ledgerOpened = false;
       console.warn('[video-jobs] AI usage row could not be opened.', { jobId: job.jobId });
@@ -724,34 +738,65 @@ export class VideoJobService {
       await this.#cleanupFiles(job);
       return false;
     }
+    // Re-checked after the round trip, and outside the catch so a cleanup failure is never read as
+    // a ledger one: the money is spent on the caller's next line, and an abandon or a deadline that
+    // arrived while the row was being written must stop it there. The check before the write is not
+    // enough, because it is the write that gives the gap its width.
+    return this.#stillOwnedForSubmission(job);
   }
 
   /**
-   * Closes the row on the first terminal outcome. Tracked, so `close()` waits for it, and
-   * warn-only, because a ledger that is down must not change what the operator's job did.
+   * The one close write, made by the two paths that can settle a submission: the terminal
+   * transition below, and the restore that fails a record it cannot resume.
+   *
+   * The outcome is derived from the status through the domain rule rather than stated beside it, so
+   * a job's durable status and its ledger row stay one decision. Warn-only, because a ledger that
+   * is down must not change what the operator's job did.
    */
-  #closeUsageRow(job: VideoJobRecord, status: VideoJobStatus): void {
+  #recordUsageClose(close: {
+    readonly ownerUserId: string;
+    readonly jobId: string;
+    readonly operation: VideoTransformOperationId;
+    readonly provider: string;
+    readonly status: VideoJobStatus;
+    readonly submittedAt: string;
+    readonly completedAt: string;
+  }): Promise<void> {
     const ledger = this.#usageLedger;
-    if (ledger === undefined || !job.ledgerOpened) return;
+    if (ledger === undefined) return Promise.resolve();
+    return ledger
+      .record({
+        ownerUserId: close.ownerUserId,
+        jobId: close.jobId,
+        operation: close.operation,
+        provider: close.provider,
+        outcome: aiUsageOutcomeForJobStatus(close.status),
+        submittedAt: close.submittedAt,
+        completedAt: close.completedAt,
+      })
+      .catch(() => {
+        console.warn('[video-jobs] AI usage row could not be closed.', {
+          jobId: close.jobId,
+          status: close.status,
+        });
+      });
+  }
+
+  /** Closes the row on the first terminal outcome. Tracked, so `close()` waits for it. */
+  #closeUsageRow(job: VideoJobRecord, status: VideoJobStatus): void {
+    if (this.#usageLedger === undefined || !job.ledgerOpened) return;
     this.#track(
-      ledger
-        .record({
-          ownerUserId: job.ownerId,
-          jobId: job.jobId,
-          operation: job.operation,
-          provider: job.providerId,
-          outcome: aiUsageOutcomeForJobStatus(status),
-          // Only reached when the row is absent — a job that was submitted before the ledger
-          // existed. An open row keeps the instant its opener recorded.
-          submittedAt: job.createdAt,
-          completedAt: job.updatedAt,
-        })
-        .catch(() => {
-          console.warn('[video-jobs] AI usage row could not be closed.', {
-            jobId: job.jobId,
-            status,
-          });
-        }),
+      this.#recordUsageClose({
+        ownerUserId: job.ownerId,
+        jobId: job.jobId,
+        operation: job.operation,
+        provider: job.providerId,
+        status,
+        // Only reached when the row is absent — a job that was submitted before the ledger
+        // existed. An open row keeps the instant its opener recorded.
+        submittedAt: job.createdAt,
+        completedAt: job.updatedAt,
+      }),
     );
   }
 
@@ -1172,12 +1217,6 @@ export class VideoJobService {
       return this.#snapshot(job);
     }
     if (!(await this.#openUsageRow(job))) return this.#snapshot(job);
-    // The same re-check as the standalone path: an abandon during the ledger write must land before
-    // the provider is paid, not after.
-    if (!this.#ownsMutableJob(job)) {
-      await this.#cleanupFiles(job);
-      return this.#snapshot(job);
-    }
     this.#track(this.#submitProvider(job, input.recipe, input.inspectedInput));
     return this.#snapshot(job);
   }
@@ -1212,13 +1251,6 @@ export class VideoJobService {
         return;
       }
       if (!(await this.#openUsageRow(job))) return;
-      // Re-checked after the ledger round trip: the money is spent on the next line, and an abandon
-      // that arrived while the row was being written must stop it. The check before the write is
-      // not enough, because it is the write that gives the gap its width.
-      if (!this.#ownsMutableJob(job)) {
-        await this.#cleanupFiles(job);
-        return;
-      }
       await this.#submitProvider(job, recipe, inspected);
     } catch (error) {
       if (!this.#ownsMutableJob(job)) {
@@ -1469,18 +1501,30 @@ export class VideoJobService {
     // launched rather than the ones that happened to finish inside it.
     const retrievalsBefore = new Map(due.map((job) => [job.jobId, job.retrievalAttempts]));
     await Promise.allSettled(due.map((job) => this.#refresh(job)));
-    const readyProjectLinked = this.#closed
-      ? []
-      : [...this.#jobs.values()]
-          .flatMap((job) =>
-            job.projectId === null ||
-            job.status !== 'ready' ||
-            job.admissionsClosed ||
-            job.activeDeliveries > 0
-              ? []
-              : [{ jobId: job.jobId, ownerId: job.ownerId, projectId: job.projectId }],
-          )
-          .slice(0, limit);
+    // Walked rather than mapped and sliced: this is the only recurring timer in the process, and a
+    // pass that reports at most `limit` results has no reason to build the ones past it first.
+    const readyProjectLinked: {
+      jobId: string;
+      ownerId: string;
+      projectId: string;
+    }[] = [];
+    if (!this.#closed) {
+      for (const job of this.#jobs.values()) {
+        if (readyProjectLinked.length >= limit) break;
+        if (
+          job.projectId !== null &&
+          job.status === 'ready' &&
+          !job.admissionsClosed &&
+          job.activeDeliveries === 0
+        ) {
+          readyProjectLinked.push({
+            jobId: job.jobId,
+            ownerId: job.ownerId,
+            projectId: job.projectId,
+          });
+        }
+      }
+    }
     return {
       polled: due.length,
       retrievalsStarted: due.filter(

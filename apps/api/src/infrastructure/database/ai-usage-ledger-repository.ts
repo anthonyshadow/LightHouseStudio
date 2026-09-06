@@ -1,5 +1,6 @@
 import {
   applyAiUsageTransition,
+  emptyAiUsageOutcomeCounts,
   type AiUsageEntry,
   type AiUsageOutcome,
   type AiUsageOutcomeCounts,
@@ -149,14 +150,9 @@ export class DrizzleAiUsageLedgerRepository implements AiUsageLedgerRepository {
       .from(aiUsageLedger)
       .where(and(eq(aiUsageLedger.ownerUserId, ownerUserId), gte(aiUsageLedger.submittedAt, since)))
       .groupBy(aiUsageLedger.outcome);
-    const counts: Record<'running' | AiUsageOutcome, number> = {
-      running: 0,
-      succeeded: 0,
-      failed: 0,
-      ambiguous: 0,
-      expired: 0,
-      cancelled: 0,
-    };
+    // Seeded from the domain rather than a literal here: the outcomes a window can hold are the
+    // ledger's own list, and a store spelling them out again would silently miss the next one.
+    const counts = emptyAiUsageOutcomeCounts();
     for (const row of rows) {
       // The group with no outcome is exactly the submissions still in flight.
       counts[row.outcome ?? 'running'] = row.total;

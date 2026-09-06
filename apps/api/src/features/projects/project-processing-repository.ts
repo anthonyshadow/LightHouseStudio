@@ -36,38 +36,6 @@ export type PersistedProcessingJobStatus =
   | 'expired'
   | 'cancelled';
 
-/**
- * The persisted lifecycle carries two states the job wire vocabulary never names: `pending`, which
- * precedes validation, and `accepted`, which the resumable mappers already read as `queued`. Both
- * are non-terminal either way, so an outcome reader sees the same "still open" answer.
- */
-const OUTCOME_STATUS: Readonly<
-  Record<PersistedProcessingJobStatus, VideoProcessingJobTrace['status']>
-> = {
-  pending: 'validating',
-  validating: 'validating',
-  submitting: 'submitting',
-  accepted: 'queued',
-  ambiguous: 'ambiguous',
-  queued: 'queued',
-  processing: 'processing',
-  retrieving: 'retrieving',
-  ready: 'ready',
-  failed: 'failed',
-  expired: 'expired',
-  cancelled: 'cancelled',
-};
-
-export const durableProcessingJobOutcome = (attempt: {
-  readonly status: PersistedProcessingJobStatus;
-  readonly completedAt: string | null;
-  readonly updatedAt: string;
-}): DurableProcessingJobOutcome => ({
-  status: OUTCOME_STATUS[attempt.status],
-  completedAt: attempt.completedAt,
-  updatedAt: attempt.updatedAt,
-});
-
 export interface ProjectProcessingAttemptRecord {
   readonly operationId: string;
   readonly ownerUserId: string;

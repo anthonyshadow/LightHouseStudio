@@ -9,6 +9,16 @@ export const VIDEO_TRANSFORM_OPERATION_IDS = ['character-swap', 'virtual-try-on'
 export const videoTransformOperationIdSchema = z.enum(VIDEO_TRANSFORM_OPERATION_IDS);
 export const VIDEO_CHARACTER_SWAP_PROVIDER_IDS = ['decart', 'pruna'] as const;
 export const videoCharacterSwapProviderIdSchema = z.enum(VIDEO_CHARACTER_SWAP_PROVIDER_IDS);
+
+/**
+ * How a job record names something it ran through — the provider that took it, or the operation
+ * kind it was — as bounded text rather than an enum.
+ *
+ * A record reports what actually ran, not what this build still offers, and the responses carrying
+ * these names are parsed whole. A name renamed or retired since the record was written therefore
+ * has to keep parsing, or one such row fails the entire response it appears in.
+ */
+export const videoJobRecordedNameSchema = z.string().trim().min(1).max(80);
 export const VIDEO_OUTPUT_RESOLUTIONS = ['720p', '1080p'] as const;
 export const videoOutputResolutionSchema = z.enum(VIDEO_OUTPUT_RESOLUTIONS);
 export const VIDEO_TRANSFORM_INPUT_KINDS = [
@@ -196,7 +206,7 @@ export const videoJobQueueItemSchema = z
   .object({
     jobId: z.uuid(),
     operation: videoTransformOperationIdSchema,
-    provider: z.string().trim().min(1).max(80),
+    provider: videoJobRecordedNameSchema,
     status: activeVideoJobStatusSchema,
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),

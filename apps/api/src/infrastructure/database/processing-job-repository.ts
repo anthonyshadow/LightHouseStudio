@@ -1,15 +1,15 @@
 import { VIDEO_JOB_TTL_MS } from '@studio/contracts';
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lte, notExists, sql } from 'drizzle-orm';
-import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestamps.js';
-import type {
-  DurableProcessingJobOutcome,
-  DurableProcessingJobRepository,
-  ProcessingJobAdmissionResult,
-  ProcessingJobTraceWriter,
-  ResumableVideoProcessingJob,
-  VideoProcessingJobTrace,
+import { toIsoTimestamp } from '../../application/timestamps.js';
+import {
+  durableProcessingJobOutcomes,
+  type DurableProcessingJobOutcome,
+  type DurableProcessingJobRepository,
+  type ProcessingJobAdmissionResult,
+  type ProcessingJobTraceWriter,
+  type ResumableVideoProcessingJob,
+  type VideoProcessingJobTrace,
 } from '../../features/processing-jobs/file-processing-job-repository.js';
-import { durableProcessingJobOutcome } from '../../features/projects/project-processing-repository.js';
 import type { LightframeDatabase } from './client.js';
 import { processingJobs, projectJobs } from './schema.js';
 
@@ -147,8 +147,8 @@ export class DrizzleProcessingJobTraceWriter
     ownerUserId: string,
     jobIds: readonly string[],
   ): Promise<ReadonlyMap<string, DurableProcessingJobOutcome>> {
-    const outcomes = new Map<string, DurableProcessingJobOutcome>();
-    if (jobIds.length === 0) return outcomes;
+    // Load-bearing: `inArray` cannot express an empty set, so an empty ask has to be answered here.
+    if (jobIds.length === 0) return new Map();
     // Deliberately without `#standaloneScope()`: this reader reports what a row says rather than
     // deciding who recovers it, and in the shared table a Project-linked row is still an answer.
     const rows = await this.db
@@ -162,17 +162,7 @@ export class DrizzleProcessingJobTraceWriter
       .where(
         and(eq(processingJobs.ownerUserId, ownerUserId), inArray(processingJobs.id, [...jobIds])),
       );
-    for (const row of rows) {
-      outcomes.set(
-        row.id,
-        durableProcessingJobOutcome({
-          status: row.status,
-          completedAt: nullableIsoTimestamp(row.completedAt),
-          updatedAt: toIsoTimestamp(row.updatedAt),
-        }),
-      );
-    }
-    return outcomes;
+    return durableProcessingJobOutcomes(rows);
   }
 
   async listResumable(now: string): Promise<readonly ResumableVideoProcessingJob[]> {

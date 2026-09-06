@@ -169,14 +169,13 @@ describe('AiUsageReconciler', () => {
     const ledger = new InMemoryLedger({ rows: [entry()] });
     const durable = durableStore({});
     const closedAtMs = SUBMITTED_MS + VIDEO_JOB_TTL_MS + 250;
-    const reconciler = new AiUsageReconciler(ledger, durable.repository, {
-      now: () => closedAtMs,
-    });
+    const reconciler = new AiUsageReconciler(ledger, durable.repository);
 
     await expect(reconciler.reconcile(SUBMITTED_MS + VIDEO_JOB_TTL_MS - 1, 25)).resolves.toBe(0);
     expect(ledger.recorded).toEqual([]);
 
-    await expect(reconciler.reconcile(SUBMITTED_MS + VIDEO_JOB_TTL_MS, 25)).resolves.toBe(1);
+    // The pass that finds the deadline passed is the same instant the row is dated from.
+    await expect(reconciler.reconcile(closedAtMs, 25)).resolves.toBe(1);
     expect(ledger.stored(OWNER, JOB)).toEqual(
       entry({ outcome: 'ambiguous', completedAt: new Date(closedAtMs).toISOString() }),
     );

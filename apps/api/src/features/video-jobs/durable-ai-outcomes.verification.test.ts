@@ -24,7 +24,7 @@ import type {
 import { AiUsageReconciler } from '../ai-usage/ai-usage-reconciler.js';
 import { FileAiUsageLedgerRepository } from '../ai-usage/file-ai-usage-ledger-repository.js';
 import { FileProcessingJobRepository } from '../processing-jobs/file-processing-job-repository.js';
-import { AI_USAGE_RECONCILE_BATCH } from './video-job-progression.js';
+import { AI_USAGE_RECONCILE_BATCH } from '../ai-usage/ai-usage-reconciler.js';
 
 /**
  * Slice 2.5, verified at the application boundary: an accepted submission reaches a retrievable

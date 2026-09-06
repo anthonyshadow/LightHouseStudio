@@ -4,6 +4,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VIDEO_JOB_TTL_MS, type InspectedVideo } from '@studio/contracts';
 import {
+  aiUsageOutcomeForJobStatus,
   applyAiUsageTransition,
   type AiUsageEntry,
   type AiUsageOutcomeCounts,
@@ -1910,6 +1911,74 @@ describe('VideoJobService', () => {
       completedAt: new Date(now).toISOString(),
     });
     expect(provider.submissions).toHaveLength(0);
+  });
+
+  it('closes the row of an unresumable record with the outcome its durable status implies', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-ledger-restore-failed-'));
+    const provider = new FakeVideoProvider();
+    const ledger = new RecordingUsageLedger();
+    const now = Date.parse('2026-08-07T12:00:00.000Z');
+    const jobId = crypto.randomUUID();
+    const ownerId = '6c0a3f18-4b2d-4f27-9a4e-0f1c6d5b8e34';
+    const traces: VideoProcessingJobTrace[] = [];
+    const durableRepository = {
+      admit: vi.fn().mockResolvedValue('admitted' as const),
+      listResumable: vi.fn().mockResolvedValue([
+        {
+          jobId,
+          ownerUserId: ownerId,
+          projectId: null,
+          operation: 'character-swap' as const,
+          // Configured nowhere in this registry, so the record cannot be resumed and the process
+          // that inherited it has to settle what it found instead of carrying it.
+          provider: 'pruna',
+          providerJobId: 'provider-restored',
+          requestFingerprint: 'a'.repeat(64),
+          status: 'queued' as const,
+          outputResolution: '720p' as const,
+          providerOutputLocation: null,
+          sourceDurationMs: 1_000,
+          sourceOrientation: 'landscape' as const,
+          createdAt: '2026-08-07T11:59:00.000Z',
+          updatedAt: '2026-08-07T11:59:30.000Z',
+          expiresAt: '2026-08-07T13:00:00.000Z',
+        },
+      ]),
+      upsert: vi.fn((trace: VideoProcessingJobTrace) => {
+        traces.push(trace);
+        return Promise.resolve();
+      }),
+      findOutcomes: vi.fn().mockResolvedValue(new Map()),
+    };
+    const service = createService(provider, root, {
+      now: () => now,
+      durableJobRepository: durableRepository,
+      traceWriter: durableRepository,
+      usageLedger: ledger,
+    });
+    services.push(service);
+
+    await service.ready();
+
+    const durableStatuses = traces.map((trace) => trace.status);
+    expect(durableStatuses).toEqual(['failed']);
+    // One close and no open: this row was opened before the restart. Its outcome is read off the
+    // durable status through the one rule rather than decided again beside it, so a path that
+    // changed what it writes durably cannot leave the ledger saying something else.
+    expect(ledger.writes).toHaveLength(1);
+    expect([...ledger.rows.values()]).toEqual(
+      durableStatuses.map((status) => ({
+        ownerUserId: ownerId,
+        jobId,
+        operation: 'character-swap',
+        provider: 'pruna',
+        outcome: aiUsageOutcomeForJobStatus(status),
+        submittedAt: '2026-08-07T11:59:00.000Z',
+        completedAt: new Date(now).toISOString(),
+      })),
+    );
+    expect(provider.submissions).toHaveLength(0);
+    expect(await service.existing(jobId, ownerId)).toBeNull();
   });
 
   it('carries a queued job to ready without a client status request', async () => {

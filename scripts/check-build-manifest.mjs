@@ -103,7 +103,10 @@ export const BUILD_CLOSURE_BUDGETS = {
   // and looking up a remembered upload key for that owner rather than for nobody.
   // Raised from 1_082_000 on 2026-09-06 for slice 2.5, measured 1_081_561 → 1_086_995: the shell's
   // growth above, carried here too, and nothing else. A Studio route mounts the same Account panel.
-  'src/studio/StudioApp.tsx': 1_087_000,
+  // Then 1_086_995 → 1_087_085 on the slice's cleanup pass, which moved the month total into a
+  // domain helper and gave the operation label a fallback, so the surface carries a little shared
+  // code in place of a hand-written sum.
+  'src/studio/StudioApp.tsx': 1_088_000,
 };
 
 /**

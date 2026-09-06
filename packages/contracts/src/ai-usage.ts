@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { opaquePageTokenSchema } from './common';
-import { videoTransformOperationIdSchema } from './video-jobs';
+import { videoJobRecordedNameSchema } from './video-jobs';
 
 /**
  * Mirrors `AI_USAGE_OUTCOMES` in the domain, which owns the rule that turns a job status into an
@@ -18,13 +18,15 @@ export const aiUsageOutcomeSchema = z.enum([
 export const aiUsageLedgerEntrySchema = z
   .object({
     jobId: z.uuid(),
-    operation: videoTransformOperationIdSchema,
     /**
-     * Which provider the submission went to, as a bounded string rather than an enum: the ledger
-     * stores whatever ran the job, and one row naming a provider this build no longer offers must
-     * not fail the whole page of usage.
+     * What ran and who ran it, both bounded strings rather than the enums the rest of the wire
+     * uses. A ledger row is a record of spend that was already made: it names whatever the store
+     * kept, so a row naming an operation kind this build has renamed, or a provider it no longer
+     * offers, has to stay readable. The handler parses the whole response, so an enum here would
+     * let one historical row answer 500 for the account's entire usage page.
      */
-    provider: z.string().trim().min(1).max(80),
+    operation: videoJobRecordedNameSchema,
+    provider: videoJobRecordedNameSchema,
     /** Null while the submission is still running; a settled outcome once it is terminal. */
     outcome: aiUsageOutcomeSchema.nullable(),
     submittedAt: z.iso.datetime(),
@@ -55,7 +57,13 @@ export const aiUsageLedgerQuerySchema = z
   })
   .strict();
 
-/** How the window's submissions settled. `running` counts the rows with no outcome yet. */
+/**
+ * How the window's submissions settled. `running` counts the rows with no outcome yet.
+ *
+ * One key per outcome, spelled out by hand for the same reason the outcome list above is, and held
+ * to that list by the same parity test: this object is strict, so a key it lacks is the stores'
+ * counts rejected rather than a count quietly missing from the page.
+ */
 export const aiUsageLedgerCountsSchema = z
   .object({
     running: z.number().int().nonnegative(),
