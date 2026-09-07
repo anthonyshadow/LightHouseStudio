@@ -106,7 +106,11 @@ export const BUILD_CLOSURE_BUDGETS = {
   // Then 1_086_995 → 1_087_085 on the slice's cleanup pass, which moved the month total into a
   // domain helper and gave the operation label a fallback, so the surface carries a little shared
   // code in place of a hand-written sum.
-  'src/studio/StudioApp.tsx': 1_088_000,
+  // Raised from 1_088_000 on 2026-09-07 for slice 2.6 (the retake loop), measured 1_087_085 →
+  // 1_089_350. Three things land in this closure: the launch hook's confirmation and its mirrored
+  // guard refs, the shared take-discard question, and a fifth control on the review surface whose
+  // row now wraps rather than shrinking its children below their labels.
+  'src/studio/StudioApp.tsx': 1_090_000,
 };
 
 /**

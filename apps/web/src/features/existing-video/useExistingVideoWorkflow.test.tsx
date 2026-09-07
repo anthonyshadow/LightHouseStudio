@@ -107,7 +107,7 @@ const recordingController = (): RecordingController => {
     restorePersistedOriginal: vi.fn().mockReturnValue(source),
     presentRemoteOriginal: vi.fn().mockReturnValue(source),
     replaceSource: vi.fn().mockReturnValue(source),
-    discard: vi.fn(),
+    discard: vi.fn(() => true),
     beginProcessing: vi.fn(),
     cancelProcessing: vi.fn(),
     completeVisualProcessing: vi.fn((blob: Blob, mimeType: string, label: string) => {
@@ -1242,7 +1242,9 @@ describe('useExistingVideoWorkflow', () => {
     expect(result.current.message).toBe('Visual processing rejected the submitted media.');
     expect(adapters.releaseVideoJob).not.toHaveBeenCalled();
 
-    act(() => result.current.reset(true));
+    act(() => {
+      result.current.reset(true);
+    });
     expect(adapters.releaseVideoJob).toHaveBeenCalledOnce();
     expect(recording.discard).toHaveBeenCalledOnce();
     unmount();

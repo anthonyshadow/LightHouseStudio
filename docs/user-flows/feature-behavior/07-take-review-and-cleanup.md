@@ -14,8 +14,9 @@ deliberately close or discard it.
    recorder container is never downloadable.
 4. After the converted MP4 becomes authoritative and live/provider resources release, confirm
    **Recorded take playback** on the Studio stage. Local and live AI recordings retain compact
-   Save, Discard, Voice, and Close actions directly beneath the video. They never overlay the take or
-   its native playback controls, and the narrowest supported viewport wraps them into a second row.
+   Save, Discard, Voice, Record again, and Close actions directly beneath the video. They never
+   overlay the take or its native playback controls, and the narrowest supported viewport wraps them
+   into a second row.
 5. Confirm **Edit video** is enabled in the creative tool rail for any finalized playback. An
    editor-backed upload reopens its retained editor state; a local/live-AI take is adopted into
    the existing-video workflow, whose panel opens already holding it. While playback is
@@ -28,10 +29,10 @@ deliberately close or discard it.
 6. When the detailed **Latest take** surface opens after finishing an editor flow or returning from
    Voice, duration and dimensions are inline; mode, sources, start time, frame rate, size and MIME
    type are behind a collapsed **Details** disclosure. `Save to Assets` is the only primary and
-   `Discard` the only destructive control; `Replace Saved Version`, `Edit video`, `Voice treatments`
-   and `Close without saving` are in the panel's action menu. Below 40rem the panel is a bottom
-   sheet at `min(45dvh, 24rem)`, so the stage it refers to stays visible above it. The panel does
-   not create another player and has no dedicated tool-rail launcher.
+   `Discard` the only destructive control; `Replace Saved Version`, `Edit video`, `Voice treatments`,
+   `Record another take` and `Close without saving` are in the panel's action menu. Below 40rem the
+   panel is a bottom sheet at `min(45dvh, 24rem)`, so the stage it refers to stays visible above it.
+   The panel does not create another player and has no dedicated tool-rail launcher.
 7. Optionally apply a voice treatment. Playback and saving remain locked until processing
    settles or is cancelled.
 8. Select **Save Video**, optionally name it, and confirm. A blank name keeps the existing generated
@@ -44,11 +45,18 @@ deliberately close or discard it.
    context keeps its own attach-and-return behavior and shows no completion surface.
 10. Select **Close without saving** (**Close** on the compact control bar). The durable gallery copy
     remains available for preview, reuse, and download. Or select **Discard** and confirm
-    irreversible removal of the take without saving it.
+    irreversible removal of the take without saving it. Or select **Record another take**
+    (**Record again** on the compact control bar): while the take is unsaved it asks the same
+    irreversible-loss question under a **Discard and record** confirmation, then discards the take
+    and re-acquires the camera, record-ready and not recording. It is offered only where the bytes
+    on the stage are this tab's own take — not inside a Project, where **Record** owns the stage,
+    and not over a Project source streamed from the server.
 
 ## Guards and recovery
 
-- Close stays unavailable until the current artifact is saved to the gallery.
+- Close appears only when nothing unsaved is at risk: after this take is saved to the gallery, or
+  when the stage holds an unchanged video opened from Assets. Until then the entry is absent rather
+  than disabled, and Discard stands in its place.
 - Playback, Voice, and Save Video remain unavailable while device-local transcoding is
   active.
 - Main video remains available if the optional sidecar fails, provided the required H.264 MP4
@@ -63,11 +71,14 @@ deliberately close or discard it.
 - Source end, manual Stop, provider end, and maximum-duration Stop coalesce into one finalization.
 - A before-unload warning and discard confirmation reduce accidental loss, but refresh, crash, tab
   closure, or device restart still loses the in-memory take.
-- No new camera or provider activity starts while review owns the take.
+- No camera or provider activity starts on its own while review owns the take. **Record another
+  take** is the one way back to a live camera: it discards the take first, confirmed when unsaved,
+  and only then re-acquires; a refused discard starts nothing.
 
 ## Evidence status
 
 Automated journeys cover finalization/transcode ordering, required codec configuration,
 track-preserving failure, local-edit history/cancellation/replacement, maximum-duration races,
 voice locking, gallery save, release, and discard. Gallery download completion, real codecs,
-memory, and interruption recovery remain manual/physical evidence.
+memory, interruption recovery, and whether the retake's second camera acquisition re-prompts for
+permission remain manual/physical evidence.

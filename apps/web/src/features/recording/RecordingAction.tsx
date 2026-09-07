@@ -128,14 +128,17 @@ export const RecordingAction = ({
       const proceed = await confirmation.ask({
         title: 'Start another take?',
         description:
-          'Starting another take replaces the current in-memory clip. Save it first if you want to keep it.',
+          'Starting another take replaces the current take, which only exists in this browser tab. Save it first if you want to keep it.',
         confirmLabel: 'Start new take',
         cancelLabel: 'Keep current take',
         danger: true,
       });
       if (!proceed) return;
     }
-    if (recording.original) recording.discard();
+    // A refused discard means the previous take is still finalizing, and `start` refuses on the
+    // same condition — so continuing would leave the operator with a confirmed dialog, the old
+    // take still on the stage, and a button that did nothing.
+    if (recording.original && !recording.discard()) return;
     if (characterAttribution) await recording.start(source, mode, characterAttribution);
     else await recording.start(source, mode);
   }, [characterAttribution, confirmation, mode, recording, source]);

@@ -54,7 +54,7 @@ afterEach(cleanup);
 describe('useStudioProjectBridge', () => {
   it('keeps project media callbacks route-scoped and hides stale activity', () => {
     const presentSource = vi.fn();
-    const clearSource = vi.fn();
+    const clearSource = vi.fn(() => true);
     const hook = renderHook(
       ({ projectId }) =>
         useStudioProjectBridge({
@@ -108,7 +108,7 @@ describe('useStudioProjectBridge', () => {
 
   it('refuses a clear from a Project that never presented onto the stage', () => {
     const presentSource = vi.fn();
-    const clearSource = vi.fn();
+    const clearSource = vi.fn(() => true);
     const hook = renderHook(() =>
       useStudioProjectBridge({
         projectId: firstProjectId,
@@ -152,7 +152,7 @@ describe('useStudioProjectBridge', () => {
           recordingLifecycle: lifecycle,
           recordingOriginal: original,
           presentSource: vi.fn(),
-          clearSource: vi.fn(),
+          clearSource: vi.fn(() => true),
         }),
       {
         initialProps: {
@@ -197,7 +197,7 @@ describe('useStudioProjectBridge', () => {
         recordingLifecycle: 'recorded',
         recordingOriginal: remote,
         presentSource: vi.fn(),
-        clearSource: vi.fn(),
+        clearSource: vi.fn(() => true),
       }),
     );
 

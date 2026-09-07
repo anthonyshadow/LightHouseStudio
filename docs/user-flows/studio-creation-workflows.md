@@ -181,6 +181,12 @@ in the take-review dock and in the existing-video result bar, so they survive di
   `?intent=record` — the panel opens after any explicit save, including one that began as an upload,
   so auto-starting the camera would demand a permission prompt nobody asked for and would push a
   history entry back onto the just-saved state.
+- **Record another take**, on take review, is the distinct press that does start the camera
+  (`restartCapture` in `useStudioRecordingLaunch`), and it does not overturn the decision above. It
+  is named for recording and is pressed while the take is still on the stage, so any permission
+  prompt it raises is the one the operator just asked for; it confirms the loss first while the take
+  is unsaved, discards the take, and only then re-acquires. Create another appears after a save and
+  says nothing about recording; this one says what it will do and asks before it does it.
 - The panel is **suppressed while a Project video context owns the save** (`?projectId=` verified).
   That path keeps its existing behaviour: attach the new Video to the Project, then replace the URL
   with `/projects/{id}`.

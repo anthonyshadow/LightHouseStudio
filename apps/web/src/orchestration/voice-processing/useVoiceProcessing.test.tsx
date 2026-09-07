@@ -89,7 +89,7 @@ const recordingController = (): RecordingController => {
     restorePersistedOriginal: vi.fn().mockReturnValue(original),
     presentRemoteOriginal: vi.fn().mockReturnValue(original),
     replaceSource: vi.fn().mockReturnValue(original),
-    discard: vi.fn(),
+    discard: vi.fn(() => true),
     beginProcessing: vi.fn(),
     cancelProcessing: vi.fn(),
     completeVisualProcessing: vi.fn().mockReturnValue(original),

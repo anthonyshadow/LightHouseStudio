@@ -24,6 +24,7 @@ import type {
 } from '../features/projects/ProjectRouteSurface';
 import { hasDraftContent } from '../features/media-session';
 import { persistedReferenceAssetId } from '../features/media-session/types';
+import { ownedRecordingArtifact } from '../features/recording/types';
 import { useStudioSession } from '../orchestration/session';
 import { ReferenceUseFailureNotice } from './ReferenceUseFailureNotice';
 import { CreativeWorkspace, type CreativeWorkspaceState } from './CreativeWorkspace';
@@ -250,9 +251,11 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     videoEditor,
   );
   const {
+    captureSupported,
     startLocalRecording,
     startExistingVideoRecording,
     startProjectRecording,
+    restartCapture,
     openPlaybackEditor,
     openExistingVideo,
     clearExistingVideoIntent,
@@ -274,6 +277,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     openOverlay,
     closeOverlay,
     focusMain: focusStudio,
+    confirmation,
   });
 
   const {
@@ -817,6 +821,18 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     activeProjectSourceActivity !== null &&
     !activeProjectSourceActivity.accepted &&
     !activeProjectSourceActivity.busy;
+  /**
+   * The one place the retake loop is offered or withheld, so the panel and the control bar can
+   * never disagree about it. Three conditions, each for its own reason: a browser that cannot
+   * capture would have the take destroyed for a camera it then refuses to start; inside a Project
+   * the stage answers to `startProjectRecording`, whose guards and navigation this would bypass;
+   * and a URL-backed presentation is a Project source streamed over HTTP, not a take this runtime
+   * holds, so there is nothing here to record again.
+   */
+  const retakeAvailable =
+    captureSupported &&
+    !projectContextActive &&
+    ownedRecordingArtifact(recording.presented) !== null;
 
   return (
     <>
@@ -853,6 +869,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
         actions={{
           startLocalRecording,
           closeTakeReview,
+          ...(retakeAvailable ? { recordAnotherTake: restartCapture } : {}),
           discardExistingVideoSelection,
           openVoiceTreatments: () => openOverlay('voice-treatments'),
           openAiExperience: liveExperience.openLiveAiExperience,
@@ -935,6 +952,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
         onStartExistingVideoRecording={startExistingVideoRecording}
         onDiscardExistingVideoSelection={discardExistingVideoSelection}
         onEditVideo={openEditorFromRail}
+        {...(retakeAvailable ? { onRecordAnotherTake: restartCapture } : {})}
         onOpenSavedCharacters={openSavedCharacters}
         onOpenSavedOutfits={openOutfitSelector}
         onOpenSavedVideosLibrary={nav.openVideos}

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
@@ -54,7 +54,7 @@ const recording = (): RecordingController => {
     restorePersistedOriginal: vi.fn().mockReturnValue(original),
     presentRemoteOriginal: vi.fn().mockReturnValue(original),
     replaceSource: vi.fn().mockReturnValue(original),
-    discard: vi.fn(),
+    discard: vi.fn(() => true),
     beginProcessing: vi.fn(),
     cancelProcessing: vi.fn(),
     completeVisualProcessing: vi.fn().mockReturnValue(original),
@@ -181,5 +181,200 @@ describe('TakeDock metadata', () => {
     await user.click(screen.getByRole('button', { name: 'More actions for this take' }));
     await user.click(screen.getByRole('menuitem', { name: 'Edit video' }));
     expect(onEditVideo).toHaveBeenCalledOnce();
+  });
+
+  it('offers Record another take as a menu row that says what the press destroys', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <StudioDesignProvider>
+        <TakeDock
+          recording={recording()}
+          processing={processing}
+          elevenLabsAvailable={false}
+          view="take"
+          onRecordAnotherTake={vi.fn(() => true)}
+        />
+      </StudioDesignProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'More actions for this take' }));
+
+    // The accessible name stays the label; the destruction is announced as the description.
+    const retake = screen.getByRole('menuitem', { name: 'Record another take' });
+    expect(retake).toHaveAccessibleDescription('Discards this take and starts the camera again.');
+    expect(retake).toHaveAttribute('aria-disabled', 'false');
+  });
+
+  it('leaves the take standing when the discard is declined, and returns focus to the menu trigger', async () => {
+    const user = userEvent.setup();
+    const discard = vi.fn(() => true);
+    const controller: RecordingController = { ...recording(), discard };
+    const onRecordAnotherTake = vi.fn(() => true);
+
+    render(
+      <StudioDesignProvider>
+        <TakeDock
+          recording={controller}
+          processing={processing}
+          elevenLabsAvailable={false}
+          view="take"
+          onRecordAnotherTake={onRecordAnotherTake}
+        />
+      </StudioDesignProvider>,
+    );
+
+    const trigger = screen.getByRole('button', { name: 'More actions for this take' });
+    await user.click(trigger);
+    await user.click(screen.getByRole('menuitem', { name: 'Record another take' }));
+
+    // The take-review question, verbatim, with the sentence that names the restart.
+    expect(
+      await screen.findByRole('dialog', { name: 'Discard this take?' }),
+    ).toHaveAccessibleDescription(
+      'It only exists in this browser tab, so it cannot be recovered once you discard it. The camera starts again so you can record.',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Stay' }));
+
+    expect(discard).not.toHaveBeenCalled();
+    expect(onRecordAnotherTake).not.toHaveBeenCalled();
+    // Selecting the row closed the menu, so the trigger is the only element that survived it.
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it('hands a confirmed retake to one owner, which discards before the surface does anything else', async () => {
+    const user = userEvent.setup();
+    const discard = vi.fn(() => true);
+    const controller: RecordingController = { ...recording(), discard };
+    const onCloseTake = vi.fn();
+    const onDiscardTake = vi.fn();
+    // The double is `restartCapture`: one act that discards, ends the handoff and re-acquires, and
+    // answers whether the discard was allowed.
+    const onRecordAnotherTake = vi.fn(() => controller.discard());
+
+    render(
+      <StudioDesignProvider>
+        <TakeDock
+          recording={controller}
+          processing={processing}
+          elevenLabsAvailable={false}
+          view="take"
+          onCloseTake={onCloseTake}
+          onDiscardTake={onDiscardTake}
+          onRecordAnotherTake={onRecordAnotherTake}
+        />
+      </StudioDesignProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'More actions for this take' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Record another take' }));
+    await user.click(await screen.findByRole('button', { name: 'Discard and record' }));
+
+    expect(onRecordAnotherTake).toHaveBeenCalledOnce();
+    // No camera can be asked for before the take is gone, because the take goes first inside the
+    // one call this surface makes, and everything else follows it.
+    const [discardOrder = 0] = discard.mock.invocationCallOrder;
+    const [selectionResetOrder = 0] = onDiscardTake.mock.invocationCallOrder;
+    expect(discardOrder).toBeGreaterThan(0);
+    expect(selectionResetOrder).toBeGreaterThan(discardOrder);
+    // Two idempotent closes already follow the discard, and only one of them owns focus.
+    expect(onCloseTake).not.toHaveBeenCalled();
+  });
+
+  it('keeps review open with a notice when the restart refuses, and does nothing further', async () => {
+    const user = userEvent.setup();
+    const discard = vi.fn(() => true);
+    const controller: RecordingController = { ...recording(), discard };
+    const onCloseTake = vi.fn();
+    const onDiscardTake = vi.fn();
+    const onRecordAnotherTake = vi.fn(() => false);
+
+    render(
+      <StudioDesignProvider>
+        <TakeDock
+          recording={controller}
+          processing={processing}
+          elevenLabsAvailable={false}
+          view="take"
+          onCloseTake={onCloseTake}
+          onDiscardTake={onDiscardTake}
+          onRecordAnotherTake={onRecordAnotherTake}
+        />
+      </StudioDesignProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'More actions for this take' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Record another take' }));
+    await user.click(await screen.findByRole('button', { name: 'Discard and record' }));
+
+    expect(onRecordAnotherTake).toHaveBeenCalledOnce();
+    expect(discard).not.toHaveBeenCalled();
+    expect(onDiscardTake).not.toHaveBeenCalled();
+    expect(onCloseTake).not.toHaveBeenCalled();
+    // Awaited rather than queried: the notice is behind the dismissed dialog's isolation until the
+    // overlay finishes leaving.
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This take is still finishing, so nothing was discarded. Try again in a moment.',
+    );
+    expect(screen.getByRole('button', { name: 'Discard' })).toBeEnabled();
+  });
+
+  it('skips the question for a take that is already saved', async () => {
+    const user = userEvent.setup();
+    const onRecordAnotherTake = vi.fn(() => true);
+
+    render(
+      <StudioDesignProvider>
+        <TakeDock
+          recording={recording()}
+          processing={processing}
+          elevenLabsAvailable={false}
+          view="take"
+          hasUnsavedChanges={false}
+          onRecordAnotherTake={onRecordAnotherTake}
+        />
+      </StudioDesignProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'More actions for this take' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Record another take' }));
+
+    // Nothing recoverable is destroyed, which is the bargain `Close without saving` already strikes.
+    expect(onRecordAnotherTake).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('keeps review open with a notice when a confirmed Discard is refused', async () => {
+    const user = userEvent.setup();
+    const discard = vi.fn(() => false);
+    const controller: RecordingController = { ...recording(), discard };
+    const onCloseTake = vi.fn();
+    const onDiscardTake = vi.fn();
+
+    render(
+      <StudioDesignProvider>
+        <TakeDock
+          recording={controller}
+          processing={processing}
+          elevenLabsAvailable={false}
+          view="take"
+          onCloseTake={onCloseTake}
+          onDiscardTake={onDiscardTake}
+        />
+      </StudioDesignProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+    await user.click(screen.getByRole('button', { name: 'Discard take' }));
+
+    expect(discard).toHaveBeenCalledOnce();
+    // The operator answered "Discard take" and the take is still there; nothing downstream may act
+    // as though it went.
+    expect(onDiscardTake).not.toHaveBeenCalled();
+    expect(onCloseTake).not.toHaveBeenCalled();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This take is still finishing, so nothing was discarded. Try again in a moment.',
+    );
   });
 });

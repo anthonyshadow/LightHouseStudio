@@ -31,6 +31,7 @@ type StudioSessionControlBarProps = {
   onStartLocalRecording?: () => void;
   onCloseTakeReview: () => void;
   onDiscardTake?: () => void;
+  onRecordAnotherTake?: () => boolean;
   onOpenVoiceTreatments: () => void;
   onChooseAiExperience: () => void;
   onChangeExperience: () => void;
@@ -264,6 +265,7 @@ export const StudioSessionControlBar = ({
   onStartLocalRecording,
   onCloseTakeReview,
   onDiscardTake,
+  onRecordAnotherTake,
   onOpenVoiceTreatments,
   onChooseAiExperience,
   onChangeExperience,
@@ -328,6 +330,7 @@ export const StudioSessionControlBar = ({
           presentation="control-bar"
           onCloseTake={onCloseTakeReview}
           {...(onDiscardTake ? { onDiscardTake } : {})}
+          {...(onRecordAnotherTake ? { onRecordAnotherTake } : {})}
           onOpenVoiceTreatments={onOpenVoiceTreatments}
           {...(onSaveVideo ? { onSaveVideo } : {})}
           {...(saveVideoState ? { saveVideoState } : {})}
