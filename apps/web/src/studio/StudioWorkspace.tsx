@@ -91,6 +91,11 @@ interface StudioWorkspaceProps {
   readonly actions: {
     readonly startLocalRecording: () => void;
     readonly closeTakeReview: () => void;
+    /**
+     * Drops the reviewed take and brings the camera back. Absent means the loop is not offered —
+     * a decision `StudioApp` makes once, for both take-review presentations at the same time.
+     */
+    readonly recordAnotherTake?: () => boolean;
     readonly discardExistingVideoSelection: () => void;
     readonly openVoiceTreatments: () => void;
     readonly openAiExperience: () => void;
@@ -141,6 +146,7 @@ export const StudioWorkspace = ({
   const {
     startLocalRecording: onStartLocalRecording,
     closeTakeReview: onCloseTakeReview,
+    recordAnotherTake: onRecordAnotherTake,
     discardExistingVideoSelection: onDiscardExistingVideoSelection,
     openVoiceTreatments: onOpenVoiceTreatments,
     openAiExperience: onOpenAiExperience,
@@ -229,6 +235,7 @@ export const StudioWorkspace = ({
                       onStartLocalRecording={onStartLocalRecording}
                       onCloseTakeReview={onCloseTakeReview}
                       onDiscardTake={onDiscardExistingVideoSelection}
+                      {...(onRecordAnotherTake ? { onRecordAnotherTake } : {})}
                       onOpenVoiceTreatments={onOpenVoiceTreatments}
                       onChooseAiExperience={onOpenAiExperience}
                       onChangeExperience={onOpenAiExperience}

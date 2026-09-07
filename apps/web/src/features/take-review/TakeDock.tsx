@@ -24,6 +24,7 @@ export type TakeDockProps = {
   view: 'take' | 'voice';
   onCloseTake?: () => void;
   onDiscardTake?: () => void;
+  onRecordAnotherTake?: () => boolean;
   onEditVideo?: () => void;
   onOpenVoiceTreatments?: () => void;
   onSaveVideo?: () => void;
@@ -217,6 +218,7 @@ export const TakeDock = ({
   view,
   onCloseTake,
   onDiscardTake,
+  onRecordAnotherTake,
   onEditVideo,
   onOpenVoiceTreatments,
   onSaveVideo,
@@ -311,6 +313,7 @@ export const TakeDock = ({
                 recording={recording}
                 {...(onCloseTake ? { onCloseTake } : {})}
                 {...(onDiscardTake ? { onDiscardTake } : {})}
+                {...(onRecordAnotherTake ? { onRecordAnotherTake } : {})}
                 {...(onEditVideo ? { onEditVideo } : {})}
                 {...(onOpenVoiceTreatments ? { onOpenVoiceTreatments } : {})}
                 {...(onSaveVideo ? { onSaveVideo } : {})}

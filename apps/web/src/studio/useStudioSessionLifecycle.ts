@@ -74,14 +74,19 @@ export const useStudioSessionLifecycle = ({
   const updateOutfitDirty = outfit.updateDirty;
   const discardWardrobeDirty = character.discardWardrobeDirty;
 
-  const discardLocalTemporaryWork = useCallback(() => {
+  /**
+   * Answers whether the take is gone. The rest of the release runs either way: none of it is the
+   * take, and a runtime that stopped halfway would hold creative dirt nobody can reach.
+   */
+  const discardLocalTemporaryWork = useCallback((): boolean => {
     discardPendingAdoption();
     processing.cancel();
-    recording.discard();
+    const takeDiscarded = recording.discard();
     updateOutfitDirty(false);
     discardWardrobeDirty();
     discardSavedVideoWork();
     closeOverlay();
+    return takeDiscarded;
   }, [
     closeOverlay,
     discardPendingAdoption,
@@ -92,9 +97,9 @@ export const useStudioSessionLifecycle = ({
     updateOutfitDirty,
   ]);
 
-  const discardTemporaryWork = useCallback(() => {
+  const discardTemporaryWork = useCallback((): boolean => {
     existingVideo.reset(false);
-    discardLocalTemporaryWork();
+    return discardLocalTemporaryWork();
   }, [discardLocalTemporaryWork, existingVideo]);
 
   const hasTemporaryTake = Boolean(recording.presented);
@@ -108,6 +113,10 @@ export const useStudioSessionLifecycle = ({
 
   const cleanupTemporaryState = useCallback(async () => {
     const cleanup = existingVideo.cleanup();
+    // The one place a refused discard is read and deliberately ignored. This is teardown: the
+    // runtime is going away, its artifact URLs are revoked on the way out regardless, and the
+    // cleanup coordinator awaits its tasks with no per-task rescue — so stopping or throwing here
+    // would skip `release-media` and leave the camera running after logout or expiry.
     discardLocalTemporaryWork();
     await cleanup;
   }, [discardLocalTemporaryWork, existingVideo]);

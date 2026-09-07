@@ -17,7 +17,8 @@ interface UseStudioProjectBridgeOptions {
   readonly recordingLifecycle: RecordingLifecycle;
   readonly recordingOriginal: PresentedRecordingArtifact | null;
   readonly presentSource: (input: Parameters<ProjectStageSourceRuntime['present']>[1]) => void;
-  readonly clearSource: () => void;
+  /** Answers whether the stage is now clear; `false` means a take is still finalizing. */
+  readonly clearSource: () => boolean;
 }
 
 export const useStudioProjectBridge = ({
@@ -59,6 +60,13 @@ export const useStudioProjectBridge = ({
        * on. The unmounting source controller clears in a passive cleanup, by which point the
        * layout effect above has already retargeted `projectIdRef` — so matching only that would
        * drop the one clear that matters and strand the Project's source as a phantom take.
+       *
+       * The clear itself may refuse while a take is still finalizing, so the ref is released only
+       * once the stage actually is — nulling it first was that same phantom take by another name.
+       * A refusal stops here rather than propagating: this port answers `void` and the source
+       * controller goes on declaring the Project sourceless, which is survivable because the take
+       * keeps its own review controls on the stage and the refusal clears itself within the
+       * bounded finalization, while giving that controller a failure phase is a larger change.
        */
       clear: (candidateProjectId) => {
         if (
@@ -67,8 +75,8 @@ export const useStudioProjectBridge = ({
         ) {
           return;
         }
+        if (!clearSourceRef.current()) return;
         presentedProjectIdRef.current = null;
-        clearSourceRef.current();
       },
     }),
     [],

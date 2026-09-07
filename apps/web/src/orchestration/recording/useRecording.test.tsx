@@ -968,7 +968,9 @@ describe('useRecording recorder construction failures', () => {
       audioSource: 'none',
     });
 
-    act(() => result.current.discard());
+    act(() => {
+      result.current.discard();
+    });
     expect(result.current.metadata).toBeNull();
     expect(result.current.presented).toBeNull();
     unmount();
@@ -1381,6 +1383,126 @@ describe('useRecording recorder construction failures', () => {
       reason: 'recorder-stopped',
     });
     expect(result.current.lifecycle).toBe('recorded');
+    unmount();
+  });
+});
+
+describe('useRecording discard answers', () => {
+  it('answers true from a settled take, leaving the runtime holding none', async () => {
+    installRecorderHarness();
+    const { result, unmount } = renderHook(() => useRecording());
+
+    await act(async () => {
+      await result.current.start(createSource(), 'local');
+      await result.current.stop();
+    });
+    expect(result.current.presented).not.toBeNull();
+
+    let answered = false;
+    act(() => {
+      answered = result.current.discard();
+    });
+
+    expect(answered).toBe(true);
+    expect(result.current.presented).toBeNull();
+    expect(result.current.original).toBeNull();
+    expect(result.current.lifecycle).toBe('idle');
+
+    unmount();
+  });
+
+  it('answers true with nothing to discard, because the answer is the state that follows', () => {
+    installRecorderHarness();
+    const { result, unmount } = renderHook(() => useRecording());
+
+    let answered = false;
+    act(() => {
+      answered = result.current.discard();
+    });
+
+    expect(answered).toBe(true);
+    expect(result.current.presented).toBeNull();
+    expect(result.current.lifecycle).toBe('idle');
+
+    unmount();
+  });
+
+  it('answers false while a recorder attempt still owns the bytes, and keeps the attempt', async () => {
+    installRecorderHarness();
+    const { result, unmount } = renderHook(() => useRecording());
+
+    await act(async () => {
+      await result.current.start(createSource(), 'local');
+    });
+    expect(result.current.lifecycle).toBe('recording');
+
+    let answered = true;
+    act(() => {
+      answered = result.current.discard();
+    });
+
+    expect(answered).toBe(false);
+    expect(result.current.lifecycle).toBe('recording');
+    expect(result.current.activeSource).not.toBeNull();
+
+    // The refused call left the attempt intact, so the take it was holding still finalizes.
+    await act(async () => {
+      await result.current.stop();
+    });
+    expect(result.current.lifecycle).toBe('recorded');
+    expect(result.current.presented).not.toBeNull();
+
+    unmount();
+  });
+
+  it('answers false across the on-device transcode and true once it resolves', async () => {
+    installRecorderHarness();
+    let finishTranscode!: (value: { blob: Blob; mimeType: 'video/mp4' }) => void;
+    recordingTranscode.transcode.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishTranscode = resolve;
+        }),
+    );
+    const { result, unmount } = renderHook(() => useRecording());
+
+    await act(async () => {
+      await result.current.start(createSource(), 'local');
+    });
+    let stopping!: Promise<PresentedRecordingArtifact | null>;
+    act(() => {
+      stopping = result.current.stop();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(result.current.lifecycle).toBe('stopping');
+
+    let duringTranscode = true;
+    act(() => {
+      duringTranscode = result.current.discard();
+    });
+    expect(duringTranscode).toBe(false);
+
+    await act(async () => {
+      finishTranscode({
+        blob: new NativeBlob(['converted'], { type: 'video/mp4' }),
+        mimeType: 'video/mp4',
+      });
+      await stopping;
+    });
+    expect(result.current.lifecycle).toBe('recorded');
+
+    let afterTranscode = false;
+    act(() => {
+      afterTranscode = result.current.discard();
+    });
+
+    expect(afterTranscode).toBe(true);
+    expect(result.current.presented).toBeNull();
+    expect(result.current.lifecycle).toBe('idle');
+
     unmount();
   });
 });

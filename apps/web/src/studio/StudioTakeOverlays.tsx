@@ -21,6 +21,7 @@ export const StudioTakeOverlays = ({
   mainRef,
   onClose,
   onDiscardTake,
+  onRecordAnotherTake,
   onEditVideo,
   onOpenVoiceTreatments,
   onBackToTakeReview,
@@ -39,6 +40,8 @@ export const StudioTakeOverlays = ({
   mainRef: RefObject<HTMLElement | null>;
   onClose: () => void;
   onDiscardTake: () => void;
+  /** Reaches the take dock only. The voice dock renders no take controls to hang it on. */
+  onRecordAnotherTake?: () => boolean;
   onEditVideo?: () => void;
   onOpenVoiceTreatments: () => void;
   onBackToTakeReview: () => void;
@@ -72,6 +75,7 @@ export const StudioTakeOverlays = ({
             browserCapabilities={browserCapabilities}
             onCloseTake={onClose}
             onDiscardTake={onDiscardTake}
+            {...(onRecordAnotherTake ? { onRecordAnotherTake } : {})}
             {...(onEditVideo ? { onEditVideo } : {})}
             onOpenVoiceTreatments={onOpenVoiceTreatments}
             {...(onSaveVideo ? { onSaveVideo } : {})}

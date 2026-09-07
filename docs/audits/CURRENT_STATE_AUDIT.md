@@ -148,8 +148,20 @@ material flow problems are of shape, not breakage:
     is converted to H.264 in the browser where the browser can decode it, and refused with copy
     that says so where it cannot;
     uploads do not survive a page reload despite full server-side replay support (STOR-2).
-12. **Recording is one-shot** (studio-2): the camera is released after every take; there is no
-    retake loop, pause/resume, or multi-take comparison.
+12. **Recording is one-shot** (studio-2): _retake loop closed by slice 2.6 (2026-09-07)._ Take
+    review offers **Record another take**, which confirms the loss while the take is unsaved,
+    discards the take, and only then re-acquires the camera. The camera is still released at
+    finalization, so the loop pays one fresh acquisition instead of holding a stream through
+    review. Pause/resume and multi-take comparison were also in this item's scope and are not
+    built. The same slice closed two defects **this audit never recorded** and which, until it, were
+    defined nowhere but [prompt 23](../roadmap/IMPLEMENTATION_PROMPTS.md); both were confirmed in
+    code, with file:line evidence in the [slice 2.6 plan](../roadmap/SLICE_2.6_RETAKE_LOOP_PLAN.md).
+    **studio-8:** `recording.discard()` returned nothing and refused silently while a recorder
+    attempt or an on-device transcode still owned the bytes, so seven call sites acted as though the
+    take were gone; it now answers a boolean with a documented post-condition, and every non-test
+    caller reads it. **studio-9:** `startProjectRecording` dropped a presented take with no
+    confirmation and no check before it navigated and started capture; it now guards, asks through
+    the shell, re-checks the Project and the runtime after the answer, and asserts the discard.
 
 ## 5. Capability inventory (condensed)
 

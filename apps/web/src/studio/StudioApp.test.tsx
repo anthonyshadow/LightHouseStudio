@@ -28,6 +28,13 @@ type WorkspaceHarnessProps = {
   refs: CreativeWorkspaceRefs;
 };
 
+/** Only what composition decides: everything else about the dock is its own suite's business. */
+type TakeDockHarnessProps = {
+  view: 'take' | 'voice';
+  onEditVideo?: () => void;
+  onRecordAnotherTake?: () => boolean;
+};
+
 const referenceAsset: ReferenceImageAsset = {
   assetId: '28d0b01f-70aa-4db6-ac65-379cdd916113',
   mimeType: 'image/png',
@@ -200,7 +207,7 @@ const harness = vi.hoisted(() => {
     recordingError: null,
     processingState: 'idle' as const,
     elapsedSeconds: 0,
-    discard: vi.fn(),
+    discard: vi.fn(() => true),
   };
   const existingVideo = {
     selection: null as null | ReturnType<typeof readySelection>,
@@ -256,6 +263,7 @@ const harness = vi.hoisted(() => {
     existingVideo,
     takeStagePresentation,
     latestWorkspace: null as WorkspaceHarnessProps | null,
+    latestTakeDockProps: null as TakeDockHarnessProps | null,
     latestProjectSurfaceProps: null as ProjectRouteSurfaceProps | null,
     latestHeaderDestination: null as StudioHeaderDestination | null,
     fetchReferenceImageMetadata: vi.fn(),
@@ -395,9 +403,11 @@ vi.mock('../features/existing-video/ExistingVideoPanel', () => ({
   ExistingVideoPanel: ({
     onRecordVideo,
     onAdjustVideo,
+    onFinish,
   }: {
     onRecordVideo?: () => void;
     onAdjustVideo?: () => void;
+    onFinish?: () => void;
   }) => (
     <div>
       Post-recording editor
@@ -411,21 +421,30 @@ vi.mock('../features/existing-video/ExistingVideoPanel', () => ({
           Edit video
         </button>
       ) : null}
+      {onFinish ? (
+        <button type="button" onClick={onFinish}>
+          Finish existing video
+        </button>
+      ) : null}
     </div>
   ),
 }));
 
 vi.mock('../features/take-review/TakeDock', () => ({
-  TakeDock: ({ onEditVideo }: { onEditVideo?: () => void }) => (
-    <div>
-      Saved Video review controls
-      {onEditVideo ? (
-        <button type="button" onClick={onEditVideo}>
-          Edit video
-        </button>
-      ) : null}
-    </div>
-  ),
+  TakeDock: (props: TakeDockHarnessProps) => {
+    // The take view is the only one composition hands take actions to; the voice dock renders none.
+    if (props.view === 'take') harness.latestTakeDockProps = props;
+    return (
+      <div>
+        Saved Video review controls
+        {props.onEditVideo ? (
+          <button type="button" onClick={props.onEditVideo}>
+            Edit video
+          </button>
+        ) : null}
+      </div>
+    );
+  },
 }));
 
 vi.mock('../features/creative-assets/OutfitSelector', () => ({
@@ -800,6 +819,7 @@ describe('StudioApp composition lifecycle', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/');
     harness.latestWorkspace = null;
+    harness.latestTakeDockProps = null;
     harness.latestProjectSurfaceProps = null;
     harness.latestHeaderDestination = null;
     harness.promptCommitted = null;
@@ -814,6 +834,7 @@ describe('StudioApp composition lifecycle', () => {
     harness.recording.discard.mockClear();
     harness.existingVideo.adoptRecordedArtifact.mockClear();
     harness.existingVideo.selectFile.mockClear();
+    harness.existingVideo.reset.mockClear();
     harness.session.replaceRecipeDraft.mockClear();
     harness.repository.recordSuccessfulPrompt.mockClear();
     harness.repository.enrichNewestMatchingRecent.mockClear();
@@ -964,6 +985,64 @@ describe('StudioApp composition lifecycle', () => {
     expect(
       screen.queryByRole('navigation', { name: 'Video editing tools' }),
     ).not.toBeInTheDocument();
+  });
+
+  it('clears the previous direct saved-video work, take and all, before hydrating the route', async () => {
+    renderStudio(`/studio/${directVideoId}`);
+
+    await screen.findByRole('region', { name: 'Latest take' });
+    // `resetDirectSavedVideoWork` is the second caller that passes `true`, and the `true` is what
+    // sends the take on the stage with the rest of the work rather than leaving it behind.
+    expect(harness.existingVideo.reset).toHaveBeenCalledWith(true);
+    expect(harness.resetSavedVideo).toHaveBeenCalled();
+    const [resetOrder = 0] = harness.existingVideo.reset.mock.invocationCallOrder;
+    const [selectOrder = 0] = harness.existingVideo.selectFile.mock.invocationCallOrder;
+    expect(resetOrder).toBeGreaterThan(0);
+    expect(selectOrder).toBeGreaterThan(resetOrder);
+  });
+
+  it('withholds the retake from the take panel inside a Project and offers it outside one', async () => {
+    const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
+    // Entering the Project before a take exists is the only unblocked way in: the exit guard
+    // refuses to carry an in-memory take across a Project boundary, which is its own decision.
+    const { router } = renderStudio('/studio/create?intent=upload');
+    await screen.findByRole('region', { name: 'Use existing video' });
+    await act(async () => {
+      await router.navigate(`/projects/${projectId}/workspace`);
+    });
+    await screen.findByText('Deferred Projects workspace');
+
+    const media = new Blob(['cut'], { type: 'video/mp4' });
+    harness.recording.presented = {
+      id: 'project-take',
+      media,
+      objectUrl: 'blob:project-take',
+      mimeType: 'video/mp4',
+      filename: 'project-take.mp4',
+      sourceModeId: 'local',
+      startedAt: '2026-08-11T16:00:00.000Z',
+      durationMs: 10_000,
+      sizeBytes: media.size,
+    };
+    harness.takeStagePresentation = { kind: 'playback', mode: 'local' };
+    fireEvent.click(screen.getByRole('button', { name: 'Finish existing video' }));
+    await screen.findByRole('region', { name: 'Latest take' });
+
+    // The panel is mounted in a Project, but the one gate withholds the action: here the stage
+    // answers to startProjectRecording, whose guards and navigation a retake would bypass.
+    expect(harness.latestTakeDockProps?.view).toBe('take');
+    expect(harness.latestTakeDockProps?.onRecordAnotherTake).toBeUndefined();
+
+    await act(async () => {
+      await router.navigate('/studio/create');
+    });
+
+    // Same take, same open panel; only the Project context changed, and the gate lives in exactly
+    // one place, so the panel and the compact bar cannot disagree about it.
+    await waitFor(() =>
+      expect(typeof harness.latestTakeDockProps?.onRecordAnotherTake).toBe('function'),
+    );
+    expect(screen.getByRole('region', { name: 'Latest take' })).toBeVisible();
   });
 
   it('shows a safe direct-route failure and returns to the canonical Video library', async () => {

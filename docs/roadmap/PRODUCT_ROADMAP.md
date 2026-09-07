@@ -97,8 +97,15 @@ provider, outcome, duration) is written at the paid call and read back in Accoun
 visit still adopts it — and a retained standalone result has no browser surface in this slice, which
 leaves the standalone re-attach to Phase 4. Design, and the six answered questions, in the
 [slice 2.5 plan](SLICE_2.5_DURABLE_AI_OUTCOMES_PLAN.md).
-2.6 Capture iteration: "Record another take" loop; keep release-on-review as the default privacy
-posture (studio-2).
+2.6 Capture iteration — **implemented 2026-09-07**: "Record another take" on take review discards
+the take, confirmed while it is unsaved, and re-acquires the camera record-ready; release-on-review
+stays the default privacy posture, so the loop pays one fresh acquisition rather than holding a
+stream through review (studio-2). The programmatic discard now answers whether it ran, and every
+call site reads that answer (studio-8); recording for a Project asks before it drops a presented
+take, re-checks after the answer, and asserts the discard (studio-9). The loop is withheld inside a
+Project and over a Project source streamed from the server, and pause/resume and multi-take
+comparison — also in studio-2's scope — are not built. Design, and the ten answered questions, in
+the [slice 2.6 plan](SLICE_2.6_RETAKE_LOOP_PLAN.md).
 **Non-goals:** multi-clip anything; sidecar caption files (burn-in first per D4); server-side
 rendering; new providers.
 **Dependencies:** D4, D10, D11 decided; Phase 1's editor promotion (2.1 builds on the promoted
