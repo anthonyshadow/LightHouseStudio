@@ -655,6 +655,60 @@ test('Save reveals Close and clears the reviewed take without reacquiring media'
   expectNoExternalProviderTraffic(network);
 });
 
+test('Record another take clears the reviewed take and reacquires the camera for a second recording', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await page.goto('/studio/create');
+
+  await createLocalTake(page);
+  const takeDialog = page.getByRole('dialog', { name: 'Latest take' });
+  const playback = page.getByLabel('Recorded take playback');
+  await expect(playback).toBeVisible();
+
+  // The state the retake has to reverse: review owns the take and the camera is already gone, one
+  // acquisition spent and the local tracks stopped before review rendered.
+  const reviewing = await readBrowserState(page);
+  expect(reviewing.cameraCalls).toBe(1);
+  expect(reviewing.lifecycleEvents).toContain('local-video-stopped');
+
+  // The panel's modal backdrop covers the compact control bar, so the action is chosen from the
+  // overflow the panel itself owns rather than clicked on the bar behind it.
+  await chooseTakeAction(page, 'Record another take', takeDialog);
+  await page
+    .getByRole('dialog', { name: 'Discard this take?' })
+    .getByRole('button', { name: 'Discard and record' })
+    .click();
+
+  await expect(takeDialog).toBeHidden();
+  await expect(playback).toHaveCount(0);
+  await expect(page.getByLabel('Live local camera preview')).toBeVisible();
+  await expect(page.getByLabel('Studio media stage')).toHaveAttribute(
+    'data-stage-presentation',
+    'live',
+  );
+  // The second snapshot is the release-then-reacquire proof: a fresh getUserMedia, not a stream
+  // held through review.
+  await expect.poll(async () => (await readBrowserState(page)).cameraCalls).toBe(2);
+
+  // The loop only closes if the returned camera is record-ready, so the journey records again.
+  await page.getByRole('button', { name: 'Record' }).click();
+  await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
+  await page.getByRole('button', { name: 'Stop recording' }).click();
+  await expect(playback).toBeVisible();
+  await expect(
+    page
+      .getByRole('group', { name: 'Recorded take controls' })
+      .getByRole('button', { name: 'Save' }),
+  ).toBeEnabled();
+
+  const browser = await readBrowserState(page);
+  expect(browser.cameraCalls).toBe(2);
+  expect(browser.recorderStarts).toBe(4);
+  expect(browser.recorderStops).toBe(4);
+  expectNoExternalProviderTraffic(network);
+});
+
 test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, and resets', async ({
   page,
 }) => {

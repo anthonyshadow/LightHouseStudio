@@ -508,8 +508,16 @@ export const useRecording = ({ onAutomaticStop }: UseRecordingOptions = {}): Rec
     [artifacts, markAutomaticStop, stop, tryFinalize],
   );
 
-  const discard = useCallback(() => {
-    if (attemptRef.current || transcodeControllerRef.current) return;
+  /**
+   * Answers the state that follows, not the work performed: `true` means the runtime now holds no
+   * take, including when it held none, and `false` means one thing only — a recorder attempt or its
+   * on-device transcode still owns the bytes, so the take is still finalizing.
+   */
+  const discard = useCallback((): boolean => {
+    // Finalization clears both refs before it publishes an original, so a presented take implies
+    // neither is set. The refusal is effectively unreachable from the take-review buttons; the
+    // answer earns its keep on the programmatic paths that discard without a take on screen.
+    if (attemptRef.current || transcodeControllerRef.current) return false;
     artifacts.discardArtifacts();
     pendingMetadataRef.current = null;
     mainStoppedAtRef.current = null;
@@ -517,6 +525,7 @@ export const useRecording = ({ onAutomaticStop }: UseRecordingOptions = {}): Rec
     setActiveSource(null);
     domainLifecycleRef.current = createRecordingLifecycle<StageArtifactMedia>();
     setLifecycle(domainLifecycleRef.current.status);
+    return true;
   }, [artifacts]);
 
   /**

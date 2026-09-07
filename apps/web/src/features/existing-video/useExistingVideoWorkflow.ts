@@ -175,19 +175,26 @@ export const useExistingVideoWorkflow = ({
     dispatchWorkflowState({ type: 'clear-operation' });
   }, []);
 
+  /**
+   * Answers whether the workflow is now empty. Aborting this workflow's own operation is
+   * unconditional, but the state is only cleared once the take it describes is actually gone —
+   * dispatching the reset over a refused discard would leave the editor forgetting a video the
+   * recording controller still holds.
+   */
   const resetWorkflowState = useCallback(
-    (discardTake = false) => {
+    (discardTake = false): boolean => {
       clearOperation();
-      if (discardTake) recording.discard();
+      if (discardTake && !recording.discard()) return false;
       dispatchWorkflowState({ type: 'reset' });
+      return true;
     },
     [clearOperation, recording],
   );
 
   const reset = useCallback(
-    (discardTake = false) => {
+    (discardTake = false): boolean => {
       releaseRetainedJob();
-      resetWorkflowState(discardTake);
+      return resetWorkflowState(discardTake);
     },
     [releaseRetainedJob, resetWorkflowState],
   );

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { APP_PATHS, projectWorkspacePath, type StudioCreationIntent } from '../app/paths';
 import type { BrowserCapabilities } from '../application/types';
@@ -6,7 +6,9 @@ import { ownedRecordingArtifact } from '../features/recording/types';
 import type { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import type { ProjectCreateOperationId } from '../features/projects/ProjectRouteSurface';
 import type { ProjectSourceActivity } from '../features/projects/useProjectSourceController';
+import { takeDiscardQuestion } from '../features/take-review/takeDiscardQuestion';
 import type { useStudioSession } from '../orchestration/session';
+import type { ConfirmationRequest } from '../ui';
 import type { useStudioOverlayController } from './useStudioOverlayController';
 import type { useTakeReviewFlow } from './useTakeReviewFlow';
 
@@ -14,6 +16,36 @@ const VISUAL_MODEL_FOR_OPERATION = {
   'character-swap': 'lucy-latest',
   'virtual-try-on': 'lucy-vton-latest',
 } as const;
+
+/** Everything a Project launch is allowed to depend on, named so both reads of it agree. */
+interface ProjectRecordingLaunchState {
+  readonly activeProjectId: string | null;
+  readonly projectSourceActivity: ProjectSourceActivity | null;
+  readonly recordingActive: boolean;
+  readonly captureSupported: boolean;
+}
+
+/**
+ * The Project a capture may launch in, or `null` when none may.
+ *
+ * Answering the Project rather than a bare yes gives the caller an identity to carry across the
+ * confirmation: asked a second time afterwards, an equal id is the whole re-check — still
+ * permitted, and still the Project whose Record button was pressed.
+ */
+const launchableProjectId = ({
+  activeProjectId,
+  projectSourceActivity,
+  recordingActive,
+  captureSupported,
+}: ProjectRecordingLaunchState): string | null =>
+  activeProjectId !== null &&
+  !projectSourceActivity?.accepted &&
+  !projectSourceActivity?.busy &&
+  // The exact proxy for "the discard is going to refuse", and already an option of this hook.
+  !recordingActive &&
+  captureSupported
+    ? activeProjectId
+    : null;
 
 /** Which surface made a launch. Only the Create cards report their own as busy. */
 export type StudioEditorLaunchOrigin = 'create-card' | 'rail';
@@ -33,6 +65,11 @@ interface UseStudioRecordingLaunchOptions {
   readonly openOverlay: ReturnType<typeof useStudioOverlayController>['open'];
   readonly closeOverlay: ReturnType<typeof useStudioOverlayController>['close'];
   readonly focusMain: () => void;
+  /**
+   * The shell's confirmation, never a surface's: a Project launch navigates, and a question owned
+   * by something the navigation tears down cannot survive to be answered.
+   */
+  readonly confirmation: ConfirmationRequest;
 }
 
 /**
@@ -57,6 +94,7 @@ export const useStudioRecordingLaunch = ({
   openOverlay,
   closeOverlay,
   focusMain,
+  confirmation,
 }: UseStudioRecordingLaunchOptions) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -103,6 +141,42 @@ export const useStudioRecordingLaunch = ({
   const captureSupported = Boolean(
     browser.mediaRecorder && browser.mediaDevices && browser.secureContext,
   );
+
+  /**
+   * The launch guard's inputs as of the last commit.
+   *
+   * A Project launch now awaits an answer, and the dialog that gives it belongs to the shell, so
+   * the route can move while it is open. The closure that asked the question therefore knows only
+   * what was true when it was asked; this is what is true when it is answered.
+   */
+  const launchStateRef = useRef<ProjectRecordingLaunchState>({
+    activeProjectId,
+    projectSourceActivity,
+    recordingActive,
+    captureSupported,
+  });
+  /**
+   * Whether this runtime is still on screen.
+   *
+   * The one thing the mirrored guard cannot cover. `useAwaitableQuestion` resolves `false` at its
+   * own owner's unmount, and that owner is the shell, which outlives the Studio runtime; a stream
+   * acquired after this runtime has gone would have nothing left to stop it.
+   */
+  const mountedRef = useRef(true);
+  useLayoutEffect(() => {
+    launchStateRef.current = {
+      activeProjectId,
+      projectSourceActivity,
+      recordingActive,
+      captureSupported,
+    };
+  }, [activeProjectId, captureSupported, projectSourceActivity, recordingActive]);
+  useLayoutEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const artifact = recording.original;
@@ -232,29 +306,54 @@ export const useStudioRecordingLaunch = ({
     void session.startLocal();
   }, [captureSupported, closeOverlay, focusMain, session]);
 
+  /**
+   * Starts a capture for a Project's source slot, dropping whatever the stage is holding.
+   *
+   * Stays a `() => void` for `onClick`; the awaiting half runs in an immediately-invoked function.
+   * Its order is the load-bearing part: the take goes before the camera is asked for, so review
+   * never owns a take while a fresh stream is being acquired for the same stage.
+   */
   const startProjectRecording = useCallback(() => {
-    if (
-      activeProjectId === null ||
-      projectSourceActivity?.accepted ||
-      projectSourceActivity?.busy ||
-      !captureSupported
-    ) {
-      return;
-    }
-    setRecordingForExistingVideo(false);
-    closeOverlay();
-    recording.discard();
-    void navigate(projectWorkspacePath(activeProjectId));
-    focusMain();
-    void session.startLocal();
+    const projectId = launchableProjectId({
+      activeProjectId,
+      projectSourceActivity,
+      recordingActive,
+      captureSupported,
+    });
+    if (projectId === null) return;
+    void (async () => {
+      // Asked before any side effect, so declining leaves the overlay, the route and the take
+      // exactly as they were. Only owned bytes raise the question: a URL-backed presentation is a
+      // Project source streamed from the server, durable there, and clearing it loses nothing.
+      if (ownedRecordingArtifact(recording.presented) !== null) {
+        if (!(await confirmation.ask(takeDiscardQuestion('project-recording')))) return;
+        // The world moves under a modal the shell owns, so both facts come from the last commit
+        // rather than from the closure that asked: is this runtime still here, and is this still
+        // the Project it may launch in.
+        if (!mountedRef.current) return;
+        if (launchableProjectId(launchStateRef.current) !== projectId) return;
+      }
+      // A defensive assert, not a diagnosed failure: `recordingActive` is in the guard and a modal
+      // held focus throughout, so a refusal here is unreachable. It is here so that a take can
+      // never be left standing behind a stage that has already gone back to live capture — the
+      // launch simply stops, and take review keeps its own controls and its own notice slot.
+      if (!recording.discard()) return;
+      setRecordingForExistingVideo(false);
+      closeOverlay();
+      void navigate(projectWorkspacePath(projectId));
+      focusMain();
+      void session.startLocal();
+    })();
   }, [
     activeProjectId,
     captureSupported,
     closeOverlay,
+    confirmation,
     focusMain,
     navigate,
     projectSourceActivity,
     recording,
+    recordingActive,
     session,
   ]);
 
@@ -317,10 +416,37 @@ export const useStudioRecordingLaunch = ({
     clearCreateLaunch();
   }, [clearCreateLaunch]);
 
+  /**
+   * Sends the stage from a reviewed take back to a live camera.
+   *
+   * The whole act in one owner, in the order that matters: the take goes first, then the handoff it
+   * could have been adopted into, and only then is a stream asked for — so review never owns a take
+   * while a fresh one is being acquired for the same stage. Answers whether it ran, so a surface
+   * can say that a refused discard changed nothing. The camera comes back record-ready; nothing
+   * here presses Record.
+   *
+   * `startLocalRecording` alone is not enough: it clears only the editor intent, while an armed
+   * Create launch would outlive the take it pointed at. That is the pairing teardown already uses.
+   */
+  const restartCapture = useCallback((): boolean => {
+    // Before the discard, not after: the surface already withholds the action on a browser that
+    // cannot capture, and refusing here as well is what stops a take being destroyed for a camera
+    // that `startLocalRecording` was going to decline to start.
+    if (!captureSupported) return false;
+    // A refusal means the take is still finalizing, so it is still there. The caller says so; the
+    // handoff and the camera stay untouched.
+    if (!recording.discard()) return false;
+    discardPendingAdoption();
+    startLocalRecording();
+    return true;
+  }, [captureSupported, discardPendingAdoption, recording, startLocalRecording]);
+
   return {
+    captureSupported,
     startLocalRecording,
     startExistingVideoRecording,
     startProjectRecording,
+    restartCapture,
     openPlaybackEditor,
     openExistingVideo,
     clearExistingVideoIntent,

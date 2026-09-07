@@ -84,6 +84,13 @@ interface StudioToolOverlaysProps {
    * only decides whether there is a video to edit.
    */
   readonly onEditVideo: () => void;
+  /**
+   * Drops this take and brings the camera back. Whether the loop is offered at all is decided once,
+   * in `StudioApp`; its presence here is that whole answer. In particular this is not
+   * `presentedOwned` below — owned bytes are only one of the three things that gate it, and a
+   * second derivation would let the panel and the control bar disagree.
+   */
+  readonly onRecordAnotherTake?: () => boolean;
   readonly onOpenSavedCharacters: () => void;
   readonly onOpenSavedOutfits: () => void;
   readonly onOpenSavedVideosLibrary: () => void;
@@ -131,6 +138,7 @@ export const StudioToolOverlays = ({
   onStartExistingVideoRecording,
   onDiscardExistingVideoSelection,
   onEditVideo,
+  onRecordAnotherTake,
   onOpenSavedCharacters,
   onOpenSavedOutfits,
   onOpenSavedVideosLibrary,
@@ -306,6 +314,7 @@ export const StudioToolOverlays = ({
         mainRef={mainRef}
         onClose={onCloseOverlay}
         onDiscardTake={onDiscardExistingVideoSelection}
+        {...(onRecordAnotherTake ? { onRecordAnotherTake } : {})}
         {...(existingVideo.selection || presentedOwned ? { onEditVideo } : {})}
         onOpenVoiceTreatments={() => onOpenOverlay('voice-treatments')}
         onBackToTakeReview={() => onOpenOverlay('take-review')}

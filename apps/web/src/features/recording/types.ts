@@ -230,7 +230,7 @@ export type RecordingController = {
   restorePersistedOriginal: (input: RestorePersistedOriginalInput) => RecordingArtifact;
   presentRemoteOriginal: (input: RemotePresentationInput) => PresentedRecordingArtifact;
   replaceSource: (input: RestorePersistedOriginalInput) => RecordingArtifact;
-  discard: () => void;
+  discard: () => boolean;
   beginProcessing: (operation?: RecordingProcessingOperation) => void;
   cancelProcessing: () => void;
   completeVisualProcessing: (

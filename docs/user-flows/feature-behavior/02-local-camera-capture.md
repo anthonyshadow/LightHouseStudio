@@ -25,7 +25,9 @@
    and shows **Recorded take playback** on the same stage.
 9. Every finalized playback enables **Edit video** in the creative tool rail — until then it is
    disabled and says it needs a recorded or uploaded video — and keeps the compact
-   Save, Discard, Voice, Release, and [detailed review](07-take-review-and-cleanup.md) path.
+   Save, Discard, Voice, Record again, and [detailed review](07-take-review-and-cleanup.md) path.
+   **Record again** is the loop back to a live camera: it confirms the loss while the take is
+   unsaved, discards it, and re-acquires camera and microphone from this same explicit-start path.
    **Edit video** adopts the presented take into the existing-video workflow and opens its panel
    already holding that take; a refused adoption surfaces the workflow's own error and opens
    nothing.

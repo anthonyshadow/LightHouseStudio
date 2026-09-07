@@ -20,6 +20,7 @@ every relative link and anchor in `README.md`, `AGENTS.md`, and everything under
 | Slice 2.1 subtitles audit and approved plan (prompt 13 → 14)      | [`roadmap/SLICE_2.1_SUBTITLES_PLAN.md`](roadmap/SLICE_2.1_SUBTITLES_PLAN.md)                     |
 | Slice 2.3 variant sets audit and plan (prompt 17 → 18)            | [`roadmap/SLICE_2.3_VARIANT_SETS_PLAN.md`](roadmap/SLICE_2.3_VARIANT_SETS_PLAN.md)               |
 | Slice 2.5 durable AI outcomes audit and plan (prompt 20 → 21)     | [`roadmap/SLICE_2.5_DURABLE_AI_OUTCOMES_PLAN.md`](roadmap/SLICE_2.5_DURABLE_AI_OUTCOMES_PLAN.md) |
+| Slice 2.6 retake loop audit and plan (prompt 23)                  | [`roadmap/SLICE_2.6_RETAKE_LOOP_PLAN.md`](roadmap/SLICE_2.6_RETAKE_LOOP_PLAN.md)                 |
 | Engineering instructions for agents                               | [`../CLAUDE.md`](../CLAUDE.md) (routing) → [`../AGENTS.md`](../AGENTS.md) (policy)               |
 
 Product direction (vision, roadmap) never overrides implementation authority: the code, the

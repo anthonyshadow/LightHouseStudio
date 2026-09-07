@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyDraft, type StudioSessionController } from '../features/media-session';
@@ -78,7 +78,7 @@ const createRecording = (
   restorePersistedOriginal: vi.fn(),
   presentRemoteOriginal: vi.fn(),
   replaceSource: vi.fn(),
-  discard: vi.fn(),
+  discard: vi.fn(() => true),
   beginProcessing: vi.fn(),
   cancelProcessing: vi.fn(),
   completeVisualProcessing: vi.fn(),
@@ -122,6 +122,7 @@ const renderBar = (
   options: {
     experienceLabel?: string;
     onDiscardTake?: () => void;
+    onRecordAnotherTake?: () => boolean;
     onStartLocalRecording?: () => void;
     onSaveVideo?: () => void;
     saveVideoState?: Parameters<typeof StudioSessionControlBar>[0]['saveVideoState'];
@@ -145,6 +146,9 @@ const renderBar = (
           : {})}
         onCloseTakeReview={onCloseTakeReview}
         {...(options.onDiscardTake ? { onDiscardTake: options.onDiscardTake } : {})}
+        {...(options.onRecordAnotherTake
+          ? { onRecordAnotherTake: options.onRecordAnotherTake }
+          : {})}
         {...(options.onSaveVideo ? { onSaveVideo: options.onSaveVideo } : {})}
         {...(options.saveVideoState ? { saveVideoState: options.saveVideoState } : {})}
         {...(options.hasUnsavedChanges !== undefined
@@ -508,6 +512,124 @@ describe('StudioSessionControlBar', () => {
     expect(recording.discard).toHaveBeenCalledOnce();
     expect(onDiscardTake).toHaveBeenCalledOnce();
     expect(onCloseTakeReview).toHaveBeenCalledOnce();
+  });
+
+  it('offers Record again beside the other take controls only where the loop is offered', () => {
+    const artifact = takeArtifact();
+    const reviewedRecording = createRecording('recorded', {
+      original: artifact,
+      presented: artifact,
+    });
+    const session = createSession();
+    const view = renderBar(session, vi.fn(), reviewedRecording, vi.fn(), true, vi.fn(), vi.fn(), {
+      onRecordAnotherTake: vi.fn(() => true),
+    });
+
+    const takeControls = within(screen.getByRole('group', { name: 'Recorded take controls' }));
+    const retake = takeControls.getByRole('button', { name: 'Record again' });
+    // The shortened label cannot carry the warning, so the tooltip does.
+    expect(retake).toHaveAttribute('title', 'Discards this take and starts the camera again.');
+
+    view.rerender(
+      <StudioDesignProvider>
+        <StudioSessionControlBar
+          session={session}
+          recording={reviewedRecording}
+          recordingMode="local"
+          recordingSource={null}
+          recordingSupported
+          reviewingTake
+          onStopRecording={vi.fn().mockResolvedValue(undefined)}
+          onCloseTakeReview={vi.fn()}
+          onOpenVoiceTreatments={vi.fn()}
+          onChooseAiExperience={vi.fn()}
+          onChangeExperience={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    // Withheld inside a Project, over a streamed source, or on a browser that cannot capture; this
+    // surface derives none of that and simply stops offering the control.
+    expect(screen.queryByRole('button', { name: 'Record again' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument();
+  });
+
+  it('discards through the one owner of the retake once the compact press is confirmed', async () => {
+    const user = userEvent.setup();
+    const artifact = takeArtifact();
+    const discard = vi.fn(() => true);
+    const recording = createRecording('recorded', {
+      original: artifact,
+      presented: artifact,
+      discard,
+    });
+    const onDiscardTake = vi.fn();
+    // The double is `restartCapture`: the discard is the half that has to land before any camera.
+    const onRecordAnotherTake = vi.fn(() => recording.discard());
+    renderBar(createSession(), vi.fn(), recording, vi.fn(), true, vi.fn(), vi.fn(), {
+      onDiscardTake,
+      onRecordAnotherTake,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Record again' }));
+    await user.click(await screen.findByRole('button', { name: 'Discard and record' }));
+
+    expect(onRecordAnotherTake).toHaveBeenCalledOnce();
+    expect(discard).toHaveBeenCalledOnce();
+    expect(onDiscardTake).toHaveBeenCalledOnce();
+  });
+
+  it('reports a refused restart in the compact presentation too', async () => {
+    const user = userEvent.setup();
+    const artifact = takeArtifact();
+    const discard = vi.fn(() => true);
+    const recording = createRecording('recorded', {
+      original: artifact,
+      presented: artifact,
+      discard,
+    });
+    const onDiscardTake = vi.fn();
+    renderBar(createSession(), vi.fn(), recording, vi.fn(), true, vi.fn(), vi.fn(), {
+      onDiscardTake,
+      onRecordAnotherTake: vi.fn(() => false),
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Record again' }));
+    await user.click(await screen.findByRole('button', { name: 'Discard and record' }));
+
+    // Awaited rather than queried: the notice is behind the dismissed dialog's isolation until the
+    // overlay finishes leaving.
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'This take is still finishing, so nothing was discarded. Try again in a moment.',
+    );
+    expect(discard).not.toHaveBeenCalled();
+    expect(onDiscardTake).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Record again' })).toBeEnabled();
+  });
+
+  it('returns focus to the pressed compact control when the retake is declined', async () => {
+    const user = userEvent.setup();
+    const artifact = takeArtifact();
+    const onRecordAnotherTake = vi.fn(() => true);
+    renderBar(
+      createSession(),
+      vi.fn(),
+      createRecording('recorded', { original: artifact, presented: artifact }),
+      vi.fn(),
+      true,
+      vi.fn(),
+      vi.fn(),
+      { onRecordAnotherTake },
+    );
+
+    const retake = screen.getByRole('button', { name: 'Record again' });
+    await user.click(retake);
+    await user.click(await screen.findByRole('button', { name: 'Stay' }));
+
+    expect(onRecordAnotherTake).not.toHaveBeenCalled();
+    // No menu trigger survives a compact press, so the dialog returns focus to the button it
+    // captured when it opened.
+    await waitFor(() => expect(retake).toHaveFocus());
   });
 
   it('renders the stage-owned visibility state with matching inert semantics', () => {

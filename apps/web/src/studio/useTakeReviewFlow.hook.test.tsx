@@ -227,6 +227,40 @@ describe('useTakeReviewFlow finalization ownership', () => {
     expect(releaseForRecordedReview).toHaveBeenCalledOnce();
     expect(session.completeExpectedModelSession).not.toHaveBeenCalled();
   });
+
+  it('reports a cleared review as soon as the presented take goes, and not while one is held', () => {
+    const artifact = { id: 'take-retake' } as NonNullable<RecordingController['presented']>;
+    const events: string[] = [];
+    const recording = createRecording(vi.fn());
+    useRecording.mockReturnValue(recording);
+    const onReviewCleared = vi.fn(() => {
+      events.push('review-cleared');
+    });
+    const { rerender } = renderHook(() =>
+      useTakeReviewFlow({
+        session: createSession(vi.fn().mockResolvedValue(undefined), {} as MediaStream),
+        onReviewCleared,
+      }),
+    );
+
+    // A runtime holding no take is already cleared, which is the state the overlays close on.
+    expect(events).toEqual(['review-cleared']);
+
+    recording.lifecycle = 'recorded';
+    recording.presented = artifact;
+    rerender();
+    expect(events).toEqual(['review-cleared']);
+
+    events.push('discard');
+    recording.lifecycle = 'idle';
+    recording.presented = null;
+    rerender();
+
+    // The order is the point: the overlay is told to close on the discard itself, so a camera
+    // started straight afterwards cannot come up behind take review.
+    expect(events).toEqual(['review-cleared', 'discard', 'review-cleared']);
+    expect(onReviewCleared).toHaveBeenCalledTimes(2);
+  });
 });
 
 let capturedAutomaticStop: (event: AutomaticRecordingStopEvent) => void = () => {
