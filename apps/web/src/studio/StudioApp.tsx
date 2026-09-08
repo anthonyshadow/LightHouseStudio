@@ -476,8 +476,8 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     registerPorts: studioHandoff.registerPorts,
     existingVideo,
     applyRecipe: applyRecipeSelection,
-    savedVideo,
-    projectCreative,
+    useSavedVideo: savedVideo.useSavedVideo,
+    checkpointProjectCreative: projectCreative.checkpoint,
     saveStudioCharacter: saveBuiltCharacter,
   });
 

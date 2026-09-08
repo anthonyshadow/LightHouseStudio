@@ -7,9 +7,10 @@ import type {
 } from '@studio/contracts';
 import { formatDateTime, formatDuration } from '@studio/domain';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { listSavedVideos, savedVideoThumbnailUrl } from '../../adapters/api-client/savedVideosApi';
 import { useRouteViewState } from '../../app/useRouteViewState';
+import { useElapsedSince, wallClockNow } from '../../orchestration/lifecycle/useElapsedSince';
 import {
   abandonVideoJob,
   activeVideoJobsQueryOptions,
@@ -78,10 +79,7 @@ const jobActionLabel = (status: VideoJobQueueItem['status']): string =>
     ? 'Remove from queue'
     : 'Stop tracking';
 
-/**
- * Owns the one-second elapsed tick, so a live job re-renders this control rather than the whole
- * route. Mounted only while work is active, which is also the interval's lifetime.
- */
+/** Mounted only while work is active, so the elapsed tick re-renders this control, not the route. */
 const ProcessingQueueTrigger = ({
   jobCount,
   startedAtMs,
@@ -94,14 +92,7 @@ const ProcessingQueueTrigger = ({
   onToggle: () => void;
 }>) => {
   const theme = useTheme();
-  const [nowMs, setNowMs] = useState(() => Date.now());
-
-  useEffect(() => {
-    const interval = window.setInterval(() => setNowMs(Date.now()), 1_000);
-    return () => window.clearInterval(interval);
-  }, []);
-
-  const elapsed = formatDuration(startedAtMs === null ? 0 : Math.max(0, nowMs - startedAtMs));
+  const elapsed = formatDuration(useElapsedSince(startedAtMs, wallClockNow));
 
   return (
     <Button

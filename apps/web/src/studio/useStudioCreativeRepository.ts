@@ -3,6 +3,7 @@ import { createCreativeAssetRepository } from '../features/creative-assets/repos
 import type { CreativeAssetRepository } from '../features/creative-assets/types';
 import { useCreativeLibraryCloudSync } from '../features/creative-assets/useCreativeLibraryCloudSync';
 import { useCreativeAssetSelector } from '../features/creative-assets/useCreativeAssetRepository';
+import { useStrictModeSafeDisposable } from '../orchestration/lifecycle/useStrictModeSafeDisposable';
 import {
   CREATIVE_ASSET_STORAGE_KEY,
   WARDROBE_CREATIVE_ASSET_STORAGE_KEY,
@@ -52,7 +53,11 @@ export const useStudioCreativeRepository = (
     [openAttempt, ownerUserId, persistenceScope],
   );
 
-  useEffect(() => () => repository.close?.(), [repository]);
+  // Not a bare cleanup: StrictMode replays effects on mount in development, and closing here
+  // latched `closed` on the very repository the app then went on to use — permanently suppressing
+  // the post-load notify and reopening a second IndexedDB connection. The character-builder
+  // repository already disposes through this lease.
+  useStrictModeSafeDisposable(repository);
   /*
    * The store starts empty and fills in after IndexedDB loads, so a surface that reads a count
    * without this would state `0` for a library it has not read yet.

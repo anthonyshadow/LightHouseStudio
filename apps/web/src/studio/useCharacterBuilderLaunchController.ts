@@ -124,6 +124,16 @@ export const useCharacterBuilderLaunchController = ({
     [launchCharacterBuilder],
   );
 
+  // Not an inline arrow, because this reaches the shell service bundle through the Character
+  // workflow's aggregate memo: a fresh identity here made that aggregate — and the library handoff
+  // built on it — a new object on every render of the authenticated shell. `discard` is itself
+  // memoized on the pending question, which that aggregate already lists as a dependency, so
+  // keying on it costs no invalidation the aggregate did not already take.
+  const resolveDiscard = useCallback(
+    (confirmed: boolean) => (confirmed ? discard.confirm() : discard.cancel()),
+    [discard],
+  );
+
   const dismissLaunchError = useCallback(() => setLaunchError(null), []);
 
   return {
@@ -134,7 +144,7 @@ export const useCharacterBuilderLaunchController = ({
     openNewCharacter,
     editCharacter,
     copyCharacter,
-    resolveDiscard: (confirmed: boolean) => (confirmed ? discard.confirm() : discard.cancel()),
+    resolveDiscard,
     dismissLaunchError,
   } as const;
 };

@@ -100,7 +100,7 @@ export const useExistingVideoWorkflow = ({
     resultHasServerApprovedVisual,
     voiceSelection,
     pendingVoiceSelection,
-    elapsedSeconds,
+    startedAtMs,
   } = workflowState;
   const {
     setStep,
@@ -119,12 +119,11 @@ export const useExistingVideoWorkflow = ({
     setResultHasServerApprovedVisual,
     setVoiceSelection,
     setPendingVoiceSelection,
-    setElapsedSeconds,
+    setStartedAtMs,
   } = workflowStateSetters;
   const controllerRef = useRef<AbortController | null>(null);
   const submissionOperationRef = useRef<ExistingVideoSubmissionOperation | null>(null);
   const generationRef = useRef(0);
-  const startedAtRef = useRef<number | null>(null);
   const { retainedJobIdRef, releaseRetainedJobAndWait, releaseRetainedJob } =
     useRetainedVideoJob(queryClient);
   const steps = useMemo<readonly ExistingVideoStep[]>(() => (step ? [step] : []), [step]);
@@ -170,7 +169,6 @@ export const useExistingVideoWorkflow = ({
     controllerRef.current?.abort();
     controllerRef.current = null;
     generationRef.current += 1;
-    startedAtRef.current = null;
     submissionOperationRef.current = null;
     dispatchWorkflowState({ type: 'clear-operation' });
   }, []);
@@ -411,7 +409,7 @@ export const useExistingVideoWorkflow = ({
       controllerRef.current = controller;
       const jobId = crypto.randomUUID();
       updateSubmissionOperation({ jobId, stepIndex, state: 'submitting' });
-      startedAtRef.current = performance.now();
+      setStartedAtMs(performance.now());
       const selectedVoice = voiceSelection;
       setPhase('uploading');
       setMessage(null);
@@ -465,6 +463,13 @@ export const useExistingVideoWorkflow = ({
             }),
             false,
             controller.signal,
+            'source',
+            {
+              // Only `metadata` and `file` are read below — the bytes go straight to the provider.
+              // This runs at the flow's peak memory, with the source and the transcoded copy both
+              // resident, so a third copy of the audio track is the worst one to allocate.
+              audioSidecar: 'skip',
+            },
           );
           if (
             validatedPrepared.metadata.container !== 'mp4' ||
@@ -550,6 +555,7 @@ export const useExistingVideoWorkflow = ({
       setMessage,
       setPhase,
       setRetryJob,
+      setStartedAtMs,
       standaloneVisualSubmissionBlockedReason,
       steps,
       updateSubmissionOperation,
@@ -572,7 +578,7 @@ export const useExistingVideoWorkflow = ({
       completedStepCount > 0 ? resultMetadata : (editBaseMetadata ?? selection?.metadata ?? null);
     if (!baseArtifact || !baseMetadata || !voiceSelection) return;
     clearOperation();
-    startedAtRef.current = performance.now();
+    setStartedAtMs(performance.now());
     setMessage(null);
     await applySelectedVoice(
       baseArtifact,
@@ -596,6 +602,7 @@ export const useExistingVideoWorkflow = ({
     resultMetadata,
     selection,
     setMessage,
+    setStartedAtMs,
     steps,
     submitStep,
     voiceSelection,
@@ -646,15 +653,14 @@ export const useExistingVideoWorkflow = ({
     controllerRef.current?.abort();
     controllerRef.current = null;
     generationRef.current += 1;
-    startedAtRef.current = null;
-    setElapsedSeconds(0);
     setStatus(null);
     setPendingVisual(null);
     const job = retryJob;
     const generation = generationRef.current;
     const controller = new AbortController();
     controllerRef.current = controller;
-    startedAtRef.current = performance.now();
+    // Re-stamping is the reset: the counter restarts at zero for the new attempt.
+    setStartedAtMs(performance.now());
     const existingOperation = submissionOperationRef.current;
     updateSubmissionOperation(
       existingOperation?.jobId === job.jobId
@@ -688,10 +694,10 @@ export const useExistingVideoWorkflow = ({
     pollAndFinalize,
     recording,
     retryJob,
-    setElapsedSeconds,
     setMessage,
     setPendingVisual,
     setPhase,
+    setStartedAtMs,
     setStatus,
     updateSubmissionOperation,
     voiceSelection,
@@ -812,22 +818,8 @@ export const useExistingVideoWorkflow = ({
     'voice-processing',
     'transcoding',
   ].includes(phase);
-  const trackingElapsedTime = workflowActive && phase !== 'validating';
 
   useEffect(() => () => controllerRef.current?.abort(), []);
-
-  useEffect(() => {
-    if (!trackingElapsedTime || startedAtRef.current === null) return;
-    const updateElapsed = () => {
-      const startedAt = startedAtRef.current;
-      if (startedAt !== null) {
-        setElapsedSeconds(Math.max(0, (performance.now() - startedAt) / 1_000));
-      }
-    };
-    updateElapsed();
-    const timer = window.setInterval(updateElapsed, 1_000);
-    return () => window.clearInterval(timer);
-  }, [phase, setElapsedSeconds, trackingElapsedTime]);
 
   return useMemo(
     () => ({
@@ -867,7 +859,7 @@ export const useExistingVideoWorkflow = ({
         (currentMetadata?.hasAudio ?? false),
       visualProviderCompatibility,
       comparison,
-      elapsedSeconds,
+      startedAtMs,
       operation: recording.processingOperation,
       active: workflowActive,
       providerActive: acceptedSubmission && phase !== 'complete',
@@ -915,7 +907,7 @@ export const useExistingVideoWorkflow = ({
       editBase,
       editBaseMetadata,
       editSelected,
-      elapsedSeconds,
+      startedAtMs,
       message,
       pendingVisual,
       retryExistingJob,
