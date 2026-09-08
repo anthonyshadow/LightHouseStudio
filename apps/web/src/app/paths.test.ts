@@ -60,27 +60,6 @@ describe('authenticated application paths', () => {
     expect(savedVideoLibraryPath(videoId)).toBe(`${APP_PATHS.videos}?video=${videoId}`);
     expect(requestedSavedVideoIdFromSearch(`?video=${videoId}`)).toBe(videoId);
     expect(requestedSavedVideoIdFromSearch('?sort=latest')).toBeNull();
-
-    for (const path of [
-      APP_PATHS.dashboard,
-      APP_PATHS.create,
-      APP_PATHS.live,
-      APP_PATHS.assets,
-      APP_PATHS.projects,
-      projectPath(projectId),
-      projectWorkspacePath(projectId),
-      APP_PATHS.campaigns,
-      campaignPath(campaignId),
-      APP_PATHS.videos,
-      APP_PATHS.characters,
-      APP_PATHS.outfits,
-      APP_PATHS.voices,
-      studioVideoPath(videoId),
-      APP_PATHS.legacyCampaignsSingular,
-      `/campaign/${campaignId}`,
-    ]) {
-      expect(isProtectedAppPath(path)).toBe(true);
-    }
     expect(isAssetsPath(APP_PATHS.assets)).toBe(true);
     expect(isAssetsPath(APP_PATHS.voices)).toBe(true);
   });

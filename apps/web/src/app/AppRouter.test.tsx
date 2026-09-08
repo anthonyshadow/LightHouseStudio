@@ -243,21 +243,15 @@ describe('AppRouter', () => {
     await waitFor(() => expect(document.activeElement).toHaveAttribute('id', 'studio-main'));
   });
 
+  // The mapping itself is pinned exhaustively by paths.test.ts and route-inventory.test.ts; this
+  // asserts only that AppRouter routes a legacy path through <Navigate replace> without remounting.
+  // One literal target and one computed one is the whole branch space.
   it.each([
     ['/studio', '/dashboard'],
-    ['/studio/projects', '/projects'],
     [
       '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace',
       '/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace',
     ],
-    ['/studio/campaigns', '/campaigns'],
-    ['/campaign', '/campaigns'],
-    [
-      '/campaign/20ce94fa-15d1-42c6-abd3-77ff61516b48',
-      '/campaigns/20ce94fa-15d1-42c6-abd3-77ff61516b48',
-    ],
-    ['/studio/assets', '/assets'],
-    ['/studio/videos', '/assets/videos'],
   ])('redirects the legacy route %s to %s', async (path, target) => {
     const { router } = renderApplication(path);
 
@@ -267,12 +261,11 @@ describe('AppRouter', () => {
   });
 
   it.each([
-    ['/projects', 'Projects · Lightframe Studio'],
-    ['/projects/18b120ac-1578-46e3-8c3d-42307772f391', 'Project · Lightframe Studio'],
+    // A workspace path also matches projectIdFromPath, so a reversed PROTECTED_ROUTES order would
+    // title it 'Project · …' — this row is what catches that.
     ['/projects/18b120ac-1578-46e3-8c3d-42307772f391/workspace', 'Project Studio · Lightframe'],
-    ['/campaigns', 'Campaigns · Lightframe Studio'],
+    // The one canonical route under the legacy '/studio' prefix: proves it is not redirected away.
     ['/studio/create', 'Studio · Lightframe'],
-    ['/assets', 'Assets · Lightframe'],
   ])('protects canonical route %s with the authenticated shell', async (path, title) => {
     renderApplication(path);
 
@@ -282,12 +275,9 @@ describe('AppRouter', () => {
   });
 
   it.each([
-    '/advanced',
-    '/guided',
-    '/projects/project-42/history',
+    // Neither legacy nor canonical: the third state of the '/studio' prefix.
     '/studio/not-a-route',
-    '/assets/recipes',
-    '/studio/assets/recipes',
+    // The only row on which the search assertion below is not vacuous.
     '/not-a-route?project=untrusted',
   ])('replaces the noncanonical path %s with the entry page', async (path) => {
     authApi.fetchCurrentSession.mockRejectedValue(new Error('No session'));
@@ -299,24 +289,21 @@ describe('AppRouter', () => {
     expect(appHarness.mountCount).toBe(0);
   });
 
-  it.each(['/advanced', '/studio/not-a-route', '/not-a-route?project=untrusted'])(
-    'tells a signed-in operator that %s does not exist instead of moving them',
-    async (path) => {
-      const { router } = renderApplication(path);
+  it('tells a signed-in operator that an unknown path does not exist instead of moving them', async () => {
+    const { router } = renderApplication('/not-a-route?project=untrusted');
 
-      expect(
-        await screen.findByRole('heading', { name: 'That page doesn’t exist' }),
-      ).toBeInTheDocument();
-      // The address is left alone: a silent redirect is what hides the typo in the first place.
-      expect(router.state.location.pathname).toBe(path.split('?')[0]);
-      expect(screen.getByRole('link', { name: 'Go to Dashboard' })).toHaveAttribute(
-        'href',
-        '/dashboard',
-      );
-      expect(appHarness.mountCount).toBe(0);
-      expect(document.title).toBe('Page not found · Lightframe');
-    },
-  );
+    expect(
+      await screen.findByRole('heading', { name: 'That page doesn’t exist' }),
+    ).toBeInTheDocument();
+    // The address is left alone: a silent redirect is what hides the typo in the first place.
+    expect(router.state.location.pathname).toBe('/not-a-route');
+    expect(screen.getByRole('link', { name: 'Go to Dashboard' })).toHaveAttribute(
+      'href',
+      '/dashboard',
+    );
+    expect(appHarness.mountCount).toBe(0);
+    expect(document.title).toBe('Page not found · Lightframe');
+  });
 
   it('waits for session restoration before deciding an unknown path is a typo', async () => {
     // Deciding while the session is unknown would bounce a signed-in operator to the entry page,

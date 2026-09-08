@@ -48,14 +48,37 @@ const requestSequence = (
 };
 
 describe('safe remote image downloader', () => {
-  it('classifies loopback, private, link-local, mapped, and documentation addresses as unsafe', () => {
-    expect(isPublicRemoteImageAddress('8.8.8.8')).toBe(true);
-    expect(isPublicRemoteImageAddress('127.0.0.1')).toBe(false);
-    expect(isPublicRemoteImageAddress('10.0.0.4')).toBe(false);
-    expect(isPublicRemoteImageAddress('169.254.1.1')).toBe(false);
-    expect(isPublicRemoteImageAddress('::1')).toBe(false);
-    expect(isPublicRemoteImageAddress('::ffff:127.0.0.1')).toBe(false);
-    expect(isPublicRemoteImageAddress('2001:db8::1')).toBe(false);
+  it('classifies the complete public/private address boundary', () => {
+    for (const [address, expected] of [
+      ['0.0.0.1', false],
+      ['10.0.0.1', false],
+      ['100.64.0.1', false],
+      ['127.0.0.1', false],
+      ['169.254.169.254', false],
+      ['172.16.0.1', false],
+      ['192.0.0.1', false],
+      ['192.0.2.1', false],
+      ['192.168.1.2', false],
+      ['198.18.0.1', false],
+      ['198.51.100.1', false],
+      ['203.0.113.1', false],
+      ['224.0.0.1', false],
+      ['240.0.0.1', false],
+      ['::', false],
+      ['::1', false],
+      ['64:ff9b::1', false],
+      ['100::1', false],
+      ['2001:db8::1', false],
+      ['fc00::1', false],
+      ['fe80::1', false],
+      ['ff00::1', false],
+      ['::ffff:127.0.0.1', false],
+      ['8.8.8.8', true],
+      ['2606:4700:4700::1111', true],
+      ['not-an-address', false],
+    ] as const) {
+      expect(isPublicRemoteImageAddress(address), address).toBe(expected);
+    }
   });
 
   it('rejects non-HTTPS, credentials, fragments, and mixed public/private DNS before a request', async () => {

@@ -635,35 +635,7 @@ describe('StudioSessionControlBar', () => {
     );
   });
 
-  it('returns focus to the compact control that opened the dialog, not to the one before it', async () => {
-    const user = userEvent.setup();
-    const artifact = takeArtifact();
-    renderBar(
-      createSession(),
-      vi.fn(),
-      createRecording('recorded', { original: artifact, presented: artifact }),
-      vi.fn(),
-      true,
-      vi.fn(),
-      vi.fn(),
-      { onRecordAnotherTake: vi.fn(() => true) },
-    );
-
-    const retake = screen.getByRole('button', { name: 'Record again' });
-    await user.click(retake);
-    await user.click(await screen.findByRole('button', { name: 'Stay' }));
-    await waitFor(() => expect(retake).toHaveFocus());
-
-    // A second press, from a control the first one never touched: the dialog they share answers to
-    // whichever button opened it, so focus comes back to Discard.
-    const discard = screen.getByRole('button', { name: 'Discard' });
-    await user.click(discard);
-    await user.click(await screen.findByRole('button', { name: 'Stay' }));
-
-    await waitFor(() => expect(discard).toHaveFocus());
-  });
-
-  it('returns focus to the pressed compact control when the retake is declined', async () => {
+  it('starts nothing on Stay and returns focus to the control that opened the dialog', async () => {
     const user = userEvent.setup();
     const artifact = takeArtifact();
     const onRecordAnotherTake = vi.fn(() => true);
@@ -681,11 +653,16 @@ describe('StudioSessionControlBar', () => {
     const retake = screen.getByRole('button', { name: 'Record again' });
     await user.click(retake);
     await user.click(await screen.findByRole('button', { name: 'Stay' }));
-
-    expect(onRecordAnotherTake).not.toHaveBeenCalled();
-    // Nothing in this row is unmounted by a press, so the pressed button hands over itself and gets
-    // focus back.
     await waitFor(() => expect(retake).toHaveFocus());
+    expect(onRecordAnotherTake).not.toHaveBeenCalled();
+
+    // A second press, from a control the first one never touched: the dialog they share answers to
+    // whichever button opened it, so focus comes back to Discard.
+    const discard = screen.getByRole('button', { name: 'Discard' });
+    await user.click(discard);
+    await user.click(await screen.findByRole('button', { name: 'Stay' }));
+
+    await waitFor(() => expect(discard).toHaveFocus());
   });
 
   it('renders the stage-owned visibility state with matching inert semantics', () => {

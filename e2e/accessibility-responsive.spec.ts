@@ -1,4 +1,3 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import type { CapabilitiesResponse } from '@studio/contracts';
 import type { CreativeAssetStore } from '@studio/domain';
@@ -7,10 +6,12 @@ import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 import { CAMPAIGNS_PATH } from './support/studioRoutes';
 import {
   CREATIVE_ASSET_STORAGE_KEY,
+  expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
   readBrowserState,
 } from './support/studioHarness';
+import { expectNoAxeViolations } from './support/accessibility';
 import { installCampaignHarness } from './support/campaignHarness';
 import { loadDecodableH264VideoFixture } from './support/existingVideoHarness';
 import { installProjectHarness, TEST_PROJECT_ID } from './support/projectHarness';
@@ -151,52 +152,6 @@ const cameraCalls = async (page: Page): Promise<number> =>
     };
     return testWindow.__lightframeAccessibilityTestState.cameraCalls;
   });
-
-const expectNoDocumentOverflow = async (page: Page) => {
-  const dimensions = await page.evaluate(() => ({
-    viewportWidth: window.innerWidth,
-    viewportHeight: window.innerHeight,
-    clientWidth: document.documentElement.clientWidth,
-    scrollWidth: document.documentElement.scrollWidth,
-    clientHeight: document.documentElement.clientHeight,
-    scrollHeight: document.documentElement.scrollHeight,
-    bodyScrollWidth: document.body.scrollWidth,
-    bodyScrollHeight: document.body.scrollHeight,
-  }));
-
-  expect(
-    dimensions.scrollWidth,
-    `document width ${dimensions.scrollWidth}px exceeded viewport width ${dimensions.viewportWidth}px`,
-  ).toBeLessThanOrEqual(dimensions.viewportWidth + 1);
-  expect(
-    dimensions.bodyScrollWidth,
-    `body width ${dimensions.bodyScrollWidth}px exceeded viewport width ${dimensions.viewportWidth}px`,
-  ).toBeLessThanOrEqual(dimensions.viewportWidth + 1);
-  expect(
-    dimensions.scrollHeight,
-    `document height ${dimensions.scrollHeight}px exceeded viewport height ${dimensions.viewportHeight}px`,
-  ).toBeLessThanOrEqual(dimensions.viewportHeight + 1);
-  expect(
-    dimensions.bodyScrollHeight,
-    `body height ${dimensions.bodyScrollHeight}px exceeded viewport height ${dimensions.viewportHeight}px`,
-  ).toBeLessThanOrEqual(dimensions.viewportHeight + 1);
-
-  expect(dimensions.clientWidth).toBeLessThanOrEqual(dimensions.viewportWidth + 1);
-  expect(dimensions.clientHeight).toBeLessThanOrEqual(dimensions.viewportHeight + 1);
-};
-
-const expectNoAxeViolations = async (page: Page) => {
-  const result = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    .analyze();
-  const summary = result.violations.map((violation) => ({
-    id: violation.id,
-    impact: violation.impact,
-    targets: violation.nodes.flatMap((node) => node.target),
-  }));
-
-  expect(summary).toEqual([]);
-};
 
 const representativeViewports = [
   { name: 'full desktop', ...STUDIO_VIEWPORT_SIZES.fullDesktop },

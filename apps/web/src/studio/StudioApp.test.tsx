@@ -1484,10 +1484,11 @@ describe('StudioApp composition lifecycle', () => {
     });
   });
 
-  it('does not expose Recipe, Dock, or Shelf controls in the Studio workspace', () => {
+  it('does not show the words Recipe, Dock, or Shelf in the Studio workspace', () => {
     renderStudio();
 
-    expect(screen.queryByRole('button', { name: /Recipe|Dock|Shelf/u })).not.toBeInTheDocument();
+    // The role-scoped half of this guard is asserted against the unstubbed app by
+    // e2e/accessibility-responsive.spec.ts across the whole viewport matrix.
     expect(screen.queryByText(/Recipe|Dock|Shelf/u)).not.toBeInTheDocument();
   });
 });
