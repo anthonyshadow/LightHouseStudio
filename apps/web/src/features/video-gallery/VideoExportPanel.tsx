@@ -48,8 +48,9 @@ export const VideoExportPanel = ({
   const [placement, setPlacement] = useState<ProjectExportSpecification | null>(
     version.exportSpecification,
   );
-  const { render, failure, cancel, download } = useSavedVideoPlacementDownload();
-  const rendering = render.phase === 'rendering';
+  const { render, busy, failure, cancel, download } = useSavedVideoPlacementDownload();
+  // The read runs before `render.phase` leaves 'idle', so the controls follow `busy`.
+  const rendering = busy;
   // A placement can only be produced where the browser can render one; elsewhere the chooser says
   // so and the original shape is what the operator gets. Carrying the placement rather than a
   // boolean lets the offer below narrow to it.

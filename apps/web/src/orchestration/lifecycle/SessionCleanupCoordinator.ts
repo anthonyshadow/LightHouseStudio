@@ -25,12 +25,27 @@ export class SessionCleanupCoordinator {
     };
   }
 
+  /**
+   * Each task is isolated: a task that rejects no longer prevents the later phases from running,
+   * so `release-media` still releases the camera and microphone when `cancel-operations` failed.
+   * The failure is not swallowed — `run()` still rejects with the first one once every task has
+   * been attempted, which is what keeps the logout controller showing its notice and skipping
+   * `logout()`.
+   */
   run(): Promise<void> {
     this.#active ??= (async () => {
       const tasks = [...this.#tasks.values()].sort(
         (left, right) => phaseOrder[left.phase] - phaseOrder[right.phase],
       );
-      for (const task of tasks) await task.cleanup();
+      const failures: unknown[] = [];
+      for (const task of tasks) {
+        try {
+          await task.cleanup();
+        } catch (error) {
+          failures.push(error);
+        }
+      }
+      if (failures.length > 0) throw failures[0];
     })().finally(() => {
       this.#active = null;
     });

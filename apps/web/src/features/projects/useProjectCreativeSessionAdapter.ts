@@ -303,7 +303,12 @@ export const useProjectCreativeSessionAdapter = ({
         );
       });
 
-    return () => controller.abort('project-creative-hydration-replaced');
+    // Deliberately no per-run cleanup: `historicalHydrationControllerRef` is the sole owner of
+    // this request's lifetime. A React cleanup fires on every re-run — and this effect re-runs on
+    // every render, since `handoff.actions` and `studioSession` are fresh objects each time — so
+    // it cancelled the restore it had just started, while the key guard above refused the retry.
+    // The three aborts that are real are owned above (a replaced snapshot), at the top (a cleared
+    // Project context) and in the unmount effect below.
   }, [
     handoff.actions,
     projectId,

@@ -268,7 +268,16 @@ export class R2AssetByteStore implements AssetByteStore {
     }
   }
 
-  async discardDirectUpload(assetId: string): Promise<void> {
+  /**
+   * Removes a staged direct-upload object that never became a managed asset.
+   *
+   * This targets the same key as `delete`, but `delete` refuses when the lifecycle registry
+   * still retains the asset and this does not, so an unconditional discard could destroy bytes a
+   * Saved Video Version names. Refuse once the upload has been registered as ready and let
+   * `delete` — the one owner of "may these bytes go" — decide instead.
+   */
+  async discardDirectUpload(ownerUserId: string, assetId: string): Promise<void> {
+    if ((await this.#lifecycle?.findReady(ownerUserId, assetId)) != null) return;
     await this.#client.send(
       new DeleteObjectCommand({ Bucket: this.#bucket, Key: this.#key(assetId) }),
     );

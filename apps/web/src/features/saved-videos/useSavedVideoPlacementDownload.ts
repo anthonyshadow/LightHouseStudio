@@ -28,19 +28,31 @@ export const useSavedVideoPlacementDownload = (offersPlacements = true) => {
   const render = useExportPlacementRender(offersPlacements);
   const fetchRef = useRef<AbortController | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  // Reading a Version can take seconds at the 300 MB ceiling, and `render.phase` stays 'idle'
+  // throughout it. Without this the surfaces offering the download show an enabled, idle-looking
+  // control for the whole read and silently discard every press.
+  const [reading, setReading] = useState(false);
+  const busy = reading || render.phase === 'rendering';
 
   useEffect(() => () => fetchRef.current?.abort('unmount'), []);
 
   const cancel = useCallback(() => {
     fetchRef.current?.abort('cancelled');
     fetchRef.current = null;
+    setReading(false);
     render.cancel();
     setFailure(null);
   }, [render]);
 
   const download = useCallback(
     async ({ version, specification }: SavedVideoPlacementDownloadInput): Promise<void> => {
-      if (render.phase === 'rendering') return;
+      // Claimed synchronously from the ref, the way `useExportPlacementRender.render` claims its
+      // own slot: a second press would otherwise start a second complete read of the same Version
+      // and overwrite `fetchRef`, leaving the first controller unreachable by `cancel` or unmount.
+      // `busy` is the rendered form of the same fact and is deliberately not read here — it would
+      // change this callback's identity for the length of every download.
+      if (render.phase === 'rendering' || fetchRef.current !== null) return;
+      setReading(true);
       setFailure(null);
       const controller = new AbortController();
       fetchRef.current = controller;
@@ -58,6 +70,7 @@ export const useSavedVideoPlacementDownload = (offersPlacements = true) => {
         return;
       } finally {
         if (fetchRef.current === controller) fetchRef.current = null;
+        setReading(false);
       }
       const rendered = await render.render({
         media,
@@ -79,5 +92,7 @@ export const useSavedVideoPlacementDownload = (offersPlacements = true) => {
     [render],
   );
 
-  return { render, failure, cancel, download } as const;
+  // `busy` covers the whole operation — the read and the render — so a caller gates one control
+  // on one fact rather than reasoning about the two phases separately.
+  return { render, busy, failure, cancel, download } as const;
 };
