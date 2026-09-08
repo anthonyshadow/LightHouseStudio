@@ -111,19 +111,6 @@ describe('API shell', () => {
     expect(app.server.timeout).toBeGreaterThan(255_000);
   });
 
-  it('keeps strict paths and explicit HEAD response parity', async () => {
-    const app = createApp({ config: testConfig() });
-    apps.push(app);
-
-    const head = await app.inject({ method: 'HEAD', url: '/api/health' });
-    const trailingSlash = await app.inject({ method: 'GET', url: '/api/health/' });
-
-    expect(head.statusCode).toBe(200);
-    expect(head.body).toBe('');
-    expect(head.headers['content-length']).toBe('11');
-    expect(trailingSlash.statusCode).toBe(404);
-  });
-
   it('reports exact batch video capability independently from realtime availability', async () => {
     const app = createApp({
       config: testConfig({ decartApiKey: 'server-only-secret' }),

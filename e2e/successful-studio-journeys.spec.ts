@@ -1,5 +1,5 @@
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { expectNoAxeViolations } from './support/accessibility';
 import {
   closeAiSettings,
   confirmSaveVideo,
@@ -104,18 +104,6 @@ const expectInternalScrollOwnership = async (
     });
   }
   return metrics;
-};
-
-const expectNoAxeViolations = async (page: Page): Promise<void> => {
-  const result = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-    .analyze();
-  expect(
-    result.violations.map((violation) => ({
-      id: violation.id,
-      targets: violation.nodes.flatMap((node) => node.target),
-    })),
-  ).toEqual([]);
 };
 
 const exactViewports = [{ name: 'small mobile', ...STUDIO_VIEWPORT_SIZES.smallMobile }] as const;

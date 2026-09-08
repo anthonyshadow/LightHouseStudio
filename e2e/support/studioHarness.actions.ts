@@ -25,10 +25,10 @@ export const expectNoDocumentOverflow = async (page: Page): Promise<void> => {
     bodyHeight: document.body.scrollHeight,
   }));
 
-  expect(dimensions.documentWidth).toBeLessThanOrEqual(dimensions.width + 1);
-  expect(dimensions.bodyWidth).toBeLessThanOrEqual(dimensions.width + 1);
-  expect(dimensions.documentHeight).toBeLessThanOrEqual(dimensions.height + 1);
-  expect(dimensions.bodyHeight).toBeLessThanOrEqual(dimensions.height + 1);
+  expect(dimensions.documentWidth, 'document width').toBeLessThanOrEqual(dimensions.width + 1);
+  expect(dimensions.bodyWidth, 'body width').toBeLessThanOrEqual(dimensions.width + 1);
+  expect(dimensions.documentHeight, 'document height').toBeLessThanOrEqual(dimensions.height + 1);
+  expect(dimensions.bodyHeight, 'body height').toBeLessThanOrEqual(dimensions.height + 1);
 };
 
 export const saveSuccessPanel = (page: Page) =>
