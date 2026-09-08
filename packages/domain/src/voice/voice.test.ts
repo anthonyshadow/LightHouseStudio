@@ -5,9 +5,7 @@ import {
   completeVoiceProcessing,
   createVoiceProcessingState,
   failVoiceProcessing,
-  isPlaybackLocked,
   restoreOriginalVoice,
-  selectPlayableArtifact,
 } from './index';
 
 describe('immutable-original voice processing', () => {
@@ -18,17 +16,17 @@ describe('immutable-original voice processing', () => {
       { kind: 'local', effectId: 'warm-studio' },
       'op-1',
     );
-    expect(isPlaybackLocked(first)).toBe(true);
+    expect(first.status).toBe('processing');
     const ready = completeVoiceProcessing(first, 'op-1', { id: 'warm' });
     expect(ready.original).toBe(original);
-    expect(selectPlayableArtifact(ready)).toEqual({ id: 'warm' });
+    expect(ready.processed).toEqual({ id: 'warm' });
 
     const second = beginVoiceProcessing(ready, { kind: 'local', effectId: 'robot' }, 'op-2');
     expect(second.original).toBe(original);
     expect(second.processed).toEqual({ id: 'warm' });
     const replaced = completeVoiceProcessing(second, 'op-2', { id: 'robot' });
     expect(replaced.original).toBe(original);
-    expect(selectPlayableArtifact(replaced)).toEqual({ id: 'robot' });
+    expect(replaced.processed).toEqual({ id: 'robot' });
   });
 
   it('ignores stale completions and preserves the last valid artifact on failure', () => {
@@ -52,7 +50,7 @@ describe('immutable-original voice processing', () => {
       'second',
       createSafeError('provider-unavailable', 'Voice conversion is temporarily unavailable.'),
     );
-    expect(selectPlayableArtifact(failed)).toEqual({ id: 'clear' });
+    expect(failed.processed).toEqual({ id: 'clear' });
     expect(failed.original).toEqual({ id: 'original' });
   });
 

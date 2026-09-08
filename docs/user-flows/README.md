@@ -73,7 +73,7 @@ Both carry Dashboard, Projects, Campaigns and Assets; the rail also holds the Qu
 quiet "How Lightframe works" help panel, the integration-status menu, and the account menu.
 
 No flag selects a chrome any more. `useStudioRouteContext` derives one boolean per destination
-(`dashboardRouteActive`, `projectWorkspaceActive`, and so on) and `ShellMain` picks the surface from
+(`dashboardRouteActive`, `projectOverviewActive`, and so on) and `ShellMain` picks the surface from
 them. Whether a media stage exists at all is `isStudioRuntimePath`.
 
 ```text

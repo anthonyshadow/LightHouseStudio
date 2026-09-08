@@ -393,7 +393,6 @@ describe('parseEnvironment', () => {
       existingVideoCharacterSwapProvider: 'pruna',
       prunaVideoReplaceEnabled: true,
       prunaApiKey: 'pruna-secret',
-      prunaVideoReplaceModel: 'p-video-replace',
     });
   });
 
@@ -433,7 +432,6 @@ describe('parseEnvironment', () => {
       existingVideoCharacterSwapProvider: 'decart',
       prunaImageTryOnEnabled: true,
       prunaApiKey: 'wardrobe-secret',
-      prunaImageTryOnModel: 'p-image-try-on',
     });
   });
 

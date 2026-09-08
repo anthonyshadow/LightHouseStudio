@@ -81,7 +81,6 @@ describe('API shell', () => {
       config: testConfig({
         prunaImageTryOnEnabled: true,
         prunaApiKey: 'server-only-test-key',
-        prunaImageTryOnModel: 'p-image-try-on',
       }),
       prunaImageTryOnProvider: {
         modelId: 'p-image-try-on',
@@ -167,7 +166,6 @@ describe('API shell', () => {
         existingVideoCharacterSwapProvider: 'pruna',
         prunaVideoReplaceEnabled: true,
         prunaApiKey: 'pruna-server-secret',
-        prunaVideoReplaceModel: 'p-video-replace',
       }),
       prunaVideoProvider: provider,
       decartVideoProvider: null,

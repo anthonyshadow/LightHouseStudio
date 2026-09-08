@@ -614,55 +614,6 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
         },
       ]);
 
-      const jobLink = {
-        projectId,
-        ownerUserId,
-        jobId,
-        initiatingRevisionId: secondRevisionId,
-        initiatingRevisionNumber: 2,
-        createdAt: later,
-      };
-      await expect(
-        Promise.all([repository.linkJob(jobLink), repository.linkJob(jobLink)]),
-      ).resolves.toEqual(
-        expect.arrayContaining([
-          { kind: 'linked', replayed: false },
-          { kind: 'linked', replayed: true },
-        ]),
-      );
-      await expect(
-        repository.linkJob({
-          ...jobLink,
-          initiatingRevisionId: firstRevisionId,
-          initiatingRevisionNumber: 1,
-        }),
-      ).resolves.toMatchObject({ kind: 'conflict', conflict: { kind: 'relation-mismatch' } });
-
-      const outputLink = {
-        projectId,
-        ownerUserId,
-        savedVideoId,
-        videoVersionId,
-        producingRevisionId: secondRevisionId,
-        producingRevisionNumber: 2,
-        createdAt: later,
-      };
-      await expect(
-        Promise.all([repository.linkOutput(outputLink), repository.linkOutput(outputLink)]),
-      ).resolves.toEqual(
-        expect.arrayContaining([
-          { kind: 'linked', replayed: false },
-          { kind: 'linked', replayed: true },
-        ]),
-      );
-      await expect(
-        repository.linkOutput({
-          ...outputLink,
-          producingRevisionId: firstRevisionId,
-          producingRevisionNumber: 1,
-        }),
-      ).resolves.toMatchObject({ kind: 'conflict', conflict: { kind: 'relation-mismatch' } });
-
       const completed = appendProjectRevision(
         appended.value,
         {

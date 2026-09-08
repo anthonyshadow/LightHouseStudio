@@ -9,7 +9,6 @@ export interface ReferenceImagePreviewProps {
   alt: string;
   label?: string;
   size?: 'thumbnail' | 'panel';
-  onUnavailable?: (() => void) | undefined;
 }
 
 const frameStyles = (theme: Theme, size: 'thumbnail' | 'panel'): CSSObject => ({
@@ -66,7 +65,6 @@ const ReferenceImagePreviewForAsset = ({
   alt,
   label = 'Open larger reference preview',
   size = 'thumbnail',
-  onUnavailable,
 }: ReferenceImagePreviewProps) => {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
@@ -97,15 +95,7 @@ const ReferenceImagePreviewForAsset = ({
           css={frameStyles(theme, size)}
           onClick={() => setOpen(true)}
         >
-          <img
-            key={revision}
-            src={contentUrl}
-            alt={alt}
-            onError={() => {
-              setFailed(true);
-              onUnavailable?.();
-            }}
-          />
+          <img key={revision} src={contentUrl} alt={alt} onError={() => setFailed(true)} />
         </button>
       )}
 

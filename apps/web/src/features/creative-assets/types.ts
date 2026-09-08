@@ -6,7 +6,6 @@ import {
   ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
   WARDROBE_CREATIVE_ASSET_SCHEMA_VERSION,
-  type CreativeAssetSearchResults as DomainCreativeAssetSearchResults,
   type CreativeAssetStore as DomainCreativeAssetStore,
   type GuidedDesignV1 as DomainGuidedDesignV1,
   type ModelModeId as DomainModelModeId,
@@ -56,7 +55,6 @@ export type SavedCharacterVariantCreation = DomainSavedCharacterVariantCreation;
 export type SavedCharacterVoicePreference = DomainSavedCharacterVoicePreference;
 export type CharacterVersionSelection = DomainCharacterVersionSelection;
 export type CreativeAssetStore = DomainCreativeAssetStore;
-export type CreativeAssetSearchResults = DomainCreativeAssetSearchResults;
 
 export interface CreativeAssetRepositoryState {
   readonly store: CreativeAssetStore;
@@ -155,7 +153,6 @@ export interface CreativeAssetRepository {
   ) => () => void;
   createSavedPrompt: (input: CreateSavedPromptInput) => Promise<SavedPrompt>;
   updateSavedPrompt: (id: string, input: UpdateSavedPromptInput) => Promise<SavedPrompt>;
-  renameSavedPrompt: (id: string, title: string) => Promise<SavedPrompt>;
   deleteSavedPrompt: (id: string) => Promise<void>;
   createSavedCharacterPrompt: (
     input: CreateSavedCharacterPromptInput,
@@ -171,7 +168,6 @@ export interface CreativeAssetRepository {
     id: string,
     input: UpdateSavedCharacterPromptInput,
   ) => Promise<SavedCharacterPrompt>;
-  renameSavedCharacterPrompt: (id: string, name: string) => Promise<SavedCharacterPrompt>;
   deleteSavedCharacterPrompt: (id: string) => Promise<void>;
   createSavedCharacterVariant: (
     input: CreateSavedCharacterVariantInput,
@@ -184,7 +180,6 @@ export interface CreativeAssetRepository {
     modelModeId: ModelModeId,
     referenceImageAssetId: string,
   ) => Promise<void>;
-  search: (query: string, modelModeId?: ModelModeId) => CreativeAssetSearchResults;
   /** Cloud-sync seam; local writes remain immediately available while the server CAS settles. */
   replaceFromRemote?: (store: CreativeAssetStore) => Promise<void>;
 }

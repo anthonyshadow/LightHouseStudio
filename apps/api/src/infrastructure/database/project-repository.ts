@@ -42,7 +42,6 @@ import type {
   ProjectAssetMembershipPageInput,
   ProjectLinkHistoryKind,
   ProjectLinkHistoryPage,
-  ProjectLinkMutationResult,
   ProjectOutputMetadataCommitResult,
   ProjectOutputMetadataUnitOfWork,
   ProjectOutputOperationReceipt,
@@ -145,7 +144,6 @@ import {
 
 type DatabaseExecutor = Parameters<Parameters<LightframeDatabase['transaction']>[0]>[0];
 type ProjectJobRow = typeof projectJobs.$inferSelect;
-type ProjectOutputRow = typeof projectOutputs.$inferSelect;
 type ProjectOutputReceiptRow = typeof projectOutputOperationReceipts.$inferSelect;
 type ProcessingJobRow = typeof processingJobs.$inferSelect;
 type CurrentProjectRow = {
@@ -494,19 +492,6 @@ const linkHistoryPage = <Row extends LinkHistoryCursorRow>(
         : null,
   };
 };
-
-const replayOrRelationConflict = <Row>(
-  row: Row | undefined,
-  matches: (row: Row) => boolean,
-  projectId: string,
-  relation: 'job' | 'output',
-): ProjectLinkMutationResult =>
-  row !== undefined && matches(row)
-    ? { kind: 'linked', replayed: true }
-    : {
-        kind: 'conflict',
-        conflict: projectConflicts.relationMismatch(projectId, relation),
-      };
 
 const toProjectOutputReceipt = (row: ProjectOutputReceiptRow): ProjectOutputOperationReceipt => ({
   operationId: row.operationId,
@@ -3714,174 +3699,6 @@ export class DrizzleProjectRepository
         })
         .where(and(eq(projects.id, current.id), eq(projects.ownerUserId, current.ownerUserId)));
       return { kind: 'committed', receipt };
-    });
-  }
-
-  async linkJob(link: ProjectJobLink): Promise<ProjectLinkMutationResult> {
-    return this.db.transaction(async (tx) => {
-      const [projectRow] = await tx
-        .select({ id: projects.id })
-        .from(projects)
-        .where(
-          and(
-            eq(projects.id, link.projectId),
-            eq(projects.ownerUserId, link.ownerUserId),
-            isNull(projects.archivedAt),
-            isNull(projects.deletedAt),
-          ),
-        )
-        .for('update')
-        .limit(1);
-      if (projectRow === undefined) return { kind: 'not-found' };
-      const [[revisionRow], [jobRow]] = await Promise.all([
-        tx
-          .select({ id: projectRevisions.id })
-          .from(projectRevisions)
-          .where(
-            and(
-              eq(projectRevisions.projectId, link.projectId),
-              eq(projectRevisions.ownerUserId, link.ownerUserId),
-              eq(projectRevisions.id, link.initiatingRevisionId),
-              eq(projectRevisions.revisionNumber, link.initiatingRevisionNumber),
-            ),
-          )
-          .limit(1),
-        tx
-          .select({ id: processingJobs.id })
-          .from(processingJobs)
-          .where(
-            and(
-              eq(processingJobs.id, link.jobId),
-              eq(processingJobs.ownerUserId, link.ownerUserId),
-            ),
-          )
-          .for('share')
-          .limit(1),
-      ]);
-      if (revisionRow === undefined || jobRow === undefined) return { kind: 'not-found' };
-      const exact = (row: ProjectJobRow): boolean =>
-        row.projectId === link.projectId &&
-        row.ownerUserId === link.ownerUserId &&
-        row.jobId === link.jobId &&
-        row.initiatingRevisionId === link.initiatingRevisionId &&
-        row.initiatingRevisionNumber === link.initiatingRevisionNumber;
-      const [existing] = await tx
-        .select()
-        .from(projectJobs)
-        .where(eq(projectJobs.jobId, link.jobId))
-        .limit(1);
-      if (existing !== undefined) {
-        return replayOrRelationConflict(existing, exact, link.projectId, 'job');
-      }
-      const inserted = await tx
-        .insert(projectJobs)
-        .values({
-          projectId: link.projectId,
-          ownerUserId: link.ownerUserId,
-          jobId: link.jobId,
-          initiatingRevisionId: link.initiatingRevisionId,
-          initiatingRevisionNumber: link.initiatingRevisionNumber,
-          createdAt: toIsoTimestamp(link.createdAt),
-        })
-        .onConflictDoNothing({ target: projectJobs.jobId })
-        .returning({ jobId: projectJobs.jobId });
-      if (inserted.length > 0) return { kind: 'linked', replayed: false };
-      const [raced] = await tx
-        .select()
-        .from(projectJobs)
-        .where(eq(projectJobs.jobId, link.jobId))
-        .limit(1);
-      return replayOrRelationConflict(raced, exact, link.projectId, 'job');
-    });
-  }
-
-  async linkOutput(link: ProjectOutputLink): Promise<ProjectLinkMutationResult> {
-    return this.db.transaction(async (tx) => {
-      const [projectRow] = await tx
-        .select({ id: projects.id })
-        .from(projects)
-        .where(
-          and(
-            eq(projects.id, link.projectId),
-            eq(projects.ownerUserId, link.ownerUserId),
-            isNull(projects.archivedAt),
-            isNull(projects.deletedAt),
-          ),
-        )
-        .for('update')
-        .limit(1);
-      if (projectRow === undefined) return { kind: 'not-found' };
-      const [[revisionRow], [outputRow]] = await Promise.all([
-        tx
-          .select({ id: projectRevisions.id })
-          .from(projectRevisions)
-          .where(
-            and(
-              eq(projectRevisions.projectId, link.projectId),
-              eq(projectRevisions.ownerUserId, link.ownerUserId),
-              eq(projectRevisions.id, link.producingRevisionId),
-              eq(projectRevisions.revisionNumber, link.producingRevisionNumber),
-            ),
-          )
-          .limit(1),
-        tx
-          .select({ id: videoVersions.id })
-          .from(videoVersions)
-          .innerJoin(
-            savedVideos,
-            and(
-              eq(savedVideos.id, videoVersions.videoId),
-              eq(savedVideos.ownerUserId, videoVersions.ownerUserId),
-            ),
-          )
-          .where(
-            and(
-              eq(savedVideos.id, link.savedVideoId),
-              eq(videoVersions.id, link.videoVersionId),
-              eq(savedVideos.ownerUserId, link.ownerUserId),
-              eq(savedVideos.status, 'ready'),
-              isNull(savedVideos.deletedAt),
-            ),
-          )
-          .for('share')
-          .limit(1),
-      ]);
-      if (revisionRow === undefined || outputRow === undefined) return { kind: 'not-found' };
-      const exact = (row: ProjectOutputRow): boolean =>
-        row.projectId === link.projectId &&
-        row.ownerUserId === link.ownerUserId &&
-        row.savedVideoId === link.savedVideoId &&
-        row.videoVersionId === link.videoVersionId &&
-        row.producingRevisionId === link.producingRevisionId &&
-        row.producingRevisionNumber === link.producingRevisionNumber;
-      const [existing] = await tx
-        .select()
-        .from(projectOutputs)
-        .where(eq(projectOutputs.videoVersionId, link.videoVersionId))
-        .limit(1);
-      if (existing !== undefined) {
-        return replayOrRelationConflict(existing, exact, link.projectId, 'output');
-      }
-      const inserted = await tx
-        .insert(projectOutputs)
-        .values({
-          projectId: link.projectId,
-          ownerUserId: link.ownerUserId,
-          savedVideoId: link.savedVideoId,
-          videoVersionId: link.videoVersionId,
-          producingRevisionId: link.producingRevisionId,
-          producingRevisionNumber: link.producingRevisionNumber,
-          createdAt: toIsoTimestamp(link.createdAt),
-        })
-        .onConflictDoNothing({ target: projectOutputs.videoVersionId })
-        .returning({ videoVersionId: projectOutputs.videoVersionId });
-      if (inserted.length > 0) return { kind: 'linked', replayed: false };
-      const [raced] = await tx
-        .select()
-        .from(projectOutputs)
-        .where(eq(projectOutputs.videoVersionId, link.videoVersionId))
-        .limit(1);
-      return replayOrRelationConflict(raced, exact, link.projectId, 'output');
     });
   }
 

@@ -140,7 +140,7 @@ describe('createCreativeAssetRepository', () => {
         message: 'A saved prompt cannot be empty.',
       }),
     );
-    await expect(repository.renameSavedPrompt('missing', 'Still valid')).rejects.toThrow(
+    await expect(repository.updateSavedPrompt('missing', { title: 'Still valid' })).rejects.toThrow(
       expect.objectContaining({
         code: 'not-found',
         message: 'Saved prompt was not found.',
@@ -148,7 +148,7 @@ describe('createCreativeAssetRepository', () => {
     );
   });
 
-  it('supports CRUD, mode-scoped search, recent deduplication, usage tracking, and unlink-on-delete', async () => {
+  it('supports CRUD, recent deduplication, usage tracking, and unlink-on-delete', async () => {
     const repository = repositoryFixture();
     const saved = await repository.createSavedPrompt({
       title: '  Copper   jacket ',
@@ -164,8 +164,6 @@ describe('createCreativeAssetRepository', () => {
 
     expect(saved.title).toBe('Copper jacket');
     expect(saved.tags).toHaveLength(12);
-    expect(repository.search('copper', 'lucy-latest').savedPrompts).toHaveLength(1);
-    expect(repository.search('linen', 'lucy-latest').savedPrompts).toHaveLength(0);
 
     await repository.recordSuccessfulPrompt({
       prompt: '  Change the jacket material to brushed copper.  ',
@@ -182,7 +180,7 @@ describe('createCreativeAssetRepository', () => {
       repository.getSnapshot().store.savedPrompts.find((item) => item.id === saved.id)?.useCount,
     ).toBe(2);
 
-    const renamed = await repository.renameSavedPrompt(saved.id, 'Copper keynote');
+    const renamed = await repository.updateSavedPrompt(saved.id, { title: 'Copper keynote' });
     expect(renamed.title).toBe('Copper keynote');
     await repository.updateSavedPrompt(saved.id, { prompt: 'Change the jacket to copper satin.' });
     await repository.deleteSavedPrompt(saved.id);

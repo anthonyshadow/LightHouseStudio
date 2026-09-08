@@ -62,10 +62,3 @@ export const failVoiceProcessing = <TArtifact>(
     error,
   };
 };
-
-export const selectPlayableArtifact = <TArtifact>(
-  state: VoiceProcessingState<TArtifact>,
-): TArtifact => state.processed ?? state.original;
-
-export const isPlaybackLocked = <TArtifact>(state: VoiceProcessingState<TArtifact>): boolean =>
-  state.status === 'processing';

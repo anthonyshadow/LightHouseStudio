@@ -34,7 +34,6 @@ export const VIDEO_INPUT_MAX_BYTES = 300_000_000;
 export const VTON_VIDEO_INPUT_MAX_BYTES = 200_000_000;
 export const VIDEO_RESULT_MAX_BYTES = 300_000_000;
 export const VIDEO_JOB_TTL_MS = 60 * 60 * 1_000;
-export const VIDEO_ASPECT_RATIO_TOLERANCE = 0.01;
 export const VIDEO_RESULT_DURATION_TOLERANCE_MS = 500;
 
 export const VIDEO_INPUT_MIME_TYPES = ['video/mp4', 'video/quicktime', 'video/webm'] as const;

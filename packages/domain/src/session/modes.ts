@@ -6,46 +6,6 @@ export const MODEL_MODE_IDS = [CHARACTER_MODEL_ID, VTON_MODEL_ID] as const;
 export type ModelModeId = (typeof MODEL_MODE_IDS)[number];
 export type SessionModeId = typeof LOCAL_MODE_ID | ModelModeId;
 
-export interface LocalSessionMode {
-  readonly id: typeof LOCAL_MODE_ID;
-  readonly kind: 'local';
-  readonly label: string;
-  readonly inputSemantics: 'none';
-}
-
-export interface ModelSessionMode {
-  readonly id: ModelModeId;
-  readonly kind: 'model';
-  readonly label: string;
-  readonly providerModelId: ModelModeId;
-  readonly inputSemantics: 'character' | 'garment';
-}
-
-export type SessionMode = LocalSessionMode | ModelSessionMode;
-
-export const SESSION_MODES = {
-  local: {
-    id: 'local',
-    kind: 'local',
-    label: 'Local camera',
-    inputSemantics: 'none',
-  },
-  'lucy-latest': {
-    id: 'lucy-latest',
-    kind: 'model',
-    label: 'Character',
-    providerModelId: 'lucy-latest',
-    inputSemantics: 'character',
-  },
-  'lucy-vton-latest': {
-    id: 'lucy-vton-latest',
-    kind: 'model',
-    label: 'Virtual try-on',
-    providerModelId: 'lucy-vton-latest',
-    inputSemantics: 'garment',
-  },
-} as const satisfies Readonly<Record<SessionModeId, SessionMode>>;
-
 export const isModelModeId = (value: unknown): value is ModelModeId =>
   value === CHARACTER_MODEL_ID || value === VTON_MODEL_ID;
 

@@ -43,7 +43,6 @@ export interface SelectOptionState {
 
 export interface SelectFieldProps {
   readonly id?: string | undefined;
-  readonly name?: string | undefined;
   readonly label: string;
   readonly hint?: string | undefined;
   readonly error?: string | undefined;
@@ -79,7 +78,6 @@ const normalizedSearchText = (value: string) => value.trim().toLocaleLowerCase()
 export const SelectField = forwardRef<HTMLButtonElement, SelectFieldProps>(function SelectField(
   {
     id: providedId,
-    name,
     label,
     hint,
     error,
@@ -373,7 +371,6 @@ export const SelectField = forwardRef<HTMLButtonElement, SelectFieldProps>(funct
           <span css={triggerValueStyles()}>{selectedOption?.label ?? placeholder}</span>
           <AppIcon name="chevronDown" css={chevronStyles(theme, open)} />
         </button>
-        {name ? <input type="hidden" name={name} value={value} /> : null}
       </div>
 
       {open ? (

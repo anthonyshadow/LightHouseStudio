@@ -479,10 +479,8 @@ export interface RuntimeConfig {
   readonly existingVideoCharacterSwapProvider: 'decart' | 'pruna';
   readonly prunaVideoReplaceEnabled: boolean;
   readonly prunaApiKey?: string;
-  readonly prunaVideoReplaceModel?: typeof PRUNA_VIDEO_REPLACE_MODEL;
   readonly prunaVideoReplaceDisableSafetyChecker: boolean;
   readonly prunaImageTryOnEnabled: boolean;
-  readonly prunaImageTryOnModel?: typeof PRUNA_IMAGE_TRY_ON_MODEL;
   readonly openAiApiKey?: string;
   readonly openAiPromptOptimizerModel: string;
   readonly openAiPromptOptimizerReasoning:
@@ -629,14 +627,8 @@ export const parseEnvironment = (
     existingVideoCharacterSwapProvider: result.data.EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER,
     prunaVideoReplaceEnabled: result.data.PRUNA_VIDEO_REPLACE_ENABLED,
     ...(result.data.PRUNA_API_KEY === undefined ? {} : { prunaApiKey: result.data.PRUNA_API_KEY }),
-    ...(result.data.PRUNA_VIDEO_REPLACE_MODEL === undefined
-      ? {}
-      : { prunaVideoReplaceModel: result.data.PRUNA_VIDEO_REPLACE_MODEL }),
     prunaVideoReplaceDisableSafetyChecker: result.data.PRUNA_VIDEO_REPLACE_DISABLE_SAFETY_CHECKER,
     prunaImageTryOnEnabled: result.data.PRUNA_IMAGE_TRY_ON_ENABLED,
-    ...(result.data.PRUNA_IMAGE_TRY_ON_MODEL === undefined
-      ? {}
-      : { prunaImageTryOnModel: result.data.PRUNA_IMAGE_TRY_ON_MODEL }),
     ...(result.data.OPENAI_API_KEY === undefined
       ? {}
       : { openAiApiKey: result.data.OPENAI_API_KEY }),

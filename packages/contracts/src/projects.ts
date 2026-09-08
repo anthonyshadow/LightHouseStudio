@@ -525,17 +525,6 @@ export const projectRevisionSchema = z
   })
   .strict();
 
-export const projectAssetLinkSchema = z
-  .object({
-    projectId: projectIdSchema,
-    assetId: z.uuid(),
-    role: projectAssetRoleSchema,
-    revisionId: projectRevisionIdSchema,
-    revisionNumber: z.number().int().positive(),
-    createdAt: z.iso.datetime(),
-  })
-  .strict();
-
 export const projectAssetMembershipSchema = z
   .object({
     id: z.uuid(),
@@ -576,16 +565,6 @@ export const projectAssetMembershipParamsSchema = z
   .object({ projectId: projectIdSchema, membershipId: z.uuid() })
   .strict();
 
-export const projectJobLinkSchema = z
-  .object({
-    projectId: projectIdSchema,
-    jobId: z.uuid(),
-    initiatingRevisionId: projectRevisionIdSchema,
-    initiatingRevisionNumber: z.number().int().positive(),
-    createdAt: z.iso.datetime(),
-  })
-  .strict();
-
 export const projectOutputLinkSchema = z
   .object({
     projectId: projectIdSchema,
@@ -593,18 +572,6 @@ export const projectOutputLinkSchema = z
     videoVersionId: z.uuid(),
     producingRevisionId: projectRevisionIdSchema,
     producingRevisionNumber: z.number().int().positive(),
-    createdAt: z.iso.datetime(),
-  })
-  .strict();
-
-export const projectVersionReferenceLinkSchema = z
-  .object({
-    projectId: projectIdSchema,
-    savedVideoId: z.uuid(),
-    videoVersionId: z.uuid(),
-    role: z.enum(['working', 'presented']),
-    revisionId: projectRevisionIdSchema,
-    revisionNumber: z.number().int().positive(),
     createdAt: z.iso.datetime(),
   })
   .strict();
@@ -1259,9 +1226,6 @@ export type DetachProjectAssetResponse = z.infer<typeof detachProjectAssetRespon
 export type ProjectContract = z.infer<typeof projectSchema>;
 export type ProjectPreviewContract = z.infer<typeof projectPreviewSchema>;
 export type ProjectRevisionContract = z.infer<typeof projectRevisionSchema>;
-export type ProjectJobLinkContract = z.infer<typeof projectJobLinkSchema>;
-export type ProjectOutputLinkContract = z.infer<typeof projectOutputLinkSchema>;
-export type ProjectVersionReferenceLinkContract = z.infer<typeof projectVersionReferenceLinkSchema>;
 export type ProjectStatusFactsContract = z.infer<typeof projectStatusFactsSchema>;
 export type ProjectConflictContract = z.infer<typeof projectConflictSchema>;
 export type ProjectsQuery = z.infer<typeof projectsQuerySchema>;

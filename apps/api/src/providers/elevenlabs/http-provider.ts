@@ -596,31 +596,6 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
     return voice === undefined ? null : normalizeWorkspaceVoice(voice);
   }
 
-  async getWorkspaceVoicesByIds(
-    voiceIds: readonly string[],
-    signal: AbortSignal,
-  ): Promise<readonly ProviderVoice[]> {
-    const uniqueIds = [...new Set(voiceIds)].slice(0, PAGE_SIZE_LIMIT);
-    if (uniqueIds.length === 0) return [];
-    const url = new URL('/v2/voices', ELEVENLABS_API_ORIGIN);
-    url.searchParams.set('page_size', String(uniqueIds.length));
-    url.searchParams.set('include_total_count', 'false');
-    url.searchParams.set('voice_type', 'saved');
-    for (const voiceId of uniqueIds) url.searchParams.append('voice_ids', voiceId);
-    const data = await this.#json(
-      this.#request(url.pathname + url.search, 'workspace-voices', signal),
-      'workspace-voices',
-    );
-    const parsed = workspaceVoicePageSchema.safeParse(data);
-    if (!parsed.success || parsed.data.voices.length > uniqueIds.length) {
-      throw new ProviderError('workspace-voices', 'invalid-response');
-    }
-    const allowed = new Set(uniqueIds);
-    return parsed.data.voices
-      .filter((voice) => allowed.has(voice.voice_id))
-      .map(normalizeWorkspaceVoice);
-  }
-
   async listSharedVoices(input: SharedVoiceSearchInput): Promise<ProviderSharedVoicePage> {
     const url = new URL('/v1/shared-voices', ELEVENLABS_API_ORIGIN);
     url.searchParams.set('page_size', String(input.pageSize));

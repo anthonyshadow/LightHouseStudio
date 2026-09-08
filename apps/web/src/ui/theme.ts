@@ -18,9 +18,6 @@ export interface StudioTheme {
     accentSoft: string;
     onAccent: string;
     violet: string;
-    violetSoft: string;
-    signal: string;
-    signalSoft: string;
     warning: string;
     warningSoft: string;
     danger: string;
@@ -38,7 +35,6 @@ export interface StudioTheme {
     shellAmbient: string;
     stageIdle: string;
     stageScrim: string;
-    recordingGlow: string;
   };
   radii: {
     small: string;
@@ -66,7 +62,6 @@ export interface StudioTheme {
     body: string;
     label: string;
     section: string;
-    stageTitle: string;
   };
   shadows: {
     soft: string;
@@ -79,21 +74,6 @@ export interface StudioTheme {
     standard: string;
   };
   layout: {
-    shellRows: {
-      header: string;
-      headerCompact: string;
-      headerMobile: string;
-      headerUltra: string;
-      capture: string;
-      captureCompact: string;
-      captureTablet: string;
-      captureMobile: string;
-      captureUltra: string;
-      launcher: string;
-      launcherCompact: string;
-      launcherMobile: string;
-      launcherUltra: string;
-    };
     overlays: {
       drawer: string;
       drawerTablet: string;
@@ -170,9 +150,6 @@ export const studioTheme: StudioTheme = {
     accentSoft: '#153d37',
     onAccent: '#041612',
     violet: '#9b7cff',
-    violetSoft: '#261d45',
-    signal: '#ffc65c',
-    signalSoft: '#3b2d12',
     warning: '#ffbf69',
     warningSoft: '#3a2914',
     danger: '#ff8178',
@@ -198,8 +175,6 @@ export const studioTheme: StudioTheme = {
       'linear-gradient(145deg, #0b2027 0%, #0d131a 48%, #110e1d 100%)',
     ].join(', '),
     stageScrim: 'linear-gradient(180deg, rgba(5, 9, 14, 0) 50%, rgba(5, 9, 14, 0.6) 100%)',
-    recordingGlow:
-      'radial-gradient(circle, rgba(255, 91, 100, 0.28) 0%, rgba(255, 91, 100, 0.1) 46%, transparent 72%)',
   },
   radii: {
     small: '0.5rem',
@@ -227,7 +202,6 @@ export const studioTheme: StudioTheme = {
     body: '0.875rem',
     label: '1rem',
     section: '1.125rem',
-    stageTitle: 'clamp(1.375rem, 2vw, 1.875rem)',
   },
   shadows: {
     soft: '0 12px 38px rgba(0, 0, 0, 0.18)',
@@ -240,21 +214,6 @@ export const studioTheme: StudioTheme = {
     standard: '220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
   },
   layout: {
-    shellRows: {
-      header: '4.5rem',
-      headerCompact: '4rem',
-      headerMobile: '3.5rem',
-      headerUltra: '3rem',
-      capture: '3.5rem',
-      captureCompact: '3.25rem',
-      captureTablet: '3.5rem',
-      captureMobile: '3.25rem',
-      captureUltra: '3rem',
-      launcher: '3rem',
-      launcherCompact: '2.75rem',
-      launcherMobile: '3.25rem',
-      launcherUltra: '3rem',
-    },
     overlays: {
       drawer: 'clamp(22.5rem, 27vw, 26rem)',
       drawerTablet: 'min(30rem, calc(100vw - 2rem))',

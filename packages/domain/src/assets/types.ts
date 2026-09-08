@@ -205,13 +205,6 @@ export interface AssetMutationContext {
   readonly createId: () => string;
 }
 
-export interface CreativeAssetSearchResults {
-  readonly savedPrompts: readonly SavedPrompt[];
-  readonly recentPrompts: readonly RecentPrompt[];
-  readonly savedCharacterPrompts: readonly SavedCharacterPrompt[];
-  readonly savedCharacterVariants: readonly SavedCharacterVariant[];
-}
-
 export interface SanitizeCreativeAssetResult {
   readonly store: CreativeAssetStore;
   readonly recovered: boolean;

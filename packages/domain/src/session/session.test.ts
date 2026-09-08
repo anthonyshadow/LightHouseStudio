@@ -3,7 +3,6 @@ import {
   CHARACTER_MODEL_ID,
   MAX_IMAGE_BYTES,
   RECOMMENDED_IMAGE_BYTES,
-  SESSION_MODES,
   buildRealtimeStateSnapshot,
   canApplyRealtimeChanges,
   canSwitchMode,
@@ -41,9 +40,6 @@ describe('session modes and drafts', () => {
     expect(isModelModeId('local')).toBe(false);
     expect(isModelModeId('lucy-2.1')).toBe(false);
     expect(isModelModeId('lucy-latest')).toBe(true);
-    expect(SESSION_MODES.local.kind).toBe('local');
-    expect(SESSION_MODES['lucy-latest'].providerModelId).toBe('lucy-latest');
-    expect(SESSION_MODES['lucy-vton-latest'].inputSemantics).toBe('garment');
   });
 
   it('allows local with no input and blocks an empty model draft', () => {

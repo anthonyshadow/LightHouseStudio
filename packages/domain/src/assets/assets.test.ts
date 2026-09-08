@@ -27,12 +27,9 @@ import {
   resolveCharacterVersion,
   sanitizeCreativeAssetStore,
   sanitizeGuidedDesignV1,
-  searchCreativeAssets,
   selectCharacterVersion,
   updateSavedPrompt,
   updateSavedCharacterPrompt,
-  useSavedCharacterPrompt,
-  useSavedPrompt,
   type GuidedDesignV1,
 } from './index';
 
@@ -188,7 +185,7 @@ describe('creative asset CRUD and use', () => {
     expect(store.recentPrompts).toHaveLength(2);
   });
 
-  it('creates, normalizes, updates, uses, searches, and deletes saved prompts', () => {
+  it('creates, normalizes, updates, uses, and deletes saved prompts', () => {
     let store = createSavedPrompt(
       createEmptyCreativeAssetStore(),
       {
@@ -208,18 +205,16 @@ describe('creative asset CRUD and use', () => {
     });
 
     store = updateSavedPrompt(store, 'saved-1', { title: 'Orbital Guide' }, timestamp(1));
-    const used = useSavedPrompt(store, 'saved-1', timestamp(2));
-    expect(used.prompt).toBe('A chrome explorer');
-    expect(used.store.savedPrompts[0]?.useCount).toBe(1);
-    expect(searchCreativeAssets(used.store, 'ORBITAL').savedPrompts).toHaveLength(1);
+    expect(store.savedPrompts[0]?.prompt).toBe('A chrome explorer');
+    expect(store.savedPrompts[0]?.title).toBe('Orbital Guide');
 
     store = recordSuccessfulPromptUse(
-      used.store,
+      store,
       { prompt: ' A   CHROME explorer ', modelModeId: 'lucy-latest' },
       context('recent-1', 3),
     );
     expect(store.recentPrompts[0]?.savedPromptId).toBe('saved-1');
-    expect(store.savedPrompts[0]?.useCount).toBe(2);
+    expect(store.savedPrompts[0]?.useCount).toBe(1);
 
     store = deleteSavedPrompt(store, 'saved-1');
     expect(store.savedPrompts).toHaveLength(0);
@@ -469,11 +464,10 @@ describe('creative asset CRUD and use', () => {
       },
       context('character-1'),
     );
-    const used = useSavedCharacterPrompt(store, 'character-1', timestamp(1));
-    expect(used.builderDraft).toEqual(builderDraft);
-    expect(used.guidedDesign).toEqual(guidedDesign());
-    expect(used.store.savedCharacterPrompts[0]).toMatchObject({
-      useCount: 1,
+    expect(store.savedCharacterPrompts[0]?.builderDraft).toEqual(builderDraft);
+    expect(store.savedCharacterPrompts[0]?.guidedDesign).toEqual(guidedDesign());
+    expect(store.savedCharacterPrompts[0]).toMatchObject({
+      useCount: 0,
       defaultVoice: null,
       referenceImageStatus: 'persisted-reference',
       referenceImageAssetId: 'reference-asset-1',

@@ -14,7 +14,6 @@ const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
 const revisionId = '3ac244b9-ec36-4a1e-b95e-7bcf37eb0b2d';
 const secondRevisionId = '4159225b-60f4-4f94-a3d5-08feee91a91d';
 const assetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
-const jobId = '4ad4594c-acde-4cba-acde-584509d9db91';
 const videoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
 const versionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
 const secondVideoId = '4a3e43b7-c237-4f07-9ff7-eb5ab6a14d12';
@@ -610,46 +609,5 @@ describe('Project persistence mapping and transactions', () => {
     await expect(repository.create(aggregate)).resolves.toBeUndefined();
     expect(scripted.calls.filter(({ operation }) => operation === 'select')).toHaveLength(1);
     expect(scripted.remaining()).toBe(0);
-  });
-
-  it('treats an exact job replay as idempotent and a revision mismatch as a no-op conflict', async () => {
-    const link = {
-      projectId,
-      ownerUserId,
-      jobId,
-      initiatingRevisionId: revisionId,
-      initiatingRevisionNumber: 1,
-      createdAt: now,
-    };
-    const exactScript = scriptedDatabase(
-      [{ id: projectId }],
-      [{ id: revisionId }],
-      [{ id: jobId }],
-      [{ ...link, createdAt: postgresNow }],
-    );
-    await expect(new DrizzleProjectRepository(exactScript.db).linkJob(link)).resolves.toEqual({
-      kind: 'linked',
-      replayed: true,
-    });
-    expect(exactScript.calls.some(({ operation }) => operation === 'insert')).toBe(false);
-
-    const mismatchScript = scriptedDatabase(
-      [{ id: projectId }],
-      [{ id: revisionId }],
-      [{ id: jobId }],
-      [
-        {
-          ...link,
-          initiatingRevisionId: secondRevisionId,
-          initiatingRevisionNumber: 2,
-          createdAt: postgresNow,
-        },
-      ],
-    );
-    await expect(new DrizzleProjectRepository(mismatchScript.db).linkJob(link)).resolves.toEqual({
-      kind: 'conflict',
-      conflict: { kind: 'relation-mismatch', projectId, relation: 'job' },
-    });
-    expect(mismatchScript.calls.some(({ operation }) => operation === 'insert')).toBe(false);
   });
 });

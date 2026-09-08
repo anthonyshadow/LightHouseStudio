@@ -27,7 +27,6 @@ export interface SavedVideoSuccessActionsProps {
   readonly exportSpecification?: ProjectExportSpecification | null;
   readonly onOpenInAssets: () => void;
   readonly onCreateAnother?: (() => void) | undefined;
-  readonly createAnotherLabel?: string;
 }
 
 export const SavedVideoSuccessActions = ({
@@ -35,7 +34,6 @@ export const SavedVideoSuccessActions = ({
   exportSpecification = null,
   onOpenInAssets,
   onCreateAnother,
-  createAnotherLabel = 'Create another',
 }: SavedVideoSuccessActionsProps) => {
   const theme = useTheme();
   // Three of this component's four call sites pass no specification at all, and the capability is
@@ -88,7 +86,7 @@ export const SavedVideoSuccessActions = ({
         </Button>
         {onCreateAnother ? (
           <Button variant="quiet" onClick={onCreateAnother}>
-            {createAnotherLabel}
+            Create another
           </Button>
         ) : null}
       </div>
