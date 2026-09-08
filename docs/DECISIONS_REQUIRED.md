@@ -151,10 +151,16 @@ migration. A failed member leaves the produced ones saved and is named with a re
 same set. Design and consequences in the
 [slice 2.3 plan](roadmap/SLICE_2.3_VARIANT_SETS_PLAN.md); implemented in slice 2.3.
 
-## D11 — HEVC intake?
+## D11 — HEVC intake? — **decided**
 
 **Question:** iPhone-default HEVC/ProRes uploads are rejected outright. Offer local
 transcode-on-upload where the browser can decode?
+**Decided 2026-09-05, as recommended**, and shipped in slice 2.4: the intake asks the browser
+whether it can decode the file's own decoder configuration, converts to H.264 where it can, and
+otherwise refuses with copy that names both facts. See
+[`roadmap/PRODUCT_ROADMAP.md`](roadmap/PRODUCT_ROADMAP.md) slice 2.4 and the closure note in
+[`audits/CURRENT_STATE_AUDIT.md`](audits/CURRENT_STATE_AUDIT.md).
+
 **Recommendation: yes** (capability-probed, with honest fallback copy) — this is a first-session
 funnel killer for the target audience.
 **Blocks:** Phase 2 slice. **Decide by:** before that slice.

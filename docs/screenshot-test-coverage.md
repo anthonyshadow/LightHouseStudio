@@ -74,7 +74,7 @@ They do not hold the same set, and that is deliberate. This product gates every 
 local H.264/AAC MP4 conversion, which is why these scenarios have media at all. Playwright's
 Chromium is the open-source build, and on Linux it cannot **decode** H.264:
 `video.canPlayType('video/mp4; codecs="avc1.42E01E"')` answers `''` and `MediaSource.isTypeSupported`
-answers `false`, against `'probably'` and `true` on the same Playwright build on macOS. Nine
+answers `false`, against `'probably'` and `true` on the same Playwright build on macOS. Ten
 scenarios reach their state through that gate, and on Linux the upload panel refuses the file — "The
 browser could not decode the selected video" — so the state is never reached. Playwright downloads
 the same browser binary on every Linux host, so this holds in the capture container and on the CI
@@ -87,10 +87,10 @@ baseline inventory cannot disagree about which files are expected to exist. A ba
 like coverage. `bun run screenshots:prune` enforces the split: it expects each platform to hold only
 what its browser can produce.
 
-| Platform          | Cases | Missing                                            |
-| ----------------- | ----: | -------------------------------------------------- |
-| `chromium-darwin` |    50 | —                                                  |
-| `chromium-linux`  |    31 | The 19 cases whose media needs H.264 (9 scenarios) |
+| Platform          | Cases | Missing                                             |
+| ----------------- | ----: | --------------------------------------------------- |
+| `chromium-darwin` |    50 | —                                                   |
+| `chromium-linux`  |    31 | The 19 cases whose media needs H.264 (10 scenarios) |
 
 ### Capturing the Linux set from a Mac
 

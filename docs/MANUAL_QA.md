@@ -171,7 +171,10 @@ focus return, reduced motion, and overlay stacking at every canonical viewport a
 
 ## Take, Voice, and cleanup checks
 
-- Exercise accepted H.264 MP4, H.264 MOV, and VP8 WebM plus rejected HEVC/ProRes/VP9/alias cases.
+- Exercise accepted H.264 MP4, H.264 MOV, and VP8 WebM. HEVC and ProRes are no longer rejected
+  outright: since slice 2.4 the intake asks the browser whether it can decode the file and converts
+  it to H.264 where it can, so check both answers on a real device, and keep VP9 and alias cases as
+  refusals.
   Confirm the full accessible filename is available without being sent to the server/provider.
 - Verify source duration/aspect/byte boundaries, no-audio visual use, Voice-disabled explanation,
   VTO's lower input cap, server-approved 720p/1080p result class and orientation, and the 500 ms
@@ -306,7 +309,8 @@ Using synthetic compatible media and no live provider:
 - at save time — from Studio and from a Project — confirm **Where is this going?** offers keep as
   it is, phone, widescreen, square post and tall feed post; that the crop preview matches the
   saved result; and that the saved Version reports the placement it was saved for;
-- run one re-framing save to completion on each physical target and confirm the progress and
+- run one save that produces several placements at once to completion on each physical target,
+  since slice 2.3 a save carries up to four, and confirm the per-placement progress and
   cancel controls behave, a cancelled render leaves the original untouched, and a failed render
   explains itself without losing the pending save;
 - on a browser without the local editor path (WebGL preview plus worker WebCodecs/OffscreenCanvas
