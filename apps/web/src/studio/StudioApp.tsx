@@ -1,16 +1,10 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router';
-import { hydrateReferenceImage } from '../adapters/api-client/apiClient';
-import { useAuth } from '../application/auth/AuthProvider';
-import type { ExistingVideoCharacterPort } from '../app/shell/studioHandoff';
 import type { StudioRuntimeRegistry } from '../app/shell/studioRuntimeWork';
 import type { ShellServices } from '../app/shell/useShellServices';
 import { APP_PATHS } from '../app/paths';
 import type { PromptCommittedHandler } from '../application/types';
-import {
-  savedCharacterStepInput,
-  useExistingVideoWorkflow,
-} from '../features/existing-video/useExistingVideoWorkflow';
+import { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import { VIDEO_TRANSFORM_INCOMPATIBLE_REASON } from '../features/existing-video/videoTransformLabels';
 import { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
@@ -29,10 +23,11 @@ import { useStudioSession } from '../orchestration/session';
 import { ReferenceUseFailureNotice } from './ReferenceUseFailureNotice';
 import { CreativeWorkspace, type CreativeWorkspaceState } from './CreativeWorkspace';
 import { StudioExitGuard } from './StudioExitGuard';
-import { isStudioFormError } from './studioStageNotices';
 import { deriveStudioContextualNotices } from './studioContextualNotices';
 import { useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
 import { useTakeReviewFlow } from './useTakeReviewFlow';
+import { useCaptureSettingsDisclosure } from './useCaptureSettingsDisclosure';
+import { useStudioRuntimePorts } from './useStudioRuntimePorts';
 import type { ActiveOverlay } from './useStudioOverlayController';
 import { useStudioProjectBridge } from './useStudioProjectBridge';
 import {
@@ -78,12 +73,6 @@ const creativeToolForOverlay = (
   }
 };
 
-const focusDesktopCaptureSettings = () => {
-  window.requestAnimationFrame(() => {
-    document.querySelector<HTMLElement>('[data-desktop-capture-settings]')?.focus();
-  });
-};
-
 export interface StudioAppProps {
   /** Everything the shell owns and the runtime borrows: route, nav, library, overlays, refs. */
   readonly services: ShellServices;
@@ -99,6 +88,7 @@ export interface StudioAppProps {
  */
 export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAppProps) => {
   const {
+    ownerUserId,
     route,
     nav,
     desktopStudioLayout,
@@ -122,10 +112,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   // Runtime-local: nothing outside the capture graph reads these.
   const uploadToggleRef = useRef<HTMLButtonElement>(null);
   const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
-  // The docked desktop panel rests collapsed so the stage and the two primary actions own the
-  // surface. Runtime-local: capture settings mean nothing on a route without live media.
-  const [captureSettingsExpanded, setCaptureSettingsExpanded] = useState(false);
-  const captureSettingsFocusRequestRef = useRef(false);
   const {
     creationIntent,
     requestedCreationProjectId,
@@ -148,12 +134,11 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     closeIf: closeOverlayIf,
   } = overlay;
 
-  const auth = useAuth();
   const location = useLocation();
   const { availability, state: capabilityState, retry: retryProviderAvailability } = provider;
   const savedVideoSave = useSaveVideo(
     Boolean(availability.directSavedVideoUploadAvailable),
-    auth.session!.user.id,
+    ownerUserId,
   );
 
   const contextualProjectId = useProjectVideoCreationContext({
@@ -186,7 +171,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   );
   const session = useStudioSession({
     availability,
-    ownerUserId: auth.session!.user.id,
+    ownerUserId,
     onPromptCommitted: handlePromptCommitted,
   });
   const handleReviewCleared = useCallback(
@@ -354,44 +339,17 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     };
   }, [recordCommittedPrompt]);
 
-  // A non-form session error is reported as a stage notice, so the capture panel steps aside to
-  // keep that notice reachable. AI Settings deliberately stays open: it owns Start/Apply/Reset, so
-  // it is the surface the disconnect recovery copy points at, and mode switching is locked while
-  // local media is live — closing it would strand a disconnected session with no way back.
-  useEffect(() => {
-    if (!session.error || isStudioFormError(session.error)) return;
-    closeOverlayIf(['capture-settings']);
-  }, [closeOverlayIf, session.error]);
-
-  // Focus follows the panel becoming focusable, not the request: a collapsed panel is inside a
-  // `hidden` subtree, so recovery has to expand it first and focus it once React has committed.
-  useEffect(() => {
-    if (!captureSettingsExpanded || !captureSettingsFocusRequestRef.current) return;
-    captureSettingsFocusRequestRef.current = false;
-    focusDesktopCaptureSettings();
-  }, [captureSettingsExpanded]);
-  const openDesktopCaptureSettings = useCallback(() => {
-    if (captureSettingsExpanded) {
-      focusDesktopCaptureSettings();
-      return;
-    }
-    captureSettingsFocusRequestRef.current = true;
-    setCaptureSettingsExpanded(true);
-  }, [captureSettingsExpanded]);
-  const toggleCaptureSettings = useCallback(
-    () => setCaptureSettingsExpanded((expanded) => !expanded),
-    [],
-  );
-
-  const clearSessionError = session.clearError;
-  const openCaptureSettingsForRecovery = useCallback(() => {
-    clearSessionError();
-    if (desktopStudioLayout) {
-      openDesktopCaptureSettings();
-      return;
-    }
-    openOverlay('capture-settings');
-  }, [clearSessionError, desktopStudioLayout, openDesktopCaptureSettings, openOverlay]);
+  // Called where its first effect used to sit, so both of the hook's effects keep their place in
+  // this fiber's effect run order. The desktop-layout effect near the top of this component stays
+  // there for the same reason — it has to write overlay state ahead of every hook below it.
+  const captureSettings = useCaptureSettingsDisclosure({
+    desktopStudioLayout,
+    recordingActive,
+    sessionError: session.error,
+    clearSessionError: session.clearError,
+    openOverlay,
+    closeOverlayIf,
+  });
 
   const stage = useStudioStageModel({
     activeOverlay,
@@ -404,7 +362,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     characterBuilderLaunchError: character.launchError,
     onRetryProviderAvailability: retryProviderAvailability,
     onDismissCharacterBuilderLaunchError: character.dismissLaunchError,
-    onOpenCaptureSettings: openCaptureSettingsForRecovery,
+    onOpenCaptureSettings: captureSettings.openForRecovery,
   });
   const {
     videoEditing,
@@ -414,15 +372,6 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     stageAspectRatio,
     stageNotices,
   } = stage;
-
-  const openCaptureSettings = () => {
-    if (recordingActive) return;
-    if (desktopStudioLayout) {
-      openDesktopCaptureSettings();
-      return;
-    }
-    openOverlay('capture-settings');
-  };
 
   const openCharacterSelector = useCallback(() => openOverlay('character-selector'), [openOverlay]);
   const openSavedCharacters = useCallback(() => openOverlay('saved-characters'), [openOverlay]);
@@ -521,58 +470,16 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     launchedOperation,
     openVideoAdjust,
   ]);
-  // Published for the surfaces that outlive this runtime. Registered in a layout effect so a
-  // selection made on the route that mounted us is applied before first paint, and withdrawn on
-  // unmount so the shell holds a selection instead of calling into a torn-down session.
-  const { registerPorts } = studioHandoff;
-  const selectVoiceForSource = useCallback(
-    (voiceId: string, voiceName: string) => {
-      if (existingVideo.selection === null) existingVideo.preselectVoice(voiceId, voiceName);
-      else existingVideo.selectVoice(voiceId, voiceName);
-    },
-    [existingVideo],
-  );
-  const existingVideoCharacter = useMemo<ExistingVideoCharacterPort>(
-    () => ({
-      providerActive: existingVideo.providerActive,
-      hasSelection: existingVideo.selection !== null,
-      isCharacterSwapStep: (stepId) =>
-        existingVideo.steps.some(
-          (candidate) => candidate.id === stepId && candidate.modelId === 'lucy-latest',
-        ),
-      applyCharacterToStep: async (stepId, snapshot, characterId) => {
-        const reference = snapshot.referenceImage
-          ? await hydrateReferenceImage(snapshot.referenceImage.assetId, snapshot.referenceImage)
-          : null;
-        existingVideo.updateStep(stepId, {
-          savedRecipeId: characterId,
-          characterName: snapshot.name,
-          characterVariantName: null,
-          ...savedCharacterStepInput(snapshot.prompt, reference?.file ?? null),
-        });
-      },
-    }),
-    [existingVideo],
-  );
-  useLayoutEffect(() => {
-    registerPorts({
-      applyRecipe: applyRecipeSelection,
-      selectVoice: selectVoiceForSource,
-      existingVideoCharacter,
-      useSavedVideo: (video, intent) => savedVideo.useSavedVideo(video, intent),
-      checkpointProjectCreative: () => projectCreative.checkpoint(),
-      saveStudioCharacter: saveBuiltCharacter,
-    });
-    return () => registerPorts(null);
-  }, [
-    applyRecipeSelection,
-    existingVideoCharacter,
-    projectCreative,
-    registerPorts,
-    saveBuiltCharacter,
+  // Called where the layout effect it replaces used to sit, so it stays the last layout effect to
+  // run on this fiber.
+  useStudioRuntimePorts({
+    registerPorts: studioHandoff.registerPorts,
+    existingVideo,
+    applyRecipe: applyRecipeSelection,
     savedVideo,
-    selectVoiceForSource,
-  ]);
+    projectCreative,
+    saveStudioCharacter: saveBuiltCharacter,
+  });
 
   const discardSavedVideoWork = savedVideo.discardWork;
   const resetDirectSavedVideoWork = useCallback(() => {
@@ -845,8 +752,8 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
           captureSupported,
           mediaPersistence: availability.mediaPersistence,
           desktopLayout: desktopStudioLayout,
-          captureSettingsExpanded,
-          ownerUserId: auth.session!.user.id,
+          captureSettingsExpanded: captureSettings.expanded,
+          ownerUserId,
           creativeStore: repositoryStore,
           onCreateProjectCharacter: character.openNewForProject,
           onCreateProjectOutfit: outfit.openNewForProject,
@@ -875,8 +782,8 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
           openVoiceTreatments: () => openOverlay('voice-treatments'),
           openAiExperience: liveExperience.openLiveAiExperience,
           openExistingVideo,
-          openCaptureSettings,
-          toggleCaptureSettings,
+          openCaptureSettings: captureSettings.open,
+          toggleCaptureSettings: captureSettings.toggle,
           startProjectRecording,
         }}
       />
