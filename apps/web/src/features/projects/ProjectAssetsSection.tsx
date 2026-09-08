@@ -252,6 +252,12 @@ export const ProjectAssetsSection = ({
   const navigate = useNavigate();
   const [filter, setFilter] = useState<AssetFilter>('all');
   const [picker, setPicker] = useState<Picker>(null);
+  // Which of the two lists the shared Character/Outfit panel shows is its own fact, kept apart
+  // from whether that panel is open. Deriving it from `picker` meant closing the panel — which
+  // clears `picker` before the 220ms exit transition finishes — also erased the selection, so a
+  // closing "Add Character" panel relabelled itself "Add Outfit" and swapped its rows on the way
+  // out.
+  const [assetPickerKind, setAssetPickerKind] = useState<'character' | 'outfit'>('character');
   const [previewVideoId, setPreviewVideoId] = useState<string | null>(null);
   const [sourceAdoptionCandidate, setSourceAdoptionCandidate] = useState<SavedVideoSummary | null>(
     null,
@@ -501,7 +507,10 @@ export const ProjectAssetsSection = ({
               key={kind}
               variant="secondary"
               {...(kind === 'voice' ? { title: PROJECT_VOICE_MEMBERSHIP_NOTE } : {})}
-              onClick={() => setPicker(kind === 'video' ? 'video-options' : kind)}
+              onClick={() => {
+                if (kind === 'character' || kind === 'outfit') setAssetPickerKind(kind);
+                setPicker(kind === 'video' ? 'video-options' : kind);
+              }}
             >
               {kind === 'voice' ? 'Add Voice' : `Add ${kindLabel(kind)}`}
             </Button>
@@ -522,34 +531,34 @@ export const ProjectAssetsSection = ({
       <OverlayPanel
         open={picker === 'character' || picker === 'outfit'}
         onClose={() => setPicker(null)}
-        title={picker === 'character' ? 'Add Character' : 'Add Outfit'}
+        title={assetPickerKind === 'character' ? 'Add Character' : 'Add Outfit'}
         description="Choose one you already saved, or create a new one in Studio."
         placement="bottom"
         size="wide"
         bodyMode="scroll"
         returnFocusRef={addTriggerRef}
         headerActions={
-          picker === 'character' && onCreateCharacter ? (
+          assetPickerKind === 'character' && onCreateCharacter ? (
             <Button onClick={() => onCreateCharacter(projectId)}>Create Character</Button>
-          ) : picker === 'outfit' && onCreateOutfit ? (
+          ) : assetPickerKind === 'outfit' && onCreateOutfit ? (
             <Button onClick={() => onCreateOutfit(projectId)}>Create Outfit</Button>
           ) : null
         }
       >
         <div css={{ display: 'grid', gap: theme.space.sm }}>
-          {(picker === 'character' ? characterItems : outfitItems).map((item) => (
+          {(assetPickerKind === 'character' ? characterItems : outfitItems).map((item) => (
             <Button
               key={item.id}
               variant="secondary"
               disabled={busy}
-              onClick={() => void attach(picker as 'character' | 'outfit', item.id)}
+              onClick={() => void attach(assetPickerKind, item.id)}
             >
               {'name' in item ? item.name : item.title}
             </Button>
           ))}
-          {(picker === 'character' ? characterItems : outfitItems).length === 0 ? (
+          {(assetPickerKind === 'character' ? characterItems : outfitItems).length === 0 ? (
             <StatusNotice tone="neutral">
-              No saved {picker === 'character' ? 'Characters' : 'Outfits'} are available.
+              No saved {assetPickerKind === 'character' ? 'Characters' : 'Outfits'} are available.
             </StatusNotice>
           ) : null}
         </div>

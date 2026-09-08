@@ -40,7 +40,7 @@ export const SavedVideoSuccessActions = ({
   const theme = useTheme();
   // Three of this component's four call sites pass no specification at all, and the capability is
   // only ever shown beside one, so those three do not make the browser measure it.
-  const { render, failure, download } = useSavedVideoPlacementDownload(
+  const { render, busy, failure, download } = useSavedVideoPlacementDownload(
     exportSpecification !== null,
   );
   // A placement can only be produced where the browser can render; elsewhere the original shape is
@@ -58,8 +58,8 @@ export const SavedVideoSuccessActions = ({
         {reframing ? (
           <Button
             variant="secondary"
-            busy={render.phase === 'rendering'}
-            disabled={render.phase === 'rendering'}
+            busy={busy}
+            disabled={busy}
             aria-label={`Download ${video.title}, Version ${video.currentVersion.ordinal}, for ${exportPlacementLabel(reframing.aspect)}`}
             onClick={() =>
               void download({ version: video.currentVersion, specification: reframing })

@@ -36,9 +36,6 @@ const matchesRequest = (
 const safeStorageFailure = (message: string, cause: unknown): AppError =>
   new AppError(503, 'storage_failure', message, { cause });
 
-const receiptLookupKey = (ownerUserId: string, idempotencyKey: string): string =>
-  `${ownerUserId}:${idempotencyKey}`;
-
 type DirectUploadStorage = Pick<
   R2AssetByteStore,
   | 'directUploadKey'
@@ -420,7 +417,7 @@ export class DirectSavedVideoUploadService {
         let removed = false;
         try {
           if (registered) await this.#storage.delete(ownerUserId, upload.assetId);
-          else await this.#storage.discardDirectUpload(upload.assetId);
+          else await this.#storage.discardDirectUpload(ownerUserId, upload.assetId);
           removed = true;
         } catch {
           // Keep the expired active row claimable by the abandoned-upload cleanup retry.
@@ -440,25 +437,21 @@ export class DirectSavedVideoUploadService {
 
   async cleanupExpired(): Promise<void> {
     const expired = await this.#repository.claimExpired(this.#now().toISOString(), 25);
-    const activeReceipts = await this.#savedVideos.findActiveReceipts(
-      expired.map(({ ownerUserId, idempotencyKey }) => ({ ownerUserId, idempotencyKey })),
-    );
-    const attachedVideoIds = new Map(
-      activeReceipts.map(({ ownerUserId, idempotencyKey, videoId }) => [
-        receiptLookupKey(ownerUserId, idempotencyKey),
-        videoId,
-      ]),
-    );
     for (const upload of expired) {
       try {
-        const attachedVideoId = attachedVideoIds.get(
-          receiptLookupKey(upload.ownerUserId, upload.idempotencyKey),
-        );
-        if (attachedVideoId !== undefined) {
+        // `claimExpired` only bumps `updatedAt` — the row stays claimable, so a `complete()` for
+        // this upload can attach it after the sweep began. Ask for this row immediately before
+        // its own deletion rather than once for the whole batch, so the window is one row's
+        // deletion instead of the entire pass. Reading it here also puts it under the per-row
+        // `catch`, where one unreadable row no longer abandons the sweep.
+        const [attached] = await this.#savedVideos.findActiveReceipts([
+          { ownerUserId: upload.ownerUserId, idempotencyKey: upload.idempotencyKey },
+        ]);
+        if (attached !== undefined) {
           await this.#repository.markReady(
             upload.ownerUserId,
             upload.id,
-            attachedVideoId,
+            attached.videoId,
             this.#now().toISOString(),
           );
           continue;
@@ -467,7 +460,7 @@ export class DirectSavedVideoUploadService {
           await this.#storage.abortDirectMultipartUpload(upload.assetId, upload.providerUploadId);
         }
         await this.#storage.delete(upload.ownerUserId, upload.assetId);
-        await this.#storage.discardDirectUpload(upload.assetId);
+        await this.#storage.discardDirectUpload(upload.ownerUserId, upload.assetId);
         await this.#repository.markTerminal(
           upload.ownerUserId,
           upload.id,

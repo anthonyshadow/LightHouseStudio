@@ -59,16 +59,27 @@ export const AuthProvider = ({
   const statusRef = useRef(status);
   const sessionRef = useRef(session);
   const holdsRef = useRef(new Set<symbol>());
-  useEffect(() => {
-    statusRef.current = status;
-    sessionRef.current = session;
-  });
+
+  // `expire` runs from a `window` event handler: it reads both refs synchronously, before any
+  // render, and several requests can 401 in the same tick. The refs are therefore what its guards
+  // consult, and writing the ref and the state as one act is what keeps them from drifting. A
+  // mirroring effect cannot: it lags a commit, and React flushes passive effects child-first, so
+  // the Studio expiry controller — a descendant — decided on the previous commit's status and a
+  // held expiry with nothing to discard never finalized.
+  const applyStatus = useCallback((next: AuthStatus) => {
+    statusRef.current = next;
+    setStatus(next);
+  }, []);
+  const applySession = useCallback((next: AuthenticatedSessionResponse | null) => {
+    sessionRef.current = next;
+    setSession(next);
+  }, []);
 
   const completeSessionEnd = useCallback(() => {
     if (statusRef.current !== 'expiring') return;
-    setSession(null);
-    setStatus('unauthenticated');
-  }, []);
+    applySession(null);
+    applyStatus('unauthenticated');
+  }, [applySession, applyStatus]);
 
   const holdSessionEnd = useCallback((): (() => void) => {
     const token = Symbol('session-end-hold');
@@ -98,14 +109,14 @@ export const AuthProvider = ({
       statusRef.current === 'logging-out' ||
       holdsRef.current.size === 0
     ) {
-      setSession(null);
-      setStatus('unauthenticated');
+      applySession(null);
+      applyStatus('unauthenticated');
       return;
     }
     // The session stays readable through 'expiring' so the holder can render; `completeSessionEnd`
     // clears it.
-    setStatus('expiring');
-  }, []);
+    applyStatus('expiring');
+  }, [applySession, applyStatus]);
 
   const restore = useCallback((): Promise<boolean> => {
     // During 'expiring' the session is deliberately still readable, so this would resolve `true`
@@ -121,16 +132,16 @@ export const AuthProvider = ({
       .then((restored) => {
         if (controller.signal.aborted || generation !== operationGenerationRef.current)
           return false;
-        setSession(restored);
-        setStatus('authenticated');
+        applySession(restored);
+        applyStatus('authenticated');
         setSessionEndReason(null);
         return true;
       })
       .catch(() => {
         if (controller.signal.aborted || generation !== operationGenerationRef.current)
           return false;
-        setSession(null);
-        setStatus('unauthenticated');
+        applySession(null);
+        applyStatus('unauthenticated');
         return false;
       })
       .finally(() => {
@@ -139,35 +150,39 @@ export const AuthProvider = ({
       });
     restoreRef.current = request;
     return request;
-  }, [session]);
+  }, [applySession, applyStatus, session]);
 
-  const login = useCallback(async (login: string, password: string): Promise<boolean> => {
-    operationGenerationRef.current += 1;
-    restoreControllerRef.current?.abort('login-started');
-    loginControllerRef.current?.abort();
-    const controller = new AbortController();
-    const generation = operationGenerationRef.current;
-    loginControllerRef.current = controller;
-    setStatus('authenticating');
-    try {
-      const authenticated = await import('../../adapters/api-client/authApi').then(
-        ({ login: loginRequest }) => loginRequest({ login, password }, controller.signal),
-      );
-      if (controller.signal.aborted || generation !== operationGenerationRef.current) return false;
-      setSession(authenticated);
-      setStatus('authenticated');
-      setSessionEndReason(null);
-      return true;
-    } catch (error) {
-      if (!controller.signal.aborted && generation === operationGenerationRef.current) {
-        setSession(null);
-        setStatus('unauthenticated');
+  const login = useCallback(
+    async (login: string, password: string): Promise<boolean> => {
+      operationGenerationRef.current += 1;
+      restoreControllerRef.current?.abort('login-started');
+      loginControllerRef.current?.abort();
+      const controller = new AbortController();
+      const generation = operationGenerationRef.current;
+      loginControllerRef.current = controller;
+      applyStatus('authenticating');
+      try {
+        const authenticated = await import('../../adapters/api-client/authApi').then(
+          ({ login: loginRequest }) => loginRequest({ login, password }, controller.signal),
+        );
+        if (controller.signal.aborted || generation !== operationGenerationRef.current)
+          return false;
+        applySession(authenticated);
+        applyStatus('authenticated');
+        setSessionEndReason(null);
+        return true;
+      } catch (error) {
+        if (!controller.signal.aborted && generation === operationGenerationRef.current) {
+          applySession(null);
+          applyStatus('unauthenticated');
+        }
+        throw error;
+      } finally {
+        if (loginControllerRef.current === controller) loginControllerRef.current = null;
       }
-      throw error;
-    } finally {
-      if (loginControllerRef.current === controller) loginControllerRef.current = null;
-    }
-  }, []);
+    },
+    [applySession, applyStatus],
+  );
 
   const logout = useCallback((): Promise<void> => {
     if (logoutRef.current) return logoutRef.current;
@@ -176,7 +191,7 @@ export const AuthProvider = ({
     restoreControllerRef.current?.abort('logout-started');
     loginControllerRef.current?.abort('logout-started');
     setSessionEndReason(null);
-    setStatus('logging-out');
+    applyStatus('logging-out');
     const controller = new AbortController();
     logoutControllerRef.current = controller;
     const request = import('../../adapters/api-client/authApi')
@@ -184,8 +199,8 @@ export const AuthProvider = ({
       .catch(() => undefined)
       .then(() => {
         if (controller.signal.aborted || generation !== operationGenerationRef.current) return;
-        setSession(null);
-        setStatus('unauthenticated');
+        applySession(null);
+        applyStatus('unauthenticated');
       })
       .finally(() => {
         if (logoutRef.current === request) logoutRef.current = null;
@@ -193,7 +208,7 @@ export const AuthProvider = ({
       });
     logoutRef.current = request;
     return request;
-  }, []);
+  }, [applySession, applyStatus]);
 
   useEffect(() => {
     mountedRef.current = true;
