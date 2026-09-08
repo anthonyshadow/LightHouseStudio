@@ -30,7 +30,6 @@ export type StudioRouteContext = Readonly<{
   dashboardRouteActive: boolean;
   assetsRouteActive: boolean;
   liveRouteActive: boolean;
-  projectWorkspaceActive: boolean;
   projectOverviewActive: boolean;
   projectContextActive: boolean;
 }>;
@@ -94,7 +93,6 @@ export const useStudioRouteContext = (): StudioRouteContext => {
       dashboardRouteActive,
       assetsRouteActive,
       liveRouteActive,
-      projectWorkspaceActive,
       projectOverviewActive,
       projectContextActive,
     }),
@@ -111,7 +109,6 @@ export const useStudioRouteContext = (): StudioRouteContext => {
       projectContextActive,
       projectOverviewActive,
       projectRouteActive,
-      projectWorkspaceActive,
       requestedCreationProjectId,
       routeOriginProjectId,
       validCreationProjectId,

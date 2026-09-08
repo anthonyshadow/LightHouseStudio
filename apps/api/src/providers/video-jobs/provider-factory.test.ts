@@ -36,7 +36,6 @@ describe('createExistingVideoProviderRegistry', () => {
         existingVideoCharacterSwapProvider: 'decart',
         prunaVideoReplaceEnabled: true,
         prunaApiKey: 'unused-secret',
-        prunaVideoReplaceModel: 'p-video-replace',
       }),
       { decartProvider: null, createPrunaProvider },
     );
@@ -55,7 +54,6 @@ describe('createExistingVideoProviderRegistry', () => {
         existingVideoCharacterSwapProvider: 'pruna',
         prunaVideoReplaceEnabled: true,
         prunaApiKey: 'pruna-secret',
-        prunaVideoReplaceModel: 'p-video-replace',
       }),
       { decartProvider: decart, createPrunaProvider },
     );

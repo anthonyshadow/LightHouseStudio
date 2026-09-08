@@ -13,7 +13,6 @@ import {
   duplicateProject,
   duplicateProjectSnapshot,
   duplicateProjectTitle,
-  isProjectResumable,
   moveProjectToCampaign,
   projectStatusAfterProcessingTrace,
   promoteProjectJobResult,
@@ -144,27 +143,22 @@ describe('Project aggregate rules', () => {
     );
   });
 
-  it('requires durable accepted source identity before claiming resume', () => {
+  it('accepts a ready source and refuses an unavailable one', () => {
     const snapshot = { ...createEmptyProjectSnapshot(now), sourceAssetId };
-    const aggregate = createProject(
-      {
-        id: projectId,
-        ownerUserId,
-        title: 'Summer Campaign',
-        snapshot,
-        author: { kind: 'user', authorId: ownerUserId },
-        facts: readyFacts,
-      },
-      { now, createId: () => firstRevisionId },
-    );
+    expect(() =>
+      createProject(
+        {
+          id: projectId,
+          ownerUserId,
+          title: 'Summer Campaign',
+          snapshot,
+          author: { kind: 'user', authorId: ownerUserId },
+          facts: readyFacts,
+        },
+        { now, createId: () => firstRevisionId },
+      ),
+    ).not.toThrow();
 
-    expect(isProjectResumable(aggregate.project, snapshot, readyFacts)).toBe(true);
-    expect(
-      isProjectResumable(aggregate.project, snapshot, {
-        ...readyFacts,
-        sourceStatus: 'unavailable',
-      }),
-    ).toBe(false);
     expect(() =>
       createProject(
         {

@@ -56,7 +56,6 @@ import type {
   ProjectLinkHistoryItem,
   ProjectLinkHistoryKind,
   ProjectLinkHistoryPage,
-  ProjectLinkMutationResult,
   ProjectOutputMetadataCommitResult,
   ProjectOutputMetadataUnitOfWork,
   ProjectOutputOperationReceipt,
@@ -135,8 +134,6 @@ import {
 
 const isMissingFile = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === 'ENOENT';
-
-const asAggregate = (value: StoredProjectAggregate): ProjectAggregate => value;
 
 const mergeAssetMemberships = (
   current: readonly ProjectAssetMembership[],
@@ -2465,38 +2462,6 @@ export class FileProjectRepository
     });
   }
 
-  async linkJob(linkValue: ProjectJobLink): Promise<ProjectLinkMutationResult> {
-    const link = storedJobLinkSchema.parse(linkValue) as ProjectJobLink;
-    return this.#link(
-      link.ownerUserId,
-      link.projectId,
-      'job',
-      (aggregate) => aggregate.jobLinks.find(({ jobId }) => jobId === link.jobId),
-      (existing) =>
-        existing.projectId === link.projectId &&
-        existing.initiatingRevisionId === link.initiatingRevisionId &&
-        existing.initiatingRevisionNumber === link.initiatingRevisionNumber,
-      (aggregate) => ({ ...aggregate, jobLinks: [...aggregate.jobLinks, link] }),
-    );
-  }
-
-  async linkOutput(linkValue: ProjectOutputLink): Promise<ProjectLinkMutationResult> {
-    const link = storedOutputLinkSchema.parse(linkValue) as ProjectOutputLink;
-    return this.#link(
-      link.ownerUserId,
-      link.projectId,
-      'output',
-      (aggregate) =>
-        aggregate.outputLinks.find(({ videoVersionId }) => videoVersionId === link.videoVersionId),
-      (existing) =>
-        existing.projectId === link.projectId &&
-        existing.savedVideoId === link.savedVideoId &&
-        existing.producingRevisionId === link.producingRevisionId &&
-        existing.producingRevisionNumber === link.producingRevisionNumber,
-      (aggregate) => ({ ...aggregate, outputLinks: [...aggregate.outputLinks, link] }),
-    );
-  }
-
   async getOutput(
     ownerUserId: string,
     projectId: string,
@@ -2523,40 +2488,6 @@ export class FileProjectRepository
       }
     }
     return assigned;
-  }
-
-  async #link<Link extends ProjectJobLink | ProjectOutputLink>(
-    ownerUserId: string,
-    projectId: string,
-    relation: 'job' | 'output',
-    findExisting: (aggregate: ProjectAggregate) => Link | undefined,
-    matches: (link: Link) => boolean,
-    append: (aggregate: ProjectAggregate) => ProjectAggregate,
-  ): Promise<ProjectLinkMutationResult> {
-    return this.#withOwnerLock(ownerUserId, async () => {
-      const library = await this.#read(ownerUserId);
-      for (const aggregate of library.projects) {
-        const existing = findExisting(asAggregate(aggregate));
-        if (existing !== undefined) {
-          return matches(existing)
-            ? { kind: 'linked', replayed: true }
-            : {
-                kind: 'conflict',
-                conflict: projectConflicts.relationMismatch(projectId, relation),
-              };
-        }
-      }
-      const index = library.projects.findIndex(
-        ({ project }) =>
-          project.id === projectId && project.archivedAt === null && project.deletedAt === null,
-      );
-      const aggregate = library.projects[index];
-      if (aggregate === undefined) return { kind: 'not-found' };
-      const projects = [...library.projects];
-      projects[index] = storedAggregateSchema.parse(append(asAggregate(aggregate)));
-      await this.#write(library, { ...library, revision: library.revision + 1, projects });
-      return { kind: 'linked', replayed: false };
-    });
   }
 
   async retainsAsset(ownerUserId: string, assetId: string): Promise<boolean> {

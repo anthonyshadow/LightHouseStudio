@@ -37,10 +37,3 @@ export const resolveCharacterVersion = (
     referenceImageAssetId: variant.referenceImageAssetId,
   };
 };
-
-export const preferredCharacterVersionSelection = (
-  character: CreativeAssetStore['savedCharacterPrompts'][number],
-): CharacterVersionSelection => ({
-  characterId: character.id,
-  variantId: character.selectedWardrobeVariantId,
-});

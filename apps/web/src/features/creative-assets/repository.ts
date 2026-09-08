@@ -14,7 +14,6 @@ import {
   recordSuccessfulPromptUse,
   selectCharacterVersion as selectDomainCharacterVersion,
   sanitizeCreativeAssetStore,
-  searchCreativeAssets,
   updateSavedCharacterPrompt as updateDomainCharacterPrompt,
   updateSavedPrompt as updateDomainSavedPrompt,
   type AssetMutationContext,
@@ -868,14 +867,14 @@ export const createCreativeAssetRepository = (
     },
     createSavedPrompt: (input) => runMutation(() => createSavedPrompt(input)),
     updateSavedPrompt: (id, input) => runMutation(() => updateSavedPrompt(id, input)),
-    renameSavedPrompt: (id, title) => runMutation(() => updateSavedPrompt(id, { title })),
     deleteSavedPrompt: (id) => runMutation(() => deleteSavedPrompt(id)),
+    // The non-durable seam: it mints its own id and commits optimistically, where
+    // `persistSavedCharacterPrompt` takes a caller-supplied durable id and commits durably. No
+    // production caller today — it is the fixture constructor six suites build characters with.
     createSavedCharacterPrompt: (input) => runMutation(() => createSavedCharacterPrompt(input)),
     persistSavedCharacterPrompt: (input) => runMutation(() => persistSavedCharacterPrompt(input)),
     updateSavedCharacterPrompt: (id, input) =>
       runMutation(() => updateSavedCharacterPrompt(id, input)),
-    renameSavedCharacterPrompt: (id, name) =>
-      runMutation(() => updateSavedCharacterPrompt(id, { name })),
     deleteSavedCharacterPrompt: (id) => runMutation(() => deleteSavedCharacterPrompt(id)),
     createSavedCharacterVariant: (input) => runMutation(() => createSavedCharacterVariant(input)),
     deleteSavedCharacterVariant: (id) => runMutation(() => deleteSavedCharacterVariant(id)),
@@ -883,7 +882,6 @@ export const createCreativeAssetRepository = (
     recordSuccessfulPrompt: (input) => runMutation(() => recordSuccessfulPrompt(input)),
     enrichNewestMatchingRecent: (prompt, modelModeId, referenceImageAssetId) =>
       runMutation(() => enrichNewestMatchingRecent(prompt, modelModeId, referenceImageAssetId)),
-    search: (query, modelModeId) => searchCreativeAssets(state.store, query, modelModeId),
     replaceFromRemote: (remoteStore) =>
       runMutation(async () => {
         const sanitized = sanitizeCreativeAssetStore(remoteStore);

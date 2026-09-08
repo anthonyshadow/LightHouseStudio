@@ -16,7 +16,6 @@ import {
   SAVED_CHARACTER_VARIANT_LIMIT,
   SAVED_PROMPT_LIMIT,
   type AssetMutationContext,
-  type CreativeAssetSearchResults,
   type CreativeAssetStore,
   type RecentPrompt,
   type SavedCharacterPrompt,
@@ -320,27 +319,6 @@ export const deleteSavedPrompt = (store: CreativeAssetStore, id: string): Creati
   savedPrompts: store.savedPrompts.filter((asset) => asset.id !== id),
   recentPrompts: store.recentPrompts.map((recent) => unlinkRecentPrompt(recent, id)),
 });
-
-export const useSavedPrompt = (
-  store: CreativeAssetStore,
-  id: string,
-  nowValue: string,
-): { readonly store: CreativeAssetStore; readonly prompt: string } => {
-  const now = assertTimestamp(nowValue);
-  const asset = store.savedPrompts.find((candidate) => candidate.id === id);
-  if (!asset) throw new AssetRuleError('not-found', 'Saved prompt was not found.');
-  return {
-    prompt: asset.prompt,
-    store: {
-      ...store,
-      savedPrompts: store.savedPrompts.map((candidate) =>
-        candidate.id === id
-          ? { ...candidate, useCount: candidate.useCount + 1, lastUsedAt: now }
-          : candidate,
-      ),
-    },
-  };
-};
 
 /** Call only after a successful model Start or Apply. */
 export const recordSuccessfulPromptUse = (
@@ -817,67 +795,5 @@ export const selectCharacterVersion = (
         ? { ...candidate, selectedWardrobeVariantId: variantId, updatedAt: now }
         : candidate,
     ),
-  };
-};
-
-export const useSavedCharacterPrompt = (
-  store: CreativeAssetStore,
-  id: string,
-  nowValue: string,
-): {
-  readonly store: CreativeAssetStore;
-  readonly prompt: string;
-  readonly builderDraft: SavedCharacterPrompt['builderDraft'];
-  readonly guidedDesign: SavedCharacterPrompt['guidedDesign'];
-} => {
-  const now = assertTimestamp(nowValue);
-  const asset = store.savedCharacterPrompts.find((candidate) => candidate.id === id);
-  if (!asset) throw new AssetRuleError('not-found', 'Character prompt was not found.');
-  return {
-    prompt: asset.prompt,
-    builderDraft: asset.builderDraft,
-    guidedDesign: asset.guidedDesign,
-    store: {
-      ...store,
-      savedCharacterPrompts: store.savedCharacterPrompts.map((candidate) =>
-        candidate.id === id
-          ? { ...candidate, useCount: candidate.useCount + 1, lastUsedAt: now }
-          : candidate,
-      ),
-    },
-  };
-};
-
-export const searchCreativeAssets = (
-  store: CreativeAssetStore,
-  queryValue: string,
-  modelModeId?: ModelModeId,
-): CreativeAssetSearchResults => {
-  const query = canonicalPrompt(queryValue);
-  const matches = (values: readonly string[]): boolean =>
-    !query || values.some((value) => canonicalPrompt(value).includes(query));
-  return {
-    savedPrompts: store.savedPrompts.filter(
-      (asset) =>
-        (!modelModeId || asset.modelModeId === modelModeId) &&
-        matches([asset.title, asset.prompt, ...asset.tags]),
-    ),
-    recentPrompts: store.recentPrompts.filter(
-      (recent) =>
-        (!modelModeId || recent.modelModeId === modelModeId) &&
-        matches([recent.prompt, recent.characterName ?? '']),
-    ),
-    savedCharacterPrompts:
-      modelModeId === 'lucy-vton-latest'
-        ? []
-        : store.savedCharacterPrompts.filter((asset) =>
-            matches([asset.name, asset.prompt, asset.notes, ...asset.tags]),
-          ),
-    savedCharacterVariants:
-      modelModeId === 'lucy-vton-latest'
-        ? []
-        : store.savedCharacterVariants.filter((variant) =>
-            matches([variant.title, variant.creation.method]),
-          ),
   };
 };

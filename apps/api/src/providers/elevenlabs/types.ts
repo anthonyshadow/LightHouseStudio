@@ -79,10 +79,6 @@ export interface ElevenLabsProvider {
     input: VoiceSearchInput & { readonly nextPageToken: string | null },
   ): Promise<ProviderWorkspaceVoicePage>;
   getWorkspaceVoice(voiceId: string, signal: AbortSignal): Promise<ProviderVoice | null>;
-  getWorkspaceVoicesByIds(
-    voiceIds: readonly string[],
-    signal: AbortSignal,
-  ): Promise<readonly ProviderVoice[]>;
   listSharedVoices(input: SharedVoiceSearchInput): Promise<ProviderSharedVoicePage>;
   getSharedVoice(
     publicOwnerId: string,

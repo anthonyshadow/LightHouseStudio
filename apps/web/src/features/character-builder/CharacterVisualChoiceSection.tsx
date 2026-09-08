@@ -73,7 +73,6 @@ export type CharacterVisualChoiceSectionProps = {
   title: string;
   description: string;
   customLabel: string;
-  fixed?: boolean;
   profile: VisualProfile;
   choice: GuidedChoiceValue | null;
   disabled?: boolean;
@@ -85,7 +84,6 @@ export const CharacterVisualChoiceSection = ({
   title,
   description,
   customLabel,
-  fixed,
   profile,
   choice,
   disabled = false,
@@ -163,30 +161,28 @@ export const CharacterVisualChoiceSection = ({
       ) : (
         <div css={choicesGridStyles}>{visible.suggested.map(renderOption)}</div>
       )}
-      {!fixed ? (
-        <div css={choiceActionsStyles(theme)}>
-          <Button
-            size="small"
-            variant="quiet"
-            aria-expanded={showAll}
-            disabled={disabled}
-            onClick={() => setShowAll((value) => !value)}
-          >
-            {showAll ? 'Show Suggestions' : 'Show All'}
-          </Button>
-          <Button
-            size="small"
-            variant="quiet"
-            aria-expanded={customOpen}
-            aria-controls={`character-${category}-custom-field`}
-            disabled={disabled}
-            onClick={() => setCustomOpen((value) => !value)}
-          >
-            Describe My Own
-          </Button>
-        </div>
-      ) : null}
-      {customOpen && !fixed ? (
+      <div css={choiceActionsStyles(theme)}>
+        <Button
+          size="small"
+          variant="quiet"
+          aria-expanded={showAll}
+          disabled={disabled}
+          onClick={() => setShowAll((value) => !value)}
+        >
+          {showAll ? 'Show Suggestions' : 'Show All'}
+        </Button>
+        <Button
+          size="small"
+          variant="quiet"
+          aria-expanded={customOpen}
+          aria-controls={`character-${category}-custom-field`}
+          disabled={disabled}
+          onClick={() => setCustomOpen((value) => !value)}
+        >
+          Describe My Own
+        </Button>
+      </div>
+      {customOpen ? (
         <div id={`character-${category}-custom-field`} css={customFieldStyles(theme)}>
           <label htmlFor={`character-${category}-custom`}>{customLabel}</label>
           <input

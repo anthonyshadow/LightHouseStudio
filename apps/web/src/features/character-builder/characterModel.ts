@@ -58,7 +58,6 @@ export const EDITABLE_CHARACTER_CATEGORIES: readonly {
   title: string;
   description: string;
   customLabel: string;
-  fixed?: boolean;
 }[] = [
   {
     category: 'adultAge',

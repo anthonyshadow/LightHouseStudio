@@ -199,8 +199,6 @@ export const referenceImageRequestIdSchema = z.uuid();
 export const referenceImageMimeTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp']);
 export const referenceImagePromptHashSchema = z.string().regex(/^[a-f0-9]{64}$/u);
 export const referenceImageSizeSchema = z.enum(REFERENCE_IMAGE_SIZES);
-export const referenceImageWidthSchema = z.union([z.literal(1024), z.literal(1536)]);
-export const referenceImageHeightSchema = z.union([z.literal(1024), z.literal(1536)]);
 
 export const createReferenceImageRequestSchema = z
   .object({

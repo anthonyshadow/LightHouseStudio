@@ -109,16 +109,13 @@ const harness = vi.hoisted(() => {
     subscribe: vi.fn(() => () => undefined),
     createSavedPrompt: vi.fn(),
     updateSavedPrompt: vi.fn(),
-    renameSavedPrompt: vi.fn(),
     deleteSavedPrompt: vi.fn(),
     createSavedCharacterPrompt: vi.fn(),
     persistSavedCharacterPrompt: vi.fn(),
     updateSavedCharacterPrompt: vi.fn(),
-    renameSavedCharacterPrompt: vi.fn(),
     deleteSavedCharacterPrompt: vi.fn(),
     recordSuccessfulPrompt: vi.fn(),
     enrichNewestMatchingRecent: vi.fn(),
-    search: vi.fn(() => ({ savedPrompts: [], recentPrompts: [], savedCharacterPrompts: [] })),
   };
   const capturePreferences = {
     draft: {

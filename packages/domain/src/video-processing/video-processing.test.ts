@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  canPromoteProjectProcessingResult,
   canonicalVideoTransformInputGeometry,
   currentProjectProcessingAttempt,
   projectProcessingResultState,
@@ -159,16 +158,6 @@ describe('single visual policy', () => {
     expect(projectProcessingRetryPolicy(retry.status)).toBe('explicit-cost-confirmation');
     expect(projectProcessingBlocksArchive(retry.status)).toBe(true);
     expect(projectProcessingNeedsAttention(retry.status)).toBe(true);
-    expect(
-      canPromoteProjectProcessingResult({
-        currentRevisionId: 'revision-1',
-        currentRevisionNumber: 1,
-        initiatingRevisionId: 'revision-1',
-        initiatingRevisionNumber: 1,
-        currentOperationId: 'op-2',
-        operationId: 'op-1',
-      }),
-    ).toBe(false);
   });
 
   it('reads the media the Project holds as the answer to whether a result was applied', () => {

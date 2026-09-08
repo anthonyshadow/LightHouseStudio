@@ -692,16 +692,6 @@ export const projectStatusAfterProcessingTrace = (
   return canTransitionProjectStatus(currentStatus, next) ? next : null;
 };
 
-export const isProjectResumable = (
-  project: Project,
-  snapshot: ProjectSnapshot,
-  facts: ProjectStatusFacts,
-): boolean =>
-  project.archivedAt === null &&
-  project.deletedAt === null &&
-  snapshot.sourceAssetId !== null &&
-  facts.sourceStatus === 'ready';
-
 export interface CreateProjectInput {
   readonly id: string;
   readonly ownerUserId: string;
@@ -935,6 +925,11 @@ export const projectConflicts = {
     expectedRevisionNumber,
     actualRevisionNumber,
   }),
+  /**
+   * Retained without a producer. The two repository link methods that raised it were removed as
+   * dead code, but the kind is a published 409 member a deployed client may already narrow on, so
+   * the vocabulary stays until a contract change retires it across domain, contracts and routes.
+   */
   relationMismatch: (
     projectId: string,
     relation: 'job' | 'output',

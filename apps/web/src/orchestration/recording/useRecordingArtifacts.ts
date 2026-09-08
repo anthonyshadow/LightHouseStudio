@@ -46,8 +46,6 @@ export const useRecordingArtifacts = () => {
   const [state, dispatch] = useReducer(recordingArtifactReducer, initialRecordingArtifactState);
   const stateRef = useRef(state);
   const originalRef = useRef<PresentedRecordingArtifact | null>(null);
-  const visualRef = useRef<RecordingArtifact | null>(null);
-  const processedRef = useRef<RecordingArtifact | null>(null);
   const pendingRevocationsRef = useRef<PresentedRecordingArtifact[]>([]);
   const repairedPlaybackArtifactIdRef = useRef<string | null>(null);
 
@@ -56,8 +54,6 @@ export const useRecordingArtifacts = () => {
     pendingRevocationsRef.current.push(...removedArtifacts(stateRef.current, next));
     stateRef.current = next;
     originalRef.current = next.original;
-    visualRef.current = next.visual;
-    processedRef.current = next.processed;
     dispatch(action);
   }, []);
 

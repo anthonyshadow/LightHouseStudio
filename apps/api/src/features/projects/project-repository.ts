@@ -304,14 +304,6 @@ export interface ProjectLinkHistoryPage {
   readonly nextCursor: { readonly revisionNumber: number; readonly key: string } | null;
 }
 
-export type ProjectLinkMutationResult =
-  | { readonly kind: 'linked'; readonly replayed: boolean }
-  | { readonly kind: 'not-found' }
-  | {
-      readonly kind: 'conflict';
-      readonly conflict: Extract<ProjectConflict, { readonly kind: 'relation-mismatch' }>;
-    };
-
 export interface ProjectOutputOperationReceipt {
   readonly operationId: string;
   readonly requestFingerprint: string;
@@ -631,8 +623,6 @@ export interface ProjectRepository {
     expectedVersion: number,
     nextProject: Project,
   ): Promise<ProjectPersistenceMutationResult>;
-  linkJob(link: ProjectJobLink): Promise<ProjectLinkMutationResult>;
-  linkOutput(link: ProjectOutputLink): Promise<ProjectLinkMutationResult>;
   getOutput(
     ownerUserId: string,
     projectId: string,

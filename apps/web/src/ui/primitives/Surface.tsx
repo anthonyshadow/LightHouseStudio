@@ -2,9 +2,9 @@ import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import type { HTMLAttributes, PropsWithChildren } from 'react';
 
 export interface SurfaceProps extends HTMLAttributes<HTMLElement> {
-  as?: 'section' | 'aside' | 'div' | 'article';
+  as?: 'section' | 'aside';
   tone?: 'default' | 'soft' | 'strong';
-  padding?: 'compact' | 'regular' | 'spacious';
+  padding?: 'compact' | 'regular';
 }
 
 const surfaceStyles = (
@@ -14,11 +14,7 @@ const surfaceStyles = (
 ): CSSObject => ({
   minWidth: 0,
   padding:
-    padding === 'compact'
-      ? theme.space.sm
-      : padding === 'spacious'
-        ? `clamp(${theme.space.lg}, 3vw, ${theme.space.xl})`
-        : `clamp(${theme.space.md}, 2vw, ${theme.space.lg})`,
+    padding === 'compact' ? theme.space.sm : `clamp(${theme.space.md}, 2vw, ${theme.space.lg})`,
   border: `1px solid ${theme.colors.border}`,
   borderRadius: theme.radii.large,
   background:

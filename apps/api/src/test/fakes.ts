@@ -307,15 +307,6 @@ export class FakeElevenLabsProvider implements ElevenLabsProvider {
     return Promise.resolve(result ?? null);
   }
 
-  getWorkspaceVoicesByIds(
-    voiceIds: readonly string[],
-    _signal: AbortSignal,
-  ): Promise<readonly ProviderVoice[]> {
-    return Promise.resolve(
-      this.workspaceVoices.filter((candidate) => voiceIds.includes(candidate.voiceId)),
-    );
-  }
-
   listSharedVoices(input: SharedVoiceSearchInput): Promise<ProviderSharedVoicePage> {
     this.sharedSearches.push(input);
     return Promise.resolve({

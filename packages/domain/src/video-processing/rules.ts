@@ -201,18 +201,6 @@ export const currentProjectProcessingAttempt = <Attempt extends ProjectProcessin
   );
 };
 
-export const canPromoteProjectProcessingResult = (input: {
-  readonly currentRevisionId: string;
-  readonly currentRevisionNumber: number;
-  readonly initiatingRevisionId: string;
-  readonly initiatingRevisionNumber: number;
-  readonly currentOperationId: string | null;
-  readonly operationId: string;
-}): boolean =>
-  input.currentRevisionId === input.initiatingRevisionId &&
-  input.currentRevisionNumber === input.initiatingRevisionNumber &&
-  input.currentOperationId === input.operationId;
-
 export const VIDEO_DURATION_LIMIT_MS = 300_000;
 export const GENERAL_VIDEO_SIZE_LIMIT_BYTES = 300_000_000;
 export const VTON_VIDEO_SIZE_LIMIT_BYTES = 200_000_000;
