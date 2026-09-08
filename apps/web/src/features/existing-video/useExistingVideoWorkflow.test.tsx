@@ -234,6 +234,48 @@ const configuredVisualWorkflow = async (standaloneVisualSubmissionBlockedReason?
   return { ...hook, recording, sourceFile };
 };
 
+/**
+ * Leaves a terminally failed job retained for explicit release — the one state in which a reset
+ * both clears the workflow and hands a still-addressable job back to the server.
+ */
+const retainedFailedJobWorkflow = async () => {
+  const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+  adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+  adapters.fetchVideoJob.mockImplementation((jobId: string) =>
+    Promise.resolve({
+      ...jobStatus(jobId),
+      status: 'failed',
+      result: null,
+      error: {
+        code: 'provider_rejected',
+        message: 'Visual processing rejected the submitted media.',
+      },
+    }),
+  );
+  const recording = recordingController();
+  const hook = renderHook(() =>
+    useExistingVideoWorkflow({
+      recording,
+      processing: processingController(),
+      publishUploadedVideo: vi.fn(),
+      videoProcessingCapabilities: requiredCharacterSwapCapabilities,
+    }),
+  );
+
+  await act(async () => hook.result.current.selectFile(sourceFile));
+  act(() => {
+    hook.result.current.addStep('lucy-latest');
+  });
+  act(() => {
+    hook.result.current.updateStep(hook.result.current.steps[0]!.id, {
+      referenceImage: new File(['identity'], 'identity.png', { type: 'image/png' }),
+    });
+  });
+  await act(async () => hook.result.current.submitStep(0));
+
+  return { ...hook, recording, sourceFile };
+};
+
 describe('useExistingVideoWorkflow', () => {
   it('cannot reach the standalone video-job submitter from Project-backed editing', async () => {
     const blockedReason =
@@ -1204,39 +1246,7 @@ describe('useExistingVideoWorkflow', () => {
   });
 
   it('retains an explicit-user terminal failure until the user discards it', async () => {
-    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
-    adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
-    adapters.fetchVideoJob.mockImplementation((jobId: string) =>
-      Promise.resolve({
-        ...jobStatus(jobId),
-        status: 'failed',
-        result: null,
-        error: {
-          code: 'provider_rejected',
-          message: 'Visual processing rejected the submitted media.',
-        },
-      }),
-    );
-    const recording = recordingController();
-    const { result, unmount } = renderHook(() =>
-      useExistingVideoWorkflow({
-        recording,
-        processing: processingController(),
-        publishUploadedVideo: vi.fn(),
-        videoProcessingCapabilities: requiredCharacterSwapCapabilities,
-      }),
-    );
-
-    await act(async () => result.current.selectFile(sourceFile));
-    act(() => {
-      result.current.addStep('lucy-latest');
-    });
-    act(() => {
-      result.current.updateStep(result.current.steps[0]!.id, {
-        referenceImage: new File(['identity'], 'identity.png', { type: 'image/png' }),
-      });
-    });
-    await act(async () => result.current.submitStep(0));
+    const { result, recording, unmount } = await retainedFailedJobWorkflow();
 
     expect(result.current.phase).toBe('error');
     expect(result.current.message).toBe('Visual processing rejected the submitted media.');
@@ -1247,6 +1257,39 @@ describe('useExistingVideoWorkflow', () => {
     });
     expect(adapters.releaseVideoJob).toHaveBeenCalledOnce();
     expect(recording.discard).toHaveBeenCalledOnce();
+    unmount();
+  });
+
+  it('keeps the retained job and the workflow when the discard is refused', async () => {
+    const { result, recording, sourceFile, unmount } = await retainedFailedJobWorkflow();
+    const discard = vi.fn(() => false);
+    recording.discard = discard;
+
+    let cleared = true;
+    act(() => {
+      cleared = result.current.reset(true);
+    });
+
+    // The take is still owned, so the surface still shows the workflow that names the retained
+    // job. Releasing it here would answer that job's retry and its status read with a 404 while
+    // its controls are on screen.
+    expect(cleared).toBe(false);
+    expect(adapters.releaseVideoJob).not.toHaveBeenCalled();
+    expect(discard).toHaveBeenCalledOnce();
+    expect(result.current.selection?.file).toBe(sourceFile);
+    expect(result.current.phase).toBe('error');
+    expect(result.current.message).toBe('Visual processing rejected the submitted media.');
+
+    // Still addressable, so the discard that does go through still hands it back.
+    discard.mockReturnValue(true);
+    act(() => {
+      cleared = result.current.reset(true);
+    });
+
+    expect(cleared).toBe(true);
+    expect(adapters.releaseVideoJob).toHaveBeenCalledWith(submittedJobIdAt(0));
+    expect(discard).toHaveBeenCalledTimes(2);
+    expect(result.current.selection).toBeNull();
     unmount();
   });
 });

@@ -34,6 +34,61 @@ const activity = (projectId: string): ProjectSourceActivity => ({
   abort: null,
 });
 
+/** The stage artifact `sourceInput` becomes once the runtime has published it. */
+const presentedProjectMedia: PresentedRecordingArtifact = {
+  id: sourceInput.artifactMetadata.id,
+  media: sourceInput.blob,
+  objectUrl: 'blob:project-source',
+  mimeType: sourceInput.artifactMetadata.mimeType,
+  filename: sourceInput.artifactMetadata.filename,
+  sourceModeId: sourceInput.artifactMetadata.sourceModeId,
+  startedAt: sourceInput.artifactMetadata.startedAt,
+  durationMs: sourceInput.artifactMetadata.durationMs,
+  sizeBytes: sourceInput.blob.size,
+};
+
+/**
+ * The three inputs a case here moves between renders. Everything else the bridge takes is either
+ * fixed for the file or a port the case hands in.
+ */
+type BridgeProps = {
+  readonly projectId: string;
+  readonly lifecycle: RecordingLifecycle;
+  readonly original: PresentedRecordingArtifact | null;
+};
+
+type BridgePorts = Pick<
+  Parameters<typeof useStudioProjectBridge>[0],
+  'presentSource' | 'clearSource'
+>;
+
+/**
+ * One rendering for every case, with the defaults an idle stage holding nothing.
+ *
+ * `rerender` takes only what moves and fills the rest back from the initial render, so what a case
+ * shows is the change it is about rather than the two inputs it is carrying along unchanged.
+ */
+const renderBridge = (ports: BridgePorts, initial: Partial<BridgeProps> = {}) => {
+  const props: BridgeProps = {
+    projectId: firstProjectId,
+    lifecycle: 'idle',
+    original: null,
+    ...initial,
+  };
+  const { rerender, ...hook } = renderHook(
+    ({ projectId, lifecycle, original }: BridgeProps) =>
+      useStudioProjectBridge({
+        projectId,
+        recordingLifecycle: lifecycle,
+        recordingOriginal: original,
+        ...ports,
+      }),
+    { initialProps: props },
+  );
+
+  return { ...hook, rerender: (next: Partial<BridgeProps>) => rerender({ ...props, ...next }) };
+};
+
 const session = (projectId: string): ProjectSessionPort => ({
   projectId,
   phase: 'saved',
@@ -55,17 +110,7 @@ describe('useStudioProjectBridge', () => {
   it('keeps project media callbacks route-scoped and hides stale activity', () => {
     const presentSource = vi.fn();
     const clearSource = vi.fn(() => true);
-    const hook = renderHook(
-      ({ projectId }) =>
-        useStudioProjectBridge({
-          projectId,
-          recordingLifecycle: 'idle',
-          recordingOriginal: null,
-          presentSource,
-          clearSource,
-        }),
-      { initialProps: { projectId: firstProjectId } },
-    );
+    const hook = renderBridge({ presentSource, clearSource });
     const runtime = hook.result.current.sourceRuntime;
 
     act(() => {
@@ -109,21 +154,74 @@ describe('useStudioProjectBridge', () => {
   it('refuses a clear from a Project that never presented onto the stage', () => {
     const presentSource = vi.fn();
     const clearSource = vi.fn(() => true);
-    const hook = renderHook(() =>
-      useStudioProjectBridge({
-        projectId: firstProjectId,
-        recordingLifecycle: 'idle',
-        recordingOriginal: null,
-        presentSource,
-        clearSource,
-      }),
-    );
+    const hook = renderBridge({ presentSource, clearSource });
 
     act(() => hook.result.current.sourceRuntime.present(firstProjectId, sourceInput));
     act(() => hook.result.current.sourceRuntime.clear(secondProjectId));
 
     expect(presentSource).toHaveBeenCalledOnce();
     expect(clearSource).not.toHaveBeenCalled();
+  });
+
+  it('finishes a clear the runtime refused once the take that refused it releases the stage', () => {
+    let finalizing = true;
+    const presentSource = vi.fn();
+    // Answers like `recording.discard`: `false` means a take is still finalizing and owns the
+    // stage, and nothing else.
+    const clearSource = vi.fn(() => !finalizing);
+    const hook = renderBridge(
+      { presentSource, clearSource },
+      { lifecycle: 'stopping', original: presentedProjectMedia },
+    );
+    const runtime = hook.result.current.sourceRuntime;
+
+    act(() => {
+      runtime.present(firstProjectId, sourceInput);
+      // The unmounting source controller's passive cleanup, refused mid-finalization.
+      runtime.clear(firstProjectId);
+    });
+    expect(clearSource).toHaveBeenCalledOnce();
+
+    // Finalization ended without publishing over the Project's media, so the clear is still owed
+    // and is now free to complete rather than waiting for a `present` that never comes.
+    finalizing = false;
+    hook.rerender({ lifecycle: 'error' });
+    expect(clearSource).toHaveBeenCalledTimes(2);
+
+    // The bridge's record of the stage recovered with the stage itself: a Project that no longer
+    // holds it, and is no longer the route's Project, can no longer clear it.
+    hook.rerender({ projectId: secondProjectId, lifecycle: 'error' });
+    act(() => hook.result.current.sourceRuntime.clear(firstProjectId));
+    expect(clearSource).toHaveBeenCalledTimes(2);
+  });
+
+  it('settles a refused clear without discarding the take that replaced the Project media', () => {
+    const newTake: PresentedRecordingArtifact = {
+      ...presentedProjectMedia,
+      id: 'video-second-take',
+      objectUrl: 'blob:video-second-take',
+    };
+    const presentSource = vi.fn();
+    const clearSource = vi.fn(() => false);
+    const hook = renderBridge(
+      { presentSource, clearSource },
+      { lifecycle: 'stopping', original: presentedProjectMedia },
+    );
+
+    act(() => {
+      hook.result.current.sourceRuntime.present(firstProjectId, sourceInput);
+      hook.result.current.sourceRuntime.clear(firstProjectId);
+    });
+    expect(clearSource).toHaveBeenCalledOnce();
+
+    // The take finished and published over the Project's media: the stage owes the Project
+    // nothing, and the fresh take the operator has not reviewed must survive.
+    hook.rerender({ lifecycle: 'recorded', original: newTake });
+    expect(clearSource).toHaveBeenCalledOnce();
+
+    hook.rerender({ projectId: secondProjectId, lifecycle: 'recorded', original: newTake });
+    act(() => hook.result.current.sourceRuntime.clear(firstProjectId));
+    expect(clearSource).toHaveBeenCalledOnce();
   });
 
   it('publishes a fresh project recording candidate only for a finalized artifact', () => {
@@ -139,28 +237,7 @@ describe('useStudioProjectBridge', () => {
       durationMs: 2_000,
       sizeBytes: media.size,
     };
-    const hook = renderHook(
-      ({
-        lifecycle,
-        original,
-      }: {
-        lifecycle: RecordingLifecycle;
-        original: RecordingArtifact | null;
-      }) =>
-        useStudioProjectBridge({
-          projectId: firstProjectId,
-          recordingLifecycle: lifecycle,
-          recordingOriginal: original,
-          presentSource: vi.fn(),
-          clearSource: vi.fn(() => true),
-        }),
-      {
-        initialProps: {
-          lifecycle: 'idle' as RecordingLifecycle,
-          original: null as RecordingArtifact | null,
-        },
-      },
-    );
+    const hook = renderBridge({ presentSource: vi.fn(), clearSource: vi.fn(() => true) });
 
     expect(hook.result.current.recordingCandidate).toBeNull();
     hook.rerender({ lifecycle: 'recorded', original: artifact });
@@ -191,14 +268,9 @@ describe('useStudioProjectBridge', () => {
       durationMs: 2_000,
       sizeBytes: 4,
     };
-    const hook = renderHook(() =>
-      useStudioProjectBridge({
-        projectId: firstProjectId,
-        recordingLifecycle: 'recorded',
-        recordingOriginal: remote,
-        presentSource: vi.fn(),
-        clearSource: vi.fn(() => true),
-      }),
+    const hook = renderBridge(
+      { presentSource: vi.fn(), clearSource: vi.fn(() => true) },
+      { lifecycle: 'recorded', original: remote },
     );
 
     expect(hook.result.current.recordingCandidate).toBeNull();

@@ -191,10 +191,17 @@ export const useExistingVideoWorkflow = ({
     [clearOperation, recording],
   );
 
+  /**
+   * Answers what `resetWorkflowState` answers, and releases a retained job only on its `true`.
+   * The release is irreversible where the clear is not: a released job answers a retry or a status
+   * read with 404, so releasing ahead of the refusal would strand the surface still showing the
+   * workflow that names it. The order is therefore clear-then-release, and never the other way.
+   */
   const reset = useCallback(
     (discardTake = false): boolean => {
+      if (!resetWorkflowState(discardTake)) return false;
       releaseRetainedJob();
-      return resetWorkflowState(discardTake);
+      return true;
     },
     [releaseRetainedJob, resetWorkflowState],
   );

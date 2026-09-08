@@ -3,6 +3,7 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { projectWorkspacePath } from '../app/paths';
+import type { ProjectRecordingLaunchRefusal } from '../features/projects/projectRecordingLaunch';
 import type { ProjectSourceActivity } from '../features/projects/useProjectSourceController';
 import type { PresentedRecordingArtifact, RecordingArtifact } from '../features/recording/types';
 import { takeDiscardQuestion } from '../features/take-review/takeDiscardQuestion';
@@ -81,18 +82,23 @@ const sourceActivity = (overrides: Partial<ProjectSourceActivity> = {}): Project
  * The shell's confirmation, with the answer held open.
  *
  * Every case that matters here happens between the question and its answer — the Project moving,
- * the runtime unmounting — so the double hands back a resolver rather than settling on its own.
+ * the runtime unmounting, the question itself failing — so the double hands back the settlers
+ * rather than settling on its own.
  */
 const confirmationHarness = () => {
-  const answers: ((confirmed: boolean) => void)[] = [];
+  const answers: { resolve: (confirmed: boolean) => void; reject: (reason: Error) => void }[] = [];
   const ask = vi.fn(
     (_question: ConfirmationRequestOptions) =>
-      new Promise<boolean>((resolve) => {
-        answers.push(resolve);
+      new Promise<boolean>((resolve, reject) => {
+        answers.push({ resolve, reject });
       }),
   );
   const answer = (confirmed: boolean): void => {
-    answers.shift()?.(confirmed);
+    answers.shift()?.resolve(confirmed);
+  };
+  /** The question ending without an answer, the way a rejecting question owner ends it. */
+  const fail = (reason: Error): void => {
+    answers.shift()?.reject(reason);
   };
   const confirmation: ConfirmationRequest = {
     pending: null,
@@ -100,7 +106,7 @@ const confirmationHarness = () => {
     confirm: () => answer(true),
     cancel: () => answer(false),
   };
-  return { confirmation, ask, answer };
+  return { confirmation, ask, answer, fail };
 };
 
 /**
@@ -185,7 +191,7 @@ interface SetupOptions {
 const setup = ({ presented = null, discards = true, launch = {} }: SetupOptions = {}) => {
   const discard = vi.fn(() => discards);
   const startLocal = vi.fn(() => Promise.resolve());
-  const { confirmation, ask, answer } = confirmationHarness();
+  const { confirmation, ask, answer, fail } = confirmationHarness();
   const openOverlay = vi.fn();
   const closeOverlay = vi.fn();
   const focusMain = vi.fn();
@@ -216,6 +222,7 @@ const setup = ({ presented = null, discards = true, launch = {} }: SetupOptions 
     startLocal,
     ask,
     answer,
+    fail,
     openOverlay,
     closeOverlay,
     focusMain,
@@ -223,15 +230,29 @@ const setup = ({ presented = null, discards = true, launch = {} }: SetupOptions 
   };
 };
 
-/** Lets the launch's immediately-invoked async half run on to its next suspension point. */
+/** Lets the launch's awaiting half run on to its next suspension point. */
 const settle = async (): Promise<void> => {
   await act(async () => {});
 };
 
-/** A press, then that same wait: the launch either finishes here or stops at the open question. */
-const press = async (start: () => void): Promise<void> => {
-  act(start);
+/**
+ * A press, then that same wait: the launch either finishes here or stops at the open question.
+ *
+ * Hands back what the press answered, which is the whole of what a surface can hear: a refusal it
+ * has a sentence for, or nothing — a launch that asks first answers nothing at the press, and the
+ * dialog is the operator's account of everything after it.
+ */
+const press = async (
+  start: () => ProjectRecordingLaunchRefusal | null,
+): Promise<ProjectRecordingLaunchRefusal | null | undefined> => {
+  // `undefined` is not an answer the launch can give, so a case whose press never ran fails on the
+  // value rather than passing on whatever this was seeded with.
+  let refusal: ProjectRecordingLaunchRefusal | null | undefined;
+  act(() => {
+    refusal = start();
+  });
   await settle();
+  return refusal;
 };
 
 beforeEach(() => {
@@ -245,8 +266,10 @@ describe('useStudioRecordingLaunch', () => {
     it('launches with no question when the stage is holding no take', async () => {
       const { hook, discard, startLocal, ask, closeOverlay, focusMain, navigate } = setup();
 
-      await press(hook.result.current.startProjectRecording);
+      const refusal = await press(hook.result.current.startProjectRecording);
 
+      // Nothing to say: the route has moved and a camera has been asked for.
+      expect(refusal).toBeNull();
       expect(ask).not.toHaveBeenCalled();
       expect(discard).toHaveBeenCalledOnce();
       expect(closeOverlay).toHaveBeenCalledOnce();
@@ -260,7 +283,10 @@ describe('useStudioRecordingLaunch', () => {
         presented: ownedArtifact(),
       });
 
-      await press(hook.result.current.startProjectRecording);
+      const refusal = await press(hook.result.current.startProjectRecording);
+      // The press hands the act to the dialog, which is the operator's own answer from here, so the
+      // section is given nothing to put beside it.
+      expect(refusal).toBeNull();
       expect(ask).toHaveBeenCalledWith(takeDiscardQuestion('project-recording'));
 
       answer(false);
@@ -312,14 +338,34 @@ describe('useStudioRecordingLaunch', () => {
       expect(startLocal).not.toHaveBeenCalled();
     });
 
-    it('returns without asking while a recording is active', async () => {
+    it('answers that a take is in flight when the discard refuses with no question to ask', async () => {
+      // `recordingActive` is the lifecycle as React last committed it, while `discard` refuses on
+      // refs written outside a render, so the two can disagree: a capture started in that gap is
+      // refused here, and the answer is what lets the surface say nothing was dropped.
+      const { hook, discard, startLocal, ask, navigate } = setup({
+        presented: streamedSource(),
+        discards: false,
+      });
+
+      const refusal = await press(hook.result.current.startProjectRecording);
+
+      expect(refusal).toBe('take-in-progress');
+      expect(ask).not.toHaveBeenCalled();
+      expect(discard).toHaveBeenCalledOnce();
+      expect(navigate).not.toHaveBeenCalled();
+      expect(startLocal).not.toHaveBeenCalled();
+    });
+
+    it('answers that a take is in flight, rather than returning bare, while a recording runs', async () => {
       const { hook, discard, startLocal, ask, navigate } = setup({
         presented: ownedArtifact(),
         launch: { recordingActive: true },
       });
 
-      await press(hook.result.current.startProjectRecording);
+      const refusal = await press(hook.result.current.startProjectRecording);
 
+      // The press looked live and started nothing, so the surface is given something to say.
+      expect(refusal).toBe('take-in-progress');
       expect(ask).not.toHaveBeenCalled();
       expect(discard).not.toHaveBeenCalled();
       expect(navigate).not.toHaveBeenCalled();
@@ -333,14 +379,17 @@ describe('useStudioRecordingLaunch', () => {
         { projectSourceActivity: sourceActivity({ accepted: true }) },
       ],
       ['the Project source is busy', { projectSourceActivity: sourceActivity({ busy: true }) }],
-    ])('returns before asking when %s', async (_reason, launch) => {
+    ])('declines silently when %s, before asking', async (_reason, launch) => {
       const { hook, discard, startLocal, ask, navigate } = setup({
         presented: ownedArtifact(),
         launch,
       });
 
-      await press(hook.result.current.startProjectRecording);
+      const refusal = await press(hook.result.current.startProjectRecording);
 
+      // Each of these turns the Record control off, so a sentence would explain a press the
+      // operator could not have made. Nothing is spent either way.
+      expect(refusal).toBeNull();
       expect(ask).not.toHaveBeenCalled();
       expect(discard).not.toHaveBeenCalled();
       expect(navigate).not.toHaveBeenCalled();
@@ -385,12 +434,45 @@ describe('useStudioRecordingLaunch', () => {
       expect(startLocal).not.toHaveBeenCalled();
     });
 
+    it('reads a question that throws as a decline, and keeps the rejection off the window', async () => {
+      const { hook, discard, startLocal, ask, answer, fail, closeOverlay, focusMain, navigate } =
+        setup({ presented: ownedArtifact() });
+
+      const refusal = await press(hook.result.current.startProjectRecording);
+      expect(refusal).toBeNull();
+
+      // The shell's question owner tearing down in a way that rejects rather than resolving false.
+      // Without a handler this reaches the test runner as an unhandled rejection, which is exactly
+      // what it did to the operator's window.
+      fail(new Error('the question owner went away'));
+      await settle();
+
+      // An answer that never arrived is not consent to destroy the one copy of this take, so the
+      // launch spends nothing: no discard, no navigation, no camera.
+      expect(discard).not.toHaveBeenCalled();
+      expect(closeOverlay).not.toHaveBeenCalled();
+      expect(navigate).not.toHaveBeenCalled();
+      expect(focusMain).not.toHaveBeenCalled();
+      expect(startLocal).not.toHaveBeenCalled();
+
+      // The launch ended on a decision rather than mid-flight, so the next press is an ordinary one.
+      await press(hook.result.current.startProjectRecording);
+      expect(ask).toHaveBeenCalledTimes(2);
+      answer(true);
+      await settle();
+
+      expect(discard).toHaveBeenCalledOnce();
+      expect(navigate).toHaveBeenCalledWith(projectWorkspacePath(projectId));
+      expect(startLocal).toHaveBeenCalledOnce();
+    });
+
     it('drops a URL-backed Project source without a question', async () => {
       const { hook, discard, startLocal, ask, navigate } = setup({ presented: streamedSource() });
 
-      await press(hook.result.current.startProjectRecording);
+      const refusal = await press(hook.result.current.startProjectRecording);
 
       // Durable on the server, so clearing the stage loses nothing worth asking about.
+      expect(refusal).toBeNull();
       expect(ask).not.toHaveBeenCalled();
       expect(discard).toHaveBeenCalledOnce();
       expect(navigate).toHaveBeenCalledWith(projectWorkspacePath(projectId));

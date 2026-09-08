@@ -1,23 +1,49 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { useRef, useState } from 'react';
-import { Button, ConfirmationRequestDialog, StatusNotice, useConfirmationRequest } from '../../ui';
+import {
+  Button,
+  ConfirmationRequestDialog,
+  StatusNotice,
+  useConfirmationRequest,
+  type ConfirmationRequestOptions,
+} from '../../ui';
 import type { RecordingController } from '../recording/types';
 import type { SaveVideoState } from '../saved-videos/useSaveVideo';
 import { media } from '../../ui/media';
 import { ActionMenu, type ActionMenuItem } from '../../ui/primitives/ActionMenu';
 import { takeDiscardQuestion } from './takeDiscardQuestion';
+import { TAKE_STILL_FINALIZING_NOTICE } from './takeRefusalNotices';
 
 /** A secondary action, plus the shorter label the persistent control bar shows it under. */
 type TakeAction = ActionMenuItem & { readonly compactLabel?: string };
 
-/*
- * A discard refuses for one reason: a recorder attempt or its on-device transcode still owns the
- * bytes, so the take is still finalizing. It clears itself within the finalization bound, which is
- * why this asks for a retry rather than offering one — and why review stays open with every control
- * live instead of closing over a take the runtime still holds.
+/**
+ * The persistent control bar's inline rendering of the list the panel hands to `ActionMenu`.
+ *
+ * The second renderer of the same actions, taking them the same way the menu does — as a prop —
+ * so the two presentations stay one description of what a take can do. A fragment of buttons, not
+ * a box: the row's own flex and grid rules address these as direct children.
  */
-const TAKE_STILL_FINALIZING_NOTICE =
-  'This take is still finishing, so nothing was discarded. Try again in a moment.';
+const CompactTakeActions = ({ actions }: { readonly actions: readonly TakeAction[] }) => (
+  <>
+    {actions.map((action) => (
+      <Button
+        key={action.id}
+        variant="secondary"
+        disabled={action.disabled ?? false}
+        {...(action.description === undefined ? {} : { title: action.description })}
+        /*
+         * The pressed control is its own focus-return target, read from the event rather than
+         * taken from the menu's selection contract: nothing in this row is unmounted by a press,
+         * so the button that was pressed is the one focus should come back to.
+         */
+        onClick={(event) => action.onSelect(event.currentTarget)}
+      >
+        {action.compactLabel ?? action.label}
+      </Button>
+    ))}
+  </>
+);
 
 export type TakeReviewActionsProps = {
   recording: RecordingController;
@@ -26,9 +52,10 @@ export type TakeReviewActionsProps = {
   onDiscardTake?: () => void;
   /**
    * Drops this take and brings the camera back, in that order and in one owner. Answers false when
-   * the discard refused, in which case nothing happened and the take is still on the stage. Absent
-   * wherever the loop is not offered — inside a Project, over a streamed source, or on a browser
-   * that cannot capture — so this surface never has to work out whether it exists.
+   * the act did not run, which here means one thing: the discard refused, so nothing happened and
+   * the take is still on the stage. Absent wherever the loop is not offered — inside a Project, over
+   * a streamed source, or on a browser that cannot capture — so this surface never has to work out
+   * whether it exists, and so the camera the owner also checks for is never the reason for a false.
    */
   onRecordAnotherTake?: () => boolean;
   onEditVideo?: () => void;
@@ -108,11 +135,13 @@ export const TakeReviewActions = ({
   const confirmation = useConfirmationRequest();
   const [refusal, setRefusal] = useState<string | null>(null);
   /*
-   * Selecting a menu item closes the menu, so a dialog opened from one can only return focus to the
-   * trigger — the single element that survives the selection. It stays null for a press from the
-   * compact bar, where `OverlayPanel` falls back to the button it captured when the dialog opened.
+   * Where focus goes when the shared dialog closes. Written by the ask itself and by nothing else,
+   * so the target always belongs to the press that opened the dialog on screen: a trigger recorded
+   * by one action and left standing would be handed to the next action's dialog, and by then the
+   * menu that owned it may not even be mounted — focus would land on a detached element, which is
+   * to say on the document body.
    */
-  const menuTriggerRef = useRef<HTMLElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
   const artifact = recording.presented;
   const locked = recording.processingState === 'processing';
   const compact = presentation === 'control-bar';
@@ -134,16 +163,28 @@ export const TakeReviewActions = ({
     return false;
   };
 
+  /**
+   * Poses one press's question, with focus returning to the control that made it.
+   *
+   * Selecting a menu item closes the menu, so a dialog opened from one can only return to the
+   * trigger — the single element that survives the selection. A control that outlives its own
+   * dialog, like either presentation's inline Discard, simply hands over itself.
+   */
+  const askFrom = (trigger: HTMLElement | null, question: ConfirmationRequestOptions) => {
+    returnFocusRef.current = trigger;
+    return confirmation.ask(question);
+  };
+
   const closeTake = () => {
     setRefusal(null);
     if (!clearTake()) return;
     onCloseTake?.();
   };
 
-  const discard = async () => {
+  const discard = async (trigger: HTMLElement | null) => {
     setRefusal(null);
     if (
-      !(await confirmation.ask({
+      !(await askFrom(trigger, {
         title: 'Discard this take?',
         description:
           'It only exists in this browser tab, so it cannot be recovered once you discard it.',
@@ -163,16 +204,19 @@ export const TakeReviewActions = ({
    * the handoff and re-acquires, in that order and in its own owner — so nothing here asks for a
    * camera and nothing here closes review. Two idempotent closes already follow from the discard,
    * and only one of them owns focus; a third would fight it.
+   *
+   * Its refusal is the same one `clearTake` reports, and gets the same sentence: the act begins with
+   * a discard, and the only other thing that could have stopped it is a camera this surface is not
+   * offered on in the first place.
    */
   const recordAnotherTake = async (
     trigger: HTMLButtonElement | null,
     restart: () => boolean,
   ): Promise<void> => {
-    menuTriggerRef.current = trigger;
     setRefusal(null);
     // Skipped once the take is saved, for the same reason `Close without saving` skips it: the
     // durable copy is in Assets and this press destroys nothing that cannot be reopened.
-    if (unsaved && !(await confirmation.ask(takeDiscardQuestion('retake')))) return;
+    if (unsaved && !(await askFrom(trigger, takeDiscardQuestion('retake')))) return;
     if (!restart()) {
       setRefusal(TAKE_STILL_FINALIZING_NOTICE);
       return;
@@ -273,30 +317,16 @@ export const TakeReviewActions = ({
         </Button>
       ) : null}
       {unsaved ? (
-        <Button variant="danger" disabled={locked || saving} onClick={() => void discard()}>
+        <Button
+          variant="danger"
+          disabled={locked || saving}
+          onClick={(event) => void discard(event.currentTarget)}
+        >
           Discard
         </Button>
       ) : null}
       {compact ? (
-        /*
-         * One of these handlers records a focus-return trigger, which taints the whole list for the
-         * refs analysis the moment the list is handed to a function. Nothing here reads `.current`:
-         * the write happens in a menu selection, long after this render. Splitting the list to
-         * satisfy the analysis would give the two presentations two answers to "does this action
-         * exist", which is the drift the single list exists to prevent.
-         */
-        // eslint-disable-next-line react-hooks/refs -- ref written in an event handler, never read during render
-        secondaryActions.map((action) => (
-          <Button
-            key={action.id}
-            variant="secondary"
-            disabled={action.disabled ?? false}
-            {...(action.description === undefined ? {} : { title: action.description })}
-            onClick={() => action.onSelect(null)}
-          >
-            {action.compactLabel ?? action.label}
-          </Button>
-        ))
+        <CompactTakeActions actions={secondaryActions} />
       ) : (
         <ActionMenu label="More actions for this take" items={secondaryActions} />
       )}
@@ -308,21 +338,21 @@ export const TakeReviewActions = ({
           role="alert"
           tone="warning"
           /*
-           * The row's rules are written for buttons — a single nowrap line that may shrink to
-           * nothing — so a sentence needs both to wrap and to claim a line of its own wherever the
-           * container allows one: the whole row where the panel wraps, the whole row at the compact
-           * bar's grid breakpoint.
+           * The row's rules are written for buttons — a nowrap label that may shrink to nothing —
+           * so a sentence needs both to wrap and to claim a line of its own wherever the container
+           * allows one. Both presentations wrap now, so both get the whole flex row, and the grid
+           * span covers each one's narrow breakpoint.
            */
           css={{
             whiteSpace: 'normal',
             gridColumn: '1 / -1',
-            ...(compact ? {} : { flexBasis: '100%' }),
+            flexBasis: '100%',
           }}
         >
           {refusal}
         </StatusNotice>
       ) : null}
-      <ConfirmationRequestDialog request={confirmation} returnFocusRef={menuTriggerRef} />
+      <ConfirmationRequestDialog request={confirmation} returnFocusRef={returnFocusRef} />
     </div>
   );
 };

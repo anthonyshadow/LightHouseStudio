@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { Button, ConfirmationRequestDialog, useConfirmationRequest } from '../../ui';
+import { Button, ConfirmationRequestDialog, StatusNotice, useConfirmationRequest } from '../../ui';
 import type { StudioMode } from '../media-session';
 import type { RecordingController, RecordingSource, VideoCharacterAttribution } from './types';
+import { TAKE_STILL_FINALIZING_NOTICE } from '../take-review/takeRefusalNotices';
 
 export type RecordingActionProps = {
   recording: RecordingController;
@@ -66,6 +67,11 @@ const recordGlyphStyles = (theme: Theme): CSSObject => ({
   '& svg': { color: theme.colors.recordingSoft },
 });
 
+// For the session control bar: a single nowrap flex row of buttons, where a full basis is what hands
+// the sentence the width those buttons do not need. The Project controls group stacks its children,
+// so the notice already takes the line under the button and needs nothing from here.
+const refusalNoticeStyles = (): CSSObject => ({ flexBasis: '100%' });
+
 const disabledReasonStyles = (): CSSObject => ({
   position: 'absolute',
   width: '1px',
@@ -121,9 +127,12 @@ export const RecordingAction = ({
   }, [recording.lifecycle]);
 
   const confirmation = useConfirmationRequest();
+  const [refusal, setRefusal] = useState<string | null>(null);
 
   const start = useCallback(async () => {
     if (!source) return;
+    // Cleared as the press begins, so what is on screen always describes the press just made.
+    setRefusal(null);
     if (recording.original) {
       const proceed = await confirmation.ask({
         title: 'Start another take?',
@@ -135,10 +144,18 @@ export const RecordingAction = ({
       });
       if (!proceed) return;
     }
-    // A refused discard means the previous take is still finalizing, and `start` refuses on the
-    // same condition — so continuing would leave the operator with a confirmed dialog, the old
-    // take still on the stage, and a button that did nothing.
-    if (recording.original && !recording.discard()) return;
+    /*
+     * A refused discard means the previous take is still finalizing, and `start` refuses on the
+     * same pair — `useRecording` checks the recorder attempt and its on-device transcode before it
+     * opens either one — so continuing would leave the operator with a confirmed dialog, the old
+     * take still on the stage, and a button that did nothing. The condition clears itself within
+     * the finalization bound, which is why this says so and asks for the press again rather than
+     * retrying on the operator's behalf.
+     */
+    if (recording.original && !recording.discard()) {
+      setRefusal(TAKE_STILL_FINALIZING_NOTICE);
+      return;
+    }
     if (characterAttribution) await recording.start(source, mode, characterAttribution);
     else await recording.start(source, mode);
   }, [characterAttribution, confirmation, mode, recording, source]);
@@ -225,6 +242,11 @@ export const RecordingAction = ({
         >
           {unavailableReason}
         </p>
+      ) : null}
+      {refusal ? (
+        <StatusNotice role="alert" tone="warning" css={refusalNoticeStyles()}>
+          {refusal}
+        </StatusNotice>
       ) : null}
       <ConfirmationRequestDialog request={confirmation} />
     </>

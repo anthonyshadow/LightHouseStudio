@@ -599,12 +599,68 @@ describe('StudioSessionControlBar', () => {
 
     // Awaited rather than queried: the notice is behind the dismissed dialog's isolation until the
     // overlay finishes leaving.
+    // Same sentence as the panel's, and the same sentence a refused Discard shows: the restart's
+    // only reachable refusal is the discard it begins with, because the compact bar withholds the
+    // control altogether on a browser that cannot capture.
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This take is still finishing, so nothing was discarded. Try again in a moment.',
     );
     expect(discard).not.toHaveBeenCalled();
     expect(onDiscardTake).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Record again' })).toBeEnabled();
+  });
+
+  it('gives a refusal its own row in the compact bar instead of a slot beside the buttons', async () => {
+    const user = userEvent.setup();
+    const artifact = takeArtifact();
+    const recording = createRecording('recorded', {
+      original: artifact,
+      presented: artifact,
+      discard: vi.fn(() => false),
+    });
+    renderBar(createSession(), vi.fn(), recording, vi.fn(), true, vi.fn(), vi.fn());
+
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+    await user.click(await screen.findByRole('button', { name: 'Discard take' }));
+
+    const notice = await screen.findByRole('alert');
+    const style = getComputedStyle(notice);
+    // The compact row wraps, so a whole-row basis is what puts the sentence on a line of its own
+    // rather than in a `min-content` column beside Save and Discard. jsdom lays nothing out, so
+    // this is the declaration the operator's browser would resolve into that line break.
+    expect(style.flexBasis).toBe('100%');
+    expect(style.whiteSpace).toBe('normal');
+    expect(notice).toHaveTextContent(
+      'This take is still finishing, so nothing was discarded. Try again in a moment.',
+    );
+  });
+
+  it('returns focus to the compact control that opened the dialog, not to the one before it', async () => {
+    const user = userEvent.setup();
+    const artifact = takeArtifact();
+    renderBar(
+      createSession(),
+      vi.fn(),
+      createRecording('recorded', { original: artifact, presented: artifact }),
+      vi.fn(),
+      true,
+      vi.fn(),
+      vi.fn(),
+      { onRecordAnotherTake: vi.fn(() => true) },
+    );
+
+    const retake = screen.getByRole('button', { name: 'Record again' });
+    await user.click(retake);
+    await user.click(await screen.findByRole('button', { name: 'Stay' }));
+    await waitFor(() => expect(retake).toHaveFocus());
+
+    // A second press, from a control the first one never touched: the dialog they share answers to
+    // whichever button opened it, so focus comes back to Discard.
+    const discard = screen.getByRole('button', { name: 'Discard' });
+    await user.click(discard);
+    await user.click(await screen.findByRole('button', { name: 'Stay' }));
+
+    await waitFor(() => expect(discard).toHaveFocus());
   });
 
   it('returns focus to the pressed compact control when the retake is declined', async () => {
@@ -627,8 +683,8 @@ describe('StudioSessionControlBar', () => {
     await user.click(await screen.findByRole('button', { name: 'Stay' }));
 
     expect(onRecordAnotherTake).not.toHaveBeenCalled();
-    // No menu trigger survives a compact press, so the dialog returns focus to the button it
-    // captured when it opened.
+    // Nothing in this row is unmounted by a press, so the pressed button hands over itself and gets
+    // focus back.
     await waitFor(() => expect(retake).toHaveFocus());
   });
 

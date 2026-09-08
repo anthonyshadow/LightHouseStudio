@@ -5,6 +5,7 @@ import { APP_PATHS } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
 import { Button, StatusNotice } from '../../ui';
 import type { ProjectCreateRuntime } from './ProjectCreateTaskPanel';
+import type { ProjectRecordingLaunchRefusal } from './projectRecordingLaunch';
 import { projectProcessingBlockedReason } from './projectProcessingPresentation';
 import { ProjectOverviewSurface } from './ProjectOverviewSurface';
 import { dialogActionsStyles, workspaceInnerStyles } from './ProjectRouteSurface.styles';
@@ -23,7 +24,14 @@ export interface ProjectRouteSurfaceProps {
   readonly sourceRuntime?: ProjectSourceRuntime;
   readonly recordingCandidate?: ProjectRecordingCandidate | null;
   readonly recordingActive?: boolean;
-  readonly onStartRecording?: () => void;
+  /**
+   * Whether the browser behind `onStartRecording` can capture. Only a caller that owns the capture
+   * graph knows; where it is absent the section keeps its Record control live, because the control
+   * it offers there opens the workspace rather than a camera.
+   */
+  readonly recordingSupported?: boolean;
+  /** Answers a refusal, or nothing, so the section holding the button can speak for a dead press. */
+  readonly onStartRecording?: () => ProjectRecordingLaunchRefusal | null;
   readonly onSourceActivityChange?: (activity: ProjectSourceActivity) => void;
   readonly onWorkingMediaActivityChange?: (activity: ProjectWorkingMediaActivity) => void;
   readonly onSessionChange?: (session: ProjectSessionPort | null) => void;
@@ -43,6 +51,7 @@ export const ProjectDetailSurface = ({
   sourceRuntime = detachedSourceRuntime,
   recordingCandidate,
   recordingActive,
+  recordingSupported,
   onStartRecording,
   onSourceActivityChange,
   onWorkingMediaActivityChange,
@@ -105,6 +114,7 @@ export const ProjectDetailSurface = ({
         sourceRuntime={sourceRuntime}
         recordingCandidate={recordingCandidate}
         recordingActive={recordingActive}
+        recordingSupported={recordingSupported}
         onStartRecording={onStartRecording}
         createRuntime={createRuntime}
         processing={processing}
