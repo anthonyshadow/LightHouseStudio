@@ -383,6 +383,48 @@ export interface ProjectOutputMetadataUnitOfWork {
 }
 
 /**
+ * The core of "the appended revision continues the row this transaction locked".
+ *
+ * Written identically at every Drizzle revision-append site; each caller keeps its own additional
+ * clauses and its own `ProjectPersistenceError` message, so what varies stays local and only the
+ * shared eleven clauses have one owner. Every clause is a pure comparison, so a caller may place
+ * its extra clauses before or after this call without changing the result.
+ *
+ * Deliberately not called from `FileProjectRepository`: it raises no such error today, and adding
+ * one would change file-mode behaviour.
+ */
+export const projectRevisionContinuesAggregate = (
+  nextProject: Pick<
+    Project,
+    'id' | 'ownerUserId' | 'version' | 'currentRevisionId' | 'currentRevisionNumber'
+  >,
+  revision: Pick<
+    ProjectRevision,
+    | 'id'
+    | 'projectId'
+    | 'ownerUserId'
+    | 'parentRevisionId'
+    | 'parentRevisionNumber'
+    | 'revisionNumber'
+  >,
+  current: Pick<Project, 'id' | 'ownerUserId' | 'version' | 'archivedAt'> & {
+    readonly currentRevisionId: string | null;
+    readonly currentRevisionNumber: number;
+  },
+): boolean =>
+  nextProject.id === current.id &&
+  nextProject.ownerUserId === current.ownerUserId &&
+  nextProject.version === current.version + 1 &&
+  current.archivedAt === null &&
+  revision.projectId === current.id &&
+  revision.ownerUserId === current.ownerUserId &&
+  revision.parentRevisionId === current.currentRevisionId &&
+  revision.parentRevisionNumber === current.currentRevisionNumber &&
+  revision.revisionNumber === current.currentRevisionNumber + 1 &&
+  nextProject.currentRevisionId === revision.id &&
+  nextProject.currentRevisionNumber === revision.revisionNumber;
+
+/**
  * Why a Project output commit would not continue the aggregate it was composed against — or
  * `null` when it would.
  *
@@ -458,20 +500,21 @@ export const projectOutputCommitInconsistency = (
   ) {
     return 'The receipt does not name what this save writes.';
   }
+  // The shared continuation clauses come from the one owner above; the three below are this
+  // save's own. `archivedAt` is already proven null by the guard further up, so folding it back
+  // in through the predicate cannot change the answer.
   if (
     projectRevision.ownerUserId !== current.ownerUserId ||
-    nextProject.id !== current.id ||
-    nextProject.ownerUserId !== current.ownerUserId ||
-    nextProject.version !== current.version + 1 ||
     nextProject.status !== 'completed' ||
-    nextProject.currentRevisionId !== revision.id ||
-    nextProject.currentRevisionNumber !== revision.revisionNumber ||
-    revision.projectId !== current.id ||
-    revision.ownerUserId !== current.ownerUserId ||
-    revision.parentRevisionId !== current.currentRevisionId ||
-    revision.parentRevisionNumber !== current.currentRevisionNumber ||
-    revision.revisionNumber !== current.currentRevisionNumber + 1 ||
-    revision.source !== 'output-save'
+    revision.source !== 'output-save' ||
+    !projectRevisionContinuesAggregate(nextProject, revision, {
+      id: current.id,
+      ownerUserId: current.ownerUserId,
+      version: current.version,
+      archivedAt: current.archivedAt,
+      currentRevisionId: current.currentRevisionId,
+      currentRevisionNumber: current.currentRevisionNumber,
+    })
   ) {
     return 'The post-save revision does not continue the current Project.';
   }

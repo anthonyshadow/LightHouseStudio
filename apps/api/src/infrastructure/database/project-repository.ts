@@ -60,7 +60,10 @@ import type {
   ProjectWorkingMediaRecord,
   ProjectRenditionRecord,
 } from '../../features/projects/project-repository.js';
-import { projectOutputCommitInconsistency } from '../../features/projects/project-repository.js';
+import {
+  projectOutputCommitInconsistency,
+  projectRevisionContinuesAggregate,
+} from '../../features/projects/project-repository.js';
 import type {
   StoredSavedVideoAggregate,
   StoredVideoVersion,
@@ -74,6 +77,7 @@ import type { StoredAssetManifest } from '../../storage/asset-byte-store.js';
 import {
   projectProcessingAttemptMatchesTrace,
   projectProcessingResultInputMatchesAttempt,
+  projectProcessingResultRemainsPromotable,
   retainedProjectProcessingResultMatches,
   resumableProjectProcessingAttempt,
   type PersistedProcessingJobStatus,
@@ -743,10 +747,7 @@ export class DrizzleProjectRepository
             );
           return {
             kind: 'conflict',
-            conflict: {
-              kind: 'campaign-membership',
-              projectId: input.aggregate.project.id,
-            },
+            conflict: projectConflicts.campaignMembership(input.aggregate.project.id),
           };
         }
         await this.#persistNewAggregate(tx, input.aggregate);
@@ -1645,26 +1646,18 @@ export class DrizzleProjectRepository
       if (current.currentRevisionNumber !== input.expectedRevisionNumber) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'revision',
-            projectId: input.projectId,
-            expectedRevisionNumber: input.expectedRevisionNumber,
-            actualRevisionNumber: current.currentRevisionNumber,
-          },
+          conflict: projectConflicts.revision(
+            input.projectId,
+            input.expectedRevisionNumber,
+            current.currentRevisionNumber,
+          ),
         } as const;
       }
-      const validNextState =
-        input.nextProject.id === current.id &&
-        input.nextProject.ownerUserId === current.ownerUserId &&
-        input.nextProject.version === current.version + 1 &&
-        current.archivedAt === null &&
-        revision.projectId === current.id &&
-        revision.ownerUserId === current.ownerUserId &&
-        revision.parentRevisionId === current.currentRevisionId &&
-        revision.parentRevisionNumber === current.currentRevisionNumber &&
-        revision.revisionNumber === current.currentRevisionNumber + 1 &&
-        input.nextProject.currentRevisionId === revision.id &&
-        input.nextProject.currentRevisionNumber === revision.revisionNumber;
+      const validNextState = projectRevisionContinuesAggregate(
+        input.nextProject,
+        revision,
+        current,
+      );
       if (!validNextState) {
         throw new ProjectPersistenceError(
           'invalid-aggregate',
@@ -1797,30 +1790,22 @@ export class DrizzleProjectRepository
       if (current.currentRevisionNumber !== input.expectedRevisionNumber) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'revision',
-            projectId: input.projectId,
-            expectedRevisionNumber: input.expectedRevisionNumber,
-            actualRevisionNumber: current.currentRevisionNumber,
-          },
+          conflict: projectConflicts.revision(
+            input.projectId,
+            input.expectedRevisionNumber,
+            current.currentRevisionNumber,
+          ),
         } as const;
       }
       const revision: ProjectRevision = {
         ...input.revision,
         snapshot: projectSnapshotSchema.parse(input.revision.snapshot),
       };
-      const validNextState =
-        input.nextProject.id === current.id &&
-        input.nextProject.ownerUserId === current.ownerUserId &&
-        input.nextProject.version === current.version + 1 &&
-        current.archivedAt === null &&
-        revision.projectId === current.id &&
-        revision.ownerUserId === current.ownerUserId &&
-        revision.parentRevisionId === current.currentRevisionId &&
-        revision.parentRevisionNumber === current.currentRevisionNumber &&
-        revision.revisionNumber === current.currentRevisionNumber + 1 &&
-        input.nextProject.currentRevisionId === revision.id &&
-        input.nextProject.currentRevisionNumber === revision.revisionNumber;
+      const validNextState = projectRevisionContinuesAggregate(
+        input.nextProject,
+        revision,
+        current,
+      );
       if (!validNextState) {
         throw new ProjectPersistenceError(
           'invalid-aggregate',
@@ -1984,18 +1969,8 @@ export class DrizzleProjectRepository
       };
       const validNextState =
         priorSource.assetId === input.removedAssetId &&
-        input.nextProject.id === current.id &&
-        input.nextProject.ownerUserId === current.ownerUserId &&
-        input.nextProject.version === current.version + 1 &&
-        current.archivedAt === null &&
         revision.snapshot.sourceAssetId === null &&
-        revision.projectId === current.id &&
-        revision.ownerUserId === current.ownerUserId &&
-        revision.parentRevisionId === current.currentRevisionId &&
-        revision.parentRevisionNumber === current.currentRevisionNumber &&
-        revision.revisionNumber === current.currentRevisionNumber + 1 &&
-        input.nextProject.currentRevisionId === revision.id &&
-        input.nextProject.currentRevisionNumber === revision.revisionNumber;
+        projectRevisionContinuesAggregate(input.nextProject, revision, current);
       if (!validNextState) {
         throw new ProjectPersistenceError(
           'invalid-aggregate',
@@ -2135,12 +2110,11 @@ export class DrizzleProjectRepository
       if (current.currentRevisionNumber !== input.expectedRevisionNumber) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'revision',
-            projectId: input.projectId,
-            expectedRevisionNumber: input.expectedRevisionNumber,
-            actualRevisionNumber: current.currentRevisionNumber,
-          },
+          conflict: projectConflicts.revision(
+            input.projectId,
+            input.expectedRevisionNumber,
+            current.currentRevisionNumber,
+          ),
         } as const;
       }
       const revision: ProjectRevision = {
@@ -2148,17 +2122,7 @@ export class DrizzleProjectRepository
         snapshot: projectSnapshotSchema.parse(input.revision.snapshot),
       };
       const validNextState =
-        input.nextProject.id === current.id &&
-        input.nextProject.ownerUserId === current.ownerUserId &&
-        input.nextProject.version === current.version + 1 &&
-        current.archivedAt === null &&
-        revision.projectId === current.id &&
-        revision.ownerUserId === current.ownerUserId &&
-        revision.parentRevisionId === current.currentRevisionId &&
-        revision.parentRevisionNumber === current.currentRevisionNumber &&
-        revision.revisionNumber === current.currentRevisionNumber + 1 &&
-        input.nextProject.currentRevisionId === revision.id &&
-        input.nextProject.currentRevisionNumber === revision.revisionNumber &&
+        projectRevisionContinuesAggregate(input.nextProject, revision, current) &&
         input.media.projectId === current.id &&
         input.media.ownerUserId === current.ownerUserId &&
         input.media.adoptedRevisionId === revision.id &&
@@ -2309,12 +2273,11 @@ export class DrizzleProjectRepository
       if (current.currentRevisionNumber !== input.expectedRevisionNumber) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'revision',
-            projectId: current.id,
-            expectedRevisionNumber: input.expectedRevisionNumber,
-            actualRevisionNumber: current.currentRevisionNumber,
-          },
+          conflict: projectConflicts.revision(
+            current.id,
+            input.expectedRevisionNumber,
+            current.currentRevisionNumber,
+          ),
         } as const;
       }
       if (
@@ -3037,12 +3000,21 @@ export class DrizzleProjectRepository
               id: row.project.currentRevisionId,
               revisionNumber: row.project.currentRevisionNumber,
             });
+      // CAS is deliberately not part of this test here. The guard immediately below applies
+      // `expectedVersion`/`expectedRevisionNumber` separately and answers `conflict`; the file
+      // store instead folds them in and answers `retained-historical`. Do not fold them into the
+      // shared predicate.
       const semanticallyCurrent =
         input.currentPromotion !== null &&
-        row.project.currentRevisionId === attempt.initiatingRevisionId &&
-        row.project.currentRevisionNumber === attempt.initiatingRevisionNumber &&
-        currentAttempt?.operationId === input.currentPromotion.expectedCurrentOperationId &&
-        currentAttempt.operationId === attempt.operationId;
+        projectProcessingResultRemainsPromotable({
+          currentRevisionId: row.project.currentRevisionId,
+          currentRevisionNumber: row.project.currentRevisionNumber,
+          attemptInitiatingRevisionId: attempt.initiatingRevisionId,
+          attemptInitiatingRevisionNumber: attempt.initiatingRevisionNumber,
+          attemptOperationId: attempt.operationId,
+          currentAttemptOperationId: currentAttempt?.operationId,
+          expectedCurrentOperationId: input.currentPromotion.expectedCurrentOperationId,
+        });
       if (
         semanticallyCurrent &&
         input.currentPromotion !== null &&
@@ -3396,12 +3368,11 @@ export class DrizzleProjectRepository
       if (current.currentRevisionNumber !== input.projectRevision.expectedRevisionNumber) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'revision',
-            projectId: current.id,
-            expectedRevisionNumber: input.projectRevision.expectedRevisionNumber,
-            actualRevisionNumber: current.currentRevisionNumber,
-          },
+          conflict: projectConflicts.revision(
+            current.id,
+            input.projectRevision.expectedRevisionNumber,
+            current.currentRevisionNumber,
+          ),
         } as const;
       }
 
@@ -3462,12 +3433,11 @@ export class DrizzleProjectRepository
         ) {
           return {
             kind: 'conflict',
-            conflict: {
-              kind: 'saved-video-version',
+            conflict: projectConflicts.savedVideoVersion(
               savedVideoId,
-              expectedVersionId: input.savedVideo.expectedVersionId,
-              actualVersionId: target.currentVersionId,
-            },
+              input.savedVideo.expectedVersionId,
+              target.currentVersionId,
+            ),
           } as const;
         }
         const [currentVersion] = await tx

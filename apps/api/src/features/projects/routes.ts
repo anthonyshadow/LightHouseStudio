@@ -42,7 +42,11 @@ import type {
 } from '../../application/application-runtime.js';
 import { ownerUserIdForRequest } from '../../http/authentication.js';
 import { AppError } from '../../http/app-error.js';
-import { requestHeader, requireConfiguredService } from '../../http/request-helpers.js';
+import {
+  parseUploadMetadata,
+  requestHeader,
+  requireConfiguredService,
+} from '../../http/request-helpers.js';
 import { isSpooledUpload } from '../../application/spooled-upload.js';
 import { sendRangedAsset } from '../saved-videos/byte-range.js';
 import type { ProjectService, ProjectServiceMutationResult } from './project-service.js';
@@ -134,20 +138,6 @@ const sendProjectOutputMutation = (reply: HttpReply, result: ProjectOutputSaveMu
     return saveProjectOutputResponseSchema.parse(result.response);
   }
   return sendProjectConflict(reply, result.conflict);
-};
-
-const parseUploadMetadata = <Output>(
-  request: HttpRequest,
-  headerName: string,
-  schema: { readonly parse: (value: unknown) => Output },
-  message: string,
-): Output => {
-  const encoded = requestHeader(request, headerName);
-  try {
-    return schema.parse(JSON.parse(decodeURIComponent(encoded ?? '')) as unknown);
-  } catch {
-    throw new AppError(400, 'validation_error', message);
-  }
 };
 
 const sourceUploadMetadata = (request: HttpRequest) =>

@@ -16,6 +16,7 @@ import pino, { type Logger } from 'pino';
 import type { AuthenticatedUser, EntitlementSnapshot } from '@studio/contracts';
 import { isSpooledUpload } from './spooled-upload.js';
 import { AppError } from '../http/app-error.js';
+import { isLoopbackHostname, parseHostHeader } from '../http/loopback-host.js';
 import { currentTraceId, SanitizingSpanExporter } from '../observability/telemetry.js';
 import {
   parseBody,
@@ -54,8 +55,6 @@ const SECURITY_HEADERS = {
   'X-XSS-Protection': '0',
 } as const;
 
-const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
-
 const incomingRequestHasBody = (request: IncomingMessage): boolean => {
   const method = request.method ?? 'GET';
   if (method === 'GET' || method === 'HEAD') return false;
@@ -69,36 +68,8 @@ const requireLoopbackHost = (request: Request, allowModuleSentinel: boolean): vo
   // Elysia precomputes always-static responses with an internal sentinel request.
   // The caller permits it only while the static plugin modules are initializing.
   if (allowModuleSentinel && host === null && new URL(request.url).hostname === 'ely.sia') return;
-  if (
-    host === null ||
-    host.includes(',') ||
-    host.includes('/') ||
-    host.includes('\\') ||
-    host.includes('@') ||
-    host.includes('?') ||
-    host.includes('#')
-  ) {
-    throw new AppError(
-      421,
-      'forbidden_origin',
-      'This local Studio server accepts only loopback hosts.',
-    );
-  }
-  let parsedHost: URL | undefined;
-  try {
-    parsedHost = new URL(`http://${host}`);
-  } catch {
-    parsedHost = undefined;
-  }
-  if (
-    parsedHost === undefined ||
-    parsedHost.username !== '' ||
-    parsedHost.password !== '' ||
-    parsedHost.pathname !== '/' ||
-    parsedHost.search !== '' ||
-    parsedHost.hash !== '' ||
-    !LOOPBACK_HOSTNAMES.has(parsedHost.hostname.toLowerCase())
-  ) {
+  const parsedHost = host === null ? undefined : parseHostHeader(host);
+  if (parsedHost === undefined || !isLoopbackHostname(parsedHost.hostname)) {
     throw new AppError(
       421,
       'forbidden_origin',
@@ -1029,8 +1000,7 @@ export class ApplicationRuntime {
     if (this.closePromise !== undefined) throw new Error('The application has already closed.');
     const hostname = options.host ?? this.hostname;
     const port = options.port ?? this.port;
-    const normalizedHostname = hostname.toLowerCase();
-    if (!LOOPBACK_HOSTNAMES.has(normalizedHostname)) {
+    if (!isLoopbackHostname(hostname)) {
       throw new Error('The local Studio API may listen only on a loopback hostname.');
     }
     await this.prepareModules();

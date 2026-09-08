@@ -88,6 +88,7 @@ import {
 import {
   projectProcessingAttemptMatchesTrace,
   projectProcessingResultInputMatchesAttempt,
+  projectProcessingResultRemainsPromotable,
   retainedProjectProcessingResultMatches,
   resumableProjectProcessingAttempt,
   type ProjectProcessingAdmissionResult,
@@ -803,12 +804,11 @@ export class FileProjectRepository
       if (aggregate.project.currentRevisionNumber !== input.expectedRevisionNumber) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'revision',
-            projectId: attempt.projectId,
-            expectedRevisionNumber: input.expectedRevisionNumber,
-            actualRevisionNumber: aggregate.project.currentRevisionNumber,
-          },
+          conflict: projectConflicts.revision(
+            attempt.projectId,
+            input.expectedRevisionNumber,
+            aggregate.project.currentRevisionNumber,
+          ),
         };
       }
       if (
@@ -1212,14 +1212,23 @@ export class FileProjectRepository
         attemptsForProject(library.processingJobs, input.projectId),
       ).attempt;
       const promotion = input.currentPromotion;
+      // The CAS pair stays folded into this decision, where this store has always kept it: a
+      // version bump between the service's read and this lock makes the result historical here,
+      // where the Drizzle store answers `conflict`. That divergence is deliberate until it is
+      // decided, so the shared predicate takes no CAS values.
       const promoteCurrent =
         promotion !== null &&
         aggregate.project.version === promotion.expectedVersion &&
         aggregate.project.currentRevisionNumber === promotion.expectedRevisionNumber &&
-        aggregate.project.currentRevisionId === attempt.initiatingRevisionId &&
-        aggregate.project.currentRevisionNumber === attempt.initiatingRevisionNumber &&
-        currentAttempt?.operationId === promotion.expectedCurrentOperationId &&
-        promotion.expectedCurrentOperationId === attempt.operationId;
+        projectProcessingResultRemainsPromotable({
+          currentRevisionId: aggregate.project.currentRevisionId,
+          currentRevisionNumber: aggregate.project.currentRevisionNumber,
+          attemptInitiatingRevisionId: attempt.initiatingRevisionId,
+          attemptInitiatingRevisionNumber: attempt.initiatingRevisionNumber,
+          attemptOperationId: attempt.operationId,
+          currentAttemptOperationId: currentAttempt?.operationId,
+          expectedCurrentOperationId: promotion.expectedCurrentOperationId,
+        });
 
       const existingJobOutput = aggregate.assetLinks.find(
         (link) =>
@@ -1734,12 +1743,11 @@ export class FileProjectRepository
       if (aggregate.project.currentRevisionNumber !== input.expectedRevisionNumber) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'revision',
-            projectId: input.projectId,
-            expectedRevisionNumber: input.expectedRevisionNumber,
-            actualRevisionNumber: aggregate.project.currentRevisionNumber,
-          },
+          conflict: projectConflicts.revision(
+            input.projectId,
+            input.expectedRevisionNumber,
+            aggregate.project.currentRevisionNumber,
+          ),
         };
       }
       const validSource =
@@ -1808,8 +1816,9 @@ export class FileProjectRepository
   /**
    * Whether unresolved provider work is still bound to this Project.
    *
-   * Shared by archive and source removal so the two refusals cannot drift, mirroring
-   * `DrizzleProjectRepository.#hasBlockingProcessingAttempt`.
+   * Shared by archive and source removal so the two refusals cannot drift. This store refuses on
+   * the Project row's own `processing` status as well as on the attempts; the Drizzle store does
+   * not, which is a live divergence rather than the mirror the previous comment here claimed.
    */
   #hasBlockingProcessingAttempt(library: ProjectLibrary, project: Project): boolean {
     if (project.status === 'processing') return true;
@@ -1841,12 +1850,11 @@ export class FileProjectRepository
       if (aggregate.project.currentRevisionNumber !== input.expectedRevisionNumber) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'revision',
-            projectId: input.projectId,
-            expectedRevisionNumber: input.expectedRevisionNumber,
-            actualRevisionNumber: aggregate.project.currentRevisionNumber,
-          },
+          conflict: projectConflicts.revision(
+            input.projectId,
+            input.expectedRevisionNumber,
+            aggregate.project.currentRevisionNumber,
+          ),
         };
       }
       if (this.#hasBlockingProcessingAttempt(library, aggregate.project)) {
@@ -1959,12 +1967,11 @@ export class FileProjectRepository
       if (aggregate.project.currentRevisionNumber !== input.expectedRevisionNumber) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'revision',
-            projectId: input.projectId,
-            expectedRevisionNumber: input.expectedRevisionNumber,
-            actualRevisionNumber: aggregate.project.currentRevisionNumber,
-          },
+          conflict: projectConflicts.revision(
+            input.projectId,
+            input.expectedRevisionNumber,
+            aggregate.project.currentRevisionNumber,
+          ),
         };
       }
       const validMedia =
@@ -2351,12 +2358,11 @@ export class FileProjectRepository
       ) {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'revision',
-            projectId: aggregate.project.id,
-            expectedRevisionNumber: input.projectRevision.expectedRevisionNumber,
-            actualRevisionNumber: aggregate.project.currentRevisionNumber,
-          },
+          conflict: projectConflicts.revision(
+            aggregate.project.id,
+            input.projectRevision.expectedRevisionNumber,
+            aggregate.project.currentRevisionNumber,
+          ),
         };
       }
 
@@ -2366,12 +2372,11 @@ export class FileProjectRepository
       if (savedMutation.kind === 'conflict') {
         return {
           kind: 'conflict',
-          conflict: {
-            kind: 'saved-video-version',
-            savedVideoId: savedMutation.savedVideoId,
-            expectedVersionId: savedMutation.expectedVersionId,
-            actualVersionId: savedMutation.actualVersionId,
-          },
+          conflict: projectConflicts.savedVideoVersion(
+            savedMutation.savedVideoId,
+            savedMutation.expectedVersionId,
+            savedMutation.actualVersionId,
+          ),
         };
       }
 
