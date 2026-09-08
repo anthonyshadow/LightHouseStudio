@@ -90,7 +90,12 @@ applies before publication, the same cancel semantics apply, and a browser that 
 cannot re-frame there either. Placement exports are chosen at a save step, not in this editor.
 Subtitles are pixels in the cut by then, so a placement crops them like any other pixel; the
 chooser says whether a shape keeps them, from the same region geometry the renderer laid them out
-with, once the cut's frame is known.
+with, once the cut's frame is known. Since 2026-09-07 every _extra_ placement of a set says it too,
+under its own checkbox in the save form: a set is where the harm hid, because the chosen placement
+was described in full while the others carried a bare label, so ticking a wider shape produced a
+silently uncaptioned deliverable. The sentence informs and never blocks — an uncaptioned product
+shot or a music-led cut is a deliverable somebody meant to make — so a warned placement can still
+be ticked, and the checkbox is described by the sentence rather than disabled by it.
 
 ## Validation and compatibility
 

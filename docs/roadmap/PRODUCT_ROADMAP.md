@@ -118,30 +118,62 @@ path; all off the UI thread; object-URL and memory checks per slice.
 **Security/privacy:** ledger contains counts and outcomes, never prompts or media.
 **Performance checks:** render-time budget stated per slice; 300 MB cap unchanged; no added
 full-object copies (respect STOR-4 — reuse recorded checksums where possible).
-**Acceptance criteria:** muted-autoplay-ready captioned vertical ad produced from a phone-shot
-HEVC clip, in three placements, from one save; a reload mid-upload resumes; a submitted swap
+**Acceptance criteria:** a captioned vertical ad produced from a phone-shot HEVC clip, in three
+placements, from one save, every member of the set keeping the caption regions the cut uses;
+a reload mid-upload resumes; a submitted swap
 completes and is retrievable after closing the browser — read as the Project path, where the result
 lands in the owner byte store and the workspace shows it on return; the standalone path is durable
 on the server but has no browser route back to a result, which is Phase 4 (D5, slice 2.5 Q4);
 Account answers "what did AI run this month".
+**Amended 2026-09-07** (recorded in [Phase 2 verification](../audits/PHASE_2_VERIFICATION.md)):
+the first criterion read "muted-autoplay-ready" until this date. That phrase occurred nowhere else
+in the repository — no domain rule, no contract field, no assertion, no operator-facing sentence
+said what it would mean — so nothing could ever decide it, and it was recorded as unverifiable
+rather than met. The clause replacing it is not a softer bar but a decidable one, and it is the
+harder half of what "ready to publish" meant here: `subtitlePlacementsCutByCrop`
+(`packages/domain/src/video-editing/subtitleLayout.ts`) already computes which caption regions a
+re-frame destroys, the save form now says it under every extra placement before the save, and the
+real-stack journey reads the pixels of all three delivered files back. A set whose square member
+silently lost its captions was arguable under the old wording — which never said whether "captioned"
+reached past the primary — and fails plainly under this one. What was
+given up with the phrase is a claim about the container — both MP4 writers set `fastStart: false`,
+for the reason in [recording memory policy](../RECORDING_MEMORY_POLICY.md) — which stays an open
+item rather than a met one.
 **Required tests:** domain rules for cues/gain; worker render tests; contract tests for extended
 schemas; API tests for ledger + retention; e2e: caption-and-export journey; migration
 verification prompts run.
 **Observability:** job progression tick metrics in logs; ledger is itself the cost surface.
 **Exit criteria:** vision Stage A satisfied end to end; MVP acceptance re-run recorded (DOCS-8).
-**Exit status (walked 2026-09-07 against candidate `ec060334`, recorded in
-[Phase 2 verification](../audits/PHASE_2_VERIFICATION.md)):** The implementation is accepted and
-every automated gate is green. The exit criteria are not met, and this is deliberately not written
-as a pass. Stage A is not satisfied end to end: no artifact composes the four acceptance criteria on
-one clip, and each is established only in parts. Three placements from one save is proven in a
-Chromium journey; caption burn-in renders but its assertion checks a filename; the HEVC decision is
-real code whose tests decode nothing; "muted-autoplay-ready" has no definition, rule or check
-anywhere in the repository. Upload resume is proven in two halves that are never joined. The durable
-swap is proven on the standalone path this phase's own criterion excludes. The ledger is proven
-against fakes at both boundaries, with no test tying a Project submission to a row. DOCS-8 is met:
-every runbook command was re-run against one immutable candidate and recorded as a new dated
-candidate in [MVP acceptance](../MVP_ACCEPTANCE.md), which carries a local automated GO for that
-candidate and says in its own words that it does not decide the four criteria above.
+**Exit status (walked 2026-09-07 against candidate `ec060334`; gap-closure work landed the same
+day and re-walked, both recorded in
+[Phase 2 verification](../audits/PHASE_2_VERIFICATION.md)):** The implementation is accepted. The
+exit criteria are still not met, and this is deliberately not written as a pass — but all four
+criteria moved, and two of them moved because the first walk found product defects rather than
+missing tests. Those defects are fixed.
+
+Stage A is not satisfied end to end: still no single artifact composes criterion 1 on one clip. What
+changed is that the parts now meet at higher altitudes and one join is left rather than five. Caption
+burn-in is asserted at the pixel, not at a filename. Three placements from one save is proven twice
+— the simulator journey unchanged, plus a running-stack journey that saves a captioned portrait cut
+as the 9:16/1:1/4:5 set and reads burned ink out of all three files the server measured and stored,
+which is the amended criterion's own clause. The Project source picker now converts a codec it used
+to refuse, so a phone HEVC clip can start a Project at all; real HEVC bytes reach the refusal in a
+unit test and a browser journey asks `VideoDecoder.isConfigSupported` and asserts whichever branch
+that machine takes. The join still missing is one artifact carrying an HEVC clip through to the
+captioned set, and it cannot run on a GPU-less Linux runner, which has no HEVC decoder to convert
+with. Upload resume was a defect: the client never asked the server which parts it held, so a reload
+re-sent everything. It now restores the multipart state that makes the uploader ask, and the two
+halves meet at the contract — the client sends only the missing part, the real routes list the held
+one back and serve the reassembled file — though never in one process together and never in a
+browser. The durable swap is now proven on the Project path the criterion names: a real progression
+timer lands a finished result in the owner byte store with no request served after the submission,
+and a second process serves it back. The ledger is read back for that same Project submission
+through the account's own route. Both still stop at the application boundary, with no live provider
+and no browser closed. DOCS-8 is met at candidate `ec060334`: every runbook command was re-run
+against one immutable candidate and recorded as a new dated candidate in
+[MVP acceptance](../MVP_ACCEPTANCE.md), which carries a local automated GO for that candidate and
+says in its own words that it does not decide the four criteria above. That gates run predates this
+work and its counts are not re-claimed for it.
 **Risks:** subtitle rendering fidelity across devices — bound by the existing WYSIWYG shader
 parity approach; ledger scope creep — counts only, no pricing claims.
 **Decisions before starting:** D4, D10, D11.

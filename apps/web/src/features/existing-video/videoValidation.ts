@@ -8,9 +8,24 @@ export type ValidatedExistingVideo = Readonly<{
   file: File;
   metadata: UploadedTakeMetadata;
   mimeType: 'video/mp4' | 'video/quicktime' | 'video/webm';
+  /**
+   * The source's audio muxed out on its own, for the callers that edit voice from it. Null where
+   * the source has no audio, where it could not be preserved, and where the caller asked for no
+   * sidecar at all — `metadata.hasAudio` is the fact about the file, this is only what was
+   * extracted, and `audioUnavailableReason` is stated only when an extraction was attempted.
+   */
   audioSidecar: Readonly<{ blob: Blob; mimeType: string }> | null;
   audioUnavailableReason: string | null;
 }>;
+
+/**
+ * Whether the caller needs the audio sidecar this inspection can produce.
+ *
+ * Extracting one reads every audio packet and muxes a complete standalone track into memory, which
+ * is a second pass over the file and a copy of its whole audio. Worth it for a caller that edits
+ * voice from it; pure cost for one that only forwards the bytes.
+ */
+export type ExistingVideoAudioSidecarRequest = 'extract' | 'skip';
 
 export type EditedVideoValidationExpectation = Readonly<{
   width: number;
@@ -147,6 +162,7 @@ const inspectExistingVideo = async (
   validationContext: 'source' | 'server-approved-result',
   /** False on the second pass: one conversion is the offer, and its result is a source like any. */
   convertible: boolean,
+  audioSidecarRequest: ExistingVideoAudioSidecarRequest,
 ): Promise<InspectedSource> => {
   if (!(file instanceof File) || file.size <= 0) {
     throw new Error('Choose a non-empty video file.');
@@ -208,7 +224,7 @@ const inspectExistingVideo = async (
 
     let audioSidecar: ValidatedExistingVideo['audioSidecar'] = null;
     let audioUnavailableReason: string | null = null;
-    if (audioTrack) {
+    if (audioTrack && audioSidecarRequest === 'extract') {
       try {
         audioSidecar = await extractExistingVideoAudioSidecar(
           file,
@@ -268,14 +284,25 @@ export const validateExistingVideo = async (
   includesVton: boolean,
   signal: AbortSignal,
   validationContext: 'source' | 'server-approved-result' = 'source',
-  options: { readonly onConvert?: () => void } = {},
+  options: {
+    readonly onConvert?: () => void;
+    /**
+     * Defaults to extracting, because the callers that hold a source on this device go on to edit
+     * its voice from the sidecar. A caller that reads only `file` — the Project source picker
+     * uploads the bytes and lets the server inspect them again — says `skip` and pays neither the
+     * second pass over the audio nor the copy of it, on a path whose peak memory is accounted for.
+     */
+    readonly audioSidecar?: ExistingVideoAudioSidecarRequest;
+  } = {},
 ): Promise<ValidatedExistingVideo> => {
+  const audioSidecarRequest = options.audioSidecar ?? 'extract';
   const inspected = await inspectExistingVideo(
     file,
     includesVton,
     signal,
     validationContext,
     validationContext === 'source',
+    audioSidecarRequest,
   );
   if (inspected.kind === 'validated') return inspected.value;
 
@@ -293,6 +320,7 @@ export const validateExistingVideo = async (
     signal,
     validationContext,
     false,
+    audioSidecarRequest,
   );
   if (reinspected.kind !== 'validated') {
     throw new Error('The converted video could not be validated.');

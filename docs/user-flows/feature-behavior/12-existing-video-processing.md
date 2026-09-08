@@ -163,7 +163,12 @@ source, then edit either base, save, start over, or discard.
   offer — the converted file is not converted again. Where the answer is no, the refusal says both
   things: the codec is not one this product publishes, and this browser cannot convert it either.
   Aliases and undocumented codecs are blocked with export guidance. A file the server has already
-  approved is never converted. When the active
+  approved is never converted. Since 2026-09-07 this intake is not only Studio's: a Project's own
+  source picker runs the same decision on the same terms before it uploads, so the answer a phone
+  clip gets does not depend on which surface the operator started from. It stays the single owner of
+  both the decision and the refusal text; each surface holds its own wait and says which half of it
+  is running (see
+  [Project lifecycle and immutable source](17-empty-project-lifecycle.md)). When the active
   Character Swap capability requires H.264 MP4, H.264 MOV or VP8 WebM is converted locally only
   at explicit Start. The converted Blob is revalidated, remains ephemeral, and never replaces the
   immutable source. MP4 passes through.

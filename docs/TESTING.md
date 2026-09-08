@@ -290,6 +290,16 @@ does not receive GitHub Environment secrets or contact Neon/R2. Manual/live chec
 
 ## Browser and visual scope
 
+**A long-lived development server can fail the visual matrix on its own.** Both Playwright configs
+reuse an already-listening development server outside CI, and the Vite server keeps a module graph
+that hot reloading mutates in place. After a long editing session that graph can serve styles in a
+different order than a fresh start would, which moves layout by a few pixels across every route
+without changing a word of content. This was observed on 2026-09-08: eight curated cases failed with
+identical content and a fourteen-pixel horizontal shift, on routes the change under test did not
+touch, and the same eight failed with the change stashed. A visual failure whose diff is a uniform
+shift and whose content is unchanged is therefore a reason to restart the development server and run
+again before reading it as a regression. CI is unaffected, because it starts its own server.
+
 Chromium runs every functional journey except the tagged ones — the tag projects are exclusive, not
 additive: `chromium` carries `grepInvert: /@(cross-browser|touch)/`, so tagging a journey hands it
 to another engine instead of widening it. WebKit runs the `@cross-browser` set (a focused media
@@ -297,6 +307,19 @@ smoke and the upload → edit → save journey); the touch project runs those pl
 control-timeout/recording-Stop case. A browser-specific test must be tagged in its title with
 `@cross-browser` or `@touch`; do not run every desktop journey under every engine by default, and
 when tagging one, decide knowingly which engine is giving it up.
+
+**Standing limitation: no automated run gates HEVC conversion, on any platform.** The phone-HEVC
+intake journey in `e2e/existing-video.spec.ts` branches on the browser's own answer to
+`VideoDecoder.isConfigSupported` over the fixture's decoder configuration, asserts whichever branch
+that answer selects, and prints and annotates which one ran. That is the only honest shape for it,
+because the answer is a property of the machine rather than of the product — but it means a green
+suite is not evidence that HEVC intake converts. Every CI job runs on Linux, where Chrome ships no
+software HEVC decoder, so CI is expected to take the refusal branch every time; Playwright's bundled
+Chromium carries no proprietary codecs on a workstation either, and a local run of that journey on
+macOS also refused (`hev1.1.6.L120.90 refused here`). What covers the conversion branch is the
+decision-level case in `apps/web/src/features/existing-video/videoIntakeConversion.test.ts` and
+manual validation on a browser with a platform decoder. Read the run's `hevc-intake` annotation
+before treating an intake change as gated.
 
 The current visual matrix contains 50 cases within the 50-case review budget. It retains Local live
 and recording at all five canonical viewports, plus selected entry, idle, Character, Builder,

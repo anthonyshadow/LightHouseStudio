@@ -1,7 +1,12 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectCurrentResponse } from '@studio/contracts';
-import { useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Button, ConfirmationDialog, StatusNotice } from '../../ui';
+import {
+  EXISTING_VIDEO_INTAKE_NOTICES,
+  type ExistingVideoIntakePhase,
+} from '../existing-video/videoIntakeNotices';
+import { validateExistingVideo } from '../existing-video/videoValidation';
 import { PROJECT_RECORDING_TAKE_IN_PROGRESS_NOTICE } from '../take-review/takeRefusalNotices';
 import type { ProjectRecordingLaunchRefusal } from './projectRecordingLaunch';
 import { emptyProjectStyles } from './ProjectRouteSurface.styles';
@@ -73,6 +78,89 @@ const projectSourceNotice = (
     case 'idle':
       return null;
   }
+};
+
+/*
+ * Two waits, said apart, because they are nothing alike: reading a file's format is a moment, and
+ * re-encoding a whole video on this device is minutes. Their names and sentences belong to the
+ * intake, beside the decision that picks between them and next to the Studio surface that shows the
+ * same two waits; all this surface decides is that both are progress rather than a problem.
+ */
+const projectSourceIntakeNotice = (phase: ExistingVideoIntakePhase): ProjectSourceNotice => ({
+  ...EXISTING_VIDEO_INTAKE_NOTICES[phase],
+  tone: 'neutral',
+});
+
+/**
+ * The picker's intake: this browser is asked about the file before the server is.
+ *
+ * A phone records HEVC by default, which this product cannot publish and the source route refuses
+ * outright — so a Project could not be started from the clip the operator actually has, while the
+ * Studio surface accepted the same clip by converting it. `validateExistingVideo` is that decision
+ * and stays its only owner; this hook holds the wait, says which half of it is running, and hands
+ * on the file that came back — the original where nothing was wrong with it, the converted MP4
+ * where the codec was.
+ */
+const useProjectSourceIntake = (onAccepted: (file: File) => void) => {
+  const [phase, setPhase] = useState<ExistingVideoIntakePhase | null>(null);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const controllerRef = useRef<AbortController | null>(null);
+
+  // A conversion holds the whole video in memory and answers to nothing else here, so a surface
+  // that goes away takes it with it rather than leaving it running for a component that is gone.
+  useEffect(
+    () => () => {
+      controllerRef.current?.abort('project-source-intake-unmounted');
+      controllerRef.current = null;
+    },
+    [],
+  );
+
+  const cancel = useCallback(() => {
+    controllerRef.current?.abort('project-source-intake-cancelled');
+    controllerRef.current = null;
+    setPhase(null);
+  }, []);
+
+  /** Clears a refusal that another way to a source has just superseded. */
+  const dismiss = useCallback(() => setRefusal(null), []);
+
+  const offer = useCallback(
+    async (file: File) => {
+      controllerRef.current?.abort('project-source-intake-replaced');
+      const controller = new AbortController();
+      controllerRef.current = controller;
+      setRefusal(null);
+      setPhase('checking');
+      try {
+        const validated = await validateExistingVideo(file, false, controller.signal, 'source', {
+          onConvert: () => setPhase('converting'),
+          // Only `file` is read below: the bytes go to the server, which inspects them itself and
+          // answers with the source it accepted. Muxing the audio out again here would read the
+          // whole track into memory beside the video it came from, on the path this product's
+          // recording memory budget accounts for, to throw it away on the next line.
+          audioSidecar: 'skip',
+        });
+        if (controller.signal.aborted) return;
+        setPhase(null);
+        onAccepted(validated.file);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setPhase(null);
+        // The intake's own words, unedited: they name what this product publishes and, for a file
+        // this browser cannot convert either, what to do about it. Restating them here would put a
+        // second owner on a refusal the intake already decides.
+        setRefusal(
+          error instanceof Error ? error.message : 'That video could not be used as a source.',
+        );
+      } finally {
+        if (controllerRef.current === controller) controllerRef.current = null;
+      }
+    },
+    [onAccepted],
+  );
+
+  return { phase, refusal, offer, cancel, dismiss };
 };
 
 /*
@@ -153,15 +241,45 @@ export const ProjectSourceSection = ({
   const [recordingRefusal, setRecordingRefusal] = useState<ProjectRecordingLaunchRefusal | null>(
     null,
   );
+  // Relayed rather than passed straight through, so the intake below can be reported as the work
+  // it is; the controller stays the only author of everything else in an activity.
+  const [controllerActivity, setControllerActivity] = useState<ProjectSourceActivity | null>(null);
   const controller = useProjectSourceController(
     current.project.id,
     current,
     runtime,
-    onActivityChange,
+    setControllerActivity,
     onCurrentChange,
   );
+  const { upload } = controller;
+  const acceptIntake = useCallback(
+    (file: File) => {
+      void upload(file);
+    },
+    [upload],
+  );
+  const intake = useProjectSourceIntake(acceptIntake);
   const archived = current.project.archivedAt !== null;
-  const controlsDisabled = archived || controller.busy || controller.accepted;
+  // One idea of busy for the whole section: an intake is the operator's video being made ready
+  // just as much as the upload that follows it, and offering a second file mid-conversion would
+  // discard the first one silently.
+  const busy = controller.busy || intake.phase !== null;
+  const controlsDisabled = archived || busy || controller.accepted;
+  /*
+   * What the shell is told while the intake runs. Reported idle, a conversion looks like nothing
+   * in flight, and a logout or an expiring session would throw away minutes of work without
+   * offering to keep it. `preparing` is the phase this product already shows for "your video is
+   * being made ready", and the abort is the intake's own, so discarding pending work discards this.
+   */
+  const reportedActivity = useMemo<ProjectSourceActivity | null>(() => {
+    if (controllerActivity === null || intake.phase === null) return controllerActivity;
+    return { ...controllerActivity, phase: 'preparing', busy: true, abort: intake.cancel };
+  }, [controllerActivity, intake.cancel, intake.phase]);
+
+  useEffect(() => {
+    if (reportedActivity !== null) onActivityChange?.(reportedActivity);
+  }, [onActivityChange, reportedActivity]);
+
   // Recording needs the capture graph, which only mounts on a Studio route. Where it is absent and
   // the caller offered a way to one, the control names where recording actually happens.
   const detached = runtime.kind === 'detached';
@@ -179,7 +297,17 @@ export const ProjectSourceSection = ({
     setRecordingRefusal(onStartRecording?.() ?? null);
   };
   const recordingRefusalMessage = recordingRefusalNotice(recordingRefusal, recordingActive);
-  const stateNotice = projectSourceNotice(controller.phase, controller.message);
+  /*
+   * One notice, with the intake speaking first while it has something to say: its wait is the only
+   * thing happening, and a refusal from here supersedes whatever the last attempt at the server
+   * left on screen.
+   */
+  const stateNotice: ProjectSourceNotice | null =
+    intake.phase !== null
+      ? projectSourceIntakeNotice(intake.phase)
+      : intake.refusal !== null
+        ? { title: 'Video not used', tone: 'danger', body: intake.refusal }
+        : projectSourceNotice(controller.phase, controller.message);
   // The controller's phase/message stay the single owner of the failure text; the dialog just
   // renders it where the operator is looking when a removal is refused.
   const removalFailure =
@@ -213,9 +341,13 @@ export const ProjectSourceSection = ({
             </p>
           )}
           {stateNotice ? (
+            // The tone already says whether this is a problem, and now three sources of notice
+            // share it; reading the role off the tone keeps them from disagreeing about it.
             <StatusNotice
               role={
-                controller.phase === 'error' || controller.phase === 'conflict' ? 'alert' : 'status'
+                stateNotice.tone === 'neutral' || stateNotice.tone === 'success'
+                  ? 'status'
+                  : 'alert'
               }
               tone={stateNotice.tone}
               title={stateNotice.title}
@@ -235,15 +367,19 @@ export const ProjectSourceSection = ({
             onChange={(event) => {
               const file = event.target.files?.[0];
               event.currentTarget.value = '';
-              if (file) void controller.upload(file);
+              if (file) void intake.offer(file);
             }}
           />
           {recordingCandidate?.ready && !controller.accepted ? (
             <Button
               variant="primary"
               busy={controller.busy}
-              disabled={archived || controller.busy}
-              onClick={() => void controller.acceptRecording(recordingCandidate.file)}
+              disabled={archived || busy}
+              onClick={() => {
+                // A take supersedes a file the intake refused, and the refusal goes with it.
+                intake.dismiss();
+                void controller.acceptRecording(recordingCandidate.file);
+              }}
             >
               Use finalized recording
             </Button>
@@ -272,7 +408,7 @@ export const ProjectSourceSection = ({
               ref={removeTriggerRef}
               variant="danger"
               data-source-action="remove"
-              disabled={archived || controller.busy}
+              disabled={archived || busy}
               onClick={() => setRemoveDialogOpen(true)}
             >
               Remove original video
@@ -331,6 +467,8 @@ export const ProjectSourceSection = ({
         onClose={() => setPickerOpen(false)}
         onSelect={(video) => {
           setPickerOpen(false);
+          // A library video supersedes a file the intake refused, and the refusal goes with it.
+          intake.dismiss();
           void controller.reuseSavedVideo(video);
         }}
       />
