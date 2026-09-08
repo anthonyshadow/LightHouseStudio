@@ -110,7 +110,11 @@ export const BUILD_CLOSURE_BUDGETS = {
   // 1_089_350. Three things land in this closure: the launch hook's confirmation and its mirrored
   // guard refs, the shared take-discard question, and a fifth control on the review surface whose
   // row now wraps rather than shrinking its children below their labels.
-  'src/studio/StudioApp.tsx': 1_090_000,
+  // Then 1_089_350 → 1_090_167 on the slice's review pass, which is the honesty costing bytes: a
+  // refusal notice on the Project Record button and another on the recording action, each with the
+  // copy that says what to do next, plus the answers the launch and the retake now give so a caller
+  // can render them.
+  'src/studio/StudioApp.tsx': 1_091_000,
 };
 
 /**

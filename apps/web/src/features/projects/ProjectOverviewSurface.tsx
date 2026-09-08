@@ -245,8 +245,13 @@ export const ProjectOverviewSurface = ({
             recordingCandidate={recordingCandidate}
             recordingActive={recordingActive}
             // Navigating is honest and keeps the control live; the alternative was a permanently
-            // greyed button. The section names the destination from its own runtime.
-            onStartRecording={() => void navigate(projectWorkspacePath(project.id, 'source'))}
+            // greyed button. The section names the destination from its own runtime. It answers
+            // nothing because it starts nothing: the launch, and anything that could refuse it,
+            // belong to the workspace this opens.
+            onStartRecording={() => {
+              void navigate(projectWorkspacePath(project.id, 'source'));
+              return null;
+            }}
             {...(onSourceActivityChange ? { onActivityChange: onSourceActivityChange } : {})}
             onCurrentChange={acceptOverviewSource}
           />

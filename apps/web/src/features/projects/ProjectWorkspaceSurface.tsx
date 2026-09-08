@@ -6,6 +6,7 @@ import { projectPath, projectWorkspacePath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
 import { AppIcon, Button, StatusNotice } from '../../ui';
 import { ProjectCreateTaskPanel, type ProjectCreateRuntime } from './ProjectCreateTaskPanel';
+import type { ProjectRecordingLaunchRefusal } from './projectRecordingLaunch';
 import { ProjectRunOverlay, projectRunInFlight } from './ProjectRunOverlay';
 import { projectProcessingBlockedReason } from './projectProcessingPresentation';
 import { ProjectHistorySection } from './ProjectHistorySection';
@@ -130,7 +131,9 @@ interface ProjectWorkspaceSurfaceProps {
   readonly sourceRuntime: ProjectSourceRuntime;
   readonly recordingCandidate?: ProjectRecordingCandidate | null | undefined;
   readonly recordingActive?: boolean | undefined;
-  readonly onStartRecording?: (() => void) | undefined;
+  readonly recordingSupported?: boolean | undefined;
+  /** Answers a refusal, or nothing, so the section holding the button can speak for a dead press. */
+  readonly onStartRecording?: (() => ProjectRecordingLaunchRefusal | null) | undefined;
   readonly createRuntime?: ProjectCreateRuntime | undefined;
   readonly processing?: ProjectProcessingController | undefined;
   readonly ownerUserId?: string | undefined;
@@ -144,6 +147,7 @@ export const ProjectWorkspaceSurface = ({
   sourceRuntime,
   recordingCandidate,
   recordingActive,
+  recordingSupported,
   onStartRecording,
   createRuntime,
   processing,
@@ -316,6 +320,7 @@ export const ProjectWorkspaceSurface = ({
               runtime={sourceRuntime}
               recordingCandidate={recordingCandidate}
               recordingActive={recordingActive}
+              recordingSupported={recordingSupported}
               removalBlockedReason={sourceRemovalBlockedReason}
               onStartRecording={onStartRecording}
               onActivityChange={handleSourceActivity}

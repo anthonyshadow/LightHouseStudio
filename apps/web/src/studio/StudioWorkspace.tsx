@@ -15,6 +15,7 @@ import { MediaStage, type MediaStageProps, type StagePresentation } from '../fea
 import type { StudioMode } from '../features/media-session';
 import type { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import type { ProjectCreateRuntime } from '../features/projects/ProjectRouteSurface';
+import type { ProjectRecordingLaunchRefusal } from '../features/projects/projectRecordingLaunch';
 import type { ProjectProcessingController } from '../features/projects/useProjectProcessingController';
 import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 import type { useStudioSession } from '../orchestration/session';
@@ -57,6 +58,12 @@ interface StudioWorkspaceProps {
   };
   readonly environment: {
     readonly browser: BrowserCapabilities;
+    /**
+     * Whether this browser can capture at all, taken from the launch that owns the rule rather than
+     * recomputed from `browser` here — two readings of "can this record" is how a control comes to
+     * offer a press the launch behind it will refuse.
+     */
+    readonly captureSupported: boolean;
     /** Undefined until capabilities resolve; the stage then describes storage conservatively. */
     readonly mediaPersistence: MediaPersistence | undefined;
     readonly desktopLayout: boolean;
@@ -102,7 +109,11 @@ interface StudioWorkspaceProps {
     readonly openExistingVideo: () => void;
     readonly openCaptureSettings: () => void;
     readonly toggleCaptureSettings: () => void;
-    readonly startProjectRecording: () => void;
+    /**
+     * Starts a capture for the open Project's source slot. Answers a refusal or nothing — the
+     * launch has no notice slot of its own, and the surface holding the button does.
+     */
+    readonly startProjectRecording: () => ProjectRecordingLaunchRefusal | null;
   };
 }
 
@@ -126,6 +137,7 @@ export const StudioWorkspace = ({
   const { session, takeReview, videoEditor, savedVideo, project, projectProcessing } = controllers;
   const {
     browser,
+    captureSupported,
     mediaPersistence,
     desktopLayout: desktopStudioLayout,
     captureSettingsExpanded,
@@ -337,6 +349,7 @@ export const StudioWorkspace = ({
             recordingActive={
               recordingActive || finalizingStartedAt !== null || finalizingStream !== null
             }
+            recordingSupported={captureSupported}
             onStartRecording={onStartProjectRecording}
             onSourceActivityChange={project.handleSourceActivity}
             onWorkingMediaActivityChange={project.handleWorkingMediaActivity}

@@ -704,8 +704,13 @@ test('Record another take clears the reviewed take and reacquires the camera for
 
   const browser = await readBrowserState(page);
   expect(browser.cameraCalls).toBe(2);
-  expect(browser.recorderStarts).toBe(4);
-  expect(browser.recorderStops).toBe(4);
+  // Recorders are counted against the first take rather than as a literal: how many one take
+  // spends (a video recorder and its audio sidecar today) belongs to the capture layer, and a
+  // journey about the retake loop should not fail over it. What it asserts is that the second take
+  // ran the same recording work over again, and that nothing either take started is still running.
+  expect(reviewing.recorderStarts).toBeGreaterThan(0);
+  expect(browser.recorderStarts).toBe(reviewing.recorderStarts * 2);
+  expect(browser.recorderStops).toBe(browser.recorderStarts);
   expectNoExternalProviderTraffic(network);
 });
 
