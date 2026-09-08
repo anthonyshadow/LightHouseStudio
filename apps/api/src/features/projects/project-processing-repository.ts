@@ -203,6 +203,43 @@ export const retainedProjectProcessingResultMatches = (
   attempt.outputAssetId === manifest.assetId &&
   JSON.stringify(attempt.result) === JSON.stringify(inspected);
 
+/**
+ * Whether the operation that produced this retained result is still the current one, so the result
+ * may be promoted to current working media rather than recorded as historical.
+ *
+ * The four-value comparison both Project stores make under their own lock: the Project still sits
+ * on the revision this attempt initiated from, and the attempt that revision holds is both
+ * `expectedCurrentOperationId` and this attempt. Today the only producer sets
+ * `expectedCurrentOperationId` to the retained attempt's own id, so the last clause is a tautology
+ * and the third carries the whole operation test. The two are kept separate because both stores
+ * compare them separately today; collapsing them would be a behaviour decision, not a refactor.
+ *
+ * Deliberately excludes CAS. `expectedVersion` and `expectedRevisionNumber` are a separate
+ * optimistic-concurrency test, and the two stores apply it in different places to different effect:
+ * the file store folds it into this decision, so a version bump makes the result a terminal
+ * `retained-historical` that can never be promoted afterwards; the Drizzle store checks it after
+ * this and answers `conflict`, which the service surfaces as a 409 that a later progression tick
+ * can re-drive. Passing either value here would change one store's answer, and converging them is
+ * a product decision that has not been taken.
+ *
+ * This is the under-lock half of a two-phase check. The other half is `promoteProjectJobResult` in
+ * `@studio/domain`, which decides whether to BUILD a promotion from values read outside the lock.
+ * Do not merge them.
+ */
+export const projectProcessingResultRemainsPromotable = (input: {
+  readonly currentRevisionId: string | null;
+  readonly currentRevisionNumber: number;
+  readonly attemptInitiatingRevisionId: string;
+  readonly attemptInitiatingRevisionNumber: number;
+  readonly attemptOperationId: string;
+  readonly currentAttemptOperationId: string | null | undefined;
+  readonly expectedCurrentOperationId: string;
+}): boolean =>
+  input.currentRevisionId === input.attemptInitiatingRevisionId &&
+  input.currentRevisionNumber === input.attemptInitiatingRevisionNumber &&
+  input.currentAttemptOperationId === input.expectedCurrentOperationId &&
+  input.expectedCurrentOperationId === input.attemptOperationId;
+
 export const resumableProjectProcessingAttempt = (
   attempt: ProjectProcessingAttemptRecord,
   now: string,

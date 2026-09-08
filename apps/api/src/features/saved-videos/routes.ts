@@ -26,21 +26,18 @@ import type {
 import { isSpooledUpload } from '../../application/spooled-upload.js';
 import { ownerUserIdForRequest } from '../../http/authentication.js';
 import { AppError } from '../../http/app-error.js';
-import { requestHeader } from '../../http/request-helpers.js';
+import { parseUploadMetadata, requestHeader } from '../../http/request-helpers.js';
 import type { SavedVideoService } from './saved-video-service.js';
 import type { DirectSavedVideoUploadService } from './direct-upload-service.js';
 import { sendRangedAsset } from './byte-range.js';
 
-const uploadMetadata = (request: HttpRequest) => {
-  const encoded = requestHeader(request, 'x-lightframe-video-metadata');
-  try {
-    return savedVideoUploadMetadataSchema.parse(
-      JSON.parse(decodeURIComponent(encoded ?? '')) as unknown,
-    );
-  } catch {
-    throw new AppError(400, 'validation_error', 'Provide valid saved-video metadata.');
-  }
-};
+const uploadMetadata = (request: HttpRequest) =>
+  parseUploadMetadata(
+    request,
+    'x-lightframe-video-metadata',
+    savedVideoUploadMetadataSchema,
+    'Provide valid saved-video metadata.',
+  );
 
 const idempotencyKey = (request: HttpRequest): string => {
   const parsed = savedVideoIdempotencyKeySchema.safeParse(

@@ -8,6 +8,25 @@ export const requestHeader = (request: HttpRequest, name: string): string | unde
 };
 
 /**
+ * Reads the URI-encoded JSON metadata that rides beside a raw byte body, in the one shape every
+ * upload route uses. The caller supplies the header name, the schema and the refusal message, so a
+ * change to the encoding is made once rather than per feature.
+ */
+export const parseUploadMetadata = <Output>(
+  request: HttpRequest,
+  headerName: string,
+  schema: { readonly parse: (value: unknown) => Output },
+  message: string,
+): Output => {
+  const encoded = requestHeader(request, headerName);
+  try {
+    return schema.parse(JSON.parse(decodeURIComponent(encoded ?? '')) as unknown);
+  } catch {
+    throw new AppError(400, 'validation_error', message);
+  }
+};
+
+/**
  * Route registration is conditional on `DATABASE_MODE`, so a registered route can still be
  * backed by an unconfigured service. `503 feature_unavailable` is the legitimate answer.
  */

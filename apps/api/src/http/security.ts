@@ -10,37 +10,7 @@ import {
 } from '@studio/contracts';
 import type { ApplicationRuntime, HttpRequest } from '../application/application-runtime.js';
 import { AppError } from './errors.js';
-
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
-
-const isLoopbackHostname = (hostname: string): boolean =>
-  LOOPBACK_HOSTS.has(hostname.toLowerCase());
-
-const parseHostHeader = (header: string): URL | undefined => {
-  if (
-    header.includes(',') ||
-    header.includes('/') ||
-    header.includes('\\') ||
-    header.includes('@') ||
-    header.includes('?') ||
-    header.includes('#')
-  )
-    return undefined;
-  try {
-    const parsed = new URL(`http://${header}`);
-    if (
-      parsed.username !== '' ||
-      parsed.password !== '' ||
-      parsed.pathname !== '/' ||
-      parsed.search !== '' ||
-      parsed.hash !== ''
-    )
-      return undefined;
-    return parsed;
-  } catch {
-    return undefined;
-  }
-};
+import { isLoopbackHostname, parseHostHeader } from './loopback-host.js';
 
 export const canonicalLoopbackOrigin = (value: string): string | undefined => {
   try {

@@ -283,6 +283,46 @@ export const useProjectProcessingController = ({
     [],
   );
 
+  /**
+   * The rule that decides whether a paid provider operation was accepted, replayed, or must be
+   * locked as unverified. `start` and `retry` differ only in the request they issue, so this is
+   * written once: AGENTS.md forbids silent resubmission, and a hardening applied to one copy and
+   * not the other is exactly the failure that rule exists to prevent.
+   */
+  const settleCommand = useCallback(
+    async (
+      operationId: string,
+      run: () => Promise<ProjectProcessingMutationResponse>,
+      controller: AbortController,
+      activeProjectId: string,
+    ): Promise<boolean> => {
+      try {
+        const response = await recoverExactOperation(operationId, run, controller.signal);
+        if (projectIdRef.current !== activeProjectId) return false;
+        await applyMutation(response, controller.signal, activeProjectId);
+        if (!attemptNeedsProjectRefresh(response.attempt)) {
+          await synchronizeProject(activeProjectId, controller.signal).catch(() => undefined);
+        }
+        return true;
+      } catch (error) {
+        if (controller.signal.aborted || projectIdRef.current !== activeProjectId) return false;
+        if (!operationStatusIsUnverified(error)) {
+          patchState({ phase: 'error', message: commandErrorMessage(error) });
+        } else {
+          patchState({
+            phase: 'error',
+            message: commandErrorMessage(error),
+            unverifiedOperationId: operationId,
+          });
+        }
+        return false;
+      } finally {
+        if (commandControllerRef.current === controller) commandControllerRef.current = null;
+      }
+    },
+    [applyMutation, patchState, recoverExactOperation, synchronizeProject],
+  );
+
   const start = useCallback(
     async (capability: Exclude<ProjectProcessingCapability, 'voice'>): Promise<boolean> => {
       const activeProjectId = projectIdRef.current;
@@ -336,34 +376,14 @@ export const useProjectProcessingController = ({
             capability,
             signal: controller.signal,
           });
-        try {
-          const response = await recoverExactOperation(operationId, run, controller.signal);
-          if (projectIdRef.current !== activeProjectId) return false;
-          await applyMutation(response, controller.signal, activeProjectId);
-          if (!attemptNeedsProjectRefresh(response.attempt)) {
-            await synchronizeProject(activeProjectId, controller.signal).catch(() => undefined);
-          }
-          return true;
-        } catch (error) {
-          if (controller.signal.aborted || projectIdRef.current !== activeProjectId) return false;
-          if (!operationStatusIsUnverified(error)) {
-            patchState({ phase: 'error', message: commandErrorMessage(error) });
-          } else {
-            patchState({
-              phase: 'error',
-              message: commandErrorMessage(error),
-              unverifiedOperationId: operationId,
-            });
-          }
-          return false;
-        } finally {
-          if (commandControllerRef.current === controller) commandControllerRef.current = null;
-        }
+        // Awaited, not returned: the enclosing `finally` releases the command slot, and a bare
+        // `return` of a promise runs it before the submission settles.
+        return await settleCommand(operationId, run, controller, activeProjectId);
       } finally {
         if (commandActiveRef.current === commandToken) commandActiveRef.current = null;
       }
     },
-    [applyMutation, patchState, recoverExactOperation, startOperation, synchronizeProject],
+    [patchState, settleCommand, startOperation],
   );
 
   const retry = useCallback(async (): Promise<boolean> => {
@@ -414,33 +434,13 @@ export const useProjectProcessingController = ({
           acknowledgePossibleDuplicateCost: previous.ambiguous,
           signal: controller.signal,
         });
-      try {
-        const response = await recoverExactOperation(operationId, run, controller.signal);
-        if (projectIdRef.current !== activeProjectId) return false;
-        await applyMutation(response, controller.signal, activeProjectId);
-        if (!attemptNeedsProjectRefresh(response.attempt)) {
-          await synchronizeProject(activeProjectId, controller.signal).catch(() => undefined);
-        }
-        return true;
-      } catch (error) {
-        if (controller.signal.aborted || projectIdRef.current !== activeProjectId) return false;
-        if (!operationStatusIsUnverified(error)) {
-          patchState({ phase: 'error', message: commandErrorMessage(error) });
-        } else {
-          patchState({
-            phase: 'error',
-            message: commandErrorMessage(error),
-            unverifiedOperationId: operationId,
-          });
-        }
-        return false;
-      } finally {
-        if (commandControllerRef.current === controller) commandControllerRef.current = null;
-      }
+      // Awaited, not returned: the enclosing `finally` releases the command slot, and a bare
+      // `return` of a promise runs it before the submission settles.
+      return await settleCommand(operationId, run, controller, activeProjectId);
     } finally {
       if (commandActiveRef.current === commandToken) commandActiveRef.current = null;
     }
-  }, [applyMutation, patchState, recoverExactOperation, retryOperation, synchronizeProject]);
+  }, [patchState, retryOperation, settleCommand]);
 
   const cancel = useCallback(async (): Promise<boolean> => {
     const activeProjectId = projectIdRef.current;
