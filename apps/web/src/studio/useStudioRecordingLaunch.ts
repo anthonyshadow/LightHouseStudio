@@ -5,6 +5,7 @@ import type { BrowserCapabilities } from '../application/types';
 import { ownedRecordingArtifact } from '../features/recording/types';
 import type { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import type { ProjectCreateOperationId } from '../features/projects/ProjectRouteSurface';
+import type { ProjectRecordingLaunchRefusal } from '../features/projects/projectRecordingLaunch';
 import type { ProjectSourceActivity } from '../features/projects/useProjectSourceController';
 import { takeDiscardQuestion } from '../features/take-review/takeDiscardQuestion';
 import type { useStudioSession } from '../orchestration/session';
@@ -41,7 +42,10 @@ const launchableProjectId = ({
   activeProjectId !== null &&
   !projectSourceActivity?.accepted &&
   !projectSourceActivity?.busy &&
-  // The exact proxy for "the discard is going to refuse", and already an option of this hook.
+  // Close to "the discard is going to refuse", but not the same fact: `discard` consults the
+  // recorder attempt and transcode refs as they stand at the call, while this is the recorder
+  // lifecycle as React last committed it. Keeping it here is still worth it — it is what turns a
+  // press made during a live take into an answer rather than into a question about discarding one.
   !recordingActive &&
   captureSupported
     ? activeProjectId
@@ -307,54 +311,105 @@ export const useStudioRecordingLaunch = ({
   }, [captureSupported, closeOverlay, focusMain, session]);
 
   /**
+   * The act itself, once it is permitted and any question has been answered.
+   *
+   * Its order is the load-bearing part: the take goes before the camera is asked for, so review
+   * never owns a take while a fresh stream is being acquired for the same stage. It answers a
+   * refusal or nothing, because the discard is the one step here that can still refuse.
+   */
+  const launchProjectCapture = useCallback(
+    (projectId: string): ProjectRecordingLaunchRefusal | null => {
+      /*
+       * Reachable, despite `recordingActive` sitting in the guard: that is the recorder lifecycle as
+       * React last committed it, while `discard` refuses on the recorder attempt and transcode refs,
+       * which are written outside a render — a capture that started in the gap between the two, or
+       * one whose start has not been committed yet, passes the guard and is refused here. So this is
+       * a real refusal to answer for, not a defensive assert: the launch stops rather than leave a
+       * take standing behind a stage that has gone back to live capture, and it says nothing was
+       * dropped, while take review keeps its own controls.
+       */
+      if (!recording.discard()) return 'take-in-progress';
+      setRecordingForExistingVideo(false);
+      closeOverlay();
+      void navigate(projectWorkspacePath(projectId));
+      focusMain();
+      void session.startLocal();
+      return null;
+    },
+    [closeOverlay, focusMain, navigate, recording, session],
+  );
+
+  /**
    * Starts a capture for a Project's source slot, dropping whatever the stage is holding.
    *
-   * Stays a `() => void` for `onClick`; the awaiting half runs in an immediately-invoked function.
-   * Its order is the load-bearing part: the take goes before the camera is asked for, so review
-   * never owns a take while a fresh stream is being acquired for the same stage.
+   * Answers a refusal or nothing, for the same reason `restartCapture` answers at all: the button
+   * belongs to a surface with a notice slot and this hook has none, so a press that starts nothing
+   * has to leave something the caller can say rather than a bare return nobody sees. Only the
+   * refusals a surface renders are named; every other way this declines is silent by construction.
    */
-  const startProjectRecording = useCallback(() => {
+  const startProjectRecording = useCallback((): ProjectRecordingLaunchRefusal | null => {
     const projectId = launchableProjectId({
       activeProjectId,
       projectSourceActivity,
       recordingActive,
       captureSupported,
     });
-    if (projectId === null) return;
-    void (async () => {
-      // Asked before any side effect, so declining leaves the overlay, the route and the take
-      // exactly as they were. Only owned bytes raise the question: a URL-backed presentation is a
-      // Project source streamed from the server, durable there, and clearing it loses nothing.
-      if (ownedRecordingArtifact(recording.presented) !== null) {
-        if (!(await confirmation.ask(takeDiscardQuestion('project-recording')))) return;
-        // The world moves under a modal the shell owns, so both facts come from the last commit
-        // rather than from the closure that asked: is this runtime still here, and is this still
-        // the Project it may launch in.
-        if (!mountedRef.current) return;
-        if (launchableProjectId(launchStateRef.current) !== projectId) return;
+    if (projectId === null) {
+      // The guard decides whether; only one of its reasons is the operator's to hear. A browser
+      // that cannot capture, no Project to record into, and a source already accepted or busy are
+      // each a control the surface withholds, where a notice would describe a press nobody could
+      // make. A take in flight is the one condition it names out loud.
+      return recordingActive ? 'take-in-progress' : null;
+    }
+    // Asked before any side effect, so declining leaves the overlay, the route and the take
+    // exactly as they were. Only owned bytes raise the question: a URL-backed presentation is a
+    // Project source streamed from the server, durable there, and clearing it loses nothing.
+    const ownedTake = ownedRecordingArtifact(recording.presented);
+    if (ownedTake === null) return launchProjectCapture(projectId);
+
+    /*
+     * Nothing hears this half, so it decides rather than answers: the press below has long since
+     * returned, and the dialog is the operator's own account of everything after it. Each exit is
+     * still a decision rather than a rejection reaching the window.
+     */
+    const confirmThenLaunch = async (): Promise<void> => {
+      let confirmed: boolean;
+      try {
+        confirmed = await confirmation.ask(takeDiscardQuestion('project-recording'));
+      } catch {
+        /*
+         * A question that ends by throwing — the shell's question owner tearing down in a way that
+         * rejects rather than resolving false — has not been answered, and this launch reads a
+         * missing answer as a no. The asymmetry is deliberate: treating it as a yes would destroy a
+         * take that exists only in this tab, spend a camera permission and move the route on nobody's
+         * decision, while treating it as a no costs one press. Nothing is left half-done either way,
+         * because the question is asked before any side effect.
+         */
+        return;
       }
-      // A defensive assert, not a diagnosed failure: `recordingActive` is in the guard and a modal
-      // held focus throughout, so a refusal here is unreachable. It is here so that a take can
-      // never be left standing behind a stage that has already gone back to live capture — the
-      // launch simply stops, and take review keeps its own controls and its own notice slot.
-      if (!recording.discard()) return;
-      setRecordingForExistingVideo(false);
-      closeOverlay();
-      void navigate(projectWorkspacePath(projectId));
-      focusMain();
-      void session.startLocal();
-    })();
+      if (!confirmed) return;
+      // The world moves under a modal the shell owns, so both facts come from the last commit
+      // rather than from the closure that asked: is this runtime still here, and is this still
+      // the Project it may launch in.
+      if (!mountedRef.current || launchableProjectId(launchStateRef.current) !== projectId) return;
+      launchProjectCapture(projectId);
+    };
+
+    /*
+     * The handler chain down to the button is a `() => void`, so the press cannot wait for the
+     * question — and the dialog is what the operator is looking at anyway. Answering nothing here
+     * is what stops the section putting a second account of the press beside it.
+     */
+    void confirmThenLaunch();
+    return null;
   }, [
     activeProjectId,
     captureSupported,
-    closeOverlay,
     confirmation,
-    focusMain,
-    navigate,
+    launchProjectCapture,
     projectSourceActivity,
     recording,
     recordingActive,
-    session,
   ]);
 
   const openPlaybackEditor = useCallback(

@@ -1174,6 +1174,9 @@ describe('StudioApp composition lifecycle', () => {
     // runtime rather than the detached default.
     expect(harness.latestProjectSurfaceProps?.sourceRuntime?.kind).toBe('stage');
     expect(typeof harness.latestProjectSurfaceProps?.onStartRecording).toBe('function');
+    // Capture support travels with the handler, so the Record control can refuse a press it knows
+    // the launch would only answer with `unsupported`.
+    expect(harness.latestProjectSurfaceProps?.recordingSupported).toBe(true);
     expect(typeof harness.latestProjectSurfaceProps?.onSourceActivityChange).toBe('function');
     expect(typeof harness.latestProjectSurfaceProps?.onSessionChange).toBe('function');
     expect(harness.latestHeaderDestination).toBe('projects');

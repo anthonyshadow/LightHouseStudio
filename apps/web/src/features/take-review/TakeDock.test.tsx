@@ -243,6 +243,37 @@ describe('TakeDock metadata', () => {
     await waitFor(() => expect(trigger).toHaveFocus());
   });
 
+  it('returns focus to the control that opened the dialog, not to the one before it', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <StudioDesignProvider>
+        <TakeDock
+          recording={recording()}
+          processing={processing}
+          elevenLabsAvailable={false}
+          view="take"
+          onRecordAnotherTake={vi.fn(() => true)}
+        />
+      </StudioDesignProvider>,
+    );
+
+    // One press through the menu, declined: it leaves the menu trigger as its return target.
+    const trigger = screen.getByRole('button', { name: 'More actions for this take' });
+    await user.click(trigger);
+    await user.click(screen.getByRole('menuitem', { name: 'Record another take' }));
+    await user.click(await screen.findByRole('button', { name: 'Stay' }));
+    await waitFor(() => expect(trigger).toHaveFocus());
+
+    // A second press, from a control the earlier one never touched. The dialog they share must
+    // answer to this press: focus belongs on Discard, not on the trigger the retake left behind.
+    const discard = screen.getByRole('button', { name: 'Discard' });
+    await user.click(discard);
+    await user.click(await screen.findByRole('button', { name: 'Stay' }));
+
+    await waitFor(() => expect(discard).toHaveFocus());
+  });
+
   it('hands a confirmed retake to one owner, which discards before the surface does anything else', async () => {
     const user = userEvent.setup();
     const discard = vi.fn(() => true);
@@ -314,6 +345,9 @@ describe('TakeDock metadata', () => {
     expect(onCloseTake).not.toHaveBeenCalled();
     // Awaited rather than queried: the notice is behind the dismissed dialog's isolation until the
     // overlay finishes leaving.
+    // The restart begins with a discard, and the only other thing that could refuse — a browser that
+    // cannot capture — is a condition this action is never offered under, so the finalization is the
+    // one cause left to name.
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This take is still finishing, so nothing was discarded. Try again in a moment.',
     );
@@ -373,6 +407,8 @@ describe('TakeDock metadata', () => {
     // as though it went.
     expect(onDiscardTake).not.toHaveBeenCalled();
     expect(onCloseTake).not.toHaveBeenCalled();
+    // This discard is the surface's own, and it refuses for exactly one reason: the same sentence
+    // the retake shows, because the retake's refusal is this same discard's.
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'This take is still finishing, so nothing was discarded. Try again in a moment.',
     );

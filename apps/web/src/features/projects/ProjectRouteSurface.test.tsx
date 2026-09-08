@@ -14,12 +14,15 @@ import { createEmptyCreativeAssetStore, type CreativeAssetStore } from '@studio/
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { delay, HttpResponse, http } from 'msw';
+import { useState } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import { chooseMenuAction } from '../../test/actionMenu';
 import { mockApiServer } from '../../test/msw/server';
+import { PROJECT_RECORDING_TAKE_IN_PROGRESS_NOTICE } from '../take-review/takeRefusalNotices';
+import type { ProjectRecordingLaunchRefusal } from './projectRecordingLaunch';
 import {
   PROJECT_VOICE_MEMBERSHIP_NOTE,
   PROJECT_VOICE_UNAVAILABLE_REASON,
@@ -289,12 +292,8 @@ const acceptedSourceResponse = (): ProjectSourceResponse => ({
   },
 });
 
-const renderProjects = (
-  path = '/projects',
-  props: ProjectRouteSurfaceProps = {},
-  previousPath?: string,
-  routeState?: unknown,
-) => {
+/** The reads a mounted Project route makes for itself, whichever surface a case is actually after. */
+const installProjectRouteHandlers = () => {
   mockApiServer.use(
     http.get('*/api/projects/:projectId/history', () =>
       HttpResponse.json({ revisions: [], nextCursor: null }),
@@ -305,6 +304,15 @@ const renderProjects = (
     ),
     http.get('*/api/projects/:projectId/assets', () => HttpResponse.json(projectAssetsResponse)),
   );
+};
+
+const renderProjects = (
+  path = '/projects',
+  props: ProjectRouteSurfaceProps = {},
+  previousPath?: string,
+  routeState?: unknown,
+) => {
+  installProjectRouteHandlers();
   const router = createMemoryRouter(
     [
       { path: '/projects/*', element: <ProjectRouteSurface {...props} /> },
@@ -1898,6 +1906,97 @@ describe('Project route surface', () => {
         expect.objectContaining({ phase: 'saved', busy: false, accepted: true }),
       ),
     );
+  });
+
+  it('speaks for a Record press that started nothing, for as long as that is true', async () => {
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(currentProject(activeId))),
+    );
+    installProjectRouteHandlers();
+    // One press per answer: the refusal a surface has a sentence for, then the silence every other
+    // launch answers with.
+    const answers: (ProjectRecordingLaunchRefusal | null)[] = ['take-in-progress', null];
+    const startRecording = vi.fn(() => answers.shift() ?? null);
+    /*
+     * `recordingActive` belongs to the Studio runtime, and the refusal is now read against it, so
+     * this case has to own it: a press can only land in a commit where the take is not visible here
+     * yet — that is the only commit where Record is still live — and the sentence belongs to the
+     * span after it, ending when the take does.
+     */
+    const WorkspaceWithATake = () => {
+      const [recordingActive, setRecordingActive] = useState(false);
+      return (
+        <>
+          <ProjectRouteSurface
+            workspaceMode
+            sourceRuntime={{ kind: 'stage', present: vi.fn(), clear: vi.fn() }}
+            recordingActive={recordingActive}
+            onStartRecording={startRecording}
+          />
+          <button type="button" onClick={() => setRecordingActive((active) => !active)}>
+            Toggle the take
+          </button>
+        </>
+      );
+    };
+    const router = createMemoryRouter([{ path: '/projects/*', element: <WorkspaceWithATake /> }], {
+      initialEntries: [`/projects/${activeId}/workspace?task=source`],
+    });
+    render(
+      <StudioDesignProvider>
+        <RemoteStateTestProvider>
+          <RouterProvider router={router} />
+        </RemoteStateTestProvider>
+      </StudioDesignProvider>,
+    );
+    const user = userEvent.setup();
+
+    const record = await screen.findByRole('button', { name: 'Record' });
+    await waitFor(() => expect(record).toBeEnabled());
+    await user.click(record);
+    const toggle = screen.getByRole('button', { name: 'Toggle the take' });
+
+    // The take the launch refused for reaches this surface a commit later, and the sentence arrives
+    // with the busy control rather than instead of it.
+    await user.click(toggle);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      PROJECT_RECORDING_TAKE_IN_PROGRESS_NOTICE,
+    );
+    expect(record).toBeDisabled();
+
+    // Finished, so "finish the current take first" has become a lie and goes on its own — no second
+    // press, and nothing left to sit beside the "Use finalized recording" that replaces Record.
+    await user.click(toggle);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+
+    // A launch answers nothing, and one write per press is what keeps this quiet.
+    await waitFor(() => expect(record).toBeEnabled());
+    await user.click(record);
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(startRecording).toHaveBeenCalledTimes(2);
+  });
+
+  it('turns Record off where the browser cannot capture, and says so before it is pressed', async () => {
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(currentProject(activeId))),
+    );
+    const startRecording = vi.fn((): ProjectRecordingLaunchRefusal | null => null);
+    renderProjects(`/projects/${activeId}/workspace?task=source`, {
+      sourceRuntime: { kind: 'stage', present: vi.fn(), clear: vi.fn() },
+      recordingSupported: false,
+      onStartRecording: startRecording,
+    });
+
+    const record = await screen.findByRole('button', { name: 'Record' });
+    expect(record).toBeDisabled();
+    // Off is not enough: the reason has to reach the control, not just the page around it.
+    expect(record).toHaveAccessibleDescription(
+      'This browser cannot record video. Upload a video or use a saved one instead.',
+    );
+    // The two it names instead are the two actually offered here.
+    expect(screen.getByRole('button', { name: 'Upload' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Use a saved video' })).toBeEnabled();
+    expect(startRecording).not.toHaveBeenCalled();
   });
 
   it('keeps an upload replaceable across conflict and safe failure states', async () => {

@@ -1,7 +1,9 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectCurrentResponse } from '@studio/contracts';
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Button, ConfirmationDialog, StatusNotice } from '../../ui';
+import { PROJECT_RECORDING_TAKE_IN_PROGRESS_NOTICE } from '../take-review/takeRefusalNotices';
+import type { ProjectRecordingLaunchRefusal } from './projectRecordingLaunch';
 import { emptyProjectStyles } from './ProjectRouteSurface.styles';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
 import {
@@ -73,11 +75,48 @@ const projectSourceNotice = (
   }
 };
 
+/*
+ * Why the Record control is off, said before it is pressed rather than after — a browser that
+ * cannot capture is not a condition the operator can wait out, so it names the two controls beside
+ * it that do work. Nothing answers this from a press: the same fact that would refuse the launch
+ * has already disabled the button.
+ */
+const RECORDING_UNSUPPORTED_NOTICE =
+  'This browser cannot record video. Upload a video or use a saved one instead.';
+
+/**
+ * What a Record press says when it started nothing, and only while that is still true.
+ *
+ * A refusal names a condition the runtime is in rather than an event that happened, so it is read
+ * against that condition on every render instead of being latched by the press: the sentence
+ * arrives with the busy Record control as the take the launch refused for lands in this surface's
+ * props, and it leaves with it. Latched, it outlived finalization and was still on screen beside
+ * the "Use finalized recording" button that replaces Record once the take is ready — telling the
+ * operator to finish a take they had just finished.
+ *
+ * A member added here has to say both halves before it can reach the screen, which is the point of
+ * the switch: a refusal with no sentence, or with no condition to hold it up, will not compile.
+ */
+const recordingRefusalNotice = (
+  refusal: ProjectRecordingLaunchRefusal | null,
+  recordingActive: boolean,
+): string | null => {
+  switch (refusal) {
+    case 'take-in-progress':
+      // The one prop that carries it: the workspace sets this for a take being captured and for one
+      // still finalizing alike, which is exactly the span this sentence is true for.
+      return recordingActive ? PROJECT_RECORDING_TAKE_IN_PROGRESS_NOTICE : null;
+    case null:
+      return null;
+  }
+};
+
 export const ProjectSourceSection = ({
   current,
   runtime,
   recordingCandidate,
   recordingActive = false,
+  recordingSupported = true,
   removalBlockedReason,
   onStartRecording,
   onActivityChange,
@@ -87,8 +126,20 @@ export const ProjectSourceSection = ({
   readonly runtime: ProjectSourceRuntime;
   readonly recordingCandidate?: ProjectRecordingCandidate | null | undefined;
   readonly recordingActive?: boolean | undefined;
+  /**
+   * Whether the browser a Record press would reach can capture at all. Defaults to true: a caller
+   * that mounts away from the capture graph cannot know, and its Record control leads to the
+   * workspace rather than to a camera, which works either way.
+   */
+  readonly recordingSupported?: boolean | undefined;
   readonly removalBlockedReason?: string | undefined;
-  readonly onStartRecording?: (() => void) | undefined;
+  /**
+   * Starts a capture for this Project's source slot. Answers a refusal, so a press that started
+   * nothing can say so; absent where recording is not offered here at all. `null` is the whole of
+   * the rest — a launch that ran, a confirmation that took the press over, and the caller whose
+   * Record control only navigates, because the launch happens on the surface it opens.
+   */
+  readonly onStartRecording?: (() => ProjectRecordingLaunchRefusal | null) | undefined;
   readonly onActivityChange?: ((activity: ProjectSourceActivity) => void) | undefined;
   readonly onCurrentChange?: ((current: ProjectCurrentResponse) => void) | undefined;
 }) => {
@@ -98,6 +149,10 @@ export const ProjectSourceSection = ({
   const removeTriggerRef = useRef<HTMLButtonElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const recordingUnsupportedId = useId();
+  const [recordingRefusal, setRecordingRefusal] = useState<ProjectRecordingLaunchRefusal | null>(
+    null,
+  );
   const controller = useProjectSourceController(
     current.project.id,
     current,
@@ -110,6 +165,20 @@ export const ProjectSourceSection = ({
   // Recording needs the capture graph, which only mounts on a Studio route. Where it is absent and
   // the caller offered a way to one, the control names where recording actually happens.
   const detached = runtime.kind === 'detached';
+  /*
+   * The one refusal this section can see coming, so the control is off with the reason attached
+   * rather than live and dead — the treatment every other Record control in the product gets, and
+   * the reason the launch never has to answer for an unsupported browser. Read only where a launch
+   * is offered: elsewhere the button is already off, and "this browser" would be the wrong reason.
+   */
+  const recordingUnsupported = onStartRecording !== undefined && !recordingSupported;
+  // One write, because the launch answers before this returns: an earlier press's refusal is
+  // replaced by this press's, whatever that is, and `null` is how a press that started something
+  // clears it.
+  const startRecording = () => {
+    setRecordingRefusal(onStartRecording?.() ?? null);
+  };
+  const recordingRefusalMessage = recordingRefusalNotice(recordingRefusal, recordingActive);
   const stateNotice = projectSourceNotice(controller.phase, controller.message);
   // The controller's phase/message stay the single owner of the failure text; the dialog just
   // renders it where the operator is looking when a removal is refused.
@@ -180,9 +249,10 @@ export const ProjectSourceSection = ({
             </Button>
           ) : (
             <Button
-              disabled={controlsDisabled || onStartRecording === undefined}
+              disabled={controlsDisabled || onStartRecording === undefined || recordingUnsupported}
               busy={recordingActive}
-              onClick={onStartRecording}
+              aria-describedby={recordingUnsupported ? recordingUnsupportedId : undefined}
+              onClick={startRecording}
             >
               {detached && onStartRecording !== undefined ? 'Record in the workspace' : 'Record'}
             </Button>
@@ -207,6 +277,14 @@ export const ProjectSourceSection = ({
             >
               Remove original video
             </Button>
+          ) : null}
+          {recordingUnsupported ? (
+            <small id={recordingUnsupportedId}>{RECORDING_UNSUPPORTED_NOTICE}</small>
+          ) : null}
+          {recordingRefusalMessage ? (
+            <StatusNotice role="alert" tone="warning">
+              {recordingRefusalMessage}
+            </StatusNotice>
           ) : null}
           {detached ? (
             <small>Choosing here opens the workspace, where you can watch it.</small>

@@ -842,6 +842,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
         controllers={{ session, takeReview, videoEditor, savedVideo, project, projectProcessing }}
         environment={{
           browser,
+          captureSupported,
           mediaPersistence: availability.mediaPersistence,
           desktopLayout: desktopStudioLayout,
           captureSettingsExpanded,
