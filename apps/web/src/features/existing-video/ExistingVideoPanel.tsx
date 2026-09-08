@@ -274,8 +274,12 @@ export const ExistingVideoPanel = ({
   const metadata = workflow.currentMetadata ?? selected.metadata;
   const currentPhase = existingVideoEditorPhase(workflow);
   const activeStep = workflow.steps[0];
-  const activeVisualCapability = activeStep
-    ? capabilityForExistingVideoStep(activeStep, visualCapabilities)
+  // Pairs the active step with its capability, so the capability is non-nullable at every read.
+  const activeVisual = activeStep
+    ? {
+        step: activeStep,
+        capability: capabilityForExistingVideoStep(activeStep, visualCapabilities),
+      }
     : null;
 
   return (
@@ -397,13 +401,13 @@ export const ExistingVideoPanel = ({
                   css={activeConfigurationStyles()}
                   tabIndex={-1}
                 >
-                  {activeStep?.modelId === 'lucy-latest' ? (
+                  {activeVisual?.step.modelId === 'lucy-latest' ? (
                     <div hidden={activeTool !== 'character'}>
                       <ExistingVideoVisualEditor
-                        step={activeStep}
+                        step={activeVisual.step}
                         savedRecipes={savedRecipes.filter(
                           (recipe) =>
-                            activeVisualCapability?.promptInput !== 'server-default' ||
+                            activeVisual.capability.promptInput !== 'server-default' ||
                             recipe.modelId !== 'lucy-latest' ||
                             recipe.referenceImageAssetId !== null,
                         )}
@@ -411,12 +415,10 @@ export const ExistingVideoPanel = ({
                         structureLocked={structureLocked}
                         recipeLocked={recipeLocked}
                         recipeLoading={recipeLoading}
-                        referenceRequired={activeVisualCapability?.referencePolicy === 'required'}
-                        promptEnhancementSupported={
-                          activeVisualCapability?.promptEnhancement ?? false
-                        }
-                        promptInput={activeVisualCapability?.promptInput ?? 'editable'}
-                        outputResolutions={activeVisualCapability?.outputResolutions ?? ['720p']}
+                        referenceRequired={activeVisual.capability.referencePolicy === 'required'}
+                        promptEnhancementSupported={activeVisual.capability.promptEnhancement}
+                        promptInput={activeVisual.capability.promptInput}
+                        outputResolutions={activeVisual.capability.outputResolutions}
                         providerOptions={visualCapabilities.characterSwap.providers ?? []}
                         onApplySavedRecipe={(step, recipeId) =>
                           void applySavedRecipe(step, recipeId)
@@ -431,20 +433,18 @@ export const ExistingVideoPanel = ({
                       />
                     </div>
                   ) : null}
-                  {activeStep?.modelId === 'lucy-vton-latest' ? (
+                  {activeVisual?.step.modelId === 'lucy-vton-latest' ? (
                     <div hidden={activeTool !== 'vton'}>
                       <ExistingVideoVisualEditor
-                        step={activeStep}
+                        step={activeVisual.step}
                         savedRecipes={savedRecipes}
                         recentOutfits={recentOutfits}
                         structureLocked={structureLocked}
                         recipeLocked={recipeLocked}
                         recipeLoading={recipeLoading}
                         referenceRequired={false}
-                        promptEnhancementSupported={
-                          visualCapabilities.virtualTryOn.promptEnhancement
-                        }
-                        promptInput={visualCapabilities.virtualTryOn.promptInput}
+                        promptEnhancementSupported={activeVisual.capability.promptEnhancement}
+                        promptInput={activeVisual.capability.promptInput}
                         onApplySavedRecipe={(step, recipeId) =>
                           void applySavedRecipe(step, recipeId)
                         }
@@ -486,11 +486,7 @@ export const ExistingVideoPanel = ({
       <ExistingVideoActionBar
         workflow={workflow}
         videoProcessingAvailable={videoProcessingAvailable}
-        {...(activeStep
-          ? {
-              activeVisualCapability: activeVisualCapability!,
-            }
-          : {})}
+        {...(activeVisual ? { activeVisualCapability: activeVisual.capability } : {})}
         onFinish={onFinish}
         {...(onSaveVideo ? { onSaveVideo } : {})}
         {...(saveVideoState ? { saveVideoState } : {})}
