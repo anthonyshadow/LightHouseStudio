@@ -4,15 +4,13 @@ import type { ExistingVideoCharacterPort, StudioRuntimePorts } from '../app/shel
 import type { useStudioHandoff } from '../app/shell/useStudioHandoff';
 import { savedCharacterStepInput } from '../features/existing-video/useExistingVideoWorkflow';
 import type { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
-import type { useProjectCreativeSessionAdapter } from '../features/projects/useProjectCreativeSessionAdapter';
-import type { useStudioSavedVideoController } from './useStudioSavedVideoController';
 
 interface UseStudioRuntimePortsOptions {
   readonly registerPorts: ReturnType<typeof useStudioHandoff>['registerPorts'];
   readonly existingVideo: ReturnType<typeof useExistingVideoWorkflow>;
   readonly applyRecipe: StudioRuntimePorts['applyRecipe'];
-  readonly savedVideo: ReturnType<typeof useStudioSavedVideoController>;
-  readonly projectCreative: ReturnType<typeof useProjectCreativeSessionAdapter>;
+  readonly useSavedVideo: StudioRuntimePorts['useSavedVideo'];
+  readonly checkpointProjectCreative: StudioRuntimePorts['checkpointProjectCreative'];
   readonly saveStudioCharacter: StudioRuntimePorts['saveStudioCharacter'];
 }
 
@@ -22,13 +20,18 @@ interface UseStudioRuntimePortsOptions {
  * Registered in a layout effect so a selection made on the route that mounted the runtime is
  * applied before first paint, and withdrawn on unmount so the shell holds a selection instead of
  * calling into a torn-down session.
+ *
+ * Takes the two methods it forwards rather than the controllers that own them, so the options
+ * name what this hook actually needs. It does not register less often: both methods depend on the
+ * existing-video workflow, and `applyRecipe` is rebuilt every render — but re-registering only
+ * writes a ref, so the frequency was never the cost.
  */
 export const useStudioRuntimePorts = ({
   registerPorts,
   existingVideo,
   applyRecipe,
-  savedVideo,
-  projectCreative,
+  useSavedVideo,
+  checkpointProjectCreative,
   saveStudioCharacter,
 }: UseStudioRuntimePortsOptions): void => {
   const selectVoice = useCallback(
@@ -65,18 +68,18 @@ export const useStudioRuntimePorts = ({
       applyRecipe,
       selectVoice,
       existingVideoCharacter,
-      useSavedVideo: (video, intent) => savedVideo.useSavedVideo(video, intent),
-      checkpointProjectCreative: () => projectCreative.checkpoint(),
+      useSavedVideo,
+      checkpointProjectCreative,
       saveStudioCharacter,
     });
     return () => registerPorts(null);
   }, [
     applyRecipe,
+    checkpointProjectCreative,
     existingVideoCharacter,
-    projectCreative,
     registerPorts,
     saveStudioCharacter,
-    savedVideo,
     selectVoice,
+    useSavedVideo,
   ]);
 };

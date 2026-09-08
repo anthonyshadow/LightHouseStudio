@@ -1,5 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { DragEvent, RefObject } from 'react';
+import { monotonicNow, useElapsedSince } from '../../orchestration/lifecycle/useElapsedSince';
 import { Button } from '../../ui';
 import {
   appliedSummaryStyles,
@@ -107,14 +108,21 @@ export const ExistingVideoResultSummary = ({
   );
 };
 
+/**
+ * Takes the operation's start stamp rather than a running count, so the one-second tick re-renders
+ * this paragraph instead of the Studio runtime root. The root still re-renders when a poll returns
+ * — every 2 to 10 seconds, on the provider backoff — but no longer once a second.
+ */
 export const ExistingVideoProcessingStatus = ({
   operation,
-  elapsedSeconds,
+  startedAtMs,
 }: {
   operation: RecordingProcessingOperation | null | undefined;
-  elapsedSeconds: number;
+  startedAtMs: number | null;
 }) => {
   const theme = useTheme();
+  const elapsedSeconds = useElapsedSince(startedAtMs, monotonicNow) / 1_000;
+
   return (
     <section css={processingStyles(theme)} aria-labelledby="existing-video-processing-heading">
       <span data-processing-mark aria-hidden="true">

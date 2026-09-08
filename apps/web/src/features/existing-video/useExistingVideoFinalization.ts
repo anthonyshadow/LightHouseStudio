@@ -76,6 +76,12 @@ export const useExistingVideoFinalization = ({
           false,
           controller.signal,
           'server-approved-result',
+          {
+            // Only `metadata` is read below. The audio composed back into the result is the
+            // original source's sidecar, so extracting the provider result's would demux and remux
+            // a whole track — up to VIDEO_RESULT_MAX_BYTES of video — to discard it.
+            audioSidecar: 'skip',
+          },
         );
       } catch (error) {
         controller.signal.throwIfAborted();

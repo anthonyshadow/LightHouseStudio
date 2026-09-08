@@ -598,6 +598,7 @@ describe('useExistingVideoWorkflow', () => {
       false,
       expect.any(AbortSignal),
       'server-approved-result',
+      { audioSidecar: 'skip' },
     );
     expect(adapters.submitVideoJob).toHaveBeenCalledOnce();
     expect(adapters.releaseVideoJob).not.toHaveBeenCalled();

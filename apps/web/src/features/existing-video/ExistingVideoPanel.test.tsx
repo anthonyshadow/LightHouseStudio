@@ -66,7 +66,7 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   pendingVoiceSelection: null,
   voiceAvailable: false,
   comparison: 'result',
-  elapsedSeconds: 0,
+  startedAtMs: null,
   operation: null,
   active: false,
   providerActive: false,

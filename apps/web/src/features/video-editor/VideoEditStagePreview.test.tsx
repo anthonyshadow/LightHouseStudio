@@ -111,7 +111,6 @@ const PreviewHarness = ({
           activeTool,
           showingBefore,
           splitComparison,
-          playheadMs: 0,
           onPlayheadChange,
           onApplySpec,
           onCropStart,

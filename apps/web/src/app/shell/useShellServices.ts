@@ -127,7 +127,10 @@ export const useShellServices = ({
   // beta is actually available it hands straight over to Studio with the chooser open, and the
   // overlay survives the navigation because the overlay controller is the shell's. When it is not,
   // `ShellMain` renders the capability card and no capture graph is fetched at all.
-  const liveAvailability = liveExperienceAvailability(provider.availability);
+  const liveAvailability = useMemo(
+    () => liveExperienceAvailability(provider.availability),
+    [provider.availability],
+  );
 
   const openVideoUpload = useMemo(() => () => openOverlay('video-upload'), [openOverlay]);
   const libraryHandoff = useStudioLibraryHandoff({

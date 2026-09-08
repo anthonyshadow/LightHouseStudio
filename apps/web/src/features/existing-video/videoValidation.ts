@@ -288,9 +288,10 @@ export const validateExistingVideo = async (
     readonly onConvert?: () => void;
     /**
      * Defaults to extracting, because the callers that hold a source on this device go on to edit
-     * its voice from the sidecar. A caller that reads only `file` — the Project source picker
-     * uploads the bytes and lets the server inspect them again — says `skip` and pays neither the
-     * second pass over the audio nor the copy of it, on a path whose peak memory is accounted for.
+     * its voice from the sidecar. A caller that never reads `audioSidecar` says `skip` and pays
+     * neither the second pass over the audio nor the copy of it, on a path whose peak memory is
+     * accounted for. Only the sidecar is skipped: `metadata`, `hasAudio` included, comes from the
+     * inspected facts either way, so reading it is not a reason to extract.
      */
     readonly audioSidecar?: ExistingVideoAudioSidecarRequest;
   } = {},

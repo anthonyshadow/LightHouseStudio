@@ -393,7 +393,7 @@ export const ExistingVideoPanel = ({
               {workflow.active ? (
                 <ExistingVideoProcessingStatus
                   operation={workflow.operation}
-                  elapsedSeconds={workflow.elapsedSeconds}
+                  startedAtMs={workflow.startedAtMs}
                 />
               ) : (
                 <div

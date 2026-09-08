@@ -45,7 +45,7 @@ export const initialExistingVideoWorkflowState: ExistingVideoWorkflowState = {
   resultHasServerApprovedVisual: false,
   voiceSelection: null,
   pendingVoiceSelection: null,
-  elapsedSeconds: 0,
+  startedAtMs: null,
 };
 
 export const existingVideoWorkflowReducer = (
@@ -56,7 +56,7 @@ export const existingVideoWorkflowReducer = (
     case 'clear-operation':
       return {
         ...state,
-        elapsedSeconds: 0,
+        startedAtMs: null,
         status: null,
         submissionOperation: null,
         pendingVisual: null,
@@ -128,5 +128,5 @@ export const createWorkflowStateSetters = (
   setResultHasServerApprovedVisual: stateSetter(dispatch, 'resultHasServerApprovedVisual'),
   setVoiceSelection: stateSetter(dispatch, 'voiceSelection'),
   setPendingVoiceSelection: stateSetter(dispatch, 'pendingVoiceSelection'),
-  setElapsedSeconds: stateSetter(dispatch, 'elapsedSeconds'),
+  setStartedAtMs: stateSetter(dispatch, 'startedAtMs'),
 });

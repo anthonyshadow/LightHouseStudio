@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export interface AwaitableQuestion<Q> {
   /** The question currently on screen, or `null` when nothing is being asked. */
@@ -54,10 +54,12 @@ export const useAwaitableQuestion = <Q>(): AwaitableQuestion<Q> => {
     };
   }, []);
 
-  return {
-    pending,
-    ask,
-    confirm: useCallback(() => settle(true), [settle]),
-    cancel: useCallback(() => settle(false), [settle]),
-  };
+  const confirm = useCallback(() => settle(true), [settle]);
+  const cancel = useCallback(() => settle(false), [settle]);
+
+  // Stable until the pending question changes. The shell builds one of these and puts it in the
+  // service bundle every authenticated surface receives, so a fresh identity per render would
+  // propagate into the outfit, character and library-handoff aggregates that list it as a
+  // dependency, and defeat their memos too.
+  return useMemo(() => ({ pending, ask, confirm, cancel }), [ask, cancel, confirm, pending]);
 };

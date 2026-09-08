@@ -148,6 +148,13 @@ export const useSessionDraftState = (): SessionDraftState => {
   const revertDraft = useCallback(() => {
     if (!applied) return;
     const mode = activeModeRef.current;
+    // React is entitled to invoke a `setDrafts` updater more than once for one call — StrictMode
+    // does it in development, and a discarded render is retried from base state. Reverting always
+    // lands on `applied`, so one call has exactly one file to preview and minting it once is
+    // sufficient; a second mint would strand a URL nothing owns and the unmount sweep below can
+    // never reach. The revoke on the next line needs no such guard: revoking twice is a no-op.
+    let mintedPreviewUrl: string | null = null;
+    const previewUrlOnce = (file: File) => (mintedPreviewUrl ??= URL.createObjectURL(file));
     setDrafts((current) => {
       const active = current[mode];
       revokeReference(active.referenceImage);
@@ -162,7 +169,7 @@ export const useSessionDraftState = (): SessionDraftState => {
               ? {
                   kind: 'ephemeral',
                   file: referenceImage.file,
-                  previewUrl: URL.createObjectURL(referenceImage.file),
+                  previewUrl: previewUrlOnce(referenceImage.file),
                 }
               : referenceImage,
         },

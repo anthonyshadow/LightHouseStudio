@@ -107,6 +107,7 @@ const harness = vi.hoisted(() => {
     // The shell awaits this before letting any surface state a library size.
     ready: vi.fn(() => Promise.resolve()),
     subscribe: vi.fn(() => () => undefined),
+    close: vi.fn(),
     createSavedPrompt: vi.fn(),
     updateSavedPrompt: vi.fn(),
     deleteSavedPrompt: vi.fn(),

@@ -48,7 +48,8 @@ export type VideoEditStagePreviewContract = Readonly<{
   activeTool: VideoEditTool;
   showingBefore: boolean;
   splitComparison: boolean;
-  playheadMs: number;
+  // No `playheadMs`: the preview reports the playhead up and never reads it back, so carrying it
+  // here would invalidate this contract at `timeupdate` rate for a value nothing consumes.
   onPlayheadChange: (playheadMs: number) => void;
   onApplySpec: (spec: VideoEditSpec) => void;
   onCropStart: () => void;

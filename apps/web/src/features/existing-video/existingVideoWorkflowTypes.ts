@@ -101,5 +101,10 @@ export interface ExistingVideoWorkflowState {
    * `voiceSelection` at that point.
    */
   pendingVoiceSelection: ExistingVideoVoiceSelection | null;
-  elapsedSeconds: number;
+  /**
+   * `performance.now()` when the current operation began, or `null` when none has. The elapsed
+   * counter is derived from this by the component that shows it, so a running job writes state
+   * once rather than once per second.
+   */
+  startedAtMs: number | null;
 }
