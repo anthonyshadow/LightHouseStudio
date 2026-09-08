@@ -132,7 +132,11 @@ HEVC and ProRes above all, which is what an iPhone records by default — is con
 in the browser when `VideoDecoder.isConfigSupported` says this browser can decode it, announced
 while it happens rather than done silently, and inspected again afterwards. Where the browser
 cannot decode it, and for container aliases and undocumented codecs, the file is refused with
-H.264 export guidance that says the browser cannot convert it either. Visual processing remains available without source audio, but Voice is disabled if a usable
+H.264 export guidance that says the browser cannot convert it either. That conversion is a physical
+target rather than an automated one: the browser journey over it asserts whichever branch the
+running browser's decoder answer selects, and no automated environment here has been observed
+answering yes, so a green suite says nothing about it. See the standing limitation in the
+[testing strategy](TESTING.md#browser-and-visual-scope). Visual processing remains available without source audio, but Voice is disabled if a usable
 immutable audio sidecar cannot be extracted. Provider results must be 1280×720 or 720×1280, retain
 the source orientation, and differ from the input duration by no more than 500 ms when Decart owns
 the operation. Pruna Character Swap uses its documented approximate 1 MP/2 MP class and accepts

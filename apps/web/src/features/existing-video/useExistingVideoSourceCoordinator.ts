@@ -5,8 +5,21 @@ import {
   type RecordingController,
 } from '../recording/types';
 import { validateExistingVideo, type ValidatedExistingVideo } from './videoValidation';
+import { EXISTING_VIDEO_INTAKE_NOTICES, type ExistingVideoIntakePhase } from './videoIntakeNotices';
 import type { ExistingVideoWorkflowStateAction } from './existingVideoWorkflowState';
 import type { ExistingVideoWorkflowPhase } from './existingVideoWorkflowTypes';
+
+/**
+ * One intake phase as this surface shows it: the shared name and sentence, spelled the way every
+ * other processing operation here is spelled. The trailing ellipsis is the recording controller's
+ * convention for work in flight, so it is added at the point of rendering rather than written into
+ * the name the Project picker also reads.
+ */
+const intakeProcessing = (phase: ExistingVideoIntakePhase) => ({
+  kind: 'source-validation' as const,
+  title: `${EXISTING_VIDEO_INTAKE_NOTICES[phase].title}…`,
+  detail: EXISTING_VIDEO_INTAKE_NOTICES[phase].body,
+});
 
 interface ExistingVideoSourceCoordinatorOptions {
   readonly recording: RecordingController;
@@ -45,22 +58,12 @@ export const useExistingVideoSourceCoordinator = ({
       controllerRef.current = controller;
       setPhase('validating');
       setMessage(null);
-      recording.beginProcessing({
-        kind: 'source-validation',
-        title: 'Checking source video…',
-        detail: 'Validating playback, duration, orientation, tracks, and codec locally.',
-      });
+      recording.beginProcessing(intakeProcessing('checking'));
       try {
         const validated = await validateExistingVideo(file, false, controller.signal, 'source', {
           // A conversion is minutes, not the moment the "Checking…" notice promises, so it says
           // what it is doing rather than leaving the operator watching an unexplained wait.
-          onConvert: () =>
-            recording.beginProcessing({
-              kind: 'source-validation',
-              title: 'Converting this video…',
-              detail:
-                'This video is in a format this app cannot publish, so it is being converted to H.264 here. Nothing is uploaded while it converts.',
-            }),
+          onConvert: () => recording.beginProcessing(intakeProcessing('converting')),
         });
         if (controller.signal.aborted) {
           if (generation === generationRef.current) recording.cancelProcessing();

@@ -37,6 +37,7 @@ import {
   ExportPlacementProgress,
   exportPlacementLabel,
   exportPlacementShortLabel,
+  exportPlacementSubtitleOutlook,
   useExportPlacementRender,
 } from '../export-placements';
 import { videoEditSupported } from '../video-editor/videoEditSupport';
@@ -669,28 +670,69 @@ export const ProjectOutputSaveSection = ({
               gap: theme.space.xs,
               fontSize: theme.fontSizes.metadata,
             },
+            '& [data-placement-extra]': { display: 'grid', gap: theme.space.xxs },
+            // Outside the label, so it describes the checkbox rather than renaming it, and
+            // indented to sit under the placement it is about rather than under the box.
+            '& [data-placement-extra-subtitles]': {
+              paddingInlineStart: theme.space.md,
+              color: theme.colors.warning,
+              fontSize: theme.fontSizes.caption,
+            },
+            // A measured loss is a warning; a cut nobody has measured yet is a caution about a
+            // risk, and reads as one rather than colouring every row before the answer arrives.
+            '& [data-placement-extra-subtitles="unmeasured"]': { color: theme.colors.textMuted },
           }}
         >
           <legend>Also save for</legend>
-          {alsoAvailable.map((aspect) => (
-            <label key={aspect}>
-              <input
-                type="checkbox"
-                checked={extras.includes(aspect)}
-                onChange={(event) => {
-                  // Read before the updater runs: by then React has released the event and
-                  // `currentTarget` is null.
-                  const { checked } = event.currentTarget;
-                  setExtras((current) =>
-                    checked
-                      ? [...current, aspect]
-                      : current.filter((candidate) => candidate !== aspect),
-                  );
-                }}
-              />
-              <span>{exportPlacementLabel(aspect)}</span>
-            </label>
-          ))}
+          {alsoAvailable.map((aspect) => {
+            /*
+             * The same rule the chooser above applies to the chosen placement, asked once per
+             * placement offered here. Captions are pixels in this cut by now, so a shape whose
+             * crop removes the regions they use delivers a silently uncaptioned video — and an
+             * extra was the one placement nothing said that about. It informs and never blocks:
+             * an uncaptioned product shot or a music-led cut is a deliverable somebody meant to
+             * make, so the row says what is true and the operator decides.
+             *
+             * A row says nothing only when there is nothing to say. Measuring the cut is a network
+             * read, and until it answers the risk is the honest thing to state; silence there was
+             * indistinguishable from a shape that keeps every caption.
+             */
+            const subtitles = exportPlacementSubtitleOutlook(
+              projectExportSpecificationForAspect(aspect),
+              currentCut,
+              subtitlePlacements,
+            );
+            const subtitleNote =
+              subtitles.kind === 'none' || subtitles.kind === 'kept' ? null : subtitles;
+            const subtitlesCutId = `project-save-extra-subtitles-${aspect.replace(':', '-')}`;
+            return (
+              <div key={aspect} data-placement-extra="">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={extras.includes(aspect)}
+                    aria-describedby={subtitleNote === null ? undefined : subtitlesCutId}
+                    onChange={(event) => {
+                      // Read before the updater runs: by then React has released the event and
+                      // `currentTarget` is null.
+                      const { checked } = event.currentTarget;
+                      setExtras((current) =>
+                        checked
+                          ? [...current, aspect]
+                          : current.filter((candidate) => candidate !== aspect),
+                      );
+                    }}
+                  />
+                  <span>{exportPlacementLabel(aspect)}</span>
+                </label>
+                {subtitleNote === null ? null : (
+                  <small id={subtitlesCutId} data-placement-extra-subtitles={subtitleNote.kind}>
+                    {subtitleNote.sentence}
+                  </small>
+                )}
+              </div>
+            );
+          })}
           <small css={{ color: theme.colors.textFaint, fontSize: theme.fontSizes.caption }}>
             Each is made from this cut, one after another, and saved as its own Version. They are
             not remembered if you leave before saving.

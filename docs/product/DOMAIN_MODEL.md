@@ -119,13 +119,24 @@ _Status: not implemented (single-clip editing only)._
 
 ### Subtitle track / subtitle cue
 
-Timed text over the composition: each cue has text, a start and end time, and a placement region
-(top, middle or bottom). Subtitles are burned into the pixels wherever the edit is rendered (D4,
-decided 2026-09-02); a sidecar track is a later option if accessibility or localization demand it.
+Timed text over the composition: each cue has text, a start and end time, and a **caption region**
+(top, middle or bottom) — the band of the frame it is drawn in. Subtitles are burned into the
+pixels wherever the edit is rendered (D4, decided 2026-09-02); a sidecar track is a later option if
+accessibility or localization demand it.
 _Status: implemented for the single clip. `SubtitleCue` is a field of `VideoEditSpec`
 (`subtitles`), persisted inside the revision's `localEdit`, rasterized and composited by the
 editor's shared renderer in the preview and the export worker. Cues may overlap and stack. A
 composition-level track that applies across clips remains target work (D3)._
+
+Because the text is pixels by the time a shape is chosen, a re-frame treats it like any other
+pixel: a crop that does not contain a region's band removes the captions drawn there. Which regions
+a given shape would cut is decided once, by `subtitlePlacementsCutByCrop` in
+`packages/domain/src/video-editing/subtitleLayout.ts`, from the same geometry the renderer uses.
+The rule informs and never blocks — an uncaptioned product shot is a deliverable somebody meant to
+make — so the placement chooser and the save form each say it in words before the bytes exist, for
+the chosen placement and for every extra placement of a set.
+_Status (2026-09-07): the per-extra sentence is the newer half; before it, an operator who
+captioned a phone cut and ticked a wider shape got a silently uncaptioned member._
 
 _Status, audio (slice 2.2, 2026-09-04): the clip's own level is a field of `VideoEditSpec`
 (`audio`: a 0–100% level and a mute), persisted inside the revision's `localEdit`, applied to every
@@ -194,6 +205,7 @@ _Status: implemented._
 | **Take**                                | A just-recorded, in-memory camera capture under review; it becomes durable only by saving (to a Library or a Project).                                                                                                                                                                                                                                                                                                                                                                                 |
 | **Retake**                              | Leaving take review for a fresh take: the take on the stage is discarded — confirmed while it is unsaved, under **Discard and record** — and the camera is re-acquired record-ready. Named **Record another take**, or **Record again** where a control bar needs the short label. Offered only over a take this browser tab owns: not inside a Project, where **Record** owns the stage, and not over a Project source streamed from the server.                                                      |
 | **Placement**                           | The destination shape a video is produced for. A placement is not delivery; nothing is sent anywhere.                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **Caption region**                      | The band of the frame a subtitle cue is drawn in — top, middle or bottom. Named apart from **Placement** on purpose: a placement is a shape the whole video is produced for, a caption region is a band inside one frame, and the interesting relation between them is that a placement's crop can remove a region. The code calls the field `placement` on a `SubtitleCue`; say "caption region" in prose and in the interface.                                                                       |
 | **Library**                             | An account-level collection surface: Videos, Characters, Outfits, Voices.                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | **Variant set**                         | The placements one save produced together — sibling Versions of one Saved Video sharing a `variantSetId`. Shown as "Saved together"; never called a variant in the interface, where that word means a Wardrobe variant.                                                                                                                                                                                                                                                                                |
 | **Character / Wardrobe variant**        | A reusable creative identity (prompt + reference image) and its saved outfit variants.                                                                                                                                                                                                                                                                                                                                                                                                                 |

@@ -31,10 +31,12 @@ export const uploadFingerprint = (media: Blob, filename: string, scope: string):
 /**
  * The idempotency keys this browser has minted for uploads that have not finished.
  *
- * The server already replays a staged upload: staging with a key it has seen returns the same
- * upload id, and the parts it holds are listed back, so the uploader continues from where it
- * stopped. Only the key was missing across a reload — it lived in a ref — which is what made a
- * reload restart a large upload from zero.
+ * A remembered key buys one thing: staging with a key the server has seen returns the same staged
+ * upload rather than starting a second one, so the parts already delivered are still addressable.
+ * The key lived in a ref, so a reload lost it and the next attempt became a separate upload.
+ * Skipping the parts already delivered is the other half of the job, and belongs to the uploader:
+ * `savedVideosApi` restores the multipart state on the file, which is what makes Uppy list what
+ * the server holds rather than send it again.
  */
 export const uploadResumeStore = createVersionedRecordStore<readonly RememberedUploadKey[]>({
   storageBase: 'lightframe.video-upload-keys',

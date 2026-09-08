@@ -48,20 +48,32 @@ provider work.
    acceptance; Use Saved Video selects the current exact active Version. The inspector groups the
    existing lifecycle into keyboard-operable **Source**, **Create**, **Save**, and **History** tasks
    without inventing a new progression or provider action.
-7. `AuthenticatedShell` remains the sole authenticated composition root; the Studio runtime owns the one mounted media
+7. A chosen upload is put to this browser before it is put to the server, through the same intake
+   the Studio surface uses (2026-09-07). A file that needs nothing done to it is uploaded exactly as
+   it was chosen. A codec this product cannot publish — a phone's HEVC clip, which the source route
+   used to refuse outright — is converted here to H.264 MP4 when this browser says it can decode it,
+   and the converted file is what is uploaded, under its own `.mp4` name. The two waits are named
+   apart, because they are nothing alike: **Checking video** is a moment and says nothing has been
+   uploaded yet, **Converting video** says minutes and says why. Both are the section's own busy
+   state, so discarding pending work cancels the conversion, and leaving the surface abandons it
+   rather than leaving it running. A refusal is the intake's own words — the codec this product
+   publishes, and, for a file this browser cannot convert either, what to do about it — shown in
+   place and superseded by the next Record or Use Saved Video. Nothing reaches the server on a
+   refusal.
+8. `AuthenticatedShell` remains the sole authenticated composition root; the Studio runtime owns the one mounted media
    stage. Project list, overview, Dashboard, Assets, and Campaign routes hide it; only the Project
    workspace presents it beside the task inspector on desktop and above it at narrower widths. The
    stage remains a visible 16:9 frame on tablet and mobile. No route mounts another Studio, player,
    media session, object-URL owner, shell, or Project store.
-8. Active Project identity and surface are URL-owned. Refreshing an `/assets/*` route
+9. Active Project identity and surface are URL-owned. Refreshing an `/assets/*` route
    restores that global Asset view and cannot resurrect the prior Project workspace from mounted
    React state. Leaving a workspace cannot silently abandon recording, finalization, local render,
    unaccepted source, dirty creative state, or a pending semantic checkpoint.
-9. The UI distinguishes **Preparing source**, **Autosaving…**, **Autosaved**,
-   **Conflict**, and safe failure. A Project becomes resumable only after durable byte storage or
-   exact Version verification, server inspection, checksum/owner validation, and atomic source
-   revision acceptance. A failed/unaccepted staging attempt can be replaced.
-10. A Project's source is immutable _while it is attached_: a second acceptance conflicts rather
+10. The UI distinguishes **Preparing source**, **Autosaving…**, **Autosaved**,
+    **Conflict**, and safe failure. A Project becomes resumable only after durable byte storage or
+    exact Version verification, server inspection, checksum/owner validation, and atomic source
+    revision acceptance. A failed/unaccepted staging attempt can be replaced.
+11. A Project's source is immutable _while it is attached_: a second acceptance conflicts rather
     than overwriting it. **Remove original video** detaches it explicitly, returning the Project to the
     Source step as a `draft` with its creative setup — Character, Outfit, Voice, prompt, treatment,
     local edit — intact, and clearing only the derived working and presented media. Removal is
@@ -73,57 +85,57 @@ provider work.
     against a source that has since been replaced conflicts instead. Exact Saved Video Version
     reuse references existing bytes and used-by lineage; it does not claim that the Project produced
     that Version or infer a later existing-video save target.
-11. Accepted source metadata exposes only normalized media facts and a controlled Project content
+12. Accepted source metadata exposes only normalized media facts and a controlled Project content
     URL. Owner-checked range/HEAD content rehydrates a fresh Blob through the existing recording
     artifact owner after navigation, browser refresh/restart, or app restart. Blob/data URLs,
     checksums, storage paths/keys, and provider bodies remain private.
-12. Recording/finalization blocks Project switching until safe. Upload/inspection/acceptance and a
+13. Recording/finalization blocks Project switching until safe. Upload/inspection/acceptance and a
     finalized unaccepted take require explicit stay or abort/discard. Every operation remains bound
     to its initiating Project, and an old Project's late completion cannot replace the new stage.
-13. One feature-local Project session hydrates only from the Project ID in the canonical URL. It
+14. One feature-local Project session hydrates only from the Project ID in the canonical URL. It
     publishes current server authority to the source controller without owning the Blob, object
     URL, stage, recording, or render lifecycle. Leaving for a global library unmounts that session;
     refreshing the library URL cannot recover a hidden Project identity.
-14. The session exposes one typed semantic-proposal port. Proposals contain workflow phase, exact
+15. The session exposes one typed semantic-proposal port. Proposals contain workflow phase, exact
     applied creative/Voice/treatment values, explicit live metadata, and validated local edit; the
     immutable source and current media references are copied from server authority. Compatible
     proposals coalesce for 750 ms and append one revision rather than one revision per input event.
     `Unsaved changes`, **Autosaving…**, and timestamped **Autosaved · &lt;time&gt;** describe this
     server checkpoint only and remain ambient in the masthead. Only conflict and failure states
     become prominent notices.
-15. A stale Project/revision CAS or unavailable response preserves the current tab's proposal and
+16. A stale Project/revision CAS or unavailable response preserves the current tab's proposal and
     reloads server authority. If authority already contains the exact proposal, the lost response
     converges without another revision. Otherwise **Conflict** requires explicit **Reapply
     changes** or **Discard local changes**; Lightframe does not merge or overwrite automatically.
-16. Project-to-Project switches, Project-to-library exits, back/forward, and logout first flush the
+17. Project-to-Project switches, Project-to-library exits, back/forward, and logout first flush the
     Project session. Failed/conflicted saves stay on the source URL until retry or explicit discard.
     Refresh/unload receives the browser warning while a proposal is dirty or saving. No Project
     IndexedDB store is activated: a browser crash, forced unload, or confirmed reload can lose only
     the pending in-memory proposal, never a server-accepted revision or source.
-17. The existing creative rail remains available beside one source-bearing Project stage. Character
+18. The existing creative rail remains available beside one source-bearing Project stage. Character
     and Variant, Outfit, prompt configuration, one visual treatment, optional local/saved Voice, capture
     metadata, and validated local edit map through feature-local adapters into the same Project
     session. **Keep this setup** is an explicit semantic boundary; keystrokes, frames, slider
     ticks, and undo/redo entries never append revisions.
-18. Snapshot v2 records stable resource IDs plus only exact applied labels, child/reference IDs,
+19. Snapshot v2 records stable resource IDs plus only exact applied labels, child/reference IDs,
     prompt/treatment/settings, and resource revisions needed to explain the checkpoint. The V1 read
     migration maps unavailable provenance to null rather than inventing it. Reusable records and
     their bytes/lifecycles stay independently owned.
-19. Owner-scoped hydration restores only exact compatible resources. Missing, tombstoned,
+20. Owner-scoped hydration restores only exact compatible resources. Missing, tombstoned,
     wrong-owner, or changed records keep the historical applied label/explanation and show
     **Choose another** without failing the source or revealing whether another owner has that ID.
-20. **Render preview** is temporary. **Use as the current cut** accepts a validated local render or
+21. **Render preview** is temporary. **Use as the current cut** accepts a validated local render or
     exact same-owner ready Media Asset/Saved Video Version, flushes the session, verifies both CAS
     tokens and one operation-key fingerprint, and appends working/presented lineage. It never
     changes the immutable source, copies exact retained media unnecessarily, infers a save target,
     or creates Project output provenance. Exact replay retains the original adoption revision ID,
     number, media, and receipt while also reporting the current Project revision; changed replay
     conflicts.
-21. A material creative/edit/working-media checkpoint clears a stale `lastSuccessfulOutput` and
+22. A material creative/edit/working-media checkpoint clears a stale `lastSuccessfulOutput` and
     returns status to current ready/attempt truth. Completing a local render or adoption alone does
     not make the Project `completed`. Saving setup, temporary rendering, and durable working-media
     readiness use distinct status copy.
-22. Project Character Swap and Virtual Try-On now start visibly through the one pre-linked Project
+23. Project Character Swap and Virtual Try-On now start visibly through the one pre-linked Project
     processing command. Reopen reconnects durable visual-provider jobs without submission,
     unknown acceptance never auto-retries, and current/stale retained results are labeled
     separately. Configuration and local render/adoption still make no provider call. Provider-
@@ -133,7 +145,7 @@ provider work.
     releases admission without claiming provider cancellation or refund; local rendering or
     working-media adoption still blocks switching/exit until it completes or returns to a safe
     cancellable checkpoint.
-23. A ready Project review exposes one placement-labelled **Save video** action. It reveals one
+24. A ready Project review exposes one placement-labelled **Save video** action. It reveals one
     destination choice: **New video**, with an editable proposed title, or **New version of an
     existing video**, with the exact current target named inside the same choice surface. The
     choice is inline in the desktop/tablet inspector and a single focus-trapped bottom sheet below
@@ -161,23 +173,23 @@ provider work.
     produced at the settled save's **Download**, which re-frames locally to that shape and names the
     file after it, and offers the original shape alongside. A browser that cannot render explains
     that and gives the original shape; the placement stays recorded either way.
-24. One pending owner/environment/Project-scoped operation survives browser response loss. Reload
+25. One pending owner/environment/Project-scoped operation survives browser response loss. Reload
     resubmits only the exact stored request and reconciles the original result; a changed replay
     conflicts without another Version or partial aggregate advancement. Removing the Saved Video
     from the global library explains and preserves exact Project-scoped Version access while any
     active, archived, or tombstoned Project output retains it.
-25. Project history uses separate bounded cursor pages for Project changes, processing attempts and
+26. Project history uses separate bounded cursor pages for Project changes, processing attempts and
     retained stale results, and immutable output Versions. Output rows distinguish the producing
     revision from the later revision that made the Version current. Lists contain metadata only;
     preview and **Download** fetch one exact retained Version through Project-scoped content. A
     Project change that recorded a placement states it, so the operator can see what a change was
     for.
-26. **Use in Project** can explicitly adopt one exact retained output Version or valid stale
+27. **Use in Project** can explicitly adopt one exact retained output Version or valid stale
     processing result as working media after current lifecycle and CAS validation. It never changes
     the immutable original, Saved Video current pointer, or existing-video save target, and stale work is
     never promoted automatically. A removed global Saved Video remains reachable only through an
     exact same-owner retaining Project relation with truthful retention copy.
-27. **Duplicate Project** duplicates a Project from its overview or from a Projects list row. The
+28. **Duplicate Project** duplicates a Project from its overview or from a Projects list row. The
     copy starts from the same original video and the same creative setup — character, outfit, voice,
     visual treatment, live-mode metadata, creative intent, local edit and placement — all carried by
     reference, so no video is duplicated and no storage is used again. It carries no outputs, no
@@ -191,7 +203,7 @@ provider work.
     response replays to the one copy. The copy opens on the step it is ready for and is renameable,
     archivable and deletable on its own; the original is left exactly as it was. Archiving or
     deleting the original never reclaims the source the copy still references.
-28. Project overview also exposes a separate non-owning Asset collection for Videos, Characters,
+29. Project overview also exposes a separate non-owning Asset collection for Videos, Characters,
     Outfits, and Voices, stated in place as not being the Project source. Memberships are
     newest-first cursor pages and idempotent by Project/kind/resource. Membership alone does not
     create a source, working media, output, or retention claim. Archived Projects show the
@@ -201,7 +213,7 @@ provider work.
     **Use as working media** once a source exists. Either adopts the exact current Version before
     navigating to `/projects/:projectId/workspace`, and the working-media path never changes the
     immutable source.
-29. **Add Asset** can attach existing records or launch Project-aware creation. Record/Upload uses
+30. **Add Asset** can attach existing records or launch Project-aware creation. Record/Upload uses
     `/studio/create?intent=...&projectId=...`; only an explicit Save to Assets attempts attachment,
     then returns to Project detail. A successful save plus failed attachment preserves the Video
     and offers retry. Character/Outfit builders and Add Voice attach without leaving Project

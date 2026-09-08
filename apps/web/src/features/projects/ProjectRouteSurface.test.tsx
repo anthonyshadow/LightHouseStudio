@@ -16,7 +16,22 @@ import userEvent from '@testing-library/user-event';
 import { delay, HttpResponse, http } from 'msw';
 import { useState } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as VideoValidation from '../existing-video/videoValidation';
+
+/**
+ * The source picker runs a chosen file through the browser intake before the server is asked
+ * anything, and that intake reads real media with `mediabunny`. Nothing in this file is about that
+ * decision — its files are four bytes long — so the intake is stubbed here to hand back what it was
+ * given, which is what it does for a file it has nothing to say about. What it decides, and what
+ * the picker does with each answer, is `ProjectSourceSection.test.tsx`.
+ */
+const intake = vi.hoisted(() => ({ validateExistingVideo: vi.fn() }));
+vi.mock('../existing-video/videoValidation', async (importOriginal) => ({
+  ...(await importOriginal<typeof VideoValidation>()),
+  validateExistingVideo: intake.validateExistingVideo,
+}));
+
 import { StudioDesignProvider } from '../../ui';
 import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import { chooseMenuAction } from '../../test/actionMenu';
@@ -349,6 +364,34 @@ const installProjectLists = (
     }),
   );
 };
+
+/** What the stubbed intake hands back: this file's own file, found to need nothing done to it. */
+const intakeAccepts = (file: File): VideoValidation.ValidatedExistingVideo => ({
+  file,
+  metadata: {
+    kind: 'uploaded',
+    mode: 'local',
+    selectedAt: now,
+    displayName: file.name,
+    container: 'mp4',
+    videoCodec: 'avc',
+    audioCodec: null,
+    durationMs: 1_000,
+    width: 640,
+    height: 360,
+    sizeBytes: file.size,
+    hasAudio: false,
+  },
+  mimeType: 'video/mp4',
+  audioSidecar: null,
+  audioUnavailableReason: null,
+});
+
+beforeEach(() => {
+  intake.validateExistingVideo.mockImplementation((file: File) =>
+    Promise.resolve(intakeAccepts(file)),
+  );
+});
 
 afterEach(() => {
   cleanup();

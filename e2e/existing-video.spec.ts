@@ -1,9 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 import { VIDEO_PROVIDER_INTENT_VALUE } from '@studio/contracts';
 import {
+  DEFAULT_INK_THRESHOLDS,
+  readRenderedFrameInk,
+  readVideoDecoderSupport,
+  type FrameBand,
+} from './support/browserMediaProbe';
+import {
   installFakeVideoJobRoutes,
   loadDecodableH264VideoFixture,
   loadH264VideoFixture,
+  loadPhoneHevcVideoFixture,
 } from './support/existingVideoHarness';
 import {
   CREATIVE_ASSET_STORAGE_KEY,
@@ -42,6 +49,21 @@ const SEEDED_UPLOAD_RECIPES = {
   recentPrompts: [],
   savedCharacterPrompts: [],
   savedCharacterVariants: [],
+};
+
+/*
+ * Where one bottom-placed cue lands on a landscape frame, and a stretch of frame it never reaches.
+ *
+ * Derived from `SUBTITLE_LAYOUT` in `packages/domain/src/video-editing/subtitleLayout.ts` rather
+ * than imported from it, because that module states a bundle boundary its own header explains.
+ * A landscape frame keeps `landscapeInsets.bottom` (0.1) clear; the region is
+ * `SUBTITLE_CUE_MAX_LINES * fontHeightRatio * lineHeightRatio` (3 × 0.045 × 1.25 = 0.16875) deep
+ * and a one-line block sits against its inner edge, so the text occupies 0.84375 to 0.9. The band
+ * below is wider on both sides on purpose: this checks that ink arrived, not where to a pixel.
+ */
+const CAPTION_FRAME_BANDS: Readonly<{ caption: FrameBand; control: FrameBand }> = {
+  caption: { fromRatio: 0.78, toRatio: 0.95 },
+  control: { fromRatio: 0.05, toRatio: 0.3 },
 };
 
 const installCameraSentinel = async (page: Page): Promise<void> => {
@@ -542,6 +564,101 @@ test('subtitles added on the timeline are burned into a local render', async ({ 
 
   await expect(upload).toBeVisible();
   await expect(upload.getByTitle(/captioned-source-edited-/u).first()).toBeVisible();
+
+  /*
+   * A filename says a render happened. Only a pixel says what it drew, so read the replacement
+   * back and look for ink where the cue lays out — the real rasterizer, the real WebGL composite
+   * and the real H.264 encode, checked at their output rather than at their name.
+   */
+  const stageVideo = page.getByLabel('Studio media stage').locator('video');
+  await expect
+    .poll(() => stageVideo.evaluate((video) => (video as HTMLVideoElement).currentSrc))
+    .toMatch(/^blob:/u);
+  const renderedSource = await stageVideo.evaluate(
+    (video) => (video as HTMLVideoElement).currentSrc,
+  );
+  // The shared floors suit this fixture: every pixel of it decodes to rgb(52, 95, 110) — luma 87 —
+  // and the cue's box multiplies that by 0.45 to about 39, with white glyphs on it. See
+  // `./fixtures/README.md`.
+  const ink = await readRenderedFrameInk(
+    page,
+    renderedSource,
+    CAPTION_FRAME_BANDS,
+    DEFAULT_INK_THRESHOLDS,
+  );
+
+  // The whole 1280x720 output, not a scaled preview of it: the bands below are fractions of it.
+  expect(ink).toMatchObject({ width: 1_280, height: 720 });
+  // The source is one flat colour on every frame, so anywhere the cue does not reach must still
+  // be exactly that: no ink leaked out of the band, and nothing else was drawn.
+  expect(ink.control).toMatchObject({ bright: 0, dark: 0 });
+  /*
+   * Inside the band, both halves of what a cue draws: the translucent box, and glyphs on it.
+   * Floors with a wide margin, because a missing Inter changes glyph widths and therefore counts.
+   * Measured on this machine's pinned Chromium: 9,705 dark and 3,554 bright of 156,160 band
+   * pixels. This proves ink, never the string — there is no OCR here.
+   */
+  expect(ink.caption.dark).toBeGreaterThan(2_000);
+  expect(ink.caption.bright).toBeGreaterThan(300);
+
+  expect(await cameraCalls(page)).toBe(0);
+  expect(network.providerSdkRequests).toEqual([]);
+  expect(network.blockedExternalRequests).toEqual([]);
+});
+
+test('a phone HEVC clip takes whichever intake branch this browser can actually take', async ({
+  page,
+}) => {
+  // The refusal is immediate; the conversion is a full decode and re-encode. Budget for the
+  // slower of the two, because which one runs is the browser's decision, not this test's.
+  test.setTimeout(120_000);
+  await installCameraSentinel(page);
+  const network = await installProviderNetworkDriver(page);
+  await page.goto('/studio/create');
+  const fixture = await loadPhoneHevcVideoFixture();
+
+  /*
+   * Ask the page the same question the intake asks, over the file's own decoder configuration:
+   * `videoValidation.ts` refuses the codec, then offers a conversion only where
+   * `videoDecoderSupportsConfig` says this browser could decode it. Chromium ships no software
+   * HEVC decoder, so a GPU-less Linux runner refuses where a laptop with VideoToolbox converts —
+   * and a journey that hard-coded either answer would be lying on the other platform. A skipped
+   * case would be no evidence at all, so both branches assert, and the run says which one ran.
+   */
+  const decoder = await readVideoDecoderSupport(page, fixture);
+  const branch = decoder.supported ? 'converts here' : 'refused here';
+  test.info().annotations.push({ type: 'hevc-intake', description: `${decoder.codec}: ${branch}` });
+  console.log(`HEVC intake branch: ${decoder.codec} ${branch}.`);
+
+  await page.getByRole('button', { name: 'Upload Video' }).click();
+  await expect(page).toHaveURL(/\/studio\/create$/u);
+  const dialog = page.getByRole('dialog', { name: 'Use existing video' });
+  await expect(dialog).toBeVisible();
+  await dialog.locator('input[type="file"]').first().setInputFiles({
+    name: 'phone-clip.mov',
+    mimeType: 'video/quicktime',
+    buffer: fixture,
+  });
+
+  if (decoder.supported) {
+    // Converted here, once, and the panel ends holding bytes this product can publish — under the
+    // converted name, at the phone shape the clip arrived in.
+    await expect(dialog.getByRole('heading', { name: 'Current video' })).toBeVisible({
+      timeout: 90_000,
+    });
+    await expect(dialog.getByTitle('phone-clip.mp4').first()).toHaveText('phone-clip.mp4');
+    await expect(dialog).toContainText('1080 × 1920');
+    await expect(dialog).toContainText('MP4 · H.264');
+  } else {
+    // Refused, in both halves: the codec this product will not publish, and the honest admission
+    // that converting it here is not on offer either.
+    const refusal = dialog.getByRole('alert');
+    await expect(refusal).toContainText('HEVC and ProRes are not qualified.');
+    await expect(refusal).toContainText('This browser cannot convert it either');
+    await expect(dialog.getByRole('heading', { name: 'Current video' })).toHaveCount(0);
+  }
+
+  // Nothing about a codec decision reaches a camera or a provider, on either branch.
   expect(await cameraCalls(page)).toBe(0);
   expect(network.providerSdkRequests).toEqual([]);
   expect(network.blockedExternalRequests).toEqual([]);

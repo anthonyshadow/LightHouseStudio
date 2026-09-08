@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  aiUsageLedgerResponseSchema,
   projectCurrentResponseSchema,
   projectProcessingCurrentResponseSchema,
   projectProcessingHistoryResponseSchema,
@@ -125,9 +126,12 @@ describe('Project processing route authority', () => {
   const application = (
     provider: DeterministicVideoProvider,
     repository = new FileProjectRepository(directory),
+    // Only the unattended case wants a progression timer; `testConfig` pins the interval to zero so
+    // that no other suite here grows one by building an app.
+    configuration: Parameters<typeof testConfig>[0] = {},
   ) => {
     const app = createApp({
-      config: testConfig({ lightframeDataDir: directory }),
+      config: testConfig({ lightframeDataDir: directory, ...configuration }),
       decartVideoProvider: provider,
       persistence: { projects: repository, projectProcessing: repository },
     });
@@ -605,6 +609,108 @@ describe('Project processing route authority', () => {
     expect(provider.submissions).toBe(1);
     await videoJobs.close();
   });
+
+  it('lands a finished result in the owner store with nobody watching, and bills it to the ledger', async () => {
+    const provider = new DeterministicVideoProvider();
+    provider.nextStatus = 'completed';
+    const first = application(provider, new FileProjectRepository(directory), {
+      videoJobProgressionIntervalMs: 5,
+    });
+    // The claim under test is that nobody was watching, so it is recorded rather than assumed: a
+    // poll smuggled in by a helper would appear beside the four writes this test makes.
+    const served: string[] = [];
+    first.app.addHook('onRequest', (request) => {
+      served.push(`${request.method} ${request.url}`);
+    });
+    const since = new Date(Date.now() - 60_000).toISOString();
+    const { projectId } = await prepareProject(first.app);
+    const operationId = randomUUID();
+
+    expect((await submit(first.app, projectId, operationId)).statusCode).toBe(202);
+
+    const bytes = new LocalAssetByteStore(directory);
+    const attempt = await vi.waitFor(
+      async () => {
+        const admitted = await first.repository.getProjectAttempt(
+          ownerUserId,
+          projectId,
+          operationId,
+        );
+        if (admitted === null || !(await bytes.exists(ownerUserId, admitted.resultAssetId))) {
+          throw new Error('The finished result has not reached the owner byte store yet.');
+        }
+        return admitted;
+      },
+      { timeout: 20_000, interval: 10 },
+    );
+    const servedWhileUnattended = [...served];
+
+    // Retention stops at the bytes. Promoting the result to what the Project shows is the
+    // operator's decision on their next visit, and a null output asset is the invariant that says
+    // no timer made it for them.
+    expect(attempt).toMatchObject({ outputAssetId: null, resultRevisionId: null });
+    expect(await first.repository.getCurrent(ownerUserId, projectId)).toMatchObject({
+      project: { version: 4, currentRevisionNumber: 3 },
+      revision: { source: 'user-edit' },
+    });
+    expect(servedWhileUnattended).toEqual([
+      'POST /api/projects',
+      `POST /api/projects/${projectId}/source`,
+      `POST /api/projects/${projectId}/revisions`,
+      `POST /api/projects/${projectId}/processing/submit`,
+    ]);
+    // With no request served after the submission, the timer is the only thing that can have
+    // polled the provider and fetched what it produced.
+    expect(provider.statusCalls).toBeGreaterThan(0);
+
+    // Read back through the account's own route rather than the repository, because that is the
+    // only thing an operator can see. The close is not awaited by any request — the job settles it
+    // in the background — so the outcome is waited for rather than assumed present.
+    const usage = await vi.waitFor(
+      async () => {
+        const response = await first.app.inject({
+          method: 'GET',
+          url: `/api/account/ai-usage?since=${encodeURIComponent(since)}`,
+          headers: browserHeaders,
+        });
+        expect(response.statusCode).toBe(200);
+        const body = aiUsageLedgerResponseSchema.parse(response.json());
+        if (body.entries[0]?.outcome === null) throw new Error('The usage row is still open.');
+        return body;
+      },
+      { timeout: 20_000, interval: 10 },
+    );
+    expect(usage.entries).toEqual([
+      expect.objectContaining({
+        jobId: operationId,
+        operation: 'character-swap',
+        provider: 'decart',
+        outcome: 'succeeded',
+      }),
+    ]);
+    expect(usage.counts).toMatchObject({ running: 0, succeeded: 1, failed: 0 });
+
+    // The nearest honest local stand-in for closing the browser: the process that paid for this
+    // result is gone, and a later one serves it from the owner's store rather than the provider.
+    await first.app.close();
+    const restarted = application(provider, new FileProjectRepository(directory));
+    const complete = await waitForPhase(restarted.app, projectId, 'complete');
+    expect(complete.attempt).toMatchObject({
+      operationId,
+      phase: 'complete',
+      result: { state: 'current' as const, assetId: attempt.resultAssetId },
+    });
+    const content = await restarted.app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/processing/${operationId}/result/content`,
+      headers: browserHeaders,
+    });
+    expect(content.statusCode).toBe(200);
+    expect(content.rawPayload).toEqual(fixture);
+    expect(provider.submissions).toBe(1);
+    // Longer than this suite's default: a timer has to poll, download and inspect real media, and
+    // then a second application has to inspect it again on the way to promotion.
+  }, 30_000);
 
   it('enforces session ownership, provider intent, and strict processing bodies before submission', async () => {
     const provider = new DeterministicVideoProvider();

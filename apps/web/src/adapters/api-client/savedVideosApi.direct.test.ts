@@ -19,6 +19,13 @@ const api = vi.hoisted(() => {
   };
 });
 
+/**
+ * A stand-in for the uploader, exercising the plugin options this adapter hands it and nothing
+ * more: create the upload, sign one part, then complete it or abort. It models no resumption —
+ * restoring a staged identity, listing what the server holds and skipping those parts is
+ * `@uppy/aws-s3`'s own branch, and `savedVideosApi.resume.test.ts` proves it against the real
+ * plugin over marked bytes. A fake that took that branch itself would only assert its own code.
+ */
 vi.mock('@uppy/core', () => ({
   default: class FakeUppy {
     pluginOptions: Record<string, (...args: unknown[]) => unknown> = {};
@@ -28,30 +35,28 @@ vi.mock('@uppy/core', () => ({
       return this;
     }
 
-    addFile() {}
+    addFile() {
+      return 'uppy-file-id';
+    }
+
+    /** Ignored here, the way the plugin treats a file whose multipart state it has dropped. */
+    setFileState() {}
 
     async upload() {
       uppyState.uploadCalls += 1;
-      const created = (await this.pluginOptions.createMultipartUpload?.({})) as {
+      const { uploadId } = (await this.pluginOptions.createMultipartUpload?.({})) as {
         uploadId: string;
       };
-      await this.pluginOptions.signPart?.({}, { uploadId: created.uploadId, partNumber: 1 });
+      await this.pluginOptions.signPart?.({}, { uploadId, partNumber: 1 });
       if (uppyState.failTransfer) {
-        await this.pluginOptions.abortMultipartUpload?.({}, { uploadId: created.uploadId });
+        await this.pluginOptions.abortMultipartUpload?.({}, { uploadId });
         return { failed: [{ error: new Error('PUT https://signed.r2.test/private-object') }] };
       }
       await this.pluginOptions.completeMultipartUpload?.(
         {},
         {
-          uploadId: created.uploadId,
-          parts: [
-            {
-              PartNumber: 1,
-              'content-length': '0',
-              etag: '"part-1"',
-              ETag: '"part-1"',
-            },
-          ],
+          uploadId,
+          parts: [{ PartNumber: 1, 'content-length': '0', etag: '"part-1"', ETag: '"part-1"' }],
         },
       );
       return { failed: [] };
@@ -108,6 +113,8 @@ const input = {
   idempotencyKey: '9bb2885e-31d7-4487-b722-c78ef43ed230',
 };
 
+const stagedUploadId = '1a0a22d4-00f7-4c64-88fd-196c97589c8f';
+
 describe('direct saved-video API adapter', () => {
   beforeEach(() => {
     uppyState.failTransfer = false;
@@ -116,7 +123,7 @@ describe('direct saved-video API adapter', () => {
     api.requestJson.mockReset().mockImplementation((url: string) => {
       if (url === '/api/videos/uploads') {
         return Promise.resolve({
-          uploadId: '1a0a22d4-00f7-4c64-88fd-196c97589c8f',
+          uploadId: stagedUploadId,
           expiresAt: '2026-08-09T15:00:00.000Z',
           result: null,
         });
@@ -153,8 +160,8 @@ describe('direct saved-video API adapter', () => {
     });
     expect(api.requestJson.mock.calls.map((call) => String(call[0]))).toEqual([
       '/api/videos/uploads',
-      '/api/videos/uploads/1a0a22d4-00f7-4c64-88fd-196c97589c8f/parts/1',
-      '/api/videos/uploads/1a0a22d4-00f7-4c64-88fd-196c97589c8f/complete',
+      `/api/videos/uploads/${stagedUploadId}/parts/1`,
+      `/api/videos/uploads/${stagedUploadId}/complete`,
     ]);
     const completeCall = api.requestJson.mock.calls[2];
     expect(JSON.parse((completeCall?.[1] as RequestInit).body as string)).toEqual({
