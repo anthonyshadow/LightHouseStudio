@@ -129,6 +129,19 @@ schemas; API tests for ledger + retention; e2e: caption-and-export journey; migr
 verification prompts run.
 **Observability:** job progression tick metrics in logs; ledger is itself the cost surface.
 **Exit criteria:** vision Stage A satisfied end to end; MVP acceptance re-run recorded (DOCS-8).
+**Exit status (walked 2026-09-07 against candidate `ec060334`, recorded in
+[Phase 2 verification](../audits/PHASE_2_VERIFICATION.md)):** The implementation is accepted and
+every automated gate is green. The exit criteria are not met, and this is deliberately not written
+as a pass. Stage A is not satisfied end to end: no artifact composes the four acceptance criteria on
+one clip, and each is established only in parts. Three placements from one save is proven in a
+Chromium journey; caption burn-in renders but its assertion checks a filename; the HEVC decision is
+real code whose tests decode nothing; "muted-autoplay-ready" has no definition, rule or check
+anywhere in the repository. Upload resume is proven in two halves that are never joined. The durable
+swap is proven on the standalone path this phase's own criterion excludes. The ledger is proven
+against fakes at both boundaries, with no test tying a Project submission to a row. DOCS-8 is met:
+every runbook command was re-run against one immutable candidate and recorded as a new dated
+candidate in [MVP acceptance](../MVP_ACCEPTANCE.md), which carries a local automated GO for that
+candidate and says in its own words that it does not decide the four criteria above.
 **Risks:** subtitle rendering fidelity across devices — bound by the existing WYSIWYG shader
 parity approach; ledger scope creep — counts only, no pricing claims.
 **Decisions before starting:** D4, D10, D11.

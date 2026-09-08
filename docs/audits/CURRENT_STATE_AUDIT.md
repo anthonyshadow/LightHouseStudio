@@ -167,17 +167,17 @@ material flow problems are of shape, not breakage:
 
 | Capability                                                                               | State                                                                                         |
 | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Record a take (≤5 min, H.264 transcode, sidecar audio)                                   | Working; one-shot loop; no pause/retake                                                       |
-| Upload a video (MP4/MOV H.264, WebM VP8, ≤300 MB, ≤5 min)                                | Working; HEVC/ProRes rejected                                                                 |
+| Record a take (≤5 min, H.264 transcode, sidecar audio)                                   | Working; retake loop shipped 2026-09-07 (slice 2.6); no pause                                 |
+| Upload a video (MP4/MOV H.264, WebM VP8, ≤300 MB, ≤5 min)                                | Working; HEVC/ProRes converted where the browser can decode (slice 2.4)                       |
 | Manual edit: trim, crop/aspect presets, rotate/flip, lighting, filters                   | Working, single clip, WYSIWYG worker render                                                   |
-| Manual edit: split into segments, reorder, stitch, audio levels, subtitles               | **Missing everywhere**                                                                        |
+| Manual edit: split into segments, reorder, stitch, audio levels, subtitles               | Subtitles (2.1) and audio level (2.2) shipped; split, reorder and stitch **missing**          |
 | Character Swap / Virtual Try-On on existing video                                        | Working (code-path; providers unconfigured in dev); durable in Projects, ephemeral standalone |
 | Voice treatment (local FX + ElevenLabs)                                                  | Working standalone; **dead end in Projects**                                                  |
 | Live realtime AI on camera                                                               | Built, triple-gated, default off (beta)                                                       |
 | Projects: create/rename/duplicate/move/archive/restore/tombstone, autosave, CAS, history | Working, strong                                                                               |
 | Project media: exactly one immutable source + one current cut                            | Working as designed; **contradicts vision**                                                   |
 | Save output with placement, rendered to real bytes, recorded on Version                  | Working (shipped 2026-08-28)                                                                  |
-| Multi-placement variant set in one save                                                  | Missing (contract already allows an array, capped at 1)                                       |
+| Multi-placement variant set in one save                                                  | Working (shipped 2026-09-05, slice 2.3); up to four placements, saved as sibling Versions     |
 | Saved Videos: versions, search, filters, preview, rename, download, placement re-export  | Working                                                                                       |
 | Campaigns: name+brief, grouping, guarded delete                                          | Working; cards show no counts/previews                                                        |
 | Asset libraries: Characters/Outfits/Voices                                               | Working; browser-local system of record with destructive sync recovery                        |
@@ -408,7 +408,7 @@ finding under its current deployment posture.
 | 13  | Content-safety posture env-toggleable, "uncensored" default model       | prov-5                                      | P2       | 1 (decision D15)               |
 | 14  | No AI cost visibility or ledger (closed, slice 2.5; tci-5 partly)       | prov-3/prod-7/tci-5                         | P2       | 2                              |
 | 15  | One placement per save; re-export forgets placement (closed, slice 2.3) | PCD-3/prod-9/DC-14                          | P2       | 2                              |
-| 16  | Upload not resumable across reload; HEVC rejected                       | STOR-2/ev-2                                 | P2       | 2                              |
+| 16  | Upload not resumable across reload; HEVC rejected (closed, slice 2.4)   | STOR-2/ev-2                                 | P2       | 2                              |
 | 17  | Orphaned rendition/failed bytes never swept                             | STOR-1/api-4                                | P2       | 5                              |
 | 18  | Creative library browser-local with destructive sync recovery           | assets-1/assets-2/assets-11                 | P2       | 5 (D7)                         |
 | 19  | Terminology sprawl (library names, "version", editor names)             | DC-8/assets-7/ev-6                          | P2       | 1–2                            |

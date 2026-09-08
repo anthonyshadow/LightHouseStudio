@@ -9,9 +9,15 @@ because the guarantee it changes is written in the canon as an invariant. studio
 [current-state audit](../audits/CURRENT_STATE_AUDIT.md) at `:151-152`; studio-8 and studio-9 are
 **not** in that audit, and prompt 23 is their only definition anywhere in the repository (§1.7).
 Both were nonetheless confirmed directly in code, so they are real defects with no canonical
-evidence record. **No code was changed by this prompt. This is a plan for approval; nothing in it is
-implemented.** Every current-behaviour claim below cites a file and a line that was read for this
+evidence record. Every current-behaviour claim in §1 cites a file and a line that was read for this
 document.
+
+**Status: implemented 2026-09-07 by prompt 23.** §1 through §5 are preserved as written, so they
+describe the tree as it stood at `cefbcbe4`, before the change. They are a record of the argument,
+not of the current code. What landed, and what it is and is not evidence of, is in
+[§6](#6-verification-evidence-prompt-23-2026-09-07), added by implementation prompt 24 while
+walking the Phase 2 acceptance criteria
+([Phase 2 verification](../audits/PHASE_2_VERIFICATION.md)).
 
 **In one paragraph.** A take is one shot. Capture finalizes, the camera is stopped outright before
 review renders, and the only way back to a live stage is Discard, then Start camera, then Record.
@@ -1117,3 +1123,137 @@ say which posture is active. Worth asking once before step 1 rather than discove
 Everything else in §3 (the entry's id, the compact label, the description text, the notice wording,
 the position before `close`, the shape of the shared helper) is a routine call made the way the
 nearest existing code makes it, and prompt 23 proceeds on those defaults.
+
+## 6. Verification evidence (prompt 23), 2026-09-07
+
+Prompt 23 implemented this plan; this section was written by prompt 24 while walking Phase 2's
+acceptance criteria, because prompt 23 is a **(B)** prompt with no paired **(C)** verification
+prompt and the slice would otherwise be the only Phase 2 slice with code and no evidence record.
+Slice 2.6 carries no roadmap acceptance criterion of its own, so the three things prompt 23 asked
+for are taken as the three claims below. No camera, microphone or provider was opened at any step:
+every capture path in the evidence runs against a substitute, named where it is used. Each
+subsection gives the case that establishes the claim, what kind of case it is, and a file and line
+for every claim made about the code.
+
+### 6.1 One action discards the take and returns a record-ready camera (studio-2)
+
+**The case.** `e2e/successful-studio-journeys.spec.ts:658`, "Record another take clears the reviewed
+take and reacquires the camera for a second recording". This is a browser journey against in-page
+simulators, which is the strongest kind of evidence any Phase 2 slice produced for a user-visible
+loop. It first pins the state the retake has to reverse: one camera acquisition spent and the local
+tracks already stopped before review rendered (`:672-673`). It then chooses the action from the
+panel's own overflow (`:677`), confirms through the shared dialog (`:679-681`), and asserts the
+review panel hidden, the playback element gone, the live preview visible and the stage back to
+`data-stage-presentation="live"` (`:683-689`). The release-then-reacquire proof is the camera count
+reaching exactly two (`:692`), not one held stream. The loop is then closed for real: it records
+again, stops, and reaches an enabled **Save** (`:695-703`), with recorder starts doubled and every
+recorder stopped (`:712-713`).
+
+**What that journey substitutes, stated rather than implied.** `navigator.mediaDevices.getUserMedia`
+is replaced at `e2e/support/studioHarness.browser.ts:206-214`, and it is that substitute which
+increments the `cameraCalls` the journey asserts on. `MediaRecorder` is replaced at `:202-205`. So
+the journey proves the application's acquisition and release ordering, and proves nothing about a
+physical camera's behaviour on a second acquisition. That is the manual gate
+`docs/BROWSER_SUPPORT.md` describes, and it was not run.
+
+**The one place the action is offered or withheld.** `apps/web/src/studio/StudioApp.tsx:832`, whose
+three conditions are a browser that can capture, a stage not in Project context, and an owned
+recording artifact. Its comment at `:824-831` gives a reason per condition. The gate is a component
+test, not a journey: `apps/web/src/studio/StudioApp.test.tsx:1004`, "withholds the retake from the
+take panel inside a Project and offers it outside one", asserts the prop absent at `:1034` and
+present after navigating out of the Project at `:1042-1044`, with the same take and the same open
+panel. The third condition, a URL-backed presentation, is asserted one layer down at
+`apps/web/src/studio/useStudioRecordingLaunch.test.tsx:469`.
+
+**The surface.** One entry in the `secondaryActions` array take review already renders two ways, at
+`apps/web/src/features/take-review/TakeReviewActions.tsx:277`, deliberately carrying no `danger`
+mark for the reason written at `:280-281`. Six component tests against that surface cover it:
+the row and its spoken description (`apps/web/src/features/take-review/TakeDock.test.tsx:186`), a
+declined discard leaving the take standing with focus returned (`:209`), a confirmed retake
+discarding before the surface does anything else, asserted by invocation order (`:277`), a refused
+restart leaving review open with a notice (`:316`), an already-saved take skipping the question
+(`:357`), and a refused plain Discard behaving the same way (`:382`).
+
+**The shared question.** `apps/web/src/features/take-review/takeDiscardQuestion.ts:33`, one leaf
+string module with a description per act at `:13-18`, so the two askers cannot drift on what the
+operator is told is at risk.
+
+### 6.2 A discard answers whether it ran (studio-8)
+
+**The case.** The signature changed at
+`apps/web/src/orchestration/recording/useRecording.ts:516`, where `discard` is now
+`useCallback((): boolean =>`. The answer is established by four unit tests in the describe at
+`apps/web/src/orchestration/recording/useRecording.test.tsx:1390`: true from a settled take, leaving
+the runtime holding none (`:1391`); true with nothing to discard, because the answer is the state
+that follows rather than the work done (`:1414`); false while a recorder attempt still owns the
+bytes, with the attempt kept (`:1430`); and false across the on-device transcode, then true once it
+resolves (`:1458`).
+
+**What kind of evidence this is.** Unit tests against a recorder harness. They establish the
+post-condition the signature promises. They do not establish that any of the five call sites the
+plan changed can be made to see a `false` from the interface, and §4 records that the refusal is
+effectively unreachable from the UI.
+
+### 6.3 A Project recording asks before it drops a presented take (studio-9)
+
+**The case.** `apps/web/src/studio/useStudioRecordingLaunch.ts:350`, where `startProjectRecording`
+answers a refusal or nothing. Ten unit tests in the describe at
+`apps/web/src/studio/useStudioRecordingLaunch.test.tsx:265` cover it: no question when the stage
+holds no take (`:266`), a declined question leaving the take, the overlay and the route alone
+(`:281`), the order discard-then-navigate-then-camera (`:302`), a launch stopped when the runtime
+refuses to give up a still-finalizing take (`:324`), two in-flight answers (`:341`, `:359`), the
+Project moving under the open question (`:399`), the runtime unmounting under it (`:417`), a
+question that throws read as a decline with the rejection kept off the window (`:437`), and a
+URL-backed Project source dropped without a question (`:469`). Three further cases cover
+`restartCapture` itself at `:484`, `:507` and `:535`.
+
+**What kind of evidence this is.** Unit tests against a hook with mocked collaborators. The
+confirmation, the guard, the mounted re-check and the assert are all exercised, and none of them is
+exercised through the interface, because §1.6 could not construct a reachable press.
+
+### What is established
+
+- One press on take review discards the take and returns a record-ready camera, proven in Chromium
+  through the real application code, with the second acquisition counted rather than inferred.
+- The camera posture did not change: the stream is still released before review renders, and the
+  retake pays one fresh acquisition.
+- The action is offered from exactly one condition, and that condition withholds it inside a Project
+  and over a Project source streamed from the server.
+- A discard answers whether it ran, with the answer defined as the state that follows rather than
+  the work performed, and it answers false while a recorder attempt or an on-device transcode still
+  owns the bytes.
+- A Project recording launch asks before it drops an owned presented take, does not ask for a
+  server-streamed one, and abandons the launch when the Project or the runtime moves under the open
+  question.
+- The two take-discard questions that are one act share one owner, so their copy cannot drift.
+
+### What is not established, or is assumed
+
+- **Framing state is lost across the loop.** Mic mute, camera off and zoom all reset
+  (`useOwnedLocalMedia.ts:206-212`), and a retake is exactly where an operator expects framing to
+  persist. §4 records it; nothing in this slice restores it. Q7.
+- **The `startProjectRecording` question may guard nothing reachable.** §1.6 could not construct a
+  press that reaches it from the interface. The confirmation, the guard, the mounted check and the
+  assert are code truth and defence in depth, and should be reported that way rather than as a fixed
+  user-visible bug.
+- **studio-8's call sites change behaviour on a refusal that is effectively unreachable from the
+  UI.** Six non-test sites now read the answer: `useStudioSessionLifecycle.ts:84`,
+  `useStudioRecordingLaunch.ts:331` and `:493`, `RecordingAction.tsx:155`,
+  `useExistingVideoWorkflow.ts:187` and `TakeReviewActions.tsx:161`. Their new branches are covered
+  at the hook and component level, not through the interface, so studio-8 is a truthfulness
+  improvement rather than a user-visible one.
+- **No test pins the order of `secondaryActions`.** `TakeDock.test.tsx` and the e2e helpers select
+  menu items by name, so an insertion at any index passes, and the ordering §3 defends stays
+  unenforced.
+- **A retake after an AI take returns to local capture** with the experience label still selected
+  but not applied (`useStudioSession.ts:325`). This is the correct cost posture and a real behaviour
+  change from the operator's point of view.
+- **No physical camera was opened.** Every acquisition in the evidence is the in-page substitute at
+  `e2e/support/studioHarness.browser.ts:206`. A real device's behaviour on a second
+  `getUserMedia` after a full release, including a permission prompt reappearing or a camera held by
+  another application, is the manual gate in `docs/BROWSER_SUPPORT.md` and was not run.
+- **The compact bar's fifth control was not separately re-captured.** §4 predicted two rows and
+  unchanged height below 22.49rem. The visual suite passed at 50 of 50 on Darwin and 31 of 31 on
+  Linux for this candidate, and no take-review baseline was among the three found stale
+  ([Phase 2 verification](../audits/PHASE_2_VERIFICATION.md)), but a change under the 0.5 percent
+  tolerance would not have shown, so this is a green suite rather than an inspection.

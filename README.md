@@ -74,16 +74,20 @@ directions.
 ## Status
 
 The core Campaign/Project workflow is implemented and has passed the local automated MVP boundary.
-The [MVP acceptance runbook](docs/MVP_ACCEPTANCE.md) records all 17 objective criteria and required
-automated gates as passing for its 2026-08-14 candidate. This local-only GO does not include
-physical-device, assistive-technology, live Neon/R2, or paid-provider checks and does not imply
-public-service readiness.
+The [MVP acceptance runbook](docs/MVP_ACCEPTANCE.md) records all 17 objective criteria and every
+required automated gate as passing for candidate `ec060334`, rerun on 2026-09-07 on macOS. That
+candidate supersedes the 2026-08-14 one, whose command record the runbook keeps alongside it. This
+local-only GO does not include physical-device, assistive-technology, live Neon/R2, or
+paid-provider checks and does not imply public-service readiness.
 
-The fifteen-step product-audit roadmap has landed since that candidate — separate Project surfaces,
-name search with real totals, export placement at save, Project duplication, a streamed Project
-source, the account panel and the persistent explainer. Those changes are covered by the ordinary
-automated gates, but the acceptance record itself has not been rerun; treat its GO as candidate-
-specific.
+The GO belongs to that revision and no other. The fifteen-step product-audit roadmap and Phase 2's
+slices both landed before it, so the rerun covers separate Project surfaces, name search with real
+totals, export placement and multi-placement saves, Project duplication, a streamed Project source,
+burned-in subtitles and audio level, converted-codec intake, remembered upload keys, server-side
+job progression with an AI usage ledger, the account panel and the persistent explainer. It does
+not cover the Phase 2 acceptance criteria walked by hand in the running product; that record is
+kept separately in [Phase 2 verification](docs/audits/PHASE_2_VERIFICATION.md). A later working
+tree needs its own rerun before the GO can be quoted for it.
 
 ## Product direction
 

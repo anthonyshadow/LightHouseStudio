@@ -17,6 +17,7 @@ every relative link and anchor in `README.md`, `AGENTS.md`, and everything under
 | Open product/architecture decisions                               | [`DECISIONS_REQUIRED.md`](DECISIONS_REQUIRED.md)                                                 |
 | Documentation dispositions and the deletion manifest              | [`audits/DOCUMENTATION_PRUNING_REPORT.md`](audits/DOCUMENTATION_PRUNING_REPORT.md)               |
 | Phase 1 acceptance record (criteria, gates, evidence, follow-ups) | [`audits/PHASE_1_VERIFICATION.md`](audits/PHASE_1_VERIFICATION.md)                               |
+| Phase 2 acceptance record (criteria, kinds of evidence, gaps)     | [`audits/PHASE_2_VERIFICATION.md`](audits/PHASE_2_VERIFICATION.md)                               |
 | Slice 2.1 subtitles audit and approved plan (prompt 13 → 14)      | [`roadmap/SLICE_2.1_SUBTITLES_PLAN.md`](roadmap/SLICE_2.1_SUBTITLES_PLAN.md)                     |
 | Slice 2.3 variant sets audit and plan (prompt 17 → 18)            | [`roadmap/SLICE_2.3_VARIANT_SETS_PLAN.md`](roadmap/SLICE_2.3_VARIANT_SETS_PLAN.md)               |
 | Slice 2.5 durable AI outcomes audit and plan (prompt 20 → 21)     | [`roadmap/SLICE_2.5_DURABLE_AI_OUTCOMES_PLAN.md`](roadmap/SLICE_2.5_DURABLE_AI_OUTCOMES_PLAN.md) |
