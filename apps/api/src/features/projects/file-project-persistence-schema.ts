@@ -455,7 +455,11 @@ export const librarySchema = z
     const membershipKeys = library.assetMemberships.map(
       ({ projectId, kind, resourceId }) => `${projectId}:${kind}:${resourceId}`,
     );
-    if (
+
+    // One `if`, one `addIssue`: a second issue would change the joined message a failed parse
+    // reports. Every operand is a pure read, so naming them costs a rejection only the two nested
+    // scans the accepted case already pays for.
+    const hasDuplicateIdentities =
       projectIdSet.size !== projectIds.length ||
       campaignIdSet.size !== campaignIds.length ||
       new Set(operationKeys).size !== operationKeys.length ||
@@ -463,62 +467,73 @@ export const librarySchema = z
       new Set(processingOperationIds).size !== processingOperationIds.length ||
       new Set(outputOperationIds).size !== outputOperationIds.length ||
       new Set(membershipIds).size !== membershipIds.length ||
-      new Set(membershipKeys).size !== membershipKeys.length ||
+      new Set(membershipKeys).size !== membershipKeys.length;
+
+    const hasForeignOwnerRecords =
       library.campaigns.some(({ ownerUserId }) => ownerUserId !== library.ownerUserId) ||
       library.projects.some(({ project }) => project.ownerUserId !== library.ownerUserId) ||
       library.processingJobs.some(({ ownerUserId }) => ownerUserId !== library.ownerUserId) ||
-      library.outputReceipts.some(
-        (receipt) =>
-          !projectIdSet.has(receipt.projectId) ||
-          !library.projects.some(
-            ({ revisions, outputLinks }) =>
-              revisions.some(
-                ({ id, revisionNumber }) =>
-                  id === receipt.resultRevisionId &&
-                  revisionNumber === receipt.resultRevisionNumber,
-              ) &&
-              outputLinks.some(
-                ({ projectId, savedVideoId, videoVersionId }) =>
-                  projectId === receipt.projectId &&
-                  savedVideoId === receipt.savedVideoId &&
-                  videoVersionId === receipt.videoVersionId,
-              ),
-          ),
-      ) ||
-      library.assetMemberships.some(
-        ({ projectId, ownerUserId }) =>
-          ownerUserId !== library.ownerUserId || !projectIdSet.has(projectId),
-      ) ||
+      library.assetMemberships.some(({ ownerUserId }) => ownerUserId !== library.ownerUserId);
+
+    const hasDanglingOutputReceipts = library.outputReceipts.some(
+      (receipt) =>
+        !projectIdSet.has(receipt.projectId) ||
+        !library.projects.some(
+          ({ revisions, outputLinks }) =>
+            revisions.some(
+              ({ id, revisionNumber }) =>
+                id === receipt.resultRevisionId && revisionNumber === receipt.resultRevisionNumber,
+            ) &&
+            outputLinks.some(
+              ({ projectId, savedVideoId, videoVersionId }) =>
+                projectId === receipt.projectId &&
+                savedVideoId === receipt.savedVideoId &&
+                videoVersionId === receipt.videoVersionId,
+            ),
+        ),
+    );
+
+    const hasOrphanAssetMemberships = library.assetMemberships.some(
+      ({ projectId }) => !projectIdSet.has(projectId),
+    );
+
+    const hasUnknownCampaignReferences =
+      library.campaignCreateReceipts.some(({ campaignId }) => !campaignIdSet.has(campaignId)) ||
       library.projects.some(
         ({ project }) => project.campaignId !== null && !campaignIdSet.has(project.campaignId),
-      ) ||
-      library.createReceipts.some(({ projectId }) => !projectIdSet.has(projectId)) ||
-      library.processingJobs.some(
-        ({
-          projectId,
-          operationId,
-          initiatingRevisionId,
-          initiatingRevisionNumber,
-          retryOfOperationId,
-        }) => {
-          const project = library.projects.find(({ project }) => project.id === projectId);
-          const linked = project?.jobLinks.some(
-            (link) =>
-              link.jobId === operationId &&
-              link.initiatingRevisionId === initiatingRevisionId &&
-              link.initiatingRevisionNumber === initiatingRevisionNumber,
-          );
-          return (
-            !linked ||
-            (retryOfOperationId !== null &&
-              !library.processingJobs.some(
-                (candidate) =>
-                  candidate.operationId === retryOfOperationId && candidate.projectId === projectId,
-              ))
-          );
-        },
-      ) ||
-      library.campaignCreateReceipts.some(({ campaignId }) => !campaignIdSet.has(campaignId))
+      );
+
+    const hasOrphanCreateReceipts = library.createReceipts.some(
+      ({ projectId }) => !projectIdSet.has(projectId),
+    );
+
+    const hasBrokenAttemptLinkage = library.processingJobs.some((attempt) => {
+      const projectEntry = library.projects.find(({ project }) => project.id === attempt.projectId);
+      const linked = projectEntry?.jobLinks.some(
+        (link) =>
+          link.jobId === attempt.operationId &&
+          link.initiatingRevisionId === attempt.initiatingRevisionId &&
+          link.initiatingRevisionNumber === attempt.initiatingRevisionNumber,
+      );
+      return (
+        !linked ||
+        (attempt.retryOfOperationId !== null &&
+          !library.processingJobs.some(
+            (candidate) =>
+              candidate.operationId === attempt.retryOfOperationId &&
+              candidate.projectId === attempt.projectId,
+          ))
+      );
+    });
+
+    if (
+      hasDuplicateIdentities ||
+      hasForeignOwnerRecords ||
+      hasDanglingOutputReceipts ||
+      hasOrphanAssetMemberships ||
+      hasUnknownCampaignReferences ||
+      hasOrphanCreateReceipts ||
+      hasBrokenAttemptLinkage
     ) {
       context.addIssue({ code: 'custom', message: 'Stored Project library identity is invalid.' });
     }
