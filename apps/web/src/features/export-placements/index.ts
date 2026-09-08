@@ -3,6 +3,7 @@ export { ExportPlacementProgress } from './ExportPlacementProgress';
 export {
   exportPlacementLabel,
   exportPlacementShortLabel,
+  exportPlacementSubtitleOutlook,
   exportSpecificationSummary,
 } from './placements';
 export {

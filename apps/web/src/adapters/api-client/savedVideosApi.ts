@@ -161,6 +161,11 @@ const directUpload = async (
     limit: 4,
     retryDelays: [0, 1_000, 3_000, 5_000],
     getChunkSize: () => 8 * 1024 * 1024,
+    /**
+     * Nothing is minted here: the upload was staged above, and both ids are that opaque staged id.
+     * The restored file state below normally answers this question before the uploader asks, which
+     * leaves this as the answer for a file whose state the plugin has dropped mid-flight.
+     */
     createMultipartUpload: (_file) => ({
       uploadId: staged.uploadId,
       key: staged.uploadId,
@@ -237,12 +242,36 @@ const directUpload = async (
   };
   input.signal?.addEventListener('abort', abort, { once: true });
   try {
-    uppy.addFile({
+    const fileId = uppy.addFile({
       name: input.filename,
       type: input.blob.type,
       data: input.blob,
       source: 'Lightframe',
     });
+    /**
+     * What makes a second attempt at these bytes a resumption rather than a repeat.
+     *
+     * Uppy's uploader takes its restoring branch only for a file that already carries the multipart
+     * identity, and that branch alone asks `listParts` which parts the server holds. Staging just
+     * replayed this attempt's idempotency key, so the identity is known before a byte is sent. It
+     * has to be set after `addFile`, which rebuilds the descriptor from the fields it knows; and
+     * `@uppy/aws-s3` widens the file internally rather than publishing `s3Multipart` on `UppyFile`,
+     * so the field is stated here as its uploader reads it.
+     *
+     * It also changes what a fingerprint collision costs. `uploadResumeStorage` names bytes by
+     * scope, filename, size, type and mtime rather than by hashing them, so two genuinely different
+     * videos can share a key; before this, a collision merely restarted the second upload, and now
+     * it resumes it — the plugin matches the parts the server holds by number alone and never
+     * compares their size, so one video's head can be completed with another's tail. What bounds
+     * it is the server: the staged upload records the byte count and type it was opened for, and
+     * the assembled object is inspected before it becomes anything, then refused when either
+     * disagrees. So a collision costs a rejected upload the operator retries, never a corrupt
+     * entry in their library.
+     */
+    const resumeState: Parameters<typeof uppy.setFileState>[1] & {
+      readonly s3Multipart: { readonly uploadId: string; readonly key: string };
+    } = { s3Multipart: { uploadId: staged.uploadId, key: staged.uploadId } };
+    uppy.setFileState(fileId, resumeState);
     const result = await uppy.upload();
     if (result?.failed?.[0]?.error) throw failure.api ?? directTransferFailure();
     if (completed === null) throw invalidResponse();

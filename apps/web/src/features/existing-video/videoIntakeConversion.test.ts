@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { loadPhoneHevcVideoFixture } from '../../test/videoFixtures';
 import { resetVideoDecodeSupportForTests } from '../../adapters/media-processing/videoDecodeSupport';
 
 /**
@@ -158,6 +159,47 @@ describe('intake of a codec this product cannot publish', () => {
     await expect(
       validateExistingVideo(file(), false, new AbortController().signal, 'server-approved-result'),
     ).rejects.toThrow(/HEVC and ProRes are not qualified/u);
+    expect(transcode.transcodeRecordingToMp4).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The cases above stub the media runtime on purpose, because what they are about is the decision.
+ * This one is about the file, and so keeps nothing stubbed but the transcoder: real HEVC bytes,
+ * read by the real runtime, reaching the same refusal. Without it every case in this file would be
+ * satisfied by a description of a video, and no committed video would be known to produce one.
+ *
+ * It does not prove a browser said no. jsdom has no `VideoDecoder`, so the support gate answers
+ * false without reaching `isConfigSupported` — asking a browser is the browser journey's to prove.
+ */
+describe('intake of a real HEVC clip', () => {
+  it('refuses the committed phone-shaped HEVC bytes, and converts nothing', async () => {
+    const clip = new File([await loadPhoneHevcVideoFixture()], 'phone-clip.mov', {
+      type: 'video/quicktime',
+    });
+
+    /*
+     * Resolved exactly the way the intake resolves it, one line before the intake does, so this
+     * states which runtime is about to run rather than assuming the stubs above were unregistered:
+     * the stub answers MP4 at 1280x720, and these are the committed clip's own facts.
+     */
+    const { ALL_FORMATS, BlobSource, Input, QTFF } = await import('mediabunny');
+    const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(clip) });
+    try {
+      expect(await input.getFormat()).toBe(QTFF);
+      const track = await input.getPrimaryVideoTrack();
+      expect(await track?.getCodec()).toBe('hevc');
+      expect(await track?.getDisplayWidth()).toBe(1_080);
+      expect(await track?.getDisplayHeight()).toBe(1_920);
+    } finally {
+      input.dispose();
+    }
+
+    const { validateExistingVideo } = await import('./videoValidation');
+
+    await expect(validateExistingVideo(clip, false, new AbortController().signal)).rejects.toThrow(
+      /HEVC and ProRes are not qualified\. This browser cannot convert it either/u,
+    );
     expect(transcode.transcodeRecordingToMp4).not.toHaveBeenCalled();
   });
 });

@@ -19,13 +19,13 @@ export const loadH264VideoFixture = async (): Promise<Buffer> => {
   return Buffer.from(match[1], 'base64');
 };
 
-export const loadDecodableH264VideoFixture = async (): Promise<Buffer> => {
-  const source = await readFile(
-    new URL('../fixtures/decodable-h264-video.base64', import.meta.url),
-    'utf8',
-  );
-  return Buffer.from(source.replaceAll(/\s/gu, ''), 'base64');
-};
+// Re-exported so a browser journey reaches the committed clips through the harness it already
+// imports, while the suites that cannot import Playwright reach the same reader directly.
+export {
+  loadDecodableH264VideoFixture,
+  loadPhoneHevcVideoFixture,
+  loadPortraitH264VideoFixture,
+} from '../fixtures/videoFixtures';
 
 export const installFakeVideoJobRoutes = async (
   page: Page,

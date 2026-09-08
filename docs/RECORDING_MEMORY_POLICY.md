@@ -32,8 +32,9 @@ close, replacement, or unmount.
 
 Peak finalization memory therefore includes recorder chunks, the raw assembled input, the
 in-progress encoded output, the final MP4 Blob, and the optional sidecar until conversion returns
-and prior temporaries become collectible. MP4 Fast Start is disabled to avoid an additional
-in-memory media-chunk staging copy. Conversion is cancellable on ownership loss but raw chunks are
+and prior temporaries become collectible. MP4 Fast Start is disabled here; what that buys, where
+else it applies, and what it costs a player are stated once under
+[MP4 Fast Start](#mp4-fast-start). Conversion is cancellable on ownership loss but raw chunks are
 never silently evicted to relieve pressure.
 
 Peak local-edit memory includes the pinned source and sidecar, decoded worker frames/GPU surfaces,
@@ -48,6 +49,37 @@ provider submission, or saving — through the same bounded incremental reader a
 other owned source, with visible progress and a cancel that leaves the streamed presentation
 intact. A freshly recorded or newly uploaded source is already owned bytes and stays that way;
 peak memory for byte-holding workflows is unchanged, only deferred.
+
+### MP4 Fast Start
+
+Both MP4 writers set `fastStart: false`: the shared transcoder at
+`apps/web/src/adapters/media-processing/transcodeRecording.ts`, which muxes into a `BufferTarget`
+and serves recording finalization, intake conversion and voice normalization alike, and the
+local-edit render worker at `apps/web/src/features/video-editor/videoEditRender.worker.ts`, which
+muxes into a chunked `StreamTarget`. The setting therefore belongs to both paths, not only to
+recording finalization, and the sentence above is a pointer rather than an owner.
+
+The two settings are not doing the same work. Left undefined, MediaBunny resolves the option to
+`'in-memory'` for a `BufferTarget` and to `false` for every other target, so on the worker's stream
+target the explicit `false` restates the library's own choice and changes nothing; the flag only
+alters an output on the transcoder's path. What it avoids there is real: under `'in-memory'` the muxer
+holds every sample's bytes until finalization instead of writing them out and releasing them as it
+goes, then lays the metadata down ahead of the media in one pass — roughly one extra copy of the
+encoded media alive at the moment of finalization, on top of the buffer that already holds the
+whole file. MediaBunny's own note judges that difference immaterial for a buffer target, so this is
+a deliberate choice against the library's default under the 300 MB ceiling, not agreement with it.
+
+The consequence for playback, previously unrecorded: with Fast Start off the metadata sits at the
+end of the file rather than the head, so nothing can begin playing until the end has been reached.
+Inside the product that costs a seek and no more — a published result is a Blob the browser already
+holds, or a ranged content route a player can jump about in. Outside it the same file is the one an
+"optimize for web" pass exists to fix: a tool or platform that streams without range requests, or
+that reads the head to inspect a file, has to take the whole thing first.
+
+Whether to flip it is an open item, not a settled one, and it cannot be settled from this document.
+The memory claim above is read off the muxer, not measured; deciding it needs a physical-device run
+at the 300 MB ceiling under [Physical validation](#physical-validation), which the automated
+boundary cannot produce. Until such a run exists, leave both settings as they are.
 
 Uploaded source limits are decimal bytes: 300,000,000 for local/Lucy-only workflows and
 200,000,000 when VTO is planned. Downloaded provider output is capped at 300,000,000 bytes.

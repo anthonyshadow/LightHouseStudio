@@ -354,6 +354,10 @@ beforeEach(() => {
       },
     } satisfies Storage,
   });
+  // Restored per test rather than inherited: `mockReturnValue` outlives `restoreAllMocks` on a
+  // module-level `vi.fn`, so a case that answers "cannot re-frame" otherwise leaves every later
+  // case's placement controls disabled for a reason its own body never states.
+  renderCapable.mockReturnValue(true);
   mockApiServer.use(
     http.get(`*/api/projects/${projectId}`, () => HttpResponse.json(current())),
     // The save step measures the cut once so the chooser can draw the crop; the ordinary
@@ -1262,6 +1266,95 @@ describe('ProjectOutputSaveSection placement', () => {
     await user.click(screen.getByRole('button', { name: /^Save video ·/u }));
     // The single-placement degrade is untouched: the cut is saved in the shape it already has.
     await waitFor(() => expect(vi.mocked(renderVideoEdit)).not.toHaveBeenCalled());
+  });
+
+  /** The phone-placed cut with one caption burned into the bottom of its 1280×720 frame. */
+  const captionedCurrent = (): ProjectCurrentResponse => {
+    const placed = placedCurrent();
+    return {
+      ...placed,
+      revision: {
+        ...placed.revision,
+        snapshot: {
+          ...placed.revision.snapshot,
+          localEdit: {
+            ...createDefaultVideoEditSpec(10_000),
+            subtitles: [
+              {
+                id: '9f4e2a10-6c3b-4f1d-8a52-1c7d0b9e4f31',
+                text: 'Ninety seconds to a better cut',
+                startMs: 0,
+                endMs: 1_000,
+                placement: 'bottom',
+              },
+            ],
+          },
+        },
+      },
+    };
+  };
+
+  const extrasGroup = () => screen.getByRole('group', { name: 'Also save for' });
+  const extraCheckbox = (name: string) => within(extrasGroup()).getByRole('checkbox', { name });
+  const CAPTIONS_CUT = 'Subtitles at the bottom would be cut by this shape.';
+  const CAPTIONS_AT_RISK =
+    'This cut carries subtitles; a shape that trims the frame can cut into them, and the re-framed video shows exactly what is kept.';
+
+  it('tells each extra placement’s checkbox whether its shape would cut the captions, and still lets it be ticked', async () => {
+    const user = userEvent.setup();
+    renderSection(session(), { currentValue: captionedCurrent() });
+
+    await openSaveDestination(user);
+    // A 1280×720 cut squared keeps the middle 56% of the width, and the caption region spans 80%
+    // of it — the same measured geometry the chooser states about the chosen placement, now said
+    // about each extra the save would also make.
+    await waitFor(() =>
+      expect(extraCheckbox('Square post')).toHaveAccessibleDescription(CAPTIONS_CUT),
+    );
+    expect(extraCheckbox('Tall feed post')).toHaveAccessibleDescription(CAPTIONS_CUT);
+    // And nothing under Widescreen, which crops nothing off a 16:9 cut. Silence there says that
+    // and only that now: a frame nobody has measured yet states the caution the next case reads.
+    expect(extraCheckbox('Widescreen')).not.toHaveAccessibleDescription();
+
+    // It informs and never blocks: an uncaptioned cut is a deliverable somebody means to make.
+    await waitFor(() => expect(extraCheckbox('Square post')).toBeEnabled());
+    await user.click(extraCheckbox('Square post'));
+    expect(extraCheckbox('Square post')).toBeChecked();
+  });
+
+  it('states the risk under every extra while the cut is still being measured', async () => {
+    const user = userEvent.setup();
+    // Measuring the cut is a network read, held open here so the window it opens can be read.
+    const cut = { release: null as (() => void) | null };
+    mockApiServer.use(
+      http.get(`*/api/projects/${projectId}/source`, async () => {
+        await new Promise<void>((resolve) => {
+          cut.release = resolve;
+        });
+        return HttpResponse.json(sourceResponse(captionedCurrent(), 10_000));
+      }),
+    );
+    renderSection(session(), { currentValue: captionedCurrent() });
+
+    await openSaveDestination(user);
+
+    /*
+     * Nothing exact can be said about a frame nobody has measured — but the cut does carry
+     * subtitles, and every one of these shapes trims the frame, so the risk is the true thing to
+     * state. Said nowhere, this window reads exactly like the shape that keeps them all.
+     */
+    await waitFor(() =>
+      expect(extraCheckbox('Square post')).toHaveAccessibleDescription(CAPTIONS_AT_RISK),
+    );
+    expect(extraCheckbox('Widescreen')).toHaveAccessibleDescription(CAPTIONS_AT_RISK);
+
+    cut.release!();
+
+    // Measured, each row narrows to what is true of its own shape.
+    await waitFor(() =>
+      expect(extraCheckbox('Square post')).toHaveAccessibleDescription(CAPTIONS_CUT),
+    );
+    expect(extraCheckbox('Widescreen')).not.toHaveAccessibleDescription();
   });
 
   it('replays a recovered save without re-framing or storing a second rendition', async () => {

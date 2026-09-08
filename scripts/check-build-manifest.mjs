@@ -114,7 +114,11 @@ export const BUILD_CLOSURE_BUDGETS = {
   // refusal notice on the Project Record button and another on the recording action, each with the
   // copy that says what to do next, plus the answers the launch and the retake now give so a caller
   // can render them.
-  'src/studio/StudioApp.tsx': 1_091_000,
+  // Then 1_090_167 → 1_091_682 on 2026-09-07, closing the Phase 2 verification gaps: the Project
+  // source picker now routes through the converting intake instead of uploading raw, and each extra
+  // placement says when its crop would cut a caption region the cut uses. Both are the acceptance
+  // criteria failing in the product rather than in a test, so this is the fix costing bytes.
+  'src/studio/StudioApp.tsx': 1_092_000,
 };
 
 /**
