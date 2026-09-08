@@ -101,30 +101,21 @@ const sanitizeVtonConfiguration = (
   value: Record<string, unknown>,
   modelModeId: ModelModeId | null,
   persistedReferenceImageAssetId: string | null,
-  includeVtonConfiguration: boolean,
 ): SanitizedVtonConfiguration => {
-  const storedInputKind = includeVtonConfiguration ? vtonInputKind(value.vtonInputKind) : null;
+  const storedInputKind = vtonInputKind(value.vtonInputKind);
   const invalidInputKind =
-    includeVtonConfiguration &&
-    (modelModeId === 'lucy-vton-latest'
+    modelModeId === 'lucy-vton-latest'
       ? value.vtonInputKind !== undefined && !storedInputKind
-      : value.vtonInputKind !== undefined && value.vtonInputKind !== null);
+      : value.vtonInputKind !== undefined && value.vtonInputKind !== null;
   const inputKind =
     modelModeId === 'lucy-vton-latest'
-      ? includeVtonConfiguration
-        ? (storedInputKind ?? (persistedReferenceImageAssetId ? 'saved-outfit' : 'prompt'))
-        : persistedReferenceImageAssetId
-          ? 'saved-outfit'
-          : 'prompt'
+      ? (storedInputKind ?? (persistedReferenceImageAssetId ? 'saved-outfit' : 'prompt'))
       : null;
   const invalidEnhancePrompt =
-    includeVtonConfiguration &&
-    value.enhancePrompt !== undefined &&
-    typeof value.enhancePrompt !== 'boolean';
+    value.enhancePrompt !== undefined && typeof value.enhancePrompt !== 'boolean';
   return {
     inputKind,
-    enhancePrompt:
-      inputKind === 'prompt' && includeVtonConfiguration ? value.enhancePrompt === true : false,
+    enhancePrompt: inputKind === 'prompt' ? value.enhancePrompt === true : false,
     invalid: invalidInputKind || invalidEnhancePrompt,
   };
 };
@@ -183,11 +174,7 @@ export const sanitizeGuidedDesignV1 = (value: unknown): GuidedDesignV1 | null =>
   return { catalogVersion: 1, starterId, choices };
 };
 
-const sanitizeSavedPrompt = (
-  value: unknown,
-  includeReferenceImage: boolean,
-  includeVtonConfiguration: boolean,
-): SavedPrompt | null => {
+const sanitizeSavedPrompt = (value: unknown): SavedPrompt | null => {
   if (!isRecord(value)) return null;
   const id = normalizedId(value.id);
   const title =
@@ -200,14 +187,11 @@ const sanitizeSavedPrompt = (
   const createdAt = validDate(value.createdAt);
   const updatedAt = validDate(value.updatedAt);
   const lastUsedAt = nullableDate(value.lastUsedAt);
-  const persistedReferenceImageAssetId = includeReferenceImage
-    ? referenceImageAssetId(value.referenceImageAssetId)
-    : null;
+  const persistedReferenceImageAssetId = referenceImageAssetId(value.referenceImageAssetId);
   const vtonConfiguration = sanitizeVtonConfiguration(
     value,
     modelModeId,
     persistedReferenceImageAssetId,
-    includeVtonConfiguration,
   );
   const hasPrompt = containsMeaningfulText(prompt);
   const validRecipe =
@@ -216,9 +200,8 @@ const sanitizeSavedPrompt = (
         ? hasPrompt && persistedReferenceImageAssetId === null
         : vtonConfiguration.inputKind === 'saved-outfit' && persistedReferenceImageAssetId !== null
       : hasPrompt &&
-        (!includeVtonConfiguration ||
-          ((value.vtonInputKind === undefined || value.vtonInputKind === null) &&
-            (value.enhancePrompt === undefined || value.enhancePrompt === false)));
+        (value.vtonInputKind === undefined || value.vtonInputKind === null) &&
+        (value.enhancePrompt === undefined || value.enhancePrompt === false);
   if (
     !id ||
     !containsMeaningfulText(title) ||
@@ -249,13 +232,7 @@ const sanitizeSavedPrompt = (
   };
 };
 
-const sanitizeRecentPrompt = (
-  value: unknown,
-  includeReferenceImage: boolean,
-  includeCharacterIdentity: boolean,
-  includeVtonConfiguration: boolean,
-  includeWardrobeIdentity: boolean,
-): RecentPrompt | null => {
+const sanitizeRecentPrompt = (value: unknown): RecentPrompt | null => {
   if (!isRecord(value)) return null;
   const id = normalizedId(value.id);
   const prompt = typeof value.prompt === 'string' ? normalizeAuthoredPrompt(value.prompt) : '';
@@ -266,26 +243,21 @@ const sanitizeRecentPrompt = (
   const savedPromptId =
     value.savedPromptId === undefined ? null : normalizedId(value.savedPromptId);
   const savedCharacterPromptId =
-    includeCharacterIdentity && value.savedCharacterPromptId !== undefined
-      ? normalizedId(value.savedCharacterPromptId)
-      : null;
+    value.savedCharacterPromptId !== undefined ? normalizedId(value.savedCharacterPromptId) : null;
   const savedCharacterVariantId =
-    includeWardrobeIdentity && value.savedCharacterVariantId !== undefined
+    value.savedCharacterVariantId !== undefined
       ? normalizedId(value.savedCharacterVariantId)
       : null;
   const characterName =
-    includeCharacterIdentity && typeof value.characterName === 'string'
+    typeof value.characterName === 'string'
       ? normalizeWhitespace(value.characterName, ASSET_NAME_MAX_LENGTH)
       : '';
-  const persistedReferenceImageAssetId = includeReferenceImage
-    ? referenceImageAssetId(value.referenceImageAssetId)
-    : null;
+  const persistedReferenceImageAssetId = referenceImageAssetId(value.referenceImageAssetId);
   const hasPrompt = containsMeaningfulText(prompt);
   const vtonConfiguration = sanitizeVtonConfiguration(
     value,
     modelModeId,
     persistedReferenceImageAssetId,
-    includeVtonConfiguration,
   );
   const validImageOnlyCharacter =
     !hasPrompt &&
@@ -300,9 +272,8 @@ const sanitizeRecentPrompt = (
   const validNonVtonRecipe =
     modelModeId !== 'lucy-vton-latest' &&
     (hasPrompt || validImageOnlyCharacter) &&
-    (!includeVtonConfiguration ||
-      ((value.vtonInputKind === undefined || value.vtonInputKind === null) &&
-        (value.enhancePrompt === undefined || value.enhancePrompt === false)));
+    (value.vtonInputKind === undefined || value.vtonInputKind === null) &&
+    (value.enhancePrompt === undefined || value.enhancePrompt === false);
   if (
     !id ||
     !modelModeId ||
@@ -310,12 +281,8 @@ const sanitizeRecentPrompt = (
     vtonConfiguration.invalid ||
     !usedAt ||
     (value.savedPromptId !== undefined && !savedPromptId) ||
-    (includeCharacterIdentity &&
-      value.savedCharacterPromptId !== undefined &&
-      !savedCharacterPromptId) ||
-    (includeWardrobeIdentity &&
-      value.savedCharacterVariantId !== undefined &&
-      !savedCharacterVariantId)
+    (value.savedCharacterPromptId !== undefined && !savedCharacterPromptId) ||
+    (value.savedCharacterVariantId !== undefined && !savedCharacterVariantId)
   ) {
     return null;
   }
@@ -334,14 +301,22 @@ const sanitizeRecentPrompt = (
   };
 };
 
-const sanitizeSavedCharacterPrompt = (
-  value: unknown,
-  includeReferenceImage: boolean,
-  includeGuidedDesign: boolean,
-  includeReferenceProvenance: boolean,
-  includeWardrobeSelection: boolean,
-  includeDefaultVoice: boolean,
-): SavedCharacterPrompt | null => {
+/**
+ * Reads the stored `finalReferenceKind`, distinguishing three outcomes that the caller's
+ * `validReferenceProvenance` check depends on: the two valid kinds, `null` for "no reference", and
+ * `undefined` for "the stored value is malformed", which rejects the record.
+ */
+const storedFinalReferenceKind = (
+  stored: unknown,
+  persistedReferenceImageAssetId: string | null,
+): 'uploaded' | 'generated' | null | undefined => {
+  if (stored === 'uploaded' || stored === 'generated') return stored;
+  if (stored === null) return null;
+  if (stored !== undefined) return undefined;
+  return persistedReferenceImageAssetId ? 'generated' : null;
+};
+
+const sanitizeSavedCharacterPrompt = (value: unknown): SavedCharacterPrompt | null => {
   if (!isRecord(value)) return null;
   const id = normalizedId(value.id);
   const name =
@@ -356,31 +331,14 @@ const sanitizeSavedCharacterPrompt = (
   const builderDraft =
     value.builderDraft == null ? null : sanitizePromptBuilderDraft(value.builderDraft);
   const guidedDesign =
-    includeGuidedDesign && value.guidedDesign != null
-      ? sanitizeGuidedDesignV1(value.guidedDesign)
-      : null;
-  const persistedReferenceImageAssetId = includeReferenceImage
-    ? referenceImageAssetId(value.referenceImageAssetId)
-    : null;
-  const uploadedReferenceImageAssetId = includeReferenceProvenance
-    ? referenceImageAssetId(value.uploadedReferenceImageAssetId)
-    : null;
-  const finalReferenceKind = includeReferenceProvenance
-    ? value.finalReferenceKind === 'uploaded' || value.finalReferenceKind === 'generated'
-      ? value.finalReferenceKind
-      : value.finalReferenceKind === null
-        ? null
-        : value.finalReferenceKind === undefined
-          ? persistedReferenceImageAssetId
-            ? ('generated' as const)
-            : null
-          : undefined
-    : persistedReferenceImageAssetId
-      ? ('generated' as const)
-      : null;
-  const selectedWardrobeVariantId = includeWardrobeSelection
-    ? referenceImageAssetId(value.selectedWardrobeVariantId)
-    : null;
+    value.guidedDesign != null ? sanitizeGuidedDesignV1(value.guidedDesign) : null;
+  const persistedReferenceImageAssetId = referenceImageAssetId(value.referenceImageAssetId);
+  const uploadedReferenceImageAssetId = referenceImageAssetId(value.uploadedReferenceImageAssetId);
+  const finalReferenceKind = storedFinalReferenceKind(
+    value.finalReferenceKind,
+    persistedReferenceImageAssetId,
+  );
+  const selectedWardrobeVariantId = referenceImageAssetId(value.selectedWardrobeVariantId);
   const validReferenceProvenance =
     finalReferenceKind !== undefined &&
     ((finalReferenceKind === null &&
@@ -401,7 +359,7 @@ const sanitizeSavedCharacterPrompt = (
     !updatedAt ||
     (value.lastUsedAt != null && !lastUsedAt) ||
     (value.builderDraft != null && !builderDraft) ||
-    (includeGuidedDesign && value.guidedDesign != null && !guidedDesign) ||
+    (value.guidedDesign != null && !guidedDesign) ||
     !validReferenceProvenance ||
     (!hasPrompt &&
       (finalReferenceKind !== 'uploaded' || builderDraft !== null || guidedDesign !== null))
@@ -428,7 +386,7 @@ const sanitizeSavedCharacterPrompt = (
     uploadedReferenceImageAssetId,
     finalReferenceKind,
     selectedWardrobeVariantId,
-    defaultVoice: includeDefaultVoice ? savedCharacterVoice(value.defaultVoice) : null,
+    defaultVoice: savedCharacterVoice(value.defaultVoice),
     notes:
       typeof value.notes === 'string'
         ? normalizeWhitespace(value.notes, CHARACTER_NOTES_MAX_LENGTH)
@@ -648,17 +606,15 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
     return { store: createEmptyCreativeAssetStore(), recovered: true, droppedRecords: 0 };
   }
 
-  const savedInput = sanitizeArray(migrated.savedPrompts, (record) =>
-    sanitizeSavedPrompt(record, true, true),
+  const savedInput = sanitizeArray(migrated.savedPrompts, sanitizeSavedPrompt);
+  const recentInput = sanitizeArray(migrated.recentPrompts, sanitizeRecentPrompt);
+  const characterInput = sanitizeArray(
+    migrated.savedCharacterPrompts,
+    sanitizeSavedCharacterPrompt,
   );
-  const recentInput = sanitizeArray(migrated.recentPrompts, (record) =>
-    sanitizeRecentPrompt(record, true, true, true, true),
-  );
-  const characterInput = sanitizeArray(migrated.savedCharacterPrompts, (record) =>
-    sanitizeSavedCharacterPrompt(record, true, true, true, true, true),
-  );
-  const variantInput = sanitizeArray(migrated.savedCharacterVariants, (record) =>
-    sanitizeSavedCharacterVariant(record),
+  const variantInput = sanitizeArray(
+    migrated.savedCharacterVariants,
+    sanitizeSavedCharacterVariant,
   );
 
   const savedPrompts = uniqueById(
