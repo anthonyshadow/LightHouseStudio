@@ -1,5 +1,5 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import type { RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { referenceImageContentUrl } from '../adapters/api-client/referenceImageRoutes';
 import { AppIcon, Button } from '../ui';
 import { fadingVisibilityAnimationStyles } from '../ui/animationStyles';
@@ -298,8 +298,6 @@ export const StudioSessionControlBar = ({
     !aiActive &&
     !aiStarting &&
     Boolean(cameraControls?.nextFacingMode || cameraControls?.zoom);
-  const endDisabled = controlsLocked || recordingActive || aiStarting || Boolean(transition);
-  const stopAiDisabled = controlsLocked || recordingActive;
   const recordingAction = (
     <RecordingAction
       recording={recording}
@@ -312,6 +310,129 @@ export const StudioSessionControlBar = ({
       onStop={onStopRecording}
     />
   );
+
+  /**
+   * Inside the final row the controls disable on `controlsLocked` alone: `recordingActive` is false
+   * by construction, and the Close branch runs only when `!aiStarting`, which also forces
+   * `!transition`.
+   */
+  const controlRow = (): ReactNode => {
+    if (!localActive) {
+      return (
+        <div css={idleRowStyles(theme)}>
+          <Button
+            variant="primary"
+            busy={session.lifecycle === 'requesting-media'}
+            disabled={controlsLocked || Boolean(transition)}
+            onClick={() => {
+              if (onStartLocalRecording) onStartLocalRecording();
+              else void session.startLocal();
+            }}
+          >
+            <AppIcon name="camera" />
+            {transition ?? 'Start camera'}
+          </Button>
+          <Button
+            ref={uploadButtonRef}
+            data-upload-action="true"
+            variant="secondary"
+            disabled={controlsLocked || Boolean(transition)}
+            onClick={onUploadVideo}
+          >
+            <AppIcon name="upload" />
+            <span data-upload-label>Upload Video</span>
+          </Button>
+        </div>
+      );
+    }
+    if (transition && !aiStarting) {
+      return (
+        <div css={idleRowStyles(theme)}>
+          <Button variant="secondary" busy>
+            {transition}
+          </Button>
+        </div>
+      );
+    }
+    if (recordingActive) {
+      return (
+        <div css={recordingRowStyles(theme)} data-recording-controls="dominant">
+          {recordingAction}
+        </div>
+      );
+    }
+    return (
+      <div
+        css={actionRowStyles(theme)}
+        data-local-recording-primary={localRecordingPrimary ? 'true' : undefined}
+      >
+        {aiStarting ? (
+          <Button variant="primary" busy>
+            Starting AI…
+          </Button>
+        ) : aiActive ? (
+          <Button
+            variant="danger"
+            disabled={controlsLocked}
+            onClick={() => void session.stopModel()}
+          >
+            <AppIcon name="stop" />
+            Stop AI
+          </Button>
+        ) : !localRecordingPrimary ? (
+          <Button variant="primary" disabled={controlsLocked} onClick={onChooseAiExperience}>
+            <AppIcon name="spark" />
+            <span data-ai-label-long>Start AI</span>
+            <span data-ai-label-short aria-hidden="true">
+              AI
+            </span>
+          </Button>
+        ) : (
+          recordingAction
+        )}
+
+        <Button
+          data-icon-only-control="true"
+          variant={session.microphoneEnabled ? 'secondary' : 'danger'}
+          aria-pressed={!session.microphoneEnabled}
+          aria-label={session.microphoneEnabled ? 'Mute microphone' : 'Unmute microphone'}
+          title={session.microphoneEnabled ? 'Mute microphone' : 'Unmute microphone'}
+          disabled={controlsLocked}
+          onClick={session.toggleMicrophone}
+        >
+          <AppIcon name={session.microphoneEnabled ? 'microphone' : 'microphoneOff'} />
+        </Button>
+        <Button
+          data-icon-only-control="true"
+          variant={session.cameraEnabled ? 'secondary' : 'danger'}
+          aria-pressed={!session.cameraEnabled}
+          aria-label={session.cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
+          title={session.cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
+          disabled={controlsLocked}
+          onClick={session.toggleCamera}
+        >
+          <AppIcon name={session.cameraEnabled ? 'camera' : 'cameraOff'} />
+        </Button>
+
+        {!localRecordingPrimary ? recordingAction : null}
+
+        {aiStarting ? (
+          <Button variant="secondary" onClick={() => void session.stopModel()}>
+            Cancel
+          </Button>
+        ) : (
+          <Button
+            variant="secondary"
+            disabled={controlsLocked}
+            onClick={() => void session.stopCamera()}
+          >
+            <AppIcon name="stop" />
+            Close
+          </Button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <section
@@ -419,118 +540,7 @@ export const StudioSessionControlBar = ({
             </div>
           ) : null}
 
-          {!localActive ? (
-            <div css={idleRowStyles(theme)}>
-              <Button
-                variant="primary"
-                busy={session.lifecycle === 'requesting-media'}
-                disabled={controlsLocked || Boolean(transition)}
-                onClick={() => {
-                  if (onStartLocalRecording) onStartLocalRecording();
-                  else void session.startLocal();
-                }}
-              >
-                <AppIcon name="camera" />
-                {transition ?? 'Start camera'}
-              </Button>
-              <Button
-                ref={uploadButtonRef}
-                data-upload-action="true"
-                variant="secondary"
-                disabled={controlsLocked || Boolean(transition)}
-                onClick={onUploadVideo}
-              >
-                <AppIcon name="upload" />
-                <span data-upload-label>Upload Video</span>
-              </Button>
-            </div>
-          ) : transition && !aiStarting ? (
-            <div css={idleRowStyles(theme)}>
-              <Button variant="secondary" busy>
-                {transition}
-              </Button>
-            </div>
-          ) : recordingActive ? (
-            <div css={recordingRowStyles(theme)} data-recording-controls="dominant">
-              {recordingAction}
-            </div>
-          ) : (
-            <div
-              css={actionRowStyles(theme)}
-              data-local-recording-primary={localRecordingPrimary ? 'true' : undefined}
-            >
-              {aiStarting ? (
-                <Button variant="primary" busy>
-                  Starting AI…
-                </Button>
-              ) : aiActive ? (
-                <Button
-                  variant="danger"
-                  disabled={stopAiDisabled}
-                  title={recordingActive ? 'Stop recording before stopping AI.' : undefined}
-                  onClick={() => void session.stopModel()}
-                >
-                  <AppIcon name="stop" />
-                  Stop AI
-                </Button>
-              ) : !localRecordingPrimary ? (
-                <Button
-                  variant="primary"
-                  disabled={controlsLocked || recordingActive}
-                  onClick={onChooseAiExperience}
-                >
-                  <AppIcon name="spark" />
-                  <span data-ai-label-long>Start AI</span>
-                  <span data-ai-label-short aria-hidden="true">
-                    AI
-                  </span>
-                </Button>
-              ) : (
-                recordingAction
-              )}
-
-              <Button
-                data-icon-only-control="true"
-                variant={session.microphoneEnabled ? 'secondary' : 'danger'}
-                aria-pressed={!session.microphoneEnabled}
-                aria-label={session.microphoneEnabled ? 'Mute microphone' : 'Unmute microphone'}
-                title={session.microphoneEnabled ? 'Mute microphone' : 'Unmute microphone'}
-                disabled={controlsLocked}
-                onClick={session.toggleMicrophone}
-              >
-                <AppIcon name={session.microphoneEnabled ? 'microphone' : 'microphoneOff'} />
-              </Button>
-              <Button
-                data-icon-only-control="true"
-                variant={session.cameraEnabled ? 'secondary' : 'danger'}
-                aria-pressed={!session.cameraEnabled}
-                aria-label={session.cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
-                title={session.cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
-                disabled={controlsLocked}
-                onClick={session.toggleCamera}
-              >
-                <AppIcon name={session.cameraEnabled ? 'camera' : 'cameraOff'} />
-              </Button>
-
-              {!localRecordingPrimary ? recordingAction : null}
-
-              {aiStarting ? (
-                <Button variant="secondary" onClick={() => void session.stopModel()}>
-                  Cancel
-                </Button>
-              ) : (
-                <Button
-                  variant="secondary"
-                  disabled={endDisabled}
-                  title={recordingActive ? 'Stop recording before closing the session.' : undefined}
-                  onClick={() => void session.stopCamera()}
-                >
-                  <AppIcon name="stop" />
-                  Close
-                </Button>
-              )}
-            </div>
-          )}
+          {controlRow()}
         </>
       )}
     </section>

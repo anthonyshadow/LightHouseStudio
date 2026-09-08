@@ -59,6 +59,17 @@ import type { VideoJobService } from '../video-jobs/video-job-service.js';
 
 const PROCESSING_SYSTEM_AUTHOR = 'project-processing';
 const PROCESSING_POLL_AFTER_MS = 2_000;
+/**
+ * Codes a client may be told verbatim. Anything else becomes `processing_failed`, so an upstream
+ * message or vendor code cannot reach the operator through a trace.
+ */
+const DISCLOSABLE_SUBMISSION_ERROR_CODES = new Set([
+  'provider_unavailable',
+  'provider_billing',
+  'provider_rejected',
+  'provider_timeout',
+]);
+
 const LOCALLY_STOPPABLE_PROCESSING_STATUSES = new Set([
   'pending',
   'validating',
@@ -310,6 +321,35 @@ export class ProjectProcessingService {
     throw new AppError(409, 'conflict', `${label} cannot start yet. ${detail}`);
   }
 
+  /** Records that a submission failed before the provider accepted it. */
+  async #recordSubmissionFailureTrace(
+    attempt: ProjectProcessingAttemptRecord,
+    error: unknown,
+  ): Promise<void> {
+    const failedAt = this.#now().toISOString();
+    await this.processing.updateProjectAttemptTrace({
+      schemaVersion: 1,
+      jobId: attempt.operationId,
+      ownerUserId: attempt.ownerUserId,
+      operation: attempt.capability as 'character-swap' | 'virtual-try-on',
+      provider: attempt.provider,
+      providerJobId: null,
+      requestFingerprint: attempt.requestFingerprint,
+      outputResolution: attempt.outputResolution,
+      providerOutputLocation: null,
+      sourceDurationMs: attempt.sourceDurationMs,
+      sourceOrientation: attempt.sourceOrientation,
+      status: 'failed',
+      safeErrorCode:
+        error instanceof AppError && DISCLOSABLE_SUBMISSION_ERROR_CODES.has(error.code)
+          ? error.code
+          : 'processing_failed',
+      createdAt: attempt.createdAt,
+      updatedAt: failedAt,
+      completedAt: failedAt,
+    });
+  }
+
   async submit(input: {
     readonly ownerUserId: string;
     readonly projectId: string;
@@ -527,34 +567,7 @@ export class ProjectProcessingService {
               referenceMimeType,
             });
           } catch (error) {
-            const failedAt = this.#now().toISOString();
-            await this.processing.updateProjectAttemptTrace({
-              schemaVersion: 1,
-              jobId: attempt.operationId,
-              ownerUserId: attempt.ownerUserId,
-              operation: attempt.capability as 'character-swap' | 'virtual-try-on',
-              provider: attempt.provider,
-              providerJobId: null,
-              requestFingerprint: attempt.requestFingerprint,
-              outputResolution: attempt.outputResolution,
-              providerOutputLocation: null,
-              sourceDurationMs: attempt.sourceDurationMs,
-              sourceOrientation: attempt.sourceOrientation,
-              status: 'failed',
-              safeErrorCode:
-                error instanceof AppError &&
-                [
-                  'provider_unavailable',
-                  'provider_billing',
-                  'provider_rejected',
-                  'provider_timeout',
-                ].includes(error.code)
-                  ? error.code
-                  : 'processing_failed',
-              createdAt: attempt.createdAt,
-              updatedAt: failedAt,
-              completedAt: failedAt,
-            });
+            await this.#recordSubmissionFailureTrace(attempt, error);
             throw error;
           }
         }

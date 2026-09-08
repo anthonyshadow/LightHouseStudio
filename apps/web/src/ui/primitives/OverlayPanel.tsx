@@ -166,18 +166,21 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
     const opener =
       returnFocusTargetRef.current?.current ??
       (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    // Re-invoked rather than memoised: the rAF recovery below resolves again against a DOM the
+    // isolation registration may have changed.
     const resolveInitialTarget = (): HTMLElement | null => {
       const panel = panelRef.current;
       const preferredTarget = initialFocusTargetRef.current?.current;
-      return preferredTarget &&
+      if (
+        preferredTarget &&
         panel?.contains(preferredTarget) &&
         isFocusableElement(preferredTarget, panel)
-        ? preferredTarget
-        : initialFocus === 'heading'
-          ? headingRef.current
-          : panel
-            ? (getFocusableElements(panel)[0] ?? panel)
-            : null;
+      ) {
+        return preferredTarget;
+      }
+      if (initialFocus === 'heading') return headingRef.current;
+      if (!panel) return null;
+      return getFocusableElements(panel)[0] ?? panel;
     };
 
     // Move focus out of the application root before aria-hiding it. Browsers may reject
