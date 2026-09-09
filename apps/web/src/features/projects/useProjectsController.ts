@@ -25,7 +25,6 @@ const PROJECT_PAGE_SIZE = 20;
 export const projectQueryKeys = {
   lists: ['projects', 'list'] as const,
   list: (lifecycle: 'active' | 'archived') => ['projects', 'list', lifecycle] as const,
-  detail: (projectId: string) => ['projects', 'detail', projectId] as const,
   /** The most recent Version this Project has saved, whether or not it is still its current cut. */
   latestOutput: (projectId: string) => ['projects', 'latest-output', projectId] as const,
   /**
@@ -49,15 +48,14 @@ export const projectQueryKeys = {
 };
 
 /**
- * The single owner of how a freshly authoritative Project lands in the cache: the detail entry is
- * replaced outright (the response *is* the new truth, so refetching it would only race), and the
+ * The single owner of how a freshly authoritative Project lands in the cache. The response *is* the
+ * new truth and reaches the surfaces that show it by return value, so nothing is written here; the
  * lists are invalidated because a mutation can move a Project between lifecycle or Campaign pages.
  */
 export const reconcileProject = async (
   queryClient: QueryClient,
   current: ProjectCurrentResponse,
 ): Promise<ProjectCurrentResponse> => {
-  queryClient.setQueryData(projectQueryKeys.detail(current.project.id), current);
   await queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
   return current;
 };
@@ -101,11 +99,10 @@ export const useProjectsController = () => {
     [queryClient],
   );
 
-  const invalidateProject = useCallback(
-    async (projectId: string) => {
-      await queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId) });
-      await queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
-    },
+  // A failed mutation leaves the lists as the only cached view of this Project, so they are what
+  // has to be re-read.
+  const invalidateProjectLists = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists }),
     [queryClient],
   );
 
@@ -185,30 +182,27 @@ export const useProjectsController = () => {
       readonly title: string;
     }) => renameProject(input.projectId, input.title, input.expectedVersion),
     onSuccess: reconcile,
-    onError: (_error, input) => invalidateProject(input.projectId),
+    onError: () => invalidateProjectLists(),
   });
 
   const archiveMutation = useMutation({
     mutationFn: (input: { readonly projectId: string; readonly expectedVersion: number }) =>
       archiveProject(input.projectId, input.expectedVersion),
     onSuccess: reconcile,
-    onError: (_error, input) => invalidateProject(input.projectId),
+    onError: () => invalidateProjectLists(),
   });
 
   const restoreMutation = useMutation({
     mutationFn: (input: { readonly projectId: string; readonly expectedVersion: number }) =>
       restoreProject(input.projectId, input.expectedVersion),
     onSuccess: reconcile,
-    onError: (_error, input) => invalidateProject(input.projectId),
+    onError: () => invalidateProjectLists(),
   });
   const tombstoneMutation = useMutation({
     mutationFn: (input: { readonly projectId: string; readonly expectedVersion: number }) =>
       tombstoneProject(input.projectId, input.expectedVersion),
-    onSuccess: async (current) => {
-      queryClient.removeQueries({ queryKey: projectQueryKeys.detail(current.project.id) });
-      await queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
-    },
-    onError: (_error, input) => invalidateProject(input.projectId),
+    onSuccess: () => invalidateProjectLists(),
+    onError: () => invalidateProjectLists(),
   });
   const moveMutation = useMutation({
     mutationFn: (input: {
@@ -217,22 +211,17 @@ export const useProjectsController = () => {
       readonly expectedVersion: number;
     }) => moveProjectToCampaign(input.projectId, input.campaignId, input.expectedVersion),
     onSuccess: reconcile,
-    onError: (_error, input) => invalidateProject(input.projectId),
+    onError: () => invalidateProjectLists(),
   });
   const renameMutateAsync = renameMutation.mutateAsync;
   const archiveMutateAsync = archiveMutation.mutateAsync;
   const restoreMutateAsync = restoreMutation.mutateAsync;
 
-  const latestProject = useCallback(
-    async (projectId: string): Promise<ProjectCurrentResponse> => {
-      const current = await getProject(projectId);
-      // Lists are invalidated by `reconcile` once the follow-up mutation lands; a read
-      // that changes nothing does not need to refetch them.
-      queryClient.setQueryData(projectQueryKeys.detail(projectId), current);
-      return current;
-    },
-    [queryClient],
-  );
+  const latestProject = useCallback(async (projectId: string): Promise<ProjectCurrentResponse> => {
+    // Lists are invalidated by `reconcile` once the follow-up mutation lands; a read
+    // that changes nothing does not need to refetch them.
+    return getProject(projectId);
+  }, []);
 
   const renameLatest = useCallback(
     async (projectId: string, title: string): Promise<ProjectCurrentResponse> => {

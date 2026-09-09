@@ -23,6 +23,9 @@ interface AssetLibraryTabsProps {
   readonly onSelect: (destination: AssetDestination) => void;
 }
 
+/** Long enough to survive a round trip through the four library overlays; a mutation still wins. */
+const ASSET_COUNT_STALE_MS = 30_000;
+
 const libraryTabs: ReadonlyArray<{
   destination: AssetDestination;
   label: string;
@@ -134,13 +137,18 @@ export const AssetLibraryTabs = ({
   onSelect,
 }: AssetLibraryTabsProps) => {
   const theme = useTheme();
+  // These tabs remount on every switch between the four library overlays, and without a stale
+  // window each switch re-asked the server for two counts that a mutation would have invalidated
+  // anyway.
   const videosQuery = useQuery({
     queryKey: savedVideoQueryKeys.total,
     queryFn: ({ signal }) => listSavedVideos({ pageSize: 1, signal }),
+    staleTime: ASSET_COUNT_STALE_MS,
   });
   const voicesQuery = useQuery({
     queryKey: savedVoiceCountQueryKey,
     queryFn: ({ signal }) => fetchSavedVoiceCount(signal),
+    staleTime: ASSET_COUNT_STALE_MS,
   });
 
   const countFor = (destination: AssetDestination): AssetCountState => {

@@ -71,6 +71,26 @@ class MemoryLifecycle implements AssetLifecycleRegistry {
       storageKey: this.location.storageKey,
     });
   }
+  async claimDeletions(
+    requestOwner: string,
+    requestAssetIds: readonly string[],
+    expectedProvider: AssetStorageProvider,
+  ): Promise<ReadonlyMap<string, AssetDeletionClaim>> {
+    const claims = new Map<string, AssetDeletionClaim>();
+    for (const requestAssetId of requestAssetIds) {
+      const claim = await this.claimDeletion(requestOwner, requestAssetId, expectedProvider);
+      if (claim !== null) claims.set(requestAssetId, claim);
+    }
+    return claims;
+  }
+  async markDeletedMany(
+    requestOwner: string,
+    claims: ReadonlyMap<string, AssetDeletionClaim>,
+  ): Promise<void> {
+    for (const [requestAssetId, claim] of claims) {
+      await this.markDeleted(requestOwner, requestAssetId, claim);
+    }
+  }
   markDeleted(
     requestOwner: string,
     requestAssetId: string,

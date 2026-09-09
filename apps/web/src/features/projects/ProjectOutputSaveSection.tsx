@@ -228,10 +228,6 @@ export const ProjectOutputSaveSection = ({
         clearPendingProjectOutput(pending.ownerUserId, pending.projectId);
         setPendingAvailable(false);
         session.acceptCurrent({ project: response.project, revision: response.revision });
-        queryClient.setQueryData(projectQueryKeys.detail(pending.projectId), {
-          project: response.project,
-          revision: response.revision,
-        });
         await Promise.all([
           queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists }),
           queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.lists }),
@@ -283,7 +279,6 @@ export const ProjectOutputSaveSection = ({
             try {
               const authoritative = await getProject(pending.projectId);
               session.acceptCurrent(authoritative);
-              queryClient.setQueryData(projectQueryKeys.detail(pending.projectId), authoritative);
               refreshed = true;
             } catch {
               // The conflict is still final for this operation; a later user action can reload.
@@ -478,7 +473,6 @@ export const ProjectOutputSaveSection = ({
     try {
       latest = await getProject(current.project.id);
       session.acceptCurrent(latest);
-      queryClient.setQueryData(projectQueryKeys.detail(latest.project.id), latest);
     } catch {
       setPhase('error');
       setMessage('The Project’s latest state could not be checked. Nothing was saved.');

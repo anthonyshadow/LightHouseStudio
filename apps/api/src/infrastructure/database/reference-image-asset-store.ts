@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { buffer } from 'node:stream/consumers';
-import { and, eq, inArray, lte } from 'drizzle-orm';
+import { and, asc, eq, inArray, lte } from 'drizzle-orm';
 import type {
   ReferenceImageAssetStore,
   StoredReferenceImageContent,
@@ -20,6 +20,13 @@ import type { LightframeDatabase } from './client.js';
 import { creativeAssets, referenceImageAssets } from './schema.js';
 
 export const TEMPORARY_REFERENCE_IMAGE_INACTIVITY_MS = 24 * 60 * 60 * 1_000;
+
+/**
+ * How many expired reference images one purge may claim. Matches the expired-direct-upload sweep's
+ * batch: this runs inline on a creative-library read or write, so it has to be work an operator can
+ * wait for, not however much has accumulated.
+ */
+const EXPIRED_REFERENCE_IMAGE_PURGE_BATCH = 25;
 
 const REFERENCE_IMAGE_ID_FIELDS = new Set([
   'referenceImageAssetId',
@@ -208,16 +215,11 @@ export class DrizzleReferenceImageAssetStore implements ReferenceImageAssetStore
         : ((await this.projectRetention?.retainedAssetIds(localOwnerId, unretainedByLibrary)) ??
           new Set<string>());
     const deletableIds = unretainedByLibrary.filter((id) => !projectRetainedIds.has(id));
-    const deletedIds: string[] = [];
-    let failure: unknown;
-    for (const id of deletableIds) {
-      try {
-        await this.bytes.delete(localOwnerId, id);
-        deletedIds.push(id);
-      } catch (error) {
-        failure ??= error;
-      }
-    }
+    // One call, so a registry-backed store settles the whole set under one lock instead of taking
+    // a transaction per asset to re-ask a retention question this method has already answered.
+    const failures = await this.bytes.deleteMany(localOwnerId, deletableIds);
+    const deletedIds = deletableIds.filter((id) => !failures.has(id));
+    const failure = [...failures.values()][0];
     if (deletedIds.length > 0) {
       await this.db
         .delete(referenceImageAssets)
@@ -244,10 +246,16 @@ export class DrizzleReferenceImageAssetStore implements ReferenceImageAssetStore
 
   async purgeExpiredUnreferenced(): Promise<number> {
     const cutoff = new Date(this.now().getTime() - TEMPORARY_REFERENCE_IMAGE_INACTIVITY_MS);
+    // Bounded and ordered, because both callers await this on a request the operator is waiting
+    // on. Oldest first so a backlog drains in a stable order instead of re-reading whatever the
+    // planner happened to return, and the leftovers are picked up by the next library read or
+    // write — which is the continuation the retry comments below already assume.
     const candidates = await this.db
       .select({ id: referenceImageAssets.id, ownerUserId: referenceImageAssets.ownerUserId })
       .from(referenceImageAssets)
-      .where(lte(referenceImageAssets.updatedAt, cutoff.toISOString()));
+      .where(lte(referenceImageAssets.updatedAt, cutoff.toISOString()))
+      .orderBy(asc(referenceImageAssets.updatedAt), asc(referenceImageAssets.id))
+      .limit(EXPIRED_REFERENCE_IMAGE_PURGE_BATCH);
     const candidatesByOwner = new Map<string, string[]>();
     for (const candidate of candidates) {
       const ownerCandidates = candidatesByOwner.get(candidate.ownerUserId) ?? [];

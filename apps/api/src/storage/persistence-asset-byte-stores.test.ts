@@ -28,6 +28,7 @@ const byteStore = (overrides: Partial<AssetByteStore> = {}): AssetByteStore => (
   open: vi.fn().mockResolvedValue(handle),
   exists: vi.fn().mockResolvedValue(true),
   delete: vi.fn().mockResolvedValue(undefined),
+  deleteMany: vi.fn().mockResolvedValue(new Map()),
   ...overrides,
 });
 
@@ -42,7 +43,11 @@ const lifecycle = (overrides: Partial<AssetLifecycleRegistry> = {}): AssetLifecy
     etag: null,
   }),
   claimDeletion: vi.fn().mockResolvedValue({ provider: 'local', storageKey: assetId }),
+  claimDeletions: vi
+    .fn()
+    .mockResolvedValue(new Map([[assetId, { provider: 'local', storageKey: assetId }]])),
   markDeleted: vi.fn().mockResolvedValue(undefined),
+  markDeletedMany: vi.fn().mockResolvedValue(undefined),
   ...overrides,
 });
 

@@ -361,10 +361,6 @@ export const useProjectSourceController = (
       // this acceptance and re-fetch media it is already about to present.
       const mediaIdentity = JSON.stringify(response.revision.snapshot.presentedMedia);
       hydratedMediaRef.current = mediaIdentity;
-      queryClient.setQueryData(projectQueryKeys.detail(projectId), {
-        project: response.project,
-        revision: response.revision,
-      });
       onCurrentChange?.({ project: response.project, revision: response.revision });
       await queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
       if (
@@ -386,7 +382,7 @@ export const useProjectSourceController = (
       setMessage(null);
       setPhase('saved');
     },
-    [onCurrentChange, operation, presentAccepted, presentOnStage, projectId, queryClient],
+    [onCurrentChange, operation, presentAccepted, presentOnStage, queryClient],
   );
 
   const finishRemoval = useCallback(

@@ -22,8 +22,13 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { z } from 'zod';
 import { persistedTimestampSchema } from '../application/timestamps.js';
 import { withWorkflowSpan } from '../observability/telemetry.js';
-import type { AssetLifecycleRegistry } from './asset-lifecycle.js';
-import type { AssetByteStore, AssetReadHandle, StoredAssetManifest } from './asset-byte-store.js';
+import type { AssetDeletionClaim, AssetLifecycleRegistry } from './asset-lifecycle.js';
+import {
+  deleteAssetsIndividually,
+  type AssetByteStore,
+  type AssetReadHandle,
+  type StoredAssetManifest,
+} from './asset-byte-store.js';
 
 const sha256File = async (filePath: string): Promise<string> => {
   const handle = await open(filePath, 'r');
@@ -557,19 +562,46 @@ export class R2AssetByteStore implements AssetByteStore {
   }
 
   async delete(ownerUserId: string, assetId: string): Promise<void> {
-    let key: string;
     if (this.#lifecycle === undefined) {
       if ((await this.open(ownerUserId, assetId)) === null) return;
-      key = this.#key(assetId);
-    } else {
-      // `deleting` remains claimable so a failed R2 request can be retried idempotently.
-      const claim = await this.#lifecycle.claimDeletion(ownerUserId, assetId, 'r2');
-      if (claim === null) return;
-      key = claim.storageKey;
-      await this.#client.send(new DeleteObjectCommand({ Bucket: this.#bucket, Key: key }));
-      await this.#lifecycle.markDeleted(ownerUserId, assetId, claim);
+      await this.#client.send(
+        new DeleteObjectCommand({ Bucket: this.#bucket, Key: this.#key(assetId) }),
+      );
       return;
     }
-    await this.#client.send(new DeleteObjectCommand({ Bucket: this.#bucket, Key: key }));
+    // `deleting` remains claimable so a failed R2 request can be retried idempotently.
+    const claim = await this.#lifecycle.claimDeletion(ownerUserId, assetId, 'r2');
+    if (claim === null) return;
+    await this.#client.send(
+      new DeleteObjectCommand({ Bucket: this.#bucket, Key: claim.storageKey }),
+    );
+    await this.#lifecycle.markDeleted(ownerUserId, assetId, claim);
+  }
+
+  async deleteMany(
+    ownerUserId: string,
+    assetIds: readonly string[],
+  ): Promise<ReadonlyMap<string, unknown>> {
+    const lifecycle = this.#lifecycle;
+    if (lifecycle === undefined) return deleteAssetsIndividually(this, ownerUserId, assetIds);
+    // One claim and one settlement for the whole set. `deleting` remains claimable, so an object
+    // whose R2 request failed is left for the next pass to retry idempotently, exactly as a single
+    // delete does.
+    const claims = await lifecycle.claimDeletions(ownerUserId, assetIds, 'r2');
+    const claimed = [...claims];
+    const removals = await Promise.allSettled(
+      claimed.map(([, claim]) =>
+        this.#client.send(new DeleteObjectCommand({ Bucket: this.#bucket, Key: claim.storageKey })),
+      ),
+    );
+    const failures = new Map<string, unknown>();
+    const settled = new Map<string, AssetDeletionClaim>();
+    removals.forEach((result, index) => {
+      const [assetId, claim] = claimed[index]!;
+      if (result.status === 'rejected') failures.set(assetId, result.reason);
+      else settled.set(assetId, claim);
+    });
+    await lifecycle.markDeletedMany(ownerUserId, settled);
+    return failures;
   }
 }

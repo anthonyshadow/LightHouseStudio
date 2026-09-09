@@ -692,11 +692,15 @@ export class ProjectProcessingService {
     return this.#lock.run(`${ownerUserId}:${operationId}:reconcile`, async () => {
       let attempt = await this.processing.getProjectAttempt(ownerUserId, projectId, operationId);
       if (attempt === null) return null;
-      if (
-        attempt.outputAssetId === null &&
-        (await this.bytes.exists(attempt.ownerUserId, attempt.resultAssetId))
-      ) {
-        attempt = await this.#retainResult(attempt);
+      // Opened rather than probed for existence: `exists` is implemented as `open`, and retaining
+      // reads the same object again on the next line. This runs on every tick of a poll that lasts
+      // the life of the job.
+      const durableResult =
+        attempt.outputAssetId === null
+          ? await this.bytes.open(attempt.ownerUserId, attempt.resultAssetId)
+          : null;
+      if (durableResult !== null) {
+        attempt = await this.#retainResult(attempt, durableResult);
         if (attempt.outputAssetId !== null) return attempt;
       }
       let volatileReady = false;
@@ -725,12 +729,21 @@ export class ProjectProcessingService {
     });
   }
 
+  /**
+   * `openedResult` is the already-open result asset for a caller that has just looked. Omitted —
+   * not `null` — by a caller that has not, because `null` is the answer "looked, nothing there",
+   * which must take the lease path rather than look again.
+   */
   async #retainResult(
     attempt: ProjectProcessingAttemptRecord,
+    openedResult?: AssetReadHandle | null,
   ): Promise<ProjectProcessingAttemptRecord> {
     let lease: Awaited<ReturnType<VideoJobService['content']>> | null = null;
     try {
-      let asset = await this.bytes.open(attempt.ownerUserId, attempt.resultAssetId);
+      let asset =
+        openedResult === undefined
+          ? await this.bytes.open(attempt.ownerUserId, attempt.resultAssetId)
+          : openedResult;
       let inspected: InspectedVideo;
       if (asset === null) {
         lease = await this.videoJobs.content(attempt.operationId, attempt.ownerUserId);

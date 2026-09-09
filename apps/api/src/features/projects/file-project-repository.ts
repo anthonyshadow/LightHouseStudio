@@ -2515,21 +2515,20 @@ export class FileProjectRepository
         versionReferences.set(`${link.savedVideoId}:${link.videoVersionId}`, link);
       }
     }
-    for (const { savedVideoId, videoVersionId } of versionReferences.values()) {
-      const retainedVersion = await this.#savedVideos.getRetainedVersion(
-        ownerUserId,
-        savedVideoId,
-        videoVersionId,
-      );
-      if (retainedVersion === null) continue;
-      if (candidates.has(retainedVersion.version.assetId)) {
-        retained.add(retainedVersion.version.assetId);
-      }
-      if (
-        retainedVersion.version.thumbnailAssetId !== null &&
-        candidates.has(retainedVersion.version.thumbnailAssetId)
-      ) {
-        retained.add(retainedVersion.version.thumbnailAssetId);
+    // The batched reader indexes the library once instead of re-scanning it per reference, which
+    // is how `project-history-service` already resolves this same shape. A reference that resolves
+    // to nothing is still skipped silently, and deleted videos still count as retaining.
+    const retainedVersions = await this.#savedVideos.getRetainedVersions(
+      ownerUserId,
+      [...versionReferences.values()].map(({ savedVideoId, videoVersionId }) => ({
+        videoId: savedVideoId,
+        versionId: videoVersionId,
+      })),
+    );
+    for (const { version } of retainedVersions) {
+      if (candidates.has(version.assetId)) retained.add(version.assetId);
+      if (version.thumbnailAssetId !== null && candidates.has(version.thumbnailAssetId)) {
+        retained.add(version.thumbnailAssetId);
       }
     }
     return retained;

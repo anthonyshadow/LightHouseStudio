@@ -1,4 +1,9 @@
-import type { AssetByteStore, AssetReadHandle, StoredAssetManifest } from './asset-byte-store.js';
+import {
+  deleteAssetsIndividually,
+  type AssetByteStore,
+  type AssetReadHandle,
+  type StoredAssetManifest,
+} from './asset-byte-store.js';
 
 /**
  * Transitional R2 cutover adapter: new writes must reach both stores; reads prefer R2 and retain
@@ -52,5 +57,12 @@ export class ShadowAssetByteStore implements AssetByteStore {
       (result): result is PromiseRejectedResult => result.status === 'rejected',
     );
     if (failed !== undefined) throw failed.reason;
+  }
+
+  deleteMany(
+    ownerUserId: string,
+    assetIds: readonly string[],
+  ): Promise<ReadonlyMap<string, unknown>> {
+    return deleteAssetsIndividually(this, ownerUserId, assetIds);
   }
 }
