@@ -1,4 +1,4 @@
-import type { AssetLifecycleRegistry } from './asset-lifecycle.js';
+import type { AssetDeletionClaim, AssetLifecycleRegistry } from './asset-lifecycle.js';
 import type { AssetByteStore, AssetReadHandle, StoredAssetManifest } from './asset-byte-store.js';
 
 /** Adds the SQL lifecycle record required by relational media references to a local byte store. */
@@ -47,5 +47,27 @@ export class ManagedLocalAssetByteStore implements AssetByteStore {
     if (claim === null) return;
     await this.bytes.delete(ownerUserId, claim.storageKey);
     await this.lifecycle.markDeleted(ownerUserId, assetId, claim);
+  }
+
+  async deleteMany(
+    ownerUserId: string,
+    assetIds: readonly string[],
+  ): Promise<ReadonlyMap<string, unknown>> {
+    // One claim and one settlement for the set: the lifecycle rows are what made a per-asset
+    // deletion cost a transaction each, and the byte removals below are per object either way.
+    const claims = await this.lifecycle.claimDeletions(ownerUserId, assetIds, 'local');
+    const claimed = [...claims];
+    const removals = await Promise.allSettled(
+      claimed.map(([, claim]) => this.bytes.delete(ownerUserId, claim.storageKey)),
+    );
+    const failures = new Map<string, unknown>();
+    const settled = new Map<string, AssetDeletionClaim>();
+    removals.forEach((result, index) => {
+      const [assetId, claim] = claimed[index]!;
+      if (result.status === 'rejected') failures.set(assetId, result.reason);
+      else settled.set(assetId, claim);
+    });
+    await this.lifecycle.markDeletedMany(ownerUserId, settled);
+    return failures;
   }
 }

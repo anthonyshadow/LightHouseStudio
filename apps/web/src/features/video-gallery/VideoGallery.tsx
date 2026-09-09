@@ -83,6 +83,12 @@ import {
 import { ActionMenu } from '../../ui/primitives/ActionMenu';
 import { PROJECT_SET_ORIGINAL_VIDEO_ACTION_LABEL } from '../projects/projectProcessingPresentation';
 
+/**
+ * Shared by the deep-link fetch and the preview's own read so the two are one request. Every write
+ * that changes a Saved Video happens in this component and updates the cache directly.
+ */
+const PREVIEW_DETAIL_STALE_MS = 30_000;
+
 const duration = (milliseconds: number): string => {
   const seconds = Math.round(milliseconds / 1_000);
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -466,6 +472,10 @@ export const VideoGallery = ({
     queryKey: savedVideoQueryKeys.detail(previewVideo?.id ?? ''),
     queryFn: ({ signal }) => getSavedVideo(previewVideo!.id, signal),
     enabled: previewVideo !== null,
+    // Without this the deep-link fetch below wrote a cache entry that was stale the instant it
+    // landed, so opening the preview it had just resolved fetched the same detail a second time.
+    // Every mutation that changes a Saved Video is in this component and writes the cache itself.
+    staleTime: PREVIEW_DETAIL_STALE_MS,
   });
 
   const replaceVideoInLists = (updated: SavedVideoSummary) => {
@@ -546,6 +556,7 @@ export const VideoGallery = ({
       .fetchQuery({
         queryKey: savedVideoQueryKeys.detail(focusVideoId),
         queryFn: ({ signal }) => getSavedVideo(focusVideoId, signal),
+        staleTime: PREVIEW_DETAIL_STALE_MS,
       })
       .then((focused) => {
         if (abandoned) return;

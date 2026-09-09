@@ -614,6 +614,30 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
         },
       ]);
 
+      // A processing attempt this Project admitted, written in production by `admitProjectAttempt`.
+      // It is what makes the archive below refuse with `active-jobs`.
+      await connection.db.insert(projectJobs).values({
+        projectId,
+        ownerUserId,
+        jobId,
+        initiatingRevisionId: secondRevisionId,
+        initiatingRevisionNumber: 2,
+        createdAt: later,
+      });
+
+      // The Version this Project saved, written in production by `commit` in the same transaction
+      // as the revision that points at it. The append below only has to find it, because
+      // `assertLastSuccessfulOutput` refuses a current-output pointer that names no exact relation.
+      await connection.db.insert(projectOutputs).values({
+        projectId,
+        ownerUserId,
+        savedVideoId,
+        videoVersionId,
+        producingRevisionId: secondRevisionId,
+        producingRevisionNumber: 2,
+        createdAt: later,
+      });
+
       const completed = appendProjectRevision(
         appended.value,
         {
@@ -921,6 +945,7 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
             (assetId === sourceAssetId || assetId === renditionAssetId),
         ),
       delete: () => Promise.resolve(),
+      deleteMany: () => Promise.resolve(new Map()),
     };
     const repository = new DrizzleProjectRepository(connection.db);
     const savedVideoRepository = new DrizzleSavedVideoRepository(connection.db);

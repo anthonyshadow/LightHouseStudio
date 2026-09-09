@@ -689,18 +689,13 @@ export class SavedVideoService {
     const deletableAssetIds = discardedAssetIds.filter(
       (assetId) => !savedVideoRetainedIds.has(assetId) && !projectRetainedIds.has(assetId),
     );
-    const results = await Promise.allSettled(
-      deletableAssetIds.map((assetId) => this.#bytes.delete(ownerUserId, assetId)),
-    );
-    const failed = results.find(
-      (result): result is PromiseRejectedResult => result.status === 'rejected',
-    );
-    if (failed !== undefined) {
+    const failures = await this.#bytes.deleteMany(ownerUserId, deletableAssetIds);
+    if (failures.size > 0) {
       throw new AppError(
         503,
         'storage_failure',
         'The saved video was removed, but its stored media could not be deleted. Retry deletion.',
-        { cause: failed.reason },
+        { cause: [...failures.values()][0] },
       );
     }
   }

@@ -57,7 +57,37 @@ export interface AssetByteStore {
   open(ownerUserId: string, assetId: string): Promise<AssetReadHandle | null>;
   exists(ownerUserId: string, assetId: string): Promise<boolean>;
   delete(ownerUserId: string, assetId: string): Promise<void>;
+  /**
+   * Deletes several assets, answering with the failures keyed by asset id — an empty map means
+   * every one is gone. Partial failure is the normal case here, not an exception: a caller
+   * discarding a set has to know which bytes it may forget about and which to retry, and a store
+   * backed by a lifecycle registry can settle the whole set under one lock instead of one each.
+   */
+  deleteMany(
+    ownerUserId: string,
+    assetIds: readonly string[],
+  ): Promise<ReadonlyMap<string, unknown>>;
 }
+
+/**
+ * The `deleteMany` a store with nothing to batch inherits: deletion is per object, so the only
+ * honest implementation is to attempt each and report which failed.
+ */
+export const deleteAssetsIndividually = async (
+  store: Pick<AssetByteStore, 'delete'>,
+  ownerUserId: string,
+  assetIds: readonly string[],
+): Promise<ReadonlyMap<string, unknown>> => {
+  const failures = new Map<string, unknown>();
+  const requested = [...new Set(assetIds)];
+  const settled = await Promise.allSettled(
+    requested.map((assetId) => store.delete(ownerUserId, assetId)),
+  );
+  settled.forEach((result, index) => {
+    if (result.status === 'rejected') failures.set(requested[index]!, result.reason);
+  });
+  return failures;
+};
 
 const extensionForMimeType = (mimeType: string): string =>
   mimeType === 'video/mp4'
@@ -237,5 +267,12 @@ export class LocalAssetByteStore implements AssetByteStore {
   async delete(ownerUserId: string, assetId: string): Promise<void> {
     const asset = await this.open(ownerUserId, assetId);
     if (asset !== null) await rm(this.#directory(assetId), { recursive: true, force: true });
+  }
+
+  deleteMany(
+    ownerUserId: string,
+    assetIds: readonly string[],
+  ): Promise<ReadonlyMap<string, unknown>> {
+    return deleteAssetsIndividually(this, ownerUserId, assetIds);
   }
 }

@@ -28,5 +28,21 @@ export interface AssetLifecycleRegistry {
     assetId: string,
     expectedProvider: AssetStorageProvider,
   ): Promise<AssetDeletionClaim | null>;
+  /**
+   * The batch form, keyed by asset id and holding only the assets this call claimed. One lock and
+   * one retention question for the whole set: a Saved Video delete or an expired-image purge hands
+   * over every id it has already decided is unreferenced, and asking again per id cost a
+   * transaction each.
+   */
+  claimDeletions(
+    ownerUserId: string,
+    assetIds: readonly string[],
+    expectedProvider: AssetStorageProvider,
+  ): Promise<ReadonlyMap<string, AssetDeletionClaim>>;
   markDeleted(ownerUserId: string, assetId: string, claim: AssetDeletionClaim): Promise<void>;
+  /** The batch form of `markDeleted`, for claims taken together by `claimDeletions`. */
+  markDeletedMany(
+    ownerUserId: string,
+    claims: ReadonlyMap<string, AssetDeletionClaim>,
+  ): Promise<void>;
 }

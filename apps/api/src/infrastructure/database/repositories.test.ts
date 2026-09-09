@@ -138,17 +138,9 @@ describe('DrizzleAssetLifecycleRegistry', () => {
       provider: readyRow.storageProvider,
       storageKey: readyRow.storageKey,
     };
-    const scripted = scriptedDatabase(
-      [],
-      [],
-      [],
-      [readyRow],
-      [deletionClaim],
-      [deletionClaim],
-      [],
-      [],
-      [],
-    );
+    // The claim is taken in batch form, so both the locking select and the update carry the id.
+    const claimRow = { id: assetId, ...deletionClaim };
+    const scripted = scriptedDatabase([], [], [], [readyRow], [claimRow], [claimRow], [], [], []);
     const repository = new DrizzleAssetLifecycleRegistry(scripted.db);
 
     await repository.prepare(manifest, { provider: 'r2', storageKey: readyRow.storageKey });
@@ -169,15 +161,18 @@ describe('DrizzleAssetLifecycleRegistry', () => {
   });
 
   it('does not claim bytes retained by any Project lifecycle state', async () => {
-    const deletionClaim = { provider: 'r2' as const, storageKey: `media/v1/${assetId}` };
-    const scripted = scriptedDatabase([deletionClaim]);
-    const projectRetention = { retainsAssetWith: vi.fn().mockResolvedValue(true) };
+    const scripted = scriptedDatabase([
+      { id: assetId, provider: 'r2' as const, storageKey: `media/v1/${assetId}` },
+    ]);
+    const projectRetention = {
+      retainedAssetIdsWith: vi.fn().mockResolvedValue(new Set([assetId])),
+    };
     const repository = new DrizzleAssetLifecycleRegistry(scripted.db, projectRetention);
 
     await expect(repository.claimDeletion(ownerUserId, assetId, 'r2')).resolves.toBeNull();
-    expect(projectRetention.retainsAssetWith.mock.calls[0]?.slice(1)).toEqual([
+    expect(projectRetention.retainedAssetIdsWith.mock.calls[0]?.slice(1)).toEqual([
       ownerUserId,
-      assetId,
+      [assetId],
     ]);
     expect(scripted.calls.map(({ operation }) => operation)).not.toContain('update');
     expect(scripted.remaining()).toBe(0);
@@ -955,8 +950,12 @@ describe('DrizzleReferenceImageAssetStore', () => {
   });
 
   it('deletes only owner assets that no saved creative record references', async () => {
+    const deleted: string[] = [];
     const bytes = {
-      delete: vi.fn().mockResolvedValue(undefined),
+      deleteMany: vi.fn((_ownerUserId: string, assetIds: readonly string[]) => {
+        deleted.push(...assetIds);
+        return Promise.resolve(new Map());
+      }),
     } as unknown as AssetByteStore;
     const savedScript = scriptedDatabase(
       [{ id: assetId }],
@@ -964,7 +963,7 @@ describe('DrizzleReferenceImageAssetStore', () => {
     );
     const savedRepository = new DrizzleReferenceImageAssetStore(savedScript.db, bytes);
     await expect(savedRepository.discardIfUnreferenced(ownerUserId, assetId)).resolves.toBe(false);
-    expect(bytes.delete).not.toHaveBeenCalled();
+    expect(deleted).toEqual([]);
     expect(savedScript.remaining()).toBe(0);
 
     const temporaryScript = scriptedDatabase([{ id: assetId }], [], []);
@@ -972,10 +971,10 @@ describe('DrizzleReferenceImageAssetStore', () => {
     await expect(temporaryRepository.discardIfUnreferenced(ownerUserId, assetId)).resolves.toBe(
       true,
     );
-    expect(bytes.delete).toHaveBeenCalledWith(ownerUserId, assetId);
+    expect(deleted).toEqual([assetId]);
     expect(temporaryScript.remaining()).toBe(0);
 
-    vi.mocked(bytes.delete).mockClear();
+    deleted.length = 0;
     const retainedScript = scriptedDatabase([{ id: assetId }], []);
     const projectRetention = {
       retainsAsset: vi.fn().mockResolvedValue(true),
@@ -992,7 +991,7 @@ describe('DrizzleReferenceImageAssetStore', () => {
     );
     expect(projectRetention.retainedAssetIds).toHaveBeenCalledWith(ownerUserId, [assetId]);
     expect(projectRetention.retainsAsset).not.toHaveBeenCalled();
-    expect(bytes.delete).not.toHaveBeenCalled();
+    expect(deleted).toEqual([]);
     expect(retainedScript.remaining()).toBe(0);
   });
 });

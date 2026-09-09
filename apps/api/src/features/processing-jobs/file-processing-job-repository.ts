@@ -124,6 +124,19 @@ const activeStatus = (status: VideoProcessingJobTrace['status']): boolean =>
 export class FileProcessingJobRepository implements DurableProcessingJobRepository {
   readonly #root: string;
   readonly #locks = new Map<string, Promise<void>>();
+  /**
+   * Owner to that owner's job ids in an active status, or null until something needs it.
+   *
+   * `admit` asks this store exactly one question — does this owner already have work in flight —
+   * and answering it by reading every trace ever written made the common case the worst one:
+   * nothing deletes a terminal trace, so an owner with no active job paid a read and two parses
+   * per trace they had ever run, on the path that gates a paid provider call.
+   *
+   * Held as the in-flight promise so concurrent admissions share one scan. `upsert` is the only
+   * writer and keeps it current, which is the same single-process assumption the per-job write
+   * mutex above already makes.
+   */
+  #activeJobsByOwner: Promise<Map<string, Set<string>>> | null = null;
   constructor(dataDirectory: string) {
     this.#root = path.resolve(dataDirectory, 'metadata', 'v1', 'processing-jobs');
   }
@@ -139,6 +152,32 @@ export class FileProcessingJobRepository implements DurableProcessingJobReposito
       if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null;
       throw error;
     }
+  }
+
+  #recordActivity(index: Map<string, Set<string>>, trace: VideoProcessingJobTrace): void {
+    const owned = index.get(trace.ownerUserId);
+    if (!activeStatus(trace.status)) {
+      if (owned === undefined) return;
+      owned.delete(trace.jobId);
+      if (owned.size === 0) index.delete(trace.ownerUserId);
+      return;
+    }
+    if (owned === undefined) index.set(trace.ownerUserId, new Set([trace.jobId]));
+    else owned.add(trace.jobId);
+  }
+
+  #activeJobs(): Promise<Map<string, Set<string>>> {
+    this.#activeJobsByOwner ??= (async () => {
+      const index = new Map<string, Set<string>>();
+      for (const trace of await this.#list()) this.#recordActivity(index, trace);
+      return index;
+    })().catch((error: unknown) => {
+      // A failed scan must not be cached as the answer: an unreadable trace directory has to keep
+      // refusing admissions rather than start reporting every owner as idle.
+      this.#activeJobsByOwner = null;
+      throw error;
+    });
+    return this.#activeJobsByOwner;
   }
 
   async #list(): Promise<readonly VideoProcessingJobTrace[]> {
@@ -170,12 +209,7 @@ export class FileProcessingJobRepository implements DurableProcessingJobReposito
         ? 'duplicate'
         : 'request-conflict';
     }
-    if (
-      (await this.#list()).some(
-        (candidate) =>
-          candidate.ownerUserId === trace.ownerUserId && activeStatus(candidate.status),
-      )
-    ) {
+    if (((await this.#activeJobs()).get(trace.ownerUserId)?.size ?? 0) > 0) {
       return 'owner-conflict';
     }
     await this.upsert(trace);
@@ -208,6 +242,14 @@ export class FileProcessingJobRepository implements DurableProcessingJobReposito
       } catch (error) {
         await rm(temporary, { force: true }).catch(() => undefined);
         throw error;
+      }
+      // The trace is durable, so keep the admission index current — but never fail a completed
+      // write over a cache: a scan that has since failed is dropped and rebuilt on next use. An
+      // index nothing has asked for yet is left alone; it will read this write when it builds.
+      if (this.#activeJobsByOwner !== null) {
+        const index = await this.#activeJobsByOwner.catch(() => null);
+        if (index === null) this.#activeJobsByOwner = null;
+        else this.#recordActivity(index, trace);
       }
     } finally {
       release();
