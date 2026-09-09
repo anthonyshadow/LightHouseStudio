@@ -16,8 +16,15 @@ export interface AssetDeletionClaim {
 
 /**
  * Claims a set, removes each claimed object, and settles the ones that went — answering with the
- * failures keyed by asset id and never throwing. A failure of the claim or the settlement itself
- * is reported against every asset asked about, because none of them can be said to be gone.
+ * failures keyed by asset id and never throwing.
+ *
+ * A failure of the claim or of the settlement is reported against every asset asked about. For a
+ * claim failure that is simply true: nothing was removed. For a settlement failure it is
+ * deliberately pessimistic — some objects are gone, but the bookkeeping that would let a caller
+ * forget them did not land, so their lifecycle rows are still `deleting`. Reporting those as
+ * succeeded would let the caller drop its own record of them, and nothing would ever reclaim the
+ * stranded rows; reporting them as failed keeps the record that a later pass retries from, and the
+ * object removal is idempotent.
  *
  * Shared by the two registry-backed byte stores: only the object removal differs between them.
  */

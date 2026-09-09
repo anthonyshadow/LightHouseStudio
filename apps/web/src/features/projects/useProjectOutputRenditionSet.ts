@@ -1,5 +1,9 @@
 import type { ProjectCurrentResponse, SaveProjectOutputRequest } from '@studio/contracts';
-import { projectExportFilename, type ProjectExportSpecification } from '@studio/domain';
+import {
+  projectExportFilename,
+  projectExportSpecificationsEqual,
+  type ProjectExportSpecification,
+} from '@studio/domain';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { QueryClient } from '@tanstack/react-query';
 import { ApiClientError } from '../../adapters/api-client/apiClient';
@@ -32,12 +36,23 @@ interface ProduceInput {
   readonly signal: AbortSignal;
 }
 
+/**
+ * Whether a stored attempt was making exactly what is being asked for now.
+ *
+ * Compared through the domain's own equality, which counts the resolution and the audio choice and
+ * not only the aspect: an operator who reopened a stopped run and changed a placement's resolution
+ * is asking for different bytes, and matching on aspect alone would resume the old ones and skip
+ * that member as already stored.
+ */
 const specificationsMatch = (
   left: readonly ProjectExportSpecification[],
   right: readonly ProjectOutputRenditionMember[],
 ): boolean =>
   left.length === right.length &&
-  left.every((specification, index) => specification.aspect === right[index]?.specification.aspect);
+  left.every((specification, index) => {
+    const stored = right[index]?.specification;
+    return stored !== undefined && projectExportSpecificationsEqual(specification, stored);
+  });
 
 /**
  * Produces every placement of one save, one at a time, from a single read of the cut.
@@ -71,10 +86,15 @@ export const useProjectOutputRenditionSet = (
       variantSetId,
       signal,
     }: ProduceInput): Promise<ProjectOutputRenditionSetResult | null> => {
+      const media = latest.revision.snapshot.workingMedia;
+      if (media === null) {
+        setStatus('settled');
+        return null;
+      }
       const basis = {
         expectedVersion: latest.project.version,
         expectedRevisionNumber: latest.project.currentRevisionNumber,
-        media: latest.revision.snapshot.workingMedia,
+        media,
       };
       const stored = store.load(ownerUserId);
       /*
@@ -103,19 +123,21 @@ export const useProjectOutputRenditionSet = (
         current = next;
         setMembers(next);
         const existing = store.load(ownerUserId);
-        // Read-compare-write: a record another attempt owns is left exactly as it is.
+        // Read-compare-write: a record another attempt owns is left exactly as it is. Re-read every
+        // time rather than latched, so an attempt that finishes and clears its record hands the
+        // slot back to one still running instead of silencing it for the rest of its run.
         if (existing !== null && existing.attemptId !== attemptId) return true;
         return store.save(ownerUserId, {
           attemptId,
           projectId,
-          basis: { ...basis, media: basis.media! },
+          basis,
           variantSetId,
           members: next,
         });
       };
 
       setStatus('producing');
-      if (basis.media === null || !persist(current)) {
+      if (!persist(current)) {
         setStatus('settled');
         return null;
       }
@@ -176,10 +198,16 @@ export const useProjectOutputRenditionSet = (
             specification: member.specification,
             signal,
           });
+          /*
+           * Recorded before the stop is honoured, not after. These bytes are on the server whether
+           * or not the operator has since pressed Stop, and a member left `pending` here is both
+           * dropped from the save and — when nothing else stored — taken with the record that holds
+           * its `operationKey`, so the retry uploads a second copy of what is already there.
+           */
+          at({ outcome: 'stored', assetId: uploaded.media.assetId, reason: null });
           if (signal.aborted) {
             break;
           }
-          at({ outcome: 'stored', assetId: uploaded.media.assetId, reason: null });
         } catch (error) {
           if (signal.aborted) {
             break;
