@@ -1,3 +1,4 @@
+import { VIDEO_JOB_TTL_MS } from '@studio/contracts';
 import { errorClassOf } from '../../http/errors.js';
 import {
   AI_USAGE_RECONCILE_BATCH,
@@ -16,6 +17,16 @@ const LEDGER_RECONCILE_INTERVAL_MS = 60_000;
 
 /** A refused retention is worth retrying, but never faster than the operator would notice. */
 const MAXIMUM_RETENTION_BACKOFF_MS = 5 * 60 * 1_000;
+
+/**
+ * How long a backoff entry may go unseen before it is dropped regardless of what a pass covered.
+ *
+ * The prune below runs only after a complete pass, which is the right rule while complete passes
+ * happen. A deployment busy enough to truncate every pass would otherwise never prune at all, and
+ * the map would keep an entry for every job that ever refused, for the life of the process. A job
+ * absent for longer than this has outlived any hour it could still be retained in.
+ */
+const RETENTION_BACKOFF_MAX_IDLE_MS = VIDEO_JOB_TTL_MS;
 
 const PROGRESSION_FAILED = '[video-job-progression] Progression pass failed.';
 const RETENTION_FAILED = '[video-job-progression] Project result retention failed.';
@@ -98,7 +109,7 @@ export class VideoJobProgressionTick {
   /** Per job: how many retentions in a row it has refused, and when it may be tried again. */
   readonly #retentionBackoff = new Map<
     string,
-    { readonly attempts: number; readonly nextAttemptAtMs: number }
+    { readonly attempts: number; readonly nextAttemptAtMs: number; readonly lastSeenAtMs: number }
   >();
   #inFlight: Promise<void> | null = null;
   #skippedOverlap = 0;
@@ -203,10 +214,14 @@ export class VideoJobProgressionTick {
      * that cannot land a fresh full-rate retry every pass, which is what the backoff exists to
      * stop. A truncated pass forgets nothing; the next complete one does the pruning.
      */
-    if (!progression.readyTruncated) {
-      const stillReady = new Set(ready.map((entry) => entry.jobId));
-      for (const jobId of [...this.#retentionBackoff.keys()]) {
-        if (!stillReady.has(jobId)) this.#retentionBackoff.delete(jobId);
+    const stillReady = new Set(ready.map((entry) => entry.jobId));
+    const prunedBefore = this.#now() - RETENTION_BACKOFF_MAX_IDLE_MS;
+    for (const [jobId, backoff] of [...this.#retentionBackoff]) {
+      if (stillReady.has(jobId)) continue;
+      // A complete pass proves the absence; a truncated one only proves it for entries so old that
+      // the job behind them cannot still be ready whatever the pass did or did not cover.
+      if (!progression.readyTruncated || backoff.lastSeenAtMs <= prunedBefore) {
+        this.#retentionBackoff.delete(jobId);
       }
     }
     const projectProcessing = this.#projectProcessing;
@@ -237,6 +252,7 @@ export class VideoJobProgressionTick {
       const failures = (this.#retentionBackoff.get(entry.jobId)?.attempts ?? 0) + 1;
       this.#retentionBackoff.set(entry.jobId, {
         attempts: failures,
+        lastSeenAtMs: this.#now(),
         // The first refusal already costs a whole pass: a job that cannot land should stop
         // competing with the ones that can immediately, not after several more attempts.
         nextAttemptAtMs:

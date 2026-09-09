@@ -169,10 +169,11 @@ export class AiUsageReconciler {
 
     // No durable row at all: nothing survived to say how the submission ended. Ambiguity is only
     // claimed once the job's own deadline has certainly passed, so a job a live process is still
-    // about to close properly is never labelled from here — that deadline is `createdAt + TTL`,
-    // always the earlier of the two, since a row opens after its job is created. An unreadable
-    // instant yields no deadline at all, and the row waits for a reader that can make sense of it
-    // rather than being called ambiguous over a parse failure.
+    // about to close properly is never labelled from here. The row's own `submittedAt` is what
+    // dates that deadline, and it is stamped after the job record exists — so this waits out the
+    // later of the two instants, never the earlier, which is the safe direction to err in. An
+    // unreadable instant yields no deadline at all, and the row waits for a reader that can make
+    // sense of it rather than being called ambiguous over a parse failure.
     const deadlineMs = Date.parse(entry.submittedAt) + VIDEO_JOB_TTL_MS;
     if (Number.isNaN(deadlineMs) || deadlineMs > nowMs) return null;
     return { ...entry, outcome: 'ambiguous', completedAt: new Date(nowMs).toISOString() };
