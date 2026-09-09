@@ -75,6 +75,13 @@ code changes**. Deliver the plan for approval.
 
 ## Phase 1 — Coherence and trust
 
+> **Landed 2026-09-02 — do not run these prompts.** They are kept as the record of what was asked.
+> Anything below written in the imperative has already been done, and names in them describe the
+> code as it was: the editor is now called **Edit video** everywhere, and the e2e journey once
+> called "provider-free Adjust video renders locally" is now
+> `"provider-free Edit video edits on every engine…"` in `e2e/existing-video.spec.ts`. What shipped,
+> with evidence per item, is in [Phase 1 verification](../audits/PHASE_1_VERIFICATION.md).
+
 **01 (A) — Editor promotion: audit.** Run the standard audit-and-plan procedure for roadmap slice
 1.1 (findings studio-1, arch-1, ev-6). Inspect `apps/web/src/studio/useStudioRecordingLaunch.ts`
 (the project-context-only adoption at 262–268), `StudioApp.test.tsx:1213` (the test asserting a

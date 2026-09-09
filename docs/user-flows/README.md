@@ -34,7 +34,7 @@ user moves through the product; use `feature-behavior/` to check what a specific
 
 Lightframe Studio is a **single-page browser video studio** with a small local/cloud API. A user
 records or uploads a short video, optionally applies AI visual treatments (Character Swap, Virtual
-Try-On) and voice treatments, optionally trims/adjusts it locally, and then saves it as an
+Try-On) and voice treatments, optionally trims/edits it locally, and then saves it as an
 immutable **Version** of a **Saved Video** in their Assets library. **Projects** add resumable,
 server-authoritative workflow state around one immutable source video. **Campaigns** are an
 optional organizer for Projects.
@@ -102,7 +102,7 @@ them. Whether a media stage exists at all is `isStudioRuntimePath`.
         ├─► /assets/outfits     (overlay: create · use · remove)
         └─► /assets/voices      (overlay: browse · preview · save · remove · Use in Studio)
 
-/studio/create ──► record | upload ──► review ──► Character Swap / Virtual Try-On / Voice / Adjust
+/studio/create ──► record | upload ──► review ──► Character Swap / Virtual Try-On / Voice / Edit
                                                     └──► Save to Assets ──► Saved Video
                                                               └──► Download | View in Assets | Create another
 /studio/{savedVideoId}  (deep link only; no UI produces this link)
@@ -121,7 +121,7 @@ them. Whether a media stage exists at all is `isStudioRuntimePath`.
 | Character Swap / Virtual Try-On on an uploaded video                   | **Complete**            | Requires a configured provider                                                                                                                                                                                                                    |
 | Voice treatment (local effects)                                        | **Complete**            |                                                                                                                                                                                                                                                   |
 | Voice treatment (ElevenLabs)                                           | **Complete**            | Requires `ELEVENLABS_API_KEY`                                                                                                                                                                                                                     |
-| Local video adjust (trim/crop render in-browser)                       | **Complete**            |                                                                                                                                                                                                                                                   |
+| Local video edit (trim/crop render in-browser)                         | **Complete**            |                                                                                                                                                                                                                                                   |
 | Save to Assets, completion surface, Versions, rename, remove, download | **Complete**            |                                                                                                                                                                                                                                                   |
 | Character builder, wardrobe variants, outfits                          | **Complete**            |                                                                                                                                                                                                                                                   |
 | Projects: create, source, checkpoint, working media, output, history   | **Complete**            |                                                                                                                                                                                                                                                   |
