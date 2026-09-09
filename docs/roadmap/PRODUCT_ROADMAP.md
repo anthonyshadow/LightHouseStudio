@@ -23,6 +23,10 @@ every gap incrementally reachable.
 
 ## Phase 1 — Coherence and trust (no schema changes)
 
+**Status:** landed 2026-09-02. What shipped, with evidence per item, is in
+[Phase 1 verification](../audits/PHASE_1_VERIFICATION.md); the slice list below is kept as the
+record of what was scoped, not as outstanding work.
+
 **User outcome:** the product tells the truth everywhere, the manual editor is a first-class,
 consistently named surface, every dead end is closed, and a returning user sees their deliverable.
 **Problem:** the audit's trust bugs and dead ends (§4, §7.2): false delete copy, wrong origin

@@ -159,8 +159,8 @@ expose `VideoEncoder` and still refuse every configuration, or accept one and pr
 asking it to encode is the only question whose answer matches what the render will do. It asks for
 the profile MediaBunny asks for, so the control and the worker behind it cannot disagree, and the
 answer is reused for the life of the page. Choosing an export placement at save time re-uses
-exactly that check (`exportPlacementRenderSupported`), so a browser that cannot run the editor
-cannot re-frame a video either; the save dialog says so and keeps the video's original shape. Until
+exactly that check — `useExportPlacementRender` calls the same `useVideoEditExportSupport` the
+editor does — so a browser that cannot run the editor cannot re-frame a video either; the save dialog says so and keeps the video's original shape. Until
 the probe answers, the placement chooser is inert rather than declared unavailable, and the
 editor's Save stays disabled without showing the unavailable notice. It does not use the limited-availability 2D canvas `filter` property.
 Preview and export share a WebGL shader for flips, curated filters, and manual lighting controls;

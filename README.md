@@ -123,7 +123,7 @@ limits.
    panel. No AI model, provider session, or remote processing starts on entry or refresh.
 3. Choose a landscape 16:9 or portrait 9:16 local format in Capture Settings, then record on the
    Studio stage, or select a compatible device-local file at any aspect ratio. For the best
-   visual-processing experience, use 16:9 or 9:16 or crop to one of those ratios with **Adjust
+   visual-processing experience, use 16:9 or 9:16 or crop to one of those ratios with **Edit
    video** after upload. A healthy local recording is normalized on device and becomes the editor
    source after finalization.
 4. Review the source and optionally use **Edit video** to trim, crop, rotate, flip, relight, or

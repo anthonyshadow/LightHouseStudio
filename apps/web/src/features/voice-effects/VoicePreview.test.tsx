@@ -18,7 +18,6 @@ const item: WorkspaceVoiceItem = {
     name: 'Studio Star',
     category: null,
     description: null,
-    labels: {},
     traits: {
       language: null,
       gender: null,

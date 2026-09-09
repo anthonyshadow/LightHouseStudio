@@ -108,23 +108,10 @@ const summarizeWorkspaceVoice = (voice: ProviderVoice): WorkspaceVoiceSummary =>
   name: voice.name,
   category: voice.category,
   description: voice.description,
-  labels: voice.labels,
   traits: traitsForVoice(voice),
   previewAvailable: voice.previewUrl !== null,
   removable: true,
 });
-
-const sharedLabels = (voice: ProviderSharedVoice): Readonly<Record<string, string>> =>
-  Object.fromEntries(
-    [
-      ['language', voice.language],
-      ['gender', voice.gender],
-      ['age', voice.age],
-      ['accent', voice.accent],
-      ['use_case', voice.useCase],
-      ['descriptive', voice.descriptive],
-    ].filter((entry): entry is [string, string] => entry[1] !== null),
-  );
 
 const summarizeSharedVoice = (voice: ProviderSharedVoice, saved: boolean): SharedVoiceSummary => ({
   publicOwnerId: voice.publicOwnerId,
@@ -132,7 +119,6 @@ const summarizeSharedVoice = (voice: ProviderSharedVoice, saved: boolean): Share
   name: voice.name,
   category: voice.category,
   description: voice.description,
-  labels: sharedLabels(voice),
   traits: traitsForVoice(voice),
   previewAvailable: voice.previewUrl !== null,
   saved,

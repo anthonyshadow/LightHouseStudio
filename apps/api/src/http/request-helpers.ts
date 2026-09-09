@@ -1,7 +1,7 @@
 import type { HttpRequest } from '../application/application-runtime.js';
 import { AppError } from './app-error.js';
 
-/** Reads a single request header, ignoring the multi-value form the runtime may produce. */
+/** Reads a request header. `HttpRequest.headers` is single-valued — only `query` can repeat. */
 export const requestHeader = (request: HttpRequest, name: string): string | undefined => {
   const value = request.headers[name];
   return typeof value === 'string' ? value : undefined;

@@ -12,6 +12,12 @@ the path forward in the [roadmap](../roadmap/PRODUCT_ROADMAP.md); open calls in
 > shell-5, STOR-3, studio-1, studio-4, tci-1, tci-2 and tci-3. Read this document for evidence and
 > for what remains; read [Phase 1 verification](PHASE_1_VERIFICATION.md) for what is already done,
 > before treating any finding below as outstanding work.
+>
+> **A cleanup pass on 2026-09-08 closed api-1 (in part), api-12, assets-8, DC-4, DC-5, edit-4,
+> shell-3, studio-7, tci-11 and `decorateRequest`, and withdrew shell-2 as never having been dead.**
+> Rows are annotated inline below. A row this document lists as open may still have been closed
+> since — check the code before acting on one, and never treat a "Remove" entry as authority to
+> delete without confirming the symbol is unreferenced today.
 
 ## 1. Scope and method
 
@@ -242,23 +248,27 @@ campaign CAS-retry parity (PCD-14); truncated UUIDs still visible on project ass
 
 P2: `StudioApp` orchestration hub — 938 lines, ~25 hooks, 44-prop overlay child (web-3 =
 studio-5); `VideoGallery` 1,058 lines (assets-9). P3: ad-hoc query keys bypassing factories and a
-voices count that nothing invalidates (web-1/web-2/assets-8); `apiClient` compatibility barrel
+voices count that nothing invalidates (web-1/web-2; assets-8 closed 2026-09-08 — the count is
+invalidated at `useVoiceLibrary.ts:271`); `apiClient` compatibility barrel
 with 36 importers (web-6); label spellings in four places (web-4); a UI primitive importing an API
 adapter (web-5); `MediaStage` dual ownership of media element props (studio-11); dead
-`creationIntent` channel across four files (shell-2); dead `isStudioPath`, `lastApplied`,
-TakeDock `view='all'` (shell-3, edit-4, studio-7). Otherwise exceptional hygiene (web-10).
+`isStudioPath`, `lastApplied`, TakeDock `view='all'` (shell-3, edit-4, studio-7 — all closed,
+removed 2026-09-08). shell-2 is **withdrawn, not closed**: the `creationIntent` channel was never
+dead. Otherwise exceptional hygiene (web-10).
 
 ### 7.4 API and backend
 
 No N+1 found anywhere; all lists paginated with sealed cursors and bounded totals. P2: route
 oracle omits the five direct-upload routes and asserts a cloud config no deployment serves
-(api-1); "production" naming implies hostability the transport forbids (api-2 = SEC-9, D9);
+(api-1 — narrowed 2026-09-08: the five direct-upload routes are in the oracle now, the cloud-config
+half stands); "production" naming implies hostability the transport forbids (api-2 = SEC-9, D9);
 image/voice AI runs synchronously in-request with cost-loss on disconnect (api-3, prov-4);
 unclaimed rendition bytes orphan forever (api-4 = STOR-1); direct-upload complete re-downloads
 300 MB with no abort wiring (api-5, STOR-9); file-mode gallery is a full-library scan (api-6).
 P3: saved-video rename lacks CAS (api-7); blanket `no-store` on immutable media + no ETags
 (api-8 = STOR-8); thumbnail version parameter dead (api-9 = prod-9-adjacent); no login throttling
-or quota enforcement (api-10 = SEC-7/8); `SpooledAudioUpload` misnomer and Fastify shims (api-12).
+or quota enforcement (api-10 = SEC-7/8); ~~`SpooledAudioUpload` misnomer and Fastify shims
+(api-12)~~ — closed 2026-09-08: renamed `SpooledUpload`, no Fastify references remain.
 
 ### 7.5 Database and domain model
 
@@ -266,8 +276,10 @@ P2 beyond the structural gap: one-active-AI-job-per-owner unique index (db-4, D8
 (100-version cliff) absent in Postgres (db-6); codec allowlist frozen in CHECK constraints (db-7);
 no purge of terminal jobs/receipts/revision snapshots (db-8, D14); multi-user schema with no
 creation path and decorative plan enum (db-9 = SEC-4, D9); file-mode single-process lock
-assumption (db-10); saved-video wire status enum diverges from domain and persistence (DC-4);
-creative-library endpoints bypass the contracts package (DC-5); hand-mirrored constant sets with
+assumption (db-10); ~~saved-video wire status enum diverges from domain and persistence (DC-4)~~ —
+closed: `shared-contract-parity.test.ts:118` pins the wire enum to the persistence enum minus
+`deleted`; ~~creative-library endpoints bypass the contracts package (DC-5)~~ — closed:
+`packages/contracts/src/creative-library.ts` exists and both routes parse through it; hand-mirrored constant sets with
 partial parity coverage (DC-6). P3: dead `outbox`/`resource_references` tables (db-5); no variant
 grouping (db-11, _closed by slice 2.3: `video_versions.variant_set_id`_); stale schema-test
 oracle (db-12); write-only-null `deleted_at` column (db-13);
@@ -373,9 +385,13 @@ split (assets-9); `SpooledAudioUpload` rename (api-12); apiClient barrel retirem
 ARCHITECTURE.md split (DOCS-6); README slimming (DOCS-5); display formatters out of domain
 (DC-12).
 
-**Remove (verified candidates):** `outbox` + `resource_references` tables (db-5); `creationIntent`
-channel (shell-2); `isStudioPath` (shell-3); `lastApplied` (edit-4); TakeDock `view='all'`
-(studio-7); `decorateRequest` no-op; dead vitest include (tci-11); `.styles.test.ts` suites
+**Remove (verified candidates):** `outbox` + `resource_references` tables (db-5);
+~~`creationIntent` channel (shell-2)~~ — **withdrawn 2026-09-08: not dead.** The only symbol of
+that name today is the query-intent channel driving `/studio/create?intent=record` and
+`?intent=upload` (`useStudioRouteContext.ts`, `useStudioRecordingLaunch.ts`), with coverage;
+deleting it would remove documented navigation behaviour. `isStudioPath` (shell-3 — closed);
+`lastApplied` (edit-4 — closed); TakeDock `view='all'` (studio-7 — closed); `decorateRequest` no-op
+(closed); dead vitest include (tci-11 — closed); `.styles.test.ts` suites
 (tci-9, verify); executed 2026-08-26 prompts 01–06; superseded docs per the
 [pruning manifest](DOCUMENTATION_PRUNING_REPORT.md) — **deletions gated on manifest approval**;
 stale `.claude` worktree (DOCS-12, after checking for uncommitted work); demo-owner default

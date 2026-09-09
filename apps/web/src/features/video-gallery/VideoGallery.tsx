@@ -537,9 +537,9 @@ export const VideoGallery = ({
     };
   }, [previewVideo]);
 
-  // Acted on once per requested id. The fetch uses the key `previewDetailQuery` already reads, so a
-  // video on screen resolves from cache and one from a later page costs only the request the
-  // preview itself would have made.
+  // Acted on once per requested id. The fetch writes the key `previewDetailQuery` reads, and that
+  // query's short stale window carries the result into the commit where the preview opens — so a
+  // deep link costs the one request the preview would have made, not two.
   //
   // The guard releases on teardown unless the work already settled, because the gallery mounts with
   // the id already set — arriving from the Dashboard opens this overlay for the first time — and

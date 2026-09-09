@@ -775,7 +775,6 @@ export const installProviderNetworkDriver = async (
               name: 'Northstar Narrator',
               category: 'professional',
               description: 'Warm, grounded documentary narration',
-              labels: { style: 'narration' },
               traits: {
                 language: 'en',
                 gender: 'neutral',
@@ -794,7 +793,6 @@ export const installProviderNetworkDriver = async (
                     name: 'Atlas Community',
                     category: 'professional',
                     description: 'Warm community narration',
-                    labels: { language: 'en' },
                     traits: {
                       language: 'en',
                       gender: 'male',
@@ -840,7 +838,6 @@ export const installProviderNetworkDriver = async (
               name: 'Atlas Community',
               category: 'professional',
               description: 'Warm community narration',
-              labels: { language: 'en' },
               traits: {
                 language: 'en',
                 gender: 'male',

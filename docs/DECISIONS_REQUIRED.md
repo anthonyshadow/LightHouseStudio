@@ -209,12 +209,13 @@ stated safety policy; today the policy is whatever the env file says.
 the disable flags exist for explicitly authorized research only. Revisit the default model choice.
 **Blocks:** nothing technically; reputationally urgent. **Decide by:** Phase 1.
 
-## D16 — Documentation retention for superseded audit corpora
+## D16 — Documentation retention for superseded audit corpora — **decided**
 
 **Question:** The repo carries three audit generations (~10,600 lines archived + the 2026-08-26
 audit). The prior convention was "archive, never delete"; this audit's mandate is to delete
 superseded material outright (with unique content preserved in canon).
 **Recommendation:** delete per the [pruning manifest](audits/DOCUMENTATION_PRUNING_REPORT.md) —
 keeping only the documents that live canon still cites, with their unique content absorbed first.
-**Blocks:** the pruning step itself — **deletion executes only on your approval of the manifest.**
-**Decide by:** now (it is the approval this audit is waiting on).
+**Blocks:** nothing — approved and executed 2026-08-31. Superseded documentation was removed per the
+manifest; git history is the record. See
+[the pruning report](audits/DOCUMENTATION_PRUNING_REPORT.md).

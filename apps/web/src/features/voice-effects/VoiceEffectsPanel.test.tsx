@@ -199,7 +199,6 @@ describe('VoiceLibrary accessibility', () => {
             name: 'Saved Star',
             category: 'featured',
             description: 'Bright delivery',
-            labels: {},
             traits: {
               language: 'en',
               gender: 'female',
@@ -231,7 +230,6 @@ describe('VoiceLibrary accessibility', () => {
       name: 'Saved Star',
       category: 'featured',
       description: 'Bright delivery',
-      labels: {},
       traits: {
         language: 'en',
         gender: 'female',
@@ -258,7 +256,6 @@ describe('VoiceLibrary accessibility', () => {
             name: 'Saved Star',
             category: 'featured',
             description: 'Bright delivery',
-            labels: {},
             traits: {
               language: 'en',
               gender: 'female',
@@ -313,7 +310,6 @@ describe('VoiceLibrary accessibility', () => {
             name: 'Catalog Star',
             category: 'professional',
             description: 'Warm narration',
-            labels: { language: 'en' },
             traits: {
               language: 'en',
               gender: 'female',
@@ -356,7 +352,6 @@ describe('VoiceLibrary accessibility', () => {
             name: 'Saved Star',
             category: 'professional',
             description: 'Warm narration',
-            labels: {},
             traits: {
               language: 'en',
               gender: 'female',

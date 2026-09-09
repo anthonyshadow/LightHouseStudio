@@ -170,8 +170,10 @@ candidates (safe / needs-verification). Produce one ordered plan with per-item v
 `packages/contracts/src/creative-library.ts` and consume it in both apps; extend
 `shared-contract-parity.test.ts` to every hand-mirrored list DC-6 names; add the real cloud
 configuration case (projects + directVideoUploads) to `apps/api/src/route-inventory.test.ts`;
-delete the `creationIntent` chain, `isStudioPath`, `lastApplied`, TakeDock `view='all'`,
-`decorateRequest`, and the dead vitest include; rename `SpooledAudioUpload` → `SpooledUpload`
+delete `isStudioPath`, `lastApplied`, TakeDock `view='all'`, `decorateRequest`, and the dead
+vitest include — **not** the `creationIntent` chain, which this prompt used to name and which is
+live: it is the query-intent channel behind `/studio/create?intent=record` and `?intent=upload`
+(`useStudioRouteContext.ts`, `useStudioRecordingLaunch.ts`), with tests; rename `SpooledAudioUpload` → `SpooledUpload`
 (temp-file prefix included); make `VoiceService`'s `ownerUserId` required and fix tests. Apply
 Standing rules + API/DB checklist. Validation: affected feature tests + `bun run typecheck`;
 route-oracle and parity suites.
