@@ -73,8 +73,9 @@ Keep only lessons that should constrain future work.
 
 - Tests deny unexpected external HTTP and WebSockets.
 - CI enforces types, lint, formatting, package boundaries, unresolved imports, cycles, dead code,
-  coverage and builds on every push. Curated visuals are a job on the same workflow but run only on
-  `workflow_dispatch`, so they gate a release deliberately rather than every commit.
+  coverage and builds on every pull request and every push to `develop`/`main`. Curated visuals are
+  a job on the same workflow but run only on `workflow_dispatch`, so they gate a release
+  deliberately rather than every commit.
 - Screenshot readiness is semantic; a stable fallback is not a valid product state.
 - Physical devices and live providers remain separate release gates because mocks cannot qualify
   codecs, memory, entitlements, retention, or output.

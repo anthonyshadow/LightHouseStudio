@@ -18,7 +18,6 @@ const workspaceVoice = {
     name: 'Warm Narrator',
     category: 'professional',
     description: 'Warm, measured delivery for editorial narration.',
-    labels: {},
     traits: {
       language: 'en',
       gender: 'female',

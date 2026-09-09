@@ -112,8 +112,8 @@ material flow problems are of shape, not breakage:
 
 1. **The manual editor is an annex of an AI wizard** (arch-1, ev-6). "Open the video editor" lands
    on an overlay titled "Use existing video" whose organizing principle is "choose your edits" —
-   two AI cards and a local "Adjust video" card. The editor has four different names across
-   surfaces.
+   two AI cards and a local "Adjust video" card. The editor had four different names across
+   surfaces. _(Closed by slice 1.1: one name, "Edit video", everywhere.)_
 2. **A fresh standalone take cannot reach the editor** (studio-1) — pressing "Edit Video" after
    recording opens the chooser _empty_; a unit test asserts the non-adoption. The path is
    save-to-Assets → reopen with edit intent.
@@ -252,8 +252,8 @@ voices count that nothing invalidates (web-1/web-2; assets-8 closed 2026-09-08 �
 invalidated at `useVoiceLibrary.ts:271`); `apiClient` compatibility barrel
 with 36 importers (web-6); label spellings in four places (web-4); a UI primitive importing an API
 adapter (web-5); `MediaStage` dual ownership of media element props (studio-11); dead
-`isStudioPath`, `lastApplied`, TakeDock `view='all'` (shell-3, edit-4, studio-7 — all closed,
-removed 2026-09-08). shell-2 is **withdrawn, not closed**: the `creationIntent` channel was never
+`isStudioPath`, `lastApplied`, TakeDock `view='all'` (shell-3 and edit-4 closed 2026-09-01,
+studio-7 closed 2026-09-07). shell-2 is **withdrawn, not closed**: the `creationIntent` channel was never
 dead. Otherwise exceptional hygiene (web-10).
 
 ### 7.4 API and backend
@@ -345,7 +345,8 @@ no default trace backend, and no recorded charge_); production smoke never touch
 (tci-6); the vitest-vs-Playwright CPU
 contention hazard is documented only in a personal memory file (tci-3). P3: one WebKit journey
 (tci-8); five `.styles.test.ts` suites pin CSS objects (tci-9); serial 13-step quality gate with a
-storybook build nothing publishes (tci-10); dead vitest include (tci-11); unexplained audit waiver
+storybook build nothing publishes (tci-10); dead vitest include (tci-11 — closed 2026-09-01);
+unexplained audit waiver
 GHSA-67mh-4wv8-2f99 (tci-12); retired-word police with required fixture strings (tci-7).
 
 ### 7.10 Documentation and rules

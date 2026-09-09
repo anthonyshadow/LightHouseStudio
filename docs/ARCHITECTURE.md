@@ -113,8 +113,9 @@ product shell, media session, global client store, or provider client.
 status menu (configured capability presentation), the account menu and its `AccountPanel`
 (`features/account`), and the static **How Lightframe works** explainer
 (`studio/HowLightframeWorksPanel.tsx`). `AccountPanel` reads the session already held by the shell,
-plus two bounded reads it makes only while open — `GET /api/video-jobs` for what is currently
-running, and the AI-usage ledger for the current month; it stores nothing, and the
+plus two reads it makes only while open — `GET /api/video-jobs` for what is currently running, and
+the current month's AI-usage ledger, which pages further only when the reader asks; it stores
+nothing, and the
 explainer is static content in a shared `OverlayPanel` with no persistence of its own beyond the
 existing dashboard dismissal flag.
 
