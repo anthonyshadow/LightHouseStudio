@@ -47,6 +47,10 @@ export const projectQueryKeys = {
     ['projects', 'history', projectId, 'processing'] as const,
 };
 
+/** The lists are the only cached view of a Project, so they are what a change has to re-read. */
+const invalidateProjectLists = (queryClient: QueryClient): Promise<void> =>
+  queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
+
 /**
  * The single owner of how a freshly authoritative Project lands in the cache. The response *is* the
  * new truth and reaches the surfaces that show it by return value, so nothing is written here; the
@@ -56,7 +60,7 @@ export const reconcileProject = async (
   queryClient: QueryClient,
   current: ProjectCurrentResponse,
 ): Promise<ProjectCurrentResponse> => {
-  await queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
+  await invalidateProjectLists(queryClient);
   return current;
 };
 
@@ -99,12 +103,7 @@ export const useProjectsController = () => {
     [queryClient],
   );
 
-  // A failed mutation leaves the lists as the only cached view of this Project, so they are what
-  // has to be re-read.
-  const invalidateProjectLists = useCallback(
-    () => queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists }),
-    [queryClient],
-  );
+  const refreshLists = useCallback(() => invalidateProjectLists(queryClient), [queryClient]);
 
   const createMutation = useMutation({
     mutationFn: async (campaignId: string | null = null) =>
@@ -182,27 +181,26 @@ export const useProjectsController = () => {
       readonly title: string;
     }) => renameProject(input.projectId, input.title, input.expectedVersion),
     onSuccess: reconcile,
-    onError: () => invalidateProjectLists(),
+    onError: refreshLists,
   });
 
   const archiveMutation = useMutation({
     mutationFn: (input: { readonly projectId: string; readonly expectedVersion: number }) =>
       archiveProject(input.projectId, input.expectedVersion),
     onSuccess: reconcile,
-    onError: () => invalidateProjectLists(),
+    onError: refreshLists,
   });
 
   const restoreMutation = useMutation({
     mutationFn: (input: { readonly projectId: string; readonly expectedVersion: number }) =>
       restoreProject(input.projectId, input.expectedVersion),
     onSuccess: reconcile,
-    onError: () => invalidateProjectLists(),
+    onError: refreshLists,
   });
   const tombstoneMutation = useMutation({
     mutationFn: (input: { readonly projectId: string; readonly expectedVersion: number }) =>
       tombstoneProject(input.projectId, input.expectedVersion),
-    onSuccess: () => invalidateProjectLists(),
-    onError: () => invalidateProjectLists(),
+    onSettled: refreshLists,
   });
   const moveMutation = useMutation({
     mutationFn: (input: {
@@ -211,21 +209,17 @@ export const useProjectsController = () => {
       readonly expectedVersion: number;
     }) => moveProjectToCampaign(input.projectId, input.campaignId, input.expectedVersion),
     onSuccess: reconcile,
-    onError: () => invalidateProjectLists(),
+    onError: refreshLists,
   });
   const renameMutateAsync = renameMutation.mutateAsync;
   const archiveMutateAsync = archiveMutation.mutateAsync;
   const restoreMutateAsync = restoreMutation.mutateAsync;
 
-  const latestProject = useCallback(async (projectId: string): Promise<ProjectCurrentResponse> => {
-    // Lists are invalidated by `reconcile` once the follow-up mutation lands; a read
-    // that changes nothing does not need to refetch them.
-    return getProject(projectId);
-  }, []);
-
   const renameLatest = useCallback(
     async (projectId: string, title: string): Promise<ProjectCurrentResponse> => {
-      const current = await latestProject(projectId);
+      // Read straight through: `reconcile` invalidates the lists once the follow-up mutation
+      // lands, and the early return below changes nothing that needs them refetched.
+      const current = await getProject(projectId);
       if (current.project.title === title.trim()) return current;
       return renameMutateAsync({
         projectId,
@@ -233,7 +227,7 @@ export const useProjectsController = () => {
         expectedVersion: current.project.version,
       });
     },
-    [latestProject, renameMutateAsync],
+    [renameMutateAsync],
   );
 
   const changeLatestLifecycle = useCallback(
@@ -241,7 +235,7 @@ export const useProjectsController = () => {
       projectId: string,
       targetLifecycle: 'active' | 'archived',
     ): Promise<ProjectCurrentResponse> => {
-      const current = await latestProject(projectId);
+      const current = await getProject(projectId);
       if (lifecycleForProject(current.project) === targetLifecycle) return current;
       const mutateAsync = targetLifecycle === 'archived' ? archiveMutateAsync : restoreMutateAsync;
       return mutateAsync({
@@ -249,7 +243,7 @@ export const useProjectsController = () => {
         expectedVersion: current.project.version,
       });
     },
-    [archiveMutateAsync, latestProject, restoreMutateAsync],
+    [archiveMutateAsync, restoreMutateAsync],
   );
 
   return {
@@ -261,7 +255,7 @@ export const useProjectsController = () => {
     restoreMutation,
     tombstoneMutation,
     moveMutation,
-    latestProject,
+    latestProject: getProject,
     renameLatest,
     changeLatestLifecycle,
   } as const;

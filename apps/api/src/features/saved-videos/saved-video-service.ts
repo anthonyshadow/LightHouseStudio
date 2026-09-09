@@ -303,24 +303,21 @@ export class SavedVideoService {
     return aggregate === null ? null : publicSavedVideoDetail(aggregate);
   }
 
-  async saveNew(
-    ownerUserId: string,
-    idempotencyKey: string,
-    sourcePath: string,
-    metadata: SavedVideoUploadMetadata,
-    checksumSha256?: string,
-  ): Promise<SavedVideoDetail> {
-    const prior = await this.#findIdempotentResult(ownerUserId, idempotencyKey);
-    if (prior !== null) return prior;
-    const videoId = randomUUID();
-    const version = await this.#versionFromUpload(
-      ownerUserId,
-      videoId,
-      1,
-      sourcePath,
-      metadata,
-      checksumSha256,
-    );
+  /**
+   * The tail both create paths share: wrap an already-produced version in its aggregate and
+   * receipt, commit them, and remove its asset when the commit did not adopt it.
+   *
+   * Reading `assetId` and `createdAt` off the version serves the staged callers too, because
+   * `#versionFromStoredAsset` assigns both straight from the parameters they passed.
+   */
+  async #createSavedVideo(input: {
+    readonly ownerUserId: string;
+    readonly videoId: string;
+    readonly idempotencyKey: string;
+    readonly metadata: SavedVideoUploadMetadata;
+    readonly version: StoredVideoVersion;
+  }): Promise<SavedVideoDetail> {
+    const { ownerUserId, videoId, idempotencyKey, metadata, version } = input;
     const aggregate: StoredSavedVideoAggregate = {
       video: {
         id: videoId,
@@ -352,6 +349,79 @@ export class SavedVideoService {
       await this.#deleteAsset(ownerUserId, version.assetId);
       throw error;
     }
+  }
+
+  /**
+   * The tail both append paths share. The refusals are translated after the cleanup, not before:
+   * a `not-found` or `conflict` string is still an outcome that leaves this version's asset
+   * unreferenced, so it has to be removed on the way out.
+   */
+  async #appendSavedVideoVersion(input: {
+    readonly ownerUserId: string;
+    readonly videoId: string;
+    readonly expectedVersionId: string;
+    readonly idempotencyKey: string;
+    readonly version: StoredVideoVersion;
+  }): Promise<SavedVideoDetail> {
+    const { ownerUserId, videoId, expectedVersionId, idempotencyKey, version } = input;
+    const receipt: SavedVideoReceipt = {
+      idempotencyKey,
+      videoId,
+      versionId: version.id,
+      createdAt: version.createdAt,
+    };
+    let result: Awaited<ReturnType<SavedVideoRepository['append']>>;
+    try {
+      result = await this.#repository.append(
+        ownerUserId,
+        videoId,
+        expectedVersionId,
+        version,
+        receipt,
+      );
+    } catch (error) {
+      await this.#deleteAsset(ownerUserId, version.assetId);
+      throw error;
+    }
+    if (typeof result === 'string' || !result.versions.some((item) => item.id === version.id)) {
+      await this.#deleteAsset(ownerUserId, version.assetId);
+    }
+    if (result === 'not-found')
+      throw new AppError(404, 'not_found', 'That saved video is unavailable.');
+    if (result === 'conflict')
+      throw new AppError(
+        409,
+        'conflict',
+        'The saved video changed before this version could be added.',
+      );
+    return publicSavedVideoDetail(result);
+  }
+
+  async saveNew(
+    ownerUserId: string,
+    idempotencyKey: string,
+    sourcePath: string,
+    metadata: SavedVideoUploadMetadata,
+    checksumSha256?: string,
+  ): Promise<SavedVideoDetail> {
+    const prior = await this.#findIdempotentResult(ownerUserId, idempotencyKey);
+    if (prior !== null) return prior;
+    const videoId = randomUUID();
+    const version = await this.#versionFromUpload(
+      ownerUserId,
+      videoId,
+      1,
+      sourcePath,
+      metadata,
+      checksumSha256,
+    );
+    return this.#createSavedVideo({
+      ownerUserId,
+      videoId,
+      idempotencyKey,
+      metadata,
+      version,
+    });
   }
 
   async appendVersion(
@@ -387,37 +457,13 @@ export class SavedVideoService {
       },
       checksumSha256,
     );
-    const receipt = {
-      idempotencyKey,
+    return this.#appendSavedVideoVersion({
+      ownerUserId,
       videoId,
-      versionId: version.id,
-      createdAt: version.createdAt,
-    };
-    let result: Awaited<ReturnType<SavedVideoRepository['append']>>;
-    try {
-      result = await this.#repository.append(
-        ownerUserId,
-        videoId,
-        expectedVersionId,
-        version,
-        receipt,
-      );
-    } catch (error) {
-      await this.#deleteAsset(ownerUserId, version.assetId);
-      throw error;
-    }
-    if (typeof result === 'string' || !result.versions.some((item) => item.id === version.id)) {
-      await this.#deleteAsset(ownerUserId, version.assetId);
-    }
-    if (result === 'not-found')
-      throw new AppError(404, 'not_found', 'That saved video is unavailable.');
-    if (result === 'conflict')
-      throw new AppError(
-        409,
-        'conflict',
-        'The saved video changed before this version could be added.',
-      );
-    return publicSavedVideoDetail(result);
+      expectedVersionId,
+      idempotencyKey,
+      version,
+    });
   }
 
   async saveNewFromStagedAsset(
@@ -443,37 +489,13 @@ export class SavedVideoService {
       inspected,
       createdAt,
     );
-    const aggregate: StoredSavedVideoAggregate = {
-      video: {
-        id: videoId,
-        ownerUserId,
-        title: normalizeSavedVideoTitle(metadata.title),
-        currentVersionId: version.id,
-        sourceVideoId: metadata.sourceVideoId,
-        status: 'ready',
-        createdAt,
-        updatedAt: createdAt,
-        deletedAt: null,
-      },
-      versions: [version],
-      revision: 1,
-    };
-    const receipt: SavedVideoReceipt = {
-      idempotencyKey,
+    return this.#createSavedVideo({
+      ownerUserId,
       videoId,
-      versionId: version.id,
-      createdAt,
-    };
-    try {
-      const saved = await this.#repository.create(ownerUserId, aggregate, receipt);
-      if (!saved.versions.some((savedVersion) => savedVersion.id === version.id)) {
-        await this.#deleteAsset(ownerUserId, assetId);
-      }
-      return publicSavedVideoDetail(saved);
-    } catch (error) {
-      await this.#deleteAsset(ownerUserId, assetId);
-      throw error;
-    }
+      idempotencyKey,
+      metadata,
+      version,
+    });
   }
 
   async appendVersionFromStagedAsset(
@@ -517,37 +539,13 @@ export class SavedVideoService {
       inspected,
       createdAt,
     );
-    const receipt: SavedVideoReceipt = {
-      idempotencyKey,
+    return this.#appendSavedVideoVersion({
+      ownerUserId,
       videoId,
-      versionId: version.id,
-      createdAt,
-    };
-    let result: Awaited<ReturnType<SavedVideoRepository['append']>>;
-    try {
-      result = await this.#repository.append(
-        ownerUserId,
-        videoId,
-        expectedVersionId,
-        version,
-        receipt,
-      );
-    } catch (error) {
-      await this.#deleteAsset(ownerUserId, assetId);
-      throw error;
-    }
-    if (typeof result === 'string' || !result.versions.some((item) => item.id === version.id)) {
-      await this.#deleteAsset(ownerUserId, assetId);
-    }
-    if (result === 'not-found')
-      throw new AppError(404, 'not_found', 'That saved video is unavailable.');
-    if (result === 'conflict')
-      throw new AppError(
-        409,
-        'conflict',
-        'The saved video changed before this version could be added.',
-      );
-    return publicSavedVideoDetail(result);
+      expectedVersionId,
+      idempotencyKey,
+      version,
+    });
   }
 
   async list(
@@ -689,13 +687,15 @@ export class SavedVideoService {
     const deletableAssetIds = discardedAssetIds.filter(
       (assetId) => !savedVideoRetainedIds.has(assetId) && !projectRetainedIds.has(assetId),
     );
+    // `deleteMany` reports rather than throws, so this still answers 503 for a lifecycle failure
+    // exactly as the per-asset loop it replaced did.
     const failures = await this.#bytes.deleteMany(ownerUserId, deletableAssetIds);
     if (failures.size > 0) {
       throw new AppError(
         503,
         'storage_failure',
         'The saved video was removed, but its stored media could not be deleted. Retry deletion.',
-        { cause: [...failures.values()][0] },
+        { cause: deletableAssetIds.map((id) => failures.get(id)).find((v) => v !== undefined) },
       );
     }
   }

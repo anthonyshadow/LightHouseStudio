@@ -362,7 +362,10 @@ export const useProjectSourceController = (
       const mediaIdentity = JSON.stringify(response.revision.snapshot.presentedMedia);
       hydratedMediaRef.current = mediaIdentity;
       onCurrentChange?.({ project: response.project, revision: response.revision });
-      await queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
+      await reconcileProject(queryClient, {
+        project: response.project,
+        revision: response.revision,
+      });
       if (
         controller.signal.aborted ||
         generation !== generationRef.current ||

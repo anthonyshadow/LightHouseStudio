@@ -62,6 +62,10 @@ export interface AssetByteStore {
    * every one is gone. Partial failure is the normal case here, not an exception: a caller
    * discarding a set has to know which bytes it may forget about and which to retry, and a store
    * backed by a lifecycle registry can settle the whole set under one lock instead of one each.
+   *
+   * It reports rather than throws, for every asset it was asked about. A store whose bookkeeping
+   * fails outright reports the whole set as failed, so a caller deciding from the map alone cannot
+   * mistake a database error for a clean sweep.
    */
   deleteMany(
     ownerUserId: string,

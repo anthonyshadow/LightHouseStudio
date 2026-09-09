@@ -173,23 +173,58 @@ export class ReferenceImageService {
     });
   }
 
-  async generate(input: GenerateReferenceImageInput): Promise<ReferenceImageAsset> {
-    const requestFingerprint = generationRequestFingerprint(input, this.#providerDescriptor);
-    const legacyFingerprint = generationRequestFingerprint(input);
+  /**
+   * The idempotency preamble all four public operations share: a request id that already stored a
+   * result is returned as it stands once its fingerprint is accepted, and anything else runs
+   * coalesced per owner. What differs between them is the fingerprint and the work itself.
+   *
+   * `legacyFingerprint` comes only from the provider-backed operations, which have to keep
+   * honouring results stored before the descriptor joined the fingerprint. Omitting it leaves the
+   * compatibility argument `undefined`, which is exactly the stricter check `upload` already made.
+   */
+  async #runIdempotent(input: {
+    readonly localOwnerId: string;
+    readonly requestId: string;
+    readonly requestFingerprint: string;
+    readonly legacyFingerprint?: string;
+    readonly providerId?: ReferenceImageProviderDescriptor['providerId'];
+    // Not optional: the four callers all have a signal slot, and the one spread that matters is
+    // the forward to `runForOwner` below.
+    readonly signal: AbortSignal | undefined;
+    readonly start: (signal: AbortSignal) => Promise<StoredReferenceImageMetadata>;
+  }): Promise<ReferenceImageAsset> {
     const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
     if (persisted !== null) {
-      assertMatchingRequestFingerprint(persisted, requestFingerprint, {
-        legacyFingerprint,
-        descriptor: this.#providerDescriptor,
-      });
+      assertMatchingRequestFingerprint(
+        persisted,
+        input.requestFingerprint,
+        input.legacyFingerprint === undefined
+          ? undefined
+          : { legacyFingerprint: input.legacyFingerprint, descriptor: this.#providerDescriptor },
+      );
       return toReferenceImageAsset(persisted);
     }
-    const metadata = await this.#operations.runForOwner({
+    return toReferenceImageAsset(
+      await this.#operations.runForOwner({
+        localOwnerId: input.localOwnerId,
+        requestId: input.requestId,
+        requestFingerprint: input.requestFingerprint,
+        ...(input.providerId === undefined ? {} : { providerId: input.providerId }),
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+        start: input.start,
+      }),
+    );
+  }
+
+  async generate(input: GenerateReferenceImageInput): Promise<ReferenceImageAsset> {
+    const requestFingerprint = generationRequestFingerprint(input, this.#providerDescriptor);
+    return this.#runIdempotent({
       localOwnerId: input.localOwnerId,
       requestId: input.requestId,
       requestFingerprint,
+      legacyFingerprint: generationRequestFingerprint(input),
       providerId: this.#providerDescriptor.providerId,
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      signal: input.signal,
       start: (operationSignal) => {
         const provider = this.#provider;
         if (provider === null) {
@@ -202,7 +237,6 @@ export class ReferenceImageService {
         );
       },
     });
-    return toReferenceImageAsset(metadata);
   }
 
   async upload(input: UploadReferenceImageInput): Promise<ReferenceImageAsset> {
@@ -210,16 +244,11 @@ export class ReferenceImageService {
       throw new ReferenceImageGenerationStateError('operation-aborted');
     }
     const requestFingerprint = uploadRequestFingerprint(input);
-    const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
-    if (persisted !== null) {
-      assertMatchingRequestFingerprint(persisted, requestFingerprint);
-      return toReferenceImageAsset(persisted);
-    }
-    const metadata = await this.#operations.runForOwner({
+    return this.#runIdempotent({
       localOwnerId: input.localOwnerId,
       requestId: input.requestId,
       requestFingerprint,
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      signal: input.signal,
       start: async (operationSignal) => {
         if (operationSignal.aborted) {
           throw new ReferenceImageGenerationStateError('operation-aborted');
@@ -244,26 +273,17 @@ export class ReferenceImageService {
         });
       },
     });
-    return toReferenceImageAsset(metadata);
   }
 
   async edit(input: EditReferenceImageInput): Promise<ReferenceImageAsset> {
     const requestFingerprint = editRequestFingerprint(input, this.#providerDescriptor);
-    const legacyFingerprint = editRequestFingerprint(input);
-    const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
-    if (persisted !== null) {
-      assertMatchingRequestFingerprint(persisted, requestFingerprint, {
-        legacyFingerprint,
-        descriptor: this.#providerDescriptor,
-      });
-      return toReferenceImageAsset(persisted);
-    }
-    const metadata = await this.#operations.runForOwner({
+    return this.#runIdempotent({
       localOwnerId: input.localOwnerId,
       requestId: input.requestId,
       requestFingerprint,
+      legacyFingerprint: editRequestFingerprint(input),
       providerId: this.#providerDescriptor.providerId,
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      signal: input.signal,
       start: (operationSignal) => {
         const provider = this.#provider;
         const editProvider = provider?.edit;
@@ -278,26 +298,17 @@ export class ReferenceImageService {
         );
       },
     });
-    return toReferenceImageAsset(metadata);
   }
 
   async compose(input: ComposeReferenceImageInput): Promise<ReferenceImageAsset> {
     const requestFingerprint = compositionRequestFingerprint(input, this.#providerDescriptor);
-    const legacyFingerprint = compositionRequestFingerprint(input);
-    const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
-    if (persisted !== null) {
-      assertMatchingRequestFingerprint(persisted, requestFingerprint, {
-        legacyFingerprint,
-        descriptor: this.#providerDescriptor,
-      });
-      return toReferenceImageAsset(persisted);
-    }
-    const metadata = await this.#operations.runForOwner({
+    return this.#runIdempotent({
       localOwnerId: input.localOwnerId,
       requestId: input.requestId,
       requestFingerprint,
+      legacyFingerprint: compositionRequestFingerprint(input),
       providerId: this.#providerDescriptor.providerId,
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      signal: input.signal,
       start: (operationSignal) => {
         const provider = this.#provider;
         const editProvider = provider?.edit;
@@ -312,7 +323,6 @@ export class ReferenceImageService {
         );
       },
     });
-    return toReferenceImageAsset(metadata);
   }
 
   async #generateAndStore(

@@ -133,8 +133,10 @@ export class FileProcessingJobRepository implements DurableProcessingJobReposito
    * per trace they had ever run, on the path that gates a paid provider call.
    *
    * Held as the in-flight promise so concurrent admissions share one scan. `upsert` is the only
-   * writer and keeps it current, which is the same single-process assumption the per-job write
-   * mutex above already makes.
+   * writer and keeps it current, which makes load-bearing what the per-job write mutex above only
+   * assumed: one process owns this directory. It also means a trace corrupted by something else
+   * after the scan no longer refuses admission the way re-reading every file did — the owner's own
+   * activity is still exact, and a restart reads the directory again.
    */
   #activeJobsByOwner: Promise<Map<string, Set<string>>> | null = null;
   constructor(dataDirectory: string) {
@@ -244,13 +246,13 @@ export class FileProcessingJobRepository implements DurableProcessingJobReposito
         throw error;
       }
       // The trace is durable, so keep the admission index current — but never fail a completed
-      // write over a cache: a scan that has since failed is dropped and rebuilt on next use. An
-      // index nothing has asked for yet is left alone; it will read this write when it builds.
-      if (this.#activeJobsByOwner !== null) {
-        const index = await this.#activeJobsByOwner.catch(() => null);
-        if (index === null) this.#activeJobsByOwner = null;
-        else this.#recordActivity(index, trace);
-      }
+      // write over a cache, and never reach past the promise this awaited: a scan that failed has
+      // already dropped itself, and a replacement started since then read this write from disk. An
+      // index nothing has asked for yet is left alone for the same reason.
+      await this.#activeJobsByOwner?.then(
+        (index) => this.#recordActivity(index, trace),
+        () => undefined,
+      );
     } finally {
       release();
       if (this.#locks.get(trace.jobId) === chain) this.#locks.delete(trace.jobId);
