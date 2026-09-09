@@ -69,3 +69,40 @@ export const createSharedOperation = <Result>(
     },
   };
 };
+
+/**
+ * One in-flight operation per key, shared by everyone who asks while it runs.
+ *
+ * The map entry is the coalescing point, not a cache: it is dropped as soon as the operation
+ * settles, so the next caller starts a fresh one. A caller that wants the result kept holds its own
+ * cache and writes it from `onResult`, which runs before the entry is released — so a caller
+ * arriving immediately after settlement reads that cache instead of starting a second run.
+ */
+export class KeyedSharedOperations<Value> {
+  readonly #operations = new Map<string, SharedOperation<Value>>();
+
+  run(
+    key: string,
+    input: {
+      readonly signal: AbortSignal | undefined;
+      readonly abortedError: () => Error;
+      readonly start: (signal: AbortSignal) => Promise<Value>;
+      readonly onResult?: (value: Value) => void;
+    },
+  ): Promise<Value> {
+    const active = this.#operations.get(key);
+    if (active?.acceptingSubscribers === true) {
+      return active.subscribe(input.signal, input.abortedError);
+    }
+    const operation = createSharedOperation(input.start);
+    this.#operations.set(key, operation);
+    const release = (): void => {
+      if (this.#operations.get(key) === operation) this.#operations.delete(key);
+    };
+    void operation.result.then((value) => {
+      input.onResult?.(value);
+      release();
+    }, release);
+    return operation.subscribe(input.signal, input.abortedError);
+  }
+}

@@ -16,20 +16,12 @@ export type ProjectRetentionExecutor =
 export class DrizzleProjectRetentionPolicy implements ProjectRetentionPolicy {
   constructor(private readonly db: LightframeDatabase) {}
 
-  retainsAsset(ownerUserId: string, assetId: string): Promise<boolean> {
-    return this.retainsAssetWith(this.db, ownerUserId, assetId);
+  async retainsAsset(ownerUserId: string, assetId: string): Promise<boolean> {
+    return (await this.retainedAssetIdsWith(this.db, ownerUserId, [assetId])).has(assetId);
   }
 
   retainedAssetIds(ownerUserId: string, assetIds: readonly string[]): Promise<ReadonlySet<string>> {
     return this.retainedAssetIdsWith(this.db, ownerUserId, assetIds);
-  }
-
-  async retainsAssetWith(
-    executor: ProjectRetentionExecutor,
-    ownerUserId: string,
-    assetId: string,
-  ): Promise<boolean> {
-    return (await this.retainedAssetIdsWith(executor, ownerUserId, [assetId])).has(assetId);
   }
 
   async retainedAssetIdsWith(

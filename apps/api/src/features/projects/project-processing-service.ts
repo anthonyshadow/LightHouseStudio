@@ -729,21 +729,15 @@ export class ProjectProcessingService {
     });
   }
 
-  /**
-   * `openedResult` is the already-open result asset for a caller that has just looked. Omitted —
-   * not `null` — by a caller that has not, because `null` is the answer "looked, nothing there",
-   * which must take the lease path rather than look again.
-   */
+  /** `openedResult` is the result asset for a caller that has just opened it; others open here. */
   async #retainResult(
     attempt: ProjectProcessingAttemptRecord,
-    openedResult?: AssetReadHandle | null,
+    openedResult?: AssetReadHandle,
   ): Promise<ProjectProcessingAttemptRecord> {
     let lease: Awaited<ReturnType<VideoJobService['content']>> | null = null;
     try {
       let asset =
-        openedResult === undefined
-          ? await this.bytes.open(attempt.ownerUserId, attempt.resultAssetId)
-          : openedResult;
+        openedResult ?? (await this.bytes.open(attempt.ownerUserId, attempt.resultAssetId));
       let inspected: InspectedVideo;
       if (asset === null) {
         lease = await this.videoJobs.content(attempt.operationId, attempt.ownerUserId);

@@ -22,7 +22,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { z } from 'zod';
 import { persistedTimestampSchema } from '../application/timestamps.js';
 import { withWorkflowSpan } from '../observability/telemetry.js';
-import type { AssetDeletionClaim, AssetLifecycleRegistry } from './asset-lifecycle.js';
+import { settleClaimedDeletions, type AssetLifecycleRegistry } from './asset-lifecycle.js';
 import {
   deleteAssetsIndividually,
   type AssetByteStore,
@@ -578,6 +578,12 @@ export class R2AssetByteStore implements AssetByteStore {
     await this.#lifecycle.markDeleted(ownerUserId, assetId, claim);
   }
 
+  /**
+   * Reports rather than throws, including when the lifecycle bookkeeping itself fails: the caller
+   * before this change wrapped every asset's delete individually, so a database error surfaced as
+   * a per-asset failure and the saved-video route answered 503. Letting a batch error escape here
+   * would turn that into a 500.
+   */
   async deleteMany(
     ownerUserId: string,
     assetIds: readonly string[],
@@ -587,21 +593,8 @@ export class R2AssetByteStore implements AssetByteStore {
     // One claim and one settlement for the whole set. `deleting` remains claimable, so an object
     // whose R2 request failed is left for the next pass to retry idempotently, exactly as a single
     // delete does.
-    const claims = await lifecycle.claimDeletions(ownerUserId, assetIds, 'r2');
-    const claimed = [...claims];
-    const removals = await Promise.allSettled(
-      claimed.map(([, claim]) =>
-        this.#client.send(new DeleteObjectCommand({ Bucket: this.#bucket, Key: claim.storageKey })),
-      ),
+    return settleClaimedDeletions(lifecycle, ownerUserId, assetIds, 'r2', (claim) =>
+      this.#client.send(new DeleteObjectCommand({ Bucket: this.#bucket, Key: claim.storageKey })),
     );
-    const failures = new Map<string, unknown>();
-    const settled = new Map<string, AssetDeletionClaim>();
-    removals.forEach((result, index) => {
-      const [assetId, claim] = claimed[index]!;
-      if (result.status === 'rejected') failures.set(assetId, result.reason);
-      else settled.set(assetId, claim);
-    });
-    await lifecycle.markDeletedMany(ownerUserId, settled);
-    return failures;
   }
 }

@@ -84,10 +84,15 @@ import { ActionMenu } from '../../ui/primitives/ActionMenu';
 import { PROJECT_SET_ORIGINAL_VIDEO_ACTION_LABEL } from '../projects/projectProcessingPresentation';
 
 /**
- * Shared by the deep-link fetch and the preview's own read so the two are one request. Every write
- * that changes a Saved Video happens in this component and updates the cache directly.
+ * Only wide enough to carry the deep-link fetch's result into the preview's own read, which mounts
+ * in the commit right after it — without this the entry was stale the instant it landed and the
+ * same detail was fetched twice back to back.
+ *
+ * Deliberately not longer. A Version can be appended from outside this component — `useSaveVideo`
+ * on the Studio save path and the Project output save both do — and neither invalidates this key,
+ * so any wider window would show a stale Versions list to someone who saved and came back to look.
  */
-const PREVIEW_DETAIL_STALE_MS = 30_000;
+const PREVIEW_DETAIL_STALE_MS = 2_000;
 
 const duration = (milliseconds: number): string => {
   const seconds = Math.round(milliseconds / 1_000);
@@ -472,9 +477,6 @@ export const VideoGallery = ({
     queryKey: savedVideoQueryKeys.detail(previewVideo?.id ?? ''),
     queryFn: ({ signal }) => getSavedVideo(previewVideo!.id, signal),
     enabled: previewVideo !== null,
-    // Without this the deep-link fetch below wrote a cache entry that was stale the instant it
-    // landed, so opening the preview it had just resolved fetched the same detail a second time.
-    // Every mutation that changes a Saved Video is in this component and writes the cache itself.
     staleTime: PREVIEW_DETAIL_STALE_MS,
   });
 

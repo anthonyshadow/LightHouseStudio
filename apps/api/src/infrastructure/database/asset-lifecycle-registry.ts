@@ -116,14 +116,11 @@ export class DrizzleAssetLifecycleRegistry implements AssetLifecycleRegistry {
         // Ordered so two overlapping batches take the same row locks in the same order.
         .orderBy(asc(mediaAssets.id))
         .for('update');
-      if (candidates.length === 0) return new Map();
+      const candidateIds = candidates.map(({ id }) => id);
       const retained =
-        (await this.projectRetention?.retainedAssetIdsWith(
-          tx,
-          ownerUserId,
-          candidates.map(({ id }) => id),
-        )) ?? new Set<string>();
-      const deletable = candidates.map(({ id }) => id).filter((id) => !retained.has(id));
+        (await this.projectRetention?.retainedAssetIdsWith(tx, ownerUserId, candidateIds)) ??
+        new Set<string>();
+      const deletable = candidateIds.filter((id) => !retained.has(id));
       if (deletable.length === 0) return new Map();
       const rows = await tx
         .update(mediaAssets)

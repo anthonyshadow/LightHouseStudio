@@ -215,11 +215,12 @@ export class DrizzleReferenceImageAssetStore implements ReferenceImageAssetStore
         : ((await this.projectRetention?.retainedAssetIds(localOwnerId, unretainedByLibrary)) ??
           new Set<string>());
     const deletableIds = unretainedByLibrary.filter((id) => !projectRetainedIds.has(id));
-    // One call, so a registry-backed store settles the whole set under one lock instead of taking
-    // a transaction per asset to re-ask a retention question this method has already answered.
+    // One call, so a registry-backed store settles the whole set under one lock. The store still
+    // asks its own retention question inside that transaction — that is the authoritative one,
+    // taken under the row locks — but it now asks it once for the set rather than once per asset.
     const failures = await this.bytes.deleteMany(localOwnerId, deletableIds);
     const deletedIds = deletableIds.filter((id) => !failures.has(id));
-    const failure = [...failures.values()][0];
+    const failure = deletableIds.map((id) => failures.get(id)).find((value) => value !== undefined);
     if (deletedIds.length > 0) {
       await this.db
         .delete(referenceImageAssets)

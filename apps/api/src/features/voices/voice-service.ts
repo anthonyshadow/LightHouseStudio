@@ -10,7 +10,7 @@ import type {
   WorkspaceVoicesResponse,
 } from '@studio/contracts';
 import type { AudioStream } from '../../application/audio-stream.js';
-import { createSharedOperation, type SharedOperation } from '../../application/shared-operation.js';
+import { KeyedSharedOperations } from '../../application/shared-operation.js';
 import type {
   ElevenLabsModel,
   ElevenLabsProvider,
@@ -26,6 +26,9 @@ import { VoiceServiceError } from './voice-service-error.js';
 import { MemorySavedVoiceRepository, type SavedVoiceRepository } from './saved-voice-repository.js';
 
 export const VOICE_MODEL_CACHE_TTL_MS = 30_000;
+
+/** The conversion model is a single value, so its coalescing map holds a single key. */
+const CONVERSION_MODEL_KEY = 'conversion-model';
 export const SHARED_VOICE_CACHE_TTL_MS = 5 * 60_000;
 export const WORKSPACE_VOICE_CACHE_TTL_MS = 60_000;
 const SHARED_VOICE_CACHE_LIMIT = 60;
@@ -228,18 +231,15 @@ export class VoiceService {
     SHARED_VOICE_CACHE_LIMIT,
   );
   readonly #sharedVoiceCache = new BoundedTtlCache<ProviderSharedVoice>(SHARED_VOICE_CACHE_LIMIT);
-  readonly #workspacePageOperations = new Map<
-    string,
-    SharedOperation<ProviderWorkspaceVoicePage>
-  >();
-  readonly #sharedPageOperations = new Map<string, SharedOperation<ProviderSharedVoicePage>>();
-  readonly #sharedVoiceOperations = new Map<string, SharedOperation<ProviderSharedVoice | null>>();
-  readonly #migrationOperations = new Map<string, SharedOperation<void>>();
-  readonly #addOperations = new Map<string, SharedOperation<VoiceLibraryMutationResponse>>();
-  readonly #removeOperations = new Map<string, SharedOperation<VoiceLibraryMutationResponse>>();
+  readonly #workspacePageOperations = new KeyedSharedOperations<ProviderWorkspaceVoicePage>();
+  readonly #sharedPageOperations = new KeyedSharedOperations<ProviderSharedVoicePage>();
+  readonly #sharedVoiceOperations = new KeyedSharedOperations<ProviderSharedVoice | null>();
+  readonly #migrationOperations = new KeyedSharedOperations<void>();
+  readonly #addOperations = new KeyedSharedOperations<VoiceLibraryMutationResponse>();
+  readonly #removeOperations = new KeyedSharedOperations<VoiceLibraryMutationResponse>();
   #cachedConversionModel: { readonly model: ElevenLabsModel; readonly expiresAt: number } | null =
     null;
-  #activeConversionModel: SharedOperation<ElevenLabsModel> | null = null;
+  readonly #conversionModelOperation = new KeyedSharedOperations<ElevenLabsModel>();
 
   constructor(
     provider: ElevenLabsProvider,
@@ -255,76 +255,64 @@ export class VoiceService {
 
   async #ensureSavedVoiceMigration(ownerUserId: string, signal: AbortSignal): Promise<void> {
     if (await this.#savedVoices.migrated(ownerUserId)) return;
-    const active = this.#migrationOperations.get(ownerUserId);
-    if (active?.acceptingSubscribers) {
-      return active.subscribe(signal, () => new ProviderError('workspace-voices', 'aborted'));
-    }
-    const operation = createSharedOperation(async (operationSignal) => {
-      if (await this.#savedVoices.migrated(ownerUserId)) return;
-      const voices: ProviderVoice[] = [];
-      let nextPageToken: string | null = null;
-      for (let pageNumber = 0; pageNumber < MAX_SAVED_PROVIDER_PAGES_PER_REQUEST; pageNumber += 1) {
-        const page = await this.#provider.listWorkspaceVoices({
-          search: '',
-          language: '',
-          gender: '',
-          age: '',
-          accent: '',
-          useCase: '',
-          descriptive: '',
-          pageSize: 20,
-          nextPageToken,
-          signal: operationSignal,
-        });
-        voices.push(...page.voices);
-        if (!page.hasMore || page.nextPageToken === null) break;
-        nextPageToken = page.nextPageToken;
-      }
-      await this.#savedVoices.completeMigration(
-        ownerUserId,
-        voices.map((voice) => ({ voiceId: voice.voiceId, publicOwnerId: voice.publicOwnerId })),
-        new Date().toISOString(),
-      );
+    return this.#migrationOperations.run(ownerUserId, {
+      signal,
+      abortedError: () => new ProviderError('workspace-voices', 'aborted'),
+      start: async (operationSignal) => {
+        if (await this.#savedVoices.migrated(ownerUserId)) return;
+        const voices: ProviderVoice[] = [];
+        let nextPageToken: string | null = null;
+        for (
+          let pageNumber = 0;
+          pageNumber < MAX_SAVED_PROVIDER_PAGES_PER_REQUEST;
+          pageNumber += 1
+        ) {
+          const page = await this.#provider.listWorkspaceVoices({
+            search: '',
+            language: '',
+            gender: '',
+            age: '',
+            accent: '',
+            useCase: '',
+            descriptive: '',
+            pageSize: 20,
+            nextPageToken,
+            signal: operationSignal,
+          });
+          voices.push(...page.voices);
+          if (!page.hasMore || page.nextPageToken === null) break;
+          nextPageToken = page.nextPageToken;
+        }
+        await this.#savedVoices.completeMigration(
+          ownerUserId,
+          voices.map((voice) => ({ voiceId: voice.voiceId, publicOwnerId: voice.publicOwnerId })),
+          new Date().toISOString(),
+        );
+      },
     });
-    this.#migrationOperations.set(ownerUserId, operation);
-    const release = (): void => {
-      if (this.#migrationOperations.get(ownerUserId) === operation) {
-        this.#migrationOperations.delete(ownerUserId);
-      }
-    };
-    void operation.result.then(release, release);
-    return operation.subscribe(signal, () => new ProviderError('workspace-voices', 'aborted'));
   }
 
   async #conversionModel(signal: AbortSignal): Promise<ElevenLabsModel> {
     const cached = this.#cachedConversionModel;
     if (cached && cached.expiresAt > Date.now()) return cached.model;
-    const active = this.#activeConversionModel;
-    if (active?.acceptingSubscribers) {
-      return active.subscribe(signal, () => new ProviderError('models', 'aborted'));
-    }
-
-    const operation = createSharedOperation(async (operationSignal) => {
-      const models = await this.#provider.listModels(operationSignal);
-      const model = models.find((candidate) => candidate.modelId === this.#modelId);
-      if (model === undefined) throw new VoiceServiceError('configured-model-unavailable');
-      if (!model.canDoVoiceConversion) {
-        throw new VoiceServiceError('configured-model-incompatible');
-      }
-      return model;
+    // One model, so one key. The expiry above is this call's cache policy; the coalescing is the
+    // same as everywhere else in this service.
+    return this.#conversionModelOperation.run(CONVERSION_MODEL_KEY, {
+      signal,
+      abortedError: () => new ProviderError('models', 'aborted'),
+      start: async (operationSignal) => {
+        const models = await this.#provider.listModels(operationSignal);
+        const model = models.find((candidate) => candidate.modelId === this.#modelId);
+        if (model === undefined) throw new VoiceServiceError('configured-model-unavailable');
+        if (!model.canDoVoiceConversion) {
+          throw new VoiceServiceError('configured-model-incompatible');
+        }
+        return model;
+      },
+      onResult: (model) => {
+        this.#cachedConversionModel = { model, expiresAt: Date.now() + VOICE_MODEL_CACHE_TTL_MS };
+      },
     });
-    this.#activeConversionModel = operation;
-    const release = (): void => {
-      if (this.#activeConversionModel === operation) this.#activeConversionModel = null;
-    };
-    void operation.result.then((model) => {
-      this.#cachedConversionModel = {
-        model,
-        expiresAt: Date.now() + VOICE_MODEL_CACHE_TTL_MS,
-      };
-      release();
-    }, release);
-    return operation.subscribe(signal, () => new ProviderError('models', 'aborted'));
   }
 
   #requireLibraryVoice(voice: ProviderVoice | null): ProviderVoice {
@@ -343,29 +331,18 @@ export class VoiceService {
       const cached = this.#workspacePageCache.get(key);
       if (cached !== null) return cached;
     }
-    const active = this.#workspacePageOperations.get(key);
-    if (active?.acceptingSubscribers) {
-      return active.subscribe(signal, () => new ProviderError('workspace-voices', 'aborted'));
-    }
-    const operation = createSharedOperation((operationSignal) =>
-      this.#provider.listWorkspaceVoices({
-        ...filters,
-        pageSize: 20,
-        nextPageToken: providerToken,
-        signal: operationSignal,
-      }),
-    );
-    this.#workspacePageOperations.set(key, operation);
-    const release = (): void => {
-      if (this.#workspacePageOperations.get(key) === operation) {
-        this.#workspacePageOperations.delete(key);
-      }
-    };
-    void operation.result.then((page) => {
-      this.#workspacePageCache.set(key, page, WORKSPACE_VOICE_CACHE_TTL_MS);
-      release();
-    }, release);
-    return operation.subscribe(signal, () => new ProviderError('workspace-voices', 'aborted'));
+    return this.#workspacePageOperations.run(key, {
+      signal,
+      abortedError: () => new ProviderError('workspace-voices', 'aborted'),
+      start: (operationSignal) =>
+        this.#provider.listWorkspaceVoices({
+          ...filters,
+          pageSize: 20,
+          nextPageToken: providerToken,
+          signal: operationSignal,
+        }),
+      onResult: (page) => this.#workspacePageCache.set(key, page, WORKSPACE_VOICE_CACHE_TTL_MS),
+    });
   }
 
   async listWorkspaceVoices(input: WorkspaceListInput): Promise<WorkspaceVoicesResponse> {
@@ -457,36 +434,25 @@ export class VoiceService {
       const cached = this.#sharedPageCache.get(key);
       if (cached !== null) return cached;
     }
-    const active = this.#sharedPageOperations.get(key);
-    if (active?.acceptingSubscribers) {
-      return active.subscribe(input.signal, () => new ProviderError('shared-voices', 'aborted'));
-    }
-    const operation = createSharedOperation((signal) =>
-      this.#provider.listSharedVoices({
-        search: input.search,
-        language: input.language,
-        gender: input.gender,
-        age: input.age,
-        accent: input.accent,
-        useCase: input.useCase,
-        descriptive: input.descriptive,
-        pageSize: input.pageSize,
-        page: input.page,
-        sort: input.sort,
-        signal,
-      }),
-    );
-    this.#sharedPageOperations.set(key, operation);
-    const release = (): void => {
-      if (this.#sharedPageOperations.get(key) === operation) {
-        this.#sharedPageOperations.delete(key);
-      }
-    };
-    void operation.result.then((page) => {
-      this.#sharedPageCache.set(key, page, SHARED_VOICE_CACHE_TTL_MS);
-      release();
-    }, release);
-    return operation.subscribe(input.signal, () => new ProviderError('shared-voices', 'aborted'));
+    return this.#sharedPageOperations.run(key, {
+      signal: input.signal,
+      abortedError: () => new ProviderError('shared-voices', 'aborted'),
+      start: (signal) =>
+        this.#provider.listSharedVoices({
+          search: input.search,
+          language: input.language,
+          gender: input.gender,
+          age: input.age,
+          accent: input.accent,
+          useCase: input.useCase,
+          descriptive: input.descriptive,
+          pageSize: input.pageSize,
+          page: input.page,
+          sort: input.sort,
+          signal,
+        }),
+      onResult: (page) => this.#sharedPageCache.set(key, page, SHARED_VOICE_CACHE_TTL_MS),
+    });
   }
 
   async #savedVoiceIds(
@@ -528,24 +494,16 @@ export class VoiceService {
       const cached = this.#sharedVoiceCache.get(key);
       if (cached !== null) return cached;
     }
-    const active = this.#sharedVoiceOperations.get(key);
-    if (active?.acceptingSubscribers) {
-      return active.subscribe(signal, () => new ProviderError('shared-voice', 'aborted'));
-    }
-    const operation = createSharedOperation((operationSignal) =>
-      this.#provider.getSharedVoice(publicOwnerId, voiceId, operationSignal),
-    );
-    this.#sharedVoiceOperations.set(key, operation);
-    const release = (): void => {
-      if (this.#sharedVoiceOperations.get(key) === operation) {
-        this.#sharedVoiceOperations.delete(key);
-      }
-    };
-    void operation.result.then((voice) => {
-      if (voice !== null) this.#sharedVoiceCache.set(key, voice, SHARED_VOICE_CACHE_TTL_MS);
-      release();
-    }, release);
-    return operation.subscribe(signal, () => new ProviderError('shared-voice', 'aborted'));
+    return this.#sharedVoiceOperations.run(key, {
+      signal,
+      abortedError: () => new ProviderError('shared-voice', 'aborted'),
+      start: (operationSignal) =>
+        this.#provider.getSharedVoice(publicOwnerId, voiceId, operationSignal),
+      // A miss is not cached: the voice may appear later.
+      onResult: (voice) => {
+        if (voice !== null) this.#sharedVoiceCache.set(key, voice, SHARED_VOICE_CACHE_TTL_MS);
+      },
+    });
   }
 
   async workspacePreview(
@@ -587,66 +545,60 @@ export class VoiceService {
     ownerUserId: string,
   ): Promise<VoiceLibraryMutationResponse> {
     const key = `${ownerUserId}:${publicOwnerId}:${voiceId}`;
-    const active = this.#addOperations.get(key);
-    if (active?.acceptingSubscribers) {
-      return active.subscribe(signal, () => new ProviderError('add-shared-voice', 'aborted'));
-    }
-    const operation = createSharedOperation(async (operationSignal) => {
-      if (await this.#savedVoices.has(ownerUserId, voiceId)) {
-        return { status: 'already-saved' as const, voiceId };
-      }
-      const existing = await this.#provider.getWorkspaceVoice(voiceId, operationSignal);
-      if (existing !== null) {
-        this.#invalidateWorkspaceMembership();
-        const status = await this.#savedVoices.save(
-          ownerUserId,
-          voiceId,
-          existing.publicOwnerId,
-          new Date().toISOString(),
-        );
-        return { status, voiceId };
-      }
-      const voice = await this.#sharedVoice(publicOwnerId, voiceId, true, operationSignal);
-      if (voice === null) throw new VoiceServiceError('shared-voice-not-found');
-      if (!eligibleSharedVoice(voice)) throw new VoiceServiceError('shared-voice-ineligible');
-      try {
-        const savedVoiceId = await this.#provider.addSharedVoice(
-          publicOwnerId,
-          voiceId,
-          voice.name,
-          operationSignal,
-        );
-        this.#invalidateWorkspaceMembership();
-        const status = await this.#savedVoices.save(
-          ownerUserId,
-          savedVoiceId,
-          publicOwnerId,
-          new Date().toISOString(),
-        );
-        return { status, voiceId: savedVoiceId };
-      } catch (error) {
-        if (error instanceof ProviderError && error.upstreamStatus === 409) {
-          const nowSaved = await this.#provider.getWorkspaceVoice(voiceId, operationSignal);
-          if (nowSaved !== null) {
-            this.#invalidateWorkspaceMembership();
-            const status = await this.#savedVoices.save(
-              ownerUserId,
-              voiceId,
-              publicOwnerId,
-              new Date().toISOString(),
-            );
-            return { status, voiceId };
-          }
+    return this.#addOperations.run(key, {
+      signal,
+      abortedError: () => new ProviderError('add-shared-voice', 'aborted'),
+      start: async (operationSignal) => {
+        if (await this.#savedVoices.has(ownerUserId, voiceId)) {
+          return { status: 'already-saved' as const, voiceId };
         }
-        throw error;
-      }
+        const existing = await this.#provider.getWorkspaceVoice(voiceId, operationSignal);
+        if (existing !== null) {
+          this.#invalidateWorkspaceMembership();
+          const status = await this.#savedVoices.save(
+            ownerUserId,
+            voiceId,
+            existing.publicOwnerId,
+            new Date().toISOString(),
+          );
+          return { status, voiceId };
+        }
+        const voice = await this.#sharedVoice(publicOwnerId, voiceId, true, operationSignal);
+        if (voice === null) throw new VoiceServiceError('shared-voice-not-found');
+        if (!eligibleSharedVoice(voice)) throw new VoiceServiceError('shared-voice-ineligible');
+        try {
+          const savedVoiceId = await this.#provider.addSharedVoice(
+            publicOwnerId,
+            voiceId,
+            voice.name,
+            operationSignal,
+          );
+          this.#invalidateWorkspaceMembership();
+          const status = await this.#savedVoices.save(
+            ownerUserId,
+            savedVoiceId,
+            publicOwnerId,
+            new Date().toISOString(),
+          );
+          return { status, voiceId: savedVoiceId };
+        } catch (error) {
+          if (error instanceof ProviderError && error.upstreamStatus === 409) {
+            const nowSaved = await this.#provider.getWorkspaceVoice(voiceId, operationSignal);
+            if (nowSaved !== null) {
+              this.#invalidateWorkspaceMembership();
+              const status = await this.#savedVoices.save(
+                ownerUserId,
+                voiceId,
+                publicOwnerId,
+                new Date().toISOString(),
+              );
+              return { status, voiceId };
+            }
+          }
+          throw error;
+        }
+      },
     });
-    this.#addOperations.set(key, operation);
-    const release = (): void => {
-      if (this.#addOperations.get(key) === operation) this.#addOperations.delete(key);
-    };
-    void operation.result.then(release, release);
-    return operation.subscribe(signal, () => new ProviderError('add-shared-voice', 'aborted'));
   }
 
   async removeWorkspaceVoice(
@@ -655,26 +607,15 @@ export class VoiceService {
     ownerUserId: string,
   ): Promise<VoiceLibraryMutationResponse> {
     const key = `${ownerUserId}:${voiceId}`;
-    const active = this.#removeOperations.get(key);
-    if (active?.acceptingSubscribers) {
-      return active.subscribe(signal, () => new ProviderError('delete-workspace-voice', 'aborted'));
-    }
-    const operation = createSharedOperation(async () => {
-      const status = await this.#savedVoices.remove(ownerUserId, voiceId);
-      this.#invalidateWorkspaceMembership();
-      return { status, voiceId };
-    });
-    this.#removeOperations.set(key, operation);
-    const release = (): void => {
-      if (this.#removeOperations.get(key) === operation) {
-        this.#removeOperations.delete(key);
-      }
-    };
-    void operation.result.then(release, release);
-    return operation.subscribe(
+    return this.#removeOperations.run(key, {
       signal,
-      () => new ProviderError('delete-workspace-voice', 'aborted'),
-    );
+      abortedError: () => new ProviderError('delete-workspace-voice', 'aborted'),
+      start: async () => {
+        const status = await this.#savedVoices.remove(ownerUserId, voiceId);
+        this.#invalidateWorkspaceMembership();
+        return { status, voiceId };
+      },
+    });
   }
 
   async convertRecording(input: {

@@ -14,6 +14,44 @@ export interface AssetDeletionClaim {
   readonly storageKey: string;
 }
 
+/**
+ * Claims a set, removes each claimed object, and settles the ones that went — answering with the
+ * failures keyed by asset id and never throwing. A failure of the claim or the settlement itself
+ * is reported against every asset asked about, because none of them can be said to be gone.
+ *
+ * Shared by the two registry-backed byte stores: only the object removal differs between them.
+ */
+export const settleClaimedDeletions = async (
+  lifecycle: AssetLifecycleRegistry,
+  ownerUserId: string,
+  assetIds: readonly string[],
+  provider: AssetStorageProvider,
+  removeObject: (claim: AssetDeletionClaim) => Promise<unknown>,
+): Promise<ReadonlyMap<string, unknown>> => {
+  const requested = [...new Set(assetIds)];
+  try {
+    const claimed = [...(await lifecycle.claimDeletions(ownerUserId, requested, provider))];
+    const removals = await Promise.allSettled(claimed.map(([, claim]) => removeObject(claim)));
+    const failures = new Map<string, unknown>();
+    const settled = new Map<string, AssetDeletionClaim>();
+    removals.forEach((result, index) => {
+      const [assetId, claim] = claimed[index]!;
+      if (result.status === 'rejected') failures.set(assetId, result.reason);
+      else settled.set(assetId, claim);
+    });
+    await lifecycle.markDeletedMany(ownerUserId, settled);
+    // Keyed in the order asked, so a caller reporting "the first failure" reports the same one on
+    // every run — `UPDATE ... RETURNING` does not promise an order.
+    return new Map(
+      requested.flatMap((assetId) =>
+        failures.has(assetId) ? [[assetId, failures.get(assetId)] as const] : [],
+      ),
+    );
+  } catch (error) {
+    return new Map(requested.map((assetId) => [assetId, error]));
+  }
+};
+
 export interface AssetLifecycleRegistry {
   prepare(
     manifest: StoredAssetManifest,

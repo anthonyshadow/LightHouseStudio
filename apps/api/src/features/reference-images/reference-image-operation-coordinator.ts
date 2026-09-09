@@ -1,5 +1,9 @@
 import type { OptimizeCharacterReferencePromptResponse } from '@studio/contracts';
-import { createSharedOperation, type SharedOperation } from '../../application/shared-operation.js';
+import {
+  createSharedOperation,
+  KeyedSharedOperations,
+  type SharedOperation,
+} from '../../application/shared-operation.js';
 import { CharacterPromptOptimizerError } from '../../providers/openai/character-prompt-optimizer.js';
 import { ReferenceImageProviderError } from '../../providers/reference-images/reference-image-provider.js';
 import type { ReferenceImageProviderErrorId } from '../../providers/reference-images/reference-image-provider.js';
@@ -13,10 +17,8 @@ interface ActiveReferenceImageOperation {
 }
 
 export class ReferenceImageOperationCoordinator {
-  readonly #activeOptimizations = new Map<
-    string,
-    SharedOperation<OptimizeCharacterReferencePromptResponse>
-  >();
+  readonly #activeOptimizations =
+    new KeyedSharedOperations<OptimizeCharacterReferencePromptResponse>();
   readonly #activeByOwner = new Map<string, ActiveReferenceImageOperation>();
 
   runOptimization(
@@ -24,21 +26,11 @@ export class ReferenceImageOperationCoordinator {
     signal: AbortSignal | undefined,
     start: (signal: AbortSignal) => Promise<OptimizeCharacterReferencePromptResponse>,
   ): Promise<OptimizeCharacterReferencePromptResponse> {
-    const active = this.#activeOptimizations.get(inputHash);
-    if (active?.acceptingSubscribers === true) {
-      return active.subscribe(signal, () => new CharacterPromptOptimizerError('aborted'));
-    }
-    if (active !== undefined) this.#activeOptimizations.delete(inputHash);
-
-    const operation = createSharedOperation(start);
-    this.#activeOptimizations.set(inputHash, operation);
-    const release = (): void => {
-      if (this.#activeOptimizations.get(inputHash) === operation) {
-        this.#activeOptimizations.delete(inputHash);
-      }
-    };
-    void operation.result.then(release, release);
-    return operation.subscribe(signal, () => new CharacterPromptOptimizerError('aborted'));
+    return this.#activeOptimizations.run(inputHash, {
+      signal,
+      abortedError: () => new CharacterPromptOptimizerError('aborted'),
+      start,
+    });
   }
 
   runForOwner(input: {
