@@ -9,8 +9,6 @@ import {
 export const VOICE_PROVIDER_INTENT_HEADER = 'x-lightframe-provider-intent' as const;
 export const VOICE_PROVIDER_INTENT_VALUE = 'voice' as const;
 
-export const voiceLabelsSchema = z.record(z.string().max(80), z.string().max(200));
-
 const optionalVoiceAttributeSchema = z.string().trim().min(1).max(80).nullable();
 
 export const voiceTraitsSchema = z
@@ -30,7 +28,6 @@ export const voiceSummarySchema = z
     name: z.string().trim().min(1).max(100),
     category: z.string().trim().max(100).nullable(),
     description: z.string().trim().max(500).nullable(),
-    labels: voiceLabelsSchema,
     traits: voiceTraitsSchema,
     previewAvailable: z.boolean(),
   })

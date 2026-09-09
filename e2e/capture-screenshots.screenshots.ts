@@ -211,7 +211,6 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
               name: 'Northstar Narrator',
               category: 'professional',
               description: 'Warm, grounded documentary narration',
-              labels: { accent: 'Canadian', style: 'documentary' },
               traits: {
                 language: 'en',
                 gender: 'neutral',

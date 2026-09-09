@@ -934,7 +934,6 @@ describe('ExistingVideoPanel', () => {
             name: 'Saved Star',
             category: 'featured',
             description: 'Bright delivery',
-            labels: {},
             traits: {
               language: null,
               gender: null,

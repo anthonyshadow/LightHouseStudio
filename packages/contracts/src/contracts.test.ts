@@ -48,7 +48,6 @@ const voice = {
   name: 'Clear Narrator',
   category: 'generated',
   description: null,
-  labels: { accent: 'neutral' },
   traits: {
     language: 'en',
     gender: 'neutral',
@@ -765,7 +764,6 @@ describe('ElevenLabs contracts', () => {
             name: voice.name,
             category: voice.category,
             description: voice.description,
-            labels: voice.labels,
             traits: voice.traits,
             previewAvailable: voice.previewAvailable,
             publicOwnerId: 'owner-1',

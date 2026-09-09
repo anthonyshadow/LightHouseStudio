@@ -32,7 +32,6 @@ const workspaceVoice: WorkspaceVoiceItem = {
     name: 'Workspace Star',
     category: null,
     description: null,
-    labels: {},
     traits: {
       language: null,
       gender: null,
@@ -64,7 +63,6 @@ const sharedVoice: SharedVoiceItem = {
     name: 'Catalog Star',
     category: 'professional',
     description: 'Warm narration',
-    labels: { language: 'en' },
     traits: {
       language: 'en',
       gender: 'female',

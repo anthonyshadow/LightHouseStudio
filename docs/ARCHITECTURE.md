@@ -53,7 +53,7 @@ retention, and cleanup decisions. See the [Product Vision](product/PRODUCT_VISIO
 | `apps/web/src/orchestration`  | Async lifecycles, policy sequencing, and resource handoff                   | Raw provider assumptions                     |
 | `apps/web/src/adapters`       | Browser APIs, same-origin API calls, Decart SDK, audio processing           | Product policy                               |
 | `apps/api/src/features`       | Route validation and application services                                   | Browser state or account data                |
-| `apps/api/src/providers`      | Decart, OpenAI, BFL, Wiro, and ElevenLabs protocols                         | UI state or unsafe upstream errors           |
+| `apps/api/src/providers`      | Decart, OpenAI, BFL, Wiro, Pruna, and ElevenLabs protocols                  | UI state or unsafe upstream errors           |
 | `apps/api/src/http`           | Loopback/origin checks, safe errors, and streaming lifetime                 | Provider-specific policy                     |
 | `apps/api/src/infrastructure` | Drizzle/PostgreSQL repositories and persistence composition                 | UI/product policy or browser state           |
 | `apps/api/src/storage`        | Local/R2 byte adapters and media-asset lifecycle                            | Feature-specific ownership decisions         |
@@ -93,11 +93,13 @@ Dashboard; `/studio/create` is standard video creation; `/studio/create/live` is
 `/assets` and its `/videos`, `/characters`, `/outfits`, and `/voices` children are reusable-resource
 surfaces; and Projects/Campaigns use `/projects`, `/projects/:projectId`,
 `/projects/:projectId/workspace`, `/campaigns`, and `/campaigns/:campaignId`. The reserved create
-routes are matched before the UUID-only Saved Video route. Legacy organization, library, Recipe,
-and `/studio/live` URLs replace-navigate to their canonical replacements.
+routes are matched before the UUID-only Saved Video route. Legacy organization, library and
+`/studio/live` URLs replace-navigate to their canonical replacements; the Recipe alias is gone, so
+its address is now simply an address the app does not have.
 The data-router form is required for route blocking. Route metadata, protected
-Login return, focus handoff, and loading/error surfaces remain router-owned; unknown paths return
-to `/`. Every authenticated route renders the same `AuthenticatedShell` instance, so moving between a
+Login return, focus handoff, and loading/error surfaces remain router-owned. An unknown path is
+_not_ redirected: a signed-in operator gets the not-found surface at the address they typed, so it
+stays copyable and shareable. Every authenticated route renders the same `AuthenticatedShell` instance, so moving between a
 workspace and its libraries preserves the remote-state cache, the session lifecycle and the creative
 library. The Studio's capture runtime is a child of that shell and belongs only to the routes that
 own live media.
@@ -110,8 +112,9 @@ product shell, media session, global client store, or provider client.
 `StudioHeader` belongs to the shell, not the runtime, and owns three mutually exclusive panels: the
 status menu (configured capability presentation), the account menu and its `AccountPanel`
 (`features/account`), and the static **How Lightframe works** explainer
-(`studio/HowLightframeWorksPanel.tsx`). `AccountPanel` reads the session already held by the shell
-plus one bounded `GET /api/video-jobs` for what is currently running; it stores nothing, and the
+(`studio/HowLightframeWorksPanel.tsx`). `AccountPanel` reads the session already held by the shell,
+plus two bounded reads it makes only while open — `GET /api/video-jobs` for what is currently
+running, and the AI-usage ledger for the current month; it stores nothing, and the
 explainer is static content in a shared `OverlayPanel` with no persistence of its own beyond the
 existing dashboard dismissal flag.
 

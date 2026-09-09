@@ -119,7 +119,6 @@ describe('ElevenLabs voice API', () => {
           name: 'Nova',
           category: 'generated',
           description: 'Bright and conversational',
-          labels: { accent: 'Canadian' },
           traits: {
             language: 'en',
             gender: 'female',
@@ -136,7 +135,6 @@ describe('ElevenLabs voice API', () => {
           name: 'Pro',
           category: 'professional',
           description: 'Bright and conversational',
-          labels: { accent: 'Canadian' },
           traits: {
             language: 'en',
             gender: 'female',

@@ -135,7 +135,6 @@ describe('CharacterWardrobePanel', () => {
             name: 'Northstar',
             category: 'professional',
             description: 'Grounded narration',
-            labels: {},
             traits: {
               language: 'en',
               gender: 'female',

@@ -116,8 +116,7 @@ The retained suite protects:
 - reusable Character create/edit/save/preload and atomic reference hydration;
 - Lucy 2.5 and VTO explicit Start/Apply, safe fallback, and independent 300-second boundaries;
 - recording source pinning, duplicate Stop coalescing, recorder/sidecar/transcode ordering, forced
-  H.264/AAC MP4 configuration, no-raw-fallback failure, playback, Download, Release, and confirmed
-  Discard;
+  H.264/AAC MP4 configuration, no-raw-fallback failure, playback, Download, and confirmed Discard;
 - immutable-original local and ElevenLabs Voice processing;
 - local video-edit normalization/history, worker progress/cancellation/stale-result handling,
   offset-aware output limits, persistent-stage preview, keyboard crop, atomic source replacement,

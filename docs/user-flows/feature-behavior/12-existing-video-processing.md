@@ -147,7 +147,7 @@ source, then edit either base, save, start over, or discard.
 - Accepted input is H.264 MP4/MOV or VP8 WebM, more than zero and at most 300 seconds, at any
   playable aspect ratio. Character Swap/local input is capped at 300,000,000 bytes; any VTO plan
   is capped at 200,000,000 bytes.
-- The picker recommends 16:9 or 9:16 for the best experience and directs creators to **Adjust
+- The picker recommends 16:9 or 9:16 for the best experience and directs creators to **Edit
   video** to crop after upload. Provider compatibility is derived in the app for uploaded and
   locally edited sources. Other ratios disable Character Swap/VTO before provider intent or HTTP
   while Save, local adjustment, and Voice stay available.
@@ -304,7 +304,7 @@ plan without provider contact. Project **Start Character Swap** and **Start Virt
 save that exact setup, then use one app-owned operation command that commits the exact initiating
 revision before provider submission. Refresh/reopen reads current authority and resumes bounded
 status/retrieval for the same durable provider identity; a lost response replays only the same
-operation key. It never falls through to the standalone `video-jobs` submit path. Local **Adjust
+operation key. It never falls through to the standalone `video-jobs` submit path. Local **Edit
 video** still produces a temporary **Render preview** whose explicit adoption remains separately
 owned.
 

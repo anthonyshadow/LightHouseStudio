@@ -11,8 +11,8 @@ accessibility, physical-device, and live-provider behavior belongs to other test
 
 ## Matrix
 
-The curated matrix is **50 Chromium cases over 25 baselines**, against a budget of 50 asserted in
-`e2e/studioVisualMatrix.ts`. Fifty is the review budget, not the definition of correctness: the
+The curated matrix is **50 Chromium cases over 50 baselines**, against a budget of 50 asserted in
+`e2e/studioVisualMatrix.ts` — one baseline per case, which the module's own invariant requires. Fifty is the review budget, not the definition of correctness: the
 executable invariants require unique baseline paths, all five viewport IDs, and every
 local-live / recording-state / viewport pair.
 
@@ -119,7 +119,7 @@ Two things about that matter, and both have bitten this repository:
 ## Determinism and readiness
 
 Each case uses fixed time, reduced motion, synthetic media, simulated Decart, deterministic
-reference/voice fixtures, seeded v6 creative metadata, hidden test-browser scrollbars, and denied
+reference/voice fixtures, seeded v7 creative metadata, hidden test-browser scrollbars, and denied
 unexpected provider traffic. Hiding scrollbars keeps captures independent of host scrollbar
 preferences; scroll containment remains asserted separately. No paid or live provider is
 contacted.
