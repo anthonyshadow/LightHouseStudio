@@ -1,5 +1,5 @@
 import type { CapabilitiesResponse } from '@studio/contracts';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { hydrateReferenceImage } from '../../adapters/api-client/apiClient';
 import { validateReferenceImage } from '../../adapters/browser-media/imageValidation';
 import type { ExistingVideoSavedRecipe } from './ExistingVideoRecipeChooser';
@@ -29,20 +29,66 @@ export const useExistingVideoRecipeHydration = ({
     useState<MissingVtonReferenceRecovery | null>(null);
   const [recipeLoading, setRecipeLoading] = useState(false);
 
+  /**
+   * The selection that currently owns this step's reference, its error state and its busy flag.
+   *
+   * A saved recipe is fetched over the network while the reference picker stays live — the picker
+   * is gated on `recipeLocked`, which hydration does not set — so the operator can drop in their
+   * own image mid-flight. Their local decode always finishes first, and the recipe's write then
+   * landed on top of it: the step showed one face while the paid provider job carried another,
+   * attributed to the character they had just replaced.
+   *
+   * One rule now: the newest claim wins, and every write states the claim it belongs to. The
+   * controller is the claim token as well as the abort signal, so a superseded hydration also
+   * stops fetching rather than running to completion to have its result discarded.
+   */
+  const claimRef = useRef<AbortController | null>(null);
+
+  useEffect(
+    () => () => {
+      claimRef.current?.abort();
+      // Nulled rather than flagged: `owns` is then false for everything still in flight, which is
+      // what keeps a late result from writing into a torn-down hook.
+      claimRef.current = null;
+    },
+    [],
+  );
+
+  const claimStep = (): AbortController => {
+    claimRef.current?.abort();
+    const controller = new AbortController();
+    claimRef.current = controller;
+    return controller;
+  };
+
+  const owns = (controller: AbortController): boolean => claimRef.current === controller;
+
   const clearReferenceRecovery = () => {
     setReferenceError(null);
     setMissingVtonReference(null);
   };
 
   const chooseReference = async (step: ExistingVideoStep, file: File) => {
+    const claim = claimStep();
+    // Nothing is loading for this step any more, whatever the abandoned hydration was doing.
+    setRecipeLoading(false);
     setMissingVtonReference(null);
     const validation = await validateReferenceImage(file, step.modelId);
+    if (!owns(claim)) return;
     if (validation.blockingError) {
       setReferenceError(validation.blockingError);
       return;
     }
     setReferenceError(null);
-    workflow.updateStep(step.id, { referenceImage: file });
+    // Choosing an image replaces the character it came from. Written here, with the reference
+    // itself, so the step's image and the name attributed to it can never be set apart — and so a
+    // file the validator rejects leaves both alone rather than clearing the name over a stale image.
+    workflow.updateStep(step.id, {
+      referenceImage: file,
+      savedRecipeId: null,
+      characterName: null,
+      characterVariantName: null,
+    });
   };
 
   const applySavedRecipe = async (step: ExistingVideoStep, recipeId: string) => {
@@ -50,12 +96,15 @@ export const useExistingVideoRecipeHydration = ({
       (candidate) => candidate.id === recipeId && candidate.modelId === step.modelId,
     );
     if (!recipe) return;
+    const claim = claimStep();
     setRecipeLoading(true);
     clearReferenceRecovery();
     try {
       const referenceImage = recipe.referenceImageAssetId
-        ? await hydrateReferenceImage(recipe.referenceImageAssetId)
+        ? await hydrateReferenceImage(recipe.referenceImageAssetId, undefined, claim.signal)
         : null;
+      // The operator chose something else while this was in flight; theirs is the newer intent.
+      if (!owns(claim)) return;
       workflow.updateStep(step.id, {
         savedRecipeId: recipe.id,
         characterName: recipe.characterName ?? null,
@@ -81,6 +130,9 @@ export const useExistingVideoRecipeHydration = ({
         workflow.selectVoice(recipe.defaultVoice.voiceId, recipe.defaultVoice.voiceName);
       }
     } catch {
+      // A superseded hydration was aborted on purpose, so it has no failure to report — and the
+      // selection that replaced it owns the step's error state now.
+      if (!owns(claim)) return;
       if (step.modelId === 'lucy-vton-latest') {
         setReferenceError(
           recipe.prompt.trim()
@@ -94,7 +146,10 @@ export const useExistingVideoRecipeHydration = ({
         );
       }
     } finally {
-      setRecipeLoading(false);
+      if (owns(claim)) {
+        claimRef.current = null;
+        setRecipeLoading(false);
+      }
     }
   };
 

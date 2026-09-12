@@ -1172,7 +1172,11 @@ describe('ExistingVideoPanel', () => {
         referenceImage: reference,
       }),
     );
-    expect(api.hydrateReferenceImage).toHaveBeenCalledWith('asset-anchor');
+    expect(api.hydrateReferenceImage).toHaveBeenCalledWith(
+      'asset-anchor',
+      undefined,
+      expect.any(AbortSignal),
+    );
   });
 
   it('fills the prompt only for a prompt-only saved character', async () => {
@@ -1449,7 +1453,11 @@ describe('ExistingVideoPanel', () => {
     fireEvent.click(within(variantCard!).getByRole('button', { name: 'Choose' }));
 
     await waitFor(() =>
-      expect(api.hydrateReferenceImage).toHaveBeenCalledWith('host-evening-asset'),
+      expect(api.hydrateReferenceImage).toHaveBeenCalledWith(
+        'host-evening-asset',
+        undefined,
+        expect.any(AbortSignal),
+      ),
     );
     expect(updateStep).toHaveBeenCalledWith(
       'lucy',

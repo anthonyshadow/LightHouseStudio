@@ -311,14 +311,10 @@ export const ExistingVideoVisualEditor = ({
           file={step.referenceImage}
           disabled={recipeLocked}
           allowUrlImport
-          onSelectFile={(file) => {
-            onUpdate(step.id, {
-              savedRecipeId: null,
-              characterName: null,
-              characterVariantName: null,
-            });
-            onChooseReference(step, file);
-          }}
+          // Clearing the character the reference came from belongs to `onChooseReference`, with
+          // the write that sets the new image: splitting them let a second caller set an image
+          // while leaving someone else's name attributed to it.
+          onSelectFile={(file) => onChooseReference(step, file)}
           onRemove={() => {
             onClearReferenceError();
             onUpdate(step.id, {
