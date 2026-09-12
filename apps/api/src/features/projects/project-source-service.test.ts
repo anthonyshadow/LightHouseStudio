@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { projectUploadAssetId } from './project-byte-acceptance.js';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -71,6 +72,7 @@ describe('ProjectSourceService local authority', () => {
   it('durably accepts, hydrates, replays, and refuses to overwrite an attached source', async () => {
     const current = await createProject();
     const operationKey = randomUUID();
+    const assetId = projectUploadAssetId(ownerUserId, operationKey);
     const input = {
       ownerUserId,
       projectId: current.project.id,
@@ -93,9 +95,15 @@ describe('ProjectSourceService local authority', () => {
           id: sourceRevisionId,
           revisionNumber: 2,
           snapshot: {
-            sourceAssetId: operationKey,
-            workingMedia: { kind: 'asset', assetId: operationKey },
-            presentedMedia: { kind: 'asset', assetId: operationKey },
+            sourceAssetId: assetId,
+            workingMedia: {
+              kind: 'asset',
+              assetId: assetId,
+            },
+            presentedMedia: {
+              kind: 'asset',
+              assetId: assetId,
+            },
             lastSuccessfulOutput: null,
           },
         },
@@ -106,7 +114,7 @@ describe('ProjectSourceService local authority', () => {
         },
       },
     });
-    expect(await bytes.exists(ownerUserId, operationKey)).toBe(true);
+    expect(await bytes.exists(ownerUserId, assetId)).toBe(true);
 
     projects = new FileProjectRepository(directory);
     const replayed = await sourceService().upload(input);
@@ -128,9 +136,49 @@ describe('ProjectSourceService local authority', () => {
     expect(await bytes.exists(ownerUserId, losingOperationKey)).toBe(false);
   });
 
+  // Covers the temporary legacy fallback in `acceptIdempotentUpload`. Delete this with it, once no
+  // deployment holds a Project asset stored under a raw operation key.
+  it('replays bytes stored under the pre-derivation asset id instead of storing a second copy', async () => {
+    const current = await createProject('Legacy source');
+    const operationKey = randomUUID();
+    // Exactly what an upload accepted before ids were owner-derived left behind: the bytes sitting
+    // under the raw operation key, with nothing at the derived id.
+    await bytes.storeFile({
+      assetId: operationKey,
+      ownerUserId,
+      sourcePath,
+      checksumSha256,
+      mimeType: 'video/mp4',
+      filename: 'legacy-source.mp4',
+      createdAt: acceptedAt,
+    });
+
+    const accepted = await sourceService().upload({
+      ownerUserId,
+      projectId: current.project.id,
+      operationKey,
+      expectedVersion: 1,
+      expectedRevisionNumber: 1,
+      kind: 'uploaded' as const,
+      sourcePath,
+      checksumSha256,
+      filename: 'legacy-source.mp4',
+    });
+
+    expect(accepted).toMatchObject({
+      ok: true,
+      response: { revision: { snapshot: { sourceAssetId: operationKey } } },
+    });
+    // The legacy bytes were adopted, not duplicated: nothing was written at the derived id.
+    expect(await bytes.exists(ownerUserId, projectUploadAssetId(ownerUserId, operationKey))).toBe(
+      false,
+    );
+  });
+
   it('removes an accepted source, retains its bytes, and accepts a different original after', async () => {
     const current = await createProject('Wrong source');
     const operationKey = randomUUID();
+    const assetId = projectUploadAssetId(ownerUserId, operationKey);
     const input = {
       ownerUserId,
       projectId: current.project.id,
@@ -173,8 +221,8 @@ describe('ProjectSourceService local authority', () => {
       statusCode: 404,
     });
     // The removed original stays retained: an output Version could already reference those bytes.
-    expect(await projects.retainsAsset(ownerUserId, operationKey)).toBe(true);
-    expect(await bytes.exists(ownerUserId, operationKey)).toBe(true);
+    expect(await projects.retainsAsset(ownerUserId, assetId)).toBe(true);
+    expect(await bytes.exists(ownerUserId, assetId)).toBe(true);
 
     const replacementKey = randomUUID();
     const reaccepted = await uniqueRevisionSourceService().upload({
@@ -189,7 +237,9 @@ describe('ProjectSourceService local authority', () => {
       response: {
         project: { status: 'ready', version: 4 },
         source: { filename: 'right.mp4' },
-        revision: { snapshot: { sourceAssetId: replacementKey } },
+        revision: {
+          snapshot: { sourceAssetId: projectUploadAssetId(ownerUserId, replacementKey) },
+        },
       },
     });
   });
@@ -246,6 +296,7 @@ describe('ProjectSourceService local authority', () => {
   it('recovers a prepared source journal and reconciles the original operation after restart', async () => {
     const current = await createProject('Interrupted source');
     const operationKey = randomUUID();
+    const assetId = projectUploadAssetId(ownerUserId, operationKey);
     const interruptedProjects = new FileProjectRepository(directory, {
       afterJournalPrepared: () => {
         throw new Error('simulated source interruption');
@@ -270,7 +321,7 @@ describe('ProjectSourceService local authority', () => {
     };
 
     await expect(interrupted.upload(input)).rejects.toThrow('simulated source interruption');
-    expect(await bytes.exists(ownerUserId, operationKey)).toBe(true);
+    expect(await bytes.exists(ownerUserId, assetId)).toBe(true);
 
     projects = new FileProjectRepository(directory);
     await expect(sourceService().upload(input)).resolves.toMatchObject({
@@ -282,7 +333,7 @@ describe('ProjectSourceService local authority', () => {
       new ProjectService(projects).get(ownerUserId, current.project.id),
     ).resolves.toMatchObject({
       project: { version: 2, currentRevisionNumber: 2 },
-      revision: { snapshot: { sourceAssetId: operationKey } },
+      revision: { snapshot: { sourceAssetId: assetId } },
     });
   });
 
@@ -312,7 +363,9 @@ describe('ProjectSourceService local authority', () => {
       }),
     ).rejects.toMatchObject({ statusCode: 404 });
     expect(inspectionStarted).toBe(false);
-    expect(await bytes.exists(otherOwnerUserId, operationKey)).toBe(false);
+    expect(
+      await bytes.exists(otherOwnerUserId, projectUploadAssetId(otherOwnerUserId, operationKey)),
+    ).toBe(false);
   });
 
   it('references an exact active Saved Video Version without copying bytes or inferring output', async () => {

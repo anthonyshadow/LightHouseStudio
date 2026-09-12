@@ -618,7 +618,7 @@ export const readProjectWorkingMediaContent = async ({
  * Stores re-framed bytes for a placement and hands back the reference a save can carry.
  *
  * Not the working-media path: a rendition is a deliverable, not the Project's current cut, and
- * adopting it would move the stage and bump the revision. The operation key is the asset id on the
+ * adopting it would move the stage and bump the revision. The operation key determines the asset id on the
  * server, so replaying this upload returns the same bytes rather than storing a second copy.
  */
 export const uploadProjectRendition = (input: {

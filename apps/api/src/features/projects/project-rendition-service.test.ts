@@ -7,6 +7,7 @@ import { KeyedLock } from '../../application/keyed-lock.js';
 import { LocalAssetByteStore } from '../../storage/asset-byte-store.js';
 import { FileSavedVideoRepository } from '../saved-videos/saved-video-repository.js';
 import { FileProjectRepository } from './file-project-repository.js';
+import { projectUploadAssetId } from './project-byte-acceptance.js';
 import { ProjectRenditionService } from './project-rendition-service.js';
 import { ProjectService } from './project-service.js';
 import { ProjectSourceService } from './project-source-service.js';
@@ -142,7 +143,7 @@ describe('ProjectRenditionService', () => {
     const replay = await upload(operationKey);
 
     expect(replay).toEqual(first);
-    expect(replay.assetId).toBe(operationKey);
+    expect(replay.assetId).toBe(projectUploadAssetId(ownerUserId, operationKey));
   });
 
   it('refuses bytes that are not the shape the placement asked for', async () => {

@@ -144,8 +144,8 @@ describe('DrizzleAssetLifecycleRegistry', () => {
     const repository = new DrizzleAssetLifecycleRegistry(scripted.db);
 
     await repository.prepare(manifest, { provider: 'r2', storageKey: readyRow.storageKey });
-    await repository.markReady(assetId, 'etag');
-    await repository.markFailed(assetId);
+    await repository.markReady(manifest, 'etag');
+    await repository.markFailed(manifest);
     await expect(repository.findReady(ownerUserId, assetId)).resolves.toMatchObject({
       manifest,
       provider: 'r2',

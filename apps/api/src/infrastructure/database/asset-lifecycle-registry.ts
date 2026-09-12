@@ -17,6 +17,16 @@ export class DrizzleAssetLifecycleRegistry implements AssetLifecycleRegistry {
     private readonly projectRetention?: Pick<DrizzleProjectRetentionPolicy, 'retainedAssetIdsWith'>,
   ) {}
 
+  /**
+   * Registers the row a store is about to write bytes for, and refuses an id another account
+   * already holds.
+   *
+   * The conflict target is the `(id, owner_user_id)` unique index rather than the primary key.
+   * Arbitrating on the id alone made a same-id/different-owner insert a silent no-op, so the store
+   * went on to overwrite that owner's object while the registry kept pointing at it; naming the
+   * owner too means the replay this is here for still converges, and a cross-owner id violates
+   * `media_assets_pkey` and raises before any byte moves.
+   */
   async prepare(
     manifest: StoredAssetManifest,
     location: Pick<StoredAssetLocation, 'provider' | 'storageKey'>,
@@ -38,21 +48,30 @@ export class DrizzleAssetLifecycleRegistry implements AssetLifecycleRegistry {
         createdAt: toIsoTimestamp(manifest.createdAt),
         updatedAt: toIsoTimestamp(manifest.createdAt),
       })
-      .onConflictDoNothing({ target: mediaAssets.id });
+      .onConflictDoNothing({ target: [mediaAssets.id, mediaAssets.ownerUserId] });
   }
 
-  async markReady(assetId: string, etag: string | null): Promise<void> {
+  // Both marks are matched on the owner as well as the id, like every other statement here. The
+  // id alone would let one account's upload settle the row of an asset it does not own.
+  async markReady(manifest: StoredAssetManifest, etag: string | null): Promise<void> {
     await this.db
       .update(mediaAssets)
       .set({ status: 'ready', etag, updatedAt: new Date().toISOString() })
-      .where(eq(mediaAssets.id, assetId));
+      .where(this.#ownedAsset(manifest));
   }
 
-  async markFailed(assetId: string): Promise<void> {
+  async markFailed(manifest: StoredAssetManifest): Promise<void> {
     await this.db
       .update(mediaAssets)
       .set({ status: 'failed', updatedAt: new Date().toISOString() })
-      .where(eq(mediaAssets.id, assetId));
+      .where(this.#ownedAsset(manifest));
+  }
+
+  #ownedAsset(manifest: StoredAssetManifest) {
+    return and(
+      eq(mediaAssets.id, manifest.assetId),
+      eq(mediaAssets.ownerUserId, manifest.ownerUserId),
+    );
   }
 
   async findReady(ownerUserId: string, assetId: string): Promise<StoredAssetLocation | null> {

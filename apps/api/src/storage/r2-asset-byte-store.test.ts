@@ -37,7 +37,7 @@ class MemoryLifecycle implements AssetLifecycleRegistry {
     this.location = { manifest, ...location, etag: null };
     return Promise.resolve();
   }
-  markReady(_assetId: string, etag: string | null): Promise<void> {
+  markReady(_manifest: StoredAssetManifest, etag: string | null): Promise<void> {
     if (this.location !== null) this.location = { ...this.location, etag };
     return Promise.resolve();
   }

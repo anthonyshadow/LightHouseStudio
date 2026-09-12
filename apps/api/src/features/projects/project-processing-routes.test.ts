@@ -9,6 +9,7 @@ import {
   projectProcessingCurrentResponseSchema,
   projectProcessingHistoryResponseSchema,
   projectProcessingMutationResponseSchema,
+  projectSourceResponseSchema,
   type ProjectProcessingCurrentResponse,
   type ProjectProcessingMutationResponse,
 } from '@studio/contracts';
@@ -154,14 +155,14 @@ describe('Project processing route authority', () => {
       payload: { title: 'Recoverable processing' },
     });
     const projectId = projectCurrentResponseSchema.parse(created.json()).project.id;
-    const sourceAssetId = randomUUID();
+    const sourceOperationKey = randomUUID();
     const source = await app.inject({
       method: 'POST',
       url: `/api/projects/${projectId}/source`,
       headers: {
         ...browserHeaders,
         'content-type': 'video/mp4',
-        'idempotency-key': sourceAssetId,
+        'idempotency-key': sourceOperationKey,
         'x-lightframe-project-source': encodeURIComponent(
           JSON.stringify({
             expectedVersion: 1,
@@ -174,6 +175,10 @@ describe('Project processing route authority', () => {
       payload: fixture,
     });
     expect(source.statusCode).toBe(201);
+    // The stored id is the server's to choose, so take it from the response rather than assuming
+    // it is the operation key the request supplied.
+    const sourceAssetId = projectSourceResponseSchema.parse(source.json()).revision.snapshot
+      .sourceAssetId;
     const checkpoint = await app.inject({
       method: 'POST',
       url: `/api/projects/${projectId}/revisions`,

@@ -14,11 +14,11 @@ export class ManagedLocalAssetByteStore implements AssetByteStore {
         provider: 'local',
         storageKey: manifest.assetId,
       });
-      await this.lifecycle.markReady(manifest.assetId, null);
+      await this.lifecycle.markReady(manifest, null);
       return manifest;
     } catch (error) {
       await this.bytes.delete(manifest.ownerUserId, manifest.assetId).catch(() => undefined);
-      await this.lifecycle.markFailed(manifest.assetId).catch(() => undefined);
+      await this.lifecycle.markFailed(manifest).catch(() => undefined);
       throw error;
     }
   }

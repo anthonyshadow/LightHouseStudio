@@ -119,7 +119,9 @@ describe('ManagedLocalAssetByteStore', () => {
     await store.delete(ownerUserId, assetId);
 
     expect(bytes.delete).toHaveBeenCalledTimes(1);
-    expect(registry.markFailed).toHaveBeenCalledWith(assetId);
+    expect(registry.markFailed).toHaveBeenCalledWith(
+      expect.objectContaining({ assetId, ownerUserId }),
+    );
   });
 
   it('deletes the persisted local key and skips provider mismatches', async () => {

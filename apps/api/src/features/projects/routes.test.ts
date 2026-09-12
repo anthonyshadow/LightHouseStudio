@@ -8,6 +8,7 @@ import { testConfig } from '../../test/fakes.js';
 import { FileProjectRepository } from './file-project-repository.js';
 import { ProjectService } from './project-service.js';
 import { createDefaultVideoEditSpec } from '@studio/domain';
+import { projectSourceResponseSchema, projectWorkingMediaResponseSchema } from '@studio/contracts';
 
 const browserHeaders = { host: 'localhost:5173', origin: 'http://localhost:5173' };
 const json = <Value>(response: { json(): unknown }): Value => response.json() as Value;
@@ -598,9 +599,14 @@ describe('Project lifecycle routes', () => {
 
     const accepted = await upload();
     expect(accepted.statusCode).toBe(201);
+    // Parsed through the contract rather than an inline shape, so the id keeps its uuid check: the
+    // server derives it, and the operation key the request supplied is deliberately not it.
+    const acceptedSourceAssetId = projectSourceResponseSchema.parse(accepted.json()).revision
+      .snapshot.sourceAssetId;
+    expect(acceptedSourceAssetId).not.toBe(operationKey);
     expect(accepted.json()).toMatchObject({
       project: { id: projectId, status: 'ready', version: 2 },
-      revision: { revisionNumber: 2, snapshot: { sourceAssetId: operationKey } },
+      revision: { revisionNumber: 2, snapshot: { sourceAssetId: acceptedSourceAssetId } },
       source: {
         kind: 'uploaded',
         filename: 'durable-source.mp4',
@@ -813,16 +819,22 @@ describe('Project lifecycle routes', () => {
         payload: fixture,
       });
 
+    const sourceAssetId = projectSourceResponseSchema.parse(source.json()).revision.snapshot
+      .sourceAssetId;
     const adopted = await upload();
     expect(adopted.statusCode).toBe(201);
+    // The render is one asset, named identically by the snapshot's working and presented media and
+    // by the response's own media, and the source it was derived from is left as it was.
+    const renderAssetId = projectWorkingMediaResponseSchema.parse(adopted.json()).media.assetId;
+    expect(renderAssetId).not.toBe(sourceAssetId);
     expect(adopted.json()).toMatchObject({
       project: { id: projectId, version: 3, status: 'ready' },
       revision: {
         revisionNumber: 3,
         snapshot: {
-          sourceAssetId: sourceKey,
-          workingMedia: { kind: 'asset', assetId: operationKey },
-          presentedMedia: { kind: 'asset', assetId: operationKey },
+          sourceAssetId,
+          workingMedia: { kind: 'asset', assetId: renderAssetId },
+          presentedMedia: { kind: 'asset', assetId: renderAssetId },
           localEdit,
           lastSuccessfulOutput: null,
         },
@@ -830,7 +842,7 @@ describe('Project lifecycle routes', () => {
       isCurrent: true,
       media: {
         kind: 'local-render',
-        assetId: operationKey,
+        assetId: renderAssetId,
       },
     });
     expect(adopted.body).not.toContain(directory);

@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { projectUploadAssetId } from './project-byte-acceptance.js';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -102,6 +103,7 @@ describe('ProjectWorkingMediaService local authority', () => {
     const current = await createProjectWithSource();
     const getCurrent = vi.spyOn(projects, 'getCurrent');
     const operationKey = randomUUID();
+    const assetId = projectUploadAssetId(ownerUserId, operationKey);
     // A cue rides inside the same field, so this proves it is stored, hydrated and replayed
     // without a migration of its own.
     const localEdit = {
@@ -140,8 +142,14 @@ describe('ProjectWorkingMediaService local authority', () => {
           id: adoptionRevisionId,
           snapshot: {
             sourceAssetId: current.revision.snapshot.sourceAssetId,
-            workingMedia: { kind: 'asset', assetId: operationKey },
-            presentedMedia: { kind: 'asset', assetId: operationKey },
+            workingMedia: {
+              kind: 'asset',
+              assetId: assetId,
+            },
+            presentedMedia: {
+              kind: 'asset',
+              assetId: assetId,
+            },
             localEdit,
             lastSuccessfulOutput: null,
             workflowPhase: 'review',
@@ -156,13 +164,13 @@ describe('ProjectWorkingMediaService local authority', () => {
         },
       },
     });
-    expect(await bytes.exists(ownerUserId, operationKey)).toBe(true);
+    expect(await bytes.exists(ownerUserId, assetId)).toBe(true);
 
     projects = new FileProjectRepository(directory);
     const replayed = await service().uploadLocalRender(input);
     expect(replayed).toMatchObject({ ok: true, replayed: true, response: { isCurrent: true } });
     await expect(service().get(ownerUserId, current.project.id)).resolves.toMatchObject({
-      media: { kind: 'local-render', assetId: operationKey },
+      media: { kind: 'local-render', assetId },
     });
     await expect(service().get(otherOwnerUserId, current.project.id)).rejects.toMatchObject({
       statusCode: 404,

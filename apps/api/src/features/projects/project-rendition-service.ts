@@ -31,8 +31,8 @@ export interface UploadProjectRenditionInput {
  * revision — it accepts bytes, checks they are what the placement asked for, and hands back a
  * reference the save request can carry.
  *
- * Idempotent by the same mechanism as every other Project upload: the operation key *is* the asset
- * id, so replaying an upload returns the bytes already stored rather than a second copy. That is
+ * Idempotent by the same mechanism as every other Project upload: the operation key *determines* the
+ * asset id, so replaying an upload returns the bytes already stored rather than a second copy. That is
  * what lets a save that was interrupted after uploading resume without re-rendering.
  */
 export class ProjectRenditionService {

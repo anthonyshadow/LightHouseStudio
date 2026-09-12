@@ -64,8 +64,13 @@ export interface AssetLifecycleRegistry {
     manifest: StoredAssetManifest,
     location: Pick<StoredAssetLocation, 'provider' | 'storageKey'>,
   ): Promise<void>;
-  markReady(assetId: string, etag: string | null): Promise<void>;
-  markFailed(assetId: string): Promise<void>;
+  /**
+   * Settling a prepared row takes the whole manifest, like `prepare` above, so the owner cannot be
+   * supplied apart from the id it belongs to — every caller holds one, and the two arriving apart
+   * is the decoupling that let an upload settle a row it did not own.
+   */
+  markReady(manifest: StoredAssetManifest, etag: string | null): Promise<void>;
+  markFailed(manifest: StoredAssetManifest): Promise<void>;
   findReady(ownerUserId: string, assetId: string): Promise<StoredAssetLocation | null>;
   /** Claims a ready asset or reclaims an interrupted deleting asset for idempotent cleanup. */
   claimDeletion(

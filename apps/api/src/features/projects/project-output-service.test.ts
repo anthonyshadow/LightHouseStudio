@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { projectUploadAssetId } from './project-byte-acceptance.js';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -94,7 +95,7 @@ describe('ProjectOutputService local composite authority', () => {
     });
     if (!accepted.ok) throw new Error('Expected Project source acceptance.');
     currentProjectId = created.current.project.id;
-    return { current: accepted.response, assetId: operationKey };
+    return { current: accepted.response, assetId: projectUploadAssetId(ownerUserId, operationKey) };
   };
 
   const outputService = (projectRepository = projects, savedVideoRepository = savedVideos) =>

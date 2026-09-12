@@ -1,5 +1,18 @@
 import { AppError } from '../../http/app-error.js';
 import type { AssetByteStore, StoredAssetManifest } from '../../storage/asset-byte-store.js';
+import { deterministicUuid } from './deterministic-uuid.js';
+
+/**
+ * The stored id for an uploaded Project asset.
+ *
+ * Deriving it from the owner as well as the operation key is what stops one account's upload from
+ * naming another account's asset. The id becomes the byte store's object key, and the operation
+ * key is chosen by the client through `Idempotency-Key` — so using the key alone let a request
+ * address, and overwrite, bytes it does not own. Replay still resolves to the same id because the
+ * derivation stays a pure function of the operation's identity.
+ */
+export const projectUploadAssetId = (ownerUserId: string, operationKey: string): string =>
+  deterministicUuid(`lightframe:project-upload:v1:${ownerUserId}:${operationKey}`);
 
 /**
  * The one rule for accepting an uploaded media file into the byte store under an idempotency key.
@@ -23,7 +36,18 @@ export const acceptIdempotentUpload = async <T extends { readonly ok: boolean }>
   readonly commit: (manifest: StoredAssetManifest) => Promise<T>;
   readonly discard: (assetId: string) => Promise<void>;
 }): Promise<T> => {
-  const existing = await options.bytes.open(options.ownerUserId, options.operationKey);
+  const assetId = projectUploadAssetId(options.ownerUserId, options.operationKey);
+  // TEMPORARY, and safe to delete once no deployment holds a Project asset stored under a raw
+  // operation key — the same shape of wind-down `ShadowAssetByteStore` documents for itself.
+  //
+  // The operation key was the asset id before ids were owner-derived. Without this read, a key
+  // minted before that change and retried after it stores the bytes a second time under the new
+  // id, and because a replay reports `ok` the discard below never runs, so the duplicate is
+  // orphaned. Both reads are owner-scoped, so the fallback can only ever find this owner's own
+  // earlier upload; it costs one extra indexed lookup on a first attempt.
+  const existing =
+    (await options.bytes.open(options.ownerUserId, assetId)) ??
+    (await options.bytes.open(options.ownerUserId, options.operationKey));
   let created = false;
   let manifest = existing?.manifest;
   if (manifest !== undefined) {
@@ -37,7 +61,7 @@ export const acceptIdempotentUpload = async <T extends { readonly ok: boolean }>
     }
   } else {
     manifest = await options.bytes.storeFile({
-      assetId: options.operationKey,
+      assetId,
       ownerUserId: options.ownerUserId,
       sourcePath: options.sourcePath,
       checksumSha256: options.checksumSha256,

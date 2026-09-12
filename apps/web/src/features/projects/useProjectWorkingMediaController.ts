@@ -118,9 +118,13 @@ export const useProjectWorkingMediaController = (
       } catch (error) {
         if (error instanceof ProjectApiConflictError) throw error;
         const reconciled = await getProjectWorkingMedia(projectId, controller.signal);
+        // The stored asset id is the server's to derive, so this attempt cannot recognise its own
+        // upload by id. What it can establish is that the Project's current cut is now an asset
+        // carrying exactly the edit this attempt submitted, which is what "the adoption landed"
+        // means — `isCurrent` is the response's own statement that the reference is that cut.
         if (
           reconciled.media.reference.kind !== 'asset' ||
-          reconciled.media.reference.assetId !== operationKey ||
+          !reconciled.isCurrent ||
           JSON.stringify(reconciled.revision.snapshot.localEdit) !== JSON.stringify(candidate.spec)
         ) {
           throw error;

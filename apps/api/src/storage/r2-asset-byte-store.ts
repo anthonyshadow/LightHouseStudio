@@ -349,14 +349,14 @@ export class R2AssetByteStore implements AssetByteStore {
   async registerDirectUpload(manifest: StoredAssetManifest, etag: string | null): Promise<void> {
     const key = this.#key(manifest.assetId);
     await this.#lifecycle?.prepare(manifest, { provider: 'r2', storageKey: key });
-    await this.#lifecycle?.markReady(manifest.assetId, etag);
+    await this.#lifecycle?.markReady(manifest, etag);
   }
 
-  async #discardFailedUpload(assetId: string, key: string): Promise<void> {
+  async #discardFailedUpload(manifest: StoredAssetManifest): Promise<void> {
     await this.#client
-      .send(new DeleteObjectCommand({ Bucket: this.#bucket, Key: key }))
+      .send(new DeleteObjectCommand({ Bucket: this.#bucket, Key: this.#key(manifest.assetId) }))
       .catch(() => undefined);
-    await this.#lifecycle?.markFailed(assetId).catch(() => undefined);
+    await this.#lifecycle?.markFailed(manifest).catch(() => undefined);
   }
 
   async #uploadStream(manifest: StoredAssetManifest, body: Readable): Promise<StoredAssetManifest> {
@@ -382,10 +382,10 @@ export class R2AssetByteStore implements AssetByteStore {
         { 'lightframe.size_bytes': manifest.sizeBytes },
         () => upload.done(),
       );
-      await this.#lifecycle?.markReady(manifest.assetId, result.ETag ?? null);
+      await this.#lifecycle?.markReady(manifest, result.ETag ?? null);
       return manifest;
     } catch (error) {
-      await this.#discardFailedUpload(manifest.assetId, key);
+      await this.#discardFailedUpload(manifest);
       throw error;
     }
   }
@@ -477,10 +477,10 @@ export class R2AssetByteStore implements AssetByteStore {
             }),
           ),
       );
-      await this.#lifecycle?.markReady(manifest.assetId, result.ETag ?? null);
+      await this.#lifecycle?.markReady(manifest, result.ETag ?? null);
       return manifest;
     } catch (error) {
-      await this.#discardFailedUpload(manifest.assetId, key);
+      await this.#discardFailedUpload(manifest);
       throw error;
     }
   }

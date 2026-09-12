@@ -15,8 +15,8 @@ export type ProjectOutputRenditionOutcome = 'pending' | 'stored' | 'failed' | 'c
 export interface ProjectOutputRenditionMember {
   readonly specification: ProjectExportSpecification;
   /**
-   * Minted before the first render and never regenerated, because on the server this key *is* the
-   * asset id: an attempt that resumes after a reload re-uploads under the same key and gets the
+   * Minted before the first render and never regenerated, because on the server this key *determines*
+   * the asset id: an attempt that resumes after a reload re-uploads under the same key and gets the
    * bytes already stored instead of leaving a second copy behind.
    */
   readonly operationKey: string;

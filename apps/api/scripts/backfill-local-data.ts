@@ -132,7 +132,7 @@ try {
     }
     if (config.assetStoreProvider === 'local') {
       await lifecycle.prepare(manifest, { provider: 'local', storageKey: manifest.assetId });
-      await lifecycle.markReady(manifest.assetId, null);
+      await lifecycle.markReady(manifest, null);
       return;
     }
     if (targetBytes.storeStream === undefined) {
