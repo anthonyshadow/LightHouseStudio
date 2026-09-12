@@ -556,13 +556,27 @@ export const createSavedCharacterPrompt = (
     lastUsedAt: null,
     useCount: 0,
   };
-  return {
-    ...store,
-    savedCharacterPrompts: capByUpdated(
-      [asset, ...store.savedCharacterPrompts],
-      SAVED_CHARACTER_PROMPT_LIMIT,
-    ),
-  };
+  const savedCharacterPrompts = capByUpdated(
+    [asset, ...store.savedCharacterPrompts],
+    SAVED_CHARACTER_PROMPT_LIMIT,
+  );
+  // An evicted character takes its wardrobe with it, exactly as deleting one does — through the
+  // same function, so a branch added to that cascade cannot miss this path.
+  //
+  // The cap used to drop the character alone, leaving its variants pointing at a parent that no
+  // longer existed. The sanitizer runs on the very write that evicts and filters an orphaned
+  // variant out, so the operator lost generated outfits with no notice, and once the store synced
+  // the images those variants named stopped being referenced and were purged.
+  //
+  // Only characters that were already stored can be evicted: if the cap drops the asset being
+  // added, there is nothing of its own to cascade.
+  const retained = new Set(savedCharacterPrompts.map((prompt) => prompt.id));
+  return store.savedCharacterPrompts
+    .filter((prompt) => !retained.has(prompt.id))
+    .reduce((next, prompt) => deleteSavedCharacterPrompt(next, prompt.id), {
+      ...store,
+      savedCharacterPrompts,
+    });
 };
 
 export const updateSavedCharacterPrompt = (

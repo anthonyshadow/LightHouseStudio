@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createPromptBuilderDraft } from '../prompts';
 import {
+  SAVED_CHARACTER_PROMPT_LIMIT,
   CREATIVE_ASSET_SCHEMA_VERSION,
   CREATIVE_LIBRARY_EXPORT_FILE_VERSION,
   CREATIVE_LIBRARY_EXPORT_MAX_BYTES,
@@ -567,6 +568,66 @@ describe('creative asset CRUD and use', () => {
         referenceImageAssetId: 'uploaded-asset-1',
       }),
     ]);
+    expect(store.recentPrompts[0]).not.toHaveProperty('savedCharacterPromptId');
+  });
+
+  it('takes an evicted character\u2019s wardrobe with it when the cap is reached', () => {
+    const character = (id: string, offset: number) => ({
+      input: {
+        name: `Character ${id}`,
+        prompt: 'Replace the subject.',
+        source: 'generator' as const,
+        promptIntent: 'character-transform' as const,
+        referenceImageStatus: 'persisted-reference' as const,
+        referenceImageAssetId: `${id}-original`,
+      },
+      context: context(id, offset),
+    });
+
+    let store = createEmptyCreativeAssetStore();
+    for (let index = 0; index < SAVED_CHARACTER_PROMPT_LIMIT; index += 1) {
+      const next = character(`character-${index}`, index);
+      store = createSavedCharacterPrompt(store, next.input, next.context);
+    }
+    // The oldest by updatedAt is the one the cap will drop.
+    const evicted = 'character-0';
+    store = createSavedCharacterVariant(
+      store,
+      {
+        parentCharacterId: evicted,
+        title: 'Evening look',
+        referenceImageAssetId: 'evicted-evening',
+        creation: {
+          method: 'add-outfit',
+          sourceReferenceImageAssetId: `${evicted}-original`,
+          garmentReferenceImageAssetId: 'garment-one',
+        },
+      },
+      context('evicted-variant', 500),
+    );
+    expect(store.savedCharacterVariants).toHaveLength(1);
+    store = recordSuccessfulPromptUse(
+      store,
+      {
+        prompt: 'Replace the subject.',
+        modelModeId: 'lucy-latest',
+        savedCharacterPromptId: evicted,
+        characterName: 'Character character-0',
+        referenceImageAssetId: `${evicted}-original`,
+      },
+      context('recent-evicted', 600),
+    );
+
+    const overflow = character('character-overflow', 900);
+    store = createSavedCharacterPrompt(store, overflow.input, overflow.context);
+
+    // The character is gone, and so is its wardrobe. Left behind, the variant pointed at a parent
+    // that no longer existed, and the sanitizer dropped it on the very write that evicted it \u2014
+    // silently, and taking the generated outfit image's last reference with it.
+    expect(store.savedCharacterPrompts).toHaveLength(SAVED_CHARACTER_PROMPT_LIMIT);
+    expect(store.savedCharacterPrompts.some((prompt) => prompt.id === evicted)).toBe(false);
+    expect(store.savedCharacterVariants).toEqual([]);
+    // The other half of the same cascade: a recent use no longer claims a character that is gone.
     expect(store.recentPrompts[0]).not.toHaveProperty('savedCharacterPromptId');
   });
 
