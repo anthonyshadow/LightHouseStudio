@@ -37,7 +37,7 @@ import { AI_USAGE_RECONCILE_BATCH } from '../ai-usage/ai-usage-reconciler.js';
 
 const browserHost = 'localhost:5173';
 const ownerDigest = createHash('sha256').update(browserHost).digest('hex');
-/** The identity `installAuthentication` derives from the host under `nodeEnv: 'test'`. */
+/** The identity `installAuthentication` derives from the host when the harness bypass is on. */
 const ownerUserId = `${ownerDigest.slice(0, 8)}-${ownerDigest.slice(8, 12)}-4${ownerDigest.slice(13, 16)}-a${ownerDigest.slice(17, 20)}-${ownerDigest.slice(20, 32)}`;
 const providerHeaders = {
   host: browserHost,

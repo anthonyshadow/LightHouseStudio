@@ -182,4 +182,30 @@ describe('demo authentication API', () => {
     expect(response.statusCode).toBe(401);
     expect(response.json()).toMatchObject({ error: { code: 'authentication_required' } });
   });
+
+  /**
+   * The bypass is gated on an explicit flag, not on an environment combination.
+   *
+   * `NODE_ENV=test` with `DEMO_AUTH_ENABLED=false` is exactly the pair that used to switch it on,
+   * and `environmentSchema` accepts it — so this pins the hook itself, not just the parser: with
+   * the flag off, that pair authenticates like any other deployment.
+   */
+  it('requires the explicit harness flag, not a test-shaped environment', async () => {
+    const app = createApp({
+      config: testConfig({
+        nodeEnv: 'test',
+        demoAuthEnabled: false,
+        testAuthBypassEnabled: false,
+      }),
+    });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/videos',
+      headers: { host: headers.host },
+    });
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({ error: { code: 'authentication_required' } });
+  });
 });

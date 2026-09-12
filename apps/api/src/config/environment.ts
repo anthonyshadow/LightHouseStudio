@@ -445,6 +445,17 @@ const environmentSchema = z
   });
 
 export interface RuntimeConfig {
+  /**
+   * Whether the API serves every request as one synthetic owner, with no session.
+   *
+   * Deliberately absent from `environmentSchema`: `parseEnvironment` always answers false, so no
+   * combination of variables can switch it on in a process that serves traffic. It was previously
+   * inferred from `NODE_ENV=test` and `DEMO_AUTH_ENABLED=false`, which the schema accepts together
+   * — and the owner was then a digest of the `Host` header, which is ownership from a request
+   * header in code that ships in the production binary. Only an in-process test harness, which
+   * builds a `RuntimeConfig` directly, can declare it.
+   */
+  readonly testAuthBypassEnabled: boolean;
   readonly nodeEnv: 'development' | 'test' | 'production';
   readonly host: '127.0.0.1';
   readonly port: number;
@@ -586,6 +597,8 @@ export const parseEnvironment = (
   }
 
   return {
+    // Never from the environment. See the field's declaration.
+    testAuthBypassEnabled: false,
     nodeEnv: result.data.NODE_ENV,
     host: '127.0.0.1',
     port: result.data.PORT,

@@ -81,14 +81,14 @@ to the same URL after login").
 
 ## System behaviour
 
-| Step                                    | Server behaviour                                                                                             |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Every `/api/*` request                  | `installAuthentication` `onRequest` hook (`apps/api/src/http/authentication.ts:26-73`)                       |
-| Public routes                           | `GET /api/health`, `GET /api/auth/demo-config`, `POST /api/auth/login`, `POST /api/auth/logout`              |
-| All other `/api/*`                      | Verify cookie → populate `request.auth`; on failure clear the cookie and throw `401 authentication_required` |
-| Any non-GET/HEAD/OPTIONS `/api/*`       | Additionally `requireTrustedOrigin(request)`                                                                 |
-| Ownership                               | Every service call takes `ownerUserIdForRequest(request)`; there is no cross-user access path                |
-| `NODE_ENV=test` with demo auth disabled | A synthetic per-host owner id is injected so integration tests are isolated (`authentication.ts:32-53`)      |
+| Step                              | Server behaviour                                                                                                                                                                                                                                                                                                               |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Every `/api/*` request            | `installAuthentication` `onRequest` hook (`apps/api/src/http/authentication.ts:31-82`)                                                                                                                                                                                                                                         |
+| Public routes                     | `GET /api/health`, `GET /api/auth/demo-config`, `POST /api/auth/login`, `POST /api/auth/logout`                                                                                                                                                                                                                                |
+| All other `/api/*`                | Verify cookie → populate `request.auth`; on failure clear the cookie and throw `401 authentication_required`                                                                                                                                                                                                                   |
+| Any non-GET/HEAD/OPTIONS `/api/*` | Additionally `requireTrustedOrigin(request)`                                                                                                                                                                                                                                                                                   |
+| Ownership                         | Every service call takes `ownerUserIdForRequest(request)`; there is no cross-user access path                                                                                                                                                                                                                                  |
+| In-process test harness           | A harness that sets `testAuthBypassEnabled` on a `RuntimeConfig` it builds itself gets a synthetic per-host owner id, so parallel suites stay isolated. No environment can switch this on: it is absent from `environmentSchema` and `parseEnvironment` always answers false (`authentication.ts:38`, `config/environment.ts`) |
 
 `/api/capabilities` is **not** public — it requires a session. `useProviderAvailability` therefore
 only resolves inside the authenticated shell.

@@ -34,6 +34,27 @@ describe('parseEnvironment', () => {
     );
   });
 
+  /*
+   * The API can serve every request as one synthetic owner, with the owner derived from the `Host`
+   * header. That path exists for in-process suites, and it used to be inferred from `NODE_ENV=test`
+   * with `DEMO_AUTH_ENABLED=false` — a combination the schema accepts, and which no refinement
+   * constrains, so two environment variables were all that stood between a served process and an
+   * unauthenticated API. No environment may switch it on.
+   */
+  it('never reads the test authentication bypass from the environment', () => {
+    for (const environment of [
+      {},
+      // The combination that used to switch it on, and which no refinement rejects.
+      { NODE_ENV: 'test', DEMO_AUTH_ENABLED: 'false' },
+      { NODE_ENV: 'test', DEMO_AUTH_ENABLED: 'false', DATABASE_MODE: 'local' },
+      // Asking for it by name does not work either: the schema has no such variable.
+      { TEST_AUTH_BYPASS_ENABLED: 'true' },
+      { LIGHTFRAME_TEST_AUTH_BYPASS_ENABLED: 'true' },
+    ]) {
+      expect(parseEnvironment(environment)).toMatchObject({ testAuthBypassEnabled: false });
+    }
+  });
+
   it('uses safe local defaults without requiring provider credentials', () => {
     expect(parseEnvironment({})).toMatchObject({
       nodeEnv: 'development',

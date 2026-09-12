@@ -15,6 +15,12 @@ const PUBLIC_API_ROUTES = new Set([
 
 const isMutation = (method: string): boolean => !['GET', 'HEAD', 'OPTIONS'].includes(method);
 
+/**
+ * One synthetic owner per Host, so parallel in-process suites do not share stored state.
+ *
+ * Reachable only when a test harness sets `testAuthBypassEnabled` on a `RuntimeConfig` it built
+ * itself — `parseEnvironment` always answers false, so no deployed process can take this path.
+ */
 const testOwnerUserId = (request: HttpRequest): string => {
   const digest = createHash('sha256')
     .update(typeof request.headers.host === 'string' ? request.headers.host.toLowerCase() : 'test')
@@ -29,7 +35,7 @@ export const installAuthentication = (
 ): void => {
   app.addHook('onRequest', async (request: HttpRequest, reply) => {
     if (!request.url.startsWith('/api/')) return;
-    if (config.nodeEnv === 'test' && !config.demoAuthEnabled) {
+    if (config.testAuthBypassEnabled) {
       const now = new Date();
       request.auth = {
         user: {
