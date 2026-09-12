@@ -10,7 +10,7 @@ import { DrizzleProcessingJobTraceWriter } from './processing-job-repository.js'
 import { DrizzleReferenceImageAssetStore } from './reference-image-asset-store.js';
 import { DrizzleSavedVideoRepository } from './saved-video-repository.js';
 import { DrizzleSavedVoiceRepository } from './saved-voice-repository.js';
-import { savedVideos } from './schema.js';
+import { savedVideos, videoVersions } from './schema.js';
 import { scriptedDatabase } from './scripted-database.test-support.js';
 
 const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
@@ -379,6 +379,8 @@ describe('DrizzleSavedVideoRepository', () => {
       [updatedVideo],
       [version, nextVersion],
       [],
+      // The thumbnail write now locks its parent video before touching the Version.
+      [{ id: videoId }],
       [{ id: versionId }],
       [],
       [updatedVideo],
@@ -519,6 +521,37 @@ describe('DrizzleSavedVideoRepository', () => {
     expect(deleteLockedTable).toBe(savedVideos);
     expect(versionSnapshotIndex).toBeGreaterThan(deleteLockIndex);
     expect(deleteScripted.remaining()).toBe(0);
+
+    // A poster must take the same parent lock, and take it before touching the Version: an
+    // unlocked liveness check reads the last committed row and cannot wait for a delete in
+    // flight, so the write would land on a video that is about to be tombstoned.
+    const thumbnailScripted = scriptedDatabase(
+      [{ id: videoId }],
+      [{ id: versionId }],
+      [],
+      [updatedVideo],
+      [{ ...version, thumbnailAssetId: assetId }, nextVersion],
+    );
+    const thumbnailRepository = new DrizzleSavedVideoRepository(thumbnailScripted.db);
+
+    await expect(
+      thumbnailRepository.setThumbnail(ownerUserId, videoId, versionId, assetId, now),
+    ).resolves.toMatchObject({ versions: [{ thumbnailAssetId: assetId }, nextVersion] });
+
+    const thumbnailLockIndex = thumbnailScripted.calls.findIndex(
+      (call) => call.operation === 'for' && call.arguments[0] === 'update',
+    );
+    const thumbnailLockedTable = thumbnailScripted.calls
+      .slice(0, thumbnailLockIndex)
+      .filter((call) => call.operation === 'from')
+      .at(-1)?.arguments[0];
+    const versionUpdateIndex = thumbnailScripted.calls.findIndex(
+      (call) => call.operation === 'update' && call.arguments[0] === videoVersions,
+    );
+    expect(thumbnailLockIndex).toBeGreaterThan(-1);
+    expect(thumbnailLockedTable).toBe(savedVideos);
+    expect(versionUpdateIndex).toBeGreaterThan(thumbnailLockIndex);
+    expect(thumbnailScripted.remaining()).toBe(0);
   });
 
   it('returns bounded empty and conflict results without loading version history', async () => {
@@ -535,6 +568,7 @@ describe('DrizzleSavedVideoRepository', () => {
       [],
       [],
       [video],
+      // The thumbnail write locks its parent first and stops there when the video is gone.
       [],
       [],
     );

@@ -674,7 +674,25 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
     assetId: string,
     updatedAt: string,
   ): Promise<StoredSavedVideoAggregate | null> {
-    const changed = await this.db.transaction(async (tx) => {
+    return this.db.transaction(async (tx) => {
+      // Locked, not merely checked. A plain subquery reads the last committed row and never waits,
+      // so a delete already in flight still looks live and the poster commits onto a video that is
+      // about to be tombstoned — after which nothing can reach the asset to reclaim it, and the
+      // service deletes the bytes the committed row now names. `append` and `delete` take this
+      // same lock, for this same reason.
+      const [live] = await tx
+        .select({ id: savedVideos.id })
+        .from(savedVideos)
+        .where(
+          and(
+            eq(savedVideos.ownerUserId, ownerUserId),
+            eq(savedVideos.id, videoId),
+            isNull(savedVideos.deletedAt),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (live === undefined) return null;
       const [version] = await tx
         .update(videoVersions)
         .set({ thumbnailAssetId: assetId })
@@ -683,17 +701,38 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
             eq(videoVersions.ownerUserId, ownerUserId),
             eq(videoVersions.videoId, videoId),
             eq(videoVersions.id, versionId),
+            // Only a Version with no poster yet. Two writes both stored bytes and both believed
+            // they had won, so the loser's asset ended up referenced by nothing — and nothing
+            // reclaims it, because `referencedAssetIds` can only report ids it can reach.
+            isNull(videoVersions.thumbnailAssetId),
           ),
         )
         .returning({ id: videoVersions.id });
-      if (version === undefined) return false;
+      if (version === undefined) {
+        // The parent is live and held, so one row settles which refusal this is — the same two the
+        // file store gives: an already-postered Version is an unchanged success and the caller
+        // keeps its bytes; no such Version is null and the caller discards them.
+        const [existing] = await tx
+          .select({ thumbnailAssetId: videoVersions.thumbnailAssetId })
+          .from(videoVersions)
+          .where(
+            and(
+              eq(videoVersions.ownerUserId, ownerUserId),
+              eq(videoVersions.videoId, videoId),
+              eq(videoVersions.id, versionId),
+            ),
+          )
+          .limit(1);
+        return existing?.thumbnailAssetId == null ? null : this.#getWith(tx, ownerUserId, videoId);
+      }
       await tx
         .update(savedVideos)
         .set({ updatedAt: toIsoTimestamp(updatedAt) })
         .where(and(eq(savedVideos.ownerUserId, ownerUserId), eq(savedVideos.id, videoId)));
-      return true;
+      // Read under the same transaction and the same lock, so the answer is the state this write
+      // produced rather than a later snapshot that may no longer include it.
+      return this.#getWith(tx, ownerUserId, videoId);
     });
-    return changed ? this.get(ownerUserId, videoId) : null;
   }
 
   async delete(
