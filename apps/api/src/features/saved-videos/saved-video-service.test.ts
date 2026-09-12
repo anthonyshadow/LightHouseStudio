@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { SAVED_VIDEO_VERSION_LIMIT } from './saved-video-repository.js';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -149,6 +150,37 @@ describe('SavedVideoService', () => {
       sourceVersionId: original.currentVersion.id,
     });
     expect(updated.versions[0]).toEqual(original.currentVersion);
+  });
+
+  it('refuses the Version past the cap instead of committing one that cannot be read back', async () => {
+    let detail = await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
+    while (detail.versionCount < SAVED_VIDEO_VERSION_LIMIT) {
+      detail = await service.appendVersion(
+        ownerUserId,
+        detail.id,
+        detail.currentVersion.id,
+        crypto.randomUUID(),
+        sourcePath,
+        metadata({ origin: 'editor' }),
+      );
+    }
+
+    // The relational store would insert this row and only fail afterwards, on the contract schema
+    // every read parses through — leaving the video permanently unopenable.
+    await expect(
+      service.appendVersion(
+        ownerUserId,
+        detail.id,
+        detail.currentVersion.id,
+        crypto.randomUUID(),
+        sourcePath,
+        metadata({ origin: 'editor' }),
+      ),
+    ).rejects.toMatchObject({ statusCode: 409, code: 'conflict' });
+
+    // Still readable, and still exactly at the cap.
+    const reread = await service.get(ownerUserId, detail.id);
+    expect(reread?.versionCount).toBe(SAVED_VIDEO_VERSION_LIMIT);
   });
 
   it('renames only against the expected revision, and says which failure happened', async () => {

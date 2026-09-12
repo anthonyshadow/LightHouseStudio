@@ -19,13 +19,14 @@ import type { ProjectRepository, ProjectRetentionPolicy } from '../projects/proj
 import { AppError } from '../../http/app-error.js';
 import { withWorkflowSpan } from '../../observability/telemetry.js';
 import { inspectSavedVideoFile } from './saved-video-inspection.js';
-import type {
-  SavedVideoReceipt,
-  SavedVideoReceiptLookup,
-  SavedVideoRepository,
-  StoredSavedVideoAggregate,
-  StoredSavedVideoSummary,
-  StoredVideoVersion,
+import {
+  SAVED_VIDEO_VERSION_LIMIT,
+  type SavedVideoReceipt,
+  type SavedVideoReceiptLookup,
+  type SavedVideoRepository,
+  type StoredSavedVideoAggregate,
+  type StoredSavedVideoSummary,
+  type StoredVideoVersion,
 } from './saved-video-repository.js';
 
 export const safeSavedVideoFilename = (value: string, mimeType: string): string => {
@@ -46,6 +47,35 @@ const currentVersion = (aggregate: StoredSavedVideoAggregate): StoredVideoVersio
   if (version === undefined) throw new Error('Saved video current version is inconsistent.');
   return version;
 };
+
+/**
+ * The refusal for an append that would carry a video past the Version cap, or null if it fits.
+ *
+ * The single owner of that rule: both the direct append paths below and the Project-output save
+ * ask it, the latter with `writes > 1` because a placement set stores several at once.
+ *
+ * The service is the layer that has to refuse, because neither repository does it usefully. The
+ * file store only throws a parse error from `storedSavedVideoAggregateSchema` before writing — a
+ * 500 where a 409 belongs — and the relational store does not refuse at all: it inserts the row
+ * and commits, after which every read of that video parses through a schema capped at the same
+ * number and answers 500, with no route able to remove the extra Version. Refusing here is also
+ * the only place that can do it *before* the bytes are spent.
+ *
+ * Returning the error rather than throwing it lets each caller run its own cleanup first without
+ * restating the threshold, which is how the two would drift apart.
+ */
+export const versionCapacityRefusal = (
+  aggregate: StoredSavedVideoAggregate | null,
+  writes: number,
+  remedy: string,
+): AppError | null =>
+  (aggregate?.versions.length ?? 0) + writes <= SAVED_VIDEO_VERSION_LIMIT
+    ? null
+    : new AppError(
+        409,
+        'conflict',
+        `A video holds at most ${SAVED_VIDEO_VERSION_LIMIT} Versions. ${remedy}`,
+      );
 
 /**
  * Whether a Version has a poster frame stored for it.
@@ -445,6 +475,8 @@ export class SavedVideoService {
         'The saved video changed before this version could be added.',
       );
     }
+    const full = versionCapacityRefusal(aggregate, 1, 'Save this one to a new video.');
+    if (full !== null) throw full;
     const version = await this.#versionFromUpload(
       ownerUserId,
       videoId,
@@ -525,6 +557,11 @@ export class SavedVideoService {
         'conflict',
         'The saved video changed before this version could be added.',
       );
+    }
+    const full = versionCapacityRefusal(aggregate, 1, 'Save this one to a new video.');
+    if (full !== null) {
+      await this.#deleteAsset(ownerUserId, assetId);
+      throw full;
     }
     const version = this.#versionFromStoredAsset(
       ownerUserId,

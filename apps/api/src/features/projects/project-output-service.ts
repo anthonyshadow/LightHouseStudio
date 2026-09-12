@@ -27,12 +27,14 @@ import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-s
 import { inspectSavedVideoFile } from '../saved-videos/saved-video-inspection.js';
 import {
   appendStoredVideoVersions,
-  SAVED_VIDEO_VERSION_LIMIT,
   type SavedVideoRepository,
   type StoredSavedVideoAggregate,
   type StoredVideoVersion,
 } from '../saved-videos/saved-video-repository.js';
-import { publicSavedVideoDetail } from '../saved-videos/saved-video-service.js';
+import {
+  publicSavedVideoDetail,
+  versionCapacityRefusal,
+} from '../saved-videos/saved-video-service.js';
 import { inspectStoredProjectMedia } from './project-media-inspection.js';
 import {
   projectAggregateForCurrent,
@@ -351,13 +353,12 @@ export class ProjectOutputService {
 
     // The cut is stored as its own Version exactly when it leads; a join never stores it again.
     const writes = set.order.length + (set.primary === null ? 1 : 0);
-    if ((targetAggregate?.versions.length ?? 0) + writes > SAVED_VIDEO_VERSION_LIMIT) {
-      throw new AppError(
-        409,
-        'conflict',
-        `A video holds at most ${SAVED_VIDEO_VERSION_LIMIT} Versions. Save these placements to a new video.`,
-      );
-    }
+    const full = versionCapacityRefusal(
+      targetAggregate ?? null,
+      writes,
+      'Save these placements to a new video.',
+    );
+    if (full !== null) throw full;
     return { order: set.order, primary: set.primary, joinedTo };
   }
 
