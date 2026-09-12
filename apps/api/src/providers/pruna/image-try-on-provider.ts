@@ -10,6 +10,10 @@ import {
   createProviderOperationDeadline,
   readBoundedJson,
 } from '../transport/bounded-provider-transport.js';
+import {
+  MAX_CONSECUTIVE_POLL_FAILURES,
+  nextProviderPollDelayMs,
+} from '../transport/provider-polling.js';
 import type { ProviderFetch } from '../transport/provider-fetch.js';
 
 const PRUNA_API_ORIGIN = 'https://api.pruna.ai' as const;
@@ -207,6 +211,7 @@ export class PrunaImageTryOnProvider implements OutfitTryOnProvider {
     }
 
     let delayMs = this.#initialPollDelayMs;
+    let consecutivePollFailures = 0;
     while (true) {
       await abortableDelay(delayMs, signal);
       const poll = await this.#fetch(expectedStatusUrl, {
@@ -216,12 +221,31 @@ export class PrunaImageTryOnProvider implements OutfitTryOnProvider {
       });
       if (!poll.ok) {
         await readLimitedJson(poll).catch(() => undefined);
+        // The prediction is accepted and running upstream by this point, so a rate limit or a
+        // gateway blip on one poll must not be what abandons it — the same budget both sibling
+        // pollers keep, and the same reason.
+        if (poll.status === 429 || poll.status >= 500) {
+          consecutivePollFailures += 1;
+          if (consecutivePollFailures > MAX_CONSECUTIVE_POLL_FAILURES) {
+            throw failureForHttpStatus(poll.status, providerRequestId);
+          }
+          delayMs = nextProviderPollDelayMs(
+            delayMs,
+            MAX_POLL_DELAY_MS,
+            poll.headers.get('retry-after'),
+            1,
+          );
+          continue;
+        }
         throw failureForHttpStatus(poll.status, providerRequestId);
       }
+      consecutivePollFailures = 0;
       const status = statusResponseSchema.safeParse(await readLimitedJson(poll));
       if (!status.success) throw providerError('invalid-response', { providerRequestId });
       if (status.data.status === 'starting' || status.data.status === 'processing') {
-        delayMs = Math.min(Math.ceil(delayMs * 1.5), MAX_POLL_DELAY_MS);
+        // Floored at 1ms: a configured delay of zero would otherwise multiply to zero forever and
+        // poll without pause for the whole deadline.
+        delayMs = nextProviderPollDelayMs(delayMs, MAX_POLL_DELAY_MS, null, 1);
         continue;
       }
       if (status.data.status === 'canceled') {

@@ -99,6 +99,86 @@ describe('PrunaImageTryOnProvider', () => {
     expect(fetchImplementation.mock.calls[5]?.[1]?.headers).toEqual({ apikey: 'server-secret' });
   });
 
+  it('absorbs a rate-limited poll rather than abandoning an accepted prediction', async () => {
+    const output = await jpeg();
+    const fetchImplementation = vi
+      .fn<ProviderFetch>()
+      .mockResolvedValueOnce(
+        json({ id: 'file-person', urls: { get: 'https://api.pruna.ai/v1/files/file-person' } }),
+      )
+      .mockResolvedValueOnce(
+        json({ id: 'file-garment', urls: { get: 'https://api.pruna.ai/v1/files/file-garment' } }),
+      )
+      .mockResolvedValueOnce(
+        json(
+          {
+            id: 'prediction-one',
+            model: PRUNA_IMAGE_TRY_ON_MODEL,
+            input: {},
+            get_url: 'https://api.pruna.ai/v1/predictions/status/prediction-one',
+          },
+          201,
+        ),
+      )
+      // The prediction is accepted and billable by now, so these must not end it.
+      .mockResolvedValueOnce(json({ message: 'slow down' }, 429))
+      .mockResolvedValueOnce(json({ message: 'bad gateway' }, 502))
+      .mockResolvedValueOnce(
+        json({
+          status: 'succeeded',
+          generation_url: 'https://api.pruna.ai/v1/predictions/delivery/zone/result/output.jpg',
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(output, {
+          headers: { 'content-type': 'image/jpeg', 'content-length': String(output.byteLength) },
+        }),
+      );
+    const provider = new PrunaImageTryOnProvider('server-secret', {
+      fetchImplementation,
+      pollDelayMs: 0,
+    });
+
+    await expect(provider.tryOn(input(output))).resolves.toMatchObject({
+      providerRequestId: 'prediction-one',
+    });
+    expect(fetchImplementation).toHaveBeenCalledTimes(7);
+  });
+
+  it('gives up once transient poll failures exceed the shared budget', async () => {
+    const output = await jpeg();
+    const fetchImplementation = vi.fn<ProviderFetch>().mockImplementation((url) => {
+      const target = url instanceof URL ? url.href : url instanceof Request ? url.url : url;
+      if (target.endsWith('/files')) {
+        return Promise.resolve(
+          json({ id: 'file-one', urls: { get: 'https://api.pruna.ai/v1/files/file-one' } }),
+        );
+      }
+      if (target.endsWith('/predictions')) {
+        return Promise.resolve(
+          json(
+            {
+              id: 'prediction-one',
+              model: PRUNA_IMAGE_TRY_ON_MODEL,
+              input: {},
+              get_url: 'https://api.pruna.ai/v1/predictions/status/prediction-one',
+            },
+            201,
+          ),
+        );
+      }
+      return Promise.resolve(json({ message: 'slow down' }, 429));
+    });
+    const provider = new PrunaImageTryOnProvider('server-secret', {
+      fetchImplementation,
+      pollDelayMs: 0,
+    });
+
+    await expect(provider.tryOn(input(output))).rejects.toBeInstanceOf(ReferenceImageProviderError);
+    // Two uploads, one submission, then the budget: four polls before it stops.
+    expect(fetchImplementation).toHaveBeenCalledTimes(7);
+  });
+
   it('rejects an untrusted delivery URL without downloading it', async () => {
     const bytes = await jpeg();
     const fetchImplementation = vi

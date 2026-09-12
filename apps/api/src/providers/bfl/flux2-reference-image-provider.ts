@@ -14,7 +14,10 @@ import {
 } from '../transport/bounded-provider-transport.js';
 import { SafeBflImageDownloader } from './safe-image-downloader.js';
 import type { DownloadedRemoteImage } from '../transport/safe-remote-image-downloader.js';
-import { nextProviderPollDelayMs } from '../transport/provider-polling.js';
+import {
+  MAX_CONSECUTIVE_POLL_FAILURES,
+  nextProviderPollDelayMs,
+} from '../transport/provider-polling.js';
 import type { ProviderFetch } from '../transport/provider-fetch.js';
 
 export const BFL_FLUX_2_PRO_MODEL = 'flux-2-pro' as const;
@@ -23,7 +26,6 @@ export const BFL_REFERENCE_IMAGE_TIMEOUT_MS = 150_000;
 const BFL_API_HOSTNAME_PATTERN = /^api(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*\.bfl\.ai$/u;
 const INITIAL_POLL_DELAY_MS = 500;
 const MAX_POLL_DELAY_MS = 5_000;
-const MAX_CONSECUTIVE_POLL_FAILURES = 3;
 const DEFAULT_SAFETY_TOLERANCE = 2;
 const DEFAULT_DISABLE_PROMPT_UPSAMPLING = true;
 
@@ -270,6 +272,7 @@ export class BflFlux2ReferenceImageProvider implements ReferenceImageProvider {
             delayMs,
             MAX_POLL_DELAY_MS,
             poll.headers.get('retry-after'),
+            1,
           );
           continue;
         }
@@ -282,7 +285,8 @@ export class BflFlux2ReferenceImageProvider implements ReferenceImageProvider {
       }
       const status = parsed.data.status;
       if (status === 'Pending' || status === 'Reasoning' || status === 'Generating') {
-        delayMs = nextProviderPollDelayMs(delayMs, MAX_POLL_DELAY_MS);
+        // Floored at 1ms so a configured delay of zero cannot multiply to zero forever.
+        delayMs = nextProviderPollDelayMs(delayMs, MAX_POLL_DELAY_MS, null, 1);
         continue;
       }
       if (status === 'Request Moderated' || status === 'Content Moderated') {

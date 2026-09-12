@@ -29,3 +29,12 @@ export const nextProviderPollDelayMs = (
     Math.min(Math.ceil(Math.max(currentDelayMs, minimumBaseMs) * 1.5), maximumDelayMs),
     parseRetryAfterMs(retryAfter, maximumDelayMs),
   );
+
+/**
+ * How many consecutive transient poll failures a provider absorbs before giving up.
+ *
+ * Shared because the answer is about an accepted submission, not about any one provider: once the
+ * work is running upstream it has been paid for, so a 429 or a gateway blip must not be the thing
+ * that abandons it.
+ */
+export const MAX_CONSECUTIVE_POLL_FAILURES = 3;

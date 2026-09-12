@@ -17,7 +17,10 @@ import {
 import { normalizeWiroImage } from './normalize-image.js';
 import { SafeWiroImageDownloader } from './safe-image-downloader.js';
 import type { DownloadedRemoteImage } from '../transport/safe-remote-image-downloader.js';
-import { nextProviderPollDelayMs } from '../transport/provider-polling.js';
+import {
+  MAX_CONSECUTIVE_POLL_FAILURES,
+  nextProviderPollDelayMs,
+} from '../transport/provider-polling.js';
 import type { ProviderFetch } from '../transport/provider-fetch.js';
 
 export const WIRO_SEEDREAM_MODEL = 'seedream-v5-lite-uncensored' as const;
@@ -31,7 +34,6 @@ export const WIRO_REFERENCE_IMAGE_TIMEOUT_MS = 180_000;
 const WIRO_CLEANUP_TIMEOUT_MS = 10_000;
 const INITIAL_POLL_DELAY_MS = 1_000;
 const MAX_POLL_DELAY_MS = 5_000;
-const MAX_CONSECUTIVE_POLL_FAILURES = 3;
 
 const wiroErrorsSchema = z.array(z.unknown()).max(50);
 

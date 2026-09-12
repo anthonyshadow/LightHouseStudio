@@ -71,7 +71,19 @@ const translate = (error: ReferenceImageProviderError): ErrorTranslation => {
   })();
   return {
     appError,
-    diagnostic: { errorClass: 'ReferenceImageProviderError', reason: error.reason },
+    // The upstream id and stage travel with the failure, the way the shared profile carries them
+    // for the other providers. A try-on that fails after Pruna accepted it has already been paid
+    // for, and this id is the only thing that lets an operator reconcile that spend; dropping it
+    // left the log with nothing to match against.
+    diagnostic: {
+      errorClass: 'ReferenceImageProviderError',
+      reason: error.reason,
+      providerId: error.providerId,
+      ...(error.providerRequestId === undefined
+        ? {}
+        : { providerRequestId: error.providerRequestId }),
+      ...(error.providerStage === undefined ? {} : { providerStage: error.providerStage }),
+    },
   };
 };
 
