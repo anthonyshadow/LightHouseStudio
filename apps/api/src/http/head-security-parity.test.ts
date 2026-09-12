@@ -1,5 +1,6 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { withoutReferenceImageSubmissions } from '../test/fakes.js';
 import path from 'node:path';
 import { createEmptyCreativeAssetStore } from '@studio/domain';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
@@ -44,6 +45,7 @@ describe('explicit HEAD and API security parity', () => {
       replace: () => Promise.resolve('conflict'),
     };
     const referenceImages: ReferenceImageAssetStore = {
+      ...withoutReferenceImageSubmissions(),
       findByRequestId: () => Promise.resolve(null),
       getMetadata: getReferenceImageMetadata,
       getContent: () => Promise.resolve(null),

@@ -13,6 +13,7 @@ import {
   fetchReferenceImageMetadata,
   uploadReferenceImage,
 } from '../../adapters/api-client/apiClient';
+import { reusableRetryRequest } from '../../adapters/api-client/reusableRetryRequest';
 import { validateReferenceImage } from '../../adapters/browser-media/imageValidation';
 import { useReferencePreviewGeneration } from '../character-builder/useReferencePreviewGeneration';
 import type {
@@ -277,9 +278,7 @@ export const useCharacterWardrobeVariantDraft = ({
       setPreview(result);
     } catch (caught) {
       if (!controller.signal.aborted) {
-        if (providerFingerprint && providerRequestId) {
-          retryRef.current = { fingerprint: providerFingerprint, requestId: providerRequestId };
-        }
+        retryRef.current = reusableRetryRequest(caught, providerFingerprint, providerRequestId);
         setError(caught instanceof Error ? caught.message : 'The outfit could not be generated.');
       }
     } finally {

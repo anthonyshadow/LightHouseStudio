@@ -5,6 +5,7 @@ import type {
   ReferenceImageAsset,
 } from '@studio/contracts';
 import { useCallback, useEffect, useRef } from 'react';
+import { reusableRetryRequest } from '../../adapters/api-client/reusableRetryRequest';
 import {
   createReferenceImage,
   composeReferenceImage,
@@ -217,12 +218,11 @@ export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerat
         });
       } catch (error: unknown) {
         if (!stillCurrent()) return;
-        if (requestFingerprint && providerRequestId) {
-          failedRequestRef.current = {
-            fingerprint: requestFingerprint,
-            requestId: providerRequestId,
-          };
-        }
+        failedRequestRef.current = reusableRetryRequest(
+          error,
+          requestFingerprint,
+          providerRequestId,
+        );
         callbacksRef.current.onError(error, operationId, sourceKey);
       } finally {
         ownerSignal?.removeEventListener('abort', abortFromOwner);

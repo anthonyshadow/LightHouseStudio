@@ -413,6 +413,34 @@ export const creativeLibraries = pgTable('creative_libraries', {
   ...auditTimestamps,
 });
 
+/**
+ * The receipt a reference-image request writes before it reaches a paid provider.
+ *
+ * Deliberately not a column on `reference_image_assets`: that row needs a `media_asset_id`, and
+ * the whole point of this record is the window where money may already be spent and no bytes
+ * exist. A row here with no matching asset means an attempt was submitted and never settled.
+ */
+export const referenceImageSubmissions = pgTable(
+  'reference_image_submissions',
+  {
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    requestId: uuid('request_id').notNull(),
+    requestFingerprint: text('request_fingerprint').notNull(),
+    submittedAt: timestamp('submitted_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.ownerUserId, table.requestId] }),
+    check(
+      'reference_image_submissions_fingerprint_length',
+      sql`length(${table.requestFingerprint}) = 64`,
+    ),
+  ],
+);
+
 export const referenceImageAssets = pgTable(
   'reference_image_assets',
   {

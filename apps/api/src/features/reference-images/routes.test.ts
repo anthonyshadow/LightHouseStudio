@@ -1,5 +1,6 @@
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { withoutReferenceImageSubmissions } from '../../test/fakes.js';
 import path from 'node:path';
 import sharp from 'sharp';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -158,6 +159,7 @@ describe('reference image API', () => {
     );
     const getContent = vi.fn(() => Promise.resolve({ metadata, bytes }));
     const store: ReferenceImageAssetStore = {
+      ...withoutReferenceImageSubmissions(),
       findByRequestId: () => Promise.resolve(null),
       getMetadata: () => Promise.resolve(null),
       getContent,
@@ -180,6 +182,7 @@ describe('reference image API', () => {
     const getContentStream = vi.fn(() => Promise.resolve(null));
     const getContent = vi.fn(() => Promise.resolve(null));
     const store: ReferenceImageAssetStore = {
+      ...withoutReferenceImageSubmissions(),
       findByRequestId: () => Promise.resolve(null),
       getMetadata: () => Promise.resolve(null),
       getContent,
@@ -202,6 +205,7 @@ describe('reference image API', () => {
   it('discards only through the trusted owner-scoped lifecycle path', async () => {
     const discardIfUnreferenced = vi.fn().mockResolvedValue(true);
     const store: ReferenceImageAssetStore = {
+      ...withoutReferenceImageSubmissions(),
       findByRequestId: () => Promise.resolve(null),
       getMetadata: () => Promise.resolve(null),
       getContent: () => Promise.resolve(null),

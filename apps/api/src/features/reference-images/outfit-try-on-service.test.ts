@@ -1,5 +1,6 @@
 import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
+import { withoutReferenceImageSubmissions } from '../../test/fakes.js';
 import type {
   OutfitTryOnProvider,
   OutfitTryOnProviderResult,
@@ -55,6 +56,7 @@ const createFixture = async () => {
   const byRequest = new Map<string, StoredReferenceImageMetadata>();
   const storedInputs: StoreReferenceImageInput[] = [];
   const store: ReferenceImageAssetStore = {
+    ...withoutReferenceImageSubmissions(),
     findByRequestId: (ownerId, id) => Promise.resolve(byRequest.get(`${ownerId}:${id}`) ?? null),
     getMetadata: (ownerId, id) =>
       Promise.resolve(ownerId === owner ? (metadata.get(id) ?? null) : null),

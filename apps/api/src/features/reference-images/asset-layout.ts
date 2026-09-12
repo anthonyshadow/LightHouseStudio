@@ -200,6 +200,22 @@ const idempotencyMappingSchema = z
   })
   .strict();
 
+/**
+ * The claim written before a request reaches a paid provider.
+ *
+ * It carries no asset id, which is the whole point: it exists precisely in the window where money
+ * may have been spent and there is nothing stored to show for it. Only the record's existence is
+ * load-bearing — the local store claims by creating the file exclusively — so these fields are an
+ * audit trail for a human reading the directory, not something the claim is read back from.
+ */
+export interface ReferenceImageSubmissionReceipt {
+  readonly schemaVersion: typeof REFERENCE_IMAGE_LAYOUT_VERSION;
+  readonly localOwnerId: string;
+  readonly requestId: string;
+  readonly requestFingerprint: string;
+  readonly submittedAt: string;
+}
+
 const referenceImageAssetIndexSchema = z
   .object({
     schemaVersion: z.literal(REFERENCE_IMAGE_INDEX_VERSION),
@@ -316,6 +332,7 @@ export interface ReferenceImageLayout {
   readonly root: string;
   readonly assetsRoot: string;
   readonly idempotencyRoot: string;
+  readonly submissionsRoot: string;
   readonly indexPath: string;
   readonly indexDirtyPath: string;
 }
@@ -330,6 +347,9 @@ export const createReferenceImageLayout = (dataDirectory: string): ReferenceImag
     root,
     assetsRoot: path.join(root, 'assets'),
     idempotencyRoot: path.join(root, 'idempotency'),
+    // Separate from `idempotency`, which maps a settled request to its asset. A submission is
+    // written before the provider is paid and has no asset to point at yet.
+    submissionsRoot: path.join(root, 'submissions'),
     indexPath: path.join(root, 'asset-index.json'),
     indexDirtyPath: path.join(root, 'asset-index.dirty'),
   };
@@ -338,16 +358,20 @@ export const createReferenceImageLayout = (dataDirectory: string): ReferenceImag
 const digestPathSegment = (value: string): string =>
   createHash('sha256').update(value, 'utf8').digest('hex');
 
+const ownerScopedRequestPath = (root: string, localOwnerId: string, requestId: string): string =>
+  path.join(root, digestPathSegment(localOwnerId), `${digestPathSegment(requestId)}.json`);
+
 export const referenceImageMappingPath = (
   layout: ReferenceImageLayout,
   localOwnerId: string,
   requestId: string,
-): string =>
-  path.join(
-    layout.idempotencyRoot,
-    digestPathSegment(localOwnerId),
-    `${digestPathSegment(requestId)}.json`,
-  );
+): string => ownerScopedRequestPath(layout.idempotencyRoot, localOwnerId, requestId);
+
+export const referenceImageSubmissionPath = (
+  layout: ReferenceImageLayout,
+  localOwnerId: string,
+  requestId: string,
+): string => ownerScopedRequestPath(layout.submissionsRoot, localOwnerId, requestId);
 
 export const parseReferenceImageAssetId = (assetId: string): string | null => {
   const parsed = z.uuid().safeParse(assetId);
@@ -379,6 +403,10 @@ export const parseStoredReferenceImageMetadata = (value: unknown): StoredReferen
 export const parseReferenceImageIdempotencyMapping = (
   value: unknown,
 ): ReferenceImageIdempotencyMapping => idempotencyMappingSchema.parse(value);
+
+export const serializeReferenceImageSubmission = (
+  receipt: ReferenceImageSubmissionReceipt,
+): string => `${JSON.stringify(receipt)}\n`;
 
 export const parseReferenceImageAssetIndex = (value: unknown): ReferenceImageAssetIndex =>
   referenceImageAssetIndexSchema.parse(value);

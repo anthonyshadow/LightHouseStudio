@@ -75,6 +75,14 @@ export class OutfitTryOnService {
       requestFingerprint: fingerprint,
       providerId: 'pruna',
       ...(input.signal === undefined ? {} : { signal: input.signal }),
+      spend: {
+        store: this.#store,
+        claim: {
+          localOwnerId: input.localOwnerId,
+          requestId: input.requestId,
+          requestFingerprint: fingerprint,
+        },
+      },
       start: async (operationSignal) => {
         const provider = this.#provider;
         if (provider === null) {

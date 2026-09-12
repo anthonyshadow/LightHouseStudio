@@ -12,14 +12,17 @@ import {
   parseReferenceImageIdempotencyMapping,
   parseStoredReferenceImageMetadata,
   REFERENCE_IMAGE_INDEX_VERSION,
+  REFERENCE_IMAGE_LAYOUT_VERSION,
   REFERENCE_IMAGE_DIRECTORY_MODE,
   REFERENCE_IMAGE_FILE_MODE,
   referenceImageContentFilename,
   type ReferenceImageLayout,
   referenceImageMappingPath,
+  referenceImageSubmissionPath,
   referenceImageStorageKey,
   serializeReferenceImageAssetIndex,
   serializeReferenceImageIdempotencyMapping,
+  serializeReferenceImageSubmission,
   serializeStoredReferenceImageMetadata,
   STALE_REFERENCE_IMAGE_TEMP_AGE_MS,
   type StoredReferenceImageMetadata,
@@ -42,7 +45,26 @@ export interface StoredReferenceImageStream {
   createReadStream(): Readable;
 }
 
+export interface RecordReferenceImageSubmissionInput {
+  readonly localOwnerId: string;
+  readonly requestId: string;
+  readonly requestFingerprint: string;
+}
+
 export interface ReferenceImageAssetStore {
+  /**
+   * Claims a request id for a call that is about to be paid for, before the call is made.
+   *
+   * Returns false when an earlier attempt already claimed it and never released it. The asset row
+   * cannot carry this — it needs bytes that do not exist yet — so without a claim written first, a
+   * failure between the provider answering and `store` completing leaves nothing to say the
+   * request was ever charged, and the browser deliberately reuses its request id when it retries.
+   *
+   * One statement in both stores, so two callers racing for the same id cannot both win it.
+   */
+  claimSubmission(input: RecordReferenceImageSubmissionInput): Promise<boolean>;
+  /** Releases a claim whose request reached an outcome that settles what it cost. */
+  clearSubmission(localOwnerId: string, requestId: string): Promise<void>;
   findByRequestId(
     localOwnerId: string,
     requestId: string,
@@ -105,6 +127,7 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
         this.#layout.root,
         this.#layout.assetsRoot,
         this.#layout.idempotencyRoot,
+        this.#layout.submissionsRoot,
       ];
       for (const directory of ownedDirectories) {
         await mkdir(directory, { recursive: true, mode: REFERENCE_IMAGE_DIRECTORY_MODE });
@@ -150,6 +173,52 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
 
   #mappingPath(localOwnerId: string, requestId: string): string {
     return referenceImageMappingPath(this.#layout, localOwnerId, requestId);
+  }
+
+  #submissionPath(localOwnerId: string, requestId: string): string {
+    return referenceImageSubmissionPath(this.#layout, localOwnerId, requestId);
+  }
+
+  async claimSubmission(input: RecordReferenceImageSubmissionInput): Promise<boolean> {
+    await this.#initialize();
+    const filePath = this.#submissionPath(input.localOwnerId, input.requestId);
+    await mkdir(path.dirname(filePath), {
+      recursive: true,
+      mode: REFERENCE_IMAGE_DIRECTORY_MODE,
+    });
+    // `wx` is the claim: the kernel refuses the second create, so the check and the write are one
+    // step and two callers racing for this id cannot both proceed to pay.
+    let handle: Awaited<ReturnType<typeof open>> | undefined;
+    try {
+      handle = await open(filePath, 'wx', REFERENCE_IMAGE_FILE_MODE);
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'EEXIST') return false;
+      throw new ReferenceImageStorageError('Reference image submission could not be claimed.', {
+        cause: error,
+      });
+    }
+    try {
+      // Fsynced before the caller pays: a claim that only reached the page cache is exactly as
+      // useless as no claim when the process dies mid-request.
+      await handle.writeFile(
+        serializeReferenceImageSubmission({
+          schemaVersion: REFERENCE_IMAGE_LAYOUT_VERSION,
+          localOwnerId: input.localOwnerId,
+          requestId: input.requestId,
+          requestFingerprint: input.requestFingerprint,
+          submittedAt: this.#now().toISOString(),
+        }),
+        'utf8',
+      );
+      await handle.sync();
+    } finally {
+      await handle.close();
+    }
+    return true;
+  }
+
+  async clearSubmission(localOwnerId: string, requestId: string): Promise<void> {
+    await rm(this.#submissionPath(localOwnerId, requestId), { force: true });
   }
 
   #requestKey(localOwnerId: string, requestId: string): string {

@@ -7,6 +7,7 @@ export const API_ERROR_CODES = [
   'feature_unavailable',
   'forbidden_origin',
   'generation_in_progress',
+  'submission_unresolved',
   'incompatible_voice',
   'internal_error',
   'invalid_credentials',

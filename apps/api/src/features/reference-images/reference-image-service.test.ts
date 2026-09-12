@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
+import { withoutReferenceImageSubmissions } from '../../test/fakes.js';
 import type {
   CharacterPromptOptimizationResult,
   OptimizeCharacterReferencePromptRequest,
@@ -43,6 +44,7 @@ const result: CharacterPromptOptimizationResult = {
 };
 
 const unusedStore: ReferenceImageAssetStore = {
+  ...withoutReferenceImageSubmissions(),
   findByRequestId: () => Promise.resolve(null),
   getMetadata: () => Promise.resolve(null),
   getContent: () => Promise.resolve(null),
@@ -102,6 +104,7 @@ const createGeneratedBytes = (): Promise<Buffer> =>
 const createStore = (
   storeImplementation: ReferenceImageAssetStore['store'],
 ): ReferenceImageAssetStore => ({
+  ...withoutReferenceImageSubmissions(),
   findByRequestId: () => Promise.resolve(null),
   getMetadata: () => Promise.resolve(null),
   getContent: (ownerId, assetId) =>
@@ -419,6 +422,73 @@ describe('ReferenceImageService prompt optimization', () => {
       expect(cleanupRemoteArtifacts).toHaveBeenCalledOnce();
     },
   );
+});
+
+describe('ReferenceImageService paid-submission accounting', () => {
+  it('records a receipt before the provider is called and refuses a replay that never settled', async () => {
+    const generatedBytes = await createGeneratedBytes();
+    const provider = createProvider(generatedBytes);
+    const generateMock = vi.mocked(provider.generate);
+    const order: string[] = [];
+    let receipt: { readonly requestId: string } | null = null;
+    const store: ReferenceImageAssetStore = {
+      ...createStore(() => {
+        order.push('store');
+        // The failure the receipt exists for: the provider has answered and been paid, and the
+        // result cannot be written.
+        return Promise.reject(new Error('storage unavailable'));
+      }),
+      claimSubmission: (submission) => {
+        order.push('claimSubmission');
+        if (receipt?.requestId === submission.requestId) return Promise.resolve(false);
+        receipt = { requestId: submission.requestId };
+        return Promise.resolve(true);
+      },
+      clearSubmission: () => {
+        order.push('clearSubmission');
+        receipt = null;
+        return Promise.resolve();
+      },
+    };
+    const service = new ReferenceImageService(provider, store, { optimizer: configuredOptimizer });
+    const request = {
+      localOwnerId,
+      requestId: generationRequestId,
+      ...optimizedRequest,
+    };
+
+    await expect(service.generate(request)).rejects.toThrow('storage unavailable');
+    expect(order).toEqual(['claimSubmission', 'store']);
+    expect(generateMock).toHaveBeenCalledTimes(1);
+
+    // The browser reuses its request id when it retries. Before the receipt existed this bought a
+    // second image; now it is refused, and the provider is not called again.
+    await expect(service.generate(request)).rejects.toMatchObject({
+      reason: 'submission-unresolved',
+    });
+    expect(generateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a local upload unclaimed, so a failed one can still be retried', async () => {
+    const claimSubmission = vi.fn(() => Promise.resolve(true));
+    const store: ReferenceImageAssetStore = {
+      ...createStore(() => Promise.reject(new Error('storage unavailable'))),
+      claimSubmission,
+    };
+    const service = new ReferenceImageService(null, store);
+    const upload = {
+      localOwnerId,
+      requestId: 'a70d9fd8-c8fb-4b5c-b32b-569571bcc2f1',
+      bytes: await createGeneratedBytes(),
+      mimeType: 'image/jpeg' as const,
+    };
+
+    // An upload reaches no provider, so it must never take a claim — one left behind by a failed
+    // upload would refuse every retry of a request that never cost anything.
+    await expect(service.upload(upload)).rejects.toThrow('storage unavailable');
+    await expect(service.upload(upload)).rejects.toThrow('storage unavailable');
+    expect(claimSubmission).not.toHaveBeenCalled();
+  });
 });
 
 describe('ReferenceImageService provider-result finalization parity', () => {

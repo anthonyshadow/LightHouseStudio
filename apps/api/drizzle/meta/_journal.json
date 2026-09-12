@@ -183,6 +183,13 @@
       "when": 1788694513049,
       "tag": "0025_thick_captain_universe",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1789250394066,
+      "tag": "0026_lazy_norrin_radd",
+      "breakpoints": true
     }
   ]
 }

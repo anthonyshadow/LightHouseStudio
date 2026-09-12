@@ -377,3 +377,14 @@ export class FakeElevenLabsProvider implements ElevenLabsProvider {
     });
   }
 }
+
+/**
+ * The submission-receipt half of `ReferenceImageAssetStore` for fakes that never exercise it.
+ *
+ * Spread into a stub store so each one does not restate the pair; a fake that needs the receipt to
+ * be present overrides `findSubmission` after the spread.
+ */
+export const withoutReferenceImageSubmissions = () => ({
+  claimSubmission: (): Promise<boolean> => Promise.resolve(true),
+  clearSubmission: (): Promise<void> => Promise.resolve(),
+});

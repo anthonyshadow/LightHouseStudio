@@ -211,6 +211,21 @@ export class ReferenceImageService {
         requestFingerprint: input.requestFingerprint,
         ...(input.providerId === undefined ? {} : { providerId: input.providerId }),
         ...(input.signal === undefined ? {} : { signal: input.signal }),
+        // `providerId` is what separates the three paid operations from `upload`, which reaches no
+        // provider and so must not claim — a failed upload that left a claim behind would be
+        // refused on every retry, for a request that never cost anything.
+        ...(input.providerId === undefined
+          ? {}
+          : {
+              spend: {
+                store: this.#store,
+                claim: {
+                  localOwnerId: input.localOwnerId,
+                  requestId: input.requestId,
+                  requestFingerprint: input.requestFingerprint,
+                },
+              },
+            }),
         start: input.start,
       }),
     );

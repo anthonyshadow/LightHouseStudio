@@ -67,6 +67,12 @@ export const translateReferenceImageError: ErrorTranslator = (error) => {
           'request_id_conflict',
           'That request ID is already bound to different reference-image inputs. Start a new request.',
         );
+      case 'submission-unresolved':
+        return new AppError(
+          409,
+          'submission_unresolved',
+          'That request already reached the image provider and its result could not be saved. Start a new request rather than repeating this one, which would generate a second image.',
+        );
       case 'source-asset-not-found':
         return new AppError(404, 'not_found', 'That local reference image is unavailable.');
       case 'provider-not-configured':

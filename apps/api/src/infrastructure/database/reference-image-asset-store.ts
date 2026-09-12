@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { buffer } from 'node:stream/consumers';
 import { and, asc, eq, inArray, lte } from 'drizzle-orm';
 import type {
+  RecordReferenceImageSubmissionInput,
   ReferenceImageAssetStore,
   StoredReferenceImageContent,
   StoredReferenceImageStream,
@@ -17,7 +18,7 @@ import {
 import type { AssetByteStore } from '../../storage/asset-byte-store.js';
 import type { ProjectRetentionPolicy } from '../../features/projects/project-repository.js';
 import type { LightframeDatabase } from './client.js';
-import { creativeAssets, referenceImageAssets } from './schema.js';
+import { creativeAssets, referenceImageAssets, referenceImageSubmissions } from './schema.js';
 
 export const TEMPORARY_REFERENCE_IMAGE_INACTIVITY_MS = 24 * 60 * 60 * 1_000;
 
@@ -75,6 +76,36 @@ export class DrizzleReferenceImageAssetStore implements ReferenceImageAssetStore
         and(
           eq(referenceImageAssets.ownerUserId, localOwnerId),
           eq(referenceImageAssets.id, assetId),
+        ),
+      );
+  }
+
+  async claimSubmission(input: RecordReferenceImageSubmissionInput): Promise<boolean> {
+    // Committed before the caller pays, and one statement: the conflict is the check, so two
+    // callers racing for this id cannot both be told they won it. An existing row keeps its own
+    // timestamp, which is the one that says when money may have left.
+    const claimed = await this.db
+      .insert(referenceImageSubmissions)
+      .values({
+        ownerUserId: input.localOwnerId,
+        requestId: input.requestId,
+        requestFingerprint: input.requestFingerprint,
+        submittedAt: this.now().toISOString(),
+      })
+      .onConflictDoNothing({
+        target: [referenceImageSubmissions.ownerUserId, referenceImageSubmissions.requestId],
+      })
+      .returning({ requestId: referenceImageSubmissions.requestId });
+    return claimed.length > 0;
+  }
+
+  async clearSubmission(localOwnerId: string, requestId: string): Promise<void> {
+    await this.db
+      .delete(referenceImageSubmissions)
+      .where(
+        and(
+          eq(referenceImageSubmissions.ownerUserId, localOwnerId),
+          eq(referenceImageSubmissions.requestId, requestId),
         ),
       );
   }

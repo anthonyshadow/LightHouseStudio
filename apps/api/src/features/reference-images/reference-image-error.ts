@@ -7,7 +7,8 @@ export type ReferenceImageGenerationStateErrorReason =
   | 'provider-not-configured'
   | 'stale-optimization'
   | 'invalid-optimization'
-  | 'operation-aborted';
+  | 'operation-aborted'
+  | 'submission-unresolved';
 
 export class ReferenceImageGenerationStateError extends Error {
   readonly reason: ReferenceImageGenerationStateErrorReason;
