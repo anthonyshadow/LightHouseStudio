@@ -201,11 +201,12 @@ recorded there.
 
 The AI usage ledger follows metadata authority rather than the trace writer: the owner-scoped file
 journal is the ledger in `local` **and in `shadow`**, and the `ai_usage_ledger` table is the ledger
-in `postgres` and `neon`. Shadow mode writes no relational mirror of it, deliberately — files are
-authoritative there, so a relational copy could only be a best-effort shadow beneath the journal,
-and a mirror that silently does nothing is worse than no mirror. A shadow deployment that later
-becomes authoritative therefore starts its table empty; the months it spent in shadow stay in the
-journal.
+in `postgres` and `neon`. In `shadow` the journal is the authority and the relational table is a
+best-effort mirror beneath it, written on every accepted row — which is what lets a shadow
+deployment that later becomes authoritative carry its history across instead of starting empty.
+Note what that means for a rehearsal: `shadow` sends owner-scoped spend rows (job id, owner,
+provider, operation, outcome, instants) to whatever `DATABASE_URL` names, including a hosted Neon
+database.
 
 `ASSET_STORE_PROVIDER=r2` requires `DATABASE_MODE=shadow`, `postgres`, or `neon`. Reference-image
 and creative metadata stay local in `shadow`; their database adapters become authoritative in
@@ -296,9 +297,9 @@ configuration fail closed before opening a pool otherwise.
 10. Run in `shadow`, exercise save/range/playback/reference/voice flows, and reconcile counts and
     checksums. Reconcile the AI usage ledger counts too: submit one transformation, let it settle,
     and check that Account's AI activity shows exactly one row for it with a terminal outcome and no
-    duplicate. In `shadow` that row is in the file journal — the table is expected to be empty — so
-    read the same counts again after switching, and expect the pre-switch months to stay behind in
-    the journal. Switch to `neon` only after that evidence is clean.
+    duplicate. In `shadow` the journal is the authority for that row and the table mirrors it, so
+    expect to find it in both, and read the same counts again after switching. Switch to `neon`
+    only after that evidence is clean.
 
 If the application later becomes geographically distributed, test R2 Local Uploads as a separate
 bucket-setting experiment. It requires no application package and does not change the authorization,
