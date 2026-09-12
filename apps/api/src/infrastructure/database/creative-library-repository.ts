@@ -4,35 +4,17 @@ import {
   sanitizeCreativeAssetStore,
   type CreativeAssetStore,
 } from '@studio/domain';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { toIsoTimestamp } from '../../application/timestamps.js';
 import type {
   CreativeLibraryRepository,
   CreativeLibrarySnapshot,
 } from '../../features/creative-libraries/creative-library-repository.js';
 import type { LightframeDatabase } from './client.js';
+import { collectReferenceImageAssetIds } from './reference-image-asset-store.js';
 import { creativeAssets, creativeLibraries } from './schema.js';
 
 type AssetKind = typeof creativeAssets.$inferInsert.kind;
-
-const referencedImageAssetIds = (store: CreativeAssetStore): Set<string> => {
-  const ids = new Set<string>();
-  const add = (value: string | null | undefined) => {
-    if (value) ids.add(value);
-  };
-  for (const item of store.savedPrompts) add(item.referenceImageAssetId);
-  for (const item of store.recentPrompts) add(item.referenceImageAssetId);
-  for (const item of store.savedCharacterPrompts) {
-    add(item.referenceImageAssetId);
-    add(item.uploadedReferenceImageAssetId);
-  }
-  for (const item of store.savedCharacterVariants) {
-    add(item.referenceImageAssetId);
-    add(item.creation.sourceReferenceImageAssetId);
-    if (item.creation.method === 'add-outfit') add(item.creation.garmentReferenceImageAssetId);
-  }
-  return ids;
-};
 
 const assetRows = (
   ownerUserId: string,
@@ -125,41 +107,59 @@ export class DrizzleCreativeLibraryRepository implements CreativeLibraryReposito
     if (sanitized.recovered || sanitized.droppedRecords > 0) {
       throw new Error('Creative library payload is not canonical.');
     }
-    const previousReferences =
-      this.releaseReferenceImages === undefined
-        ? new Set<string>()
-        : referencedImageAssetIds((await this.load(ownerUserId)).store);
-    const nextReferences = referencedImageAssetIds(sanitized.store);
+    const nextReferences = collectReferenceImageAssetIds(sanitized.store);
+    const nextRevision = expectedRevision + 1;
     const result = await this.db.transaction(async (tx) => {
-      const [current] = await tx
-        .select()
-        .from(creativeLibraries)
-        .where(eq(creativeLibraries.ownerUserId, ownerUserId))
-        .for('update')
-        .limit(1);
-      const revision = current?.revision ?? 0;
-      if (revision !== expectedRevision) return 'conflict' as const;
-      const nextRevision = revision + 1;
-      await tx.delete(creativeAssets).where(eq(creativeAssets.ownerUserId, ownerUserId));
+      // The revision claim is the statement itself, not a read followed by a write.
+      //
+      // `select ... for update` was the check, which cannot lock a row that does not exist — so on
+      // an account's first write, when there is no library row, two callers both read nothing, both
+      // computed revision 0, both passed the check and both went on to delete every asset and
+      // insert their own. One operator's characters, outfits and prompts vanished while both were
+      // told the write succeeded. Each branch below decides and writes in one statement, and an
+      // empty result means somebody else got there first.
+      const claimed =
+        expectedRevision === 0
+          ? await tx
+              .insert(creativeLibraries)
+              .values({
+                ownerUserId,
+                revision: nextRevision,
+                schemaVersion: sanitized.store.schemaVersion,
+                createdAt: updatedAt,
+                updatedAt,
+              })
+              // The row's absence is what this claims, so the unique index is the arbiter: exactly
+              // one of two first writes inserts, and the other returns nothing.
+              .onConflictDoNothing({ target: creativeLibraries.ownerUserId })
+              .returning({ revision: creativeLibraries.revision })
+          : await tx
+              .update(creativeLibraries)
+              .set({
+                revision: nextRevision,
+                schemaVersion: sanitized.store.schemaVersion,
+                updatedAt,
+              })
+              .where(
+                and(
+                  eq(creativeLibraries.ownerUserId, ownerUserId),
+                  eq(creativeLibraries.revision, expectedRevision),
+                ),
+              )
+              .returning({ revision: creativeLibraries.revision });
+      if (claimed.length === 0) return 'conflict' as const;
+      // Only the writer that took the revision replaces the assets, and it holds that row's lock
+      // for the rest of the transaction, so the next writer waits rather than interleaving.
+      // The rows this write replaces are also the previous reference set, so it comes from the
+      // delete that has to run anyway — under the claim's lock — rather than from a second full
+      // read of the library, sanitized in full, before the transaction had even opened.
+      const replaced = await tx
+        .delete(creativeAssets)
+        .where(eq(creativeAssets.ownerUserId, ownerUserId))
+        .returning({ payload: creativeAssets.payload });
       const rows = assetRows(ownerUserId, nextRevision, sanitized.store, updatedAt);
       if (rows.length > 0) await tx.insert(creativeAssets).values(rows);
-      await tx
-        .insert(creativeLibraries)
-        .values({
-          ownerUserId,
-          revision: nextRevision,
-          schemaVersion: sanitized.store.schemaVersion,
-          createdAt: current?.createdAt ?? updatedAt,
-          updatedAt,
-        })
-        .onConflictDoUpdate({
-          target: creativeLibraries.ownerUserId,
-          set: {
-            revision: nextRevision,
-            schemaVersion: sanitized.store.schemaVersion,
-            updatedAt,
-          },
-        });
+      const previousReferences = collectReferenceImageAssetIds(replaced.map((row) => row.payload));
       return {
         snapshot: { revision: nextRevision, store: sanitized.store, updatedAt },
         releasedReferenceImageAssetIds: [...previousReferences].filter(

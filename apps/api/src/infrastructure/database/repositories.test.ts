@@ -757,16 +757,9 @@ describe('DrizzleCreativeLibraryRepository', () => {
         },
       ],
       [{ kind: 'saved-prompt', payload: prompt }],
-      [
-        {
-          ownerUserId,
-          revision: 3,
-          schemaVersion: store.schemaVersion,
-          createdAt: now,
-          updatedAt: now,
-        },
-      ],
-      [],
+      // The revision claim is now one statement that returns the row it took, followed by the
+      // asset delete and insert.
+      [{ revision: 4 }],
       [],
       [],
     );
@@ -786,18 +779,8 @@ describe('DrizzleCreativeLibraryRepository', () => {
 
   it('returns an empty snapshot and rejects a stale replacement revision', async () => {
     const emptyStore = createEmptyCreativeAssetStore();
-    const scripted = scriptedDatabase(
-      [],
-      [
-        {
-          ownerUserId,
-          revision: 2,
-          schemaVersion: emptyStore.schemaVersion,
-          createdAt: now,
-          updatedAt: now,
-        },
-      ],
-    );
+    // No library row for the load, and a claim at the wrong revision that matches nothing.
+    const scripted = scriptedDatabase([], []);
     const repository = new DrizzleCreativeLibraryRepository(scripted.db);
 
     await expect(repository.load(ownerUserId)).resolves.toMatchObject({
@@ -821,19 +804,11 @@ describe('DrizzleCreativeLibraryRepository', () => {
       },
       { now, createId: () => 'image-outfit' },
     );
-    const previousLibrary = {
-      ownerUserId,
-      revision: 1,
-      schemaVersion: previousStore.schemaVersion,
-      createdAt: now,
-      updatedAt: now,
-    };
+    // The claim, then the delete that both clears the old rows and reports which reference
+    // images they held. The replacement store is empty, so the asset insert is skipped.
     const scripted = scriptedDatabase(
-      [previousLibrary],
-      [{ kind: 'outfit', payload: previousStore.savedPrompts[0] }],
-      [previousLibrary],
-      [],
-      [],
+      [{ revision: 2 }],
+      [{ payload: previousStore.savedPrompts[0] }],
     );
     const releaseReferenceImages = vi.fn().mockResolvedValue(undefined);
     const repository = new DrizzleCreativeLibraryRepository(scripted.db, releaseReferenceImages);

@@ -36,7 +36,19 @@ const REFERENCE_IMAGE_ID_FIELDS = new Set([
   'garmentReferenceImageAssetId',
 ]);
 
-const collectReferenceImageAssetIds = (value: unknown, result = new Set<string>()): Set<string> => {
+/**
+ * Every reference-image id a stored payload names, found structurally rather than by walking the
+ * typed shape.
+ *
+ * One owner because two sides of the same decision ask it: the creative-library write computes what
+ * it released, and the purge computes what is still retained. A new reference-carrying field
+ * registered in only one of two walkers would either delete bytes the library still points at or
+ * leak them forever.
+ */
+export const collectReferenceImageAssetIds = (
+  value: unknown,
+  result = new Set<string>(),
+): Set<string> => {
   if (Array.isArray(value)) {
     for (const item of value) collectReferenceImageAssetIds(item, result);
     return result;

@@ -62,6 +62,10 @@ export class DrizzleAiUsageLedgerRepository implements AiUsageLedgerRepository {
    * racing an open would find nothing to update and be dropped in silence. Conflicting into an
    * update makes this statement wait for that transaction and take the row's lock, which is the
    * whole point of the read below.
+   *
+   * That shape is specific to a ledger row, which must be served whichever writer created it. A
+   * caller that has to *reject* the loser wants the opposite — a claiming statement whose empty
+   * result is the refusal, as `creative-library-repository.ts` uses for its revision CAS.
    */
   async record(entry: AiUsageEntry): Promise<void> {
     await this.db.transaction(async (tx) => {
