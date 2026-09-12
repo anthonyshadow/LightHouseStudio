@@ -56,6 +56,25 @@ describe('FileProcessingJobRepository', () => {
     expect(stored).toEqual(trace('ready'));
   });
 
+  it('admits one of two submissions racing for the same owner', async () => {
+    const repository = new FileProcessingJobRepository(temporaryRoot());
+    const second = {
+      ...trace('validating'),
+      jobId: 'b3f1c0d2-9a45-4f7e-8c31-6de2a0f95471',
+    };
+
+    // Both arrive before either has written its trace. Reading the index and recording the job are
+    // separate steps with an fsync and a rename between them, so without a per-owner lock both saw
+    // an idle owner and both went on to a paid provider.
+    const results = await Promise.all([
+      repository.admit(trace('validating')),
+      repository.admit(second),
+    ]);
+
+    expect(results.filter((result) => result === 'admitted')).toHaveLength(1);
+    expect(results.filter((result) => result === 'owner-conflict')).toHaveLength(1);
+  });
+
   it('rejects unsafe trace data before creating storage', async () => {
     const root = temporaryRoot();
     const repository = new FileProcessingJobRepository(root);

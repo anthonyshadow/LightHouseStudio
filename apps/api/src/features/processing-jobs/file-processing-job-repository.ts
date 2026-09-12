@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { chmod, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
+import { KeyedLock } from '../../application/keyed-lock.js';
 import path from 'node:path';
 import { z } from 'zod';
 import {
@@ -123,7 +124,13 @@ const activeStatus = (status: VideoProcessingJobTrace['status']): boolean =>
 
 export class FileProcessingJobRepository implements DurableProcessingJobRepository {
   readonly #root: string;
-  readonly #locks = new Map<string, Promise<void>>();
+  /**
+   * Admission is serialized per owner, a trace write per job. Kept as two locks rather than one
+   * with prefixed keys because `KeyedLock` is not reentrant: `admit` takes the owner lock and then
+   * calls `upsert`, so a shared key space would turn an id collision into a deadlock.
+   */
+  readonly #ownerLock = new KeyedLock();
+  readonly #writeLock = new KeyedLock();
   /**
    * Owner to that owner's job ids in an active status, or null until something needs it.
    *
@@ -199,35 +206,37 @@ export class FileProcessingJobRepository implements DurableProcessingJobReposito
     return traces;
   }
 
+  /**
+   * Admits one job per owner, and serializes the decision against that owner's other admissions.
+   *
+   * Reading the index and recording the job are separate steps with an `fsync` and a rename
+   * between them, so without the lock two submissions arriving together both saw an idle owner and
+   * both reached a paid provider. The relational store gets this from the
+   * `processing_jobs_owner_active_unique` partial index; this one has to arrange it.
+   */
   async admit(traceValue: VideoProcessingJobTrace): Promise<ProcessingJobAdmissionResult> {
     const trace = traceSchema.parse(traceValue);
-    const existing = await this.#read(trace.jobId);
-    if (existing !== null) {
-      if (existing.ownerUserId !== trace.ownerUserId) return 'owner-mismatch';
-      return existing.operation === trace.operation &&
-        existing.provider === trace.provider &&
-        existing.requestFingerprint === trace.requestFingerprint &&
-        existing.outputResolution === trace.outputResolution
-        ? 'duplicate'
-        : 'request-conflict';
-    }
-    if (((await this.#activeJobs()).get(trace.ownerUserId)?.size ?? 0) > 0) {
-      return 'owner-conflict';
-    }
-    await this.upsert(trace);
-    return 'admitted';
+    return this.#ownerLock.run(trace.ownerUserId, async () => {
+      const existing = await this.#read(trace.jobId);
+      if (existing !== null) {
+        if (existing.ownerUserId !== trace.ownerUserId) return 'owner-mismatch';
+        return existing.operation === trace.operation &&
+          existing.provider === trace.provider &&
+          existing.requestFingerprint === trace.requestFingerprint &&
+          existing.outputResolution === trace.outputResolution
+          ? 'duplicate'
+          : 'request-conflict';
+      }
+      if (((await this.#activeJobs()).get(trace.ownerUserId)?.size ?? 0) > 0) {
+        return 'owner-conflict';
+      }
+      await this.upsert(trace);
+      return 'admitted';
+    });
   }
   async upsert(value: VideoProcessingJobTrace): Promise<void> {
     const trace = traceSchema.parse(value);
-    const prior = this.#locks.get(trace.jobId) ?? Promise.resolve();
-    let release!: () => void;
-    const barrier = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    const chain = prior.then(() => barrier);
-    this.#locks.set(trace.jobId, chain);
-    await prior;
-    try {
+    await this.#writeLock.run(trace.jobId, async () => {
       await mkdir(this.#root, { recursive: true, mode: 0o700 });
       await chmod(this.#root, 0o700);
       const file = this.#file(trace.jobId);
@@ -253,10 +262,7 @@ export class FileProcessingJobRepository implements DurableProcessingJobReposito
         (index) => this.#recordActivity(index, trace),
         () => undefined,
       );
-    } finally {
-      release();
-      if (this.#locks.get(trace.jobId) === chain) this.#locks.delete(trace.jobId);
-    }
+    });
   }
 
   async findOutcomes(

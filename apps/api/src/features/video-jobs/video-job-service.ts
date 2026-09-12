@@ -936,7 +936,16 @@ export class VideoJobService {
     job.operationController.abort();
     if (this.#jobs.get(job.jobId) === job) this.#jobs.delete(job.jobId);
     if (this.#activeJobByOwner.get(job.ownerId) === job.jobId) {
-      this.#activeJobByOwner.delete(job.ownerId);
+      // Point the index back at whatever this owner still has running rather than clearing it.
+      // `#createJob` claims the entry before admission decides, so a submission refused for
+      // owner-conflict is holding the entry that belongs to the job it just lost to — and simply
+      // deleting it would leave that winner unregistered, which is the one state this index is
+      // supposed to make impossible.
+      const running = [...this.#jobs.values()].find(
+        (candidate) => candidate.ownerId === job.ownerId && !terminal(candidate.status),
+      );
+      if (running === undefined) this.#activeJobByOwner.delete(job.ownerId);
+      else this.#activeJobByOwner.set(job.ownerId, running.jobId);
     }
     this.#scheduleNextDeadline();
     await this.#removePath(job.directory, { recursive: true, force: true }).catch(() => undefined);
