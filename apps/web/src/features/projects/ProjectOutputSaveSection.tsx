@@ -66,7 +66,6 @@ import {
 import { getProject, ProjectApiConflictError, saveProjectOutput } from './projectsApi';
 import { useProjectCurrentCut } from './useProjectCurrentCut';
 import { useProjectOutputRenditionSet } from './useProjectOutputRenditionSet';
-import type { ProjectOutputRenditionMember } from './projectOutputRenditionPreparationStorage';
 import { ProjectPlacementSetProgress } from './ProjectPlacementSetProgress';
 import type { ProjectSessionPort } from './useProjectSession';
 import { projectQueryKeys } from './useProjectsController';
@@ -162,7 +161,6 @@ export const ProjectOutputSaveSection = ({
    */
   const [extras, setExtras] = useState<readonly ProjectExportPlacementAspect[]>([]);
   /** Placements a run could not make, kept so the operator can ask for exactly those again. */
-  const [missing, setMissing] = useState<readonly ProjectOutputRenditionMember[]>([]);
   const readyMedia = readyMediaFor(current);
   // Gated like its two siblings. This section is mounted by the workspace whichever task is
   // showing, so the exclusion is a Project with nothing ready to save — where the chooser can
@@ -176,6 +174,14 @@ export const ProjectOutputSaveSection = ({
     placementRender,
     queryClient,
   );
+  /*
+   * Derived, not captured. A frozen copy was cleared at the top of `begin` and only refilled once a
+   * run reached the end, so every early return — a transient read failure, storage unavailable, a
+   * flushed session conflict — left the progress list still drawing the previous run's failed
+   * placements while the button that offers to make them again had silently gone. The only way back
+   * was a second full save.
+   */
+  const missing = renditionSet.members.filter(({ outcome }) => outcome !== 'stored');
   // The cut's frame, so the chooser can draw the crop and say what it does to burned-in subtitles
   // rather than describe them; one small read per revision, reused by the save itself.
   const currentCut = useProjectCurrentCut(current, readyMedia !== null);
@@ -407,7 +413,6 @@ export const ProjectOutputSaveSection = ({
       );
       return 'stopped';
     }
-    setMissing(produced.members.filter(({ outcome }) => outcome !== 'stored'));
     if (produced.renditions.length === 0) {
       /*
        * Every placement failed or was stopped. Saving the cut in its own shape here would answer a
@@ -449,7 +454,6 @@ export const ProjectOutputSaveSection = ({
   ) => {
     restoreFocusRef.current = true;
     setDestinationOpen(false);
-    setMissing([]);
     if (ownerUserId === undefined) {
       setPhase('error');
       setMessage('Your account could not be confirmed for this save.');
@@ -900,7 +904,7 @@ export const ProjectOutputSaveSection = ({
                   onOpenInAssets={() => void navigate(savedVideoLibraryPath(savedVideo.id))}
                 />
               ) : null}
-              {missing.length > 0 ? (
+              {missing.length > 0 && !busy ? (
                 <div data-placements-missing="">
                   <ul css={{ margin: `${theme.space.xs} 0`, paddingInlineStart: theme.space.md }}>
                     {missing.map((member) => (
@@ -910,11 +914,15 @@ export const ProjectOutputSaveSection = ({
                       </li>
                     ))}
                   </ul>
-                  <Button size="small" onClick={retryMissing}>
-                    {missing.length === 1
-                      ? 'Make this placement'
-                      : `Make these ${missing.length} placements`}
-                  </Button>
+                  {/* `retryMissing` needs the video these placements join, and a save that
+                      failed before storing one has none — the list still says what is missing. */}
+                  {savedVideo !== null ? (
+                    <Button size="small" onClick={retryMissing}>
+                      {missing.length === 1
+                        ? 'Make this placement'
+                        : `Make these ${missing.length} placements`}
+                    </Button>
+                  ) : null}
                 </div>
               ) : null}
               {phase === 'error' && pendingAvailable ? (
