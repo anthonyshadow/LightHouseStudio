@@ -1,3 +1,4 @@
+import { mkdtempSync } from 'node:fs';
 import { readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -8,6 +9,14 @@ import {
 } from './file-processing-job-repository.js';
 
 const roots: string[] = [];
+
+// Created up front rather than named and left to the repository: `mkdtemp` takes the directory in
+// one step, owner-only, so no other user of the machine can be sitting on the path first.
+const temporaryRoot = (): string => {
+  const root = mkdtempSync(path.join(tmpdir(), 'lightframe-processing-'));
+  roots.push(root);
+  return root;
+};
 const trace = (status: VideoProcessingJobTrace['status']): VideoProcessingJobTrace => ({
   schemaVersion: 1,
   jobId: '720620f6-446b-4987-828e-bc23470e613d',
@@ -33,8 +42,7 @@ describe('FileProcessingJobRepository', () => {
   });
 
   it('atomically serializes concurrent updates to one safe trace file', async () => {
-    const root = path.join(tmpdir(), `lightframe-processing-${crypto.randomUUID()}`);
-    roots.push(root);
+    const root = temporaryRoot();
     const repository = new FileProcessingJobRepository(root);
 
     await Promise.all([repository.upsert(trace('processing')), repository.upsert(trace('ready'))]);
@@ -49,8 +57,7 @@ describe('FileProcessingJobRepository', () => {
   });
 
   it('rejects unsafe trace data before creating storage', async () => {
-    const root = path.join(tmpdir(), `lightframe-processing-${crypto.randomUUID()}`);
-    roots.push(root);
+    const root = temporaryRoot();
     const repository = new FileProcessingJobRepository(root);
     await expect(
       repository.upsert({ ...trace('failed'), safeErrorCode: 'x'.repeat(81) }),
@@ -58,8 +65,7 @@ describe('FileProcessingJobRepository', () => {
   });
 
   it('re-downloads an unretained ready result from durable provider identity after restart', async () => {
-    const root = path.join(tmpdir(), `lightframe-processing-${crypto.randomUUID()}`);
-    roots.push(root);
+    const root = temporaryRoot();
     const repository = new FileProcessingJobRepository(root);
     await repository.upsert({
       ...trace('ready'),
@@ -81,8 +87,7 @@ describe('FileProcessingJobRepository', () => {
   });
 
   it('answers for the jobs it was asked about, and for no other job or owner', async () => {
-    const root = path.join(tmpdir(), `lightframe-processing-${crypto.randomUUID()}`);
-    roots.push(root);
+    const root = temporaryRoot();
     const repository = new FileProcessingJobRepository(root);
     const settled: VideoProcessingJobTrace = {
       ...trace('failed'),
@@ -127,8 +132,7 @@ describe('FileProcessingJobRepository', () => {
   });
 
   it('answers about no jobs without reading any trace', async () => {
-    const root = path.join(tmpdir(), `lightframe-processing-${crypto.randomUUID()}`);
-    roots.push(root);
+    const root = temporaryRoot();
     const repository = new FileProcessingJobRepository(root);
     await repository.upsert(trace('failed'));
 
@@ -138,8 +142,7 @@ describe('FileProcessingJobRepository', () => {
   });
 
   it('keeps a submission with no provider identity ambiguous until an explicit decision', async () => {
-    const root = path.join(tmpdir(), `lightframe-processing-${crypto.randomUUID()}`);
-    roots.push(root);
+    const root = temporaryRoot();
     const repository = new FileProcessingJobRepository(root);
     await repository.upsert({
       ...trace('submitting'),

@@ -1,3 +1,4 @@
+import { mkdtempSync } from 'node:fs';
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import type * as NodeFileSystem from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -53,8 +54,10 @@ const VOICE_ID = '0f4a5f52-3a52-4d3b-9c8f-2b7f39a4c1de';
 
 const roots: string[] = [];
 
+// Created up front rather than named and left to the repository: `mkdtemp` takes the directory in
+// one step, owner-only, so no other user of the machine can be sitting on the path first.
 const temporaryRoot = (): string => {
-  const root = path.join(tmpdir(), `lightframe-ai-usage-${crypto.randomUUID()}`);
+  const root = mkdtempSync(path.join(tmpdir(), 'lightframe-ai-usage-'));
   roots.push(root);
   return root;
 };
