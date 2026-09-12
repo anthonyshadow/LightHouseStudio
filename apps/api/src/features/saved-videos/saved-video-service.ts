@@ -17,6 +17,7 @@ import { matchesSearchTerm, normalizeSavedVideoTitle } from '@studio/domain';
 import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
 import type { ProjectRepository, ProjectRetentionPolicy } from '../projects/project-repository.js';
 import { AppError } from '../../http/app-error.js';
+import { sealedCriteria } from '../../http/page-cursor.js';
 import { withWorkflowSpan } from '../../observability/telemetry.js';
 import { inspectSavedVideoFile } from './saved-video-inspection.js';
 import {
@@ -145,18 +146,28 @@ export const publicSavedVideoDetail = (
   });
 };
 
+/**
+ * The query a cursor is bound to, sealed as a digest.
+ *
+ * Offset paging is only meaningful against the query that produced it, and the binding is only
+ * ever compared — so it is hashed rather than carried. Verbatim, a 120-character CJK character
+ * name plus an 80-character CJK search made the token longer than the `nextCursor` cap in the
+ * response contract, and the service failed parsing its own reply.
+ */
 const cursorQueryKey = (query: SavedVideosQuery): string =>
-  JSON.stringify({
-    characterName: query.characterName ?? null,
-    format: query.format ?? null,
-    search: query.search ?? null,
-    pageSize: query.pageSize,
-    sort: query.sort,
-  });
+  sealedCriteria(
+    JSON.stringify({
+      characterName: query.characterName ?? null,
+      format: query.format ?? null,
+      search: query.search ?? null,
+      pageSize: query.pageSize,
+      sort: query.sort,
+    }),
+  );
 
 const encodeCursor = (offset: number, query: SavedVideosQuery): string =>
   Buffer.from(
-    JSON.stringify({ version: 2, offset, query: cursorQueryKey(query) }),
+    JSON.stringify({ version: 3, offset, query: cursorQueryKey(query) }),
     'utf8',
   ).toString('base64url');
 
@@ -164,20 +175,22 @@ const decodeCursor = (cursor: string | undefined, query: SavedVideosQuery): numb
   if (cursor === undefined) return 0;
   try {
     const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as unknown;
+    // Version 1 carried no query binding at all and was accepted for tokens already in flight when
+    // one was added. Re-minting every cursor here retires that allowance rather than carrying a
+    // shape that lets a replayed token page a filter it was never issued for.
     if (
       typeof value === 'object' &&
       value !== null &&
       'version' in value &&
+      value.version === 3 &&
       'offset' in value &&
       typeof value.offset === 'number' &&
       Number.isInteger(value.offset) &&
       value.offset >= 0 &&
       value.offset <= 100_000 &&
-      (value.version === 1 ||
-        (value.version === 2 &&
-          'query' in value &&
-          typeof value.query === 'string' &&
-          value.query === cursorQueryKey(query)))
+      'query' in value &&
+      typeof value.query === 'string' &&
+      value.query === cursorQueryKey(query)
     )
       return value.offset;
   } catch {

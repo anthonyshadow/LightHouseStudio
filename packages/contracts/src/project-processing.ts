@@ -186,7 +186,7 @@ export const projectProcessingHistoryQuerySchema = z
 export const projectProcessingHistoryResponseSchema = z
   .object({
     attempts: z.array(projectProcessingAttemptSchema).max(40),
-    nextCursor: z.string().max(1_000).nullable(),
+    nextCursor: opaquePageTokenSchema.nullable(),
   })
   .strict();
 

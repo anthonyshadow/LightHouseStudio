@@ -1,7 +1,19 @@
+import { createHash } from 'node:crypto';
 import { AppError } from './app-error.js';
 
 const CURSOR_UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+/**
+ * The sealed criteria, as a fixed-width digest rather than the criteria themselves.
+ *
+ * Nothing ever reads them back — they are only compared for equality — and carrying them verbatim
+ * made the token's length track the caller's search text. A search is bounded in characters while
+ * the token is built from bytes, so an 80-character CJK term produced a cursor longer than the
+ * response contract's own `nextCursor` cap, and the server failed parsing its own reply.
+ */
+export const sealedCriteria = (criteria: string): string =>
+  createHash('sha256').update(criteria, 'utf8').digest('base64url');
 
 /**
  * The single owner of the opaque page-cursor envelope.
@@ -24,7 +36,10 @@ export type DecodedPageCursor<TimestampKey extends string, IdKey extends string>
   Record<IdKey, string>;
 
 export const encodePageCursor = (cursor: object, criteria: string): string =>
-  Buffer.from(JSON.stringify({ version: 1, ...cursor, criteria }), 'utf8').toString('base64url');
+  Buffer.from(
+    JSON.stringify({ version: 2, ...cursor, criteria: sealedCriteria(criteria) }),
+    'utf8',
+  ).toString('base64url');
 
 export const decodePageCursor = <TimestampKey extends string, IdKey extends string>(
   token: string | undefined,
@@ -39,12 +54,12 @@ export const decodePageCursor = <TimestampKey extends string, IdKey extends stri
       const timestamp = record[shape.timestampKey];
       const id = record[shape.idKey];
       if (
-        record['version'] === 1 &&
+        record['version'] === 2 &&
         typeof timestamp === 'string' &&
         Number.isFinite(new Date(timestamp).valueOf()) &&
         typeof id === 'string' &&
         CURSOR_UUID_PATTERN.test(id) &&
-        record['criteria'] === criteria
+        record['criteria'] === sealedCriteria(criteria)
       ) {
         return {
           [shape.timestampKey]: new Date(timestamp).toISOString(),

@@ -547,7 +547,7 @@ export const projectAssetsResponseSchema = z
   .object({
     assets: z.array(projectAssetMembershipSchema).max(50),
     videoSummaries: z.array(savedVideoSummarySchema).max(50),
-    nextCursor: z.string().max(1_000).nullable(),
+    nextCursor: opaquePageTokenSchema.nullable(),
   })
   .strict();
 
@@ -687,7 +687,7 @@ export const projectHistoryRevisionSchema = z
 export const projectHistoryResponseSchema = z
   .object({
     revisions: z.array(projectHistoryRevisionSchema).max(40),
-    nextCursor: z.string().max(1_000).nullable(),
+    nextCursor: opaquePageTokenSchema.nullable(),
   })
   .strict();
 
@@ -726,7 +726,7 @@ export const projectOutputHistoryItemSchema = z
 export const projectOutputHistoryResponseSchema = z
   .object({
     outputs: z.array(projectOutputHistoryItemSchema).max(40),
-    nextCursor: z.string().max(1_000).nullable(),
+    nextCursor: opaquePageTokenSchema.nullable(),
   })
   .strict();
 export const projectWorkingMediaParamsSchema = z
@@ -765,7 +765,7 @@ export const projectsResponseSchema = z
     projects: z.array(projectSchema).max(40),
     /** Only the Projects in this page that resolve to one; absent entries have no preview. */
     previews: z.array(projectPreviewSchema).max(40).default([]),
-    nextCursor: z.string().max(500).nullable(),
+    nextCursor: opaquePageTokenSchema.nullable(),
     /** How many Projects match the query, counted to a ceiling rather than censused. */
     total: listTotalSchema,
   })

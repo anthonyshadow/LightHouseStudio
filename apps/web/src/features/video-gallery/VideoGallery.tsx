@@ -845,6 +845,18 @@ export const VideoGallery = ({
           onRemove={(video, trigger) => openAction('remove', video, trigger)}
         />
       )}
+      {/* A failure with pages already loaded is not the empty-state branch above, which returns
+          early only when there is nothing to show. `fetchNextPage` recomputes its cursor from the
+          cached last page, so pressing Load more again re-sends the token that just failed;
+          `refetch` re-walks from the first page and mints fresh ones. */}
+      {videosQuery.isError && videosQuery.data ? (
+        <StatusNotice tone="danger" role="alert">
+          {videosQuery.error instanceof Error
+            ? videosQuery.error.message
+            : 'More saved videos could not be loaded.'}{' '}
+          <Button onClick={() => void videosQuery.refetch()}>Retry</Button>
+        </StatusNotice>
+      ) : null}
       {videosQuery.hasNextPage ? (
         <div css={paginationStyles(theme)}>
           <Button

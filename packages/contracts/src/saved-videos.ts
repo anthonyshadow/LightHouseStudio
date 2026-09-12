@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { projectExportSpecificationValueSchema } from './export-placements';
-import { listSearchSchema } from './common';
+import { listSearchSchema, opaquePageTokenSchema } from './common';
 import { videoInputMimeTypeSchema, VIDEO_RESULT_MAX_BYTES } from './video-jobs';
 
 export const SAVED_VIDEO_ORIGINS = [
@@ -134,7 +134,7 @@ export const savedVideosQuerySchema = z
 export const savedVideosResponseSchema = z
   .object({
     videos: z.array(savedVideoSummarySchema).max(40),
-    nextCursor: z.string().max(500).nullable(),
+    nextCursor: opaquePageTokenSchema.nullable(),
     total: z.number().int().nonnegative(),
     facets: z
       .object({

@@ -70,7 +70,7 @@ export const campaignConflictSchema = z.discriminatedUnion('kind', [
 export const campaignsResponseSchema = z
   .object({
     campaigns: z.array(campaignSchema).max(40),
-    nextCursor: z.string().max(500).nullable(),
+    nextCursor: opaquePageTokenSchema.nullable(),
     /** How many Campaigns match the query, counted to a ceiling rather than censused. */
     total: listTotalSchema,
   })
