@@ -336,6 +336,33 @@ describe('useExistingVideoWorkflow', () => {
     });
   });
 
+  it('does not offer Voice for a source whose audio could not be extracted', async () => {
+    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+    // What the inspection reports when the container has an audio track it could not pull out: a
+    // sidecar it never produced, a reason it did, and `hasAudio` still true.
+    adapters.validateExistingVideo.mockResolvedValue({
+      ...inspected(sourceFile),
+      audioSidecar: null,
+      audioUnavailableReason:
+        'The source audio could not be preserved separately, so Voice is unavailable.',
+      metadata: { ...inspected(sourceFile).metadata, hasAudio: true, audioCodec: null },
+    });
+    const recording = recordingController();
+    const hook = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording,
+        processing: processingController(),
+        publishUploadedVideo: vi.fn().mockReturnValue(recording.original),
+      }),
+    );
+
+    await act(async () => hook.result.current.selectFile(sourceFile));
+
+    // Offering it here only moved the failure later: preparing the voice reads the sidecar that
+    // was never produced, so the operator found out after choosing a voice.
+    expect(hook.result.current.voiceAvailable).toBe(false);
+  });
+
   it('adopts an edited square source, keeps Voice available, and blocks visual provider intent', async () => {
     const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
     adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));

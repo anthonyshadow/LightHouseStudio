@@ -850,13 +850,12 @@ export const useExistingVideoWorkflow = ({
       currentMetadata,
       voiceSelection,
       pendingVoiceSelection,
-      // The capture sidecar is what restores original audio onto a *visual* result; voice work
-      // rewrites the audio of the complete video and never reads it. Gating voice on the sidecar
-      // therefore refused every adopted or generated video, which has its own audio track. Kept as
-      // a union so a local take whose container carries no usable audio still offers its sidecar.
-      voiceAvailable:
-        (recording.sidecar.state === 'ready' && recording.sidecar.blob !== null) ||
-        (currentMetadata?.hasAudio ?? false),
+      // Voice work rewrites the audio track by reading the sidecar — `useVoiceProcessing.prepare`
+      // refuses without one — so the sidecar is the gate. It was widened to the source's own
+      // `hasAudio` on the belief that voice never reads it, which let a source whose extraction was
+      // attempted and failed offer Voice and then fail after the operator had picked one. Every
+      // path that publishes a source publishes its sidecar with it, adopted takes included.
+      voiceAvailable: recording.sidecar.state === 'ready' && recording.sidecar.blob !== null,
       visualProviderCompatibility,
       comparison,
       startedAtMs,
