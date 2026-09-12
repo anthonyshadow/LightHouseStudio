@@ -202,7 +202,10 @@ export const DashboardRouteSurface = ({
   const onboardingVisible = !useDashboardOnboardingDismissed(ownerUserId);
   const [onboardingStorageWarning, setOnboardingStorageWarning] = useState(false);
   const [recentKind, setRecentKind] = useState<RecentKind>(initialView ?? 'all');
-  const [selectedJob, setSelectedJob] = useState<VideoJobQueueItem | null>(null);
+  // The id, not the row. The queue re-polls every few seconds, so a frozen copy kept offering
+  // the verb the job had when it was clicked — "Remove from queue" for work that had since started
+  // processing — and stayed open, still aimed, at a job that had already finished and left.
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [queueOpen, setQueueOpen] = useState(false);
   const [queueNotice, setQueueNotice] = useState<string | null>(null);
 
@@ -234,7 +237,7 @@ export const DashboardRouteSurface = ({
   const abandonMutation = useMutation({
     mutationFn: (jobId: string) => abandonVideoJob(jobId),
     onSuccess: async () => {
-      setSelectedJob(null);
+      setSelectedJobId(null);
       setQueueOpen(false);
       setQueueNotice('The job was removed from Lightframe and the processing slot is available.');
       await queryClient.invalidateQueries({ queryKey: activeJobsQuery.queryKey });
@@ -356,6 +359,9 @@ export const DashboardRouteSurface = ({
     recentItems.length === 0;
   const queueJobs = processingQueueQuery.data?.jobs ?? [];
   const queueActive = queueJobs.length > 0;
+  // Derived from the polled queue, so the dialog relabels itself as the job moves and closes on its
+  // own once the job is no longer there to act on.
+  const selectedJob = queueJobs.find((job) => job.jobId === selectedJobId) ?? null;
   /*
    * "The operator asked for this open" — not "these exact jobs are open". Keying the disclosure on
    * the polled job set closed the panel from under whoever was reading it every time a job
@@ -552,7 +558,7 @@ export const DashboardRouteSurface = ({
                     onClick={() => {
                       abandonMutation.reset();
                       setQueueNotice(null);
-                      setSelectedJob(job);
+                      setSelectedJobId(job.jobId);
                     }}
                   >
                     {jobActionLabel(job.status)}
@@ -784,7 +790,10 @@ export const DashboardRouteSurface = ({
       </PageShell>
 
       <ConfirmationDialog
-        open={selectedJob !== null}
+        // The queue polls independently of the mutation, so a job leaving it mid-request would
+        // otherwise unmount the dialog under an in-flight abandon — and the failure alert lives
+        // only in here. This is what the `selectedJob ? … : …` fallbacks below are for.
+        open={selectedJob !== null || abandonMutation.isPending || abandonMutation.isError}
         title={selectedJob ? `${jobActionLabel(selectedJob.status)}?` : 'Remove job?'}
         description="This releases Lightframe's processing slot and discards any result that arrives later."
         alert={
@@ -801,7 +810,7 @@ export const DashboardRouteSurface = ({
         onCancel={() => {
           if (abandonMutation.isPending) return;
           abandonMutation.reset();
-          setSelectedJob(null);
+          setSelectedJobId(null);
         }}
         onConfirm={() => {
           if (selectedJob) abandonMutation.mutate(selectedJob.jobId);
