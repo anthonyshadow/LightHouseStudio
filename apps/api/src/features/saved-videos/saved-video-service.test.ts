@@ -181,7 +181,10 @@ describe('SavedVideoService', () => {
     // Still readable, and still exactly at the cap.
     const reread = await service.get(ownerUserId, detail.id);
     expect(reread?.versionCount).toBe(SAVED_VIDEO_VERSION_LIMIT);
-  });
+    // Filling the cap is 100 sequential durable appends, so this test's runtime is set by a domain
+    // constant rather than by what it asserts. The default 5s left about 50ms an append and timed
+    // out on a loaded runner at 5050ms. Stated here so raising the cap does not quietly fail.
+  }, 60_000);
 
   it('renames only against the expected revision, and says which failure happened', async () => {
     const saved = await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());

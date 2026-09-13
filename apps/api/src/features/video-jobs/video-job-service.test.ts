@@ -1186,7 +1186,11 @@ describe('VideoJobService', () => {
       operation: 'character-swap',
       reason: 'billing',
     });
-    expect(JSON.stringify(report.mock.calls)).not.toContain('402');
+    // Every logged value the service chooses, with the one it does not: a random job id can
+    // contain any digits at all, and CI drew `…b010-402aef4b0044` — a passing diagnostic failing
+    // this as if the upstream status had leaked into it.
+    const logged = JSON.stringify(report.mock.calls).replaceAll(jobId, '<job-id>');
+    expect(logged).not.toContain('402');
     report.mockRestore();
   });
 
