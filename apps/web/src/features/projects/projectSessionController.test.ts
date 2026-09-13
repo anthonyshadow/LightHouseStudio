@@ -182,6 +182,45 @@ describe('ProjectSessionController', () => {
     vi.useRealTimers();
   });
 
+  it('keeps a staged derived change unscheduled when authority moves under it', async () => {
+    vi.useFakeTimers();
+    let authority = currentProject();
+    const save = vi.fn(
+      (_id: string, current: ProjectCurrentResponse, proposal: ProjectSessionProposalContract) => {
+        authority = withProposal(current, proposal);
+        return Promise.resolve(authority);
+      },
+    );
+    const controller = new ProjectSessionController(projectId, {
+      load: () => Promise.resolve(authority),
+      save,
+      autosaveMs: 50,
+    });
+    await controller.hydrate();
+
+    controller.propose({ workflowPhase: 'creative' }, { autosave: false });
+    // A boundary elsewhere wrote a revision — a submission reconciling, say. The staged change is
+    // still only derived, so this is not the moment to start writing it: doing so appended the
+    // revision that moved a Project's head past the run it had just pinned.
+    controller.acceptCurrent(withProposal(currentProject(), {}));
+    expect(controller.getSnapshot()).toMatchObject({ phase: 'dirty', hasLocalProposal: true });
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(save).not.toHaveBeenCalled();
+
+    // One change the operator did ask for makes the whole proposal schedulable again.
+    controller.propose({
+      selectedVoice: {
+        kind: 'local-effect',
+        effectId: 'warm-studio',
+        effectRevision: 'builtin-v1',
+      },
+    });
+    await vi.advanceTimersByTimeAsync(50);
+    expect(save).toHaveBeenCalledOnce();
+    expect(save.mock.calls[0]?.[2]).toMatchObject({ workflowPhase: 'creative' });
+    vi.useRealTimers();
+  });
+
   it('reconciles a lost response when server authority already contains the exact proposal', async () => {
     let authority = currentProject();
     const controller = new ProjectSessionController(projectId, {

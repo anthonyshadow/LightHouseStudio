@@ -64,6 +64,17 @@ export class ProjectSessionController {
   readonly #autosaveMs: number;
   #snapshot: ProjectSessionSnapshot;
   #desired: ProjectSessionProposalContract | null = null;
+  /**
+   * Whether anything staged into `#desired` asked to be written on its own.
+   *
+   * `autosave: false` was only ever a property of the call, so every later reason to reschedule —
+   * an authority that moved, a reload — promoted a staged derived selection to a write the operator
+   * never asked for. That is how a creative capture came to append a revision a second after a
+   * submission, moving the Project's head past the run it had just pinned and unpinning the run.
+   * Held on the proposal instead: it survives until the proposal is written or discarded, and one
+   * operator change staged on top is enough to make the whole of `#desired` schedulable again.
+   */
+  #autosaveRequested = false;
   #timer: ReturnType<typeof setTimeout> | null = null;
   #hydratePromise: Promise<boolean> | null = null;
   #savePromise: Promise<boolean> | null = null;
@@ -109,6 +120,10 @@ export class ProjectSessionController {
    * the session, and `flush` will still write it, but nothing is appended on its own. That is what
    * a derived selection wants — a Project revision is a record of a change the operator made, not
    * of the Studio settling — so those callers stage and let a real boundary do the writing.
+   *
+   * It holds until the proposal is written or discarded, not just for this call: see
+   * `#autosaveRequested`. Staging one operator change on top lifts it for the whole proposal, which
+   * is the honest reading — by then `#desired` does carry something they asked to keep.
    */
   readonly propose = (
     proposal: Partial<ProjectSessionProposalContract>,
@@ -121,14 +136,16 @@ export class ProjectSessionController {
       ...proposal,
     });
     this.#desired = desired;
+    if (options.autosave !== false) this.#autosaveRequested = true;
     if (!this.#hasLocalProposal()) {
       this.#clearTimer();
+      this.#autosaveRequested = false;
       if (this.#savePromise === null) this.#update({ phase: 'saved', message: null });
       return true;
     }
     if (this.#snapshot.phase !== 'saving') {
       this.#update({ phase: 'dirty', message: null });
-      if (options.autosave !== false) this.#scheduleAutosave();
+      if (this.#autosaveRequested) this.#scheduleAutosave();
     } else {
       this.#update({});
     }
@@ -157,6 +174,7 @@ export class ProjectSessionController {
     this.#clearTimer();
     const current = this.#snapshot.current;
     this.#desired = current === null ? null : proposalFromCurrent(current);
+    this.#autosaveRequested = false;
     this.#update({ phase: current === null ? 'hydrating' : 'saved', message: null });
     return true;
   };
@@ -167,8 +185,9 @@ export class ProjectSessionController {
     this.#acceptAuthority(current, preserveProposal);
     if (this.#hasLocalProposal() && this.#snapshot.phase !== 'saving') {
       this.#update({ phase: 'dirty', message: null });
-      this.#scheduleAutosave();
+      if (this.#autosaveRequested) this.#scheduleAutosave();
     } else if (this.#savePromise === null) {
+      this.#autosaveRequested = false;
       this.#update({ phase: 'saved', message: null });
     }
   };
@@ -190,7 +209,7 @@ export class ProjectSessionController {
       const current = await this.dependencies.load(this.projectId, controller.signal);
       if (controller.signal.aborted || this.#disposed) return false;
       this.#acceptLoadedAuthority(current, this.#hasLocalProposal());
-      if (this.#hasLocalProposal()) this.#scheduleAutosave();
+      if (this.#hasLocalProposal() && this.#autosaveRequested) this.#scheduleAutosave();
       return true;
     } catch (error) {
       if (controller.signal.aborted || this.#disposed) return false;
@@ -243,6 +262,7 @@ export class ProjectSessionController {
       if (!(await this.#saveOnce())) return false;
     }
     if (!this.#hasLocalProposal()) {
+      this.#autosaveRequested = false;
       this.#update({ phase: 'saved', message: null });
       return true;
     }

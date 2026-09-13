@@ -7,6 +7,7 @@ import {
   projectCreativeHydrationSelection,
   resolveProjectCreativeResourceIssues,
   resolveProjectSavedVoiceResourceIssue,
+  type ProjectCreativeProposal,
 } from './projectCreativeSessionAdapter';
 
 const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
@@ -263,6 +264,57 @@ describe('Project creative session adapter', () => {
         exportSpecification: null,
       }).success,
     ).toBe(true);
+  });
+
+  describe('a Virtual Try-On input kind the operator overrode', () => {
+    // "Continue without the reference" downgrades a saved-outfit step to `prompt` and leaves the
+    // Outfit selected. A stepless capture that re-derived from scratch answered `saved-outfit` and
+    // overwrote them — and the API sends `inputKind` on to the provider, so that is a different
+    // submission, not a cosmetic difference.
+    const vtonCapture = (
+      settledInputKind: 'prompt' | 'saved-outfit',
+      outfitId: string | null,
+    ): ProjectCreativeProposal['visualTreatment'] =>
+      createProjectCreativeProposal({
+        current: currentWith({
+          selectedOutfit:
+            outfitId === null
+              ? null
+              : {
+                  outfitId,
+                  outfitLabel: 'Copper coat',
+                  outfitRevision: now,
+                  referenceAssetId,
+                  inputKind: 'saved-outfit',
+                },
+          visualTreatment: {
+            kind: 'virtual-try-on',
+            providerId: null,
+            outputResolution: null,
+            inputKind: settledInputKind,
+            enhancePrompt: false,
+          },
+        }),
+        draft: {
+          mode: 'lucy-vton-latest',
+          prompt: 'A structured copper coat',
+          referenceImage: null,
+          enhance: false,
+        },
+        capturePreferences,
+        activeRecipe: { origin: 'saved-prompt', assetId: 'outfit-one' },
+        store,
+        visualStep: null,
+        voiceSelection: null,
+      }).visualTreatment;
+
+    it('is kept by a capture that states no step of its own', () => {
+      expect(vtonCapture('prompt', 'outfit-one')).toMatchObject({ inputKind: 'prompt' });
+    });
+
+    it('is re-derived once a different Outfit is the one selected', () => {
+      expect(vtonCapture('prompt', 'outfit-two')).toMatchObject({ inputKind: 'saved-outfit' });
+    });
   });
 
   /*

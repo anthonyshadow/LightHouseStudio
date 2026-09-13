@@ -197,18 +197,41 @@ const visualSettings = (
   };
 };
 
+/**
+ * The try-on input kind the settled snapshot already states, when it still describes this Outfit.
+ *
+ * The chain below is how a capture works one out from scratch, and it answers with the Outfit's own
+ * kind. But an operator can have overridden that — "continue without the reference" downgrades a
+ * saved-outfit step to `prompt` and leaves the Outfit selected — and a stepless capture re-deriving
+ * from scratch would answer `saved-outfit` and overwrite them. That disagreement is submitted, not
+ * cosmetic: the API sends `inputKind` on to the provider and drops the prompt for a reference-image
+ * try-on. Tied to the Outfit that was selected when it was stated, so choosing a different one
+ * still re-derives rather than inheriting a decision made about something else.
+ */
+const carriedInputKind = (
+  settled: ProjectSnapshot,
+  selectedOutfit: ProjectCreativeProposal['selectedOutfit'],
+): 'prompt' | 'saved-outfit' | 'reference-image' | null =>
+  settled.visualTreatment.kind === 'virtual-try-on' &&
+  (settled.selectedOutfit?.outfitId ?? null) === (selectedOutfit?.outfitId ?? null)
+    ? settled.visualTreatment.inputKind
+    : null;
+
 const visualProposal = (
   draft: SessionDraft,
   step: ExistingVideoStep | null,
   selectedCharacter: ProjectCreativeProposal['selectedCharacter'],
   selectedOutfit: ProjectCreativeProposal['selectedOutfit'],
-  settled: ProjectSnapshot['visualTreatment'],
+  settled: ProjectSnapshot,
 ): ProjectCreativeProposal['visualTreatment'] => {
   const mode = step?.modelId ?? draft.mode;
   if (mode === 'lucy-latest') {
     return selectedCharacter === null
       ? { kind: 'none' }
-      : { kind: 'character-swap', ...visualSettings(step, settled, 'character-swap') };
+      : {
+          kind: 'character-swap',
+          ...visualSettings(step, settled.visualTreatment, 'character-swap'),
+        };
   }
   if (mode === 'lucy-vton-latest') {
     const inputKind =
@@ -216,14 +239,15 @@ const visualProposal = (
       step?.inputKind === 'reference-image' ||
       step?.inputKind === 'prompt'
         ? step.inputKind
-        : selectedOutfit?.inputKind === 'saved-outfit'
-          ? 'saved-outfit'
-          : draft.referenceImage
-            ? 'reference-image'
-            : 'prompt';
+        : (carriedInputKind(settled, selectedOutfit) ??
+          (selectedOutfit?.inputKind === 'saved-outfit'
+            ? 'saved-outfit'
+            : draft.referenceImage
+              ? 'reference-image'
+              : 'prompt'));
     return {
       kind: 'virtual-try-on',
-      ...visualSettings(step, settled, 'virtual-try-on'),
+      ...visualSettings(step, settled.visualTreatment, 'virtual-try-on'),
       inputKind,
       enhancePrompt: step?.enhancePrompt ?? draft.enhance,
     };
@@ -369,7 +393,7 @@ export const createProjectCreativeProposal = ({
     visualStep,
     selectedCharacter,
     selectedOutfit,
-    current.revision.snapshot.visualTreatment,
+    current.revision.snapshot,
   );
   const hasCreativeState = draft.mode !== 'local' || visualStep !== null || voiceSelection !== null;
   return {
