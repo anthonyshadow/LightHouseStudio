@@ -512,8 +512,14 @@ export const useProjectCreativeSessionAdapter = ({
     ) {
       return;
     }
+    // The pending write laid over the settled one: what the Project is about to hold, which is both
+    // the baseline this capture must not contradict and the one its own fallbacks have to read.
+    // Reading the settled snapshot for those inside the window between a checkpoint and its save
+    // made this capture answer `null` for the settings it has no step to state, and overwrite them.
+    const pending = effectiveCreativeSnapshot(snapshot, pendingProposal);
     const proposal = createProjectCreativeProposal({
       current,
+      settled: pending,
       draft: studioSession.draft,
       capturePreferences: studioSession.capturePreferences.applied,
       activeRecipe: handoff.state.activeRecipe,
@@ -526,10 +532,8 @@ export const useProjectCreativeSessionAdapter = ({
       visualStep: null,
       voiceSelection: existingVideo.voiceSelection,
     });
-    // Compared against the pending write laid over the settled one, which is the session's own
-    // record of what it is about to save. That covers both "the Project already agrees" and "this
-    // was proposed a moment ago and has not landed yet" without a second copy of either fact.
-    const pending = effectiveCreativeSnapshot(snapshot, pendingProposal);
+    // Covers both "the Project already agrees" and "this was proposed a moment ago and has not
+    // landed yet" without a second copy of either fact.
     if (creativeChoices(pending) === creativeChoices(proposal)) return;
     // Staged, not scheduled: a boundary writes the revision.
     proposeCreative(proposal, { autosave: false });

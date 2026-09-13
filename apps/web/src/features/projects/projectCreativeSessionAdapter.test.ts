@@ -414,6 +414,39 @@ describe('Project creative session adapter', () => {
     expect(checkpoint.selectedCharacter?.referenceAssetId).toBe(referenceAssetId);
   });
 
+  it('reads settings a checkpoint staged but has not yet written', () => {
+    // Between `propose` and the save returning, the settled snapshot is a step behind. A capture
+    // landing in that window must read what is about to be written, or it answers `null` for the
+    // settings it has no step to state and overwrites the checkpoint — each write making the other
+    // stale until the flush gives up and the submission it was taken for never goes out.
+    const staged = currentWith({
+      visualTreatment: { kind: 'character-swap', providerId: 'decart', outputResolution: '720p' },
+    }).revision.snapshot;
+
+    const proposal = createProjectCreativeProposal({
+      // Still the pre-checkpoint authority, exactly as the session holds it mid-save.
+      current: current(),
+      settled: staged,
+      draft: {
+        mode: 'lucy-latest',
+        prompt: characterPrompt,
+        referenceImage: null,
+        enhance: false,
+      },
+      capturePreferences,
+      activeRecipe: { origin: 'character-prompt', assetId: 'character-one', variantId: null },
+      store,
+      visualStep: null,
+      voiceSelection: null,
+    });
+
+    expect(proposal.visualTreatment).toEqual({
+      kind: 'character-swap',
+      providerId: 'decart',
+      outputResolution: '720p',
+    });
+  });
+
   it('states its own settings when the treatment kind changes rather than inheriting them', () => {
     const proposal = createProjectCreativeProposal({
       current: currentWith({

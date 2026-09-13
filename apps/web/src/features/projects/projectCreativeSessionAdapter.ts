@@ -31,6 +31,18 @@ export interface ProjectCreativeAdapterInput {
   readonly store: CreativeAssetStore;
   readonly visualStep: ExistingVideoStep | null;
   readonly voiceSelection: ExistingVideoVoiceSelection | null;
+  /**
+   * What the Project will hold once everything already staged lands — the settled snapshot with the
+   * pending proposal laid over it.
+   *
+   * The settled snapshot alone is a step behind from the moment `propose` is called until the save
+   * returns, and the fallbacks below read it. A capture landing inside that window carried nothing,
+   * answered `null` for settings it had no step to state, and overwrote the checkpoint staged a
+   * moment earlier — each write making the other stale, until the flush gave up and the submission
+   * it was taken for never went out. Defaults to `current`'s own snapshot, which is the same thing
+   * for a caller holding a settled session.
+   */
+  readonly settled?: ProjectSnapshot;
 }
 
 export interface ProjectCreativeResourceIssue {
@@ -385,6 +397,7 @@ export const createProjectCreativeProposal = ({
   store,
   visualStep,
   voiceSelection,
+  settled,
 }: ProjectCreativeAdapterInput): ProjectCreativeProposal => {
   const selectedCharacter = characterSelection(activeRecipe, store, visualStep);
   const selectedOutfit = outfitSelection(activeRecipe, store, visualStep);
@@ -393,7 +406,7 @@ export const createProjectCreativeProposal = ({
     visualStep,
     selectedCharacter,
     selectedOutfit,
-    current.revision.snapshot,
+    settled ?? current.revision.snapshot,
   );
   const hasCreativeState = draft.mode !== 'local' || visualStep !== null || voiceSelection !== null;
   return {

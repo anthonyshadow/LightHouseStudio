@@ -785,9 +785,14 @@ test('an accepted Project operation reconnects after refresh and presents its re
   // Choosing the character adds no change of its own: it is staged, and the checkpoint taken
   // before the paid start is what records it. The history is the operator's decisions, not the
   // Studio's settling.
-  await expect(
-    page.getByRole('tabpanel', { name: 'History' }).getByText(/^Change 5 ·/u),
-  ).toBeVisible();
+  //
+  // So the run's own two changes are consecutive: the checkpoint it was started from, then the
+  // result. Nothing of the Studio's lands between them — which is what keeps the attempt current,
+  // and is why this is one change shorter than it was while a capture wrote in that gap.
+  const history = page.getByRole('tabpanel', { name: 'History' });
+  await expect(history.getByText(/^Change 4 ·/u)).toBeVisible();
+  await expect(history.getByText(/Started from change 3 ·/u)).toBeVisible();
+  await expect(history.getByText(/^Change 5 ·/u)).toBeHidden();
   expect(projects.processingOperationKeys).toHaveLength(1);
   expect(projects.processingReconcileCount).toBeGreaterThanOrEqual(1);
   expect(network.apiRequests.some(({ path }) => path.startsWith('/api/video-jobs'))).toBe(false);
