@@ -63,6 +63,7 @@ import type {
 import {
   projectOutputCommitInconsistency,
   projectRevisionContinuesAggregate,
+  projectSourceMediaReference,
 } from '../../features/projects/project-repository.js';
 import type {
   StoredSavedVideoAggregate,
@@ -243,7 +244,7 @@ const toProjectCurrentRead = (row: CurrentProjectRow): ProjectCurrentRead => {
  * statement snapshot is consistent across both sides, and every mutation still asserts version and
  * revision number, so no caller relied on the lock for correctness.
  */
-const currentRevisionMatch = and(
+export const currentRevisionMatch = and(
   eq(projectRevisions.projectId, projects.id),
   eq(projectRevisions.ownerUserId, projects.ownerUserId),
   eq(projectRevisions.id, projects.currentRevisionId),
@@ -268,6 +269,18 @@ const currentWorkingMediaMatch = sql`(
     )
   )
 )`;
+
+/**
+ * Which held source the single-clip reads mean by "the source": the one the current revision names.
+ *
+ * A Project may hold several sources, so `limit(1)` over its rows would return whichever one the
+ * plan happened to reach. The snapshot already says which is primary and every acceptance has
+ * asserted the agreement (`assertReadyProjectSource`), so there is no second column to keep in sync —
+ * and while a Project still holds exactly one source this predicate selects the same row `limit(1)`
+ * did, which is what makes it safe to land before any writer exists. Compared as text for the reason
+ * `currentWorkingMediaMatch` is.
+ */
+const currentPrimarySourceMatch = sql`${projectSources.assetId}::text = ${projectRevisions.snapshot} ->> 'sourceAssetId'`;
 
 const assertRevisionAssetLinks = (
   revision: ProjectRevision,
@@ -892,6 +905,7 @@ export class DrizzleProjectRepository
         and(
           eq(projectSources.projectId, projects.id),
           eq(projectSources.ownerUserId, projects.ownerUserId),
+          currentPrimarySourceMatch,
         ),
       )
       .where(
@@ -922,8 +936,15 @@ export class DrizzleProjectRepository
           isNull(projects.deletedAt),
         ),
       )
+      // The current revision joins so `currentPrimarySourceMatch` can name which held source this
+      // returns; `getCurrentWithSource` already had the revision in hand and this read did not.
+      .innerJoin(projectRevisions, currentRevisionMatch)
       .where(
-        and(eq(projectSources.projectId, projectId), eq(projectSources.ownerUserId, ownerUserId)),
+        and(
+          eq(projectSources.projectId, projectId),
+          eq(projectSources.ownerUserId, ownerUserId),
+          currentPrimarySourceMatch,
+        ),
       )
       .limit(1);
     return row === undefined ? null : toProjectSource(row.source);
@@ -1150,6 +1171,11 @@ export class DrizzleProjectRepository
             revisions: revisionRows
               .filter(({ projectId }) => projectId === projectRow.id)
               .map(toRevision),
+            // Deliberately not narrowed to the source the snapshot names: membership says the
+            // Project is associated with a Saved Video, which primacy has nothing to do with, and
+            // `acceptSource` writes one for every accepted source. Widening this to every held
+            // source is a change to `deriveProjectAssetMemberships` under a new migration id, since
+            // this one's receipt is permanent — recorded as a follow-up, not smuggled in here.
             source:
               sourceRows
                 .filter(({ projectId }) => projectId === projectRow.id)
@@ -1912,21 +1938,22 @@ export class DrizzleProjectRepository
     return this.db.transaction(async (tx) => {
       // `acceptSource` takes its first lock on `project_sources`; leading with `projects` here
       // would open an ABBA deadlock window against a concurrent accept.
-      const [priorSource] = await tx
-        .select({
-          projectId: projectSources.projectId,
-          assetId: projectSources.assetId,
-        })
+      //
+      // Keyed by the asset the caller resolved, so a stale caller is told the source it was looking
+      // at is gone instead of locking whichever sibling the plan reached first.
+      const [lockedSource] = await tx
+        .select({ assetId: projectSources.assetId })
         .from(projectSources)
         .where(
           and(
             eq(projectSources.projectId, input.projectId),
             eq(projectSources.ownerUserId, input.ownerUserId),
+            eq(projectSources.assetId, input.removedAssetId),
           ),
         )
         .for('update')
         .limit(1);
-      if (priorSource === undefined) return { kind: 'not-found' } as const;
+      if (lockedSource === undefined) return { kind: 'not-found' } as const;
       const [current] = await tx
         .select()
         .from(projects)
@@ -1967,8 +1994,9 @@ export class DrizzleProjectRepository
         ...input.revision,
         snapshot: projectSnapshotSchema.parse(input.revision.snapshot),
       };
+      // `priorSource` is now selected by `removedAssetId`, so the agreement this used to assert is
+      // the WHERE clause; what is left to check is that the revision really detaches it.
       const validNextState =
-        priorSource.assetId === input.removedAssetId &&
         revision.snapshot.sourceAssetId === null &&
         projectRevisionContinuesAggregate(input.nextProject, revision, current);
       if (!validNextState) {
@@ -1989,6 +2017,13 @@ export class DrizzleProjectRepository
       // Only the current-source pointer goes. The historical `project_assets` row with
       // role='source' stays, so `DrizzleProjectRetentionPolicy` keeps retaining the bytes for any
       // output Version already produced from them.
+      /*
+       * By Project, not by the removed asset. This command means "the Project goes back to having
+       * no source" — the revision it commits says `sourceAssetId: null`, asserted just above — so
+       * leaving any held source behind would contradict the snapshot it wrote, and the row would be
+       * unreachable afterwards: every read resolves a source through the pointer that is now null.
+       * Removing one source of several is a different command, with its own key and its own rule.
+       */
       await tx
         .delete(projectSources)
         .where(
@@ -2332,7 +2367,7 @@ export class DrizzleProjectRepository
             projectMediaReferencesEqual(mediaReference, snapshot.workingMedia) &&
             projectMediaReferencesEqual(mediaReference, snapshot.presentedMedia),
         );
-      const [sourceRow] = await tx
+      const sourceRows = await tx
         .select()
         .from(projectSources)
         .where(
@@ -2340,24 +2375,18 @@ export class DrizzleProjectRepository
             eq(projectSources.projectId, current.id),
             eq(projectSources.ownerUserId, current.ownerUserId),
           ),
-        )
-        .limit(1);
-      const source = sourceRow === undefined ? null : toProjectSource(sourceRow);
-      const sourceReference =
-        source === null
-          ? null
-          : source.kind === 'saved-video-version'
-            ? {
-                kind: 'saved-video-version' as const,
-                savedVideoId: source.savedVideoId!,
-                videoVersionId: source.videoVersionId!,
-              }
-            : { kind: 'asset' as const, assetId: source.assetId };
-      const exactInputAssetId =
-        working?.assetId ??
-        (projectMediaReferencesEqual(sourceReference, snapshot.workingMedia)
-          ? source?.assetId
-          : undefined);
+        );
+      // Which held source this attempt may fall back to is the one whose media the working pointer
+      // names — the question `working` above already asks of the adoptions, and the only one this
+      // site cares about. Asking "is it the primary?" instead would answer a different question and
+      // then have to be re-checked against the pointer anyway.
+      const source =
+        sourceRows
+          .map(toProjectSource)
+          .find((held) =>
+            projectMediaReferencesEqual(projectSourceMediaReference(held), snapshot.workingMedia),
+          ) ?? null;
+      const exactInputAssetId = working?.assetId ?? source?.assetId;
       if (exactInputAssetId !== input.attempt.inputAssetId) {
         throw new ProjectPersistenceError(
           'asset-not-ready',

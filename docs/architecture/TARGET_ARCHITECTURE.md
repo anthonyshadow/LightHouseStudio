@@ -81,14 +81,19 @@ cloud configuration so the direct-upload routes are covered.
 
 ### Database model direction
 
-**Current:** rigorous single-video Project aggregate — `project_sources` PK is the project id (one
-source), full-jsonb revision snapshots (v1/v2) whose first-class fields are AI selections, an
+**Current:** rigorous single-video Project aggregate — one source per Project, refused by the domain
+rule, both repositories and the source service (its PK stopped being the project id in slice 3.2's
+expand stage), full-jsonb revision snapshots (v1/v2) whose first-class fields are AI selections, an
 output commit that forces status `completed`, and a schema-level one-active-AI-job-per-owner
 unique index. Dead tables `outbox` and `resource_references`.
 **Direction (staged, additive — never destructive):**
 
-1. **Multi-source:** `project_sources` becomes a child collection (PK project + source id),
-   reusing the existing acceptance/idempotency/retention machinery, which is already per-asset.
+1. **Multi-source:** `project_sources` becomes a child collection, reusing the existing
+   acceptance/idempotency machinery, which is already per-asset. _Expanded in slice 3.2
+   (2026-09-13): the key is the media a Project holds, `(project_id, asset_id)`, so a media
+   reference addresses a source without a second identifier. Retention was **not** already
+   per-asset for a source — it read only snapshot-derived links — so `project_sources` joined the
+   retention union in the same stage; the writer and the collection endpoints are prompt 30's._
 2. **Composition:** stored in the revision snapshot as **schema version 3** — ordered clip list,
    subtitle cues, audio settings — reusing the existing revision/CAS/replay machinery rather than
    inventing parallel tables (D3). Snapshot v3 also demotes AI selections to an optional

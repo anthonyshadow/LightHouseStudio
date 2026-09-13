@@ -885,10 +885,18 @@ export const projectVersionReferences = pgTable(
   ],
 );
 
+/**
+ * The media a Project holds as original material. A Project may hold several, and a source is
+ * identified by the media it holds: `(project_id, asset_id)` is the key, so one asset resolves to at
+ * most one source row and a `ProjectMediaReference` addresses a source without a second identifier.
+ * Which of them the single-clip flows treat as *the* source is the revision snapshot's
+ * `sourceAssetId`, not a column here — source membership is relational, the primary is snapshot
+ * state.
+ */
 export const projectSources = pgTable(
   'project_sources',
   {
-    projectId: uuid('project_id').primaryKey(),
+    projectId: uuid('project_id').notNull(),
     ownerUserId: uuid('owner_user_id').notNull(),
     assetId: uuid('asset_id').notNull(),
     kind: projectSourceKind('kind').notNull(),
@@ -914,8 +922,16 @@ export const projectSources = pgTable(
       .defaultNow(),
   },
   (table) => [
+    primaryKey({ columns: [table.projectId, table.assetId] }),
     uniqueIndex('project_sources_owner_operation_unique').on(table.ownerUserId, table.operationKey),
     index('project_sources_asset_idx').on(table.ownerUserId, table.assetId),
+    // Byte retention joins borrowed sources to their Version to reach its thumbnail, the same way it
+    // does for `project_version_references` and `project_outputs`; this is the index those two have.
+    index('project_sources_version_idx').on(
+      table.ownerUserId,
+      table.savedVideoId,
+      table.videoVersionId,
+    ),
     foreignKey({
       name: 'project_sources_project_owner_fk',
       columns: [table.projectId, table.ownerUserId],

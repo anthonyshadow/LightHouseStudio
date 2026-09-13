@@ -16,6 +16,7 @@
     "db:migrate:production": "LIGHTFRAME_ENV=production drizzle-kit migrate --config drizzle.config.ts",
     "db:smoke:development": "LIGHTFRAME_ENV=development bun run --no-env-file scripts/database-smoke.ts",
     "db:backfill-local": "LIGHTFRAME_ENV=production bun run --no-env-file scripts/backfill-local-data.ts",
+    "db:verify-sources": "LIGHTFRAME_ENV=development bun run --no-env-file scripts/verify-project-source-collection.ts",
     "env:prepare": "bun run --no-env-file scripts/prepare-environment-files.ts"
   },
   "dependencies": {
