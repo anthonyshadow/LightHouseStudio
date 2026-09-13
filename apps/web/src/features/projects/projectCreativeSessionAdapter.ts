@@ -170,21 +170,45 @@ const voiceProposal = (
       };
 };
 
+/**
+ * The two settings whose only writer is the editor's step, resolved for one treatment kind.
+ *
+ * The ambient creative edge deliberately does not read the step, so without the settled fallback
+ * "no step supplied" read as "no provider, no resolution": the first ambient capture after a
+ * checkpoint nulled both, appending a revision roughly a second after the one a run was pinned to.
+ * That moved the Project's head past the attempt, so the run stopped being current — the workspace
+ * dropped its blocking overlay mid-run, and the finished result came back retained instead of
+ * applied, with nothing to show for it.
+ *
+ * Inheriting is for fields like these, whose sole writer is the step. A field the stepless capture
+ * can work out for itself — from the draft or the active Recipe — must be re-derived there instead,
+ * or the Project can never let go of a setting. A different treatment kind inherits nothing: it is
+ * a real change of intent and states its own settings.
+ */
+const visualSettings = (
+  step: ExistingVideoStep | null,
+  settled: ProjectSnapshot['visualTreatment'],
+  kind: 'character-swap' | 'virtual-try-on',
+) => {
+  const carried = settled.kind === kind ? settled : null;
+  return {
+    providerId: step?.provider ?? carried?.providerId ?? null,
+    outputResolution: step?.outputResolution ?? carried?.outputResolution ?? null,
+  };
+};
+
 const visualProposal = (
   draft: SessionDraft,
   step: ExistingVideoStep | null,
   selectedCharacter: ProjectCreativeProposal['selectedCharacter'],
   selectedOutfit: ProjectCreativeProposal['selectedOutfit'],
+  settled: ProjectSnapshot['visualTreatment'],
 ): ProjectCreativeProposal['visualTreatment'] => {
   const mode = step?.modelId ?? draft.mode;
   if (mode === 'lucy-latest') {
     return selectedCharacter === null
       ? { kind: 'none' }
-      : {
-          kind: 'character-swap',
-          providerId: step?.provider ?? null,
-          outputResolution: step?.outputResolution ?? null,
-        };
+      : { kind: 'character-swap', ...visualSettings(step, settled, 'character-swap') };
   }
   if (mode === 'lucy-vton-latest') {
     const inputKind =
@@ -199,8 +223,7 @@ const visualProposal = (
             : 'prompt';
     return {
       kind: 'virtual-try-on',
-      providerId: step?.provider ?? null,
-      outputResolution: step?.outputResolution ?? null,
+      ...visualSettings(step, settled, 'virtual-try-on'),
       inputKind,
       enhancePrompt: step?.enhancePrompt ?? draft.enhance,
     };
@@ -214,6 +237,26 @@ const creativeIntent = (
   store: CreativeAssetStore,
   step: ExistingVideoStep | null,
 ): ProjectCreativeProposal['creativeIntent'] => {
+  /*
+   * An override, never the reference itself. Every reader — the workspace's hydration below, the
+   * Studio session edge, and the API that picks the image a submission actually sends — resolves
+   * `creativeIntent.referenceAssetId ?? selectedCharacter/selectedOutfit.referenceAssetId`, and
+   * that second term already is the resolved Character version's own reference. So this states one
+   * thing only: a reference this session persisted that is not the resource's. Restating the
+   * resource's reference here said nothing new and disagreed with the capture that did not.
+   */
+  const referenceAssetId =
+    draft.referenceImage?.kind === 'persisted' ? draft.referenceImage.assetId : null;
+  /*
+   * The prompt the step states, or the draft's when it states none. An operation whose prompt the
+   * provider supplies — character swap on a server-default binding — leaves the step's own prompt
+   * empty for the whole of its life, and an editable one is empty until it is typed into. Reading
+   * that emptiness as "no intent" blanked what the ambient capture had recorded from the draft, so
+   * the checkpoint before a submission and the capture after it disagreed and appended a revision
+   * on top of the run. Emptiness is the absence of a statement, not a statement that there is none.
+   * Stated once above the branches, which is the point: all five of them apply the one rule.
+   */
+  const intent = step?.prompt || draft.prompt;
   if (step?.modelId === 'lucy-latest') {
     const variant = step.savedRecipeId
       ? (store.savedCharacterVariants.find((candidate) => candidate.id === step.savedRecipeId) ??
@@ -227,16 +270,20 @@ const creativeIntent = (
     return {
       promptId: null,
       promptLabel: null,
-      recipeId: step.savedRecipeId,
+      // The Character, never the Variant: `selectedCharacter.variantId` is what says which version
+      // was used, and the ambient capture — which cannot see the step — has only the Character to
+      // name. Naming the Variant here made the two captures disagree without recording anything
+      // `selectedCharacter` did not already hold. `recipeLabel` still prefers the Variant's title.
+      recipeId: character?.id ?? step.savedRecipeId,
       recipeLabel:
         variant?.title ??
         character?.name ??
         step.characterVariantName ??
         step.characterName ??
         null,
-      userIntent: step.prompt,
-      appliedPrompt: step.prompt || null,
-      referenceAssetId: variant?.referenceImageAssetId ?? character?.referenceImageAssetId ?? null,
+      userIntent: intent,
+      appliedPrompt: intent || null,
+      referenceAssetId,
       resourceRevision: variant?.updatedAt ?? character?.updatedAt ?? null,
     };
   }
@@ -249,14 +296,12 @@ const creativeIntent = (
       promptLabel: outfit?.title ?? null,
       recipeId: null,
       recipeLabel: null,
-      userIntent: step.prompt,
-      appliedPrompt: step.prompt || null,
-      referenceAssetId: outfit?.referenceImageAssetId ?? null,
+      userIntent: intent,
+      appliedPrompt: intent || null,
+      referenceAssetId,
       resourceRevision: outfit?.updatedAt ?? null,
     };
   }
-  const referenceAssetId =
-    draft.referenceImage?.kind === 'persisted' ? draft.referenceImage.assetId : null;
   if (activeRecipe?.origin === 'character-prompt') {
     const character = store.savedCharacterPrompts.find(
       (candidate) => candidate.id === activeRecipe.assetId,
@@ -273,8 +318,8 @@ const creativeIntent = (
       promptLabel: null,
       recipeId: character?.id ?? activeRecipe.assetId,
       recipeLabel: variant?.title ?? character?.name ?? null,
-      userIntent: draft.prompt,
-      appliedPrompt: draft.prompt || null,
+      userIntent: intent,
+      appliedPrompt: intent || null,
       referenceAssetId,
       resourceRevision: variant?.updatedAt ?? character?.updatedAt ?? null,
     };
@@ -286,8 +331,8 @@ const creativeIntent = (
       promptLabel: prompt?.title ?? null,
       recipeId: null,
       recipeLabel: null,
-      userIntent: draft.prompt,
-      appliedPrompt: draft.prompt || null,
+      userIntent: intent,
+      appliedPrompt: intent || null,
       referenceAssetId,
       resourceRevision: prompt?.updatedAt ?? null,
     };
@@ -297,8 +342,8 @@ const creativeIntent = (
     promptLabel: null,
     recipeId: null,
     recipeLabel: null,
-    userIntent: draft.prompt,
-    appliedPrompt: draft.prompt || null,
+    userIntent: intent,
+    appliedPrompt: intent || null,
     referenceAssetId,
     resourceRevision: null,
   };
@@ -319,7 +364,13 @@ export const createProjectCreativeProposal = ({
 }: ProjectCreativeAdapterInput): ProjectCreativeProposal => {
   const selectedCharacter = characterSelection(activeRecipe, store, visualStep);
   const selectedOutfit = outfitSelection(activeRecipe, store, visualStep);
-  const visualTreatment = visualProposal(draft, visualStep, selectedCharacter, selectedOutfit);
+  const visualTreatment = visualProposal(
+    draft,
+    visualStep,
+    selectedCharacter,
+    selectedOutfit,
+    current.revision.snapshot.visualTreatment,
+  );
   const hasCreativeState = draft.mode !== 'local' || visualStep !== null || voiceSelection !== null;
   return {
     workflowPhase:

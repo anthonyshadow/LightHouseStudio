@@ -130,12 +130,25 @@ const current = (): ProjectCurrentResponse => ({
   },
 });
 
+/** `current()` with the settled snapshot patched — the shape a capture reads its fallbacks from. */
+const currentWith = (
+  patch: Partial<ProjectCurrentResponse['revision']['snapshot']>,
+): ProjectCurrentResponse => {
+  const settled = current();
+  return {
+    ...settled,
+    revision: { ...settled.revision, snapshot: { ...settled.revision.snapshot, ...patch } },
+  };
+};
+
 const capturePreferences = {
   videoDeviceId: null,
   audioDeviceId: null,
   profile: '1080p30',
   aspectRatio: '9:16',
 } as const;
+
+const characterPrompt = 'Replace the character with a red-haired explorer';
 
 describe('Project creative session adapter', () => {
   it('maps an exact Character Variant, treatment, Voice, prompt, and live metadata atomically', () => {
@@ -202,7 +215,9 @@ describe('Project creative session adapter', () => {
         outputResolution: '1080p',
       },
       creativeIntent: {
-        recipeId: 'variant-one',
+        // The Character, with the Variant recorded in `selectedCharacter.variantId` above; the
+        // label still names the Variant.
+        recipeId: 'character-one',
         recipeLabel: 'Ari · field jacket',
         appliedPrompt: 'Exact applied explorer prompt',
         referenceAssetId,
@@ -248,6 +263,134 @@ describe('Project creative session adapter', () => {
         exportSpecification: null,
       }).success,
     ).toBe(true);
+  });
+
+  /*
+   * The sequence a submission actually produces: `start()` checkpoints with the editor's step, then
+   * the ambient creative edge captures again moments later with no step of its own. Any field the
+   * two disagree on appends a revision about a second after the one the run was pinned to, which
+   * moves the Project's head past the attempt and stops the run being current mid-flight.
+   */
+  const captureThenSync = ({
+    variantId = null,
+    draftReference = referenceAssetId,
+  }: {
+    readonly variantId?: string | null;
+    readonly draftReference?: string | null;
+  } = {}) => {
+    const draft = {
+      mode: 'lucy-latest' as const,
+      prompt: characterPrompt,
+      referenceImage: draftReference
+        ? {
+            kind: 'persisted' as const,
+            assetId: draftReference,
+            file: new File(['image'], 'ari.png', { type: 'image/png' }),
+            contentUrl: `/api/reference-images/${draftReference}/content`,
+          }
+        : null,
+      enhance: false,
+    };
+    const activeRecipe = {
+      origin: 'character-prompt',
+      assetId: 'character-one',
+      variantId,
+    } as const;
+    const shared = { draft, capturePreferences, activeRecipe, store, voiceSelection: null };
+
+    const checkpoint = createProjectCreativeProposal({
+      ...shared,
+      current: current(),
+      visualStep: {
+        id: 'step-one',
+        modelId: 'lucy-latest',
+        savedRecipeId: variantId ?? 'character-one',
+        // Character swap on a server-default binding never carries a prompt of its own.
+        prompt: '',
+        enhancePrompt: false,
+        referenceImage: null,
+        inputKind: 'character',
+        provider: 'decart',
+        outputResolution: '720p',
+        characterName: 'Ari',
+        characterVariantName: null,
+      },
+    });
+
+    const ambient = createProjectCreativeProposal({
+      ...shared,
+      current: currentWith(checkpoint),
+      visualStep: null,
+    });
+
+    return { checkpoint, ambient };
+  };
+
+  it('leaves a checkpointed run settled, so the next ambient capture appends no revision', () => {
+    const { checkpoint, ambient } = captureThenSync();
+
+    expect(checkpoint.visualTreatment).toEqual({
+      kind: 'character-swap',
+      providerId: 'decart',
+      outputResolution: '720p',
+    });
+    expect(checkpoint.creativeIntent.userIntent).toBe(characterPrompt);
+    expect(ambient).toEqual(checkpoint);
+  });
+
+  it('settles a run checkpointed against a Character Variant the same way', () => {
+    const { checkpoint, ambient } = captureThenSync({ variantId: 'variant-one' });
+
+    // The Variant is recorded where hydration and the resource-issue resolver read it from, and
+    // the Character is what both captures can name.
+    expect(checkpoint.selectedCharacter).toMatchObject({
+      characterId: 'character-one',
+      variantId: 'variant-one',
+    });
+    expect(checkpoint.creativeIntent).toMatchObject({
+      recipeId: 'character-one',
+      recipeLabel: 'Ari · field jacket',
+    });
+    expect(ambient).toEqual(checkpoint);
+  });
+
+  it('records a session reference only when it is not the resolved Character version’s own', () => {
+    // Nothing is lost by staying silent: every reader falls back to `selectedCharacter`, which
+    // carries the Variant's reference whenever a Variant is selected.
+    const { checkpoint } = captureThenSync({ variantId: 'variant-one', draftReference: null });
+    expect(checkpoint.creativeIntent.referenceAssetId).toBeNull();
+    expect(checkpoint.selectedCharacter?.referenceAssetId).toBe(referenceAssetId);
+  });
+
+  it('states its own settings when the treatment kind changes rather than inheriting them', () => {
+    const proposal = createProjectCreativeProposal({
+      current: currentWith({
+        visualTreatment: {
+          kind: 'character-swap',
+          providerId: 'decart',
+          outputResolution: '1080p',
+        },
+      }),
+      draft: {
+        mode: 'lucy-vton-latest',
+        prompt: 'A cobalt evening jacket',
+        referenceImage: null,
+        enhance: false,
+      },
+      capturePreferences,
+      activeRecipe: null,
+      store,
+      visualStep: null,
+      voiceSelection: null,
+    });
+
+    expect(proposal.visualTreatment).toEqual({
+      kind: 'virtual-try-on',
+      providerId: null,
+      outputResolution: null,
+      inputKind: 'prompt',
+      enhancePrompt: false,
+    });
   });
 
   it('hydrates only an exact owner-scoped resource revision and retains historical missing labels', () => {
