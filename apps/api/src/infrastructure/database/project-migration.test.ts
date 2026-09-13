@@ -36,6 +36,10 @@ const projectAssetMembershipMigrationUrl = new URL(
   '../../../drizzle/0021_slow_krista_starr.sql',
   import.meta.url,
 );
+const projectSnapshotV3MigrationUrl = new URL(
+  '../../../drizzle/0027_early_white_tiger.sql',
+  import.meta.url,
+);
 
 describe('Project aggregate migration', () => {
   it('is additive and creates every normalized Project relationship', async () => {
@@ -206,6 +210,26 @@ describe('Project output authority migration', () => {
     expect(migration).toContain('project_output_receipts_project_idx');
     expect(migration).not.toMatch(
       /\b(?:DROP|TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"|\bINSERT\s+INTO\b/u,
+    );
+  });
+});
+
+describe('Project snapshot v3 migration', () => {
+  it('widens the snapshot version check to v3 and adds the clip roles, without backfill', async () => {
+    const migration = await readFile(projectSnapshotV3MigrationUrl, 'utf8');
+
+    // The constraint swap is a DROP + ADD of the same name, as 0018 did for v2; the set only widens,
+    // so validating existing rows under the constraint's lock cannot fail.
+    expect(migration).toContain('DROP CONSTRAINT "project_revisions_snapshot_version_supported"');
+    expect(migration).toContain(
+      'ADD CONSTRAINT "project_revisions_snapshot_version_supported" CHECK ("project_revisions"."snapshot_schema_version" in (1, 2, 3))',
+    );
+    expect(migration).toContain(`ALTER TYPE "public"."project_asset_role" ADD VALUE 'clip'`);
+    expect(migration).toContain(
+      `ALTER TYPE "public"."project_version_reference_role" ADD VALUE 'clip'`,
+    );
+    expect(migration).not.toMatch(
+      /\b(?:TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"|\bINSERT\s+INTO\b|\bDROP\s+(?:TABLE|COLUMN|TYPE)\b/u,
     );
   });
 });

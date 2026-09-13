@@ -106,6 +106,7 @@ export const projectAssetRole = pgEnum('project_asset_role', [
   'job-output',
   'audio',
   'thumbnail',
+  'clip',
 ]);
 export const projectAssetKind = pgEnum('project_asset_kind', [
   'video',
@@ -116,6 +117,7 @@ export const projectAssetKind = pgEnum('project_asset_kind', [
 export const projectVersionReferenceRole = pgEnum('project_version_reference_role', [
   'working',
   'presented',
+  'clip',
 ]);
 export const projectRevisionAuthorKind = pgEnum('project_revision_author_kind', [
   'user',
@@ -751,7 +753,7 @@ export const projectRevisions = pgTable(
     check('project_revisions_number_positive', sql`${table.revisionNumber} > 0`),
     check(
       'project_revisions_snapshot_version_supported',
-      sql`${table.snapshotSchemaVersion} in (1, 2)`,
+      sql`${table.snapshotSchemaVersion} in (1, 2, 3)`,
     ),
     check(
       'project_revisions_parent_consistent',

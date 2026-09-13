@@ -13,6 +13,7 @@ import {
   duplicateProject,
   promoteProjectJobResult,
   type ProjectAssetLink,
+  projectTransformOf,
 } from '@studio/domain';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -1500,9 +1501,12 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
           expectedRevisionNumber: 3,
           snapshot: {
             ...workingRevision.snapshot,
-            creativeIntent: {
-              ...workingRevision.snapshot.creativeIntent,
-              userIntent: 'A later creative checkpoint.',
+            transform: {
+              ...projectTransformOf(workingRevision.snapshot),
+              creativeIntent: {
+                ...projectTransformOf(workingRevision.snapshot).creativeIntent,
+                userIntent: 'A later creative checkpoint.',
+              },
             },
             workflowPhase: 'creative',
             updatedAt: creativeAt,

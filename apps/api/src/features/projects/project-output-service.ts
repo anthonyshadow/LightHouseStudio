@@ -14,6 +14,7 @@ import {
   projectExportMatchesFrame,
   projectOutputPlacementSet,
   ProjectRuleError,
+  projectTransformOf,
   saveProjectOutput,
   type ProjectConflict,
   type ProjectExportPlacementAspect,
@@ -166,9 +167,10 @@ const assertVersionMatches = (
 
 const outputOrigin = (current: ProjectCurrentRead, media: ReadyProjectMedia): SavedVideoOrigin => {
   const snapshot = current.revision.snapshot;
-  if (snapshot.visualTreatment.kind === 'character-swap') return 'character-swap';
-  if (snapshot.visualTreatment.kind === 'virtual-try-on') return 'virtual-try-on';
-  if (snapshot.selectedVoice !== null) return 'voice-treatment';
+  const transform = projectTransformOf(snapshot);
+  if (transform.visualTreatment.kind === 'character-swap') return 'character-swap';
+  if (transform.visualTreatment.kind === 'virtual-try-on') return 'virtual-try-on';
+  if (transform.selectedVoice !== null) return 'voice-treatment';
   if (snapshot.localEdit !== null) return 'editor';
   if (media.savedVersion !== null) return media.savedVersion.origin;
   if (media.source?.kind === 'recorded') return 'recorded';
@@ -180,11 +182,11 @@ const outputAttribution = (
   media: ReadyProjectMedia,
 ): Pick<StoredVideoVersion, 'characterName' | 'characterVariantName'> => ({
   characterName:
-    current.revision.snapshot.selectedCharacter?.characterLabel ??
+    projectTransformOf(current.revision.snapshot).selectedCharacter?.characterLabel ??
     media.savedVersion?.characterName ??
     null,
   characterVariantName:
-    current.revision.snapshot.selectedCharacter?.variantLabel ??
+    projectTransformOf(current.revision.snapshot).selectedCharacter?.variantLabel ??
     media.savedVersion?.characterVariantName ??
     null,
 });

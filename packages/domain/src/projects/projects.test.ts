@@ -9,6 +9,7 @@ import {
   createProject,
   createProjectAssetMembership,
   deleteProject,
+  EMPTY_PROJECT_TRANSFORM,
   deriveProjectStatus,
   duplicateProject,
   duplicateProjectSnapshot,
@@ -33,7 +34,9 @@ import {
   validateProjectExportPlacementSet,
   validateProjectExportSpecification,
   validateProjectSnapshot,
+  type ProjectTransform,
 } from './index';
+import type { Composition } from '../composition';
 import {
   createDefaultVideoEditSpec,
   SUBTITLE_CUE_PLACEMENTS,
@@ -433,12 +436,15 @@ describe('Project aggregate rules', () => {
         expectedRevisionNumber: 2,
         snapshot: {
           ...accepted.value.revisions.at(-1)!.snapshot,
-          selectedCharacter,
-          visualTreatment: { kind: 'character-swap', providerId: null, outputResolution: null },
-          creativeIntent: {
-            ...accepted.value.revisions.at(-1)!.snapshot.creativeIntent,
-            userIntent: 'A product walkthrough',
-            appliedPrompt: 'Nova presenting the product',
+          transform: {
+            ...EMPTY_PROJECT_TRANSFORM,
+            selectedCharacter,
+            visualTreatment: { kind: 'character-swap', providerId: null, outputResolution: null },
+            creativeIntent: {
+              ...EMPTY_PROJECT_TRANSFORM.creativeIntent,
+              userIntent: 'A product walkthrough',
+              appliedPrompt: 'Nova presenting the product',
+            },
           },
           localEdit: createDefaultVideoEditSpec(12_000),
           updatedAt: latest,
@@ -470,20 +476,89 @@ describe('Project aggregate rules', () => {
     // Nothing pre-fills the next round: a different treatment can be chosen without clearing up.
     // The edit that made the working media is not a treatment and stays with the media it made.
     expect(saved.value.revisions.at(-1)!.snapshot).toMatchObject({
-      selectedCharacter: null,
-      selectedOutfit: null,
-      selectedVoice: null,
-      visualTreatment: { kind: 'none' },
-      creativeIntent: { appliedPrompt: null, userIntent: 'A product walkthrough' },
+      transform: {
+        selectedCharacter: null,
+        selectedOutfit: null,
+        selectedVoice: null,
+        visualTreatment: { kind: 'none' },
+        creativeIntent: { appliedPrompt: null, userIntent: 'A product walkthrough' },
+      },
       localEdit: createDefaultVideoEditSpec(12_000),
       workflowPhase: 'complete',
     });
     // The producing revision keeps the exact configuration that made the retained Version.
     expect(saved.value.revisions.at(-2)!.snapshot).toMatchObject({
-      selectedCharacter,
-      visualTreatment: { kind: 'character-swap' },
-      creativeIntent: { appliedPrompt: 'Nova presenting the product' },
+      transform: {
+        selectedCharacter,
+        visualTreatment: { kind: 'character-swap' },
+        creativeIntent: { appliedPrompt: 'Nova presenting the product' },
+      },
     });
+  });
+
+  it('stores no transform at all when a save leaves nothing configured', () => {
+    const accepted = acceptProjectSource(
+      emptyProject(),
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        assetId: sourceAssetId,
+        mediaReference: { kind: 'asset', assetId: sourceAssetId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    if (!accepted.ok) throw new Error('Expected Project source acceptance.');
+    const voiceOnly: ProjectTransform = {
+      ...EMPTY_PROJECT_TRANSFORM,
+      selectedVoice: {
+        kind: 'local-effect',
+        effectId: 'warm-studio',
+        effectRevision: 'builtin-v1',
+      },
+    };
+    const configured = appendProjectRevision(
+      accepted.value,
+      {
+        expectedProjectVersion: 2,
+        expectedRevisionNumber: 2,
+        snapshot: {
+          ...accepted.value.revisions.at(-1)!.snapshot,
+          transform: voiceOnly,
+          updatedAt: latest,
+        },
+        author: { kind: 'user', authorId: ownerUserId },
+        source: 'user-edit',
+        facts: readyFacts,
+      },
+      { now: latest, createId: () => '2a8b1f3d-9a52-4a0b-9a3f-9a2c1f4d6b70' },
+    );
+    if (!configured.ok) throw new Error('Expected a creative checkpoint.');
+    // A configured transform is stored as itself: the same object, never a rebuilt one.
+    expect(configured.value.revisions.at(-1)!.snapshot.transform).toBe(voiceOnly);
+
+    const saved = saveProjectOutput(
+      configured.value,
+      {
+        expectedProjectVersion: 3,
+        expectedRevisionNumber: 3,
+        savedVideoId: 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338',
+        videoVersionId: 'b276694b-58c4-40d3-8fb6-315e32b66fd0',
+        presentsOutput: true,
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => '5354b1d3-4022-4c85-a7b6-b230b58ba10b' },
+    );
+    if (!saved.ok) throw new Error('Expected the output save.');
+    // No intent was typed, so the post-save reset leaves nothing: the canonical form is null.
+    expect(saved.value.revisions.at(-1)!.snapshot.transform).toBeNull();
+    // And an empty transform handed in explicitly leaves the rules as null too.
+    expect(
+      validateProjectSnapshot({
+        ...createEmptyProjectSnapshot(now),
+        transform: { ...EMPTY_PROJECT_TRANSFORM },
+      }).transform,
+    ).toBeNull();
   });
 
   it('carries a chosen placement onto the revision and through the output save', () => {
@@ -569,10 +644,13 @@ describe('Project aggregate rules', () => {
     expect(() =>
       validateProjectSnapshot({
         ...snapshot,
-        visualTreatment: {
-          kind: 'character-swap',
-          providerId: null,
-          outputResolution: null,
+        transform: {
+          ...EMPTY_PROJECT_TRANSFORM,
+          visualTreatment: {
+            kind: 'character-swap',
+            providerId: null,
+            outputResolution: null,
+          },
         },
       }),
     ).toThrow('requires a selected character');
@@ -585,37 +663,186 @@ describe('Project aggregate rules', () => {
     expect(
       validateProjectSnapshot({
         ...snapshot,
-        selectedCharacter: {
-          characterId: 'character-one',
-          characterLabel: 'Character One',
-          characterRevision: now,
-          variantId: null,
-          variantLabel: null,
-          variantRevision: null,
-          referenceAssetId: null,
+        transform: {
+          ...EMPTY_PROJECT_TRANSFORM,
+          selectedCharacter: {
+            characterId: 'character-one',
+            characterLabel: 'Character One',
+            characterRevision: now,
+            variantId: null,
+            variantLabel: null,
+            variantRevision: null,
+            referenceAssetId: null,
+          },
+          selectedOutfit: null,
+          visualTreatment: {
+            kind: 'virtual-try-on',
+            providerId: null,
+            outputResolution: null,
+            inputKind: 'prompt',
+            enhancePrompt: false,
+          },
         },
-        selectedOutfit: null,
-        visualTreatment: {
-          kind: 'virtual-try-on',
-          providerId: null,
-          outputResolution: null,
-          inputKind: 'prompt',
-          enhancePrompt: false,
-        },
-      }).visualTreatment,
+      }).transform?.visualTreatment,
     ).toMatchObject({ kind: 'virtual-try-on', inputKind: 'prompt' });
     expect(() =>
       validateProjectSnapshot({
         ...snapshot,
-        visualTreatment: {
-          kind: 'virtual-try-on',
-          providerId: null,
-          outputResolution: null,
-          inputKind: 'saved-outfit',
-          enhancePrompt: false,
+        transform: {
+          ...EMPTY_PROJECT_TRANSFORM,
+          visualTreatment: {
+            kind: 'virtual-try-on',
+            providerId: null,
+            outputResolution: null,
+            inputKind: 'saved-outfit',
+            enhancePrompt: false,
+          },
         },
       }),
     ).toThrow('requires a selected outfit');
+  });
+
+  it('holds a composition to its own invariants and reads it as material state', () => {
+    const accepted = acceptProjectSource(
+      emptyProject(),
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        assetId: sourceAssetId,
+        mediaReference: { kind: 'asset', assetId: sourceAssetId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    if (!accepted.ok) throw new Error('Expected Project source acceptance.');
+    const sourced = accepted.value.revisions.at(-1)!.snapshot;
+    const composition: Composition = {
+      clips: [
+        {
+          id: 'c1b7f4e5-9e51-4f1a-9c39-1f01d0a2e7ad',
+          media: { kind: 'asset', assetId: sourceAssetId },
+          trim: { startMs: 0, endMs: 4_000 },
+          audio: { level: 100, muted: false },
+        },
+      ],
+      subtitles: [],
+    };
+    expect(() =>
+      validateProjectSnapshot({
+        ...sourced,
+        composition: { ...composition, clips: [] },
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        reason: 'invalid-snapshot',
+        message: 'A composition needs at least one clip.',
+      }),
+    );
+
+    const output = {
+      savedVideoId: 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338',
+      videoVersionId: 'b276694b-58c4-40d3-8fb6-315e32b66fd0',
+    };
+    const arranged = createProject(
+      {
+        id: projectId,
+        ownerUserId,
+        title: 'Arranged',
+        snapshot: { ...sourced, composition, lastSuccessfulOutput: output },
+        author: { kind: 'user', authorId: ownerUserId },
+        facts: { ...readyFacts, validatedLastSuccessfulOutput: output },
+      },
+      { now: later, createId: () => firstRevisionId },
+    );
+    expect(arranged.project.status).toBe('completed');
+    // Re-trimming the arrangement is a material change: the saved output no longer describes it.
+    const rearranged = appendProjectRevision(
+      arranged,
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        snapshot: {
+          ...arranged.revisions[0]!.snapshot,
+          composition: {
+            ...composition,
+            clips: [{ ...composition.clips[0]!, trim: { startMs: 500, endMs: 4_000 } }],
+          },
+          updatedAt: latest,
+        },
+        author: { kind: 'user', authorId: ownerUserId },
+        source: 'user-edit',
+        facts: { ...readyFacts, validatedLastSuccessfulOutput: output },
+      },
+      { now: latest, createId: () => secondRevisionId },
+    );
+    expect(rearranged).toMatchObject({
+      ok: true,
+      value: {
+        project: { status: 'ready' },
+        revisions: [{}, { snapshot: { lastSuccessfulOutput: null } }],
+      },
+    });
+    if (!rearranged.ok) return;
+    // The media the arrangement names goes away with the source, as the local edit does.
+    const removed = removeProjectSource(
+      rearranged.value,
+      {
+        expectedProjectVersion: 2,
+        expectedRevisionNumber: 2,
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => '9f5b2ad6-4f4b-4e13-9a03-2ef6b6c1a51e' },
+    );
+    expect(removed).toMatchObject({
+      ok: true,
+      value: { revisions: [{}, {}, { snapshot: { composition: null, sourceAssetId: null } }] },
+    });
+
+    // A save ends the round its transform configured; the arrangement describes the media, which
+    // carries forward, so it stays — by reference, like the edit that made the cut.
+    const configured = appendProjectRevision(
+      arranged,
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        snapshot: {
+          ...arranged.revisions[0]!.snapshot,
+          transform: {
+            ...EMPTY_PROJECT_TRANSFORM,
+            creativeIntent: {
+              ...EMPTY_PROJECT_TRANSFORM.creativeIntent,
+              userIntent: 'A walkthrough',
+            },
+          },
+          lastSuccessfulOutput: null,
+          updatedAt: latest,
+        },
+        author: { kind: 'user', authorId: ownerUserId },
+        source: 'user-edit',
+        facts: readyFacts,
+      },
+      { now: latest, createId: () => '2fd0fd54-2f2a-4f83-9d84-4be07d20d2c1' },
+    );
+    if (!configured.ok) throw new Error('Expected a creative checkpoint.');
+    const saved = saveProjectOutput(
+      configured.value,
+      {
+        expectedProjectVersion: 2,
+        expectedRevisionNumber: 2,
+        savedVideoId: output.savedVideoId,
+        videoVersionId: output.videoVersionId,
+        presentsOutput: true,
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => '5354b1d3-4022-4c85-a7b6-b230b58ba10b' },
+    );
+    if (!saved.ok) throw new Error('Expected the output save.');
+    expect(saved.value.revisions.at(-1)!.snapshot.composition).toBe(composition);
+    expect(saved.value.revisions.at(-1)!.snapshot.transform).toMatchObject({
+      selectedCharacter: null,
+      visualTreatment: { kind: 'none' },
+      creativeIntent: { userIntent: 'A walkthrough', appliedPrompt: null },
+    });
   });
 
   it('appends monotonic immutable revisions and reports both CAS conflict kinds', () => {
@@ -760,9 +987,12 @@ describe('Project aggregate rules', () => {
     if (!accepted.ok) throw new Error('Expected Project source acceptance.');
     const configuredSnapshot = {
       ...accepted.value.revisions.at(-1)!.snapshot,
-      creativeIntent: {
-        ...accepted.value.revisions.at(-1)!.snapshot.creativeIntent,
-        userIntent: 'Warm handheld promo',
+      transform: {
+        ...EMPTY_PROJECT_TRANSFORM,
+        creativeIntent: {
+          ...EMPTY_PROJECT_TRANSFORM.creativeIntent,
+          userIntent: 'Warm handheld promo',
+        },
       },
       updatedAt: latest,
     };
@@ -809,7 +1039,7 @@ describe('Project aggregate rules', () => {
       },
     });
     // The usual reason to remove a source is to point the same setup at the right video.
-    expect(removed.value.revisions.at(-1)?.snapshot.creativeIntent.userIntent).toBe(
+    expect(removed.value.revisions.at(-1)?.snapshot.transform?.creativeIntent.userIntent).toBe(
       'Warm handheld promo',
     );
     // Earlier revisions keep naming the removed asset, which is what protects its bytes.
@@ -992,7 +1222,13 @@ describe('Project aggregate rules', () => {
         expectedRevisionNumber: 1,
         snapshot: {
           ...snapshot,
-          creativeIntent: { ...snapshot.creativeIntent, userIntent: 'A material change' },
+          transform: {
+            ...EMPTY_PROJECT_TRANSFORM,
+            creativeIntent: {
+              ...EMPTY_PROJECT_TRANSFORM.creativeIntent,
+              userIntent: 'A material change',
+            },
+          },
           updatedAt: later,
         },
         author: { kind: 'user', authorId: ownerUserId },
@@ -1434,51 +1670,66 @@ describe('Project duplication', () => {
   const duplicateRevisionId = 'd2c8a5f6-0f62-4a2b-8d4a-2f12e1b3f8be';
 
   /** A finished Project: source, full creative intent, a placement, and a saved output. */
+  const arrangement: Composition = {
+    clips: [
+      {
+        id: 'c1b7f4e5-9e51-4f1a-9c39-1f01d0a2e7ad',
+        media: { kind: 'saved-video-version', savedVideoId, videoVersionId },
+        trim: { startMs: 0, endMs: 4_000 },
+        audio: { level: 100, muted: false },
+      },
+    ],
+    subtitles: [],
+  };
+
   const finishedSnapshot = () => ({
     ...createEmptyProjectSnapshot(now),
+    composition: arrangement,
     sourceAssetId,
     workingMedia: { kind: 'saved-video-version' as const, savedVideoId, videoVersionId },
     presentedMedia: { kind: 'saved-video-version' as const, savedVideoId, videoVersionId },
-    selectedCharacter: {
-      characterId: 'character-one',
-      characterLabel: 'Avery',
-      characterRevision: now,
-      variantId: null,
-      variantLabel: null,
-      variantRevision: null,
-      referenceAssetId,
-    },
-    selectedOutfit: {
-      outfitId: 'outfit-one',
-      outfitLabel: 'Red jacket',
-      outfitRevision: now,
-      referenceAssetId: null,
-      inputKind: 'saved-outfit' as const,
-    },
-    selectedVoice: {
-      kind: 'local-effect' as const,
-      effectId: 'warm-studio' as const,
-      effectRevision: 'builtin-v1' as const,
-    },
-    visualTreatment: {
-      kind: 'character-swap' as const,
-      providerId: null,
-      outputResolution: '1080p' as const,
+    transform: {
+      selectedCharacter: {
+        characterId: 'character-one',
+        characterLabel: 'Avery',
+        characterRevision: now,
+        variantId: null,
+        variantLabel: null,
+        variantRevision: null,
+        referenceAssetId,
+      },
+      selectedOutfit: {
+        outfitId: 'outfit-one',
+        outfitLabel: 'Red jacket',
+        outfitRevision: now,
+        referenceAssetId: null,
+        inputKind: 'saved-outfit' as const,
+      },
+      selectedVoice: {
+        kind: 'local-effect' as const,
+        effectId: 'warm-studio' as const,
+        effectRevision: 'builtin-v1' as const,
+      },
+      visualTreatment: {
+        kind: 'character-swap' as const,
+        providerId: null,
+        outputResolution: '1080p' as const,
+      },
+      creativeIntent: {
+        promptId: 'prompt-one',
+        promptLabel: 'Summer launch',
+        recipeId: null,
+        recipeLabel: null,
+        userIntent: 'A bright summer launch.',
+        appliedPrompt: 'A bright summer launch.',
+        referenceAssetId: null,
+        resourceRevision: now,
+      },
     },
     liveMode: {
       modeId: 'local',
       captureFormat: 'landscape' as const,
       audioSource: 'local-microphone' as const,
-    },
-    creativeIntent: {
-      promptId: 'prompt-one',
-      promptLabel: 'Summer launch',
-      recipeId: null,
-      recipeLabel: null,
-      userIntent: 'A bright summer launch.',
-      appliedPrompt: 'A bright summer launch.',
-      referenceAssetId: null,
-      resourceRevision: now,
     },
     localEdit: createDefaultVideoEditSpec(12_000),
     exportSpecification: projectExportSpecificationForAspect('9:16'),
@@ -1510,12 +1761,9 @@ describe('Project duplication', () => {
     expect(copy.sourceAssetId).toBe(original.sourceAssetId);
     expect(copy.workingMedia).toEqual(original.workingMedia);
     expect(copy.presentedMedia).toEqual(original.presentedMedia);
-    expect(copy.selectedCharacter).toEqual(original.selectedCharacter);
-    expect(copy.selectedOutfit).toEqual(original.selectedOutfit);
-    expect(copy.selectedVoice).toEqual(original.selectedVoice);
-    expect(copy.visualTreatment).toEqual(original.visualTreatment);
+    expect(copy.composition).toBe(original.composition);
+    expect(copy.transform).toBe(original.transform);
     expect(copy.liveMode).toEqual(original.liveMode);
-    expect(copy.creativeIntent).toEqual(original.creativeIntent);
     expect(copy.localEdit).toEqual(original.localEdit);
     expect(copy.exportSpecification).toEqual(original.exportSpecification);
 

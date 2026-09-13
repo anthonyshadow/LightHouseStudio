@@ -117,9 +117,10 @@ provider work.
     metadata, and validated local edit map through feature-local adapters into the same Project
     session. **Keep this setup** is an explicit semantic boundary; keystrokes, frames, slider
     ticks, and undo/redo entries never append revisions.
-19. Snapshot v2 records stable resource IDs plus only exact applied labels, child/reference IDs,
-    prompt/treatment/settings, and resource revisions needed to explain the checkpoint. The V1 read
-    migration maps unavailable provenance to null rather than inventing it. Reusable records and
+19. The snapshot's `transform` (snapshot v3) records stable resource IDs plus only exact applied
+    labels, child/reference IDs, prompt/treatment/settings, and resource revisions needed to
+    explain the checkpoint. The v1 and v2 read migrations map unavailable provenance to null rather
+    than inventing it. Reusable records and
     their bytes/lifecycles stay independently owned.
 20. Owner-scoped hydration restores only exact compatible resources. Missing, tombstoned,
     wrong-owner, or changed records keep the historical applied label/explanation and show

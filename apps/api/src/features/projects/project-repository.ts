@@ -13,7 +13,7 @@ import type {
   ProjectVersionReferenceLink,
   ProjectExportSpecification,
 } from '@studio/domain';
-import { projectMediaReferencesEqual } from '@studio/domain';
+import { deriveProjectStatus, projectMediaReferencesEqual } from '@studio/domain';
 import type {
   StoredSavedVideoAggregate,
   StoredVideoVersion,
@@ -500,12 +500,29 @@ export const projectOutputCommitInconsistency = (
   ) {
     return 'The receipt does not name what this save writes.';
   }
+  // Read before the status clause below, which would otherwise answer first with the vaguer
+  // reason: the derived status is `ready` for a revision that points elsewhere, so every such
+  // save would be refused as "does not continue" rather than for the pointer it actually got
+  // wrong. Pure comparisons either way, so the order changes the message and nothing else.
+  if (
+    revision.snapshot.lastSuccessfulOutput?.savedVideoId !== savedVideoId ||
+    revision.snapshot.lastSuccessfulOutput.videoVersionId !== primary.id
+  ) {
+    return 'The post-save revision does not point at the primary Version.';
+  }
   // The shared continuation clauses come from the one owner above; the three below are this
   // save's own. `archivedAt` is already proven null by the guard further up, so folding it back
-  // in through the predicate cannot change the answer.
+  // in through the predicate cannot change the answer. The status is the one the domain derives
+  // from the deliverable this save records — the storage boundary checks the derivation, never
+  // the word: "completed" is a milestone the Project moves through, not a state a save demands.
   if (
     projectRevision.ownerUserId !== current.ownerUserId ||
-    nextProject.status !== 'completed' ||
+    nextProject.status !==
+      deriveProjectStatus(revision.snapshot, {
+        sourceStatus: 'ready',
+        currentAttempt: { status: 'none' },
+        validatedLastSuccessfulOutput: { savedVideoId, videoVersionId: primary.id },
+      }) ||
     revision.source !== 'output-save' ||
     !projectRevisionContinuesAggregate(nextProject, revision, {
       id: current.id,
@@ -544,12 +561,6 @@ export const projectOutputCommitInconsistency = (
     !projectMediaReferencesEqual(media.mediaReference, revision.snapshot.presentedMedia)
   ) {
     return 'The hydration record does not describe what the post-save revision presents.';
-  }
-  if (
-    revision.snapshot.lastSuccessfulOutput?.savedVideoId !== savedVideoId ||
-    revision.snapshot.lastSuccessfulOutput.videoVersionId !== primary.id
-  ) {
-    return 'The post-save revision does not point at the primary Version.';
   }
   return null;
 };

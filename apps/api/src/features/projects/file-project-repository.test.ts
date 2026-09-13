@@ -15,20 +15,7 @@ const now = '2026-08-11T12:00:00.000Z';
 
 /** The creative half of a revision proposal, empty, so a case states only what it is about. */
 const emptyCreativeProposal = {
-  selectedCharacter: null,
-  selectedOutfit: null,
-  selectedVoice: null,
-  visualTreatment: { kind: 'none' as const },
-  creativeIntent: {
-    promptId: null,
-    promptLabel: null,
-    recipeId: null,
-    recipeLabel: null,
-    userIntent: '',
-    appliedPrompt: null,
-    referenceAssetId: null,
-    resourceRevision: null,
-  },
+  transform: null,
   localEdit: null,
   exportSpecification: null,
 };
@@ -486,43 +473,58 @@ describe('FileProjectRepository', () => {
         revisions: Array<{
           id: string;
           revisionNumber: number;
-          snapshot: {
-            selectedCharacter: unknown;
-            selectedOutfit: unknown;
-            selectedVoice: unknown;
-            lastSuccessfulOutput: unknown;
-            creativeIntent: { recipeId: string | null; recipeLabel: string | null };
-          };
+          snapshot: Record<string, unknown>;
         }>;
       }>;
     };
     const aggregate = previous.projects[0]!;
     const revision = aggregate.revisions[0]!;
-    const snapshot = revision.snapshot;
-    snapshot.selectedCharacter = {
-      characterId: 'legacy-character',
-      characterLabel: 'Legacy Character',
-      characterRevision: now,
-      variantId: null,
-      variantLabel: null,
-      variantRevision: null,
-      referenceAssetId: null,
+    // A v6 library held snapshot v2: the five AI fields at the top level and no composition. The
+    // memberships below are derived from the v3 shape the read map produces, so this also proves
+    // the envelope migration reads through the snapshot migration.
+    const { transform, composition, ...v2 } = revision.snapshot;
+    expect(transform).toBeNull();
+    expect(composition).toBeNull();
+    const snapshot: Record<string, unknown> = {
+      ...v2,
+      schemaVersion: 2,
+      selectedCharacter: {
+        characterId: 'legacy-character',
+        characterLabel: 'Legacy Character',
+        characterRevision: now,
+        variantId: null,
+        variantLabel: null,
+        variantRevision: null,
+        referenceAssetId: null,
+      },
+      selectedOutfit: {
+        outfitId: 'legacy-outfit',
+        outfitLabel: 'Legacy Outfit',
+        outfitRevision: now,
+        referenceAssetId: null,
+        inputKind: 'saved-outfit',
+      },
+      selectedVoice: {
+        kind: 'saved-voice',
+        voiceId: 'legacy-voice',
+        voiceName: 'Legacy Voice',
+        resourceRevision: now,
+        treatment: { stability: 0.5, similarity: 0.8, style: null, speakerBoost: true },
+      },
+      visualTreatment: { kind: 'none' },
+      creativeIntent: {
+        promptId: null,
+        promptLabel: null,
+        recipeId: 'legacy-recipe',
+        recipeLabel: 'Compatibility only',
+        userIntent: '',
+        appliedPrompt: null,
+        referenceAssetId: null,
+        resourceRevision: null,
+      },
+      lastSuccessfulOutput: { savedVideoId, videoVersionId },
     };
-    snapshot.selectedOutfit = {
-      outfitId: 'legacy-outfit',
-      outfitLabel: 'Legacy Outfit',
-      outfitRevision: now,
-      referenceAssetId: null,
-      inputKind: 'saved-outfit',
-    };
-    snapshot.selectedVoice = {
-      kind: 'saved-voice',
-      voiceId: 'legacy-voice',
-      voiceName: 'Legacy Voice',
-      resourceRevision: now,
-      treatment: { stability: 0.5, similarity: 0.8, style: null, speakerBoost: true },
-    };
-    snapshot.lastSuccessfulOutput = { savedVideoId, videoVersionId };
+    revision.snapshot = snapshot;
     aggregate.outputLinks.push({
       projectId: aggregate.project.id,
       ownerUserId: aggregate.project.ownerUserId,
@@ -532,8 +534,6 @@ describe('FileProjectRepository', () => {
       producingRevisionNumber: revision.revisionNumber,
       createdAt: now,
     });
-    snapshot.creativeIntent.recipeId = 'legacy-recipe';
-    snapshot.creativeIntent.recipeLabel = 'Compatibility only';
     previous.schemaVersion = 6;
     delete previous.assetMemberships;
     await writeFile(paths.primary, `${JSON.stringify(previous)}\n`, 'utf8');
@@ -596,7 +596,7 @@ describe('FileProjectRepository', () => {
     ).toEqual([]);
   });
 
-  it('migrates v3 snapshot v1 records to v7/snapshot v2 without fabricating applied values', async () => {
+  it('migrates v3 snapshot v1 records to v7/snapshot v3 without fabricating applied values', async () => {
     const service = new ProjectService(new FileProjectRepository(directory));
     const created = await service.create(ownerUserId, randomUUID(), 'Prompt 07 Project');
     if (!created.ok) throw new Error('Expected a Project create.');
@@ -615,9 +615,19 @@ describe('FileProjectRepository', () => {
     for (const aggregate of previous.projects) {
       delete aggregate.workingMediaAdoptions;
       for (const revision of aggregate.revisions) {
-        const snapshot = revision.snapshot;
-        snapshot.schemaVersion = 1;
-        snapshot.creativeIntent = { promptId: null, recipeId: null, userIntent: '' };
+        // Snapshot v1: the five fields flat, without the applied provenance v2 added.
+        const { transform, composition, ...v1 } = revision.snapshot;
+        expect(transform).toBeNull();
+        expect(composition).toBeNull();
+        revision.snapshot = {
+          ...v1,
+          schemaVersion: 1,
+          selectedCharacter: { characterId: 'legacy-character', variantId: null },
+          selectedOutfit: null,
+          selectedVoice: null,
+          visualTreatment: { kind: 'none' },
+          creativeIntent: { promptId: null, recipeId: 'legacy-recipe', userIntent: '' },
+        };
       }
     }
     await writeFile(paths.primary, `${JSON.stringify(previous)}\n`, 'utf8');
@@ -627,12 +637,21 @@ describe('FileProjectRepository', () => {
     await expect(restarted.get(ownerUserId, created.current.project.id)).resolves.toMatchObject({
       revision: {
         snapshot: {
-          schemaVersion: 2,
-          creativeIntent: {
-            promptLabel: null,
-            recipeLabel: null,
-            appliedPrompt: null,
-            resourceRevision: null,
+          schemaVersion: 3,
+          composition: null,
+          transform: {
+            selectedCharacter: {
+              characterId: 'legacy-character',
+              characterLabel: null,
+              characterRevision: null,
+              referenceAssetId: null,
+            },
+            creativeIntent: {
+              recipeId: 'legacy-recipe',
+              recipeLabel: null,
+              appliedPrompt: null,
+              resourceRevision: null,
+            },
           },
         },
       },
@@ -646,7 +665,93 @@ describe('FileProjectRepository', () => {
     };
     expect(migrated.schemaVersion).toBe(7);
     expect(migrated.projects[0]?.workingMediaAdoptions).toEqual([]);
-    expect(migrated.projects[0]?.revisions[0]?.snapshot.schemaVersion).toBe(2);
+    expect(migrated.projects[0]?.revisions[0]?.snapshot.schemaVersion).toBe(3);
+  });
+
+  it('reads a v2 snapshot on disk as v3 and rewrites it as v3 on the next write', async () => {
+    const service = new ProjectService(new FileProjectRepository(directory));
+    const created = await service.create(ownerUserId, randomUUID(), 'Snapshot v2 Project');
+    if (!created.ok) throw new Error('Expected a Project create.');
+    const paths = metadataPaths(directory, ownerUserId);
+    const previous = JSON.parse(await readFile(paths.primary, 'utf8')) as {
+      schemaVersion: number;
+      projects: Array<{ revisions: Array<{ snapshot: Record<string, unknown> }> }>;
+    };
+    for (const revision of previous.projects[0]!.revisions) {
+      const { transform, composition, ...rest } = revision.snapshot;
+      expect(transform).toBeNull();
+      expect(composition).toBeNull();
+      revision.snapshot = {
+        ...rest,
+        schemaVersion: 2,
+        selectedCharacter: null,
+        selectedOutfit: null,
+        selectedVoice: {
+          kind: 'local-effect',
+          effectId: 'warm-studio',
+          effectRevision: 'builtin-v1',
+        },
+        visualTreatment: { kind: 'none' },
+        creativeIntent: {
+          promptId: null,
+          promptLabel: null,
+          recipeId: null,
+          recipeLabel: null,
+          userIntent: 'Kept as typed',
+          appliedPrompt: null,
+          referenceAssetId: null,
+          resourceRevision: null,
+        },
+      };
+    }
+    await writeFile(paths.primary, `${JSON.stringify(previous)}\n`, 'utf8');
+    await writeFile(paths.backup, `${JSON.stringify(previous)}\n`, 'utf8');
+
+    const restarted = new ProjectService(new FileProjectRepository(directory));
+    const reopened = await restarted.get(ownerUserId, created.current.project.id);
+    expect(reopened.revision.snapshot).toMatchObject({
+      schemaVersion: 3,
+      composition: null,
+      transform: {
+        selectedVoice: { kind: 'local-effect', effectId: 'warm-studio' },
+        creativeIntent: { userIntent: 'Kept as typed' },
+      },
+    });
+    expect(reopened.revision.snapshot).not.toHaveProperty('selectedVoice');
+    // The library format is unchanged; a read migrates, and the next write records v3 on disk.
+    const afterRead = JSON.parse(await readFile(paths.primary, 'utf8')) as {
+      schemaVersion: number;
+      projects: Array<{ revisions: Array<{ snapshot: { schemaVersion: number } }> }>;
+    };
+    expect(afterRead).toMatchObject({ schemaVersion: 7 });
+    // A read is a read: the migration happened in memory, and the row on disk is still the v2 one
+    // this case put there. Only the write below is allowed to change it.
+    expect(afterRead.projects[0]!.revisions.map(({ snapshot }) => snapshot.schemaVersion)).toEqual([
+      2,
+    ]);
+    const checkpointed = await restarted.checkpoint(ownerUserId, created.current.project.id, {
+      expectedVersion: 1,
+      expectedRevisionNumber: 1,
+      proposal: {
+        ...emptyCreativeProposal,
+        workflowPhase: 'source',
+        liveMode: null,
+        transform: reopened.revision.snapshot.transform,
+        exportSpecification: {
+          container: 'video/mp4',
+          aspect: '9:16',
+          resolution: { width: 1_080, height: 1_920 },
+          includeAudio: true,
+        },
+      },
+    });
+    expect(checkpointed).toMatchObject({ ok: true });
+    const rewritten = JSON.parse(await readFile(paths.primary, 'utf8')) as {
+      projects: Array<{ revisions: Array<{ snapshot: { schemaVersion: number } }> }>;
+    };
+    expect(rewritten.projects[0]!.revisions.map(({ snapshot }) => snapshot.schemaVersion)).toEqual([
+      3, 3,
+    ]);
   });
 
   it.each([4, 5] as const)(

@@ -1,4 +1,9 @@
-import { projectSessionProposalSchema, type ProjectCurrentResponse } from '@studio/contracts';
+import {
+  projectSessionProposalSchema,
+  type ProjectCurrentResponse,
+  type ProjectTransformContract,
+} from '@studio/contracts';
+import { EMPTY_PROJECT_TRANSFORM } from '@studio/domain';
 import { describe, expect, it } from 'vitest';
 import type { CreativeAssetStore } from '../creative-assets/types';
 import {
@@ -7,7 +12,6 @@ import {
   projectCreativeHydrationSelection,
   resolveProjectCreativeResourceIssues,
   resolveProjectSavedVoiceResourceIssue,
-  type ProjectCreativeProposal,
 } from './projectCreativeSessionAdapter';
 
 const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
@@ -99,25 +103,13 @@ const current = (): ProjectCurrentResponse => ({
     parentRevisionId: null,
     parentRevisionNumber: 1,
     snapshot: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       sourceAssetId,
       workingMedia: { kind: 'asset', assetId: sourceAssetId },
       presentedMedia: { kind: 'asset', assetId: sourceAssetId },
-      selectedCharacter: null,
-      selectedOutfit: null,
-      selectedVoice: null,
-      visualTreatment: { kind: 'none' },
+      composition: null,
+      transform: null,
       liveMode: null,
-      creativeIntent: {
-        promptId: null,
-        promptLabel: null,
-        recipeId: null,
-        recipeLabel: null,
-        userIntent: '',
-        appliedPrompt: null,
-        referenceAssetId: null,
-        resourceRevision: null,
-      },
       localEdit: null,
       exportSpecification: null,
       lastSuccessfulOutput: null,
@@ -196,33 +188,35 @@ describe('Project creative session adapter', () => {
         captureFormat: 'portrait',
         audioSource: 'model-output',
       },
-      selectedCharacter: {
-        characterId: 'character-one',
-        characterLabel: 'Ari',
-        characterRevision: now,
-        variantId: 'variant-one',
-        variantLabel: 'Ari · field jacket',
-        variantRevision: now,
-        referenceAssetId,
-      },
-      selectedVoice: {
-        kind: 'local-effect',
-        effectId: 'warm-studio',
-        effectRevision: 'builtin-v1',
-      },
-      visualTreatment: {
-        kind: 'character-swap',
-        providerId: 'decart',
-        outputResolution: '1080p',
-      },
-      creativeIntent: {
-        // The Character, with the Variant recorded in `selectedCharacter.variantId` above; the
-        // label still names the Variant.
-        recipeId: 'character-one',
-        recipeLabel: 'Ari · field jacket',
-        appliedPrompt: 'Exact applied explorer prompt',
-        referenceAssetId,
-        resourceRevision: now,
+      transform: {
+        selectedCharacter: {
+          characterId: 'character-one',
+          characterLabel: 'Ari',
+          characterRevision: now,
+          variantId: 'variant-one',
+          variantLabel: 'Ari · field jacket',
+          variantRevision: now,
+          referenceAssetId,
+        },
+        selectedVoice: {
+          kind: 'local-effect',
+          effectId: 'warm-studio',
+          effectRevision: 'builtin-v1',
+        },
+        visualTreatment: {
+          kind: 'character-swap',
+          providerId: 'decart',
+          outputResolution: '1080p',
+        },
+        creativeIntent: {
+          // The Character, with the Variant recorded in `selectedCharacter.variantId` above; the
+          // label still names the Variant.
+          recipeId: 'character-one',
+          recipeLabel: 'Ari · field jacket',
+          appliedPrompt: 'Exact applied explorer prompt',
+          referenceAssetId,
+          resourceRevision: now,
+        },
       },
     });
     expect(
@@ -249,14 +243,38 @@ describe('Project creative session adapter', () => {
       visualStep: null,
       voiceSelection: null,
     });
-    expect(proposal.selectedOutfit).toBeNull();
-    expect(proposal.visualTreatment).toEqual({
+    expect(proposal.transform?.selectedOutfit).toBeNull();
+    expect(proposal.transform?.visualTreatment).toEqual({
       kind: 'virtual-try-on',
       providerId: null,
       outputResolution: null,
       inputKind: 'prompt',
       enhancePrompt: true,
     });
+    expect(
+      projectSessionProposalSchema.safeParse({
+        ...proposal,
+        localEdit: null,
+        exportSpecification: null,
+      }).success,
+    ).toBe(true);
+  });
+
+  it('proposes no transform at all for an empty Studio', () => {
+    // The canonical form of "nothing configured" is `null`, which is also what the Project stores,
+    // so a settled session and its own proposal compare equal instead of `null` meeting an empty
+    // object across the comparison.
+    const proposal = createProjectCreativeProposal({
+      current: current(),
+      draft: { mode: 'local', prompt: '', referenceImage: null, enhance: false },
+      capturePreferences,
+      activeRecipe: null,
+      store,
+      visualStep: null,
+      voiceSelection: null,
+    });
+
+    expect(proposal.transform).toBeNull();
     expect(
       projectSessionProposalSchema.safeParse({
         ...proposal,
@@ -274,25 +292,28 @@ describe('Project creative session adapter', () => {
     const vtonCapture = (
       settledInputKind: 'prompt' | 'saved-outfit',
       outfitId: string | null,
-    ): ProjectCreativeProposal['visualTreatment'] =>
+    ): ProjectTransformContract['visualTreatment'] | undefined =>
       createProjectCreativeProposal({
         current: currentWith({
-          selectedOutfit:
-            outfitId === null
-              ? null
-              : {
-                  outfitId,
-                  outfitLabel: 'Copper coat',
-                  outfitRevision: now,
-                  referenceAssetId,
-                  inputKind: 'saved-outfit',
-                },
-          visualTreatment: {
-            kind: 'virtual-try-on',
-            providerId: null,
-            outputResolution: null,
-            inputKind: settledInputKind,
-            enhancePrompt: false,
+          transform: {
+            ...EMPTY_PROJECT_TRANSFORM,
+            selectedOutfit:
+              outfitId === null
+                ? null
+                : {
+                    outfitId,
+                    outfitLabel: 'Copper coat',
+                    outfitRevision: now,
+                    referenceAssetId,
+                    inputKind: 'saved-outfit',
+                  },
+            visualTreatment: {
+              kind: 'virtual-try-on',
+              providerId: null,
+              outputResolution: null,
+              inputKind: settledInputKind,
+              enhancePrompt: false,
+            },
           },
         }),
         draft: {
@@ -306,7 +327,7 @@ describe('Project creative session adapter', () => {
         store,
         visualStep: null,
         voiceSelection: null,
-      }).visualTreatment;
+      }).transform?.visualTreatment;
 
     it('is kept by a capture that states no step of its own', () => {
       expect(vtonCapture('prompt', 'outfit-one')).toMatchObject({ inputKind: 'prompt' });
@@ -381,12 +402,12 @@ describe('Project creative session adapter', () => {
   it('leaves a checkpointed run settled, so the next ambient capture appends no revision', () => {
     const { checkpoint, ambient } = captureThenSync();
 
-    expect(checkpoint.visualTreatment).toEqual({
+    expect(checkpoint.transform?.visualTreatment).toEqual({
       kind: 'character-swap',
       providerId: 'decart',
       outputResolution: '720p',
     });
-    expect(checkpoint.creativeIntent.userIntent).toBe(characterPrompt);
+    expect(checkpoint.transform?.creativeIntent.userIntent).toBe(characterPrompt);
     expect(ambient).toEqual(checkpoint);
   });
 
@@ -395,11 +416,11 @@ describe('Project creative session adapter', () => {
 
     // The Variant is recorded where hydration and the resource-issue resolver read it from, and
     // the Character is what both captures can name.
-    expect(checkpoint.selectedCharacter).toMatchObject({
+    expect(checkpoint.transform?.selectedCharacter).toMatchObject({
       characterId: 'character-one',
       variantId: 'variant-one',
     });
-    expect(checkpoint.creativeIntent).toMatchObject({
+    expect(checkpoint.transform?.creativeIntent).toMatchObject({
       recipeId: 'character-one',
       recipeLabel: 'Ari · field jacket',
     });
@@ -410,8 +431,8 @@ describe('Project creative session adapter', () => {
     // Nothing is lost by staying silent: every reader falls back to `selectedCharacter`, which
     // carries the Variant's reference whenever a Variant is selected.
     const { checkpoint } = captureThenSync({ variantId: 'variant-one', draftReference: null });
-    expect(checkpoint.creativeIntent.referenceAssetId).toBeNull();
-    expect(checkpoint.selectedCharacter?.referenceAssetId).toBe(referenceAssetId);
+    expect(checkpoint.transform?.creativeIntent.referenceAssetId).toBeNull();
+    expect(checkpoint.transform?.selectedCharacter?.referenceAssetId).toBe(referenceAssetId);
   });
 
   it('reads settings a checkpoint staged but has not yet written', () => {
@@ -420,7 +441,10 @@ describe('Project creative session adapter', () => {
     // settings it has no step to state and overwrites the checkpoint — each write making the other
     // stale until the flush gives up and the submission it was taken for never goes out.
     const staged = currentWith({
-      visualTreatment: { kind: 'character-swap', providerId: 'decart', outputResolution: '720p' },
+      transform: {
+        ...EMPTY_PROJECT_TRANSFORM,
+        visualTreatment: { kind: 'character-swap', providerId: 'decart', outputResolution: '720p' },
+      },
     }).revision.snapshot;
 
     const proposal = createProjectCreativeProposal({
@@ -440,7 +464,7 @@ describe('Project creative session adapter', () => {
       voiceSelection: null,
     });
 
-    expect(proposal.visualTreatment).toEqual({
+    expect(proposal.transform?.visualTreatment).toEqual({
       kind: 'character-swap',
       providerId: 'decart',
       outputResolution: '720p',
@@ -450,10 +474,13 @@ describe('Project creative session adapter', () => {
   it('states its own settings when the treatment kind changes rather than inheriting them', () => {
     const proposal = createProjectCreativeProposal({
       current: currentWith({
-        visualTreatment: {
-          kind: 'character-swap',
-          providerId: 'decart',
-          outputResolution: '1080p',
+        transform: {
+          ...EMPTY_PROJECT_TRANSFORM,
+          visualTreatment: {
+            kind: 'character-swap',
+            providerId: 'decart',
+            outputResolution: '1080p',
+          },
         },
       }),
       draft: {
@@ -469,7 +496,7 @@ describe('Project creative session adapter', () => {
       voiceSelection: null,
     });
 
-    expect(proposal.visualTreatment).toEqual({
+    expect(proposal.transform?.visualTreatment).toEqual({
       kind: 'virtual-try-on',
       providerId: null,
       outputResolution: null,
@@ -481,29 +508,32 @@ describe('Project creative session adapter', () => {
   it('hydrates only an exact owner-scoped resource revision and retains historical missing labels', () => {
     const snapshot = {
       ...current().revision.snapshot,
-      selectedCharacter: {
-        characterId: 'character-one',
-        characterLabel: 'Historical Ari',
-        characterRevision: now,
-        variantId: 'variant-one',
-        variantLabel: 'Historical field jacket',
-        variantRevision: now,
-        referenceAssetId,
-      },
-      visualTreatment: {
-        kind: 'character-swap' as const,
-        providerId: 'decart',
-        outputResolution: '720p' as const,
-      },
-      creativeIntent: {
-        promptId: null,
-        promptLabel: null,
-        recipeId: 'character-one',
-        recipeLabel: 'Historical field jacket',
-        userIntent: 'Historical prompt',
-        appliedPrompt: 'Historical prompt',
-        referenceAssetId,
-        resourceRevision: now,
+      transform: {
+        ...EMPTY_PROJECT_TRANSFORM,
+        selectedCharacter: {
+          characterId: 'character-one',
+          characterLabel: 'Historical Ari',
+          characterRevision: now,
+          variantId: 'variant-one',
+          variantLabel: 'Historical field jacket',
+          variantRevision: now,
+          referenceAssetId,
+        },
+        visualTreatment: {
+          kind: 'character-swap' as const,
+          providerId: 'decart',
+          outputResolution: '720p' as const,
+        },
+        creativeIntent: {
+          promptId: null,
+          promptLabel: null,
+          recipeId: 'character-one',
+          recipeLabel: 'Historical field jacket',
+          userIntent: 'Historical prompt',
+          appliedPrompt: 'Historical prompt',
+          referenceAssetId,
+          resourceRevision: now,
+        },
       },
     };
     expect(projectCreativeHydrationSelection(snapshot, store)).toMatchObject({
@@ -550,15 +580,18 @@ describe('Project creative session adapter', () => {
   it('explains missing prompts and Voices without presenting historical Recipe issues', () => {
     const promptSnapshot = {
       ...current().revision.snapshot,
-      creativeIntent: {
-        promptId: 'deleted-prompt',
-        promptLabel: 'Historical keynote prompt',
-        recipeId: null,
-        recipeLabel: null,
-        userIntent: 'Historical keynote prompt body',
-        appliedPrompt: 'Historical keynote prompt body',
-        referenceAssetId: null,
-        resourceRevision: now,
+      transform: {
+        ...EMPTY_PROJECT_TRANSFORM,
+        creativeIntent: {
+          promptId: 'deleted-prompt',
+          promptLabel: 'Historical keynote prompt',
+          recipeId: null,
+          recipeLabel: null,
+          userIntent: 'Historical keynote prompt body',
+          appliedPrompt: 'Historical keynote prompt body',
+          referenceAssetId: null,
+          resourceRevision: now,
+        },
       },
     };
     expect(resolveProjectCreativeResourceIssues(promptSnapshot, store)).toContainEqual(
@@ -571,31 +604,37 @@ describe('Project creative session adapter', () => {
 
     const recipeSnapshot = {
       ...current().revision.snapshot,
-      creativeIntent: {
-        promptId: null,
-        promptLabel: null,
-        recipeId: 'outfit-one',
-        recipeLabel: 'Historical copper recipe',
-        userIntent: 'Historical copper recipe body',
-        appliedPrompt: 'Historical copper recipe body',
-        referenceAssetId,
-        resourceRevision: '2026-08-11T16:00:00.000Z',
+      transform: {
+        ...EMPTY_PROJECT_TRANSFORM,
+        creativeIntent: {
+          promptId: null,
+          promptLabel: null,
+          recipeId: 'outfit-one',
+          recipeLabel: 'Historical copper recipe',
+          userIntent: 'Historical copper recipe body',
+          appliedPrompt: 'Historical copper recipe body',
+          referenceAssetId,
+          resourceRevision: '2026-08-11T16:00:00.000Z',
+        },
       },
     };
     expect(resolveProjectCreativeResourceIssues(recipeSnapshot, store)).toEqual([]);
 
     const voiceSnapshot = {
       ...current().revision.snapshot,
-      selectedVoice: {
-        kind: 'saved-voice' as const,
-        voiceId: 'voice-one',
-        voiceName: 'Historical Nova',
-        resourceRevision: null,
-        treatment: {
-          stability: null,
-          similarity: null,
-          style: null,
-          speakerBoost: null,
+      transform: {
+        ...EMPTY_PROJECT_TRANSFORM,
+        selectedVoice: {
+          kind: 'saved-voice' as const,
+          voiceId: 'voice-one',
+          voiceName: 'Historical Nova',
+          resourceRevision: null,
+          treatment: {
+            stability: null,
+            similarity: null,
+            style: null,
+            speakerBoost: null,
+          },
         },
       },
     };

@@ -221,10 +221,17 @@ snapshot, contracts, capture bridge, and UI all enforce one video per Project.
 stitch, or audio-level concept in any layer. Subtitles now exist on the single-clip edit as
 burn-in (slice 2.1, 2026-09-03: `VideoEditSpec.subtitles`, editor tool and lane, shared-shader
 compositing), which closes the single-clip half of edit-2; the player carries no caption track by
-decision (D4), and composition-level subtitle tracks remain Phase 3 work.
+decision (D4), and composition-level subtitle tracks remain Phase 3 work. _Slice 3.1
+(2026-09-12) closed the model half of db-2: snapshot v3 carries a `composition` (clips over held
+media with per-clip trim and level, one sequence-time cue list) with rules in
+`packages/domain/src/composition`; no writer, no timeline and no stitch yet (3.3, 4.1, 4.2)._
 **GAP-3 AI-round workspace model** (db-3 = DC-3-adjacent = prod-4): revision snapshots put AI
 selections first-class; the post-source phase is literally named "creative"; an output commit
-_requires_ project status `completed`; an AI run scrims the whole workspace.
+_requires_ project status `completed`; an AI run scrims the whole workspace. _Slice 3.1
+(2026-09-12) closed db-3's two structural halves: the AI selections are one nullable `transform`
+on snapshot v3, and the shared output-commit rule checks the status the domain derives instead of
+demanding `completed` (D2). The "creative" phase name and the run overlay are unchanged (prod-4,
+Phase 4)._
 **GAP-4 Two parallel pipelines** (prov-1 = prod-3 = DC-9 = api-3-adjacent): standalone
 video-jobs (ephemeral, voice-capable) beside Project processing (durable, voice-less); two status
 taxonomies; standalone outputs orphanable.
@@ -408,28 +415,28 @@ re-render profiling (web-3 note); light theme.
 P0: none found. The product has no data-loss, corruption, security-breach, or broken-critical-path
 finding under its current deployment posture.
 
-| #   | Finding                                                                 | IDs                                         | Priority | Phase                          |
-| --- | ----------------------------------------------------------------------- | ------------------------------------------- | -------- | ------------------------------ |
-| 1   | Single-source Projects foreclose the vision's core flow                 | db-1/STOR-7/PCD-1/studio-3/DC-2             | P1       | 3                              |
-| 2   | No composition/subtitle/audio primitives anywhere                       | db-2/edit-1/edit-2/web-7/DC-1/prod-1/prod-2 | P1       | 2–4                            |
-| 3   | Paid jobs progress only while a client polls (closed, slice 2.5)        | prov-2                                      | P1       | 2                              |
-| 4   | Standalone AI outputs bypass Projects; ephemeral (prov-6 closed, 2.5)   | prov-1/prov-6/ev-3                          | P1       | 4                              |
-| 5   | Fresh take cannot reach the manual editor                               | studio-1                                    | P1       | 1                              |
-| 6   | Voice inside Projects is a configurable dead end                        | ev-1/PCD-4/studio-6                         | P1       | 1 (honesty) / 4 (build)        |
-| 7   | `/studio/<uuid>` outside the exit guard — silent loss of dirty edits    | shell-1                                     | P1       | 1                              |
-| 8   | e2e bypasses the real stack CI already provisions                       | tci-2                                       | P1       | 1                              |
-| 9   | "Current" audit documents deny their own implementation                 | DOCS-1                                      | P1       | resolved by this audit's canon |
-| 10  | AI-round model: save forces `completed`; AI selections structural       | db-3/prod-4                                 | P2       | 3                              |
-| 11  | Delete copy false in R2 mode; local delete keeps bytes                  | assets-3/SEC-1/STOR-5                       | P2       | 1 (copy) / 5 (GC)              |
-| 12  | No consent/likeness/rights capture for face/voice transforms            | SEC-5                                       | P2       | 1 (decision D15)               |
-| 13  | Content-safety posture env-toggleable, "uncensored" default model       | prov-5                                      | P2       | 1 (decision D15)               |
-| 14  | No AI cost visibility or ledger (closed, slice 2.5; tci-5 partly)       | prov-3/prod-7/tci-5                         | P2       | 2                              |
-| 15  | One placement per save; re-export forgets placement (closed, slice 2.3) | PCD-3/prod-9/DC-14                          | P2       | 2                              |
-| 16  | Upload not resumable across reload; HEVC rejected (closed, slice 2.4)   | STOR-2/ev-2                                 | P2       | 2                              |
-| 17  | Orphaned rendition/failed bytes never swept                             | STOR-1/api-4                                | P2       | 5                              |
-| 18  | Creative library browser-local with destructive sync recovery           | assets-1/assets-2/assets-11                 | P2       | 5 (D7)                         |
-| 19  | Terminology sprawl (library names, "version", editor names)             | DC-8/assets-7/ev-6                          | P2       | 1–2                            |
-| 20  | Editor reachable only through AI wizard; IA restyle-first               | arch-1/shell-10/prod-5                      | P2       | 1                              |
+| #   | Finding                                                                                    | IDs                                         | Priority | Phase                          |
+| --- | ------------------------------------------------------------------------------------------ | ------------------------------------------- | -------- | ------------------------------ |
+| 1   | Single-source Projects foreclose the vision's core flow                                    | db-1/STOR-7/PCD-1/studio-3/DC-2             | P1       | 3                              |
+| 2   | No composition/subtitle/audio primitives anywhere                                          | db-2/edit-1/edit-2/web-7/DC-1/prod-1/prod-2 | P1       | 2–4                            |
+| 3   | Paid jobs progress only while a client polls (closed, slice 2.5)                           | prov-2                                      | P1       | 2                              |
+| 4   | Standalone AI outputs bypass Projects; ephemeral (prov-6 closed, 2.5)                      | prov-1/prov-6/ev-3                          | P1       | 4                              |
+| 5   | Fresh take cannot reach the manual editor                                                  | studio-1                                    | P1       | 1                              |
+| 6   | Voice inside Projects is a configurable dead end                                           | ev-1/PCD-4/studio-6                         | P1       | 1 (honesty) / 4 (build)        |
+| 7   | `/studio/<uuid>` outside the exit guard — silent loss of dirty edits                       | shell-1                                     | P1       | 1                              |
+| 8   | e2e bypasses the real stack CI already provisions                                          | tci-2                                       | P1       | 1                              |
+| 9   | "Current" audit documents deny their own implementation                                    | DOCS-1                                      | P1       | resolved by this audit's canon |
+| 10  | AI-round model: save forces `completed`; AI selections structural (db-3 closed, slice 3.1) | db-3/prod-4                                 | P2       | 3                              |
+| 11  | Delete copy false in R2 mode; local delete keeps bytes                                     | assets-3/SEC-1/STOR-5                       | P2       | 1 (copy) / 5 (GC)              |
+| 12  | No consent/likeness/rights capture for face/voice transforms                               | SEC-5                                       | P2       | 1 (decision D15)               |
+| 13  | Content-safety posture env-toggleable, "uncensored" default model                          | prov-5                                      | P2       | 1 (decision D15)               |
+| 14  | No AI cost visibility or ledger (closed, slice 2.5; tci-5 partly)                          | prov-3/prod-7/tci-5                         | P2       | 2                              |
+| 15  | One placement per save; re-export forgets placement (closed, slice 2.3)                    | PCD-3/prod-9/DC-14                          | P2       | 2                              |
+| 16  | Upload not resumable across reload; HEVC rejected (closed, slice 2.4)                      | STOR-2/ev-2                                 | P2       | 2                              |
+| 17  | Orphaned rendition/failed bytes never swept                                                | STOR-1/api-4                                | P2       | 5                              |
+| 18  | Creative library browser-local with destructive sync recovery                              | assets-1/assets-2/assets-11                 | P2       | 5 (D7)                         |
+| 19  | Terminology sprawl (library names, "version", editor names)                                | DC-8/assets-7/ev-6                          | P2       | 1–2                            |
+| 20  | Editor reachable only through AI wizard; IA restyle-first                                  | arch-1/shell-10/prod-5                      | P2       | 1                              |
 
 (Full P2/P3 inventory: sections 7.2–7.10 above; every ID resolves to a finding with evidence,
 impact, recommendation, effort, and confidence in the per-area audit reports retained by the lead.)

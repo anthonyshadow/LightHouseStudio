@@ -48,8 +48,9 @@ the links to its saved outputs. It is resumable: closing the browser and returni
 state. Projects can be renamed, duplicated (by reference, no bytes copied), moved between
 Campaigns, archived, restored, and — after archiving — tombstoned.
 _Status: implemented as a **single-video** workspace (one immutable source, one current cut).
-The multi-source, composition-bearing Project is the target model; see
-[Decisions required](../DECISIONS_REQUIRED.md) D1–D3._
+Since slice 3.1 (2026-09-12) the revision snapshot is version 3 and can hold a composition and an
+optional AI `transform`; no surface writes a composition yet, and several sources arrive with
+slice 3.2. D1–D3 are decided in [Decisions required](../DECISIONS_REQUIRED.md)._
 
 ### Source media
 
@@ -101,8 +102,12 @@ accepted transformation with no client watching it._
 The arrangement that turns a Project's material into one deliverable: an ordered sequence of clips,
 plus subtitle tracks and audio settings that apply across the sequence. The composition — not any
 single source — is what the user previews, refines, saves, and exports.
-_Status: **not implemented.** Today a Project's "composition" degenerates to a single current cut
-with one edit specification. Composition storage shape is an open decision (D3)._
+_Status: **modelled, not yet written.** Since slice 3.1 (2026-09-12) the revision snapshot (v3)
+carries `composition: Composition | null` — ordered clips over media the Project holds, each with a
+trim in its own media time and its own level, plus one list of subtitle cues in sequence time — with
+its rules in `packages/domain/src/composition` and its media held by revision-scoped `clip` links
+(D3). It is `null` on every Project today: the current cut, with its `localEdit`, stands in until
+the composition write path (3.3) and the timeline (4.1) land._
 
 ### Timeline
 
@@ -115,7 +120,8 @@ target work._
 
 A reference into source media with in/out trim points, occupying a position in the composition. A
 clip does not copy bytes; splitting a clip creates two references.
-_Status: not implemented (single-clip editing only)._
+_Status: modelled in snapshot v3 (`CompositionClip`: id, media reference, trim, audio level);
+no surface creates one yet (single-clip editing only)._
 
 ### Subtitle track / subtitle cue
 
@@ -126,7 +132,10 @@ accessibility or localization demand it.
 _Status: implemented for the single clip. `SubtitleCue` is a field of `VideoEditSpec`
 (`subtitles`), persisted inside the revision's `localEdit`, rasterized and composited by the
 editor's shared renderer in the preview and the export worker. Cues may overlap and stack. A
-composition-level track that applies across clips remains target work (D3)._
+composition-level list exists in the model since slice 3.1 — `Composition.subtitles`, one list of
+cues in **sequence time** (milliseconds from the start of the stitched output) with per-cue caption
+regions, which is the "subtitle track" the roadmap named; wrapping it into named tracks later is a
+defaulted addition — and is written by nothing yet (D3)._
 
 Because the text is pixels by the time a shape is chosen, a re-frame treats it like any other
 pixel: a crop that does not contain a region's band removes the captions drawn there. Which regions
@@ -176,7 +185,10 @@ is already saved reads the snapshot.
 
 _Status: partially implemented — outputs and provenance exist, and the Project overview surfaces
 the most recent one (poster, placement, Download, View in Assets), saying so when the Project has
-changed since. The product still marks the Project "completed" on save._
+changed since. Since slice 3.1 (2026-09-12) `completed` is a derived milestone (D2): it means "the
+current cut is saved", the storage layer checks the derivation rather than demanding the word, and
+it moves back to `ready` on the next material change; the status and phase vocabulary the interface
+shows is unchanged._
 
 ### Export
 

@@ -23,6 +23,7 @@ import {
   projectProcessingPhase,
   projectProcessingResultState,
   projectProcessingRetryPolicy,
+  projectTransformOf,
   promoteProjectJobResult,
   type ProjectAssetLink,
   type ProjectJobLink,
@@ -247,8 +248,10 @@ export class ProjectProcessingService {
     current: ProjectCurrentRead,
     capability: Exclude<ProjectProcessingCapability, 'voice'>,
   ): { readonly recipe: VideoTransformRecipe; readonly referenceAssetId: string | null } {
-    const snapshot = current.revision.snapshot;
-    if (snapshot.visualTreatment.kind !== capability) {
+    // A Project with no transform configured has no visual intent to run; the same conflict as a
+    // transform whose treatment is a different capability.
+    const transform = projectTransformOf(current.revision.snapshot);
+    if (transform.visualTreatment.kind !== capability) {
       throw new AppError(
         409,
         'conflict',
@@ -256,38 +259,38 @@ export class ProjectProcessingService {
       );
     }
     const referenceAssetId =
-      snapshot.creativeIntent.referenceAssetId ??
+      transform.creativeIntent.referenceAssetId ??
       (capability === 'character-swap'
-        ? snapshot.selectedCharacter?.referenceAssetId
-        : snapshot.selectedOutfit?.referenceAssetId) ??
+        ? transform.selectedCharacter?.referenceAssetId
+        : transform.selectedOutfit?.referenceAssetId) ??
       null;
     // The same expression the workspace puts into the editable step, so the prompt this Project
     // would submit is the prompt the operator was shown. Reading `appliedPrompt` alone let a
     // Project look ready on screen and fail validation here.
-    const prompt = snapshot.creativeIntent.appliedPrompt ?? snapshot.creativeIntent.userIntent;
+    const prompt = transform.creativeIntent.appliedPrompt ?? transform.creativeIntent.userIntent;
     if (capability === 'character-swap') {
       return {
         referenceAssetId,
         recipe: this.#validRecipe(capability, {
           operation: capability,
-          ...(snapshot.visualTreatment.providerId === null
+          ...(transform.visualTreatment.providerId === null
             ? {}
-            : { provider: snapshot.visualTreatment.providerId }),
+            : { provider: transform.visualTreatment.providerId }),
           inputKind: 'character',
           prompt,
           enhancePrompt: false,
           hasReferenceImage: referenceAssetId !== null,
-          ...(snapshot.visualTreatment.outputResolution === null
+          ...(transform.visualTreatment.outputResolution === null
             ? {}
-            : { outputResolution: snapshot.visualTreatment.outputResolution }),
+            : { outputResolution: transform.visualTreatment.outputResolution }),
         }),
       };
     }
-    const treatment = snapshot.visualTreatment;
+    const treatment = transform.visualTreatment;
     if (treatment.kind !== 'virtual-try-on') {
       throw new AppError(409, 'conflict', 'Checkpoint Virtual Try-On intent before processing.');
     }
-    const inputKind = treatment.inputKind ?? snapshot.selectedOutfit?.inputKind ?? null;
+    const inputKind = treatment.inputKind ?? transform.selectedOutfit?.inputKind ?? null;
     return {
       referenceAssetId,
       recipe: this.#validRecipe(capability, {

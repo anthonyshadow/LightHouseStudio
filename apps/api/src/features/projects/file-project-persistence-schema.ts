@@ -87,7 +87,7 @@ const storedVersionReferenceLinkSchema = z
     ownerUserId: ownerIdSchema,
     savedVideoId: z.uuid(),
     videoVersionId: z.uuid(),
-    role: z.enum(['working', 'presented']),
+    role: z.enum(['working', 'presented', 'clip']),
     revisionId: z.uuid(),
     revisionNumber: z.number().int().positive(),
     createdAt: persistedTimestampSchema,

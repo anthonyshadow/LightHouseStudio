@@ -45,39 +45,42 @@ const current = (): ProjectCurrentResponse => ({
     parentRevisionId: null,
     parentRevisionNumber: 1,
     snapshot: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       sourceAssetId,
       workingMedia: { kind: 'asset', assetId: sourceAssetId },
       presentedMedia: { kind: 'asset', assetId: sourceAssetId },
-      selectedCharacter: null,
-      selectedOutfit: null,
-      selectedVoice: {
-        kind: 'saved-voice',
-        voiceId: 'voice-one',
-        voiceName: 'Historical Nova',
-        resourceRevision: null,
-        treatment: {
-          stability: null,
-          similarity: null,
-          style: null,
-          speakerBoost: null,
+      composition: null,
+      transform: {
+        selectedCharacter: null,
+        selectedOutfit: null,
+        selectedVoice: {
+          kind: 'saved-voice',
+          voiceId: 'voice-one',
+          voiceName: 'Historical Nova',
+          resourceRevision: null,
+          treatment: {
+            stability: null,
+            similarity: null,
+            style: null,
+            speakerBoost: null,
+          },
+        },
+        visualTreatment: { kind: 'none' },
+        creativeIntent: {
+          promptId: null,
+          promptLabel: null,
+          recipeId: null,
+          recipeLabel: null,
+          userIntent: '',
+          appliedPrompt: null,
+          referenceAssetId: null,
+          resourceRevision: null,
         },
       },
-      visualTreatment: { kind: 'none' },
       liveMode: {
         modeId: 'local',
         captureFormat: 'portrait',
         audioSource: 'local-microphone',
-      },
-      creativeIntent: {
-        promptId: null,
-        promptLabel: null,
-        recipeId: null,
-        recipeLabel: null,
-        userIntent: '',
-        appliedPrompt: null,
-        referenceAssetId: null,
-        resourceRevision: null,
       },
       localEdit: null,
       exportSpecification: null,
@@ -159,8 +162,7 @@ const setup = (
 };
 
 const completedOutputSnapshot = {
-  selectedVoice: null,
-  visualTreatment: { kind: 'none' },
+  transform: null,
   lastSuccessfulOutput: {
     savedVideoId: 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338',
     videoVersionId: 'b276694b-58c4-40d3-8fb6-315e32b66fd0',
@@ -210,7 +212,7 @@ describe('useProjectCreativeSessionAdapter output completion', () => {
 
   it('leaves the controls alone while the Project is still being configured', async () => {
     const { dependencies, restoreAspectRatio } = setup({
-      snapshot: { selectedVoice: null, visualTreatment: { kind: 'none' } },
+      snapshot: { transform: null },
       existingVideo: { steps: [leftoverStep] },
     });
     const existingVideo = dependencies.existingVideo as unknown as {
@@ -294,7 +296,7 @@ describe('useProjectCreativeSessionAdapter selection propagation', () => {
   it('carries a rail selection out to the Project without waiting to be asked', async () => {
     // The whole defect: before this, a character chosen on the rail reached nothing, so the Create
     // task read "Not chosen" and the editor opened on an empty step.
-    const { dependencies } = setup({ snapshot: { selectedVoice: null } });
+    const { dependencies } = setup({ snapshot: { transform: null } });
     const session = dependencies.projectSession as unknown as {
       propose: Mock<(proposal: ProjectSessionProposalContract) => boolean>;
     };
@@ -303,11 +305,13 @@ describe('useProjectCreativeSessionAdapter selection propagation', () => {
     renderHook(() => useProjectCreativeSessionAdapter(dependencies));
 
     await waitFor(() => expect(session.propose).toHaveBeenCalled());
-    expect(session.propose.mock.calls[0]?.[0].selectedCharacter?.characterId).toBe(character.id);
+    expect(session.propose.mock.calls[0]?.[0].transform?.selectedCharacter?.characterId).toBe(
+      character.id,
+    );
   });
 
   it('proposes once for one selection, so writing what it reads cannot loop', async () => {
-    const { dependencies } = setup({ snapshot: { selectedVoice: null } });
+    const { dependencies } = setup({ snapshot: { transform: null } });
     const session = dependencies.projectSession as unknown as {
       propose: Mock<(proposal: ProjectSessionProposalContract) => boolean>;
     };
@@ -322,7 +326,7 @@ describe('useProjectCreativeSessionAdapter selection propagation', () => {
   });
 
   it('stays silent when the Project already holds what the Studio is showing', async () => {
-    const { dependencies, restoreAspectRatio } = setup({ snapshot: { selectedVoice: null } });
+    const { dependencies, restoreAspectRatio } = setup({ snapshot: { transform: null } });
     const session = dependencies.projectSession as unknown as {
       propose: Mock<(proposal: ProjectSessionProposalContract) => boolean>;
     };
@@ -390,7 +394,7 @@ describe('useProjectCreativeSessionAdapter after a saved output', () => {
 
   it('carries a pick made after the save out to the next round', async () => {
     const { dependencies, restoreAspectRatio } = setup({
-      snapshot: { ...completedOutputSnapshot, selectedVoice: null },
+      snapshot: { ...completedOutputSnapshot, transform: null },
     });
     const session = dependencies.projectSession as unknown as {
       propose: Mock<(proposal: ProjectSessionProposalContract) => boolean>;
@@ -406,6 +410,8 @@ describe('useProjectCreativeSessionAdapter after a saved output', () => {
     rerender();
 
     await waitFor(() => expect(session.propose).toHaveBeenCalledTimes(1));
-    expect(session.propose.mock.calls[0]?.[0].selectedCharacter?.characterId).toBe(character.id);
+    expect(session.propose.mock.calls[0]?.[0].transform?.selectedCharacter?.characterId).toBe(
+      character.id,
+    );
   });
 });

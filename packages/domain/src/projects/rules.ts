@@ -16,9 +16,17 @@ import type {
   ProjectSnapshot,
   ProjectStatus,
   ProjectStatusFacts,
+  ProjectTransform,
   ProjectWorkflowPhase,
 } from './types';
 import { PROJECT_EXPORT_ASPECTS } from './types';
+import type { Composition } from '../composition';
+import { CompositionRuleError, validateComposition } from '../composition';
+import {
+  EMPTY_PROJECT_TRANSFORM,
+  normalizeProjectTransform,
+  projectTransformOf,
+} from './transform';
 import type { NormalizedVideoCrop, VideoEditSourceGeometry, VideoEditSpec } from '../video-editing';
 import {
   FULL_VIDEO_CROP,
@@ -421,6 +429,116 @@ export const projectExportFilename = (
   return `${base}-${PROJECT_EXPORT_FILENAME_TAGS[specification.aspect]}.mp4`;
 };
 
+const validateProjectTransform = (transform: ProjectTransform): void => {
+  if (transform.selectedCharacter !== null) {
+    requireId(transform.selectedCharacter.characterId, 'Character');
+    if (transform.selectedCharacter.characterLabel !== null) {
+      requireAppliedLabel(transform.selectedCharacter.characterLabel, 'Character label');
+    }
+    if (transform.selectedCharacter.characterRevision !== null) {
+      requireTimestamp(transform.selectedCharacter.characterRevision);
+    }
+    if (transform.selectedCharacter.variantId !== null) {
+      requireId(transform.selectedCharacter.variantId, 'Character variant');
+      if (
+        (transform.selectedCharacter.variantLabel === null) !==
+        (transform.selectedCharacter.variantRevision === null)
+      ) {
+        throw new ProjectRuleError(
+          'invalid-snapshot',
+          'A Character Variant label and revision must be recorded together.',
+        );
+      }
+      if (transform.selectedCharacter.variantLabel !== null) {
+        requireAppliedLabel(transform.selectedCharacter.variantLabel, 'Character Variant label');
+        requireTimestamp(transform.selectedCharacter.variantRevision!);
+      }
+    } else if (
+      transform.selectedCharacter.variantLabel !== null ||
+      transform.selectedCharacter.variantRevision !== null
+    ) {
+      throw new ProjectRuleError(
+        'invalid-snapshot',
+        'Character Variant applied values require a Variant identifier.',
+      );
+    }
+    if (transform.selectedCharacter.referenceAssetId !== null) {
+      requireId(transform.selectedCharacter.referenceAssetId, 'Character reference');
+    }
+  }
+  if (transform.selectedOutfit !== null) {
+    requireId(transform.selectedOutfit.outfitId, 'Outfit');
+    if (transform.selectedOutfit.outfitLabel !== null) {
+      requireAppliedLabel(transform.selectedOutfit.outfitLabel, 'Outfit label');
+    }
+    if (transform.selectedOutfit.outfitRevision !== null) {
+      requireTimestamp(transform.selectedOutfit.outfitRevision);
+    }
+    if (transform.selectedOutfit.referenceAssetId !== null) {
+      requireId(transform.selectedOutfit.referenceAssetId, 'Outfit reference');
+    }
+  }
+  if (transform.selectedVoice?.kind === 'saved-voice') {
+    requireId(transform.selectedVoice.voiceId, 'Voice');
+    requireAppliedLabel(transform.selectedVoice.voiceName, 'Voice label');
+    if (transform.selectedVoice.resourceRevision !== null) {
+      requireTimestamp(transform.selectedVoice.resourceRevision);
+    }
+  }
+  if (transform.visualTreatment.kind === 'character-swap' && transform.selectedCharacter === null) {
+    throw new ProjectRuleError('invalid-snapshot', 'Character Swap requires a selected character.');
+  }
+  if (
+    transform.visualTreatment.kind === 'virtual-try-on' &&
+    transform.visualTreatment.inputKind === 'saved-outfit' &&
+    transform.selectedOutfit === null
+  ) {
+    throw new ProjectRuleError(
+      'invalid-snapshot',
+      'Saved-outfit Virtual Try-On requires a selected outfit.',
+    );
+  }
+  if (transform.creativeIntent.promptId !== null) {
+    requireId(transform.creativeIntent.promptId, 'Prompt');
+  }
+  if (transform.creativeIntent.recipeId !== null) {
+    requireId(transform.creativeIntent.recipeId, 'Recipe');
+  }
+  if (transform.creativeIntent.promptLabel !== null) {
+    requireAppliedLabel(transform.creativeIntent.promptLabel, 'Prompt label');
+  }
+  if (transform.creativeIntent.recipeLabel !== null) {
+    requireAppliedLabel(transform.creativeIntent.recipeLabel, 'Recipe label');
+  }
+  if (transform.creativeIntent.referenceAssetId !== null) {
+    requireId(transform.creativeIntent.referenceAssetId, 'Creative reference');
+  }
+  if (transform.creativeIntent.resourceRevision !== null) {
+    requireTimestamp(transform.creativeIntent.resourceRevision);
+  }
+  if (transform.creativeIntent.userIntent.length > PROJECT_INTENT_MAX_LENGTH) {
+    throw new ProjectRuleError('invalid-snapshot', 'Project intent is too long.');
+  }
+  if (
+    transform.creativeIntent.appliedPrompt !== null &&
+    transform.creativeIntent.appliedPrompt.length > PROJECT_INTENT_MAX_LENGTH
+  ) {
+    throw new ProjectRuleError('invalid-snapshot', 'The applied Project prompt is too long.');
+  }
+};
+
+/** The composition module throws its own error type; on a snapshot it is an invalid-snapshot reason. */
+const validateSnapshotComposition = (composition: Composition): void => {
+  try {
+    validateComposition(composition);
+  } catch (error) {
+    if (error instanceof CompositionRuleError) {
+      throw new ProjectRuleError('invalid-snapshot', error.message);
+    }
+    throw error;
+  }
+};
+
 export const validateProjectSnapshot = (snapshot: ProjectSnapshot): ProjectSnapshot => {
   if (snapshot.schemaVersion !== PROJECT_SNAPSHOT_SCHEMA_VERSION) {
     throw new ProjectRuleError('invalid-snapshot', 'The project snapshot version is unsupported.');
@@ -436,102 +554,9 @@ export const validateProjectSnapshot = (snapshot: ProjectSnapshot): ProjectSnaps
   if (snapshot.sourceAssetId !== null) requireId(snapshot.sourceAssetId, 'Source asset');
   validateMediaReference(snapshot.workingMedia);
   validateMediaReference(snapshot.presentedMedia);
-  if (snapshot.selectedCharacter !== null) {
-    requireId(snapshot.selectedCharacter.characterId, 'Character');
-    if (snapshot.selectedCharacter.characterLabel !== null) {
-      requireAppliedLabel(snapshot.selectedCharacter.characterLabel, 'Character label');
-    }
-    if (snapshot.selectedCharacter.characterRevision !== null) {
-      requireTimestamp(snapshot.selectedCharacter.characterRevision);
-    }
-    if (snapshot.selectedCharacter.variantId !== null) {
-      requireId(snapshot.selectedCharacter.variantId, 'Character variant');
-      if (
-        (snapshot.selectedCharacter.variantLabel === null) !==
-        (snapshot.selectedCharacter.variantRevision === null)
-      ) {
-        throw new ProjectRuleError(
-          'invalid-snapshot',
-          'A Character Variant label and revision must be recorded together.',
-        );
-      }
-      if (snapshot.selectedCharacter.variantLabel !== null) {
-        requireAppliedLabel(snapshot.selectedCharacter.variantLabel, 'Character Variant label');
-        requireTimestamp(snapshot.selectedCharacter.variantRevision!);
-      }
-    } else if (
-      snapshot.selectedCharacter.variantLabel !== null ||
-      snapshot.selectedCharacter.variantRevision !== null
-    ) {
-      throw new ProjectRuleError(
-        'invalid-snapshot',
-        'Character Variant applied values require a Variant identifier.',
-      );
-    }
-    if (snapshot.selectedCharacter.referenceAssetId !== null) {
-      requireId(snapshot.selectedCharacter.referenceAssetId, 'Character reference');
-    }
-  }
-  if (snapshot.selectedOutfit !== null) {
-    requireId(snapshot.selectedOutfit.outfitId, 'Outfit');
-    if (snapshot.selectedOutfit.outfitLabel !== null) {
-      requireAppliedLabel(snapshot.selectedOutfit.outfitLabel, 'Outfit label');
-    }
-    if (snapshot.selectedOutfit.outfitRevision !== null) {
-      requireTimestamp(snapshot.selectedOutfit.outfitRevision);
-    }
-    if (snapshot.selectedOutfit.referenceAssetId !== null) {
-      requireId(snapshot.selectedOutfit.referenceAssetId, 'Outfit reference');
-    }
-  }
-  if (snapshot.selectedVoice?.kind === 'saved-voice') {
-    requireId(snapshot.selectedVoice.voiceId, 'Voice');
-    requireAppliedLabel(snapshot.selectedVoice.voiceName, 'Voice label');
-    if (snapshot.selectedVoice.resourceRevision !== null) {
-      requireTimestamp(snapshot.selectedVoice.resourceRevision);
-    }
-  }
-  if (snapshot.visualTreatment.kind === 'character-swap' && snapshot.selectedCharacter === null) {
-    throw new ProjectRuleError('invalid-snapshot', 'Character Swap requires a selected character.');
-  }
-  if (
-    snapshot.visualTreatment.kind === 'virtual-try-on' &&
-    snapshot.visualTreatment.inputKind === 'saved-outfit' &&
-    snapshot.selectedOutfit === null
-  ) {
-    throw new ProjectRuleError(
-      'invalid-snapshot',
-      'Saved-outfit Virtual Try-On requires a selected outfit.',
-    );
-  }
+  if (snapshot.composition !== null) validateSnapshotComposition(snapshot.composition);
+  if (snapshot.transform !== null) validateProjectTransform(snapshot.transform);
   if (snapshot.liveMode !== null) requireId(snapshot.liveMode.modeId, 'Live mode');
-  if (snapshot.creativeIntent.promptId !== null) {
-    requireId(snapshot.creativeIntent.promptId, 'Prompt');
-  }
-  if (snapshot.creativeIntent.recipeId !== null) {
-    requireId(snapshot.creativeIntent.recipeId, 'Recipe');
-  }
-  if (snapshot.creativeIntent.promptLabel !== null) {
-    requireAppliedLabel(snapshot.creativeIntent.promptLabel, 'Prompt label');
-  }
-  if (snapshot.creativeIntent.recipeLabel !== null) {
-    requireAppliedLabel(snapshot.creativeIntent.recipeLabel, 'Recipe label');
-  }
-  if (snapshot.creativeIntent.referenceAssetId !== null) {
-    requireId(snapshot.creativeIntent.referenceAssetId, 'Creative reference');
-  }
-  if (snapshot.creativeIntent.resourceRevision !== null) {
-    requireTimestamp(snapshot.creativeIntent.resourceRevision);
-  }
-  if (snapshot.creativeIntent.userIntent.length > PROJECT_INTENT_MAX_LENGTH) {
-    throw new ProjectRuleError('invalid-snapshot', 'Project intent is too long.');
-  }
-  if (
-    snapshot.creativeIntent.appliedPrompt !== null &&
-    snapshot.creativeIntent.appliedPrompt.length > PROJECT_INTENT_MAX_LENGTH
-  ) {
-    throw new ProjectRuleError('invalid-snapshot', 'The applied Project prompt is too long.');
-  }
   if (snapshot.exportSpecification !== null) {
     validateProjectExportSpecification(snapshot.exportSpecification);
   }
@@ -539,7 +564,14 @@ export const validateProjectSnapshot = (snapshot: ProjectSnapshot): ProjectSnaps
     requireId(snapshot.lastSuccessfulOutput.savedVideoId, 'Saved video');
     requireId(snapshot.lastSuccessfulOutput.videoVersionId, 'Video version');
   }
-  return { ...snapshot, createdAt, updatedAt };
+  // The one place the transform's canonical form is applied: every rule that builds a snapshot
+  // returns through here, so an empty transform leaves as `null` whoever assembled it.
+  return {
+    ...snapshot,
+    transform: normalizeProjectTransform(snapshot.transform),
+    createdAt,
+    updatedAt,
+  };
 };
 
 export const createEmptyProjectSnapshot = (nowValue: string): ProjectSnapshot => {
@@ -549,21 +581,9 @@ export const createEmptyProjectSnapshot = (nowValue: string): ProjectSnapshot =>
     sourceAssetId: null,
     workingMedia: null,
     presentedMedia: null,
-    selectedCharacter: null,
-    selectedOutfit: null,
-    selectedVoice: null,
-    visualTreatment: { kind: 'none' },
+    composition: null,
+    transform: null,
     liveMode: null,
-    creativeIntent: {
-      promptId: null,
-      promptLabel: null,
-      recipeId: null,
-      recipeLabel: null,
-      userIntent: '',
-      appliedPrompt: null,
-      referenceAssetId: null,
-      resourceRevision: null,
-    },
     localEdit: null,
     exportSpecification: null,
     lastSuccessfulOutput: null,
@@ -574,48 +594,38 @@ export const createEmptyProjectSnapshot = (nowValue: string): ProjectSnapshot =>
 };
 
 /**
- * The creative configuration a Project starts a round of work from.
+ * The transform a Project starts a round of work from after a save.
  *
  * A saved output ends the round it was configured for: the exact character, outfit, voice and
  * prompt that produced it are immutable on the producing revision and on the retained Version, so
  * carrying them onto the post-save revision only pre-fills the next round with settings the
- * operator has to clear before choosing a different treatment. `localEdit` is not a treatment: it
- * records the edit that made the working media, and the working media carries forward unchanged —
- * so it stays, and a second save of the same cut still knows the cut is an edit and what it burned
- * in. Live capture metadata and the export placement are left alone for the same reason.
+ * operator has to clear before choosing a different treatment. The operator's own intent text is
+ * kept; when that too is empty, the canonical form is no transform at all. `localEdit` and the
+ * composition are not treatments: they describe the media, and the media carries forward unchanged
+ * — so they stay, and a second save of the same cut still knows the cut is an edit and what it
+ * burned in. Live capture metadata and the export placement are left alone for the same reason.
  */
-const clearedProjectCreativeConfiguration = (
-  snapshot: ProjectSnapshot,
-): Pick<
-  ProjectSnapshot,
-  'selectedCharacter' | 'selectedOutfit' | 'selectedVoice' | 'visualTreatment' | 'creativeIntent'
-> => ({
-  selectedCharacter: null,
-  selectedOutfit: null,
-  selectedVoice: null,
-  visualTreatment: { kind: 'none' },
-  creativeIntent: {
-    promptId: null,
-    promptLabel: null,
-    recipeId: null,
-    recipeLabel: null,
-    userIntent: snapshot.creativeIntent.userIntent,
-    appliedPrompt: null,
-    referenceAssetId: null,
-    resourceRevision: null,
-  },
-});
+const clearedProjectTransform = (snapshot: ProjectSnapshot): ProjectTransform | null =>
+  normalizeProjectTransform({
+    ...EMPTY_PROJECT_TRANSFORM,
+    creativeIntent: {
+      ...EMPTY_PROJECT_TRANSFORM.creativeIntent,
+      userIntent: projectTransformOf(snapshot).creativeIntent.userIntent,
+    },
+  });
 
+/**
+ * Everything whose change means the last saved output no longer describes the current material.
+ * Compared as JSON, which is why the transform's canonical form matters: `null` and an empty
+ * object would read as a change.
+ */
 const materialSnapshot = (snapshot: ProjectSnapshot) => ({
   sourceAssetId: snapshot.sourceAssetId,
   workingMedia: snapshot.workingMedia,
   presentedMedia: snapshot.presentedMedia,
-  selectedCharacter: snapshot.selectedCharacter,
-  selectedOutfit: snapshot.selectedOutfit,
-  selectedVoice: snapshot.selectedVoice,
-  visualTreatment: snapshot.visualTreatment,
+  composition: snapshot.composition,
+  transform: snapshot.transform,
   liveMode: snapshot.liveMode,
-  creativeIntent: snapshot.creativeIntent,
   localEdit: snapshot.localEdit,
   exportSpecification: snapshot.exportSpecification,
 });
@@ -799,9 +809,8 @@ const duplicatedWorkflowPhase = (snapshot: ProjectSnapshot): ProjectWorkflowPhas
  * The creative state a duplicate starts from: everything that describes *intent* is carried, and
  * everything that records what the original *produced* is dropped.
  *
- * Carried: `sourceAssetId`, `workingMedia`, `presentedMedia`, `selectedCharacter`,
- * `selectedOutfit`, `selectedVoice`, `visualTreatment`, `liveMode`, `creativeIntent`, `localEdit`
- * and `exportSpecification` — all by reference, so no media is copied.
+ * Carried: `sourceAssetId`, `workingMedia`, `presentedMedia`, `composition`, `transform`,
+ * `liveMode`, `localEdit` and `exportSpecification` — all by reference, so no media is copied.
  * Cleared: `lastSuccessfulOutput`, and a `workflowPhase` that claimed completion or processing.
  */
 export const duplicateProjectSnapshot = (
@@ -1122,7 +1131,7 @@ export interface SaveProjectOutputInput {
  * while this command proves the replacement reference names the same newly retained output.
  *
  * The post-save revision also starts the next round of work with its creative configuration
- * cleared — see `clearedProjectCreativeConfiguration`.
+ * transform cleared — see `clearedProjectTransform`.
  */
 export const saveProjectOutput = (
   aggregate: ProjectAggregate,
@@ -1207,7 +1216,7 @@ export const saveProjectOutput = (
     : workingMedia;
   const snapshot = validateProjectSnapshot({
     ...producingRevision.snapshot,
-    ...clearedProjectCreativeConfiguration(producingRevision.snapshot),
+    transform: clearedProjectTransform(producingRevision.snapshot),
     // One value for both, because the readiness check above already proved the producing pair is
     // exact — and the pair the save writes has to stay exact for the same reason.
     workingMedia: nextPresentedMedia,
@@ -1496,8 +1505,11 @@ export const removeProjectSource = (
          * because the working media carries forward unchanged and the edit is that media's
          * provenance; here there is no media left for it to describe. Left behind, it followed the
          * next uploaded video around — stamping its Version as edited locally and telling the
-         * placement chooser about burned-in subtitles the new source never had.
+         * placement chooser about burned-in subtitles the new source never had. The composition
+         * arranges the same media and goes for the same reason; with several sources this narrows
+         * to pruning the clips that named the removed one.
          */
+        composition: null,
         localEdit: null,
         workflowPhase: 'source',
         updatedAt: now,

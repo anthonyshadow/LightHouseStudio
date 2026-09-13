@@ -1,6 +1,7 @@
 import { deterministicUuid } from './deterministic-uuid';
 import {
   createProjectAssetMembership,
+  projectTransformOf,
   type Project,
   type ProjectAssetKind,
   type ProjectAssetMembership,
@@ -32,7 +33,13 @@ const candidateKey = ({ kind, resourceId }: Pick<MembershipCandidate, 'kind' | '
 
 const candidatesForRevision = (revision: ProjectRevision): readonly MembershipCandidate[] => {
   const candidates: MembershipCandidate[] = [];
-  for (const media of [revision.snapshot.workingMedia, revision.snapshot.presentedMedia]) {
+  const { snapshot } = revision;
+  const heldMedia = [
+    snapshot.workingMedia,
+    snapshot.presentedMedia,
+    ...(snapshot.composition?.clips.map((clip) => clip.media) ?? []),
+  ];
+  for (const media of heldMedia) {
     if (media?.kind === 'saved-video-version') {
       candidates.push({
         kind: 'video',
@@ -41,31 +48,32 @@ const candidatesForRevision = (revision: ProjectRevision): readonly MembershipCa
       });
     }
   }
-  if (revision.snapshot.lastSuccessfulOutput !== null) {
+  if (snapshot.lastSuccessfulOutput !== null) {
     candidates.push({
       kind: 'video',
-      resourceId: revision.snapshot.lastSuccessfulOutput.savedVideoId,
+      resourceId: snapshot.lastSuccessfulOutput.savedVideoId,
       createdAt: revision.createdAt,
     });
   }
-  if (revision.snapshot.selectedCharacter !== null) {
+  const transform = projectTransformOf(snapshot);
+  if (transform.selectedCharacter !== null) {
     candidates.push({
       kind: 'character',
-      resourceId: revision.snapshot.selectedCharacter.characterId,
+      resourceId: transform.selectedCharacter.characterId,
       createdAt: revision.createdAt,
     });
   }
-  if (revision.snapshot.selectedOutfit !== null) {
+  if (transform.selectedOutfit !== null) {
     candidates.push({
       kind: 'outfit',
-      resourceId: revision.snapshot.selectedOutfit.outfitId,
+      resourceId: transform.selectedOutfit.outfitId,
       createdAt: revision.createdAt,
     });
   }
-  if (revision.snapshot.selectedVoice?.kind === 'saved-voice') {
+  if (transform.selectedVoice?.kind === 'saved-voice') {
     candidates.push({
       kind: 'voice',
-      resourceId: revision.snapshot.selectedVoice.voiceId,
+      resourceId: transform.selectedVoice.voiceId,
       createdAt: revision.createdAt,
     });
   }

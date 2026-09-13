@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -7,26 +7,17 @@ import { createApp } from '../../app.js';
 import { testConfig } from '../../test/fakes.js';
 import { FileProjectRepository } from './file-project-repository.js';
 import { ProjectService } from './project-service.js';
-import { createDefaultVideoEditSpec } from '@studio/domain';
-import { projectSourceResponseSchema, projectWorkingMediaResponseSchema } from '@studio/contracts';
+import { createDefaultVideoEditSpec, EMPTY_PROJECT_TRANSFORM } from '@studio/domain';
+import {
+  PROJECT_STALE_CLIENT_MESSAGE,
+  projectSourceResponseSchema,
+  projectWorkingMediaResponseSchema,
+} from '@studio/contracts';
 
 const browserHeaders = { host: 'localhost:5173', origin: 'http://localhost:5173' };
 const json = <Value>(response: { json(): unknown }): Value => response.json() as Value;
 const emptyCreativeProposal = {
-  selectedCharacter: null,
-  selectedOutfit: null,
-  selectedVoice: null,
-  visualTreatment: { kind: 'none' as const },
-  creativeIntent: {
-    promptId: null,
-    promptLabel: null,
-    recipeId: null,
-    recipeLabel: null,
-    userIntent: '',
-    appliedPrompt: null,
-    referenceAssetId: null,
-    resourceRevision: null,
-  },
+  transform: null,
   localEdit: null,
   exportSpecification: null,
 };
@@ -311,16 +302,39 @@ describe('Project lifecycle routes', () => {
           ...emptyCreativeProposal,
           workflowPhase: 'creative',
           liveMode: null,
-          creativeIntent: {
-            ...emptyCreativeProposal.creativeIntent,
-            userIntent: 'A bright summer launch.',
-            appliedPrompt: 'A bright summer launch.',
+          transform: {
+            ...EMPTY_PROJECT_TRANSFORM,
+            creativeIntent: {
+              ...EMPTY_PROJECT_TRANSFORM.creativeIntent,
+              userIntent: 'A bright summer launch.',
+              appliedPrompt: 'A bright summer launch.',
+            },
           },
           exportSpecification,
         },
       },
     });
     expect(checkpointed.statusCode).toBe(200);
+    // A bundle built before snapshot v3 sends the five AI fields flat; the 400 tells it to reload,
+    // in words the session surfaces, rather than answering with a validation code.
+    const preV3Checkpoint = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/revisions`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: {
+        expectedVersion: 2,
+        expectedRevisionNumber: 2,
+        proposal: {
+          workflowPhase: 'creative',
+          liveMode: null,
+          ...EMPTY_PROJECT_TRANSFORM,
+          localEdit: null,
+          exportSpecification,
+        },
+      },
+    });
+    expect(preV3Checkpoint.statusCode).toBe(400);
+    expect(JSON.stringify(preV3Checkpoint.json())).toContain(PROJECT_STALE_CLIENT_MESSAGE);
 
     const duplicate = (operationKey: string, payload: Record<string, unknown>) =>
       app.inject({
@@ -353,7 +367,7 @@ describe('Project lifecycle routes', () => {
       source: 'create',
       snapshot: {
         exportSpecification,
-        creativeIntent: { userIntent: 'A bright summer launch.' },
+        transform: { creativeIntent: { userIntent: 'A bright summer launch.' } },
         lastSuccessfulOutput: null,
       },
     });
@@ -947,12 +961,60 @@ describe('Project lifecycle routes', () => {
             savedVideoId: string;
             videoVersionId: string;
           };
+          workflowPhase: string;
+          liveMode: unknown;
+          transform: unknown;
+          localEdit: unknown;
+          exportSpecification: unknown;
+          lastSuccessfulOutput: { savedVideoId: string; videoVersionId: string };
         };
       };
       output: { savedVideoId: string; videoVersionId: string };
       savedVideo: { id: string; currentVersion: { id: string } };
       contentUrl: string;
     }>(first);
+
+    // The tab that asked for the save re-proposes what it is now looking at, which is the post-save
+    // snapshot itself — transform and all, and after a save the transform is the canonical `null`.
+    // That proposal has to converge: appending a revision for it would be an edit that changed
+    // nothing while dropping the output pointer this save just recorded.
+    const postSaveSnapshot = firstBody.revision.snapshot;
+    const reproposed = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/revisions`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: {
+        expectedVersion: firstBody.project.version,
+        expectedRevisionNumber: firstBody.revision.revisionNumber,
+        proposal: {
+          workflowPhase: postSaveSnapshot.workflowPhase,
+          liveMode: postSaveSnapshot.liveMode,
+          transform: postSaveSnapshot.transform,
+          localEdit: postSaveSnapshot.localEdit,
+          exportSpecification: postSaveSnapshot.exportSpecification,
+        },
+      },
+    });
+    expect(reproposed.statusCode).toBe(200);
+    expect(postSaveSnapshot.transform).toBeNull();
+    expect(reproposed.json()).toMatchObject({
+      project: {
+        status: 'completed',
+        version: firstBody.project.version,
+        currentRevisionNumber: firstBody.revision.revisionNumber,
+      },
+      revision: {
+        revisionNumber: firstBody.revision.revisionNumber,
+        snapshot: {
+          transform: null,
+          lastSuccessfulOutput: {
+            savedVideoId: firstBody.output.savedVideoId,
+            videoVersionId: firstBody.output.videoVersionId,
+          },
+        },
+      },
+    });
+
     const replay = await save();
     expect(replay.statusCode).toBe(200);
     expect(replay.json()).toEqual({ ...json<Record<string, unknown>>(first), replayed: true });
@@ -1162,6 +1224,216 @@ describe('Project lifecycle routes', () => {
     expect(outputHead.statusCode).toBe(200);
     expect(outputHead.body).toBe('');
     expect(outputHead.headers['content-length']).toBe(String(fixture.byteLength));
+  });
+
+  it('saves an output over an arrangement, clearing the treatment and leaving the arrangement alone', async () => {
+    const app = localApp();
+    const created = (await create(app, 'Arranged Project')).response;
+    const projectId = json<{ project: { id: string } }>(created).project.id;
+    const fixture = Buffer.from(
+      (
+        await readFile(
+          new URL('../../../../../e2e/fixtures/decodable-h264-video.base64', import.meta.url),
+          'utf8',
+        )
+      ).replaceAll(/\s/gu, ''),
+      'base64',
+    );
+    const source = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/source`,
+      headers: {
+        ...browserHeaders,
+        'content-type': 'video/mp4',
+        'idempotency-key': randomUUID(),
+        'x-lightframe-project-source': encodeURIComponent(
+          JSON.stringify({
+            expectedVersion: 1,
+            expectedRevisionNumber: 1,
+            kind: 'uploaded',
+            filename: 'arranged.mp4',
+          }),
+        ),
+      },
+      payload: fixture,
+    });
+    expect(source.statusCode).toBe(201);
+    const sourceBody = json<{
+      project: { version: number };
+      revision: {
+        revisionNumber: number;
+        snapshot: { sourceAssetId: string; workingMedia: { kind: 'asset'; assetId: string } };
+      };
+    }>(source);
+
+    // Nothing in the product writes a composition yet — the session proposal carries the creative
+    // fields and deliberately has no arrangement field until the editor can build one — so the
+    // arrangement is placed on the stored library the way its writer will, and a second app over
+    // the same directory reads it back. Everything after that is the ordinary save path.
+    const projectsDirectory = path.join(directory, 'metadata', 'v1', 'projects');
+    const libraryFile = (await readdir(projectsDirectory)).find((entry) =>
+      /^[a-f0-9]{64}\.json$/u.test(entry),
+    );
+    if (libraryFile === undefined) throw new Error('Expected one stored Project library.');
+    const libraryPath = path.join(projectsDirectory, libraryFile);
+    const library = JSON.parse(await readFile(libraryPath, 'utf8')) as {
+      projects: Array<{
+        project: { id: string; ownerUserId: string; currentRevisionId: string };
+        revisions: Array<{
+          id: string;
+          revisionNumber: number;
+          createdAt: string;
+          snapshot: Record<string, unknown>;
+        }>;
+        assetLinks: Array<Record<string, unknown>>;
+      }>;
+    };
+    const aggregate = library.projects.find(({ project }) => project.id === projectId);
+    if (aggregate === undefined) throw new Error('Expected the created Project to be stored.');
+    const arranged = aggregate.revisions.find(
+      ({ id }) => id === aggregate.project.currentRevisionId,
+    );
+    if (arranged === undefined) throw new Error('Expected a current stored revision.');
+    const composition = {
+      clips: [
+        {
+          id: randomUUID(),
+          media: sourceBody.revision.snapshot.workingMedia,
+          trim: { startMs: 0, endMs: 1_000 },
+          audio: createDefaultVideoEditSpec(1_000).audio,
+        },
+      ],
+      subtitles: [],
+    };
+    arranged.snapshot.composition = composition;
+    // A clip's media is held by the revision that arranges it, so its writer records the link.
+    aggregate.assetLinks.push({
+      projectId,
+      ownerUserId: aggregate.project.ownerUserId,
+      assetId: sourceBody.revision.snapshot.sourceAssetId,
+      role: 'clip',
+      revisionId: arranged.id,
+      revisionNumber: arranged.revisionNumber,
+      createdAt: arranged.createdAt,
+    });
+    const serialized = `${JSON.stringify(library)}\n`;
+    await writeFile(libraryPath, serialized, 'utf8');
+    await writeFile(`${libraryPath}.bak`, serialized, 'utf8');
+
+    const reopened = localApp();
+    const treated = await reopened.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/revisions`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: {
+        expectedVersion: sourceBody.project.version,
+        expectedRevisionNumber: sourceBody.revision.revisionNumber,
+        proposal: {
+          ...emptyCreativeProposal,
+          workflowPhase: 'review',
+          liveMode: null,
+          transform: {
+            ...EMPTY_PROJECT_TRANSFORM,
+            selectedVoice: {
+              kind: 'local-effect',
+              effectId: 'warm-studio',
+              effectRevision: 'builtin-v1',
+            },
+          },
+        },
+      },
+    });
+    expect(treated.statusCode).toBe(200);
+    // A checkpoint states the creative half; the arrangement it says nothing about carries forward.
+    expect(treated.json()).toMatchObject({ revision: { snapshot: { composition } } });
+    const treatedBody = json<{
+      project: { version: number };
+      revision: {
+        revisionNumber: number;
+        snapshot: { workingMedia: { kind: 'asset'; assetId: string } };
+      };
+    }>(treated);
+
+    const saved = await reopened.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/outputs`,
+      headers: {
+        ...browserHeaders,
+        'content-type': 'application/json',
+        'idempotency-key': randomUUID(),
+      },
+      payload: {
+        expectedVersion: treatedBody.project.version,
+        expectedRevisionNumber: treatedBody.revision.revisionNumber,
+        media: treatedBody.revision.snapshot.workingMedia,
+        target: { kind: 'new', title: 'Arranged master' },
+      },
+    });
+    expect(saved.statusCode).toBe(201);
+    // The storage boundary checks the status the domain derives from the deliverable this save
+    // recorded rather than the word "completed", and it derives it over this snapshot — the one
+    // carrying an arrangement.
+    expect(saved.json()).toMatchObject({
+      project: { status: 'completed' },
+      revision: {
+        source: 'output-save',
+        snapshot: {
+          // The save ends the round its treatment was configured for; the arrangement describes
+          // the media instead, which carries forward untouched.
+          transform: null,
+          composition,
+        },
+      },
+    });
+
+    // The same case as the replayed proposal after the save above, with a treatment that was
+    // genuinely configured before it: the tab re-proposes the cleared `null` it can now see, and
+    // the checkpoint converges rather than appending an edit that changes nothing.
+    const savedBody = json<{
+      project: { version: number };
+      revision: {
+        revisionNumber: number;
+        snapshot: {
+          workflowPhase: string;
+          liveMode: unknown;
+          transform: unknown;
+          localEdit: unknown;
+          exportSpecification: unknown;
+          lastSuccessfulOutput: { savedVideoId: string; videoVersionId: string };
+        };
+      };
+    }>(saved);
+    const reproposed = await reopened.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/revisions`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: {
+        expectedVersion: savedBody.project.version,
+        expectedRevisionNumber: savedBody.revision.revisionNumber,
+        proposal: {
+          workflowPhase: savedBody.revision.snapshot.workflowPhase,
+          liveMode: savedBody.revision.snapshot.liveMode,
+          transform: savedBody.revision.snapshot.transform,
+          localEdit: savedBody.revision.snapshot.localEdit,
+          exportSpecification: savedBody.revision.snapshot.exportSpecification,
+        },
+      },
+    });
+    expect(reproposed.statusCode).toBe(200);
+    expect(reproposed.json()).toMatchObject({
+      project: {
+        status: 'completed',
+        version: savedBody.project.version,
+        currentRevisionNumber: savedBody.revision.revisionNumber,
+      },
+      revision: {
+        revisionNumber: savedBody.revision.revisionNumber,
+        snapshot: {
+          composition,
+          lastSuccessfulOutput: savedBody.revision.snapshot.lastSuccessfulOutput,
+        },
+      },
+    });
   });
 
   it('keeps pagination cursors filter-bound and create idempotency durable across app restart', async () => {

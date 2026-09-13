@@ -1,7 +1,15 @@
+import type { Composition } from '../composition/types';
 import type { LocalVoiceEffectId } from '../voice/types';
 import type { VideoEditSpec } from '../video-editing';
+import type { ProjectMediaReference } from './media-reference';
 
-export const PROJECT_SNAPSHOT_SCHEMA_VERSION = 2 as const;
+export type { ProjectMediaReference } from './media-reference';
+
+/** The version every snapshot is written at. Older versions are read through explicit maps. */
+export const PROJECT_SNAPSHOT_SCHEMA_VERSION = 3 as const;
+/** Snapshot v2: the five AI fields at the top level, no composition. Read-migrated. */
+export const PREVIOUS_PROJECT_SNAPSHOT_SCHEMA_VERSION = 2 as const;
+/** Snapshot v1: v2 without applied provenance. Read-migrated, through v2. */
 export const LEGACY_PROJECT_SNAPSHOT_SCHEMA_VERSION = 1 as const;
 
 export const PROJECT_STATUSES = [
@@ -25,6 +33,8 @@ export const PROJECT_ASSET_ROLES = [
   'job-output',
   'audio',
   'thumbnail',
+  /** Media a composition clip reads from, held by the revision that arranges it. */
+  'clip',
 ] as const;
 
 export type ProjectAssetRole = (typeof PROJECT_ASSET_ROLES)[number];
@@ -54,14 +64,6 @@ export const PROJECT_REVISION_SOURCES = [
 ] as const;
 
 export type ProjectRevisionSource = (typeof PROJECT_REVISION_SOURCES)[number];
-
-export type ProjectMediaReference =
-  | { readonly kind: 'asset'; readonly assetId: string }
-  | {
-      readonly kind: 'saved-video-version';
-      readonly savedVideoId: string;
-      readonly videoVersionId: string;
-    };
 
 export interface ProjectCharacterSelection {
   readonly characterId: string;
@@ -153,17 +155,30 @@ export interface ProjectOutputReference {
   readonly videoVersionId: string;
 }
 
-export interface ProjectSnapshot {
-  readonly schemaVersion: typeof PROJECT_SNAPSHOT_SCHEMA_VERSION;
-  readonly sourceAssetId: string | null;
-  readonly workingMedia: ProjectMediaReference | null;
-  readonly presentedMedia: ProjectMediaReference | null;
+/**
+ * The optional AI attachment: what a transformation would be configured with. `null` on the
+ * snapshot when nothing is configured — an all-empty transform is never stored, sent or compared
+ * as an object (`normalizeProjectTransform`). Key order is load-bearing; the contract mirrors it.
+ */
+export interface ProjectTransform {
   readonly selectedCharacter: ProjectCharacterSelection | null;
   readonly selectedOutfit: ProjectOutfitSelection | null;
   readonly selectedVoice: ProjectVoiceSelection | null;
   readonly visualTreatment: ProjectVisualTreatment;
-  readonly liveMode: ProjectLiveModeMetadata | null;
   readonly creativeIntent: ProjectCreativeIntent;
+}
+
+export interface ProjectSnapshot {
+  readonly schemaVersion: typeof PROJECT_SNAPSHOT_SCHEMA_VERSION;
+  /** The primary, first-accepted source. Source membership is relational, never snapshot state. */
+  readonly sourceAssetId: string | null;
+  readonly workingMedia: ProjectMediaReference | null;
+  readonly presentedMedia: ProjectMediaReference | null;
+  /** `null` until the Project is arranged: the current cut, with its `localEdit`, stands in. */
+  readonly composition: Composition | null;
+  readonly transform: ProjectTransform | null;
+  /** How the source was captured; metadata, not a treatment, so a save leaves it alone. */
+  readonly liveMode: ProjectLiveModeMetadata | null;
   readonly localEdit: VideoEditSpec | null;
   readonly exportSpecification: ProjectExportSpecification | null;
   readonly lastSuccessfulOutput: ProjectOutputReference | null;
@@ -227,7 +242,7 @@ export interface ProjectAssetMembership {
   readonly createdAt: string;
 }
 
-export type ProjectVersionReferenceRole = 'working' | 'presented';
+export type ProjectVersionReferenceRole = 'working' | 'presented' | 'clip';
 
 export const PROJECT_SOURCE_KINDS = ['uploaded', 'recorded', 'saved-video-version'] as const;
 

@@ -3,6 +3,7 @@ import type {
   ProjectProcessingAttempt,
   ProjectSessionProposalContract,
 } from '@studio/contracts';
+import { projectTransformOf } from '@studio/domain';
 import { LOCAL_EFFECTS, type LocalVoiceEffectId } from '../voice-effects/types';
 import {
   VIDEO_TRANSFORM_OPERATION_DESCRIPTIONS,
@@ -44,7 +45,7 @@ export const localVoiceName = (effectId: LocalVoiceEffectId): string =>
   LOCAL_EFFECTS.find((effect) => effect.id === effectId)?.name ?? 'Local treatment';
 
 const characterValue = (snapshot: Snapshot): string | null => {
-  const character = snapshot.selectedCharacter;
+  const character = projectTransformOf(snapshot).selectedCharacter;
   if (character === null) return null;
   const name = character.characterLabel ?? 'Saved character';
   return character.variantLabel ? `${name} · ${character.variantLabel}` : name;
@@ -140,7 +141,7 @@ export const projectCreateLaunchers = (
     input: {
       kind: 'outfit',
       label: 'Outfit',
-      value: input.snapshot.selectedOutfit?.outfitLabel ?? null,
+      value: projectTransformOf(input.snapshot).selectedOutfit?.outfitLabel ?? null,
     },
     cost: PROJECT_PROCESSING_START_COST_NOTE,
     actionLabel: `Open ${VIDEO_TRANSFORM_OPERATION_LABELS['virtual-try-on']}`,
