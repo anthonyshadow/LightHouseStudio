@@ -180,16 +180,14 @@ const outputOrigin = (current: ProjectCurrentRead, media: ReadyProjectMedia): Sa
 const outputAttribution = (
   current: ProjectCurrentRead,
   media: ReadyProjectMedia,
-): Pick<StoredVideoVersion, 'characterName' | 'characterVariantName'> => ({
-  characterName:
-    projectTransformOf(current.revision.snapshot).selectedCharacter?.characterLabel ??
-    media.savedVersion?.characterName ??
-    null,
-  characterVariantName:
-    projectTransformOf(current.revision.snapshot).selectedCharacter?.variantLabel ??
-    media.savedVersion?.characterVariantName ??
-    null,
-});
+): Pick<StoredVideoVersion, 'characterName' | 'characterVariantName'> => {
+  const character = projectTransformOf(current.revision.snapshot).selectedCharacter;
+  return {
+    characterName: character?.characterLabel ?? media.savedVersion?.characterName ?? null,
+    characterVariantName:
+      character?.variantLabel ?? media.savedVersion?.characterVariantName ?? null,
+  };
+};
 
 export class ProjectOutputService {
   constructor(

@@ -13,7 +13,7 @@ import type {
   ProjectVersionReferenceLink,
   ProjectExportSpecification,
 } from '@studio/domain';
-import { deriveProjectStatus, projectMediaReferencesEqual } from '@studio/domain';
+import { projectMediaReferencesEqual, projectOutputSaveStatus } from '@studio/domain';
 import type {
   StoredSavedVideoAggregate,
   StoredVideoVersion,
@@ -500,10 +500,9 @@ export const projectOutputCommitInconsistency = (
   ) {
     return 'The receipt does not name what this save writes.';
   }
-  // Read before the status clause below, which would otherwise answer first with the vaguer
-  // reason: the derived status is `ready` for a revision that points elsewhere, so every such
-  // save would be refused as "does not continue" rather than for the pointer it actually got
-  // wrong. Pure comparisons either way, so the order changes the message and nothing else.
+  // Read before the status clause below, which derives from this pointer and would otherwise
+  // answer first with the vaguer reason. Pure comparisons either way, so the order decides which
+  // message a caller gets and nothing else.
   if (
     revision.snapshot.lastSuccessfulOutput?.savedVideoId !== savedVideoId ||
     revision.snapshot.lastSuccessfulOutput.videoVersionId !== primary.id
@@ -512,16 +511,15 @@ export const projectOutputCommitInconsistency = (
   }
   // The shared continuation clauses come from the one owner above; the three below are this
   // save's own. `archivedAt` is already proven null by the guard further up, so folding it back
-  // in through the predicate cannot change the answer. The status is the one the domain derives
-  // from the deliverable this save records — the storage boundary checks the derivation, never
-  // the word: "completed" is a milestone the Project moves through, not a state a save demands.
+  // in through the predicate cannot change the answer. The status is asked of the domain rather
+  // than asserted here: "completed" is a milestone a Project moves through, not a word storage
+  // demands, and the derivation it must match has one owner both layers call.
   if (
     projectRevision.ownerUserId !== current.ownerUserId ||
     nextProject.status !==
-      deriveProjectStatus(revision.snapshot, {
-        sourceStatus: 'ready',
-        currentAttempt: { status: 'none' },
-        validatedLastSuccessfulOutput: { savedVideoId, videoVersionId: primary.id },
+      projectOutputSaveStatus(revision.snapshot, {
+        savedVideoId,
+        videoVersionId: primary.id,
       }) ||
     revision.source !== 'output-save' ||
     !projectRevisionContinuesAggregate(nextProject, revision, {

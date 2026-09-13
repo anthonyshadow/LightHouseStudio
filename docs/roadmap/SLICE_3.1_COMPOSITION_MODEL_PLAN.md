@@ -517,3 +517,110 @@ was keyed on the whole transform, so an intent-only change would have rewritten 
 while the operator typed; the output-commit rule reported the vaguer reason for a save pointing at
 the wrong Version; and four domain files failed `format:check`. The remaining items were test-gap
 and documentation corrections, also made here.
+
+## 7. Verification (prompt 27), 2026-09-13
+
+The gate's five checks, each with what was run and what it established. Nothing here was taken on
+faith from §6: every claim below was re-run against the committed tree.
+
+### 7.1 Every stored v1 and v2 snapshot reads as v3
+
+Two kinds of evidence, because the fixtures and the real data can fail differently.
+
+**The repository's own fixtures**, all exercised by suites that run in the ordinary gate:
+`packages/contracts/src/projects.test.ts` (a v1 body and a v2 body, each asserted to regroup
+without fabricating provenance, plus the refusal of a v2 body carrying a v3 key);
+`projects.snapshot-migration.property.test.ts` (200 generated v2 bodies and 200 generated v1 bodies
+per run, on fixed seeds); `apps/api/src/infrastructure/database/project-repository.test.ts` (a
+stored v2 row and a stored v1 row through `toRevision` and `mapProjectAggregate`, plus an
+unsupported version refused); `apps/api/src/features/projects/file-project-repository.test.ts` (a
+v1 snapshot inside a v3 library envelope, a v2 snapshot inside a v6 one, and a v2 snapshot on disk
+read as v3 without being rewritten); `project-migration.postgres.integration.test.ts` (v1 rows
+inserted as SQL and read back through the migrated schema);
+`apps/web/src/features/projects/projectsApi.test.ts` (a v2 response body from a not-yet-upgraded
+API, parsed by the browser).
+
+**The developer database**, which is the only place real rows of unknown shape exist. A read-only
+pass parsed all 286 `project_revisions` rows — 2 stored as v1, 284 as v2 — through the union:
+286 read as v3, 227 with no transform, 59 with one, none carrying a composition, zero failures.
+No row was written; the pass only reads.
+
+### 7.2 Round-trip write and read, in both persistence modes
+
+**File mode** is covered by `file-project-repository.test.ts`, which writes through the service and
+re-reads across a process restart, and by the on-disk assertions that a read migrates without
+rewriting while the next write records v3.
+
+**Postgres** was verified on a throwaway database created for the purpose, migrated through `0027`
+and dropped afterwards: the five gated suites pass (5 files, 10 tests), which exercise the
+repository's own write and read paths against a real server. The developer database was never used
+for test rows.
+
+### 7.3 No behaviour change in the untouched interface
+
+The Project journeys run unchanged: the three checkpoint journeys in `e2e/app-routing.spec.ts` on
+Chromium, and the whole Playwright suite as part of the CI gate run recorded in §8 below. The
+browser's own suites — 26 files, 248 tests across the Projects and Campaigns surfaces — pass with
+fixture shapes updated and no assertion weakened.
+
+### 7.4 The `completed` decoupling, in the status-derivation tests
+
+Three levels now pin it. `deriveProjectStatus` keeps its own table-driven test. A new domain case,
+`reaches, leaves, and returns to the completed milestone through ordinary work`, walks the real
+mutation path: accept a source (`ready`), save (`completed`), edit (`ready`, pointer cleared), save
+again (`completed`), with both saves keeping their own producing provenance. And at the storage
+boundary, `routes.test.ts` proves a save succeeds against the derived status rather than the word,
+and that re-sending the post-save proposal converges without appending a revision or dropping the
+output pointer.
+
+### 7.5 The rollback point
+
+**Measured, not assumed.** The pre-slice contract was checked out at `229ae1e5` and asked to read
+what today's code writes. The result is one-directional: today's code writes v3; the pre-v3
+contract **refuses** a v3 snapshot; today's code accepts a v2 row and reads it as v3; the pre-v3
+contract accepts a v2 row. So the rollback point is exact — **the last moment before the first v3
+write** — and it is a property of the data, not of the deployment.
+
+After that moment, rolling the code back needs the data rolled back with it. What that costs
+differs by mode, and the difference is the one recorded in §4: Postgres keeps every untouched row
+at v2, so only the Projects actually written are affected; file mode serialises the owner's whole
+library on each write, so one write moves that owner entirely.
+
+**On the roadmap's suggestion that the v3 write be feature-flagged off until a switch: evaluated
+and not built, deliberately.** A flag that suppresses v3 writes has to keep a v2 writer alive — the
+domain building the five flat fields, the contract accepting and emitting them, the checkpoint
+carrying them — which is the duplicate old/new pathway the standing rules forbid, and it doubles
+the matrix every test in §6 covers. It also buys nothing the deploy boundary does not: reads are
+already backward-compatible in the direction that matters, so there is nothing to soak behind a
+flag; with the flag on the slice is inert, and the moment it is off the boundary has been crossed.
+The rollback point above is therefore the mechanism, and it is stated rather than implemented.
+This is a deliberate deviation from the parenthetical in prompt 27, recorded here because a
+verification gate reports what it finds rather than papering over it.
+
+### 7.6 The CI gates, run locally
+
+Every job in `.github/workflows/quality.yml` was run on this machine with the job's own
+environment. The four the `quality-gate` job requires all pass: **quality** (`audit:all` clean,
+`bun run quality` green at 298 files and 2,454 tests, `test:production` 1 passed), **coverage**
+(83.27% statements against an 81% threshold, and above the gate on all four metrics), **e2e**
+(`test:e2e` on the CI path, 92 passed), and **database** (`db:migrate:development`, `db:check`,
+`db:smoke:development`, then the five gated Postgres suites). The **visual** job passes too: 50
+curated cases.
+
+**`broad-captures` fails, and it failed before this slice.** The job builds a screenshot artifact,
+runs only on `workflow_dispatch`, and is not among the jobs `quality-gate` requires. 55 of its 85
+captures fail one assertion — that a captured screen contacts no API beyond `/api/capabilities` —
+and the extra request, read out of a failure trace, is `/api/creative-library`. That is the
+Characters and Outfits store syncing; this slice touches no file in it, and the failing scenarios
+are Studio, AI-settings, capture-settings and take-review screens, none of which read a Project
+snapshot. Confirmed rather than argued: the same scenario was run at `229ae1e5`, the commit before
+this slice, and fails identically, five for five. It is recorded here as a pre-existing failure in
+a dispatch-only job, not fixed, because fixing it is neither this slice's scope nor its cause.
+
+### 7.7 What this gate did not establish
+
+The real-stack journey `e2e/real-stack-project-deliverable.spec.ts` exercises the API over
+Postgres, but every Project it creates is new, so no v3 read migration runs in it — the migration's
+coverage is the fixture and developer-database evidence in §7.1, not that journey. And nothing here
+tests a rollback being performed; §7.5 measures the boundary that makes one safe or unsafe, which
+is what the gate asked for.

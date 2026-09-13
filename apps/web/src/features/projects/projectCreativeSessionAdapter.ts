@@ -423,8 +423,10 @@ export const createProjectCreativeProposal = ({
       captureFormat: capturePreferences.aspectRatio === '16:9' ? 'landscape' : 'portrait',
       audioSource: draft.mode === 'local' ? 'local-microphone' : 'model-output',
     },
-    // Canonical on the way out: a Studio with nothing chosen proposes no transform at all, which
-    // is what the Project stores, so a settled session and its own proposal compare equal.
+    // Canonical on the way out, even though the contract folds an empty transform too: this value
+    // is compared against the stored one *before* it is ever parsed — the ambient capture asks
+    // `creativeChoices(pending) === creativeChoices(proposal)` to decide whether anything changed —
+    // and an unfolded empty object there would stage a proposal on every settle.
     transform: normalizeProjectTransform({
       selectedCharacter,
       selectedOutfit,

@@ -13,6 +13,7 @@ import type {
   ProjectSourceRecord,
   ProjectWorkingMediaRecord,
 } from './project-repository.js';
+import { projectHeldMedia } from './project-snapshot-relations.js';
 
 interface MembershipCandidate {
   readonly kind: ProjectAssetKind;
@@ -34,13 +35,8 @@ const candidateKey = ({ kind, resourceId }: Pick<MembershipCandidate, 'kind' | '
 const candidatesForRevision = (revision: ProjectRevision): readonly MembershipCandidate[] => {
   const candidates: MembershipCandidate[] = [];
   const { snapshot } = revision;
-  const heldMedia = [
-    snapshot.workingMedia,
-    snapshot.presentedMedia,
-    ...(snapshot.composition?.clips.map((clip) => clip.media) ?? []),
-  ];
-  for (const media of heldMedia) {
-    if (media?.kind === 'saved-video-version') {
+  for (const media of projectHeldMedia(snapshot)) {
+    if (media.kind === 'saved-video-version') {
       candidates.push({
         kind: 'video',
         resourceId: media.savedVideoId,

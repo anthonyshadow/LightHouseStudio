@@ -13,6 +13,7 @@ import type {
   ProjectRevisionAuthor,
   ProjectRevisionSource,
   ProjectMediaReference,
+  ProjectOutputReference,
   ProjectSnapshot,
   ProjectStatus,
   ProjectStatusFacts,
@@ -34,6 +35,7 @@ import {
   normalizeVideoEditSpec,
 } from '../video-editing';
 import { requireIsoTimestamp, requireOpaqueId, stripControlCharacters } from '../common/identity';
+import { requireMediaReferenceIds } from './media-reference';
 import { normalizeWhitespace } from '../common/text';
 import type { ProjectProcessingJobStatus } from '../video-processing/types';
 import { projectProcessingNeedsAttention } from '../video-processing/rules';
@@ -109,12 +111,9 @@ export const createProjectAssetMembership = (input: {
 
 const validateMediaReference = (reference: ProjectSnapshot['workingMedia']): void => {
   if (reference === null) return;
-  if (reference.kind === 'asset') {
-    requireId(reference.assetId, 'Media asset');
-    return;
-  }
-  requireId(reference.savedVideoId, 'Saved video');
-  requireId(reference.videoVersionId, 'Video version');
+  requireMediaReferenceIds(reference, 'Project', (message) => {
+    throw new ProjectRuleError('invalid-id', message);
+  });
 };
 
 /**
@@ -655,6 +654,26 @@ export const deriveProjectStatus = (
   }
   return facts.sourceStatus === 'ready' ? 'ready' : 'draft';
 };
+
+/**
+ * The status a Project holds once a save has settled, and the facts that decide it.
+ *
+ * One owner, because two layers ask: the command that performs the save, and the storage boundary
+ * that has to prove the aggregate handed to it is the one the domain would have produced. The
+ * boundary cannot read the status off the input it is checking, so it re-derives — and it must
+ * re-derive from the same facts, which is what this function is for. A save asserts its source is
+ * ready and no attempt is open rather than reading them, so those assertions live here too, where
+ * a change to them reaches both callers at once.
+ */
+export const projectOutputSaveStatus = (
+  snapshot: Pick<ProjectSnapshot, 'lastSuccessfulOutput'>,
+  output: ProjectOutputReference,
+): ProjectStatus =>
+  deriveProjectStatus(snapshot, {
+    sourceStatus: 'ready',
+    currentAttempt: { status: 'none' },
+    validatedLastSuccessfulOutput: output,
+  });
 
 export const PROJECT_STATUS_TRANSITIONS: Readonly<Record<ProjectStatus, readonly ProjectStatus[]>> =
   {
@@ -1246,11 +1265,7 @@ export const saveProjectOutput = (
     source: 'output-save',
     createdAt: now,
   };
-  const status = deriveProjectStatus(snapshot, {
-    sourceStatus: 'ready',
-    currentAttempt: { status: 'none' },
-    validatedLastSuccessfulOutput: outputReference,
-  });
+  const status = projectOutputSaveStatus(snapshot, outputReference);
   assertStatusTransition(project.status, status);
   return {
     ok: true,
