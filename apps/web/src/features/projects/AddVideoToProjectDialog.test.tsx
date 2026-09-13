@@ -2,6 +2,8 @@
 
 import type {
   ProjectCurrentResponse,
+  ProjectSourceCollectionItem,
+  ProjectSourceListResponse,
   ProjectSourceResponse,
   SavedVideoSummary,
 } from '@studio/contracts';
@@ -140,6 +142,57 @@ const accepted: ProjectSourceResponse = {
   },
 };
 
+/** What `GET /sources` answers for a Project holding `sources`, as the contract requires. */
+const sourceList = (
+  current: ProjectCurrentResponse,
+  sources: readonly ProjectSourceCollectionItem[] = [],
+): ProjectSourceListResponse => ({
+  project: current.project,
+  revision: current.revision,
+  sources: [...sources],
+});
+
+/** A Project whose original is already in place, which is what the old refusal turned away. */
+const occupiedProject: ProjectCurrentResponse = {
+  project: accepted.project,
+  revision: accepted.revision,
+};
+
+const heldSource = (
+  held: string,
+  lineage: Pick<ProjectSourceCollectionItem, 'kind' | 'savedVideoId' | 'videoVersionId'>,
+): ProjectSourceCollectionItem => ({
+  ...lineage,
+  assetId: held,
+  acceptedRevisionId: revisionId,
+  acceptedRevisionNumber: 2,
+  mimeType: 'video/mp4',
+  filename: 'launch-master.mp4',
+  sizeBytes: 1_024,
+  container: 'mp4',
+  videoCodec: 'avc',
+  audioCodec: null,
+  durationMs: 10_000,
+  width: 1_280,
+  height: 720,
+  hasAudio: false,
+  acceptedAt: now,
+  contentUrl: `/api/projects/${projectId}/sources/${held}/content`,
+});
+
+/** The Project's original, which is a different video from the one the dialog is offering. */
+const originalSource = heldSource(assetId, {
+  kind: 'uploaded',
+  savedVideoId: null,
+  videoVersionId: null,
+});
+
+const borrowedSource = heldSource('0f0e2d69-bb32-4f0a-9d3c-2a4c5f9c81aa', {
+  kind: 'saved-video-version',
+  savedVideoId: videoId,
+  videoVersionId: versionId,
+});
+
 const DialogHarness = () => {
   const returnFocusRef = useRef<HTMLButtonElement>(null);
   return (
@@ -158,19 +211,19 @@ describe('AddVideoToProjectDialog', () => {
     vi.restoreAllMocks();
   });
 
-  it('references the current Version in an empty Project and opens its workspace', async () => {
-    let requestBody: unknown;
+  const renderDialog = (held: ProjectSourceListResponse) => {
+    const calls: { body?: unknown } = {};
     mockApiServer.use(
       http.get('*/api/projects', () =>
         HttpResponse.json({
-          projects: [emptyProject.project],
+          projects: [held.project],
           nextCursor: null,
           total: { count: 1, exceedsCeiling: false },
         }),
       ),
-      http.get(`*/api/projects/${projectId}`, () => HttpResponse.json(emptyProject)),
-      http.post(`*/api/projects/${projectId}/source/reuse`, async ({ request }) => {
-        requestBody = await request.json();
+      http.get(`*/api/projects/${projectId}/sources`, () => HttpResponse.json(held)),
+      http.post(`*/api/projects/${projectId}/sources/reuse`, async ({ request }) => {
+        calls.body = await request.json();
         return HttpResponse.json(accepted, { status: 201 });
       }),
     );
@@ -188,6 +241,11 @@ describe('AddVideoToProjectDialog', () => {
         </RemoteStateTestProvider>
       </StudioDesignProvider>,
     );
+    return { router, calls };
+  };
+
+  it('references the current Version in an empty Project and opens its workspace', async () => {
+    const { router, calls } = renderDialog(sourceList(emptyProject));
     const user = userEvent.setup();
 
     expect(await screen.findByText(/This is not an attachment/u)).toBeVisible();
@@ -197,12 +255,45 @@ describe('AddVideoToProjectDialog', () => {
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(`/projects/${projectId}/workspace`),
     );
-    expect(requestBody).toEqual({
+    expect(calls.body).toEqual({
       expectedVersion: 1,
       expectedRevisionNumber: 1,
       savedVideoId: videoId,
       videoVersionId: versionId,
     });
     expect(screen.getByText('Project workspace')).toBeVisible();
+  });
+
+  it('adds to a Project that already has an original instead of refusing it', async () => {
+    // The refusal this replaces told the operator to "choose an empty Project instead", which was
+    // the browser speaking for a server rule that no longer exists.
+    const { router, calls } = renderDialog(sourceList(occupiedProject, [originalSource]));
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: /Launch cut/u }));
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/projects/${projectId}/workspace`),
+    );
+    expect(calls.body).toEqual({
+      expectedVersion: 2,
+      expectedRevisionNumber: 2,
+      savedVideoId: videoId,
+      videoVersionId: versionId,
+    });
+  });
+
+  it('finishes without a second acceptance when the Project already holds that exact Version', async () => {
+    const { router, calls } = renderDialog(
+      sourceList(occupiedProject, [originalSource, borrowedSource]),
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: /Launch cut/u }));
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(`/projects/${projectId}/workspace`),
+    );
+    expect(calls.body).toBeUndefined();
   });
 });

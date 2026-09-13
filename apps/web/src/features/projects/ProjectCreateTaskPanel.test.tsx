@@ -152,6 +152,7 @@ const renderPanel = (props: Partial<Parameters<typeof ProjectCreateTaskPanel>[0]
         runtime={runtime()}
         sourceBusy={false}
         workingMediaBusy={false}
+        mediaBusy={false}
         onOpenSource={onOpenSource}
         onOpenTask={vi.fn()}
         {...props}

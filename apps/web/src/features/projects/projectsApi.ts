@@ -7,6 +7,7 @@ import {
   projectAssetsResponseSchema,
   projectOutputHistoryResponseSchema,
   projectRenditionUploadResponseSchema,
+  projectSourceListResponseSchema,
   projectSourceResponseSchema,
   saveProjectOutputResponseSchema,
   projectWorkingMediaResponseSchema,
@@ -22,6 +23,7 @@ import {
   type ProjectPreviewContract,
   type ProjectExportSpecificationValue,
   type ProjectRenditionUploadResponse,
+  type ProjectSourceListResponse,
   type ProjectSourceResponse,
   type SaveProjectOutputRequest,
   type SaveProjectOutputResponse,
@@ -325,32 +327,43 @@ export const moveProjectToCampaign = (
     parseProjectConflict,
   );
 
-export const getProjectSource = (
-  projectId: string,
-  signal?: AbortSignal,
-): Promise<ProjectSourceResponse> =>
-  requestJson(
-    `/api/projects/${encodeURIComponent(projectId)}/source`,
-    {
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
-      ...(signal ? { signal } : {}),
-    },
-    projectSourceResponseSchema,
-    invalidProjectResponse,
-  );
-
-export const uploadProjectSource = (input: {
-  readonly projectId: string;
-  readonly file: File;
-  readonly operationKey: string;
+/**
+ * The compare-and-set pair every Project mutation carries, named once so a caller cannot send one
+ * revision's expectation in the request and another's in the idempotency key it is signed with.
+ */
+export interface ProjectRevisionExpectation {
   readonly expectedVersion: number;
   readonly expectedRevisionNumber: number;
-  readonly kind: 'uploaded' | 'recorded';
+}
+
+type ProjectSourceDetachment = ProjectRevisionExpectation & {
+  readonly projectId: string;
   readonly signal?: AbortSignal;
-}): Promise<ProjectSourceResponse> =>
+};
+
+type ProjectSourceAcceptance = ProjectSourceDetachment & { readonly operationKey: string };
+
+/**
+ * The two source contracts, which differ in their path and in nothing else.
+ *
+ * `source` is the original-video contract a browser built before slice 3.2 still speaks: a second
+ * acceptance is refused, and the read describes the one the snapshot names. `sources` is the
+ * collection, which takes a first piece of media just as readily as a fifth — the server decides
+ * which of the two acts it is from what the Project already holds, not from the caller. Both answer
+ * the same shape, so the calls below are one request builder each rather than two.
+ */
+const projectSourcePath = (projectId: string, contract: 'source' | 'sources'): string =>
+  `/api/projects/${encodeURIComponent(projectId)}/${contract}`;
+
+const acceptProjectSourceUpload = (
+  contract: 'source' | 'sources',
+  input: ProjectSourceAcceptance & {
+    readonly file: File;
+    readonly kind: 'uploaded' | 'recorded';
+  },
+): Promise<ProjectSourceResponse> =>
   requestJson(
-    `/api/projects/${encodeURIComponent(input.projectId)}/source`,
+    projectSourcePath(input.projectId, contract),
     {
       method: 'POST',
       cache: 'no-store',
@@ -375,17 +388,15 @@ export const uploadProjectSource = (input: {
     parseProjectConflict,
   );
 
-export const reuseSavedVideoAsProjectSource = (input: {
-  readonly projectId: string;
-  readonly operationKey: string;
-  readonly expectedVersion: number;
-  readonly expectedRevisionNumber: number;
-  readonly savedVideoId: string;
-  readonly videoVersionId: string;
-  readonly signal?: AbortSignal;
-}): Promise<ProjectSourceResponse> =>
+const acceptSavedVideoAsProjectSource = (
+  contract: 'source' | 'sources',
+  input: ProjectSourceAcceptance & {
+    readonly savedVideoId: string;
+    readonly videoVersionId: string;
+  },
+): Promise<ProjectSourceResponse> =>
   requestJson(
-    `/api/projects/${encodeURIComponent(input.projectId)}/source/reuse`,
+    `${projectSourcePath(input.projectId, contract)}/reuse`,
     {
       method: 'POST',
       cache: 'no-store',
@@ -403,19 +414,75 @@ export const reuseSavedVideoAsProjectSource = (input: {
     parseProjectConflict,
   );
 
-/**
- * Detaches the current source. Carries no `Idempotency-Key`: no bytes and no provider work are
- * created, and the server converges when the source is already gone, so a lost response is safe
- * to replay.
- */
-export const removeProjectSource = (input: {
-  readonly projectId: string;
-  readonly expectedVersion: number;
-  readonly expectedRevisionNumber: number;
-  readonly signal?: AbortSignal;
-}): Promise<ProjectCurrentResponse> =>
+export const uploadProjectSource = (
+  input: ProjectSourceAcceptance & { readonly file: File; readonly kind: 'uploaded' | 'recorded' },
+): Promise<ProjectSourceResponse> => acceptProjectSourceUpload('source', input);
+
+export const reuseSavedVideoAsProjectSource = (
+  input: ProjectSourceAcceptance & {
+    readonly savedVideoId: string;
+    readonly videoVersionId: string;
+  },
+): Promise<ProjectSourceResponse> => acceptSavedVideoAsProjectSource('source', input);
+
+/** Takes on one more piece of media, or the Project's first if it holds none. */
+export const addProjectSourceUpload = (
+  input: ProjectSourceAcceptance & { readonly file: File; readonly kind: 'uploaded' | 'recorded' },
+): Promise<ProjectSourceResponse> => acceptProjectSourceUpload('sources', input);
+
+export const addSavedVideoAsProjectSource = (
+  input: ProjectSourceAcceptance & {
+    readonly savedVideoId: string;
+    readonly videoVersionId: string;
+  },
+): Promise<ProjectSourceResponse> => acceptSavedVideoAsProjectSource('sources', input);
+
+const readProjectSource = <T>(
+  path: string,
+  schema: Parameters<typeof requestJson<T>>[2],
+  signal?: AbortSignal,
+): Promise<T> =>
   requestJson(
-    `/api/projects/${encodeURIComponent(input.projectId)}/source/remove`,
+    path,
+    { cache: 'no-store', headers: { Accept: 'application/json' }, ...(signal ? { signal } : {}) },
+    schema,
+    invalidProjectResponse,
+  );
+
+/** Describes the original, and refuses a Project that has none. */
+export const getProjectSource = (
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<ProjectSourceResponse> =>
+  readProjectSource(projectSourcePath(projectId, 'source'), projectSourceResponseSchema, signal);
+
+/** Everything the Project holds, beside the revision that names one of them as the original. */
+export const listProjectSources = (
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<ProjectSourceListResponse> =>
+  readProjectSource(
+    projectSourcePath(projectId, 'sources'),
+    projectSourceListResponseSchema,
+    signal,
+  );
+
+/** The ranged bytes of one piece of a Project's media, whether or not it is the original. */
+export const projectSourceContentUrl = (projectId: string, assetId: string): string =>
+  `${projectSourcePath(projectId, 'sources')}/${encodeURIComponent(assetId)}/content`;
+
+/**
+ * Lets go of one piece of a Project's source media, named by its path.
+ *
+ * Carries no `Idempotency-Key`: no bytes and no provider work are created, and the server converges
+ * when the media is already gone, so a lost response is safe to replay.
+ */
+const detachProjectSource = (
+  path: string,
+  input: ProjectRevisionExpectation & { readonly signal?: AbortSignal },
+): Promise<ProjectCurrentResponse> =>
+  requestJson(
+    path,
     {
       method: 'POST',
       cache: 'no-store',
@@ -429,6 +496,21 @@ export const removeProjectSource = (input: {
     projectCurrentResponseSchema,
     invalidProjectResponse,
     parseProjectConflict,
+  );
+
+/** Detaches the original, which the server refuses while the Project holds other media. */
+export const removeProjectSource = (
+  input: ProjectSourceDetachment,
+): Promise<ProjectCurrentResponse> =>
+  detachProjectSource(`${projectSourcePath(input.projectId, 'source')}/remove`, input);
+
+/** Lets go of one named piece of media, original or not. */
+export const removeProjectSourceById = (
+  input: ProjectSourceDetachment & { readonly assetId: string },
+): Promise<ProjectCurrentResponse> =>
+  detachProjectSource(
+    `${projectSourcePath(input.projectId, 'sources')}/${encodeURIComponent(input.assetId)}/remove`,
+    input,
   );
 
 export const getProjectWorkingMedia = (

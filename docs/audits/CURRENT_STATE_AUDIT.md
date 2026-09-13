@@ -137,8 +137,10 @@ material flow problems are of shape, not breakage:
    Versions of one Saved Video. The gallery re-export chooser opens on the Version's recorded
    placement (prod-9 closed earlier); a Studio-saved re-framed Version still records none, which
    is the remaining prod-9 residue.
-7. **Organize doesn't feed edit** (PCD-5): "Used in this Project" renders only on the overview;
-   workspace pickers list the whole library and ignore memberships.
+7. **Organize doesn't feed edit** (PCD-5): _closed by slice 3.4 (2026-09-13)._ The workspace
+   pickers — the original-video chooser, the current-cut chooser, the Save destination chooser and
+   the Media area's own — put attached videos first under "Used in this Project", with the rest of
+   the library below. The overview's "Used in this Project" strip is unchanged.
 8. **Small silent dead ends:** unknown URLs silently redirect to the dashboard (shell-4); the
    `/studio/<uuid>` route sits outside the exit guard so in-app navigation can silently drop dirty
    local edits (shell-1); "Replace the original video" is actually a remove (PCD-11); notices
@@ -216,7 +218,12 @@ material flow problems are of shape, not breakage:
 ### 7.1 The structural gap (P1 — one decision, many symptoms)
 
 **GAP-1 Single-source Projects** (db-1 = STOR-7 = PCD-1 = studio-3 = DC-2): schema PK, domain
-snapshot, contracts, capture bridge, and UI all enforce one video per Project.
+snapshot, contracts, capture bridge, and UI all enforce one video per Project. _Closed across
+slices 3.2 (storage and contracts, 2026-09-13) and 3.4 (the workspace Media area and the capture
+bridge, 2026-09-13). The three gates that withheld the Record affordance once a Project had a
+video read `ProjectSourceActivity.accepted`; the field is gone, and the exit guard now asks about
+owned bytes rather than about what the Project had accepted. What remains is promoting a sibling
+to original, which the domain refuses and no surface can ask for._
 **GAP-2 No composition primitives** (db-2 = edit-1 = web-7 = DC-1 = prod-1): no clip, timeline,
 stitch, or audio-level concept in any layer. Subtitles now exist on the single-clip edit as
 burn-in (slice 2.1, 2026-09-03: `VideoEditSpec.subtitles`, editor tool and lane, shared-shader
@@ -242,7 +249,7 @@ deliverables.
 ### 7.2 Product/UX (beyond the structural gap)
 
 P2: deliverable invisible on overview (PCD-8); one placement per save (PCD-3); memberships
-disconnected from workspace (PCD-5); campaign cards empty (PCD-7); no campaign filter on Projects
+disconnected from workspace (PCD-5 — closed 2026-09-13); campaign cards empty (PCD-7); no campaign filter on Projects
 page (PCD-6); compact nav ranks Campaigns over Assets (shell-5); no not-found surface (shell-4);
 identity copy drift (prod-5); terminology sprawl — five names for the creative library, four
 meanings of "version", four names for the editor (assets-7, DC-8, ev-6); one-visual-tool policy

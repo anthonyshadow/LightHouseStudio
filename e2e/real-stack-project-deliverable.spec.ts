@@ -7,18 +7,20 @@ import {
 import { loadPortraitH264VideoFixture } from './support/existingVideoHarness';
 
 /**
- * The one journey that runs against the stack CI provisions — a real login, real Project routes,
- * real bytes stored and served back — rather than the in-page simulators every other spec uses.
+ * The journeys that run against the stack CI provisions — a real login, real Project routes, real
+ * bytes stored and served back — rather than the in-page simulators every other spec uses.
  *
  * The simulators exist for failure injection: a lost response, a provider that never settles, a
  * disconnect mid-upload. None of them can prove the server honours its own contract, because each
  * one *is* the contract, restated in the test. This spec is where that proof lives: if the API
  * changed what it stores or serves for a Project's deliverable, this is the check that goes red.
  *
- * It drives only what needs no provider: create a Project, upload a portrait source, adopt a
- * captioned on-device render as the current cut, save that cut for three placements at once, read
- * the pixels of all three back, and download the bytes the server kept. Every external host is
- * blocked and reported, so a regression that started contacting one fails here too.
+ * They drive only what needs no provider. The first: create a Project, upload a portrait source,
+ * adopt a captioned on-device render as the current cut, save that cut for three placements at
+ * once, read the pixels of all three back, and download the bytes the server kept. The second: take
+ * a Project from one video to two through the Media area, stream the second one back from its own
+ * content route, and let it go again. Every external host is blocked and reported, so a regression
+ * that started contacting one fails here too.
  */
 
 const ORIGIN_FALLBACK = 'http://127.0.0.1:4173';
@@ -192,6 +194,17 @@ const removeResidue = async (
   }
 };
 
+/** Creates a Project through the product and records it for cleanup; answers its id. */
+const createProject = async (page: Page, residue: Residue): Promise<string> => {
+  await page.goto('/projects');
+  await page.getByRole('button', { name: 'New Project' }).click();
+  await page.getByRole('button', { name: 'Create without a name' }).click();
+  await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/u);
+  const projectId = /\/projects\/([0-9a-f-]{36})$/u.exec(new URL(page.url()).pathname)![1]!;
+  residue.projectId = projectId;
+  return projectId;
+};
+
 const currentProjectVersion = async (
   context: APIRequestContext,
   projectId: string,
@@ -243,11 +256,7 @@ test('a Project goes from an uploaded source to a downloadable captioned placeme
 
   try {
     // 1. Create — the Project exists on the server before anything else happens to it.
-    await page.goto('/projects');
-    await page.getByRole('button', { name: 'New Project' }).click();
-    await page.getByRole('button', { name: 'Create without a name' }).click();
-    await expect(page).toHaveURL(/\/projects\/[0-9a-f-]{36}$/u);
-    residue.projectId = /\/projects\/([0-9a-f-]{36})$/u.exec(new URL(page.url()).pathname)![1]!;
+    await createProject(page, residue);
     await expect(page.getByRole('heading', { name: 'Untitled Project' })).toBeVisible();
 
     clock.mark('create');
@@ -445,6 +454,117 @@ test('a Project goes from an uploaded source to a downloadable captioned placeme
     console.log(`Real-stack phase timings: ${clock.report()}`);
     // Best effort, and never the reported failure: a cleanup that throws would replace whatever
     // the journey itself found.
+    await removeResidue(page.request, origin, residue).catch((error: unknown) => {
+      console.warn(`Real-stack residue was not removed: ${String(error)}`);
+    });
+  }
+});
+
+test('a Project takes on a second video, previews it, and lets it go again through the running API', async ({
+  page,
+  baseURL,
+}) => {
+  /*
+   * The other half of the same proof, and deliberately a separate journey: this one adds no
+   * encodes and no saves, so it costs a create, two uploads and two reads. 120s is generous
+   * against the 15.6s the journey above measures for far more work, and leaves a cold CI runner
+   * the same headroom.
+   */
+  test.setTimeout(120_000);
+  const origin = new URL(baseURL ?? ORIGIN_FALLBACK).origin;
+  const residue: Residue = {
+    title: `Real-stack second source ${Date.now()}`,
+    projectId: null,
+    savedVideoId: null,
+    renditionAssetIds: [],
+  };
+  const blocked = await blockExternalHosts(page);
+  const fixture = await loadPortraitH264VideoFixture();
+
+  try {
+    const projectId = await createProject(page, residue);
+
+    // The original, through the surface that owns the Project's first video.
+    await page.goto(`/projects/${projectId}/workspace`);
+    await expect(page.getByRole('heading', { name: 'No original video yet' })).toBeVisible();
+    await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
+      name: 'first-source.mp4',
+      mimeType: 'video/mp4',
+      buffer: fixture,
+    });
+    await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible({
+      timeout: 60_000,
+    });
+
+    // The Media area, which only exists once the Project has an original.
+    const media = page.getByRole('region', { name: 'Media in this Project' });
+    await expect(media.getByRole('listitem')).toHaveCount(1);
+    await expect(media.getByText('Original', { exact: true })).toBeVisible();
+
+    // The second video, through the collection — and through the Media area's own input, which is
+    // the only one left: the original-video section withdraws its three ways in once there is an
+    // original, rather than showing them dead beside these.
+    await media
+      .locator('input[type="file"][accept*="video/mp4"]')
+      .setInputFiles({ name: 'second-source.mp4', mimeType: 'video/mp4', buffer: fixture });
+    await expect(media.getByText('“second-source.mp4” is now part of this Project.')).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(media.getByRole('listitem')).toHaveCount(2);
+
+    /*
+     * The server, not the browser, says what the Project now holds. Two rows, distinct media, and
+     * the original still the one the snapshot names — which is the invariant the whole collection
+     * hangs off.
+     */
+    const sources = await page.request.get(`/api/projects/${residue.projectId}/sources`);
+    expect(sources.ok(), await sources.text()).toBe(true);
+    const held = (await sources.json()) as {
+      readonly revision: { readonly snapshot: { readonly sourceAssetId: string | null } };
+      readonly sources: readonly { readonly assetId: string; readonly filename: string }[];
+    };
+    expect(held.sources).toHaveLength(2);
+    expect(held.sources.map(({ filename }) => filename).sort()).toEqual([
+      'first-source.mp4',
+      'second-source.mp4',
+    ]);
+    expect(new Set(held.sources.map(({ assetId }) => assetId)).size).toBe(2);
+    expect(held.sources.map(({ assetId }) => assetId)).toContain(
+      held.revision.snapshot.sourceAssetId,
+    );
+
+    // Preview — each piece of media is served from its own content route, with real bytes behind it.
+    const second = held.sources.find(({ filename }) => filename === 'second-source.mp4')!;
+    await media.getByRole('button', { name: 'Preview second-source.mp4' }).click();
+    const player = media.locator('video');
+    await expect(player).toHaveAttribute(
+      'src',
+      `/api/projects/${residue.projectId}/sources/${second.assetId}/content`,
+    );
+    const streamed = await page.request.get(
+      `/api/projects/${residue.projectId}/sources/${second.assetId}/content`,
+      { headers: { Range: 'bytes=0-1023' } },
+    );
+    expect(streamed.status()).toBe(206);
+    expect(streamed.headers()['content-type']).toMatch(/^video\/mp4/u);
+
+    // And let it go again. The original is never offered here; only the media beside it.
+    await media.getByRole('button', { name: 'Remove second-source.mp4 from this Project' }).click();
+    await page.getByRole('button', { name: 'Remove from Project' }).click();
+    await expect(
+      media.getByText(
+        '“second-source.mp4” is no longer part of this Project. The video itself is kept.',
+      ),
+    ).toBeVisible({ timeout: 60_000 });
+    await expect(media.getByRole('listitem')).toHaveCount(1);
+
+    const remaining = await page.request.get(`/api/projects/${residue.projectId}/sources`);
+    expect(remaining.ok(), await remaining.text()).toBe(true);
+    expect(((await remaining.json()) as { readonly sources: unknown[] }).sources).toHaveLength(1);
+
+    expect(blocked.requests).toEqual([]);
+    expect(blocked.webSockets).toEqual([]);
+  } finally {
     await removeResidue(page.request, origin, residue).catch((error: unknown) => {
       console.warn(`Real-stack residue was not removed: ${String(error)}`);
     });

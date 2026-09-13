@@ -28,7 +28,6 @@ const sourceInput = {
 
 const activity = (projectId: string): ProjectSourceActivity => ({
   projectId,
-  accepted: false,
   phase: 'idle',
   busy: false,
   abort: null,

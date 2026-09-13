@@ -37,6 +37,11 @@ export const projectQueryKeys = {
     cut: ProjectCurrentResponse['revision']['snapshot']['presentedMedia'],
   ) => ['projects', 'current-cut', projectId, cut] as const,
   /**
+   * Everything the Project holds to work from. Not keyed by revision: a Project checkpoints on
+   * every creative edit, and its media changes only when something here changes it.
+   */
+  sources: (projectId: string) => ['projects', 'sources', projectId] as const,
+  /**
    * The prefix every history panel query hangs off, so one invalidation reaches revisions,
    * outputs and processing attempts together — which is exactly how adoption uses it.
    */

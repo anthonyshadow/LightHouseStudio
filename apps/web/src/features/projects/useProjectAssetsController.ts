@@ -34,6 +34,12 @@ export const attachProjectAssetAndSync = async (
 export const useProjectAssetsController = (
   projectId: string,
   kind: AttachProjectAssetRequest['kind'] | 'all',
+  /**
+   * `enabled: false` keeps the hook mounted without asking. A surface that only sometimes has a
+   * Project — a picker that promotes attachments when it is given one — must still call the hook
+   * unconditionally, and a query for a Project id it does not have would be a guaranteed 404.
+   */
+  options: { readonly enabled?: boolean } = {},
 ) => {
   const queryClient = useQueryClient();
   const query = useInfiniteQuery({
@@ -48,6 +54,7 @@ export const useProjectAssetsController = (
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
+    enabled: options.enabled ?? true,
   });
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: projectAssetQueryKeys.project(projectId) });

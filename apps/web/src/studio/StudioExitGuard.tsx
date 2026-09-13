@@ -27,6 +27,21 @@ export interface StudioExitGuardProps {
    * is the same rule for the workspaces that have no Project to accept anything.
    */
   readonly hasUnsavedTake: boolean;
+  /**
+   * The stage holds bytes this browser owns and the Project did not put there.
+   *
+   * What decides whether leaving a Project would lose a take. The Project branch used to ask
+   * whether the Project had accepted a source, which answered the same question only while a
+   * Project could hold one video: a take standing in a Project that already had one could never be
+   * adopted, so it was not worth a prompt. It can now.
+   *
+   * Both halves are load-bearing. `hasTemporaryTake` alone is true for a Project source presented
+   * from its own content route — the steady state of every Project with a video, which loses
+   * nothing on the way out. Owned bytes alone is true for a source this browser just uploaded,
+   * which is durable on the server and equally safe to leave. Only a take the Project has not
+   * taken on is work that goes.
+   */
+  readonly hasUnclaimedTake?: boolean;
   readonly voiceProcessingActive: boolean;
   readonly creativeWorkDirty: boolean;
   /**
@@ -41,7 +56,6 @@ export interface StudioExitGuardProps {
   readonly projectContextDirty?: boolean;
   readonly projectSourceActivity?: Readonly<{
     projectId: string;
-    accepted: boolean;
     busy: boolean;
     abort: (() => void) | null;
   }> | null;
@@ -58,11 +72,12 @@ export interface StudioExitGuardProps {
 const hasUnacceptedProjectDraft = (
   currentProjectId: string | null,
   hasTemporaryTake: boolean,
+  hasUnclaimedTake: boolean,
   projectSourceActivity: StudioExitGuardProps['projectSourceActivity'],
 ): boolean =>
-  hasTemporaryTake &&
-  (currentProjectId === null ||
-    (projectSourceActivity?.projectId === currentProjectId && !projectSourceActivity.accepted));
+  currentProjectId === null
+    ? hasTemporaryTake
+    : hasUnclaimedTake && projectSourceActivity?.projectId === currentProjectId;
 
 /**
  * Which workspace a pathname belongs to, or `null` for anywhere outside one.
@@ -113,6 +128,7 @@ export const StudioExitGuard = ({
   recordingOrFinalizing,
   videoRenderingActive,
   hasTemporaryTake,
+  hasUnclaimedTake = false,
   hasUnsavedTake,
   voiceProcessingActive,
   creativeWorkDirty,
@@ -127,12 +143,30 @@ export const StudioExitGuard = ({
   const projectSourceStaging = projectSourceActivity?.busy ?? false;
   const projectSavePending =
     projectSession?.hasLocalProposal === true || projectSession?.phase === 'saving';
+  /*
+   * The take a Project would lose, counted as discardable work rather than only as a reason to
+   * block. These two conditions have to name the same fact: what blocks the navigation is what the
+   * dialog then offers to discard, and a term in one and not the other is a navigation that stops
+   * with nothing on screen to answer it. Scoped to a Project on purpose — outside one, an owned
+   * artifact is as likely to be a Saved Video opened in the Studio, which is already on the server
+   * and which `hasUnsavedTake` is the narrower question about.
+   */
+  const currentProjectId = projectIdFromPath(location.pathname);
+  const projectTakeAtRisk =
+    currentProjectId !== null &&
+    hasUnacceptedProjectDraft(
+      currentProjectId,
+      hasTemporaryTake,
+      hasUnclaimedTake,
+      projectSourceActivity,
+    );
   const hasDiscardableWork =
     hasUnsavedTake ||
     voiceProcessingActive ||
     creativeWorkDirty ||
     projectContextDirty ||
-    projectSourceStaging;
+    projectSourceStaging ||
+    projectTakeAtRisk;
   const unsafeWorkActive =
     recordingOrFinalizing || videoRenderingActive || hasDiscardableWork || projectSavePending;
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
@@ -141,6 +175,7 @@ export const StudioExitGuard = ({
     const projectDraftActive = hasUnacceptedProjectDraft(
       currentProjectId,
       hasTemporaryTake,
+      hasUnclaimedTake,
       projectSourceActivity,
     );
     const unsafeProjectWorkActive =
@@ -169,6 +204,7 @@ export const StudioExitGuard = ({
       const projectDraftActive = hasUnacceptedProjectDraft(
         currentProjectId,
         hasTemporaryTake,
+        hasUnclaimedTake,
         projectSourceActivity,
       );
       const unsafeProjectWorkActive =
@@ -194,6 +230,7 @@ export const StudioExitGuard = ({
     },
     [
       hasDiscardableWork,
+      hasUnclaimedTake,
       hasTemporaryTake,
       location.pathname,
       projectSourceActivity,
@@ -322,7 +359,6 @@ export const StudioExitGuard = ({
     hasDiscardableWork;
   const projectDiscardConfirmationOpen = temporaryWorkPromptOpen && projectContextChangeBlocked;
   const discardConfirmationOpen = temporaryWorkPromptOpen && !projectContextChangeBlocked;
-  const currentProjectId = projectIdFromPath(location.pathname);
   const destinationProjectId =
     blocker.state === 'blocked' ? projectIdFromPath(blocker.location.pathname) : null;
   const projectDiscardCopy =

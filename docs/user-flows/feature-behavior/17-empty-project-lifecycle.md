@@ -78,6 +78,16 @@ provider work.
     piece is held once, up to a hundred, and taking one on moves neither the original nor what the
     stage is showing. Letting go of a held piece leaves the rest; letting go of the original while
     others are held is refused until one of them is made the original, and no surface offers that yet.
+    Since slice 3.4 (2026-09-13) the workspace's **Media** task shows what the Project holds — a
+    poster, a duration and which of the three ways it arrived, with the original named as such —
+    previews any one of them from its own content route one at a time, and offers **Remove** on
+    everything except the original, whose removal keeps its own control and its own explanation.
+    Media is added there by file, by an exact Library Version, or by recording: **Record more** stays
+    live once a Project has an original, and the finalized take is offered exactly once. A change
+    whose answer goes missing is reconciled against what the Project then holds rather than
+    repeated, because a repeat of an upload is a second copy of the same video under a different
+    asset. Adding and removing are refused, with the reason stated, while the Project is archived,
+    while a provider attempt is unresolved, and while the original or the current cut is mid-change.
     **Remove original video** detaches explicitly, returning the Project to the Source step as a
     `draft` with its creative setup — Character, Outfit, Voice, prompt, treatment — intact, and
     clearing the derived working and presented media, the arrangement, the local edit and the

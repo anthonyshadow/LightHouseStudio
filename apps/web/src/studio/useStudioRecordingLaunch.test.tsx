@@ -71,7 +71,6 @@ const streamedSource = (): PresentedRecordingArtifact => ({
 
 const sourceActivity = (overrides: Partial<ProjectSourceActivity> = {}): ProjectSourceActivity => ({
   projectId,
-  accepted: false,
   phase: 'idle',
   busy: false,
   abort: null,
@@ -372,12 +371,27 @@ describe('useStudioRecordingLaunch', () => {
       expect(startLocal).not.toHaveBeenCalled();
     });
 
+    it('launches into a Project that already holds an original, streaming it on the stage', async () => {
+      /*
+       * The capture bridge targeting the collection, at its narrowest: a Project with a video is
+       * exactly the state the launch used to decline in, and declining it was studio-3 — the
+       * Record control, and with it the Stop control, disappeared the moment the first source
+       * landed. The presented artifact here is that source streamed from the server, so no
+       * question is owed either: clearing it loses nothing.
+       */
+      const { hook, discard, startLocal, ask, navigate } = setup({ presented: streamedSource() });
+
+      const refusal = await press(hook.result.current.startProjectRecording);
+
+      expect(refusal).toBeNull();
+      expect(ask).not.toHaveBeenCalled();
+      expect(discard).toHaveBeenCalledOnce();
+      expect(navigate).toHaveBeenCalledWith(projectWorkspacePath(projectId));
+      expect(startLocal).toHaveBeenCalledOnce();
+    });
+
     it.each<[string, Partial<LaunchOptions>]>([
       ['the browser cannot capture', { browser: { ...capableBrowser, mediaRecorder: false } }],
-      [
-        'the Project source is already accepted',
-        { projectSourceActivity: sourceActivity({ accepted: true }) },
-      ],
       ['the Project source is busy', { projectSourceActivity: sourceActivity({ busy: true }) }],
     ])('declines silently when %s, before asking', async (_reason, launch) => {
       const { hook, discard, startLocal, ask, navigate } = setup({

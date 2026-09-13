@@ -112,8 +112,23 @@ export const PROJECT_PROVIDER_START_BLOCKED_REASON =
 export const PROJECT_PROCESSING_AUTHORITY_PENDING_REASON =
   'Checking whether this Project already has an accepted operation. Starting stays unavailable until that is known, so a second potentially billable submission cannot be created.';
 
-/** One word for pointing a Project at a video it does not yet have, wherever it is offered. */
-export const PROJECT_SET_ORIGINAL_VIDEO_ACTION_LABEL = 'Set as a Project’s original video';
+/**
+ * What letting go of a piece of a Project's media does not do, wherever that is confirmed.
+ *
+ * Two dialogs ask it — the original's own removal and the Media area's per-video one — and the
+ * reassurance is the same both times, because the retention rule behind it is.
+ */
+export const PROJECT_MEDIA_REMOVAL_REASSURANCE =
+  'The video itself is not deleted, and saved versions, Project history and your saved progress are all kept.';
+
+/**
+ * One word for putting a saved video into a Project, wherever it is offered.
+ *
+ * Not "set as the original" any more: which of the two acts it is belongs to the Project rather
+ * than to the operator's choice here — the first video a Project takes on is its original, and
+ * every one after that is more material beside it.
+ */
+export const PROJECT_ADD_VIDEO_ACTION_LABEL = 'Add to a Project';
 
 /** One word for adopting a retained result, wherever it is offered. */
 export const PROJECT_RESULT_ADOPT_ACTION_LABEL = 'Use this result now';
@@ -136,6 +151,12 @@ const BLOCKED_REASON_COPY = {
       'Starting another edit is blocked while it is unclear whether the provider accepted the last run. Resolve that run first, or a second one may be charged too.',
     accepted:
       'Starting another edit is blocked while accepted provider work is running. Let it finish, or remove it from the queue first.',
+  },
+  'media-change': {
+    ambiguous:
+      'Changing this Project’s media is blocked while it is unclear whether the provider accepted this run. Resolve the run first.',
+    accepted:
+      'Changing this Project’s media is blocked while accepted provider work is running. Cancel it or let it finish first.',
   },
   'source-removal': {
     ambiguous:

@@ -55,6 +55,7 @@ interface ProjectCreateTaskPanelProps {
   readonly runtime?: ProjectCreateRuntime | undefined;
   readonly sourceBusy: boolean;
   readonly workingMediaBusy: boolean;
+  readonly mediaBusy: boolean;
   readonly onOpenSource: () => void;
   readonly onOpenTask: (task: ProjectWorkflowStepId) => void;
   readonly onWorkingMediaActivityChange?:
@@ -75,6 +76,7 @@ export const ProjectCreateTaskPanel = ({
   runtime,
   sourceBusy,
   workingMediaBusy,
+  mediaBusy,
   onOpenSource,
   onOpenTask,
   onWorkingMediaActivityChange,
@@ -153,6 +155,7 @@ export const ProjectCreateTaskPanel = ({
             editorBlockedReason: runtime.editorBlockedReason,
             sourceBusy,
             workingMediaBusy,
+            mediaBusy,
           })}
           busyOperation={runtime.launchingOperation}
           reasonStatedAbove={archived}

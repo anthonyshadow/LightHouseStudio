@@ -826,6 +826,7 @@ export const ProjectOutputSaveSection = ({
               <ProjectSavedVideoList
                 active={destinationOpen && targetMode === 'version'}
                 busy={busy}
+                projectId={current.project.id}
                 selectedVideoId={appendTarget?.id}
                 onSelect={setAppendTarget}
                 emptyTitle="No version targets yet"

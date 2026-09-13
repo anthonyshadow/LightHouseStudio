@@ -428,12 +428,63 @@ describe('StudioExitGuard', () => {
     expect(event.defaultPrevented).toBe(true);
   });
 
-  it('allows accepted Project media to move to its overview without a discard prompt', async () => {
+  it('asks before leaving a Project with a take on its stage, even once it has an original', async () => {
+    /*
+     * New with the Media area, and a fix rather than a widening: a take standing in a Project that
+     * already had a video could not be adopted, so the guard let it go silently. It can now become
+     * that Project's second video, which makes it work this browser would lose.
+     */
     const { router } = renderProjectGuard({
       hasTemporaryTake: true,
+      hasUnclaimedTake: true,
       projectSourceActivity: {
         projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
-        accepted: true,
+        busy: false,
+        abort: null,
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open Project overview' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Discard temporary work and leave?' }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toContain('/workspace');
+  });
+
+  it('offers the discard when it blocks on a take the Project has already saved elsewhere', async () => {
+    /*
+     * The pair that must not come apart: whatever blocks the navigation is what the dialog then
+     * offers to discard. A take saved to the library is no longer an *unsaved* take, so the prompt's
+     * own condition went false while the block's stayed true — a navigation that stopped with
+     * nothing on screen to answer it.
+     */
+    const { router } = renderProjectGuard({
+      hasTemporaryTake: true,
+      hasUnsavedTake: false,
+      hasUnclaimedTake: true,
+      projectSourceActivity: {
+        projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
+        busy: false,
+        abort: null,
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Open Project overview' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Discard temporary work and leave?' }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toContain('/workspace');
+  });
+
+  it('allows Project media streamed from the server to reach its overview without a prompt', async () => {
+    // The steady state of every Project with a video: a presented artifact that is not this
+    // browser's to lose. `hasUnclaimedTake` tells it apart from a take standing on the stage,
+    // which a Project can now take on as a second video and so must be asked about.
+    const { router } = renderProjectGuard({
+      hasTemporaryTake: true,
+      hasUnclaimedTake: false,
+      projectSourceActivity: {
+        projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
         busy: false,
         abort: null,
       },
@@ -452,7 +503,6 @@ describe('StudioExitGuard', () => {
     const { router } = renderProjectGuard({
       projectSourceActivity: {
         projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
-        accepted: false,
         busy: true,
         abort,
       },

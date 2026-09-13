@@ -1,0 +1,276 @@
+# Slice 3.4 — Workspace media area: audit and plan
+
+**Document type:** the audit-and-plan output for implementation prompt 31 (Phase 3, slice 3.4 of
+the [roadmap](PRODUCT_ROADMAP.md)), written 2026-09-13 against commit `e8d0890d`, followed by the
+implementation record. Slice 3.4 has no (A) prompt of its own; the operator asked for the standard
+audit-and-plan procedure before the (B) prompt's code. Finding studio-3 and PCD-5 are in the
+[current-state audit](../audits/CURRENT_STATE_AUDIT.md). The storage half landed in
+[slice 3.2](SLICE_3.2_MULTI_SOURCE_PLAN.md).
+
+**In one paragraph.** The API has been able to hold a hundred videos per Project since 2026-09-13
+and no surface offers a second one. Three things stand in the way, and only one of them is the
+missing list. First, **the capture affordance is switched off by the wrong fact**: three separate
+gates — the launch guard, the stage's Record/Stop control group, and the exit guard — all read
+`ProjectSourceActivity.accepted`, which means "this Project has an original", as a proxy for
+"another capture would be pointless". That proxy was true when a Project could hold one video; now
+it is the whole of studio-3. Second, **the exit guard's use of that proxy is load-bearing in a way
+that is easy to get wrong**: `hasTemporaryTake` is true for a URL-backed Project source sitting on
+the stage, so simply deleting the `accepted` term would make every Project with a source prompt
+"discard temporary work?" on the way out. The fact it was standing in for is _owned bytes_, which
+the codebase already names (`ownedRecordingArtifact`). Third, **`AddVideoToProjectDialog` refuses
+in the browser** what the server now allows, with a sentence telling the operator to find an empty
+Project. The plan below adds one surface (`ProjectMediaSection`) with one controller, replaces the
+three gates' proxy with the fact, promotes attached-membership videos to the top of the workspace
+pickers, and changes no HTTP contract and no schema — everything it needs is already in the
+collection response.
+
+## 1. Current behaviour, with evidence
+
+### 1.1 The collection is complete and unreachable
+
+Five endpoints are live and covered by `route-inventory.test.ts:105–109`:
+
+| Endpoint                                         | Answers                                                             |
+| ------------------------------------------------ | ------------------------------------------------------------------- |
+| `GET /api/projects/:id/sources`                  | `projectSourceListResponseSchema` — project, revision, every source |
+| `POST /api/projects/:id/sources`                 | upload; takes a first source too (`refuseWhenOccupied: false`)      |
+| `POST /api/projects/:id/sources/reuse`           | borrow one exact Saved Video Version                                |
+| `POST /api/projects/:id/sources/:assetId/remove` | let go of one named source                                          |
+| `GET /api/projects/:id/sources/:assetId/content` | ranged bytes for one named source                                   |
+
+No file under `apps/web/src` names any of them. `grep -rn "/sources" apps/web/src` is empty.
+
+### 1.2 Everything the prompt asks a row to show is already in the response
+
+Canon flow 7 asks for "posters, durations, and states".
+[`projectSourceCollectionItemSchema`](../../packages/contracts/src/projects.ts) carries
+`assetId`, `kind`, `savedVideoId`, `videoVersionId`, `durationMs`, `width`, `height`, `filename`,
+`sizeBytes`, `acceptedAt` and `contentUrl`, and the response carries the `revision` whose
+`snapshot.sourceAssetId` names the original. So:
+
+- **poster** — `savedVideoThumbnailUrl(savedVideoId, videoVersionId)` for a borrowed Version;
+  nothing for an uploaded or recorded one, because `project_sources` stores no thumbnail asset and
+  neither does `media_assets`. `WorkPosterTile`'s icon fallback is what every other surface shows
+  for media with no poster, and this one shows the same.
+- **duration** — `formatDuration(durationMs)`, the same call the picker rows make.
+- **state** — the _stored_ state is always ready: the service inspects and stores before it writes
+  a row, so "uploading / processing / failed" have no stored representation. They are states of
+  the operator's in-flight act, which the surface owns and the server never sees.
+
+**No contract change, no schema change, no migration.** This slice is `apps/web` plus the three
+capture gates.
+
+### 1.3 studio-3: the Record affordance dies on `accepted`
+
+| Where                                                                                           | Reads                                                       | Effect                                                                                                                                    |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| [`useStudioRecordingLaunch.ts:43`](../../apps/web/src/studio/useStudioRecordingLaunch.ts)       | `!projectSourceActivity?.accepted` in `launchableProjectId` | A Record press in a Project with a source returns `null` and starts nothing.                                                              |
+| [`StudioApp.tsx:729`](../../apps/web/src/studio/StudioApp.tsx)                                  | `!activeProjectSourceActivity.accepted`                     | `projectRecordingAvailable` is false, so `StudioWorkspace` renders no Project recording control group at all — no Record **and no Stop**. |
+| [`ProjectSourceSection.tsx:267`](../../apps/web/src/features/projects/ProjectSourceSection.tsx) | `controller.accepted` in `controlsDisabled`                 | The section's own Record/Upload/Use-a-saved-video are disabled. Correct for that section: the original is immutable.                      |
+
+The first two are the finding. The third is right and stays.
+
+### 1.4 The exit guard reads the same proxy, and the obvious fix breaks it
+
+[`StudioExitGuard.tsx:58`](../../apps/web/src/studio/StudioExitGuard.tsx):
+
+```ts
+hasTemporaryTake &&
+  (currentProjectId === null ||
+    (projectSourceActivity?.projectId === currentProjectId && !projectSourceActivity.accepted));
+```
+
+`hasTemporaryTake` is `Boolean(recording.presented)`
+([`useStudioSessionLifecycle.ts:105`](../../apps/web/src/studio/useStudioSessionLifecycle.ts)) —
+**true for a Project source streamed from the server and presented on the stage**, which is the
+steady state of every Project with a video. Only `!accepted` keeps that from blocking navigation.
+Delete the term and every Project workspace prompts on exit.
+
+The fact the proxy stood in for is stated three files away, in `startProjectRecording`: "Only owned
+bytes raise the question: a URL-backed presentation is a Project source streamed from the server,
+durable there, and clearing it loses nothing." So the replacement is
+`ownedRecordingArtifact(recording.presented) !== null`, which `StudioApp` already computes for
+`retakeAvailable`.
+
+That is also a **fix**, not just a refactor: once a take can become a Project's second video, a
+take standing in a Project that already has one is losable work, and today's guard lets it go
+silently.
+
+### 1.5 PCD-5: the workspace pickers ignore memberships
+
+[`ProjectSavedVideoList`](../../apps/web/src/features/projects/ProjectSavedVideoPicker.tsx) queries
+`savedVideoQueryKeys.lists` and nothing else. Four surfaces mount it or its panel: the source
+picker, the current-cut picker, the Save destination chooser, and `ProjectAssetsSection`'s attach
+picker. The first three are workspace pickers that should promote attachments; the fourth is where
+attachments are _made_, so promoting already-attached videos there would be backwards.
+
+The membership data needs no new query:
+[`useProjectAssetsController(projectId, 'video')`](../../apps/web/src/features/projects/useProjectAssetsController.ts)
+returns `videoSummaries` — full `SavedVideoSummary` objects — beside the memberships.
+
+### 1.6 `AddVideoToProjectDialog` refuses what the server allows
+
+[`AddVideoToProjectDialog.tsx:46–58`](../../apps/web/src/features/projects/AddVideoToProjectDialog.tsx)
+throws `ProjectSourceOccupiedError` — "already has an original video. Choose an empty Project
+instead." — for any Project with a source, unless the video is already that source.
+
+### 1.7 What happens to the stage when a take is adopted as additional media
+
+`recordingCandidate` is `recordingLifecycle === 'recorded' ? ownedRecordingArtifact(original) : null`
+([`useStudioProjectBridge.ts:143`](../../apps/web/src/studio/useStudioProjectBridge.ts)), and
+`commitPresentedTake` sets the lifecycle back to `'recorded'` on every re-presentation
+([`useRecording.ts:561`](../../apps/web/src/orchestration/recording/useRecording.ts)). So
+**accepting a take does not clear the candidate today** — `ProjectSourceSection` simply stops
+rendering the button once `controller.accepted` flips. A second surface offering the same take has
+to remember for itself that it already added it, or the operator can add the same recording twice:
+`projectUploadAssetId(ownerUserId, operationKey)`
+([`project-byte-acceptance.ts:39`](../../apps/api/src/features/projects/project-byte-acceptance.ts))
+derives the asset id from the operation key, not the checksum, so a re-upload is a _different_
+asset and `acceptSource`'s held-media check does not catch it.
+
+## 2. Affected code
+
+**New:** `ProjectMediaSection.tsx`, `useProjectMediaController.ts`, and their tests.
+
+**Changed:** `projectsApi.ts` (four collection calls), `useProjectsController.ts` (one query key),
+`ProjectWorkspaceSurface.tsx` (mounts the section; panel header), `ProjectSavedVideoPicker.tsx`
+(optional attached-first grouping), `ProjectSourceSection.tsx` (current-cut/source pickers pass
+`projectId`), `ProjectWorkingMediaSection.tsx`, `ProjectOutputSaveSection.tsx` (same),
+`AddVideoToProjectDialog.tsx` (stop refusing), `projectProcessingPresentation.ts` (one copy key),
+`useProjectSourceController.ts` (drop `accepted` from the reported activity; export the artifact
+helpers), `useStudioRecordingLaunch.ts`, `StudioApp.tsx`, `StudioExitGuard.tsx`.
+
+**Docs:** `DOMAIN_MODEL.md` (source media status), `TARGET_USER_FLOWS.md` (flows 7 and 8),
+`TARGET_ARCHITECTURE.md`, `PRODUCT_ROADMAP.md`, `CURRENT_STATE_AUDIT.md`,
+`17-empty-project-lifecycle.md`.
+
+**Tests:** `ProjectMediaSection.test.tsx` (new), `ProjectSavedVideoPicker` coverage via the
+sections that mount it, `useStudioRecordingLaunch.test.tsx`, `useStudioProjectBridge.test.tsx`,
+`StudioApp.test.tsx`, `ProjectRouteSurface.test.tsx`, `AddVideoToProjectDialog.test.tsx`, and the
+real-stack e2e.
+
+## 3. The plan, in order
+
+1. **Client calls.** Add `listProjectSources`, `addProjectSourceUpload`,
+   `addSavedVideoAsProjectSource`, `removeProjectSourceById` to `projectsApi.ts`, sharing the
+   request construction with the legacy pair rather than restating it. Add
+   `projectQueryKeys.sources`.
+2. **The controller.** `useProjectMediaController` owns the list query and four acts: add by
+   upload, add by finalized take, add from Videos, remove one. Each flushes the session first (the
+   pattern `ProjectWorkingMediaSection` already uses for a revision-appending mutation), carries an
+   idempotency key from `useStableOperationKey`, CASes on the session's freshest version,
+   reconciles, and invalidates the list.
+3. **The surface.** `ProjectMediaSection` renders one row per source — poster, title, duration,
+   dimensions, state — with an inline preview (one at a time, like the picker), Remove on
+   everything but the original, and four ways to add. It mounts only where the Project has an
+   original, so the empty case keeps its single owner in `ProjectSourceSection`.
+4. **Capture.** Drop `accepted` from `ProjectSourceActivity` and from the launch guard and
+   `projectRecordingAvailable`; give the exit guard `hasOwnedTake` instead.
+5. **Pickers.** `ProjectSavedVideoList` takes an optional `projectId` and renders attached videos
+   first under their own heading, excluded from the paginated list below.
+6. **The dialog.** `AddVideoToProjectDialog` adds to the collection instead of refusing.
+7. **Docs and tests.**
+
+## 4. Risks and decisions
+
+| #   | Risk                                                                                                        | Decision                                                                                                                                                                                                                                                                                   |
+| --- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Deleting `accepted` from the exit guard blocks every Project exit (§1.4).                                   | Replace with `hasOwnedTake`, not with nothing. Covered by a test that a presented remote source does not block.                                                                                                                                                                            |
+| 2   | The same take added twice (§1.7).                                                                           | The controller remembers the signature of the take it added and withholds the control for it.                                                                                                                                                                                              |
+| 3   | The original appears both in `ProjectSourceSection` and in the media list.                                  | Two different acts. The list marks it **Original** and never offers Remove on it; "Remove original video" keeps one owner. The server agrees: `removeProjectSourceById` on the original with siblings returns a `primary-source` conflict.                                                 |
+| 4   | Attached-first grouping could show a video twice.                                                           | The paginated list excludes ids already promoted. Only the first page of memberships is promoted; everything else is still in the list below, so nothing is hidden.                                                                                                                        |
+| 5   | Adding media bumps the Project version under an unresolved provider attempt.                                | The run overlay already covers the workspace while a run is in flight; for an unresolved attempt the section reuses `projectProcessingBlockedReason` with its own copy.                                                                                                                    |
+| 6   | Recording into a Project that already holds media leaves the take on the stage rather than the current cut. | Accepted, and stated in the UI. The source controller's hydration marker is keyed on the snapshot's `presentedMedia`, which an added source does not change; leaving the workspace and returning re-hydrates. Restoring the cut in place needs the stage-ownership work Phase 4 owns (§6). |
+
+## 5. Questions whose answers change the implementation
+
+1. **Should the Media area be a fifth workspace task?** No — taken as: it belongs in the existing
+   `source` task, whose progress step is "Original". A fifth tab would change
+   `PROJECT_WORKFLOW_STEPS`, the progress strip, both route oracles and the e2e journey for a
+   presentational choice. The panel's heading becomes **Media**; the tab stays **Original**.
+2. **Can the original be removed from the Media list?** No (§4.3).
+3. **Does the Save destination chooser get attached-first too?** Yes — canon flow 8 says "the
+   workspace's pickers", and it is one.
+
+## 6. Follow-ups discovered, not done here
+
+- **Promoting a sibling to original.** The domain refuses changing the original while other media
+  is held, and no surface can ask. Needs a rule and a contract; Phase 4.
+- **Stage authority inside a Project.** §4.6: after a capture, the stage holds the take while the
+  snapshot's `presentedMedia` names the cut, and only leaving the workspace reconciles them. This
+  is the same seam as prod-4 (the run overlay) and web-3 (StudioApp decomposition).
+- **Resumable uploads.** Canon flow 7 asks for uploads that survive a reload. Still a gap.
+- **Composition pruning is written but unreachable.** `compositionWithoutMedia` runs on every
+  per-source removal and no writer produces a composition yet (slice 3.3/4.1).
+- **A take added to the collection stays "unclaimed" on the stage.** It is never re-presented as
+  Project media, so leaving the workspace afterwards asks to discard a recording the Project already
+  holds. One extra confirmation, in the safe direction; fixing it properly is the stage-authority
+  seam above.
+- **The browser now speaks two source contracts.** Every legacy client call has a collection
+  equivalent that is a superset of it, so `useProjectSourceController` could drop the `source` half
+  entirely — at the cost of no longer exercising `POST /source`'s refusal of a second acceptance.
+  Named here rather than done: it moves stage hydration, which this slice deliberately did not.
+- **The blocked-reason matrix is still pairwise.** Four writers of Project revisions guard each
+  other by hand in three idioms; slice 3.4 added the fifth clause to two of them. One
+  `activeRevisionWriter` derived in the workspace would collapse all of it.
+
+## 7. What was built, and what the review changed
+
+Landed 2026-09-13 on `phase3`. §3's order held; §5's three answers all stood.
+
+### 7.1 Validation
+
+`bun run quality` — 2,470 tests passed, 16 skipped, across typecheck, Storybook typecheck, lint,
+format, dead code, module graph (zero cycles), script references, doc links, retired-program words,
+the full unit/integration suite, the production build, the bundle manifest and the Storybook build.
+
+`bunx playwright test` against a stack pointed at a throwaway database with `ASSET_STORE_PROVIDER=local`
+and no provider credentials — **93 passed, exit 0**, including the new second-source journey. The
+throwaway database was dropped afterwards and only `lightframe_development` remains, untouched.
+
+### 7.2 Two bundle ceilings were already red, and this slice says so
+
+A clean build at `e8d0890d` measures the shell closure at 750_547 against a 750_000 ceiling, and
+Studio's at 1_093_398 against 1_093_000. Slice 3.2's switch stage crossed both and was reported
+green because `check:build-manifest` reads whatever `apps/web/dist` holds and nothing had rebuilt
+it — `0f819c9e` and `245aa415` both measure 749_092 and 1_091_943, which is what the stale manifest
+was still answering with. Both ceilings are raised with that recorded in the ledger, and 253 bytes
+of this slice's own growth were recovered first.
+
+### 7.3 What the cleanup review changed
+
+Four reviews ran over the diff. Five findings were behavioural and are fixed here:
+
+1. **The exit guard blocked without prompting.** Whatever blocks a navigation is what the dialog
+   then offers to discard, and the two conditions had come apart: a take saved to the library made
+   `hasUnsavedTake` false while the block's own term stayed true, so the navigation stopped with
+   nothing on screen to answer it. The prompt now reads the same fact.
+2. **"Owned bytes" was the wrong fact.** A source uploaded from this browser is owned bytes _and_
+   already durable on the server, so the first fix asked to discard temporary work on the way out of
+   every Project whose source was uploaded in that session — caught by the real-stack e2e, not by a
+   unit test. What tells a take apart from the Project's own media is which door it came through:
+   media the Project puts on the stage goes through `ProjectStageSourceRuntime.present`, and a
+   capture never does. The bridge already tracked that id for its own use; it now renders it.
+3. **The panel showed three dead controls above three live ones.** With an original in place,
+   `ProjectSourceSection` rendered a disabled Record, Upload and Use-a-saved-video directly above
+   the Media area's working equivalents. They are withdrawn rather than disabled — the original is
+   immutable while it is attached, so they were never going to act again.
+4. **Starting an AI run was not blocked while media was changing.** The guard was added to the
+   original-video removal and not to the Create task's launchers, which is what a pairwise matrix
+   guarantees; the fifth clause is now in both.
+5. **A recording could be added twice.** Identity came from a reconstructed file signature rather
+   than the artifact id the capture graph holds one file away. `ProjectRecordingCandidate` carries
+   the id.
+
+Six more were reuse and efficiency, and are also fixed: the double list read and double
+`reconcileProject` on every change (`acceptCurrent` already publishes); per-row styles rebuilt
+inside the `map`; the picker's derived lists unmemoised; a locally re-implemented `apiErrorMessage`;
+the duration badge, inline preview and list reset copied a third time (now
+`projectVideoRow.styles.ts`); and the removal reassurance copied word-for-word into a second dialog.
+
+Deliberately skipped, and why: one shared idempotency-signature builder across three controllers
+(the client signature only decides when this browser rotates its own key, so the two shapes cannot
+drift into a defect); shared test fixtures across four suites (real duplication, but the fix reaches
+well outside this diff); a `VideoPreviewRow` component (shape alone is not a reason to abstract);
+`staleTime` on the attachments query (an optimisation with a staleness trade this slice did not
+ask for); and the three structural findings now recorded as follow-ups in §6.
