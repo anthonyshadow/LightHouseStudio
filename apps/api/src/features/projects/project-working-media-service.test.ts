@@ -76,6 +76,7 @@ describe('ProjectWorkingMediaService local authority', () => {
       projectRetention: projects,
     });
     const accepted = await source.upload({
+      refuseWhenOccupied: true,
       ownerUserId,
       projectId: created.current.project.id,
       operationKey: randomUUID(),

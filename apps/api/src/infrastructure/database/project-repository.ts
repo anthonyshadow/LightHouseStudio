@@ -25,6 +25,7 @@ import {
   type ProjectVersionReferenceLink,
   projectStatusAfterProcessingTrace,
   projectConflicts,
+  PROJECT_SOURCE_LIMIT,
 } from '@studio/domain';
 import { and, desc, eq, gt, inArray, isNull, lt, ne, or, sql, type SQLWrapper } from 'drizzle-orm';
 import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestamps.js';
@@ -53,6 +54,7 @@ import type {
   ProjectSummaryPreview,
   ProjectSourceAcceptanceResult,
   ProjectSourceRecord,
+  ProjectSourceListRead,
   ProjectSourceRemovalResult,
   RemoveProjectSourcePersistenceInput,
   ProjectWorkingMediaAdoptionResult,
@@ -330,8 +332,10 @@ const assertReadyAssets = async (
   executor: LightframeDatabase | DatabaseExecutor,
   ownerUserId: string,
   links: readonly ProjectAssetLink[],
+  /** Material the Project holds that this revision does not link to — a source beside the original. */
+  alsoRequire: readonly string[] = [],
 ): Promise<ReadonlyMap<string, ReadyAsset>> => {
-  const assetIds = [...new Set(links.map(({ assetId }) => assetId))];
+  const assetIds = [...new Set([...links.map(({ assetId }) => assetId), ...alsoRequire])];
   if (assetIds.length === 0) return new Map();
   const rows = await executor
     .select({
@@ -421,12 +425,16 @@ const assertReadyProjectSource = (
   asset: ReadyAsset | undefined,
   version: ReadyVersionReference | undefined,
 ): void => {
+  /*
+   * Per-row facts only. Whether this row is the one the snapshot points at is a question about the
+   * Project's whole collection — a first source is, a later one is not — and it is asked where the
+   * collection is locked, not here where one row is in hand.
+   */
   if (
     source.projectId !== revision.projectId ||
     source.ownerUserId !== revision.ownerUserId ||
     source.acceptedRevisionId !== revision.id ||
-    source.acceptedRevisionNumber !== revision.revisionNumber ||
-    source.assetId !== revision.snapshot.sourceAssetId
+    source.acceptedRevisionNumber !== revision.revisionNumber
   ) {
     throw new ProjectPersistenceError(
       'invalid-aggregate',
@@ -922,6 +930,64 @@ export class DrizzleProjectRepository
       current: toProjectCurrentRead(row),
       source: row.source === null ? null : toProjectSource(row.source),
     };
+  }
+
+  async listSources(ownerUserId: string, projectId: string): Promise<ProjectSourceListRead | null> {
+    const rows = await this.db
+      .select({ project: projects, revision: projectRevisions, source: projectSources })
+      .from(projects)
+      .innerJoin(projectRevisions, currentRevisionMatch)
+      .leftJoin(
+        projectSources,
+        and(
+          eq(projectSources.projectId, projects.id),
+          eq(projectSources.ownerUserId, projects.ownerUserId),
+        ),
+      )
+      .where(
+        and(
+          eq(projects.id, projectId),
+          eq(projects.ownerUserId, ownerUserId),
+          isNull(projects.deletedAt),
+        ),
+      )
+      // Oldest acceptance first, so the order a client renders is the order the operator built it
+      // in; the asset id breaks a tie two acceptances in the same millisecond would otherwise leave
+      // to the plan.
+      .orderBy(projectSources.acceptedAt, projectSources.assetId);
+    const first = rows[0];
+    if (first === undefined) return null;
+    return {
+      current: toProjectCurrentRead(first),
+      sources: rows.flatMap(({ source }) => (source === null ? [] : [toProjectSource(source)])),
+    };
+  }
+
+  async getSourceById(
+    ownerUserId: string,
+    projectId: string,
+    assetId: string,
+  ): Promise<ProjectSourceRecord | null> {
+    const [row] = await this.db
+      .select({ source: projectSources })
+      .from(projectSources)
+      .innerJoin(
+        projects,
+        and(
+          eq(projects.id, projectSources.projectId),
+          eq(projects.ownerUserId, projectSources.ownerUserId),
+          isNull(projects.deletedAt),
+        ),
+      )
+      .where(
+        and(
+          eq(projectSources.projectId, projectId),
+          eq(projectSources.ownerUserId, ownerUserId),
+          eq(projectSources.assetId, assetId),
+        ),
+      )
+      .limit(1);
+    return row === undefined ? null : toProjectSource(row.source);
   }
 
   async getSource(ownerUserId: string, projectId: string): Promise<ProjectSourceRecord | null> {
@@ -1719,6 +1785,15 @@ export class DrizzleProjectRepository
     });
   }
 
+  /**
+   * Takes a Project's material on, whether it is the first piece or the next.
+   *
+   * Which it is, is not the caller's to declare — the revision says so. A revision that points the
+   * Project's original at what is being accepted is taking a first source; one that leaves the
+   * pointer where it was is taking on more. That is the same reading `removeSource` makes of how
+   * much to let go of, and it means the legacy endpoint's refusal lives where the legacy contract
+   * does rather than travelling down here as a flag.
+   */
   async acceptSource(
     input: AcceptProjectSourcePersistenceInput,
   ): Promise<ProjectSourceAcceptanceResult> {
@@ -1786,8 +1861,8 @@ export class DrizzleProjectRepository
         .for('update')
         .limit(1);
       if (current === undefined) return { kind: 'not-found' } as const;
-      const [acceptedSource] = await tx
-        .select({ projectId: projectSources.projectId })
+      const heldSources = await tx
+        .select({ assetId: projectSources.assetId })
         .from(projectSources)
         .where(
           and(
@@ -1795,12 +1870,33 @@ export class DrizzleProjectRepository
             eq(projectSources.ownerUserId, input.ownerUserId),
           ),
         )
-        .for('update')
-        .limit(1);
-      if (acceptedSource !== undefined) {
+        .for('update');
+      const held = new Set(heldSources.map(({ assetId }) => assetId));
+      // A Project holds each piece of media once, and the key says so — but a second request for the
+      // same media under a fresh operation key is a different request rather than a replay, so it is
+      // refused by name instead of surfacing as a unique violation.
+      if (held.has(input.source.assetId)) {
+        return {
+          kind: 'conflict',
+          conflict: projectConflicts.sourceAlreadyHeld(input.projectId),
+        } as const;
+      }
+      // A revision that points the Project's original at what is being accepted is taking a first
+      // source. Doing that while material is already held would overwrite the original, which is the
+      // refusal the legacy contract has always made.
+      if (input.revision.snapshot.sourceAssetId === input.source.assetId && held.size > 0) {
         return {
           kind: 'conflict',
           conflict: projectConflicts.immutableSource(input.projectId),
+        } as const;
+      }
+      // The domain refused on the count its caller read; this is the count under the lock that
+      // writes the row, which is the one that decides. Same conflict either way, so a client cannot
+      // tell which layer said no — as `removeSource` does for unresolved provider work.
+      if (held.size >= PROJECT_SOURCE_LIMIT) {
+        return {
+          kind: 'conflict',
+          conflict: projectConflicts.sourceLimit(input.projectId),
         } as const;
       }
       if (current.version !== input.expectedVersion) {
@@ -1840,7 +1936,18 @@ export class DrizzleProjectRepository
       }
       assertRevisionAssetLinks(revision, input.assetLinks);
       const versionReferenceLinks = projectVersionReferenceLinksForRevision(revision);
-      const readyAssets = await assertReadyAssets(tx, input.ownerUserId, input.assetLinks);
+      /*
+       * The revision's links plus the accepted source's own asset.
+       *
+       * A first source is named by the snapshot, so it is already among the links. A later one is
+       * not — it is material the Project holds and the snapshot says nothing about — and it gets no
+       * `project_assets` row of its own, because its bytes are retained by the `project_sources`
+       * row instead. Its readiness still has to be verified, so it joins the check without joining
+       * what the check's callers go on to insert.
+       */
+      const readyAssets = await assertReadyAssets(tx, input.ownerUserId, input.assetLinks, [
+        input.source.assetId,
+      ]);
       const readyVersionReferences = await assertReadyVersionReferences(
         tx,
         input.ownerUserId,
@@ -1994,10 +2101,12 @@ export class DrizzleProjectRepository
         ...input.revision,
         snapshot: projectSnapshotSchema.parse(input.revision.snapshot),
       };
-      // `priorSource` is now selected by `removedAssetId`, so the agreement this used to assert is
-      // the WHERE clause; what is left to check is that the revision really detaches it.
+      // `lockedSource` is selected by `removedAssetId`, so the agreement this used to assert is the
+      // WHERE clause. What is left is that the revision does not claim the removed asset is still
+      // the Project's original.
+      const detachesEverything = revision.snapshot.sourceAssetId === null;
       const validNextState =
-        revision.snapshot.sourceAssetId === null &&
+        revision.snapshot.sourceAssetId !== input.removedAssetId &&
         projectRevisionContinuesAggregate(input.nextProject, revision, current);
       if (!validNextState) {
         throw new ProjectPersistenceError(
@@ -2018,11 +2127,13 @@ export class DrizzleProjectRepository
       // role='source' stays, so `DrizzleProjectRetentionPolicy` keeps retaining the bytes for any
       // output Version already produced from them.
       /*
-       * By Project, not by the removed asset. This command means "the Project goes back to having
-       * no source" — the revision it commits says `sourceAssetId: null`, asserted just above — so
-       * leaving any held source behind would contradict the snapshot it wrote, and the row would be
-       * unreachable afterwards: every read resolves a source through the pointer that is now null.
-       * Removing one source of several is a different command, with its own key and its own rule.
+       * How much goes is read off the revision, not off a flag the caller passed.
+       *
+       * A revision that clears the source pointer says the Project has no original any more, and
+       * every read resolves a source through that pointer — so a survivor would be unreachable as
+       * well as unremovable. Detaching the Project's original therefore detaches its material.
+       * A revision that leaves the pointer alone is letting go of one piece of material, and the
+       * rest stay exactly where they were.
        */
       await tx
         .delete(projectSources)
@@ -2030,6 +2141,7 @@ export class DrizzleProjectRepository
           and(
             eq(projectSources.projectId, input.projectId),
             eq(projectSources.ownerUserId, input.ownerUserId),
+            ...(detachesEverything ? [] : [eq(projectSources.assetId, input.removedAssetId)]),
           ),
         );
       await tx

@@ -12,6 +12,7 @@ import {
   createProject,
   duplicateProject,
   promoteProjectJobResult,
+  addProjectSource,
   removeProjectSource,
   type ProjectAssetLink,
   projectTransformOf,
@@ -1920,6 +1921,7 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
     const firstRevisionId = randomUUID();
     const sourceRevisionId = randomUUID();
     const removalRevisionId = randomUUID();
+    const addedAt = '2026-09-13T09:07:00.000Z';
     const createdAt = '2026-09-13T09:00:00.000Z';
     const acceptedAt = '2026-09-13T09:05:00.000Z';
     const removedAt = '2026-09-13T09:10:00.000Z';
@@ -2022,15 +2024,50 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
         }),
       ).resolves.toMatchObject({ kind: 'accepted' });
 
-      // The sibling the collection can now hold. It names the same accepting revision, so it is a
-      // member the snapshot does not point at — exactly what an additional source will be.
-      await connection.db.insert(projectSources).values({
-        ...source,
-        assetId: extraAssetId,
-        operationKey: randomUUID(),
-        requestFingerprint: 'c'.repeat(64),
-        filename: 'collection-1.mp4',
-        checksumSha256: '1'.repeat(64),
+      // The second source, through the writer rather than seeded: a revision that moves nothing but
+      // the clock, and a row the snapshot does not point at.
+      const addedRevisionId = randomUUID();
+      const added = addProjectSource(
+        accepted.value,
+        {
+          expectedProjectVersion: 2,
+          expectedRevisionNumber: 2,
+          heldSourceCount: 1,
+          author: { kind: 'user', authorId: ownerUserId },
+        },
+        { now: addedAt, createId: () => addedRevisionId },
+      );
+      if (!added.ok) throw new Error('The additional source fixture must succeed.');
+      const addedRevision = added.value.revisions.at(-1)!;
+      expect(addedRevision.snapshot).toMatchObject({
+        sourceAssetId: assetId,
+        workingMedia: { kind: 'asset', assetId },
+      });
+      await expect(
+        repository.acceptSource({
+          ownerUserId,
+          projectId,
+          expectedVersion: 2,
+          expectedRevisionNumber: 2,
+          nextProject: added.value.project,
+          revision: addedRevision,
+          assetLinks: projectAssetLinksForRevision(addedRevision),
+          source: {
+            ...source,
+            assetId: extraAssetId,
+            acceptedRevisionId: addedRevision.id,
+            acceptedRevisionNumber: addedRevision.revisionNumber,
+            operationKey: randomUUID(),
+            requestFingerprint: 'c'.repeat(64),
+            filename: 'collection-1.mp4',
+            checksumSha256: '1'.repeat(64),
+            acceptedAt: addedRevision.createdAt,
+          },
+        }),
+      ).resolves.toMatchObject({ kind: 'accepted' });
+
+      await expect(repository.listSources(ownerUserId, projectId)).resolves.toMatchObject({
+        sources: [{ assetId }, { assetId: extraAssetId }],
       });
 
       await expect(repository.getSource(ownerUserId, projectId)).resolves.toMatchObject({
@@ -2043,10 +2080,10 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
       await expect(retention.retainsAsset(ownerUserId, extraAssetId)).resolves.toBe(true);
 
       const removed = removeProjectSource(
-        accepted.value,
+        added.value,
         {
-          expectedProjectVersion: 2,
-          expectedRevisionNumber: 2,
+          expectedProjectVersion: 3,
+          expectedRevisionNumber: 3,
           author: { kind: 'user', authorId: ownerUserId },
         },
         { now: removedAt, createId: () => removalRevisionId },
@@ -2057,8 +2094,8 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
         repository.removeSource({
           ownerUserId,
           projectId,
-          expectedVersion: 2,
-          expectedRevisionNumber: 2,
+          expectedVersion: 3,
+          expectedRevisionNumber: 3,
           nextProject: removed.value.project,
           revision: removalRevision,
           assetLinks: projectAssetLinksForRevision(removalRevision),

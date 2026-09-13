@@ -244,6 +244,13 @@ export interface ProjectAssetMembership {
 
 export type ProjectVersionReferenceRole = 'working' | 'presented' | 'clip';
 
+/**
+ * How much original material one Project may hold. Matched to `COMPOSITION_CLIP_LIMIT` because a
+ * clip can only name media the Project holds, so a larger source collection could not all be
+ * arranged; the primary key already stops the same media being held twice.
+ */
+export const PROJECT_SOURCE_LIMIT = 100;
+
 export const PROJECT_SOURCE_KINDS = ['uploaded', 'recorded', 'saved-video-version'] as const;
 
 export type ProjectSourceKind = (typeof PROJECT_SOURCE_KINDS)[number];
@@ -334,6 +341,21 @@ export type ProjectConflict =
     }
   | {
       readonly kind: 'immutable-source';
+      readonly projectId: string;
+    }
+  | {
+      readonly kind: 'source-limit';
+      readonly projectId: string;
+      readonly limit: number;
+    }
+  /** The source named is the one the snapshot points at, and others are held behind it. */
+  | {
+      readonly kind: 'primary-source';
+      readonly projectId: string;
+    }
+  /** A Project holds each piece of media once; this one is already among its material. */
+  | {
+      readonly kind: 'source-already-held';
       readonly projectId: string;
     }
   | {

@@ -194,12 +194,15 @@ save-forces-completed.
 (from 2.1), per-clip gain; snapshot **schema v3** with AI selections demoted to an optional
 `transform` object; `completed` becomes derived-milestone semantics (D2). _Landed 2026-09-12 and
 verified 2026-09-13 — [plan, validation and verification](SLICE_3.1_COMPOSITION_MODEL_PLAN.md)._
-3.2 Multi-source storage: `project_sources` becomes a per-project collection (expand → idempotent
-receipted backfill of the existing single row → verify counts/owners → switch reads → contract
-migration), reusing the per-asset acceptance/idempotency/retention machinery unchanged.
-3.3 Contracts + API: sources collection endpoints, composition read/write on revisions,
-v2→v3 snapshot read migration mirroring the existing v1→v2 pattern; file/relational parity
-maintained and tested in both modes.
+3.2 Multi-source storage: `project_sources` becomes a per-project collection (expand → verify
+counts/owners/byte facts → switch reads → contract migration), reusing the per-asset
+acceptance/idempotency machinery — retention needed widening, which the expand stage did. _Landed
+2026-09-13 across prompts 28–30; the key is the media a Project holds, so there was no value to
+backfill. [Plan, decisions and evidence](SLICE_3.2_MULTI_SOURCE_PLAN.md)._
+3.3 Composition read/write on revisions; file/relational parity maintained and tested in both
+modes. _The sources collection endpoints listed here landed with 3.2 — prompt 30 makes them live,
+and there is no separate prompt for 3.3's endpoint half. The v2→v3 snapshot read migration also
+listed here landed in slice 3.1._
 3.4 Workspace media area: add/remove/preview several sources; capture bridge targets the
 collection, restoring the record affordance after the first source (studio-3).
 **Non-goals:** the timeline UI (Phase 4); removing the current single-clip flows (they keep

@@ -236,6 +236,8 @@ export type ProjectSourceAcceptanceResult =
         | { readonly kind: 'project-version' }
         | { readonly kind: 'revision' }
         | { readonly kind: 'immutable-source' }
+        | { readonly kind: 'source-limit' }
+        | { readonly kind: 'source-already-held' }
       >;
     };
 
@@ -248,6 +250,11 @@ export interface RemoveProjectSourcePersistenceInput extends AppendProjectRevisi
   readonly removedAssetId: string;
 }
 
+export interface ProjectSourceListRead {
+  readonly current: ProjectCurrentRead;
+  readonly sources: readonly ProjectSourceRecord[];
+}
+
 export type ProjectSourceRemovalResult =
   | { readonly kind: 'removed'; readonly current: ProjectCurrentRead }
   | { readonly kind: 'not-found' }
@@ -258,6 +265,7 @@ export type ProjectSourceRemovalResult =
         | { readonly kind: 'project-version' }
         | { readonly kind: 'revision' }
         | { readonly kind: 'active-jobs' }
+        | { readonly kind: 'primary-source' }
       >;
     };
 
@@ -668,7 +676,35 @@ export interface ProjectRepository {
     input: AppendProjectRevisionPersistenceInput,
   ): Promise<ProjectPersistenceMutationResult>;
   acceptSource(input: AcceptProjectSourcePersistenceInput): Promise<ProjectSourceAcceptanceResult>;
+  /**
+   * Lets go of source material, and of exactly as much as the revision says.
+   *
+   * One method for both removals because the difference is not the caller's to declare: a revision
+   * that clears the snapshot's source pointer detaches everything the Project holds, since nothing
+   * could reach a survivor afterwards, and a revision that leaves the pointer alone lets go of the
+   * one named asset. The rule decided which of those it was; this carries it out.
+   */
   removeSource(input: RemoveProjectSourcePersistenceInput): Promise<ProjectSourceRemovalResult>;
+  /**
+   * Every source the Project holds, oldest acceptance first, with the current revision beside them.
+   *
+   * `getCurrentWithSource` answers the narrower question the single-clip flows ask — which one the
+   * snapshot names — and keeps doing so. This is the collection itself.
+   */
+  listSources(ownerUserId: string, projectId: string): Promise<ProjectSourceListRead | null>;
+  /**
+   * One held source by the media it holds, without reading the rest of the collection.
+   *
+   * `listSources` is the collection; this is the point lookup a byte-range request wants, because a
+   * player asks for one source's bytes many times over and should not pay for the Project's whole
+   * material — nor for the revision snapshot — on every seek.
+   */
+  getSourceById(
+    ownerUserId: string,
+    projectId: string,
+    assetId: string,
+  ): Promise<ProjectSourceRecord | null>;
+
   adoptWorkingMedia(
     input: AdoptProjectWorkingMediaPersistenceInput,
   ): Promise<ProjectWorkingMediaAdoptionResult>;

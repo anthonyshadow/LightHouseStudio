@@ -10,6 +10,7 @@ import { ProjectService } from './project-service.js';
 import { createDefaultVideoEditSpec, EMPTY_PROJECT_TRANSFORM } from '@studio/domain';
 import {
   PROJECT_STALE_CLIENT_MESSAGE,
+  projectSourceListResponseSchema,
   projectSourceResponseSchema,
   projectWorkingMediaResponseSchema,
 } from '@studio/contracts';
@@ -765,6 +766,89 @@ describe('Project lifecycle routes', () => {
       payload: { expectedVersion: 4 },
     });
     expect(malformed.statusCode).toBe(400);
+
+    /*
+     * The collection, over the wire, beside the legacy endpoints in the same Project.
+     *
+     * The point of the assertions below is what does NOT move: `POST /source` still refuses,
+     * `GET /source` still describes the original, and the snapshot the browser reads still names it.
+     */
+    const secondKey = randomUUID();
+    const secondMetadata = JSON.stringify({
+      expectedVersion: 4,
+      expectedRevisionNumber: 4,
+      kind: 'uploaded',
+      filename: 'second.mp4',
+    });
+    const added = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/sources`,
+      headers: {
+        ...browserHeaders,
+        'content-type': 'video/mp4',
+        'idempotency-key': secondKey,
+        'x-lightframe-project-source': secondMetadata,
+      },
+      payload: fixture,
+    });
+    expect(added.statusCode).toBe(201);
+    const listed = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/sources`,
+      headers: browserHeaders,
+    });
+    expect(listed.statusCode).toBe(200);
+    const collection = projectSourceListResponseSchema.parse(listed.json());
+    expect(collection.sources.map(({ filename }) => filename)).toEqual(['right.mp4', 'second.mp4']);
+    expect(listed.body).not.toContain('checksum');
+    expect(listed.body).not.toContain('operationKey');
+    const secondAssetId = collection.sources[1]!.assetId;
+
+    const legacyAfterAdd = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/source`,
+      headers: browserHeaders,
+    });
+    expect(legacyAfterAdd.json()).toMatchObject({ source: { filename: 'right.mp4' } });
+
+    const refusedSecond = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/source`,
+      headers: {
+        ...browserHeaders,
+        'content-type': 'video/mp4',
+        'idempotency-key': randomUUID(),
+        'x-lightframe-project-source': secondMetadata,
+      },
+      payload: fixture,
+    });
+    expect(refusedSecond.statusCode).toBe(409);
+    expect(refusedSecond.json()).toMatchObject({ conflict: { kind: 'immutable-source' } });
+
+    const held = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/sources/${secondAssetId}/content`,
+      headers: { ...browserHeaders, range: 'bytes=0-3' },
+    });
+    expect(held.statusCode).toBe(206);
+
+    const refusedPrimary = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/sources/${collection.sources[0]!.assetId}/remove`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { expectedVersion: 5, expectedRevisionNumber: 5 },
+    });
+    expect(refusedPrimary.statusCode).toBe(409);
+    expect(refusedPrimary.json()).toMatchObject({ conflict: { kind: 'primary-source' } });
+
+    const removedHeld = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/sources/${secondAssetId}/remove`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: { expectedVersion: 5, expectedRevisionNumber: 5 },
+    });
+    expect(removedHeld.statusCode).toBe(200);
+    expect(removedHeld.json()).not.toHaveProperty('sources');
   });
 
   it('adopts a validated local render explicitly and range-streams it without changing source', async () => {

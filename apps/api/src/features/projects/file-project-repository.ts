@@ -22,6 +22,7 @@ import {
   type ProjectRevision,
   projectStatusAfterProcessingTrace,
   projectConflicts,
+  PROJECT_SOURCE_LIMIT,
   matchesSearchTerm,
 } from '@studio/domain';
 import type {
@@ -69,6 +70,7 @@ import type {
   ProjectSourceAcceptanceResult,
   ProjectSourceRecord,
   ProjectSourceRemovalResult,
+  ProjectSourceListRead,
   RemoveProjectSourcePersistenceInput,
   ProjectWorkingMediaAdoptionResult,
   ProjectWorkingMediaRead,
@@ -110,6 +112,7 @@ import {
   ownerIdSchema,
   parseJournal,
   parseLibrary,
+  PROJECT_LIBRARY_SCHEMA_VERSION,
   storedAggregateSchema,
   storedCampaignSchema,
   storedJobLinkSchema,
@@ -166,6 +169,20 @@ const currentRead = (aggregate: StoredProjectAggregate): ProjectCurrentRead => {
   if (revision === undefined) throw new Error('Project current revision is unavailable.');
   return { project: aggregate.project, revision };
 };
+
+/**
+ * The source the Project's current revision names, out of everything it holds.
+ *
+ * The single-source reads resolve through the snapshot pointer rather than through a stored flag,
+ * which is the same rule the Drizzle store applies in SQL — and the stored invariant guarantees the
+ * pointer names something the Project holds, so a `null` here means the Project holds nothing.
+ */
+const primarySource = (
+  aggregate: StoredProjectAggregate,
+  current: ProjectCurrentRead,
+): ProjectSourceRecord | null =>
+  aggregate.sources.find(({ assetId }) => assetId === current.revision.snapshot.sourceAssetId) ??
+  null;
 
 const workingMediaForOperation = (
   library: ProjectLibrary,
@@ -660,7 +677,7 @@ export class FileProjectRepository
         createReceipts: [...library.createReceipts, receipt],
       });
       await this.#write(library, next, {
-        schemaVersion: 7,
+        schemaVersion: PROJECT_LIBRARY_SCHEMA_VERSION,
         ownerUserId: aggregate.project.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -721,17 +738,41 @@ export class FileProjectRepository
       ({ project }) => project.id === projectId && project.deletedAt === null,
     );
     if (aggregate === undefined) return null;
-    return {
-      current: currentRead(aggregate),
-      source: aggregate.source ?? null,
-    };
+    const current = currentRead(aggregate);
+    return { current, source: primarySource(aggregate, current) };
   }
 
   async getSource(ownerUserId: string, projectId: string): Promise<ProjectSourceRecord | null> {
     const aggregate = (await this.#read(ownerUserId)).projects.find(
       ({ project }) => project.id === projectId && project.deletedAt === null,
     );
-    return aggregate?.source ?? null;
+    return aggregate === undefined ? null : primarySource(aggregate, currentRead(aggregate));
+  }
+
+  async getSourceById(
+    ownerUserId: string,
+    projectId: string,
+    assetId: string,
+  ): Promise<ProjectSourceRecord | null> {
+    const aggregate = (await this.#read(ownerUserId)).projects.find(
+      ({ project }) => project.id === projectId && project.deletedAt === null,
+    );
+    return aggregate?.sources.find((held) => held.assetId === assetId) ?? null;
+  }
+
+  async listSources(ownerUserId: string, projectId: string): Promise<ProjectSourceListRead | null> {
+    const aggregate = (await this.#read(ownerUserId)).projects.find(
+      ({ project }) => project.id === projectId && project.deletedAt === null,
+    );
+    if (aggregate === undefined) return null;
+    return {
+      current: currentRead(aggregate),
+      sources: [...aggregate.sources].sort(
+        (left, right) =>
+          left.acceptedAt.localeCompare(right.acceptedAt) ||
+          left.assetId.localeCompare(right.assetId),
+      ),
+    };
   }
 
   async getWorkingMedia(
@@ -832,13 +873,15 @@ export class FileProjectRepository
           projectMediaReferencesEqual(mediaReference, currentRevision.snapshot.workingMedia) &&
           projectMediaReferencesEqual(mediaReference, currentRevision.snapshot.presentedMedia),
       );
-      const sourceReference =
-        aggregate.source === null ? null : projectSourceMediaReference(aggregate.source);
-      const exactInputAssetId =
-        working?.assetId ??
-        (projectMediaReferencesEqual(sourceReference, currentRevision.snapshot.workingMedia)
-          ? aggregate.source?.assetId
-          : undefined);
+      // The held source whose media the working pointer names, which is the question this site asks
+      // — the same resolution the Drizzle store makes, so both answer an admission identically.
+      const source = aggregate.sources.find((held) =>
+        projectMediaReferencesEqual(
+          projectSourceMediaReference(held),
+          currentRevision.snapshot.workingMedia,
+        ),
+      );
+      const exactInputAssetId = working?.assetId ?? source?.assetId;
       if (exactInputAssetId !== attempt.inputAssetId) return { kind: 'not-found' };
 
       if (attempt.retryOfOperationId !== null) {
@@ -892,7 +935,7 @@ export class FileProjectRepository
         processingJobs: [...library.processingJobs, attempt],
       });
       await this.#write(library, next, {
-        schemaVersion: 7,
+        schemaVersion: PROJECT_LIBRARY_SCHEMA_VERSION,
         ownerUserId: attempt.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -1323,7 +1366,7 @@ export class FileProjectRepository
         assetMemberships: mergeAssetMemberships(library.assetMemberships, introducedMemberships),
       });
       await this.#write(library, next, {
-        schemaVersion: 7,
+        schemaVersion: PROJECT_LIBRARY_SCHEMA_VERSION,
         ownerUserId: input.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -1671,36 +1714,45 @@ export class FileProjectRepository
     });
   }
 
+  /** The file-mode twin of the Drizzle store's `acceptSource`; see the note there. */
   async acceptSource(
     input: AcceptProjectSourcePersistenceInput,
   ): Promise<ProjectSourceAcceptanceResult> {
     const source = storedProjectSourceSchema.parse(input.source) as ProjectSourceRecord;
     return this.#withOwnerLock(input.ownerUserId, async () => {
       const library = await this.#read(input.ownerUserId);
-      const prior = library.projects.find(
-        (aggregate) => aggregate.source?.operationKey === source.operationKey,
-      );
-      if (prior?.source !== undefined && prior.source !== null) {
+      // The receipt is the operation key, wherever it sits in whichever Project's collection.
+      let prior: { aggregate: StoredProjectAggregate; held: ProjectSourceRecord } | undefined;
+      for (const aggregate of library.projects) {
+        const held = aggregate.sources.find(
+          ({ operationKey }) => operationKey === source.operationKey,
+        );
+        if (held !== undefined) {
+          prior = { aggregate, held };
+          break;
+        }
+      }
+      if (prior !== undefined) {
         if (
-          prior.source.projectId !== input.projectId ||
-          prior.source.requestFingerprint !== source.requestFingerprint
+          prior.held.projectId !== input.projectId ||
+          prior.held.requestFingerprint !== source.requestFingerprint
         ) {
           return {
             kind: 'conflict',
             conflict: projectConflicts.operationKey('source-accept'),
           };
         }
-        const revision = prior.revisions.find(
+        const revision = prior.aggregate.revisions.find(
           ({ id, revisionNumber }) =>
-            id === prior.project.currentRevisionId &&
-            revisionNumber === prior.project.currentRevisionNumber,
+            id === prior.aggregate.project.currentRevisionId &&
+            revisionNumber === prior.aggregate.project.currentRevisionNumber,
         );
         if (revision === undefined)
           throw new Error('Project source receipt has no current result.');
         return {
           kind: 'replayed',
-          current: { project: prior.project, revision },
-          source: prior.source,
+          current: { project: prior.aggregate.project, revision },
+          source: prior.held,
         };
       }
 
@@ -1709,21 +1761,29 @@ export class FileProjectRepository
       if (aggregate === undefined || aggregate.project.deletedAt !== null) {
         return { kind: 'not-found' };
       }
-      // Only the *current* revision decides this. Scanning all history would refuse a fresh source
-      // after a removal, which Postgres allows — the two adapters must answer identically.
       const acceptedRevision = aggregate.revisions.find(
         ({ id, revisionNumber }) =>
           id === aggregate.project.currentRevisionId &&
           revisionNumber === aggregate.project.currentRevisionNumber,
       );
+      const held = new Set(aggregate.sources.map(({ assetId }) => assetId));
+      if (held.has(source.assetId)) {
+        return { kind: 'conflict', conflict: projectConflicts.sourceAlreadyHeld(input.projectId) };
+      }
+      // Only the *current* revision decides the first-source refusal. Scanning all history would
+      // refuse a fresh source after a removal, which Postgres allows, and the two adapters must
+      // answer identically.
       if (
-        aggregate.source !== null ||
-        (acceptedRevision?.snapshot.sourceAssetId ?? null) !== null
+        input.revision.snapshot.sourceAssetId === source.assetId &&
+        (held.size > 0 || (acceptedRevision?.snapshot.sourceAssetId ?? null) !== null)
       ) {
         return {
           kind: 'conflict',
           conflict: projectConflicts.immutableSource(input.projectId),
         };
+      }
+      if (held.size >= PROJECT_SOURCE_LIMIT) {
+        return { kind: 'conflict', conflict: projectConflicts.sourceLimit(input.projectId) };
       }
       if (aggregate.project.version !== input.expectedVersion) {
         return {
@@ -1748,7 +1808,6 @@ export class FileProjectRepository
       const validSource =
         source.projectId === input.projectId &&
         source.ownerUserId === input.ownerUserId &&
-        source.assetId === input.revision.snapshot.sourceAssetId &&
         source.acceptedRevisionId === input.revision.id &&
         source.acceptedRevisionNumber === input.revision.revisionNumber;
       if (!validSource) throw new Error('Project source acceptance record is inconsistent.');
@@ -1762,7 +1821,7 @@ export class FileProjectRepository
           ...aggregate.versionReferenceLinks,
           ...projectVersionReferenceLinksForRevision(input.revision),
         ],
-        source,
+        sources: [...aggregate.sources, source],
       });
       const projects = [...library.projects];
       projects[index] = nextAggregate;
@@ -1787,7 +1846,7 @@ export class FileProjectRepository
         ]),
       });
       await this.#write(library, next, {
-        schemaVersion: 7,
+        schemaVersion: PROJECT_LIBRARY_SCHEMA_VERSION,
         ownerUserId: input.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -1831,7 +1890,9 @@ export class FileProjectRepository
       if (aggregate === undefined || aggregate.project.deletedAt !== null) {
         return { kind: 'not-found' };
       }
-      if (aggregate.source === null) return { kind: 'not-found' };
+      if (!aggregate.sources.some(({ assetId }) => assetId === input.removedAssetId)) {
+        return { kind: 'not-found' };
+      }
       if (aggregate.project.version !== input.expectedVersion) {
         return {
           kind: 'conflict',
@@ -1855,17 +1916,22 @@ export class FileProjectRepository
       if (this.#hasBlockingProcessingAttempt(library, aggregate.project)) {
         return { kind: 'conflict', conflict: projectConflicts.activeJobs(input.projectId) };
       }
-      if (aggregate.source.assetId !== input.removedAssetId) {
-        throw new Error('A Project source removal named a different source asset.');
+      if (input.revision.snapshot.sourceAssetId === input.removedAssetId) {
+        throw new Error('A Project source removal named the source its revision still keeps.');
       }
-      // `source` drops; `assetLinks` do not. The historical role='source' link is what keeps the
+      // How much goes is read off the revision, exactly as the Drizzle store reads it: clearing the
+      // snapshot's pointer detaches everything, because nothing could reach a survivor afterwards.
+      // `sources` drop; `assetLinks` do not — the historical role='source' link is what keeps the
       // removed bytes retained for any output Version already produced from them.
       const nextAggregate = storedAggregateSchema.parse({
         ...aggregate,
         project: input.nextProject,
         revisions: [...aggregate.revisions, input.revision],
         assetLinks: [...aggregate.assetLinks, ...input.assetLinks],
-        source: null,
+        sources:
+          input.revision.snapshot.sourceAssetId === null
+            ? []
+            : aggregate.sources.filter(({ assetId }) => assetId !== input.removedAssetId),
       });
       const projects = [...library.projects];
       projects[index] = nextAggregate;
@@ -2012,7 +2078,7 @@ export class FileProjectRepository
         ]),
       });
       await this.#write(library, next, {
-        schemaVersion: 7,
+        schemaVersion: PROJECT_LIBRARY_SCHEMA_VERSION,
         ownerUserId: input.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -2167,7 +2233,7 @@ export class FileProjectRepository
         campaignCreateReceipts: [...library.campaignCreateReceipts, receipt],
       });
       await this.#write(library, next, {
-        schemaVersion: 7,
+        schemaVersion: PROJECT_LIBRARY_SCHEMA_VERSION,
         ownerUserId: campaign.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -2442,7 +2508,7 @@ export class FileProjectRepository
         ]),
       });
       await this.#write(library, next, {
-        schemaVersion: 7,
+        schemaVersion: PROJECT_LIBRARY_SCHEMA_VERSION,
         ownerUserId: input.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -2506,11 +2572,25 @@ export class FileProjectRepository
       for (const link of aggregate.assetLinks) {
         if (candidates.has(link.assetId)) retained.add(link.assetId);
       }
-      // The Drizzle policy also retains what `project_sources` holds, because a Project there can
-      // hold a source no revision names. Here it cannot yet: the stored aggregate has one `source`,
-      // tied by `storedAggregateSchema` to the revision that accepted it, so `assetLinks` already
-      // covers it. The matching arm arrives with the stored collection in slice 3.2's switch stage,
-      // where it has something to find and a test that can reach it.
+      /*
+       * A Project's source bytes are retained while the Project holds that source — the same rule
+       * `DrizzleProjectRetentionPolicy` states against `project_sources`, and both stores have to
+       * state it, because this repository *is* the retention policy in local mode.
+       *
+       * The links above answer "some revision used this", which the snapshot states. A source the
+       * Project holds but has not arranged appears in no snapshot and therefore in no link: taking
+       * material on appends a revision that names nothing new. Without this, borrowing a Library
+       * Version as extra material and then deleting that Video would take the bytes with it.
+       */
+      for (const held of aggregate.sources) {
+        if (candidates.has(held.assetId)) retained.add(held.assetId);
+        if (held.savedVideoId !== null && held.videoVersionId !== null) {
+          versionReferences.set(`${held.savedVideoId}:${held.videoVersionId}`, {
+            savedVideoId: held.savedVideoId,
+            videoVersionId: held.videoVersionId,
+          });
+        }
+      }
       for (const link of [...aggregate.versionReferenceLinks, ...aggregate.outputLinks]) {
         versionReferences.set(`${link.savedVideoId}:${link.videoVersionId}`, link);
       }

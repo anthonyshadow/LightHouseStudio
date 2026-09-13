@@ -59,6 +59,7 @@ describe('ProjectRenditionService', () => {
       inspect: () => Promise.resolve({ ...inspected, width: 1_280, height: 720 }),
       projectRetention: projects,
     }).upload({
+      refuseWhenOccupied: true,
       ownerUserId,
       projectId,
       operationKey: randomUUID(),
