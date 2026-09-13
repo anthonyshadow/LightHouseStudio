@@ -41,6 +41,7 @@ import type { ReferenceImageAssetStore } from '../reference-images/asset-store.j
 import { inspectStoredProjectMedia } from './project-media-inspection.js';
 import {
   projectAggregateForCurrent,
+  projectSourceMediaReference,
   type ProjectCurrentRead,
   type ProjectRepository,
   type ProjectSourceRecord,
@@ -80,15 +81,6 @@ const LOCALLY_STOPPABLE_PROCESSING_STATUSES = new Set([
   'processing',
   'retrieving',
 ]);
-
-const sourceMediaReference = (source: ProjectSourceRecord): ProjectMediaReference =>
-  source.kind === 'saved-video-version'
-    ? {
-        kind: 'saved-video-version',
-        savedVideoId: source.savedVideoId!,
-        videoVersionId: source.videoVersionId!,
-      }
-    : { kind: 'asset', assetId: source.assetId };
 
 type ProcessingInputRecord = Pick<
   ProjectSourceRecord | ProjectWorkingMediaRecord,
@@ -225,7 +217,10 @@ export class ProjectProcessingService {
       record = working.media;
     } else {
       const source = await this.projects.getSource(ownerUserId, projectId);
-      if (source !== null && projectMediaReferencesEqual(sourceMediaReference(source), reference)) {
+      if (
+        source !== null &&
+        projectMediaReferencesEqual(projectSourceMediaReference(source), reference)
+      ) {
         record = source;
       }
     }

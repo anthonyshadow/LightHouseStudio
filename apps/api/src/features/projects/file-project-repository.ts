@@ -75,7 +75,10 @@ import type {
   ProjectWorkingMediaRecord,
   ProjectRenditionRecord,
 } from './project-repository.js';
-import { projectOutputCommitInconsistency } from './project-repository.js';
+import {
+  projectOutputCommitInconsistency,
+  projectSourceMediaReference,
+} from './project-repository.js';
 import {
   appendStoredVideoVersions,
   type StoredVideoVersion,
@@ -830,15 +833,7 @@ export class FileProjectRepository
           projectMediaReferencesEqual(mediaReference, currentRevision.snapshot.presentedMedia),
       );
       const sourceReference =
-        aggregate.source === null
-          ? null
-          : aggregate.source.kind === 'saved-video-version'
-            ? {
-                kind: 'saved-video-version' as const,
-                savedVideoId: aggregate.source.savedVideoId!,
-                videoVersionId: aggregate.source.videoVersionId!,
-              }
-            : { kind: 'asset' as const, assetId: aggregate.source.assetId };
+        aggregate.source === null ? null : projectSourceMediaReference(aggregate.source);
       const exactInputAssetId =
         working?.assetId ??
         (projectMediaReferencesEqual(sourceReference, currentRevision.snapshot.workingMedia)
@@ -2511,6 +2506,11 @@ export class FileProjectRepository
       for (const link of aggregate.assetLinks) {
         if (candidates.has(link.assetId)) retained.add(link.assetId);
       }
+      // The Drizzle policy also retains what `project_sources` holds, because a Project there can
+      // hold a source no revision names. Here it cannot yet: the stored aggregate has one `source`,
+      // tied by `storedAggregateSchema` to the revision that accepted it, so `assetLinks` already
+      // covers it. The matching arm arrives with the stored collection in slice 3.2's switch stage,
+      // where it has something to find and a test that can reach it.
       for (const link of [...aggregate.versionReferenceLinks, ...aggregate.outputLinks]) {
         versionReferences.set(`${link.savedVideoId}:${link.videoVersionId}`, link);
       }

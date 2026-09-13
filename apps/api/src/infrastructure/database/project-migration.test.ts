@@ -40,6 +40,10 @@ const projectSnapshotV3MigrationUrl = new URL(
   '../../../drizzle/0027_early_white_tiger.sql',
   import.meta.url,
 );
+const projectSourceCollectionMigrationUrl = new URL(
+  '../../../drizzle/0028_strange_mister_fear.sql',
+  import.meta.url,
+);
 
 describe('Project aggregate migration', () => {
   it('is additive and creates every normalized Project relationship', async () => {
@@ -248,6 +252,40 @@ describe('Project asset membership migration', () => {
     expect(migration).toContain('project_asset_memberships_project_kind_recent_idx');
     expect(migration).not.toMatch(
       /\b(?:DROP|TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"|\bINSERT\s+INTO\b/u,
+    );
+  });
+});
+
+describe('Project source collection expand migration', () => {
+  it('widens the key to the media a Project holds, and changes no row', async () => {
+    const migration = await readFile(projectSourceCollectionMigrationUrl, 'utf8');
+
+    // A re-key is the one structural change drizzle-kit cannot finish on its own: it emits the ADD
+    // and leaves the DROP commented out with a placeholder name, because the old key was declared
+    // inline and Postgres named it. 0004 hand-filled the same swap for `creative_assets`.
+    expect(migration).toContain(
+      'ALTER TABLE "project_sources" DROP CONSTRAINT "project_sources_pkey"',
+    );
+    expect(migration).toContain(
+      'ADD CONSTRAINT "project_sources_project_id_asset_id_pk" PRIMARY KEY("project_id","asset_id")',
+    );
+    expect(migration.match(/DROP\s+CONSTRAINT/gu)).toHaveLength(1);
+    expect(migration).toContain('LOCK TABLE "project_sources"');
+
+    // Retention joins a borrowed source to its Version the way the other two link tables do, so it
+    // gets the index those two have.
+    expect(migration).toContain('CREATE INDEX "project_sources_version_idx"');
+
+    // One preflight, and it guards the half that can hurt: the reads start resolving a source
+    // through the revision pointer, so a stored row the pointer does not name would go dark. The key
+    // swap needs none — the key it replaces is still in force while the preflight runs.
+    expect(migration).toContain('held sources the current revision does not name');
+    expect(migration.match(/RAISE EXCEPTION USING/gu)).toHaveLength(1);
+
+    // The key is made of columns every row already carries, so the collection needs no backfill and
+    // this migration touches no data. DROP is permitted here only for the primary key constraint.
+    expect(migration).not.toMatch(
+      /\b(?:TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"|\bINSERT\s+INTO\b|\bDROP\s+(?:TABLE|COLUMN|TYPE)\b/u,
     );
   });
 });

@@ -116,6 +116,21 @@ export interface ProjectSourceRecord {
   readonly acceptedAt: string;
 }
 
+/**
+ * How a held source names its media, so it can be compared with the pointers a snapshot carries.
+ *
+ * The non-null assertions are the table's `project_sources_lineage_consistent` check restated in
+ * TypeScript: a `saved-video-version` source has both Version ids and no other kind has either.
+ */
+export const projectSourceMediaReference = (source: ProjectSourceRecord): ProjectMediaReference =>
+  source.kind === 'saved-video-version'
+    ? {
+        kind: 'saved-video-version',
+        savedVideoId: source.savedVideoId!,
+        videoVersionId: source.videoVersionId!,
+      }
+    : { kind: 'asset', assetId: source.assetId };
+
 export type ProjectWorkingMediaKind = 'local-render' | 'media-asset' | 'saved-video-version';
 
 /**

@@ -151,6 +151,11 @@ describe('Drizzle persistence schema', () => {
         'project_sources_asset_idx',
       ]),
     );
+    // A Project holds several sources, each identified by the media it holds. Pinned because the
+    // single-column key this replaced was what made one source per Project true in the database.
+    expect(getTableConfig(projectSources).primaryKeys.map((key) => key.getName())).toEqual([
+      'project_sources_project_id_asset_id_pk',
+    ]);
     expect(
       [projectAssets, projectJobs, projectOutputs].every(
         (table) => getTableConfig(table).foreignKeys.length >= 3,

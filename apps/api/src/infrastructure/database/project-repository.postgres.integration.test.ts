@@ -12,6 +12,7 @@ import {
   createProject,
   duplicateProject,
   promoteProjectJobResult,
+  removeProjectSource,
   type ProjectAssetLink,
   projectTransformOf,
 } from '@studio/domain';
@@ -1899,6 +1900,198 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
       await connection.db.delete(mediaAssets).where(eq(mediaAssets.id, assetId));
       await connection.db.delete(mediaAssets).where(eq(mediaAssets.id, workingAssetId));
       await connection.db.delete(mediaAssets).where(eq(mediaAssets.id, processingResultAssetId));
+      await connection.db.delete(users).where(eq(users.id, ownerUserId));
+    }
+  }, 20_000);
+
+  /*
+   * The expand stage lets `project_sources` hold several rows per Project; nothing can write the
+   * second one yet, because the service, both repositories and the domain all still refuse a second
+   * acceptance. So this seeds one directly — which is the state prompt 30's writer will create — and
+   * pins the three things that have to be true before that writer exists: the legacy reads name the
+   * source the snapshot names rather than whichever row the plan reaches, a keyed removal leaves its
+   * siblings alone, and a held source nothing has arranged still keeps its bytes.
+   */
+  it('reads the source the revision names, retains a held source it does not, and detaches all', async () => {
+    const ownerUserId = randomUUID();
+    const projectId = randomUUID();
+    const assetId = randomUUID();
+    const extraAssetId = randomUUID();
+    const firstRevisionId = randomUUID();
+    const sourceRevisionId = randomUUID();
+    const removalRevisionId = randomUUID();
+    const createdAt = '2026-09-13T09:00:00.000Z';
+    const acceptedAt = '2026-09-13T09:05:00.000Z';
+    const removedAt = '2026-09-13T09:10:00.000Z';
+    const repository = new DrizzleProjectRepository(connection.db);
+    const retention = new DrizzleProjectRetentionPolicy(connection.db);
+
+    try {
+      await connection.db.insert(users).values({
+        id: ownerUserId,
+        login: `${ownerUserId}@source-collection.test`,
+        normalizedLogin: `${ownerUserId}@source-collection.test`,
+        username: `sc-${ownerUserId}`,
+        email: `${ownerUserId}@source-collection.test`,
+        displayName: 'Source Collection Integration',
+      });
+      await connection.db.insert(mediaAssets).values(
+        [assetId, extraAssetId].map((id, index) => ({
+          id,
+          ownerUserId,
+          storageProvider: 'local' as const,
+          storageKey: id,
+          status: 'ready' as const,
+          mimeType: 'video/mp4',
+          filename: `collection-${index}.mp4`,
+          sizeBytes: 2_048,
+          checksumSha256: `${index}`.repeat(64),
+        })),
+      );
+
+      const created = createProject(
+        {
+          id: projectId,
+          ownerUserId,
+          title: 'Source collection',
+          author: { kind: 'user', authorId: ownerUserId },
+          facts: {
+            sourceStatus: 'none',
+            currentAttempt: { status: 'none' },
+            validatedLastSuccessfulOutput: null,
+          },
+        },
+        { now: createdAt, createId: () => firstRevisionId },
+      );
+      await repository.createIdempotent({
+        aggregate: created,
+        receipt: {
+          operationKey: randomUUID(),
+          requestFingerprint: 'a'.repeat(64),
+          projectId,
+          createdAt,
+        },
+      });
+      const accepted = acceptProjectSource(
+        created,
+        {
+          expectedProjectVersion: 1,
+          expectedRevisionNumber: 1,
+          assetId,
+          mediaReference: { kind: 'asset', assetId },
+          author: { kind: 'user', authorId: ownerUserId },
+        },
+        { now: acceptedAt, createId: () => sourceRevisionId },
+      );
+      if (!accepted.ok) throw new Error('The source acceptance fixture must succeed.');
+      const revision = accepted.value.revisions.at(-1)!;
+      const source: ProjectSourceRecord = {
+        projectId,
+        ownerUserId,
+        assetId,
+        kind: 'uploaded',
+        savedVideoId: null,
+        videoVersionId: null,
+        acceptedRevisionId: revision.id,
+        acceptedRevisionNumber: revision.revisionNumber,
+        operationKey: randomUUID(),
+        requestFingerprint: 'b'.repeat(64),
+        mimeType: 'video/mp4',
+        filename: 'collection-0.mp4',
+        sizeBytes: 2_048,
+        checksumSha256: '0'.repeat(64),
+        container: 'mp4',
+        videoCodec: 'avc',
+        audioCodec: 'aac',
+        durationMs: 8_000,
+        width: 1_920,
+        height: 1_080,
+        hasAudio: true,
+        acceptedAt: revision.createdAt,
+      };
+      await expect(
+        repository.acceptSource({
+          ownerUserId,
+          projectId,
+          expectedVersion: 1,
+          expectedRevisionNumber: 1,
+          nextProject: accepted.value.project,
+          revision,
+          assetLinks: projectAssetLinksForRevision(revision),
+          source,
+        }),
+      ).resolves.toMatchObject({ kind: 'accepted' });
+
+      // The sibling the collection can now hold. It names the same accepting revision, so it is a
+      // member the snapshot does not point at — exactly what an additional source will be.
+      await connection.db.insert(projectSources).values({
+        ...source,
+        assetId: extraAssetId,
+        operationKey: randomUUID(),
+        requestFingerprint: 'c'.repeat(64),
+        filename: 'collection-1.mp4',
+        checksumSha256: '1'.repeat(64),
+      });
+
+      await expect(repository.getSource(ownerUserId, projectId)).resolves.toMatchObject({
+        assetId,
+      });
+      await expect(repository.getCurrentWithSource(ownerUserId, projectId)).resolves.toMatchObject({
+        source: { assetId },
+      });
+      // Nothing links the sibling to a revision, so only the new retention arm can be keeping it.
+      await expect(retention.retainsAsset(ownerUserId, extraAssetId)).resolves.toBe(true);
+
+      const removed = removeProjectSource(
+        accepted.value,
+        {
+          expectedProjectVersion: 2,
+          expectedRevisionNumber: 2,
+          author: { kind: 'user', authorId: ownerUserId },
+        },
+        { now: removedAt, createId: () => removalRevisionId },
+      );
+      if (!removed.ok) throw new Error('The source removal fixture must succeed.');
+      const removalRevision = removed.value.revisions.at(-1)!;
+      await expect(
+        repository.removeSource({
+          ownerUserId,
+          projectId,
+          expectedVersion: 2,
+          expectedRevisionNumber: 2,
+          nextProject: removed.value.project,
+          revision: removalRevision,
+          assetLinks: projectAssetLinksForRevision(removalRevision),
+          removedAssetId: assetId,
+        }),
+      ).resolves.toMatchObject({ kind: 'removed' });
+
+      // Detaching means the Project has no source, so nothing may be left holding one: the revision
+      // it wrote says `sourceAssetId: null`, and a surviving row would be unreachable behind it.
+      await expect(
+        connection.db
+          .select({ assetId: projectSources.assetId })
+          .from(projectSources)
+          .where(eq(projectSources.projectId, projectId)),
+      ).resolves.toEqual([]);
+      await expect(repository.getSource(ownerUserId, projectId)).resolves.toBeNull();
+      // The one a revision used keeps its bytes through the historical role='source' link; the one
+      // nothing ever arranged loses the only anchor it had, which is the release the rule implies.
+      await expect(retention.retainsAsset(ownerUserId, assetId)).resolves.toBe(true);
+      await expect(retention.retainsAsset(ownerUserId, extraAssetId)).resolves.toBe(false);
+    } finally {
+      await connection.db.delete(projectSources).where(eq(projectSources.projectId, projectId));
+      await connection.db.delete(projectAssets).where(eq(projectAssets.projectId, projectId));
+      await connection.db
+        .update(projects)
+        .set({ currentRevisionId: null, currentRevisionNumber: 0 })
+        .where(eq(projects.id, projectId));
+      await connection.db.delete(projectRevisions).where(eq(projectRevisions.projectId, projectId));
+      await connection.db.delete(projects).where(eq(projects.id, projectId));
+      await connection.db
+        .delete(projectOperationReceipts)
+        .where(eq(projectOperationReceipts.ownerUserId, ownerUserId));
+      await connection.db.delete(mediaAssets).where(eq(mediaAssets.ownerUserId, ownerUserId));
       await connection.db.delete(users).where(eq(users.id, ownerUserId));
     }
   }, 20_000);
