@@ -342,6 +342,12 @@ contracts (new endpoints live; legacy endpoints delegating), and remove the supe
 read path within this scope. Rollback plan stated and tested before the switch. Apply Standing
 rules + API/DB checklist. Tests: full projects API + e2e regression; both persistence modes.
 
+> **Prompt 31 has run** — on 2026-09-13, on the operator's instruction to audit, plan and implement
+> in one pass. Slice 3.4 has no (A) prompt of its own, so the standard audit-and-plan procedure was
+> followed first; the plan, the decisions taken, the validation record and what the cleanup review
+> changed are in [`SLICE_3.4_WORKSPACE_MEDIA_PLAN.md`](SLICE_3.4_WORKSPACE_MEDIA_PLAN.md). Phase 3
+> is closed; the sequence resumes at prompt 32.
+
 **31 (B) — Workspace media area.** Implement slice 3.4 (studio-3, PCD-5-adjacent): the Project
 workspace gains a Media area listing all sources (poster, duration, state) with add (upload /
 record / from Videos), preview, and remove; the capture bridge targets the collection so recording

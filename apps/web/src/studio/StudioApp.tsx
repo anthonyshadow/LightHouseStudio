@@ -723,10 +723,15 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
       projectWorkingMedia,
     ],
   );
+  /*
+   * Whether the stage offers this Project a camera. Not "and it has no original yet": a Project
+   * holds several videos, and withholding the group once the first one landed took the Stop control
+   * with it. What remains is the section reporting for this Project — which is what says a Project
+   * surface is mounted at all — and no source operation in flight.
+   */
   const projectRecordingAvailable =
     activeProjectId !== null &&
     activeProjectSourceActivity !== null &&
-    !activeProjectSourceActivity.accepted &&
     !activeProjectSourceActivity.busy;
   /**
    * The one place the retake loop is offered or withheld, so the panel and the control bar can
@@ -792,6 +797,9 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
         recordingOrFinalizing={work.recordingOrFinalizing}
         videoRenderingActive={work.videoRenderingActive}
         hasTemporaryTake={work.hasTemporaryTake}
+        hasUnclaimedTake={
+          ownedRecordingArtifact(recording.presented) !== null && !project.presentedByProject
+        }
         hasUnsavedTake={work.hasTemporaryTake && savedVideo.presentedHasUnsavedChanges}
         voiceProcessingActive={work.voiceProcessingActive}
         creativeWorkDirty={work.creativeWorkDirty}

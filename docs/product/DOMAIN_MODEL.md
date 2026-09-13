@@ -57,12 +57,15 @@ slice 3.2. D1–D3 are decided in [Decisions required](../DECISIONS_REQUIRED.md)
 Original video brought into a Project by upload, camera recording, or explicit reuse of a Library
 video Version. Sources are immutable once accepted: editing never alters them, and removing a
 source from a Project keeps its bytes as long as any history references them.
-_Status: **implemented for several sources per Project** since slice 3.2 (2026-09-13). A source is
-identified by the media it holds, so a Project holds each piece of media once, and it may hold up to
-`PROJECT_SOURCE_LIMIT` (100) of them. One of them is the Project's **original** — the one the
-revision snapshot names — and the single-source surfaces still read that one: `POST /source` refuses
-a second acceptance and `GET /source` describes the original, unchanged. Taking on more material goes
-through the sources collection instead. No surface offers it yet: the Media area is slice 3.4._
+_Status: **implemented for several sources per Project** since slice 3.2 (2026-09-13), and offered
+by the workspace's **Media** area since slice 3.4 (2026-09-13). A source is identified by the media
+it holds, so a Project holds each piece of media once, and it may hold up to `PROJECT_SOURCE_LIMIT`
+(100) of them. One of them is the Project's **original** — the one the revision snapshot names — and
+the single-source surfaces still read that one: `POST /source` refuses a second acceptance and
+`GET /source` describes the original, unchanged. Taking on more material goes through the sources
+collection instead: the Media area adds by upload, camera recording or an exact Library Version,
+previews any of them, and removes anything but the original. Changing which one is the original is
+not offered yet — the domain refuses it while other media is held._
 
 ### Asset
 

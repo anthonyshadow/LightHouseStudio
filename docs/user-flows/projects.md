@@ -460,17 +460,19 @@ Project provider **voice** and **live** starts are deliberately unavailable
 
 ## Getting media into a Project — every path found in code
 
-| Path                                                   | Where                             | Result                                                                                                    |
-| ------------------------------------------------------ | --------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Workspace ▸ Source ▸ Upload                            | `/projects/{id}/workspace`        | Source                                                                                                    |
-| Workspace ▸ Source ▸ Record                            | `/projects/{id}/workspace`        | Source from a finalized take                                                                              |
-| Workspace ▸ Source ▸ Use Saved Video                   | `/projects/{id}/workspace`        | Source referencing an exact Version                                                                       |
-| Overview ▸ Source ▸ Record/Upload/Use Saved Video      | `/projects/{id}` (empty Project)  | Source; then lands in the workspace                                                                       |
-| Overview ▸ Assets ▸ Import Saved Video                 | `/projects/{id}`                  | Asset **membership** only — not the source                                                                |
-| Overview ▸ Assets ▸ add video ▸ new/record/upload      | → `/studio/create?projectId={id}` | Saves to Assets, then auto-attaches and redirects back to `/projects/{id}` (`StudioApp.tsx`)              |
-| Overview ▸ Assets ▸ attached Video ▸ adopt             | `/projects/{id}`                  | **Use as the original video** on an empty Project (confirmed), **Use as the current cut** once it has one |
-| Videos library ▸ ⋯ ▸ Set as a Project’s original video | `/assets/videos`                  | Source of an empty Project — **not** a membership                                                         |
-| Quick Create ▸ Video (with a project in context)       | anywhere on a project route       | Same as the Studio path above                                                                             |
+| Path                                                    | Where                             | Result                                                                                                    |
+| ------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Workspace ▸ Source ▸ Upload                             | `/projects/{id}/workspace`        | Source                                                                                                    |
+| Workspace ▸ Source ▸ Record                             | `/projects/{id}/workspace`        | Source from a finalized take                                                                              |
+| Workspace ▸ Source ▸ Use Saved Video                    | `/projects/{id}/workspace`        | Source referencing an exact Version                                                                       |
+| Workspace ▸ Media ▸ Add a video file / from your videos | `/projects/{id}/workspace`        | More source media beside the original (slice 3.4) — **not** a membership                                  |
+| Workspace ▸ Media ▸ Record more                         | `/projects/{id}/workspace`        | More source media from a finalized take                                                                   |
+| Overview ▸ Source ▸ Record/Upload/Use Saved Video       | `/projects/{id}` (empty Project)  | Source; then lands in the workspace                                                                       |
+| Overview ▸ Assets ▸ Import Saved Video                  | `/projects/{id}`                  | Asset **membership** only — not the source                                                                |
+| Overview ▸ Assets ▸ add video ▸ new/record/upload       | → `/studio/create?projectId={id}` | Saves to Assets, then auto-attaches and redirects back to `/projects/{id}` (`StudioApp.tsx`)              |
+| Overview ▸ Assets ▸ attached Video ▸ adopt              | `/projects/{id}`                  | **Use as the original video** on an empty Project (confirmed), **Use as the current cut** once it has one |
+| Videos library ▸ ⋯ ▸ Add to a Project                   | `/assets/videos`                  | Source media — the original where the Project has none, more material where it does; **not** a membership |
+| Quick Create ▸ Video (with a project in context)        | anywhere on a project route       | Same as the Studio path above                                                                             |
 
 The distinction between _source_ and _attached asset_ is load-bearing, so the UI names it: every
 action that sets the source says "source", the attached-assets section states that memberships

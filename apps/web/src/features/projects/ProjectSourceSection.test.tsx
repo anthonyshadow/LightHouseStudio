@@ -349,7 +349,7 @@ describe('choosing the video a Project works from', () => {
     // A conversion is work the shell must know about: an expiring session or a logout has
     // something to lose here, and something to cancel it with.
     const converting = activities.at(-1);
-    expect(converting).toEqual(expect.objectContaining({ busy: true, accepted: false }));
+    expect(converting).toEqual(expect.objectContaining({ busy: true, phase: 'preparing' }));
     expect(converting?.abort).toEqual(expect.any(Function));
 
     await act(() => {
@@ -523,5 +523,36 @@ describe('abandoning a conversion the picker started', () => {
     // The second file, once: the abandoned conversion's own result has nowhere to go.
     await waitFor(() => expect(uploads).toHaveLength(1));
     expect(uploads[0]).toMatchObject({ filename: 'ready-cut.mp4', contentType: 'video/mp4' });
+  });
+});
+
+describe('a Project that already has an original', () => {
+  it('withdraws the three ways to a first video rather than showing them dead', async () => {
+    /*
+     * The original is immutable while it is attached, so these were never going to act again — and
+     * the Media area below renders live equivalents of all three. Disabled copies above working
+     * controls say the opposite of what is true.
+     */
+    const accepted = acceptedSource('phone-cut.mp4');
+    mockApiServer.use(
+      http.get(`*/api/projects/${ids.project}/source`, () => HttpResponse.json(accepted)),
+    );
+    render(
+      <StudioDesignProvider>
+        <RemoteStateTestProvider>
+          <ProjectSourceSection
+            current={{ project: accepted.project, revision: accepted.revision }}
+            runtime={detachedSourceRuntime}
+          />
+        </RemoteStateTestProvider>
+      </StudioDesignProvider>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Original video ready' })).toBeVisible();
+    for (const name of ['Record', 'Upload', 'Use a saved video']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
+    }
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Remove original video' })).toBeEnabled();
   });
 });

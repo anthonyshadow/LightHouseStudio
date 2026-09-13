@@ -2,7 +2,7 @@ import { useTheme, type Theme } from '@emotion/react';
 import type { SavedVideoSummary } from '@studio/contracts';
 import { formatDuration } from '@studio/domain';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useState, type RefObject } from 'react';
+import { useMemo, useState, type RefObject } from 'react';
 import {
   listSavedVideos,
   savedVideoContentUrl,
@@ -11,8 +11,13 @@ import {
 import { Button, OverlayPanel, StatusNotice } from '../../ui';
 import { media } from '../../ui/media';
 import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
-import { durationBadgeStyles as galleryDurationBadgeStyles } from '../video-gallery/VideoGallery.styles';
+import { useProjectAssetsController } from './useProjectAssetsController';
 import { ProjectAssetThumbnail } from './ProjectAssetThumbnail';
+import {
+  videoRowBadgeStyles,
+  videoRowListStyles,
+  videoRowPreviewStyles,
+} from './projectVideoRow.styles';
 import { VideoPlayer } from '../video-player/VideoPlayer';
 
 const rowStyles = (theme: Theme) => ({
@@ -55,27 +60,18 @@ const copyStyles = (theme: Theme) => ({
   '& > small': { color: theme.colors.textMuted },
 });
 
-// The Videos gallery owns the badge treatment; only the density changes on this smaller tile, so
-// the two poster surfaces cannot drift apart on colour, radius or type.
-const durationBadgeStyles = (theme: Theme) => ({
-  ...galleryDurationBadgeStyles(theme),
-  insetBlockEnd: theme.space.xxs,
-  insetInlineEnd: theme.space.xxs,
-  padding: '0.15rem 0.35rem',
-});
-
-const previewStyles = (theme: Theme) => ({
-  marginBlockStart: theme.space.xs,
-  width: '100%',
-  maxWidth: '100%',
-  height: 'clamp(11rem, 32vh, 18rem)',
-});
-
 interface ProjectSavedVideoListProps {
   readonly active: boolean;
   readonly busy: boolean;
   readonly onSelect: (video: SavedVideoSummary) => void;
   readonly selectedVideoId?: string | null | undefined;
+  /**
+   * The Project whose attachments come first, or nothing where that ordering would be wrong.
+   *
+   * Absent for the picker that *makes* an attachment: promoting what is already attached there
+   * would put the one video the operator cannot usefully choose at the top of the list.
+   */
+  readonly projectId?: string | undefined;
   readonly emptyTitle?: string;
   readonly emptyBody?: string;
   readonly listLabel?: string;
@@ -91,6 +87,7 @@ export const ProjectSavedVideoList = ({
   busy,
   onSelect,
   selectedVideoId = null,
+  projectId,
   emptyTitle = 'No videos yet',
   emptyBody = 'Save a video in Studio first, or use Upload or Record for this Project.',
   listLabel = 'Videos available as a Project source',
@@ -110,13 +107,99 @@ export const ProjectSavedVideoList = ({
     getNextPageParam: (page) => page.nextCursor,
     enabled: active,
   });
+  /*
+   * What this Project already uses, first.
+   *
+   * The membership list resolves its own `SavedVideoSummary` objects, so promoting them costs one
+   * query and no extra resolution. Only its first page is promoted — everything else stays in the
+   * full list below in its usual place, so this is an ordering and never a filter.
+   */
+  const attachments = useProjectAssetsController(projectId ?? '', 'video', {
+    enabled: active && projectId !== undefined,
+  });
+  const attachedPages = attachments.query.data;
+  const attached = useMemo(
+    () => attachedPages?.pages.flatMap((page) => page.videoSummaries) ?? [],
+    [attachedPages],
+  );
   // A disabled query still serves cached pages. An inactive list must not build thumbnails,
   // badges and preview controls only for its owner to hide them.
-  const videos = active ? (query.data?.pages.flatMap((page) => page.videos) ?? []) : [];
+  const allVideos = useMemo(
+    () => (active ? (query.data?.pages.flatMap((page) => page.videos) ?? []) : []),
+    [active, query.data],
+  );
+  const videos = useMemo(() => {
+    const promoted = new Set(attached.map(({ id }) => id));
+    return allVideos.filter(({ id }) => !promoted.has(id));
+  }, [allVideos, attached]);
   const rowCss = rowStyles(theme);
   const copyCss = copyStyles(theme);
-  const badgeCss = durationBadgeStyles(theme);
-  const previewCss = previewStyles(theme);
+  const badgeCss = videoRowBadgeStyles(theme);
+  const previewCss = videoRowPreviewStyles(theme);
+  const listCss = videoRowListStyles(theme);
+  const groupCss = { margin: 0, color: theme.colors.textMuted, fontSize: theme.fontSizes.caption };
+
+  const videoRow = (video: SavedVideoSummary) => {
+    const unavailable = video.status !== 'ready';
+    const disabled = busy || unavailable;
+    const previewOpen = previewVideoId === video.id;
+    const selected = selectedVideoId === video.id;
+    const thumbnailUrl = video.thumbnailAvailable
+      ? savedVideoThumbnailUrl(video.id, video.currentVersion.id)
+      : null;
+    const duration = formatDuration(video.currentVersion.durationMs);
+    return (
+      <li key={video.id}>
+        <div css={rowCss}>
+          <Button
+            variant="secondary"
+            data-saved-video-action="select"
+            disabled={disabled}
+            aria-pressed={selected}
+            onClick={() => onSelect(video)}
+            css={selectStyles(theme, selected)}
+          >
+            <ProjectAssetThumbnail
+              kind="video"
+              label={video.title}
+              thumbnailUrl={thumbnailUrl}
+              unavailable={unavailable}
+              decorative
+            >
+              <span css={badgeCss}>{duration}</span>
+            </ProjectAssetThumbnail>
+            <span css={copyCss}>
+              <span>{video.title}</span>
+              <small>
+                Version {video.currentVersion.ordinal} · {video.currentVersion.width}×
+                {video.currentVersion.height} · {duration}
+              </small>
+            </span>
+          </Button>
+          <Button
+            size="small"
+            variant="quiet"
+            data-saved-video-action="preview"
+            disabled={disabled}
+            aria-expanded={previewOpen}
+            aria-controls={`saved-video-preview-${video.id}`}
+            onClick={() => setPreviewVideoId(previewOpen ? null : video.id)}
+          >
+            {previewOpen ? 'Hide preview' : 'Preview'}
+          </Button>
+        </div>
+        {previewOpen ? (
+          <div id={`saved-video-preview-${video.id}`} css={previewCss}>
+            <VideoPlayer
+              src={savedVideoContentUrl(video.id, video.currentVersion.id)}
+              title={video.title}
+              poster={thumbnailUrl ?? undefined}
+            />
+          </div>
+        ) : null}
+      </li>
+    );
+  };
 
   return (
     <>
@@ -129,84 +212,36 @@ export const ProjectSavedVideoList = ({
           </Button>
         </StatusNotice>
       ) : null}
-      {!query.isPending && !query.isError && videos.length === 0 ? (
+      {!query.isPending && !query.isError && allVideos.length === 0 ? (
         <StatusNotice tone="neutral" title={emptyTitle}>
           {emptyBody}
         </StatusNotice>
       ) : null}
+      {/*
+        Two groups only while there are two: with nothing attached there is one list and it wears
+        the caller's own label, exactly as it did before this Project's attachments were promoted.
+      */}
+      {attached.length > 0 ? (
+        <>
+          <p data-saved-video-group="attached" css={groupCss}>
+            Used in this Project
+          </p>
+          <ul aria-label="Videos used in this Project" css={listCss}>
+            {attached.map(videoRow)}
+          </ul>
+        </>
+      ) : null}
       {videos.length > 0 ? (
-        <ul
-          aria-label={listLabel}
-          css={{
-            display: 'grid',
-            gap: theme.space.sm,
-            margin: 0,
-            padding: 0,
-            listStyle: 'none',
-          }}
-        >
-          {videos.map((video) => {
-            const unavailable = video.status !== 'ready';
-            const disabled = busy || unavailable;
-            const previewOpen = previewVideoId === video.id;
-            const selected = selectedVideoId === video.id;
-            const thumbnailUrl = video.thumbnailAvailable
-              ? savedVideoThumbnailUrl(video.id, video.currentVersion.id)
-              : null;
-            const duration = formatDuration(video.currentVersion.durationMs);
-            return (
-              <li key={video.id}>
-                <div css={rowCss}>
-                  <Button
-                    variant="secondary"
-                    data-saved-video-action="select"
-                    disabled={disabled}
-                    aria-pressed={selected}
-                    onClick={() => onSelect(video)}
-                    css={selectStyles(theme, selected)}
-                  >
-                    <ProjectAssetThumbnail
-                      kind="video"
-                      label={video.title}
-                      thumbnailUrl={thumbnailUrl}
-                      unavailable={unavailable}
-                      decorative
-                    >
-                      <span css={badgeCss}>{duration}</span>
-                    </ProjectAssetThumbnail>
-                    <span css={copyCss}>
-                      <span>{video.title}</span>
-                      <small>
-                        Version {video.currentVersion.ordinal} · {video.currentVersion.width}×
-                        {video.currentVersion.height} · {duration}
-                      </small>
-                    </span>
-                  </Button>
-                  <Button
-                    size="small"
-                    variant="quiet"
-                    data-saved-video-action="preview"
-                    disabled={disabled}
-                    aria-expanded={previewOpen}
-                    aria-controls={`saved-video-preview-${video.id}`}
-                    onClick={() => setPreviewVideoId(previewOpen ? null : video.id)}
-                  >
-                    {previewOpen ? 'Hide preview' : 'Preview'}
-                  </Button>
-                </div>
-                {previewOpen ? (
-                  <div id={`saved-video-preview-${video.id}`} css={previewCss}>
-                    <VideoPlayer
-                      src={savedVideoContentUrl(video.id, video.currentVersion.id)}
-                      title={video.title}
-                      poster={thumbnailUrl ?? undefined}
-                    />
-                  </div>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          {attached.length > 0 ? (
+            <p data-saved-video-group="all" css={groupCss}>
+              Everything else
+            </p>
+          ) : null}
+          <ul aria-label={listLabel} css={listCss}>
+            {videos.map(videoRow)}
+          </ul>
+        </>
       ) : null}
       {query.hasNextPage ? (
         <Button
@@ -227,6 +262,7 @@ export const ProjectSavedVideoPicker = ({
   returnFocusRef,
   onClose,
   onSelect,
+  projectId,
   title = 'Use a saved video',
   description = 'Choose one exact active Version. The stored bytes are referenced, not copied.',
   emptyTitle = 'No videos yet',
@@ -238,6 +274,8 @@ export const ProjectSavedVideoPicker = ({
   readonly returnFocusRef: RefObject<HTMLElement | null>;
   readonly onClose: () => void;
   readonly onSelect: (video: SavedVideoSummary) => void;
+  /** The Project whose attachments come first; see {@link ProjectSavedVideoList}. */
+  readonly projectId?: string | undefined;
   readonly title?: string;
   readonly description?: string;
   readonly emptyTitle?: string;
@@ -260,6 +298,7 @@ export const ProjectSavedVideoPicker = ({
       <ProjectSavedVideoList
         active={open}
         busy={busy}
+        projectId={projectId}
         onSelect={onSelect}
         emptyTitle={emptyTitle}
         emptyBody={emptyBody}

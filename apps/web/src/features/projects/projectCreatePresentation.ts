@@ -83,11 +83,13 @@ export interface ProjectCreateLauncherInput {
   readonly editorBlockedReason: string | undefined;
   readonly sourceBusy: boolean;
   readonly workingMediaBusy: boolean;
+  readonly mediaBusy: boolean;
 }
 
 const ARCHIVED_REASON = 'This Project is archived.';
 const SOURCE_LOADING_REASON = 'Loading this Project’s original video onto the stage.';
 const WORKING_MEDIA_BUSY_REASON = 'Finish updating the current cut before starting an edit.';
+const MEDIA_BUSY_REASON = 'Finish the change to this Project’s media before starting an edit.';
 
 /**
  * Why every launcher cannot act, in one precedence.
@@ -114,6 +116,9 @@ const launcherBlockedReason = (
   if (input.sourceBusy) return SOURCE_LOADING_REASON;
   if (input.editorBlockedReason !== undefined) return input.editorBlockedReason;
   if (input.workingMediaBusy) return WORKING_MEDIA_BUSY_REASON;
+  // Same hazard as the current cut: taking media on or letting it go appends a revision, so a start
+  // made across one carries a compare-and-set that is already stale.
+  if (input.mediaBusy) return MEDIA_BUSY_REASON;
   return null;
 };
 

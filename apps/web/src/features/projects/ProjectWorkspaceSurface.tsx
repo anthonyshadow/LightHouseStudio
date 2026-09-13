@@ -13,6 +13,7 @@ import { ProjectHistorySection } from './ProjectHistorySection';
 import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
 import { saveTaskPanelStyles } from './ProjectOutputSaveSection.styles';
 import { dialogActionsStyles } from './ProjectRouteSurface.styles';
+import { ProjectMediaSection } from './ProjectMediaSection';
 import { ProjectSourceSection, type ProjectRecordingCandidate } from './ProjectSourceSection';
 import { projectStatusLabel } from './projectStatusPresentation';
 import {
@@ -162,6 +163,7 @@ export const ProjectWorkspaceSurface = ({
   const [sourceActivity, setSourceActivity] = useState<ProjectSourceActivity | null>(null);
   const [workingMediaActivity, setWorkingMediaActivity] =
     useState<ProjectWorkingMediaActivity | null>(null);
+  const [mediaBusy, setMediaBusy] = useState(false);
   const handleSourceActivity = useCallback(
     (activity: ProjectSourceActivity) => {
       setSourceActivity(activity);
@@ -221,7 +223,22 @@ export const ProjectWorkspaceSurface = ({
     projectProcessingBlockedReason(processing?.attempt, 'source-removal') ??
     (workingMediaActivity?.busy
       ? 'Finish updating the current cut before removing the original video.'
-      : undefined);
+      : mediaBusy
+        ? 'Finish the change to this Project’s media before removing the original video.'
+        : undefined);
+  /*
+   * The same hazard from the other side: adding or removing media appends a revision, so it moves
+   * the compare-and-set out from under anything else still writing one. The run overlay already
+   * covers the workspace while provider work is in flight; this is the window after it, where an
+   * attempt is accepted or ambiguous and the operator can still reach these controls.
+   */
+  const mediaChangeBlockedReason =
+    projectProcessingBlockedReason(processing?.attempt, 'media-change') ??
+    (sourceActivity?.busy
+      ? 'Finish adding the original video before changing this Project’s media.'
+      : workingMediaActivity?.busy
+        ? 'Finish updating the current cut before changing this Project’s media.'
+        : undefined);
   const activeWorkspaceTask =
     pinnedWorkspaceTask ?? enteredWorkspaceTask ?? entryTaskForSnapshot(current.revision.snapshot);
   const focusWorkspaceTask = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -311,11 +328,11 @@ export const ProjectWorkspaceSurface = ({
             css={taskPanelStyles(theme)}
           >
             <header>
-              <h2>Original video</h2>
-              <p>Choose the one video this Project works from.</p>
+              <h2>Media</h2>
+              <p>The one video this Project is built from, and anything else it works with.</p>
             </header>
             <ProjectSourceSection
-              key={current.project.id}
+              key={`source-${current.project.id}`}
               current={current}
               runtime={sourceRuntime}
               recordingCandidate={recordingCandidate}
@@ -326,6 +343,25 @@ export const ProjectWorkspaceSurface = ({
               onActivityChange={handleSourceActivity}
               onCurrentChange={session.acceptCurrent}
             />
+            {/*
+              Only once the Project has an original: until then the section above is the single
+              owner of "this Project has no video yet", and a second empty state beside it would
+              ask the same question twice.
+            */}
+            {current.revision.snapshot.sourceAssetId === null ? null : (
+              <ProjectMediaSection
+                key={`media-${current.project.id}`}
+                current={current}
+                session={session.port}
+                archived={archived}
+                recordingCandidate={recordingCandidate}
+                recordingActive={recordingActive}
+                recordingSupported={recordingSupported}
+                changeBlockedReason={mediaChangeBlockedReason}
+                onStartRecording={onStartRecording}
+                onBusyChange={setMediaBusy}
+              />
+            )}
           </section>
 
           <section
@@ -348,6 +384,7 @@ export const ProjectWorkspaceSurface = ({
               runtime={createRuntime}
               sourceBusy={sourceActivity?.busy ?? false}
               workingMediaBusy={workingMediaActivity?.busy ?? false}
+              mediaBusy={mediaBusy}
               onOpenSource={openSourceTask}
               onOpenTask={selectWorkspaceTask}
               onWorkingMediaActivityChange={handleWorkingMediaActivity}

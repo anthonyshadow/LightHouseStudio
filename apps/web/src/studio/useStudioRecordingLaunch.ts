@@ -40,7 +40,8 @@ const launchableProjectId = ({
   captureSupported,
 }: ProjectRecordingLaunchState): string | null =>
   activeProjectId !== null &&
-  !projectSourceActivity?.accepted &&
+  // Deliberately not "and the Project has no original yet". A Project holds several videos, and a
+  // capture after the first one is how the second arrives; the Media area takes the finished take.
   !projectSourceActivity?.busy &&
   // Close to "the discard is going to refuse", but not the same fact: `discard` consults the
   // recorder attempt and transcode refs as they stand at the call, while this is the recorder
@@ -356,9 +357,9 @@ export const useStudioRecordingLaunch = ({
     });
     if (projectId === null) {
       // The guard decides whether; only one of its reasons is the operator's to hear. A browser
-      // that cannot capture, no Project to record into, and a source already accepted or busy are
-      // each a control the surface withholds, where a notice would describe a press nobody could
-      // make. A take in flight is the one condition it names out loud.
+      // that cannot capture, no Project to record into, and a source mid-acceptance are each a
+      // control the surface withholds, where a notice would describe a press nobody could make. A
+      // take in flight is the one condition it names out loud.
       return recordingActive ? 'take-in-progress' : null;
     }
     // Asked before any side effect, so declining leaves the overlay, the route and the take

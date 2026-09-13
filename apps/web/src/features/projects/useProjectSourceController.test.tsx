@@ -525,7 +525,7 @@ describe('useProjectSourceController', () => {
       firstProjectId,
       expect.objectContaining({ blob: file }),
     );
-    expect(activities.at(-1)).toMatchObject({ busy: true, accepted: false });
+    expect(activities.at(-1)).toMatchObject({ busy: true, phase: 'preparing' });
 
     act(() => hook.result.current.abort());
     await waitFor(() => expect(hook.result.current.phase).toBe('idle'));

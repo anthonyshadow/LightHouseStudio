@@ -82,7 +82,8 @@ cloud configuration so the direct-upload routes are covered.
 ### Database model direction
 
 **Current:** a Project holds several sources (slice 3.2, 2026-09-13) with one of them named as its
-original; the single-source surfaces still read that one, and no UI adds a second yet —
+original; the single-source surfaces still read that one, and the workspace's Media area adds,
+previews and removes the rest (slice 3.4, 2026-09-13) —
 full-jsonb revision snapshots (v1/v2) whose first-class fields are AI selections, an
 output commit that forces status `completed`, and a schema-level one-active-AI-job-per-owner
 unique index. Dead tables `outbox` and `resource_references`.
@@ -93,7 +94,8 @@ unique index. Dead tables `outbox` and `resource_references`.
    reference addresses a source without a second identifier; file mode stores the same collection at
    library schema v8. Retention was **not** already per-asset for a source — it read only
    snapshot-derived links — so `project_sources` joined the retention union in the same slice. The
-   workspace surface that adds and removes them is slice 3.4._
+   workspace surface that adds and removes them landed in slice 3.4 (2026-09-13); promoting a
+   sibling to original still has no rule and no contract._
 2. **Composition:** stored in the revision snapshot as **schema version 3** — ordered clip list,
    subtitle cues, audio settings — reusing the existing revision/CAS/replay machinery rather than
    inventing parallel tables (D3). Snapshot v3 also demotes AI selections to an optional

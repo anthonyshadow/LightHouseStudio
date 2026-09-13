@@ -81,7 +81,7 @@ import {
   thumbnailStyles,
 } from './VideoGallery.styles';
 import { ActionMenu } from '../../ui/primitives/ActionMenu';
-import { PROJECT_SET_ORIGINAL_VIDEO_ACTION_LABEL } from '../projects/projectProcessingPresentation';
+import { PROJECT_ADD_VIDEO_ACTION_LABEL } from '../projects/projectProcessingPresentation';
 
 /**
  * Only wide enough to carry the deep-link fetch's result into the preview's own read, which mounts
@@ -367,7 +367,7 @@ const VideoGalleryGrid = ({
                     },
                     {
                       id: 'project-source',
-                      label: PROJECT_SET_ORIGINAL_VIDEO_ACTION_LABEL,
+                      label: PROJECT_ADD_VIDEO_ACTION_LABEL,
                       disabled: busy || video.status !== 'ready',
                       onSelect: (trigger) => onAddToProject(video, trigger),
                     },

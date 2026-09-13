@@ -77,11 +77,14 @@ detach; Campaign archive never touches its Projects.
 
 ## 7. Media upload and import (into a Project)
 
-**Sees:** the Project's Media area listing its source videos **(gap — today exactly one source)**
-with posters, durations, and states (uploading / processing / ready / failed).
+**Sees:** the Project's Media area listing its source videos with posters, durations, and states
+(adding / ready / failed — a stored source is always ready, because the server inspects and stores
+before it records one).
 **Does:** adds media by upload, camera recording, or reuse of a Library video Version; previews any
-source; removes a source (bytes retained by history).
-**System:** uploads are idempotent and resumable across a reload **(gap)**; originals are
+source; removes a source (bytes retained by history) — the original excepted, which
+**Remove original video** owns and which cannot be let go while other media is held.
+**System:** uploads are idempotent, and an answer that goes missing is reconciled against what the
+Project holds rather than repeated; resumable across a reload is still a **gap**; originals are
 immutable; failures show a reason and a retry that never duplicates work.
 **Next:** edit a clip, or go straight to the composition.
 
@@ -91,8 +94,8 @@ immutable; failures show a reason and a retry that never duplicates work.
 outfits, voices); in Assets, the account Libraries with search, filters, and posters.
 **Does:** attaches/detaches Library items to a Project (organizational, never destructive); from a
 Video's card, sees which Projects use it; renames, previews, downloads.
-**System:** attached items surface first in the workspace's pickers **(gap — today the workspace
-pickers ignore memberships)**.
+**System:** attached items surface first in the workspace's pickers, under **Used in this
+Project**, with the rest of the library below (slice 3.4, 2026-09-13).
 **Next:** attached material is one click from being used in the edit.
 
 ## 9. Manual editing (no AI required)

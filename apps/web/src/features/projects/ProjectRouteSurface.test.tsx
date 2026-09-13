@@ -499,7 +499,7 @@ describe('Project route surface', () => {
     expect(within(tabs).getAllByRole('tab')).toHaveLength(4);
     expect(sourceTab).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tabpanel', { name: 'Original' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Original video' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: /^Media$/u })).toBeVisible();
 
     await user.click(createTab);
     expect(createTab).toHaveAttribute('aria-selected', 'true');
@@ -1919,7 +1919,7 @@ describe('Project route surface', () => {
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
       sourceRuntime: { kind: 'stage', present, clear },
-      recordingCandidate: { file, ready: true },
+      recordingCandidate: { file, artifactId: 'take-artifact-1', ready: true },
       onSourceActivityChange: (activity) => activities.push(activity),
     });
 
@@ -1929,13 +1929,9 @@ describe('Project route surface', () => {
 
     expect(await screen.findByRole('heading', { name: 'Original video ready' })).toBeVisible();
     expect(present).toHaveBeenCalledWith(activeId, expect.objectContaining({ blob: file }));
-    expect(activities).toContainEqual(
-      expect.objectContaining({ phase: 'preparing', busy: true, accepted: false }),
-    );
+    expect(activities).toContainEqual(expect.objectContaining({ phase: 'preparing', busy: true }));
     await waitFor(() =>
-      expect(activities.at(-1)).toEqual(
-        expect.objectContaining({ phase: 'saved', busy: false, accepted: true }),
-      ),
+      expect(activities.at(-1)).toEqual(expect.objectContaining({ phase: 'saved', busy: false })),
     );
   });
 

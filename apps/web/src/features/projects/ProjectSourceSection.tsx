@@ -2,15 +2,16 @@ import { useTheme } from '@emotion/react';
 import type { ProjectCurrentResponse } from '@studio/contracts';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Button, ConfirmationDialog, StatusNotice } from '../../ui';
-import {
-  EXISTING_VIDEO_INTAKE_NOTICES,
-  type ExistingVideoIntakePhase,
-} from '../existing-video/videoIntakeNotices';
-import { validateExistingVideo } from '../existing-video/videoValidation';
 import { PROJECT_RECORDING_TAKE_IN_PROGRESS_NOTICE } from '../take-review/takeRefusalNotices';
+import { PROJECT_MEDIA_REMOVAL_REASSURANCE } from './projectProcessingPresentation';
 import type { ProjectRecordingLaunchRefusal } from './projectRecordingLaunch';
 import { emptyProjectStyles } from './ProjectRouteSurface.styles';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
+import {
+  PROJECT_VIDEO_FILE_ACCEPT,
+  projectVideoIntakeNotice,
+  useProjectVideoIntake,
+} from './useProjectVideoIntake';
 import {
   useProjectSourceController,
   type ProjectSourceActivity,
@@ -20,6 +21,14 @@ import {
 
 export interface ProjectRecordingCandidate {
   readonly file: File;
+  /**
+   * The stage artifact these bytes came from.
+   *
+   * A take stays `recorded` through every re-presentation, so a surface that takes one on has to
+   * remember which one — and the artifact id is the identity the capture graph already holds, where
+   * a file's name, size and timestamp are only a reconstruction of it.
+   */
+  readonly artifactId: string;
   readonly ready: boolean;
 }
 
@@ -78,89 +87,6 @@ const projectSourceNotice = (
     case 'idle':
       return null;
   }
-};
-
-/*
- * Two waits, said apart, because they are nothing alike: reading a file's format is a moment, and
- * re-encoding a whole video on this device is minutes. Their names and sentences belong to the
- * intake, beside the decision that picks between them and next to the Studio surface that shows the
- * same two waits; all this surface decides is that both are progress rather than a problem.
- */
-const projectSourceIntakeNotice = (phase: ExistingVideoIntakePhase): ProjectSourceNotice => ({
-  ...EXISTING_VIDEO_INTAKE_NOTICES[phase],
-  tone: 'neutral',
-});
-
-/**
- * The picker's intake: this browser is asked about the file before the server is.
- *
- * A phone records HEVC by default, which this product cannot publish and the source route refuses
- * outright — so a Project could not be started from the clip the operator actually has, while the
- * Studio surface accepted the same clip by converting it. `validateExistingVideo` is that decision
- * and stays its only owner; this hook holds the wait, says which half of it is running, and hands
- * on the file that came back — the original where nothing was wrong with it, the converted MP4
- * where the codec was.
- */
-const useProjectSourceIntake = (onAccepted: (file: File) => void) => {
-  const [phase, setPhase] = useState<ExistingVideoIntakePhase | null>(null);
-  const [refusal, setRefusal] = useState<string | null>(null);
-  const controllerRef = useRef<AbortController | null>(null);
-
-  // A conversion holds the whole video in memory and answers to nothing else here, so a surface
-  // that goes away takes it with it rather than leaving it running for a component that is gone.
-  useEffect(
-    () => () => {
-      controllerRef.current?.abort('project-source-intake-unmounted');
-      controllerRef.current = null;
-    },
-    [],
-  );
-
-  const cancel = useCallback(() => {
-    controllerRef.current?.abort('project-source-intake-cancelled');
-    controllerRef.current = null;
-    setPhase(null);
-  }, []);
-
-  /** Clears a refusal that another way to a source has just superseded. */
-  const dismiss = useCallback(() => setRefusal(null), []);
-
-  const offer = useCallback(
-    async (file: File) => {
-      controllerRef.current?.abort('project-source-intake-replaced');
-      const controller = new AbortController();
-      controllerRef.current = controller;
-      setRefusal(null);
-      setPhase('checking');
-      try {
-        const validated = await validateExistingVideo(file, false, controller.signal, 'source', {
-          onConvert: () => setPhase('converting'),
-          // Only `file` is read below: the bytes go to the server, which inspects them itself and
-          // answers with the source it accepted. Muxing the audio out again here would read the
-          // whole track into memory beside the video it came from, on the path this product's
-          // recording memory budget accounts for, to throw it away on the next line.
-          audioSidecar: 'skip',
-        });
-        if (controller.signal.aborted) return;
-        setPhase(null);
-        onAccepted(validated.file);
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        setPhase(null);
-        // The intake's own words, unedited: they name what this product publishes and, for a file
-        // this browser cannot convert either, what to do about it. Restating them here would put a
-        // second owner on a refusal the intake already decides.
-        setRefusal(
-          error instanceof Error ? error.message : 'That video could not be used as a source.',
-        );
-      } finally {
-        if (controllerRef.current === controller) controllerRef.current = null;
-      }
-    },
-    [onAccepted],
-  );
-
-  return { phase, refusal, offer, cancel, dismiss };
 };
 
 /*
@@ -258,7 +184,7 @@ export const ProjectSourceSection = ({
     },
     [upload],
   );
-  const intake = useProjectSourceIntake(acceptIntake);
+  const intake = useProjectVideoIntake(acceptIntake);
   const archived = current.project.archivedAt !== null;
   // One idea of busy for the whole section: an intake is the operator's video being made ready
   // just as much as the upload that follows it, and offering a second file mid-conversion would
@@ -304,7 +230,7 @@ export const ProjectSourceSection = ({
    */
   const stateNotice: ProjectSourceNotice | null =
     intake.phase !== null
-      ? projectSourceIntakeNotice(intake.phase)
+      ? projectVideoIntakeNotice(intake.phase)
       : intake.refusal !== null
         ? { title: 'Video not used', tone: 'danger', body: intake.refusal }
         : projectSourceNotice(controller.phase, controller.message);
@@ -358,51 +284,76 @@ export const ProjectSourceSection = ({
           ) : null}
         </div>
         <div data-source-actions>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="video/mp4,video/quicktime,video/webm"
-            hidden
-            disabled={controlsDisabled}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.currentTarget.value = '';
-              if (file) void intake.offer(file);
-            }}
-          />
-          {recordingCandidate?.ready && !controller.accepted ? (
-            <Button
-              variant="primary"
-              busy={controller.busy}
-              disabled={archived || busy}
-              onClick={() => {
-                // A take supersedes a file the intake refused, and the refusal goes with it.
-                intake.dismiss();
-                void controller.acceptRecording(recordingCandidate.file);
-              }}
-            >
-              Use finalized recording
-            </Button>
-          ) : (
-            <Button
-              disabled={controlsDisabled || onStartRecording === undefined || recordingUnsupported}
-              busy={recordingActive}
-              aria-describedby={recordingUnsupported ? recordingUnsupportedId : undefined}
-              onClick={startRecording}
-            >
-              {detached && onStartRecording !== undefined ? 'Record in the workspace' : 'Record'}
-            </Button>
+          {/*
+            Three ways to a first video, withdrawn once there is one rather than shown dead beside
+            the Media area's live equivalents. The original is immutable while it is attached, so
+            these were never going to act again — and a disabled Record above a working one says
+            the opposite of what is true.
+          */}
+          {controller.accepted ? null : (
+            <>
+              <input
+                ref={inputRef}
+                type="file"
+                accept={PROJECT_VIDEO_FILE_ACCEPT}
+                hidden
+                disabled={controlsDisabled}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.currentTarget.value = '';
+                  if (file) void intake.offer(file);
+                }}
+              />
+              {recordingCandidate?.ready ? (
+                <Button
+                  variant="primary"
+                  busy={controller.busy}
+                  disabled={archived || busy}
+                  onClick={() => {
+                    // A take supersedes a file the intake refused, and the refusal goes with it.
+                    intake.dismiss();
+                    void controller.acceptRecording(recordingCandidate.file);
+                  }}
+                >
+                  Use finalized recording
+                </Button>
+              ) : (
+                <Button
+                  disabled={
+                    controlsDisabled || onStartRecording === undefined || recordingUnsupported
+                  }
+                  busy={recordingActive}
+                  aria-describedby={recordingUnsupported ? recordingUnsupportedId : undefined}
+                  onClick={startRecording}
+                >
+                  {detached && onStartRecording !== undefined
+                    ? 'Record in the workspace'
+                    : 'Record'}
+                </Button>
+              )}
+              <Button disabled={controlsDisabled} onClick={() => inputRef.current?.click()}>
+                Upload
+              </Button>
+              <Button
+                ref={savedVideoTriggerRef}
+                disabled={controlsDisabled}
+                onClick={() => setPickerOpen(true)}
+              >
+                Use a saved video
+              </Button>
+              {recordingUnsupported ? (
+                <small id={recordingUnsupportedId}>{RECORDING_UNSUPPORTED_NOTICE}</small>
+              ) : null}
+              {recordingRefusalMessage ? (
+                <StatusNotice role="alert" tone="warning">
+                  {recordingRefusalMessage}
+                </StatusNotice>
+              ) : null}
+              {detached ? (
+                <small>Choosing here opens the workspace, where you can watch it.</small>
+              ) : null}
+            </>
           )}
-          <Button disabled={controlsDisabled} onClick={() => inputRef.current?.click()}>
-            Upload
-          </Button>
-          <Button
-            ref={savedVideoTriggerRef}
-            disabled={controlsDisabled}
-            onClick={() => setPickerOpen(true)}
-          >
-            Use a saved video
-          </Button>
           {controller.accepted ? (
             <Button
               ref={removeTriggerRef}
@@ -413,17 +364,6 @@ export const ProjectSourceSection = ({
             >
               Remove original video
             </Button>
-          ) : null}
-          {recordingUnsupported ? (
-            <small id={recordingUnsupportedId}>{RECORDING_UNSUPPORTED_NOTICE}</small>
-          ) : null}
-          {recordingRefusalMessage ? (
-            <StatusNotice role="alert" tone="warning">
-              {recordingRefusalMessage}
-            </StatusNotice>
-          ) : null}
-          {detached ? (
-            <small>Choosing here opens the workspace, where you can watch it.</small>
           ) : null}
           <small>Choosing, recording, or reopening a video never starts paid AI work.</small>
         </div>
@@ -437,8 +377,7 @@ export const ProjectSourceSection = ({
             <>
               <p>
                 Remove “{controller.source?.filename ?? 'this video'}” as the original video for
-                this Project? The video itself is not deleted, and saved versions, Project history
-                and your saved progress are all kept.
+                this Project? {PROJECT_MEDIA_REMOVAL_REASSURANCE}
               </p>
               {removalBlockedReason === undefined ? null : <p>{removalBlockedReason}</p>}
             </>
@@ -462,6 +401,7 @@ export const ProjectSourceSection = ({
       <ProjectSavedVideoPicker
         open={pickerOpen}
         busy={controller.busy}
+        projectId={current.project.id}
         title="Choose the original video"
         returnFocusRef={savedVideoTriggerRef}
         onClose={() => setPickerOpen(false)}

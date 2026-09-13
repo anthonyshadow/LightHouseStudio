@@ -171,6 +171,7 @@ export const ProjectWorkingMediaSection = ({
       <ProjectSavedVideoPicker
         open={pickerOpen}
         busy={phase === 'saving'}
+        projectId={current.project.id}
         returnFocusRef={triggerRef}
         onClose={() => setPickerOpen(false)}
         onSelect={(video) => void adoptVersion(video)}

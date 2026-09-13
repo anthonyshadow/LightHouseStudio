@@ -204,7 +204,9 @@ modes. _The sources collection endpoints listed here landed with 3.2 — prompt 
 and there is no separate prompt for 3.3's endpoint half. The v2→v3 snapshot read migration also
 listed here landed in slice 3.1._
 3.4 Workspace media area: add/remove/preview several sources; capture bridge targets the
-collection, restoring the record affordance after the first source (studio-3).
+collection, restoring the record affordance after the first source (studio-3). _Landed 2026-09-13
+with prompt 31; attached-membership videos now come first in the workspace pickers, which closes
+PCD-5. [Plan, decisions and evidence](SLICE_3.4_WORKSPACE_MEDIA_PLAN.md)._
 **Non-goals:** the timeline UI (Phase 4); removing the current single-clip flows (they keep
 working on v3 unchanged); any destructive migration.
 **Dependencies:** D1, D2, D3 decided; Phase 2's cue/gain models (they move into the composition).

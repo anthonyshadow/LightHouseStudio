@@ -37,6 +37,15 @@ export const useStudioProjectBridge = ({
    * the operator has yet to see.
    */
   const presentedArtifactIdRef = useRef<string | null>(null);
+  /**
+   * The same id as a rendered value.
+   *
+   * The ref is read synchronously from inside the runtime and from a passive effect, so it stays;
+   * this mirror is what lets a surface *render* against the answer. Nothing else can say whether
+   * the artifact on the stage is the Project's own: media this Project put there arrives through
+   * `present` below, and a take from the camera never does.
+   */
+  const [presentedArtifactId, setPresentedArtifactId] = useState<string | null>(null);
   /** A clear this port accepted and the runtime refused, still owed to whoever asked for it. */
   const clearOwedRef = useRef(false);
   const presentSourceRef = useRef(presentSource);
@@ -59,6 +68,7 @@ export const useStudioProjectBridge = ({
   const releaseStage = useCallback(() => {
     presentedProjectIdRef.current = null;
     presentedArtifactIdRef.current = null;
+    setPresentedArtifactId(null);
     clearOwedRef.current = false;
   }, []);
 
@@ -69,6 +79,7 @@ export const useStudioProjectBridge = ({
         if (projectIdRef.current !== candidateProjectId) return;
         presentedProjectIdRef.current = candidateProjectId;
         presentedArtifactIdRef.current = input.artifactMetadata.id;
+        setPresentedArtifactId(input.artifactMetadata.id);
         // Fresh media settles any clear still owed: what the refusal meant to take off the stage
         // is no longer on it.
         clearOwedRef.current = false;
@@ -151,12 +162,24 @@ export const useStudioProjectBridge = ({
         type: owned.mimeType,
         lastModified: new Date(owned.startedAt).valueOf(),
       }),
+      artifactId: owned.id,
       ready: true,
     };
   }, [recordingLifecycle, recordingOriginal]);
 
+  /**
+   * Whether the stage is showing media this Project put there, rather than a take it has not taken
+   * on. What tells the two apart is which door the artifact came through: the Project's own media
+   * — hydrated, accepted, or adopted as the current cut — is published through `present` above, and
+   * a capture reaches the stage from the recorder. Bytes alone cannot answer it, because a source
+   * just uploaded from this browser is owned bytes *and* already durable on the server.
+   */
+  const presentedByProject =
+    presentedArtifactId !== null && presentedArtifactId === (recordingOriginal?.id ?? null);
+
   return {
     sourceRuntime,
+    presentedByProject,
     sourceActivity: activeSourceActivity,
     workingMediaActivity: activeWorkingMediaActivity,
     session: activeSession,

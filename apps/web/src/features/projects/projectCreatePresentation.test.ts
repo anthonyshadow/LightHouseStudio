@@ -68,6 +68,7 @@ const launcherInput = (
   editorBlockedReason: undefined,
   sourceBusy: false,
   workingMediaBusy: false,
+  mediaBusy: false,
   ...overrides,
 });
 

@@ -512,7 +512,9 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   // it into a Blob, so the stage binds the app-owned URL instead of a fresh object URL.
   await expect(stageVideo).toHaveAttribute('src', /\/source\/content$/u);
   expect(await stageVideo.getAttribute('src')).not.toBe(firstObjectUrl);
-  await expect(page.getByRole('button', { name: 'Upload' })).toBeDisabled();
+  // Withdrawn rather than disabled, since slice 3.4: the original is immutable while it is
+  // attached, and the Media area below carries the live controls for everything else.
+  await expect(page.getByRole('button', { name: 'Upload' })).toBeHidden();
   expect(projects.sourceOperationKeys).toHaveLength(1);
 
   // The wrong source is recoverable without deleting the Project: remove it and choose again.

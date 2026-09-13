@@ -6,13 +6,10 @@ import { useNavigate } from 'react-router';
 import { projectWorkspacePath } from '../../app/paths';
 import { Button, OverlayPanel, StatusNotice } from '../../ui';
 import { safeProjectError } from './ProjectDialogs';
-import { getProject, reuseSavedVideoAsProjectSource } from './projectsApi';
+import { addSavedVideoAsProjectSource, listProjectSources } from './projectsApi';
 import { reconcileProject, useProjectList } from './useProjectsController';
 import { useStableOperationKey } from './useStableOperationKey';
-import { PROJECT_SET_ORIGINAL_VIDEO_ACTION_LABEL } from './projectProcessingPresentation';
-
-/** Raised locally so its operator-facing copy is distinguishable from transport-vetted errors. */
-class ProjectSourceOccupiedError extends Error {}
+import { PROJECT_ADD_VIDEO_ACTION_LABEL } from './projectProcessingPresentation';
 
 export const AddVideoToProjectDialog = ({
   video,
@@ -41,41 +38,43 @@ export const AddVideoToProjectDialog = ({
     setBusyProjectId(project.id);
     setError(null);
     try {
-      const current = await getProject(project.id);
-      const source = current.revision.snapshot.presentedMedia;
-      if (current.revision.snapshot.sourceAssetId !== null) {
-        if (
-          source?.kind === 'saved-video-version' &&
-          source.savedVideoId === video.id &&
-          source.videoVersionId === video.currentVersion.id
-        ) {
-          finish(project.id);
-          return;
-        }
-        throw new ProjectSourceOccupiedError(
-          `“${project.title}” already has an original video. Choose an empty Project instead.`,
-        );
+      /*
+       * One read for both answers. The collection response carries the Project and its current
+       * revision beside what it holds, so this is the compare-and-set the add below needs *and*
+       * the check that the Project does not already hold this exact Version — which is what makes
+       * a retry after a lost answer converge instead of storing the same video twice.
+       */
+      const held = await listProjectSources(project.id);
+      if (
+        held.sources.some(
+          (source) =>
+            source.savedVideoId === video.id && source.videoVersionId === video.currentVersion.id,
+        )
+      ) {
+        finish(project.id);
+        return;
       }
       // Mirrors the server's request fingerprint for `source-accept`. Keying on `projectId` alone
       // let one key outlive the request it was minted for: after a first attempt landed but lost
       // its response, the retry re-read a bumped `expectedVersion`, and the same key with a
       // different fingerprint is rejected as an `operation-key` conflict — so a retry of a
       // *succeeded* operation surfaced as a 409 instead of reconciling. Rotating the key with the
-      // request lets the preflight above recognise the Project's own source and finish cleanly.
+      // request lets the preflight above recognise media the Project already holds and finish
+      // cleanly.
       const operationKey = operation.keyFor(
         JSON.stringify({
           projectId: project.id,
-          expectedVersion: current.project.version,
-          expectedRevisionNumber: current.project.currentRevisionNumber,
+          expectedVersion: held.project.version,
+          expectedRevisionNumber: held.project.currentRevisionNumber,
           savedVideoId: video.id,
           videoVersionId: video.currentVersion.id,
         }),
       );
-      const response = await reuseSavedVideoAsProjectSource({
+      const response = await addSavedVideoAsProjectSource({
         projectId: project.id,
         operationKey,
-        expectedVersion: current.project.version,
-        expectedRevisionNumber: current.project.currentRevisionNumber,
+        expectedVersion: held.project.version,
+        expectedRevisionNumber: held.project.currentRevisionNumber,
         savedVideoId: video.id,
         videoVersionId: video.currentVersion.id,
       });
@@ -86,9 +85,7 @@ export const AddVideoToProjectDialog = ({
       operation.reset();
       finish(project.id);
     } catch (caught) {
-      setError(
-        caught instanceof ProjectSourceOccupiedError ? caught.message : safeProjectError(caught),
-      );
+      setError(safeProjectError(caught));
     } finally {
       setBusyProjectId(null);
     }
@@ -98,8 +95,8 @@ export const AddVideoToProjectDialog = ({
     <OverlayPanel
       open
       onClose={onClose}
-      title={PROJECT_SET_ORIGINAL_VIDEO_ACTION_LABEL}
-      description={`Make the current Version of “${video.title}” the source of a Project that does not have one yet. This is not an attachment: it becomes the video the Project is built from. The Asset stays reusable everywhere.`}
+      title={PROJECT_ADD_VIDEO_ACTION_LABEL}
+      description={`Make the current Version of “${video.title}” part of a Project’s media. This is not an attachment: the Project works from it, as its original video where it has none yet and as more material beside the original where it does. The Asset stays reusable everywhere.`}
       placement="bottom"
       size="wide"
       bodyMode="scroll"

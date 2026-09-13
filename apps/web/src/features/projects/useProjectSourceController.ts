@@ -28,9 +28,16 @@ import {
 export type ProjectSourcePhase =
   'idle' | 'hydrating' | 'preparing' | 'saving' | 'removing' | 'saved' | 'conflict' | 'error';
 
+/**
+ * What this Project's original video is doing right now, for the surfaces that outlive the section.
+ *
+ * Work in flight only. It used to carry `accepted` as well, and three capture gates read that as a
+ * proxy for "another recording would be pointless" — true while a Project could hold one video, and
+ * the whole of finding studio-3 once it could hold a hundred. What a gate needs is either this
+ * `busy` or a fact about the take itself, and neither of them is this.
+ */
 export interface ProjectSourceActivity {
   readonly projectId: string;
-  readonly accepted: boolean;
   readonly phase: ProjectSourcePhase;
   readonly busy: boolean;
   readonly abort: (() => void) | null;
@@ -228,12 +235,11 @@ export const useProjectSourceController = (
   useEffect(() => {
     onActivityChange?.({
       projectId,
-      accepted,
       phase: effectivePhase,
       busy,
       abort: busy ? abort : null,
     });
-  }, [abort, accepted, busy, effectivePhase, onActivityChange, projectId]);
+  }, [abort, busy, effectivePhase, onActivityChange, projectId]);
 
   const presentAccepted = useCallback(
     (response: ProjectSourceResponse, signal: AbortSignal) => {
