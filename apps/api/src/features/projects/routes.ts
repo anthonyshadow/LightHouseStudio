@@ -1,6 +1,7 @@
 import {
   attachProjectAssetRequestSchema,
   appendProjectRevisionRequestSchema,
+  isStaleProjectClientError,
   PROJECT_STALE_CLIENT_MESSAGE,
   adoptProjectWorkingMediaRequestSchema,
   createProjectRequestSchema,
@@ -287,9 +288,7 @@ export const registerProjectRoutes = (
     if (!params.success || !body.success) {
       // A bundle that predates the current snapshot shape is told to reload, in its own words;
       // every other invalid write keeps the generic answer.
-      const stale =
-        body.success === false &&
-        body.error.issues.some((issue) => issue.message === PROJECT_STALE_CLIENT_MESSAGE);
+      const stale = body.success === false && isStaleProjectClientError(body.error);
       throw new AppError(
         400,
         'validation_error',

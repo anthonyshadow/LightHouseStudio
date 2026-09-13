@@ -24,6 +24,24 @@ export const READABLE_PROJECT_SNAPSHOT_SCHEMA_VERSIONS = [
 /** What a stale bundle is told when its write cannot describe the current model. */
 export const PROJECT_STALE_CLIENT_MESSAGE =
   'This tab is out of date and cannot describe this edit. Reload and try again.';
+
+/** The marker the refinements below attach, so the verdict travels as data and not as prose. */
+const STALE_CLIENT_ISSUE = { staleProjectClient: true } as const;
+
+/**
+ * Whether a refused Project write failed because the client that sent it predates the current
+ * model, rather than because it was simply wrong.
+ *
+ * A caller asking this must not match on the message: the copy is presentation and changes for
+ * reasons — tone, translation, splitting one sentence into two — that have nothing to do with the
+ * classification. The refinements that raise it tag the issue instead, and this reads the tag.
+ */
+export const isStaleProjectClientError = (error: z.ZodError): boolean =>
+  error.issues.some(
+    (issue) =>
+      issue.code === 'custom' &&
+      (issue.params as typeof STALE_CLIENT_ISSUE | undefined)?.staleProjectClient === true,
+  );
 export const PROJECT_STATUSES = [
   'draft',
   'ready',
@@ -203,6 +221,9 @@ const refineSubtitleCueList = (
   });
 };
 
+/** One cue list, bounded once: the single clip's and a composition's are the same list. */
+const subtitleCueListSchema = z.array(subtitleCueSchema).max(SUBTITLE_CUE_LIMIT).readonly();
+
 /** A whole percentage of the source and a mute; no default here, the edit spec supplies its own. */
 const videoEditAudioSchema = z
   .object({
@@ -250,7 +271,7 @@ export const projectVideoEditSpecSchema = z
      * Absent from every snapshot written before subtitles existed, and read back as none. Cues
      * may overlap; they must be listed in start order and each carry its own id.
      */
-    subtitles: z.array(subtitleCueSchema).max(SUBTITLE_CUE_LIMIT).readonly().default([]),
+    subtitles: subtitleCueListSchema.default([]),
     /**
      * Absent from every snapshot written before the audio level existed, and read back as the
      * source as recorded: full level, not muted. Last on purpose — the wire mirrors the domain's
@@ -508,7 +529,7 @@ const compositionClipSchema = z
 export const compositionSchema = z
   .object({
     clips: z.array(compositionClipSchema).min(1).max(COMPOSITION_CLIP_LIMIT).readonly(),
-    subtitles: z.array(subtitleCueSchema).max(SUBTITLE_CUE_LIMIT).readonly(),
+    subtitles: subtitleCueListSchema,
   })
   .strict()
   .superRefine((value, context) => {
@@ -540,12 +561,12 @@ const projectSnapshotV3Schema = z
 
 /**
  * Snapshot v2 — the write format until 2026-09-12: the five AI fields at the top level and no
- * composition. Read only, through the map below.
+ * composition. Read only, and only through the map below.
  *
- * It carries the same refinements v3 does, even though the map re-parses as v3, because a union
- * member's `.transform` throws rather than reporting: without them a v2 body that violates a
- * cross-field rule would make `safeParse` throw instead of returning a failure, and the file
- * library's envelope recovery reads through `safeParse`.
+ * It states the shape and nothing else. Every rule about what those fields may say lives on v3,
+ * because the map reshapes and then pipes into it: a reshape cannot fail, so the one schema that
+ * owns a rule is the one that reports it, and no version has to mirror the next one's refinements
+ * to keep `safeParse` from throwing.
  */
 const projectSnapshotV2Schema = z
   .object({
@@ -553,18 +574,17 @@ const projectSnapshotV2Schema = z
     ...projectSnapshotSharedShape,
     ...projectTransformShape,
   })
-  .strict()
-  .superRefine((value, context) => {
-    refineSnapshotTimestamps(value, context);
-    refineProjectTransform(value, context);
-  });
+  .strict();
 
 /**
- * v2 → v3: the five fields regroup under `transform` (an empty one becoming `null`) and the
- * composition is `null` — nothing is synthesised from the single cut, because an arrangement the
- * operator never made would disagree with the working media, which is the rendered cut.
+ * v2 → v3, as a pure reshape: the five fields regroup under `transform` and the composition is
+ * `null` — nothing is synthesised from the single cut, because an arrangement the operator never
+ * made would disagree with the working media, which is the rendered cut. It validates nothing;
+ * the pipe below hands the result to v3, which owns every rule including the empty-to-null fold.
  */
-export const migrateProjectSnapshotV2 = (previous: z.infer<typeof projectSnapshotV2Schema>) => {
+const regroupProjectSnapshotV2 = (
+  previous: z.infer<typeof projectSnapshotV2Schema>,
+): z.input<typeof projectSnapshotV3Schema> => {
   const {
     selectedCharacter,
     selectedOutfit,
@@ -573,7 +593,7 @@ export const migrateProjectSnapshotV2 = (previous: z.infer<typeof projectSnapsho
     creativeIntent,
     ...rest
   } = previous;
-  return projectSnapshotV3Schema.parse({
+  return {
     ...rest,
     schemaVersion: PROJECT_SNAPSHOT_SCHEMA_VERSION,
     composition: null,
@@ -584,7 +604,7 @@ export const migrateProjectSnapshotV2 = (previous: z.infer<typeof projectSnapsho
       visualTreatment,
       creativeIntent,
     },
-  });
+  };
 };
 
 /** Prompt 07 snapshots are accepted only through this explicit provenance-preserving read map. */
@@ -633,74 +653,97 @@ export const legacyProjectSnapshotSchema = z
   })
   .strict();
 
-export const migrateLegacyProjectSnapshot = (legacy: z.infer<typeof legacyProjectSnapshotSchema>) =>
-  migrateProjectSnapshotV2(
-    projectSnapshotV2Schema.parse({
-      ...legacy,
-      schemaVersion: PREVIOUS_PROJECT_SNAPSHOT_SCHEMA_VERSION,
-      selectedCharacter:
-        legacy.selectedCharacter === null
-          ? null
-          : {
-              ...legacy.selectedCharacter,
-              characterLabel: null,
-              characterRevision: null,
-              variantLabel: null,
-              variantRevision: null,
-              referenceAssetId: null,
-            },
-      selectedOutfit:
-        legacy.selectedOutfit === null
-          ? null
-          : {
-              ...legacy.selectedOutfit,
-              outfitLabel: null,
-              outfitRevision: null,
-              referenceAssetId: null,
-              inputKind: null,
-            },
-      selectedVoice:
-        legacy.selectedVoice === null
-          ? null
-          : legacy.selectedVoice.kind === 'local-effect'
-            ? { ...legacy.selectedVoice, effectRevision: null }
-            : { ...legacy.selectedVoice, resourceRevision: null },
-      visualTreatment:
-        legacy.visualTreatment.kind === 'none'
-          ? legacy.visualTreatment
-          : legacy.visualTreatment.kind === 'character-swap'
-            ? {
-                kind: 'character-swap' as const,
-                providerId: null,
-                outputResolution: null,
-              }
-            : {
-                kind: 'virtual-try-on' as const,
-                providerId: null,
-                outputResolution: null,
-                inputKind: null,
-                enhancePrompt: null,
-              },
-      creativeIntent: {
-        ...legacy.creativeIntent,
-        promptLabel: null,
-        recipeLabel: null,
-        appliedPrompt: null,
-        referenceAssetId: null,
-        resourceRevision: null,
-      },
-    }),
-  );
+/** v1 → v2's shape: what v1 never recorded is `null`, never a guess. A reshape, like the step above. */
+const toProjectSnapshotV2Body = (
+  legacy: z.infer<typeof legacyProjectSnapshotSchema>,
+): z.input<typeof projectSnapshotV2Schema> => ({
+  ...legacy,
+  schemaVersion: PREVIOUS_PROJECT_SNAPSHOT_SCHEMA_VERSION,
+  selectedCharacter:
+    legacy.selectedCharacter === null
+      ? null
+      : {
+          ...legacy.selectedCharacter,
+          characterLabel: null,
+          characterRevision: null,
+          variantLabel: null,
+          variantRevision: null,
+          referenceAssetId: null,
+        },
+  selectedOutfit:
+    legacy.selectedOutfit === null
+      ? null
+      : {
+          ...legacy.selectedOutfit,
+          outfitLabel: null,
+          outfitRevision: null,
+          referenceAssetId: null,
+          inputKind: null,
+        },
+  selectedVoice:
+    legacy.selectedVoice === null
+      ? null
+      : legacy.selectedVoice.kind === 'local-effect'
+        ? { ...legacy.selectedVoice, effectRevision: null }
+        : { ...legacy.selectedVoice, resourceRevision: null },
+  visualTreatment:
+    legacy.visualTreatment.kind === 'none'
+      ? legacy.visualTreatment
+      : legacy.visualTreatment.kind === 'character-swap'
+        ? {
+            kind: 'character-swap' as const,
+            providerId: null,
+            outputResolution: null,
+          }
+        : {
+            kind: 'virtual-try-on' as const,
+            providerId: null,
+            outputResolution: null,
+            inputKind: null,
+            enhancePrompt: null,
+          },
+  creativeIntent: {
+    ...legacy.creativeIntent,
+    promptLabel: null,
+    recipeLabel: null,
+    appliedPrompt: null,
+    referenceAssetId: null,
+    resourceRevision: null,
+  },
+});
+
+/**
+ * The read maps, as the union uses them: reshape, then pipe into the schema that owns the rules.
+ * v1 goes through v2's shape on the way, so there is one map per version step rather than one per
+ * version pair, and adding v4 adds one link to the chain.
+ */
+const projectSnapshotV2ReadSchema = projectSnapshotV2Schema
+  .transform(regroupProjectSnapshotV2)
+  .pipe(projectSnapshotV3Schema);
+
+const projectSnapshotV1ReadSchema = legacyProjectSnapshotSchema
+  .transform(toProjectSnapshotV2Body)
+  .pipe(projectSnapshotV2ReadSchema);
 
 /**
  * Every version a stored snapshot may carry, read as v3. Members are strict and the version
- * literal routes the row, so a v2 body carrying a stray v3 key is refused rather than half-read.
+ * literal routes the row, so a v2 body carrying a stray v3 key is refused rather than half-read,
+ * and the current format is the first member tried.
+ *
+ * Not a discriminated union, which would route on the version instead of trying members in turn:
+ * its option type rejects a piped member, and buying that routing would mean asserting past the
+ * types. The cost is one discarded attempt when reading a row older than the write format, which
+ * only stored rows pay and which shrinks as they are rewritten.
  */
 export const projectSnapshotSchema = z.union([
   projectSnapshotV3Schema,
-  projectSnapshotV2Schema.transform(migrateProjectSnapshotV2),
-  legacyProjectSnapshotSchema.transform(migrateLegacyProjectSnapshot),
+  projectSnapshotV2ReadSchema,
+  projectSnapshotV1ReadSchema,
 ]);
+
+/** The v2 → v3 step on its own, so the migration property tests can hold the map to the union. */
+export const migrateProjectSnapshotV2 = (previous: z.infer<typeof projectSnapshotV2Schema>) =>
+  projectSnapshotV3Schema.parse(regroupProjectSnapshotV2(previous));
 
 export const projectSchema = z
   .object({
@@ -1008,6 +1051,7 @@ const statesEveryDefaultedField = (value: unknown, context: z.RefinementCtx): vo
       context.addIssue({
         code: 'custom',
         path: [field],
+        params: STALE_CLIENT_ISSUE,
         message: PROJECT_STALE_CLIENT_MESSAGE,
       });
     }
@@ -1038,6 +1082,7 @@ const refusesPreV3Proposal = (value: unknown, context: z.RefinementCtx): void =>
     context.addIssue({
       code: 'custom',
       path: ['transform'],
+      params: STALE_CLIENT_ISSUE,
       message: PROJECT_STALE_CLIENT_MESSAGE,
     });
   }

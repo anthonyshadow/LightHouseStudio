@@ -119,11 +119,13 @@ export const BUILD_CLOSURE_BUDGETS = {
   // placement says when its crop would cut a caption region the cut uses. Both are the acceptance
   // criteria failing in the product rather than in a test, so this is the fix costing bytes.
   // Raised from 1_092_000 on 2026-09-12 for slice 3.1 (snapshot v3), measured 1_091_682 →
-  // 1_092_103: 421 bytes, all of it the domain's transform helpers, which every Project surface now
+  // 1_091_943: 261 bytes, all of it the domain's transform helpers, which every Project surface now
   // reads its creative setup through instead of five fields it read directly. The composition rules
   // are in the same barrel and cost nothing here — nothing on a Studio route calls them yet — and
   // the arrangement's own editor is Phase 4, behind the lazy editor chunk this closure already
-  // excludes.
+  // excludes. It peaked at 1_092_103 before the slice's cleanup pass, which collapsed three
+  // enumerations of a revision's held media into one and gave the read maps a single validation
+  // owner.
   'src/studio/StudioApp.tsx': 1_093_000,
 };
 

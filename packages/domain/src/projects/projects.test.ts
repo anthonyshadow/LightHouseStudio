@@ -1247,6 +1247,96 @@ describe('Project aggregate rules', () => {
     });
   });
 
+  /*
+   * D2, end to end on the real save path: `completed` is a milestone the Project moves through,
+   * not a state it stops in. The save derives it from the deliverable it recorded, the next
+   * material change clears the pointer and the status falls back to `ready`, and saving again
+   * returns to `completed`. The seeded case above pins the derivation; this pins that a Project
+   * can leave the milestone and reach it again without any lifecycle command.
+   */
+  it('reaches, leaves, and returns to the completed milestone through ordinary work', () => {
+    const savedVideoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
+    const firstVersionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
+    const secondVersionId = '0f0e4a30-6b98-4d1a-8bd6-32bd0a3b9b21';
+    const accepted = acceptProjectSource(
+      emptyProject(),
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        assetId: sourceAssetId,
+        mediaReference: { kind: 'asset', assetId: sourceAssetId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    if (!accepted.ok) throw new Error('Expected Project source acceptance.');
+    expect(accepted.value.project.status).toBe('ready');
+
+    const saved = saveProjectOutput(
+      accepted.value,
+      {
+        expectedProjectVersion: 2,
+        expectedRevisionNumber: 2,
+        savedVideoId,
+        videoVersionId: firstVersionId,
+        presentsOutput: true,
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => '5354b1d3-4022-4c85-a7b6-b230b58ba10b' },
+    );
+    if (!saved.ok) throw new Error('Expected the output save.');
+    expect(saved.value.project.status).toBe('completed');
+
+    // Editing after a save is ordinary work, not a lifecycle transition: the pointer the save
+    // recorded no longer describes the material, so it goes, and the status follows it.
+    const editedAgain = appendProjectRevision(
+      saved.value,
+      {
+        expectedProjectVersion: 3,
+        expectedRevisionNumber: 3,
+        snapshot: {
+          ...saved.value.revisions.at(-1)!.snapshot,
+          localEdit: createDefaultVideoEditSpec(8_000),
+          updatedAt: latest,
+        },
+        author: { kind: 'user', authorId: ownerUserId },
+        source: 'user-edit',
+        facts: {
+          ...readyFacts,
+          validatedLastSuccessfulOutput: { savedVideoId, videoVersionId: firstVersionId },
+        },
+      },
+      { now: latest, createId: () => '2fd0fd54-2f2a-4f83-9d84-4be07d20d2c1' },
+    );
+    if (!editedAgain.ok) throw new Error('Expected the post-save edit.');
+    expect(editedAgain.value.project.status).toBe('ready');
+    expect(editedAgain.value.revisions.at(-1)!.snapshot.lastSuccessfulOutput).toBeNull();
+
+    const savedAgain = saveProjectOutput(
+      editedAgain.value,
+      {
+        expectedProjectVersion: 4,
+        expectedRevisionNumber: 4,
+        savedVideoId,
+        videoVersionId: secondVersionId,
+        presentsOutput: true,
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => '9f5b2ad6-4f4b-4e13-9a03-2ef6b6c1a51e' },
+    );
+    if (!savedAgain.ok) throw new Error('Expected the second output save.');
+    expect(savedAgain.value.project.status).toBe('completed');
+    expect(savedAgain.value.revisions.at(-1)!.snapshot.lastSuccessfulOutput).toEqual({
+      savedVideoId,
+      videoVersionId: secondVersionId,
+    });
+    // Both saves keep their own producing provenance; the second never rewrote the first.
+    expect(savedAgain.value.outputLinks.map(({ videoVersionId }) => videoVersionId)).toEqual([
+      firstVersionId,
+      secondVersionId,
+    ]);
+  });
+
   it('uses project version CAS for rename and archive-first deletion', () => {
     const initial = emptyProject().project;
     expect(renameProject(initial, 'Campaign 2027', 9, later)).toMatchObject({

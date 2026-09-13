@@ -329,10 +329,10 @@ describe('Project snapshot contract', () => {
   });
 
   /*
-   * A union member's `.transform` throws rather than reporting, so the v2 member keeps the
-   * refinements even though the map re-parses as v3: a stored body that violates one has to fail
-   * a `safeParse`, because the file library's envelope recovery reads through it and a throw would
-   * take the whole owner's file down instead of falling through to the older envelope schema.
+   * The read maps reshape and pipe rather than re-parsing inside a `.transform`, so a stored body
+   * that violates a rule is reported instead of thrown. That matters beyond tidiness: the file
+   * library's envelope recovery reads through `safeParse`, and a throw there would take the whole
+   * owner's file down rather than falling through to the older envelope schema.
    */
   it('reports an invalid v2 body as a failed parse rather than throwing out of the read map', () => {
     const previous = validSnapshotV2();

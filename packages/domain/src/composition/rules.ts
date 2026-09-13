@@ -1,13 +1,17 @@
 import { requireOpaqueId } from '../common/identity';
+import { requireMediaReferenceIds } from '../projects/media-reference';
 import { clamp } from '../video-editing/clamp';
-import { VIDEO_EDIT_MINIMUM_TRIM_MS, normalizeVideoEditAudio } from '../video-editing/rules';
+import {
+  VIDEO_EDIT_MINIMUM_TRIM_MS,
+  clampVideoEditAudioLevel,
+  normalizeVideoEditAudio,
+} from '../video-editing/rules';
 import {
   SUBTITLE_CUE_LIMIT,
   SUBTITLE_CUE_MINIMUM_DURATION_MS,
   SUBTITLE_CUE_TEXT_MAX_LENGTH,
   normalizeSubtitleCues,
 } from '../video-editing/subtitles';
-import { VIDEO_EDIT_AUDIO_LEVEL_MAX } from '../video-editing/types';
 import { COMPOSITION_CLIP_LIMIT, type Composition, type CompositionClip } from './types';
 
 export class CompositionRuleError extends Error {
@@ -29,15 +33,6 @@ const fail = (message: string): never => {
  */
 const UNBOUNDED_TIMELINE = { durationMs: Number.POSITIVE_INFINITY } as const;
 
-const validateClipMedia = (clip: CompositionClip): void => {
-  if (clip.media.kind === 'asset') {
-    requireOpaqueId(clip.media.assetId, 'Composition clip asset', fail);
-    return;
-  }
-  requireOpaqueId(clip.media.savedVideoId, 'Composition clip Saved Video', fail);
-  requireOpaqueId(clip.media.videoVersionId, 'Composition clip Video Version', fail);
-};
-
 /**
  * The invariants every stored composition holds. Throws `CompositionRuleError`; the snapshot rule
  * that composes this reports it as its own invalid-snapshot reason.
@@ -52,7 +47,7 @@ export const validateComposition = (composition: Composition): Composition => {
     const id = requireOpaqueId(clip.id, 'Composition clip', fail);
     if (clipIds.has(id)) fail('Each composition clip needs its own identifier.');
     clipIds.add(id);
-    validateClipMedia(clip);
+    requireMediaReferenceIds(clip.media, 'Composition clip', fail);
     if (
       !Number.isFinite(clip.trim.startMs) ||
       !Number.isFinite(clip.trim.endMs) ||
@@ -61,10 +56,10 @@ export const validateComposition = (composition: Composition): Composition => {
     ) {
       fail('A clip must keep at least a tenth of a second of its media.');
     }
+    // What the level would clamp to is what a valid level already is, so the bound has one owner
+    // and a later boost moves it in one place rather than two.
     if (
-      !Number.isInteger(clip.audio.level) ||
-      clip.audio.level < 0 ||
-      clip.audio.level > VIDEO_EDIT_AUDIO_LEVEL_MAX ||
+      clampVideoEditAudioLevel(clip.audio.level) !== clip.audio.level ||
       typeof clip.audio.muted !== 'boolean'
     ) {
       fail('A clip level is a whole percentage of its own audio.');
@@ -107,26 +102,30 @@ export const validateComposition = (composition: Composition): Composition => {
  * timeline. Identity-preserving, like every normalizer beside it: a composition already in form is
  * returned as itself, so an editor gesture that changes nothing re-renders nothing.
  */
+const normalizeCompositionClip = (clip: CompositionClip): CompositionClip => {
+  const startMs = clamp(clip.trim.startMs, 0, Number.POSITIVE_INFINITY);
+  const endMs = clamp(
+    clip.trim.endMs,
+    startMs + VIDEO_EDIT_MINIMUM_TRIM_MS,
+    Number.POSITIVE_INFINITY,
+  );
+  const audio = normalizeVideoEditAudio(clip.audio);
+  return startMs === clip.trim.startMs && endMs === clip.trim.endMs && audio === clip.audio
+    ? clip
+    : { ...clip, trim: { startMs, endMs }, audio };
+};
+
 export const normalizeComposition = (composition: Composition): Composition => {
-  let clipsChanged = false;
-  const clips = composition.clips.map((clip) => {
-    const startMs = clamp(clip.trim.startMs, 0, Number.POSITIVE_INFINITY);
-    const endMs = clamp(
-      clip.trim.endMs,
-      startMs + VIDEO_EDIT_MINIMUM_TRIM_MS,
-      Number.POSITIVE_INFINITY,
-    );
-    const audio = normalizeVideoEditAudio(clip.audio);
-    if (startMs === clip.trim.startMs && endMs === clip.trim.endMs && audio === clip.audio) {
-      return clip;
-    }
-    clipsChanged = true;
-    return { ...clip, trim: { startMs, endMs }, audio };
-  });
+  const mapped = composition.clips.map(normalizeCompositionClip);
+  // One rule for both halves: same reference means nothing moved. Stated as an identity check
+  // rather than a flag so the clips and the cues answer the question the same way.
+  const clips = mapped.every((clip, index) => clip === composition.clips[index])
+    ? composition.clips
+    : mapped;
   const subtitles = normalizeSubtitleCues(composition.subtitles, UNBOUNDED_TIMELINE);
-  return !clipsChanged && subtitles === composition.subtitles
+  return clips === composition.clips && subtitles === composition.subtitles
     ? composition
-    : { clips: clipsChanged ? clips : composition.clips, subtitles };
+    : { clips, subtitles };
 };
 
 /** The length of the stitched output — the timeline the cues are anchored to. */

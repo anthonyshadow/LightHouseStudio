@@ -290,10 +290,14 @@ targeted e2e; never concurrently). Report evidence per criterion.
 
 ## Phase 3 — The composition model
 
-> **Prompts 25 and 26 ran together on 2026-09-12** on the operator's instruction to audit, plan and
-> implement in one pass; the plan, the decisions taken and the validation record are in
-> [`SLICE_3.1_COMPOSITION_MODEL_PLAN.md`](SLICE_3.1_COMPOSITION_MODEL_PLAN.md). Prompt 27 has not
-> run.
+> **Prompts 25, 26 and 27 have run** — 25 and 26 together on 2026-09-12 on the operator's
+> instruction to audit, plan and implement in one pass, and 27 on 2026-09-13. The plan, the
+> decisions taken, the validation record and the verification evidence are all in
+> [`SLICE_3.1_COMPOSITION_MODEL_PLAN.md`](SLICE_3.1_COMPOSITION_MODEL_PLAN.md) (§5, §6, §7). Slice
+> 3.1 is closed; the sequence resumes at prompt 28. One item of prompt 27 is recorded as a
+> deliberate deviation rather than met: the v3 write is **not** feature-flagged, because the flag
+> would require keeping a v2 writer alive and buys nothing the deploy boundary does not — the
+> reasoning and the measured rollback point are in §7.5.
 
 **25 (A) — Composition domain model: audit.** Standard audit-and-plan for slice 3.1 (db-2, db-3,
 DC-1/2/3; decisions D1–D3 must be recorded first). Inspect `packages/domain/src/projects/types.ts`

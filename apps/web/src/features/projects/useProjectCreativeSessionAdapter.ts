@@ -373,12 +373,11 @@ export const useProjectCreativeSessionAdapter = ({
 
   useEffect(() => {
     if (projectId === null || effectiveSnapshot === null) return;
-    const effectiveTransform = projectTransformOf(effectiveSnapshot);
-    // The four fields this effect actually writes into the step, never the whole transform: the
+    const { selectedCharacter, selectedOutfit, selectedVoice, visualTreatment, creativeIntent } =
+      projectTransformOf(effectiveSnapshot);
+    // Keyed on the four fields this effect writes into the step, never the whole transform: the
     // intent text changes on every keystroke the ambient capture stages, and re-running on those
     // would rewrite the step's prompt from the snapshot while the operator is typing into it.
-    const { selectedCharacter, selectedOutfit, selectedVoice, visualTreatment } =
-      effectiveTransform;
     const configKey = JSON.stringify({
       projectId,
       revisionId: current?.revision.id,
@@ -399,15 +398,17 @@ export const useProjectCreativeSessionAdapter = ({
     });
     if (existingVideoConfigurationKeyRef.current === configKey) return;
 
-    const voice = effectiveTransform.selectedVoice;
-    if (voice?.kind === 'local-effect') {
-      existingVideo.selectLocalVoice(voice.effectId, localVoiceName(voice.effectId));
-    } else if (voice?.kind === 'saved-voice') {
+    if (selectedVoice?.kind === 'local-effect') {
+      existingVideo.selectLocalVoice(
+        selectedVoice.effectId,
+        localVoiceName(selectedVoice.effectId),
+      );
+    } else if (selectedVoice?.kind === 'saved-voice') {
       if (
         savedVoiceRelationship.key === savedVoiceKey &&
         savedVoiceRelationship.status === 'available'
       ) {
-        existingVideo.selectVoice(voice.voiceId, voice.voiceName);
+        existingVideo.selectVoice(selectedVoice.voiceId, selectedVoice.voiceName);
       } else if (existingVideo.voiceSelection !== null) {
         existingVideo.clearVoice();
       }
@@ -415,12 +416,11 @@ export const useProjectCreativeSessionAdapter = ({
       existingVideo.clearVoice();
     }
 
-    const visual = effectiveTransform.visualTreatment;
-    if (visual.kind === 'none' || existingVideo.selection === null) {
+    if (visualTreatment.kind === 'none' || existingVideo.selection === null) {
       existingVideoConfigurationKeyRef.current = configKey;
       return;
     }
-    const modelId = visual.kind === 'character-swap' ? 'lucy-latest' : 'lucy-vton-latest';
+    const modelId = visualTreatment.kind === 'character-swap' ? 'lucy-latest' : 'lucy-vton-latest';
     const step = existingVideo.steps[0] ?? null;
     if (step === null || step.modelId !== modelId) {
       if (step !== null) existingVideo.removeStep(step.id);
@@ -428,29 +428,30 @@ export const useProjectCreativeSessionAdapter = ({
       return;
     }
 
-    const parsedProvider = videoCharacterSwapProviderIdSchema.safeParse(visual.providerId);
+    const parsedProvider = videoCharacterSwapProviderIdSchema.safeParse(visualTreatment.providerId);
     existingVideo.updateStep(step.id, {
       savedRecipeId:
-        visual.kind === 'character-swap'
+        visualTreatment.kind === 'character-swap'
           ? // A variant is its own saved recipe; sending the parent id would silently drop it.
-            (effectiveTransform.selectedCharacter?.variantId ??
-            effectiveTransform.selectedCharacter?.characterId ??
-            null)
-          : (effectiveTransform.selectedOutfit?.outfitId ?? null),
-      prompt:
-        effectiveTransform.creativeIntent.appliedPrompt ??
-        effectiveTransform.creativeIntent.userIntent,
-      enhancePrompt: visual.kind === 'virtual-try-on' ? (visual.enhancePrompt ?? false) : false,
+            (selectedCharacter?.variantId ?? selectedCharacter?.characterId ?? null)
+          : (selectedOutfit?.outfitId ?? null),
+      prompt: creativeIntent.appliedPrompt ?? creativeIntent.userIntent,
+      enhancePrompt:
+        visualTreatment.kind === 'virtual-try-on'
+          ? (visualTreatment.enhancePrompt ?? false)
+          : false,
       referenceImage: studioSession.draft.referenceImage?.file ?? null,
       inputKind:
-        visual.kind === 'character-swap'
+        visualTreatment.kind === 'character-swap'
           ? 'character'
-          : (visual.inputKind ??
+          : (visualTreatment.inputKind ??
             (studioSession.draft.referenceImage ? 'reference-image' : 'prompt')),
       ...(parsedProvider.success ? { provider: parsedProvider.data } : {}),
-      ...(visual.outputResolution ? { outputResolution: visual.outputResolution } : {}),
-      characterName: effectiveTransform.selectedCharacter?.characterLabel ?? null,
-      characterVariantName: effectiveTransform.selectedCharacter?.variantLabel ?? null,
+      ...(visualTreatment.outputResolution
+        ? { outputResolution: visualTreatment.outputResolution }
+        : {}),
+      characterName: selectedCharacter?.characterLabel ?? null,
+      characterVariantName: selectedCharacter?.variantLabel ?? null,
     });
     existingVideoConfigurationKeyRef.current = configKey;
   }, [
