@@ -14,6 +14,20 @@ const probePath = fileURLToPath(
 );
 const MEBIBYTE = 1_024 * 1_024;
 
+/**
+ * What the server's own RSS may grow by while it spools a 300 MB (286 MiB) upload.
+ *
+ * The bound exists to prove the body is never held in memory, so what matters is the distance from
+ * the request size, not a tight fit: buffering would put this near 286 MiB, three times this
+ * ceiling. How much is in flight at the peak depends on how fast the spool file drains, so the
+ * figure is a property of the disk as much as the transport — measured at about 20 MiB (raw) and
+ * 26 MiB (multipart) on a developer SSD, and up to 68 MiB on a shared CI runner writing under
+ * contention. A 64 MiB ceiling was inside that spread and failed three CI runs on machine speed
+ * while passing every local one. Tighten this only alongside a measurement from the slower of the
+ * two, or it will start reporting the runner's disk as a memory regression again.
+ */
+const SPOOLED_RSS_CEILING_BYTES = 96 * MEBIBYTE;
+
 describe('Bun large-media boundary', () => {
   it('spools raw and multipart 300 MB boundaries with bounded memory and cleanup', async () => {
     // The probe proves cleanup by diffing `lightframe-upload-*` directories in `tmpdir()`.
@@ -48,7 +62,7 @@ describe('Bun large-media boundary', () => {
     );
     // With the legacy transport removed, this invariant proves that the server's
     // RSS growth stays far below the request size instead of inventing a baseline.
-    expect(result.exact.peakRssDeltaBytes).toBeLessThanOrEqual(64 * MEBIBYTE);
+    expect(result.exact.peakRssDeltaBytes).toBeLessThanOrEqual(SPOOLED_RSS_CEILING_BYTES);
     expect(result.exact.clientPeakQueuedBytes).toBeLessThanOrEqual(2 * MEBIBYTE);
     expect(result.exact.clientDrainEvents).toBeGreaterThan(0);
     expect(result.declaredOverLimit).toEqual({
@@ -61,7 +75,7 @@ describe('Bun large-media boundary', () => {
       cleanupConfirmed: true,
       operation: 'character-swap',
     });
-    expect(result.multipart.peakRssDeltaBytes).toBeLessThanOrEqual(64 * MEBIBYTE);
+    expect(result.multipart.peakRssDeltaBytes).toBeLessThanOrEqual(SPOOLED_RSS_CEILING_BYTES);
     expect(result.cancelled).toEqual({
       temporaryDirectoryObserved: true,
       cleanupConfirmed: true,
