@@ -45,25 +45,13 @@ const currentProject = (overrides: Partial<ProjectCurrentResponse['project']> = 
       parentRevisionId: null,
       parentRevisionNumber: null,
       snapshot: {
-        schemaVersion: 2,
+        schemaVersion: 3,
         sourceAssetId: null,
         workingMedia: null,
         presentedMedia: null,
-        selectedCharacter: null,
-        selectedOutfit: null,
-        selectedVoice: null,
-        visualTreatment: { kind: 'none' },
+        composition: null,
+        transform: null,
         liveMode: null,
-        creativeIntent: {
-          promptId: null,
-          promptLabel: null,
-          recipeId: null,
-          recipeLabel: null,
-          userIntent: '',
-          appliedPrompt: null,
-          referenceAssetId: null,
-          resourceRevision: null,
-        },
         localEdit: null,
         exportSpecification: null,
         lastSuccessfulOutput: null,
@@ -382,11 +370,8 @@ describe('Projects API adapter', () => {
     const proposal = {
       workflowPhase: 'creative',
       liveMode: null,
-      selectedCharacter: null,
-      selectedOutfit: null,
-      selectedVoice: null,
-      visualTreatment: { kind: 'none' },
-      creativeIntent: base.revision.snapshot.creativeIntent,
+      // Nothing configured is written as `null`, never as an all-empty object.
+      transform: null,
       localEdit: null,
       exportSpecification: null,
     } as const;
@@ -402,6 +387,72 @@ describe('Projects API adapter', () => {
       expectedVersion: 1,
       expectedRevisionNumber: 1,
       proposal,
+    });
+  });
+
+  it('still reads a v2 snapshot from a not-yet-upgraded API, regrouped under transform', async () => {
+    const voice = {
+      kind: 'local-effect',
+      effectId: 'warm-studio',
+      effectRevision: 'builtin-v1',
+    } as const;
+    const creativeIntent = {
+      promptId: null,
+      promptLabel: null,
+      recipeId: null,
+      recipeLabel: null,
+      userIntent: '',
+      appliedPrompt: null,
+      referenceAssetId: null,
+      resourceRevision: null,
+    };
+    const base = currentProject();
+    mockApiServer.use(
+      jsonScenario('GET', `/api/projects/${projectId}`, {
+        body: {
+          ...base,
+          revision: {
+            ...base.revision,
+            snapshot: {
+              schemaVersion: 2,
+              sourceAssetId: null,
+              workingMedia: null,
+              presentedMedia: null,
+              selectedCharacter: null,
+              selectedOutfit: null,
+              selectedVoice: voice,
+              visualTreatment: { kind: 'none' },
+              liveMode: null,
+              creativeIntent,
+              localEdit: null,
+              exportSpecification: null,
+              lastSuccessfulOutput: null,
+              workflowPhase: 'source',
+              createdAt: now,
+              updatedAt: now,
+            },
+          },
+        },
+      }),
+    );
+
+    // The web keeps the read union: the API it is talking to may not have been upgraded yet.
+    await expect(getProject(projectId)).resolves.toEqual({
+      ...base,
+      revision: {
+        ...base.revision,
+        snapshot: {
+          ...base.revision.snapshot,
+          composition: null,
+          transform: {
+            selectedCharacter: null,
+            selectedOutfit: null,
+            selectedVoice: voice,
+            visualTreatment: { kind: 'none' },
+            creativeIntent,
+          },
+        },
+      },
     });
   });
 

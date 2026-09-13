@@ -290,6 +290,11 @@ targeted e2e; never concurrently). Report evidence per criterion.
 
 ## Phase 3 — The composition model
 
+> **Prompts 25 and 26 ran together on 2026-09-12** on the operator's instruction to audit, plan and
+> implement in one pass; the plan, the decisions taken and the validation record are in
+> [`SLICE_3.1_COMPOSITION_MODEL_PLAN.md`](SLICE_3.1_COMPOSITION_MODEL_PLAN.md). Prompt 27 has not
+> run.
+
 **25 (A) — Composition domain model: audit.** Standard audit-and-plan for slice 3.1 (db-2, db-3,
 DC-1/2/3; decisions D1–D3 must be recorded first). Inspect `packages/domain/src/projects/types.ts`
 (snapshot v2), `video-editing/types.ts`, both snapshot validators

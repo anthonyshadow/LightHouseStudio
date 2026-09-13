@@ -1,10 +1,16 @@
-import { createEmptyProjectSnapshot, createProject, type ProjectAssetLink } from '@studio/domain';
+import {
+  createEmptyProjectSnapshot,
+  createProject,
+  type ProjectAssetLink,
+  type ProjectSnapshot,
+} from '@studio/domain';
 import { describe, expect, it } from 'vitest';
 import {
   DrizzleProjectRepository,
   mapProjectAggregate,
   ProjectPersistenceError,
 } from './project-repository.js';
+import { revisionValues, toRevision } from './project-repository-mappers.js';
 import { scriptedDatabase } from './scripted-database.test-support.js';
 import { projectAssets, projectOperationReceipts, projectRevisions, projects } from './schema.js';
 
@@ -68,7 +74,7 @@ const workingMediaReadRow = () => {
     },
     revision: {
       ...aggregate.revisions[0]!,
-      snapshotSchemaVersion: 2,
+      snapshotSchemaVersion: 3,
       snapshot: aggregate.revisions[0]!.snapshot,
       authorKind: 'user' as const,
       authorId: ownerUserId,
@@ -101,6 +107,77 @@ const workingMediaReadRow = () => {
   };
 };
 
+/**
+ * A snapshot as it sits in a database last written before 2026-09-12: the five creative fields
+ * flat at the top level, no composition, and the media pointers and output pointer where they have
+ * always been. Rows in this shape are read and never written, so the union's v2 member is the only
+ * thing between them and a Project that cannot be opened.
+ */
+const storedV2Snapshot = () => ({
+  schemaVersion: 2,
+  sourceAssetId: assetId,
+  workingMedia: { kind: 'asset', assetId },
+  presentedMedia: {
+    kind: 'saved-video-version',
+    savedVideoId: videoId,
+    videoVersionId: versionId,
+  },
+  liveMode: null,
+  localEdit: null,
+  exportSpecification: null,
+  lastSuccessfulOutput: { savedVideoId: videoId, videoVersionId: versionId },
+  workflowPhase: 'review',
+  createdAt: now,
+  updatedAt: now,
+  selectedCharacter: null,
+  selectedOutfit: null,
+  selectedVoice: { kind: 'local-effect', effectId: 'warm-studio', effectRevision: 'builtin-v1' },
+  visualTreatment: { kind: 'none' },
+  creativeIntent: {
+    promptId: null,
+    promptLabel: null,
+    recipeId: null,
+    recipeLabel: null,
+    userIntent: 'Kept as typed',
+    appliedPrompt: null,
+    referenceAssetId: null,
+    resourceRevision: null,
+  },
+});
+
+/** The same revision a version earlier: Prompt 07's narrower creative fields, read through v2. */
+const storedV1Snapshot = () => {
+  const { selectedVoice, visualTreatment, creativeIntent, ...shared } = storedV2Snapshot();
+  return {
+    ...shared,
+    schemaVersion: 1,
+    selectedCharacter: { characterId: 'legacy-character', variantId: null },
+    selectedOutfit: null,
+    selectedVoice: { kind: selectedVoice.kind, effectId: selectedVoice.effectId },
+    visualTreatment,
+    creativeIntent: {
+      promptId: null,
+      recipeId: null,
+      userIntent: creativeIntent.userIntent,
+    },
+  };
+};
+
+const storedRevisionRow = (snapshotSchemaVersion: number, snapshot: unknown) => ({
+  id: revisionId,
+  projectId,
+  ownerUserId,
+  revisionNumber: 1,
+  parentRevisionId: null,
+  parentRevisionNumber: null,
+  snapshotSchemaVersion,
+  snapshot,
+  authorKind: 'user' as const,
+  authorId: ownerUserId,
+  source: 'create' as const,
+  createdAt: postgresNow,
+});
+
 describe('Project persistence mapping and transactions', () => {
   it('maps validated snapshots and any number of normalized output links', () => {
     const aggregate = sourceAggregate();
@@ -118,7 +195,7 @@ describe('Project persistence mapping and transactions', () => {
       revisionNumber: 1,
       parentRevisionId: null,
       parentRevisionNumber: null,
-      snapshotSchemaVersion: 2,
+      snapshotSchemaVersion: 3,
       snapshot: aggregate.revisions[0]!.snapshot,
       authorKind: 'user' as const,
       authorId: ownerUserId,
@@ -154,6 +231,91 @@ describe('Project persistence mapping and transactions', () => {
     ).toThrow();
   });
 
+  it('reads stored v2 and v1 revision rows as v3 snapshots, regrouping the flat creative fields', () => {
+    const migrated = toRevision(storedRevisionRow(2, storedV2Snapshot()));
+    expect(migrated.snapshot).toMatchObject({
+      schemaVersion: 3,
+      // Nothing is synthesised from the single cut, and the pointers that were never part of the
+      // transform stay exactly where a reader already looks for them.
+      composition: null,
+      sourceAssetId: assetId,
+      presentedMedia: {
+        kind: 'saved-video-version',
+        savedVideoId: videoId,
+        videoVersionId: versionId,
+      },
+      lastSuccessfulOutput: { savedVideoId: videoId, videoVersionId: versionId },
+      transform: {
+        selectedCharacter: null,
+        selectedVoice: { kind: 'local-effect', effectId: 'warm-studio' },
+        visualTreatment: { kind: 'none' },
+        creativeIntent: { userIntent: 'Kept as typed' },
+      },
+    });
+    // The five fields moved rather than being copied: nothing reads them at the top level again.
+    expect(migrated.snapshot).not.toHaveProperty('selectedVoice');
+    expect(migrated.snapshot).not.toHaveProperty('creativeIntent');
+
+    // The aggregate read is the same route — the row's version column routes the JSON to its map —
+    // so a Project whose whole history predates v3 still loads.
+    const projectRow = {
+      ...sourceAggregate().project,
+      archivedAt: null,
+      deletedAt: null,
+      createdAt: postgresNow,
+      updatedAt: postgresNow,
+    };
+    expect(
+      mapProjectAggregate(projectRow, [storedRevisionRow(2, storedV2Snapshot())], [], [], []),
+    ).toMatchObject({
+      revisions: [
+        {
+          id: revisionId,
+          snapshot: { schemaVersion: 3, transform: { selectedVoice: { effectId: 'warm-studio' } } },
+        },
+      ],
+    });
+
+    // Prompt 07 rows reach v3 through the same map, with the provenance v2 added left null rather
+    // than invented.
+    expect(toRevision(storedRevisionRow(1, storedV1Snapshot())).snapshot).toMatchObject({
+      schemaVersion: 3,
+      composition: null,
+      transform: {
+        selectedCharacter: {
+          characterId: 'legacy-character',
+          characterLabel: null,
+          characterRevision: null,
+          variantId: null,
+          referenceAssetId: null,
+        },
+        creativeIntent: { userIntent: 'Kept as typed', appliedPrompt: null, promptLabel: null },
+      },
+    });
+
+    // A version no read map covers is refused before its JSON is looked at, because a snapshot
+    // read as the wrong shape is worse than an unreadable one.
+    expect(() => toRevision(storedRevisionRow(4, storedV2Snapshot()))).toThrow(
+      ProjectPersistenceError,
+    );
+  });
+
+  it('derives the stored snapshot version from the snapshot it writes', () => {
+    // A caller holding a snapshot that predates v3 — a migration replaying stored history, say —
+    // cannot leave the column and the JSON disagreeing: both come from the parsed result.
+    const values = revisionValues({
+      ...sourceAggregate().revisions[0]!,
+      snapshot: storedV2Snapshot() as unknown as ProjectSnapshot,
+    });
+    expect(values.snapshotSchemaVersion).toBe(3);
+    expect(values.snapshot).toMatchObject({
+      schemaVersion: 3,
+      composition: null,
+      transform: { selectedVoice: { kind: 'local-effect', effectId: 'warm-studio' } },
+    });
+    expect(values.snapshot).not.toHaveProperty('selectedVoice');
+  });
+
   it('loads the current Project and revision in one query', async () => {
     const aggregate = sourceAggregate();
     const scripted = scriptedDatabase([
@@ -167,7 +329,7 @@ describe('Project persistence mapping and transactions', () => {
         },
         revision: {
           ...aggregate.revisions[0]!,
-          snapshotSchemaVersion: 2,
+          snapshotSchemaVersion: 3,
           snapshot: aggregate.revisions[0]!.snapshot,
           authorKind: 'user',
           authorId: ownerUserId,
@@ -198,7 +360,7 @@ describe('Project persistence mapping and transactions', () => {
         },
         revision: {
           ...aggregate.revisions[0]!,
-          snapshotSchemaVersion: 2,
+          snapshotSchemaVersion: 3,
           snapshot: aggregate.revisions[0]!.snapshot,
           authorKind: 'user',
           authorId: ownerUserId,
@@ -346,7 +508,7 @@ describe('Project persistence mapping and transactions', () => {
           },
           revision: {
             ...aggregate.revisions[0]!,
-            snapshotSchemaVersion: 2,
+            snapshotSchemaVersion: 3,
             snapshot: aggregate.revisions[0]!.snapshot,
             authorKind: 'user',
             authorId: ownerUserId,

@@ -1,6 +1,7 @@
 export * from './assets';
 export * from './accounts';
 export * from './campaigns';
+export * from './composition';
 export * from './saved-videos';
 export * from './projects';
 export * from './common/datetime';

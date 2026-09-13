@@ -879,11 +879,7 @@ describe('ProjectOutputService local composite authority', () => {
       proposal: {
         workflowPhase: 'creative',
         liveMode: adoptedSnapshot.liveMode,
-        selectedCharacter: adoptedSnapshot.selectedCharacter,
-        selectedOutfit: adoptedSnapshot.selectedOutfit,
-        selectedVoice: adoptedSnapshot.selectedVoice,
-        visualTreatment: adoptedSnapshot.visualTreatment,
-        creativeIntent: adoptedSnapshot.creativeIntent,
+        transform: adoptedSnapshot.transform,
         localEdit: adoptedSnapshot.localEdit,
         exportSpecification: adoptedSnapshot.exportSpecification,
       },

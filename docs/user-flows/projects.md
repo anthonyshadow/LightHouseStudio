@@ -19,10 +19,12 @@ Project (id, ownerUserId, campaignId?, title, status, version, currentRevisionId
  └── ProjectOutputLink[]         immutable producer provenance for saved Versions
 ```
 
-`ProjectSnapshot` (`types.ts`) is the entire creative state of a revision:
-`sourceAssetId`, `workingMedia`, `presentedMedia`, `selectedCharacter`, `selectedOutfit`,
-`selectedVoice`, `visualTreatment`, `liveMode`, `creativeIntent`, `localEdit`,
-`exportSpecification`, `lastSuccessfulOutput`, `workflowPhase`.
+`ProjectSnapshot` (`types.ts`, version 3 since slice 3.1) is the entire creative state of a
+revision: `sourceAssetId`, `workingMedia`, `presentedMedia`, `composition` (`null` until the
+composition write path lands), `transform` (the optional AI attachment — `selectedCharacter`,
+`selectedOutfit`, `selectedVoice`, `visualTreatment`, `creativeIntent` — `null` when nothing is
+configured), `liveMode`, `localEdit`, `exportSpecification`, `lastSuccessfulOutput`,
+`workflowPhase`.
 
 `exportSpecification` records where the finished video is going: `source` (stored as `null`,
 meaning unchanged), `16:9`, `9:16`, `1:1` or `4:5`, each with the exact size it is produced at.
@@ -371,9 +373,10 @@ Both actions are disabled when archived, busy, `readyMedia === null`, or the pro
 `processing`.
 
 **A settled save frees the next round.** The post-save revision `saveProjectOutput` appends clears
-the creative configuration it was produced from — `selectedCharacter`, `selectedOutfit`,
-`selectedVoice`, `visualTreatment` and the applied prompt — keeping the operator's own
-`userIntent`, the live-capture metadata, the chosen placement and `localEdit`. The exact
+the transform it was produced from — `selectedCharacter`, `selectedOutfit`, `selectedVoice`,
+`visualTreatment` and the applied prompt — keeping the operator's own `userIntent` (when that too
+is empty, the revision stores no transform at all), the live-capture metadata, the chosen placement,
+the composition and `localEdit`. The exact
 configuration that made the Version stays immutable on the producing revision and on the Version
 itself, so nothing is lost; it simply stops pre-filling the next round, which is what made a
 Character Swap Project unable to move to Virtual Try-On. `localEdit` is kept because it is not a
@@ -404,9 +407,8 @@ revision, and `ProjectService.duplicate` composes it with the same create path e
    state. A deleted Project cannot be duplicated; an archived one can, which is the only way to get
    sourced work out of an archive.
 2. `duplicateProjectSnapshot` carries everything that describes intent — `sourceAssetId`,
-   `workingMedia`, `presentedMedia`, `selectedCharacter`, `selectedOutfit`, `selectedVoice`,
-   `visualTreatment`, `liveMode`, `creativeIntent`, `localEdit`, `exportSpecification` — **by
-   reference**. No bytes are copied and no storage is used again.
+   `workingMedia`, `presentedMedia`, `composition`, `transform`, `liveMode`, `localEdit`,
+   `exportSpecification` — **by reference**. No bytes are copied and no storage is used again.
 3. It clears `lastSuccessfulOutput`, and derives a truthful `workflowPhase`: `complete` and `export`
    become `review`, `processing` becomes `creative`, because a duplicate has produced nothing and no
    provider job comes with it. The `status` is derived by `deriveProjectStatus`, never copied.

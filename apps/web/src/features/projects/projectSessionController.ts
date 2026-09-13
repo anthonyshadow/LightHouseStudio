@@ -31,14 +31,15 @@ export interface ProjectSessionDependencies {
   readonly autosaveMs?: number;
 }
 
+/**
+ * The proposal a settled Project would send back: the snapshot's mutable creative part, in the
+ * contract's key order — `proposalsMatch` compares serialized text, and the stored transform is
+ * read raw so that `null` never meets an empty view across the comparison.
+ */
 const proposalFromCurrent = (current: ProjectCurrentResponse): ProjectSessionProposalContract => ({
   workflowPhase: current.revision.snapshot.workflowPhase,
   liveMode: current.revision.snapshot.liveMode,
-  selectedCharacter: current.revision.snapshot.selectedCharacter,
-  selectedOutfit: current.revision.snapshot.selectedOutfit,
-  selectedVoice: current.revision.snapshot.selectedVoice,
-  visualTreatment: current.revision.snapshot.visualTreatment,
-  creativeIntent: current.revision.snapshot.creativeIntent,
+  transform: current.revision.snapshot.transform,
   localEdit: current.revision.snapshot.localEdit,
   exportSpecification: current.revision.snapshot.exportSpecification,
 });

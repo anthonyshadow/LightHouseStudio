@@ -92,7 +92,9 @@ unique index. Dead tables `outbox` and `resource_references`.
 2. **Composition:** stored in the revision snapshot as **schema version 3** — ordered clip list,
    subtitle cues, audio settings — reusing the existing revision/CAS/replay machinery rather than
    inventing parallel tables (D3). Snapshot v3 also demotes AI selections to an optional
-   `transform` sub-object and removes the save-completes-the-project invariant (D2).
+   `transform` sub-object and removes the save-completes-the-project invariant (D2). _Landed in
+   slice 3.1 (2026-09-12): the model, the read maps, the widened check and the storage rule; the
+   composition write path is 3.3._
 3. **Variants:** placement renditions of one deliverable become recognizable siblings (shared
    deliverable key) rather than an undifferentiated version chain (D10).
 4. **Hygiene:** drop `outbox`/`resource_references` via migration; align file-mode caps (the
@@ -195,7 +197,8 @@ found has an incremental path.
 
 ## Open decisions
 
-D1 (multi-clip model), D2 (save vs completed), D3 (composition storage), D4 (subtitle delivery),
+D1 (multi-clip model), D2 (save vs completed), D3 (composition storage) — all three decided
+2026-09-12 with slice 3.1 — D4 (subtitle delivery),
 D5 (standalone Videos surface), D6 (voice in Projects), D7 (creative-library system of record),
 D8 (AI concurrency), D9 (deployment model), D10 (variant sets), D11 (HEVC intake), D12 (live AI
 beta), D13 (compact nav), D14 (retention policy) — all specified with recommendations in

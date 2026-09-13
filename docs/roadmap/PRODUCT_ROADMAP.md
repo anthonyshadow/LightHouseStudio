@@ -192,7 +192,8 @@ save-forces-completed.
 **Scope (slices):**
 3.1 Domain `composition` module: Clip (source ref + trim), ordered clip list, subtitle tracks
 (from 2.1), per-clip gain; snapshot **schema v3** with AI selections demoted to an optional
-`transform` object; `completed` becomes derived-milestone semantics (D2).
+`transform` object; `completed` becomes derived-milestone semantics (D2). _Landed 2026-09-12 —
+[plan and validation](SLICE_3.1_COMPOSITION_MODEL_PLAN.md); prompt 27 verifies._
 3.2 Multi-source storage: `project_sources` becomes a per-project collection (expand → idempotent
 receipted backfill of the existing single row → verify counts/owners → switch reads → contract
 migration), reusing the per-asset acceptance/idempotency/retention machinery unchanged.

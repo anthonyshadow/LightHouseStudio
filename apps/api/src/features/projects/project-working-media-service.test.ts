@@ -4,7 +4,7 @@ import { projectUploadAssetId } from './project-byte-acceptance.js';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createDefaultVideoEditSpec } from '@studio/domain';
+import { createDefaultVideoEditSpec, projectTransformOf } from '@studio/domain';
 import { LocalAssetByteStore } from '../../storage/asset-byte-store.js';
 import { FileSavedVideoRepository } from '../saved-videos/saved-video-repository.js';
 import { SavedVideoService } from '../saved-videos/saved-video-service.js';
@@ -186,11 +186,13 @@ describe('ProjectWorkingMediaService local authority', () => {
       proposal: {
         workflowPhase: 'creative',
         liveMode: snapshot.liveMode,
-        selectedCharacter: snapshot.selectedCharacter,
-        selectedOutfit: snapshot.selectedOutfit,
-        selectedVoice: snapshot.selectedVoice,
-        visualTreatment: snapshot.visualTreatment,
-        creativeIntent: { ...snapshot.creativeIntent, userIntent: 'A later creative checkpoint.' },
+        transform: {
+          ...projectTransformOf(snapshot),
+          creativeIntent: {
+            ...projectTransformOf(snapshot).creativeIntent,
+            userIntent: 'A later creative checkpoint.',
+          },
+        },
         localEdit: snapshot.localEdit,
         exportSpecification: snapshot.exportSpecification,
       },

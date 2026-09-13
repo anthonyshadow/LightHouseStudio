@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   attachProjectAssetRequestSchema,
   appendProjectRevisionRequestSchema,
+  compositionSchema,
   createProjectRequestSchema,
+  PROJECT_STALE_CLIENT_MESSAGE,
+  projectTransformSchema,
   projectConflictResponseSchema,
   projectCurrentResponseSchema,
   projectHistoryResponseSchema,
@@ -69,15 +72,7 @@ describe('Project asset membership contracts', () => {
   });
 });
 
-const validSnapshot = () => ({
-  schemaVersion: 2 as const,
-  sourceAssetId: assetId,
-  workingMedia: { kind: 'asset' as const, assetId },
-  presentedMedia: {
-    kind: 'saved-video-version' as const,
-    savedVideoId: videoId,
-    videoVersionId: versionId,
-  },
+const validTransform = () => ({
   selectedCharacter: {
     characterId: 'character-one',
     characterLabel: 'Avery',
@@ -106,7 +101,6 @@ const validSnapshot = () => ({
     providerId: 'fal',
     outputResolution: '720p' as const,
   },
-  liveMode: null,
   creativeIntent: {
     promptId: 'prompt-one',
     promptLabel: 'Summer launch prompt',
@@ -117,6 +111,75 @@ const validSnapshot = () => ({
     referenceAssetId: assetId,
     resourceRevision: now,
   },
+});
+
+const emptyTransform = () => ({
+  selectedCharacter: null,
+  selectedOutfit: null,
+  selectedVoice: null,
+  visualTreatment: { kind: 'none' as const },
+  creativeIntent: {
+    promptId: null,
+    promptLabel: null,
+    recipeId: null,
+    recipeLabel: null,
+    userIntent: '',
+    appliedPrompt: null,
+    referenceAssetId: null,
+    resourceRevision: null,
+  },
+});
+
+const clipId = '3b8b3d3e-5f0f-4a0c-9d1c-2d9f7a1b5c6e';
+const validComposition = () => ({
+  clips: [
+    {
+      id: clipId,
+      media: { kind: 'asset' as const, assetId },
+      trim: { startMs: 0, endMs: 4_000 },
+      audio: { level: 100, muted: false },
+    },
+    {
+      id: '9c2d7f5e-1a4b-4c3d-8e2f-0b1a2c3d4e5f',
+      media: {
+        kind: 'saved-video-version' as const,
+        savedVideoId: videoId,
+        videoVersionId: versionId,
+      },
+      trim: { startMs: 1_000, endMs: 2_500 },
+      audio: { level: 40, muted: true },
+    },
+  ],
+  subtitles: [
+    {
+      id: 'd4e5f6a7-b8c9-4d0e-9f1a-2b3c4d5e6f70',
+      text: 'Across the cut',
+      startMs: 3_500,
+      endMs: 5_000,
+      placement: 'bottom' as const,
+    },
+  ],
+});
+
+/** The v2 spelling of `validSnapshot()`: the five AI fields flat, no composition. */
+const validSnapshotV2 = () => {
+  const { composition, transform, ...rest } = validSnapshot();
+  expect(composition).toBeNull();
+  return { ...rest, schemaVersion: 2 as const, ...transform! };
+};
+
+const validSnapshot = () => ({
+  schemaVersion: 3 as const,
+  sourceAssetId: assetId,
+  workingMedia: { kind: 'asset' as const, assetId },
+  presentedMedia: {
+    kind: 'saved-video-version' as const,
+    savedVideoId: videoId,
+    videoVersionId: versionId,
+  },
+  composition: null as ReturnType<typeof validComposition> | null,
+  transform: validTransform() as ReturnType<typeof validTransform> | null,
+  liveMode: null,
   localEdit: {
     trim: { startMs: 0, endMs: 30_000 },
     crop: { preset: 'original' as const, rectangle: { x: 0, y: 0, width: 1, height: 1 } },
@@ -197,7 +260,7 @@ describe('Project snapshot contract', () => {
   });
 
   it('migrates v1 snapshots explicitly without fabricating missing applied provenance', () => {
-    const current = validSnapshot();
+    const current = validSnapshotV2();
     const legacy = {
       ...current,
       schemaVersion: 1 as const,
@@ -217,36 +280,153 @@ describe('Project snapshot contract', () => {
       },
     };
 
-    expect(projectSnapshotSchema.parse(legacy)).toMatchObject({
-      schemaVersion: 2,
-      selectedCharacter: {
-        characterId: 'character-one',
-        characterLabel: null,
-        variantId: 'red-jacket',
-        variantLabel: null,
-        referenceAssetId: null,
-      },
-      selectedOutfit: { outfitId: 'summer-outfit', outfitLabel: null, inputKind: null },
-      creativeIntent: {
-        recipeId: 'recipe-one',
-        recipeLabel: null,
-        appliedPrompt: null,
-        resourceRevision: null,
+    const migrated = projectSnapshotSchema.parse(legacy);
+    expect(migrated).toMatchObject({
+      schemaVersion: 3,
+      composition: null,
+      transform: {
+        selectedCharacter: {
+          characterId: 'character-one',
+          characterLabel: null,
+          variantId: 'red-jacket',
+          variantLabel: null,
+          referenceAssetId: null,
+        },
+        selectedOutfit: { outfitId: 'summer-outfit', outfitLabel: null, inputKind: null },
+        creativeIntent: {
+          recipeId: 'recipe-one',
+          recipeLabel: null,
+          appliedPrompt: null,
+          resourceRevision: null,
+        },
       },
     });
+    expect(migrated).not.toHaveProperty('selectedCharacter');
+  });
+
+  it('reads a v2 snapshot as v3 by regrouping, never by inventing an arrangement', () => {
+    const previous = validSnapshotV2();
+    const migrated = projectSnapshotSchema.parse(previous);
+    expect(migrated).toEqual({ ...validSnapshot(), createdAt: now, updatedAt: now });
+    // The regrouped object carries the transform's keys in the contract's order.
+    expect(Object.keys(migrated.transform!)).toEqual(Object.keys(validTransform()));
+    // A v2 row with nothing configured reads as no transform at all.
+    const bare = { ...previous, ...emptyTransform() };
+    expect(projectSnapshotSchema.parse(bare)).toMatchObject({ schemaVersion: 3, transform: null });
+    // A v2 body carrying a v3 key is refused rather than half-migrated.
+    expect(projectSnapshotSchema.safeParse({ ...previous, transform: null }).success).toBe(false);
+    expect(projectSnapshotSchema.safeParse({ ...previous, composition: null }).success).toBe(false);
+    // And the other direction: a v3 body may not carry a pre-v3 field, nor omit either new one.
+    expect(
+      projectSnapshotSchema.safeParse({ ...validSnapshot(), selectedCharacter: null }).success,
+    ).toBe(false);
+    const { composition, ...withoutComposition } = validSnapshot();
+    expect(composition).toBeNull();
+    expect(projectSnapshotSchema.safeParse(withoutComposition).success).toBe(false);
+    const { transform, ...withoutTransform } = validSnapshot();
+    expect(transform).not.toBeNull();
+    expect(projectSnapshotSchema.safeParse(withoutTransform).success).toBe(false);
+  });
+
+  /*
+   * A union member's `.transform` throws rather than reporting, so the v2 member keeps the
+   * refinements even though the map re-parses as v3: a stored body that violates one has to fail
+   * a `safeParse`, because the file library's envelope recovery reads through it and a throw would
+   * take the whole owner's file down instead of falling through to the older envelope schema.
+   */
+  it('reports an invalid v2 body as a failed parse rather than throwing out of the read map', () => {
+    const previous = validSnapshotV2();
+    const swapWithoutCharacter = { ...previous, selectedCharacter: null };
+    expect(() => projectSnapshotSchema.safeParse(swapWithoutCharacter)).not.toThrow();
+    expect(projectSnapshotSchema.safeParse(swapWithoutCharacter).success).toBe(false);
+    const backwards = { ...previous, updatedAt: '2026-08-10T12:00:00.000Z' };
+    expect(() => projectSnapshotSchema.safeParse(backwards)).not.toThrow();
+    expect(projectSnapshotSchema.safeParse(backwards).success).toBe(false);
+  });
+
+  it('folds an empty transform to null on the snapshot and on the proposal alike', () => {
+    expect(projectTransformSchema.parse(emptyTransform())).toBeNull();
+    expect(projectTransformSchema.parse(null)).toBeNull();
+    const parsed = projectTransformSchema.parse(validTransform());
+    expect(parsed).toEqual(validTransform());
+    expect(Object.keys(parsed!)).toEqual([
+      'selectedCharacter',
+      'selectedOutfit',
+      'selectedVoice',
+      'visualTreatment',
+      'creativeIntent',
+    ]);
+    // Untrimmed intent is a configured field: the domain and the contract agree on that.
+    expect(
+      projectTransformSchema.parse({
+        ...emptyTransform(),
+        creativeIntent: { ...emptyTransform().creativeIntent, userIntent: ' ' },
+      }),
+    ).not.toBeNull();
+    expect(
+      projectSnapshotSchema.parse({ ...validSnapshot(), transform: emptyTransform() }),
+    ).toMatchObject({ transform: null });
+    expect(projectSnapshotSchema.parse(validSnapshot()).transform).toEqual(validTransform());
+  });
+
+  it('holds a composition to its clip and cue rules, and carries it on the snapshot', () => {
+    const composition = validComposition();
+    expect(compositionSchema.parse(composition)).toEqual(composition);
+    expect(projectSnapshotSchema.parse({ ...validSnapshot(), composition })).toMatchObject({
+      composition,
+    });
+    const accepts = (value: unknown) => compositionSchema.safeParse(value).success;
+    expect(accepts({ ...composition, clips: [] })).toBe(false);
+    expect(accepts({ ...composition, clips: [composition.clips[0], composition.clips[0]] })).toBe(
+      false,
+    );
+    expect(
+      accepts({
+        ...composition,
+        clips: [{ ...composition.clips[0], trim: { startMs: 1_000, endMs: 1_050 } }],
+      }),
+    ).toBe(false);
+    expect(
+      accepts({
+        ...composition,
+        clips: [{ ...composition.clips[0], audio: { level: 100.5, muted: false } }],
+      }),
+    ).toBe(false);
+    expect(accepts({ ...composition, clips: [{ ...composition.clips[0], id: 'clip-1' }] })).toBe(
+      false,
+    );
+    expect(
+      accepts({
+        ...composition,
+        subtitles: [{ ...composition.subtitles[0], endMs: composition.subtitles[0]!.startMs + 50 }],
+      }),
+    ).toBe(false);
+    // Nothing defaults: a composition that omits its cue list is not one a client may write.
+    const { subtitles, ...withoutCues } = composition;
+    expect(subtitles).toHaveLength(1);
+    expect(accepts(withoutCues)).toBe(false);
+    const overflow = Array.from({ length: 101 }, (_, index) => ({
+      ...composition.clips[0]!,
+      id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+    }));
+    expect(accepts({ ...composition, clips: overflow })).toBe(false);
+    expect(accepts({ ...composition, clips: overflow.slice(0, 100) })).toBe(true);
   });
 
   it('rejects missing visual selections, object URLs, unknown state, and invalid edits', () => {
     expect(
       projectSnapshotSchema.safeParse({
         ...validSnapshot(),
-        selectedCharacter: null,
+        transform: { ...validTransform(), selectedCharacter: null },
       }).success,
     ).toBe(false);
     expect(
       projectSnapshotSchema.safeParse({
         ...validSnapshot(),
-        selectedCharacter: { characterId: 'blob:browser-state', variantId: null },
+        transform: {
+          ...validTransform(),
+          selectedCharacter: { characterId: 'blob:browser-state', variantId: null },
+        },
       }).success,
     ).toBe(false);
     expect(
@@ -267,20 +447,29 @@ describe('Project snapshot contract', () => {
 
     const promptOnlyTryOn = {
       ...validSnapshot(),
-      selectedOutfit: null,
-      visualTreatment: {
-        kind: 'virtual-try-on' as const,
-        providerId: 'fal',
-        outputResolution: '720p' as const,
-        inputKind: 'prompt' as const,
-        enhancePrompt: false,
+      transform: {
+        ...validTransform(),
+        selectedOutfit: null,
+        visualTreatment: {
+          kind: 'virtual-try-on' as const,
+          providerId: 'fal',
+          outputResolution: '720p' as const,
+          inputKind: 'prompt' as const,
+          enhancePrompt: false,
+        },
       },
     };
     expect(projectSnapshotSchema.safeParse(promptOnlyTryOn).success).toBe(true);
     expect(
       projectSnapshotSchema.safeParse({
         ...promptOnlyTryOn,
-        visualTreatment: { ...promptOnlyTryOn.visualTreatment, inputKind: 'saved-outfit' },
+        transform: {
+          ...promptOnlyTryOn.transform,
+          visualTreatment: {
+            ...promptOnlyTryOn.transform.visualTreatment,
+            inputKind: 'saved-outfit',
+          },
+        },
       }).success,
     ).toBe(false);
   });
@@ -366,11 +555,7 @@ describe('Project snapshot contract', () => {
             captureFormat: 'landscape',
             audioSource: 'local-microphone',
           },
-          selectedCharacter: snapshot.selectedCharacter,
-          selectedOutfit: snapshot.selectedOutfit,
-          selectedVoice: snapshot.selectedVoice,
-          visualTreatment: snapshot.visualTreatment,
-          creativeIntent: snapshot.creativeIntent,
+          transform: snapshot.transform,
           localEdit: snapshot.localEdit,
           exportSpecification: snapshot.exportSpecification,
         },
@@ -378,6 +563,7 @@ describe('Project snapshot contract', () => {
     ).toMatchObject({
       proposal: {
         workflowPhase: 'creative',
+        transform: { selectedCharacter: { characterId: 'character-one' } },
         exportSpecification: { aspect: '9:16', resolution: { width: 1_080, height: 1_920 } },
       },
     });
@@ -388,17 +574,23 @@ describe('Project snapshot contract', () => {
         proposal: {
           workflowPhase: 'creative',
           liveMode: null,
-          selectedCharacter: snapshot.selectedCharacter,
-          selectedOutfit: snapshot.selectedOutfit,
-          selectedVoice: snapshot.selectedVoice,
-          visualTreatment: snapshot.visualTreatment,
-          creativeIntent: snapshot.creativeIntent,
+          transform: snapshot.transform,
           localEdit: snapshot.localEdit,
           exportSpecification: null,
           workingMedia: { kind: 'asset', assetId },
         },
       }).success,
     ).toBe(false);
+    // A bundle built before v3 sends the five fields flat; it is told to reload, by name.
+    const stale = appendProjectRevisionRequestSchema.safeParse({
+      expectedVersion: 2,
+      expectedRevisionNumber: 2,
+      proposal: { ...validSnapshotV2(), liveMode: null },
+    });
+    expect(stale.success).toBe(false);
+    expect(stale.error?.issues.map((issue) => issue.message)).toContain(
+      PROJECT_STALE_CLIENT_MESSAGE,
+    );
   });
 
   it('requires exact Saved Video Version lineage and a controlled Project content URL', () => {
@@ -745,20 +937,7 @@ describe('projectSessionProposalSchema', () => {
   const proposal = (localEdit: unknown) => ({
     workflowPhase: 'review' as const,
     liveMode: null,
-    selectedCharacter: null,
-    selectedOutfit: null,
-    selectedVoice: null,
-    visualTreatment: { kind: 'none' as const },
-    creativeIntent: {
-      promptId: null,
-      promptLabel: null,
-      recipeId: null,
-      recipeLabel: null,
-      userIntent: '',
-      appliedPrompt: null,
-      referenceAssetId: null,
-      resourceRevision: null,
-    },
+    transform: null,
     localEdit,
     exportSpecification: null,
   });
@@ -787,6 +966,37 @@ describe('projectSessionProposalSchema', () => {
       localEdit: { subtitles: [] },
     });
     expect(projectSessionProposalSchema.parse(proposal(null)).localEdit).toBeNull();
+  });
+
+  it('keeps the proposal in the snapshot shape, with an empty transform folded to null', () => {
+    const parsed = projectSessionProposalSchema.parse({
+      ...proposal(null),
+      transform: emptyTransform(),
+    });
+    expect(parsed.transform).toBeNull();
+    expect(Object.keys(parsed)).toEqual([
+      'workflowPhase',
+      'liveMode',
+      'transform',
+      'localEdit',
+      'exportSpecification',
+    ]);
+    const configured = projectSessionProposalSchema.parse({
+      ...proposal(null),
+      transform: validTransform(),
+    });
+    expect(Object.keys(configured.transform!)).toEqual(Object.keys(validTransform()));
+    // Nothing defaults: a bundle that omits the field is refused, never read as "no transform".
+    const { transform, ...withoutTransform } = proposal(null);
+    expect(transform).toBeNull();
+    expect(projectSessionProposalSchema.safeParse(withoutTransform).success).toBe(false);
+    // The transform's own rules run on the proposal too.
+    expect(
+      projectSessionProposalSchema.safeParse({
+        ...proposal(null),
+        transform: { ...validTransform(), selectedCharacter: null },
+      }).success,
+    ).toBe(false);
   });
 
   /*

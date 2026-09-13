@@ -909,7 +909,7 @@ test('a Project checkpoints a reusable Character, adopts a local render, and ref
   // save; adopting a render writes its own revision through the working-media command instead.
   // The adoption flushed the staged pick on its way through, so exactly one revision carries it.
   expect(projects.checkpointRequests).toHaveLength(1);
-  expect(projects.checkpointRequests[0]?.proposal.selectedCharacter).toMatchObject({
+  expect(projects.checkpointRequests[0]?.proposal.transform?.selectedCharacter).toMatchObject({
     characterId: 'project-field-host',
     characterLabel: 'Project Field Host',
     characterRevision: selectedCharacter?.updatedAt,
@@ -1024,7 +1024,7 @@ test('Prompt 13 MVP journey resumes one Campaign Project through exact Version d
   await existingVideo.getByRole('button', { name: 'Start Project Character Swap' }).click();
   // Starting a paid run is one such boundary: the exact setup it will use is written first.
   await expect.poll(() => projects.checkpointRequests.length).toBeGreaterThanOrEqual(1);
-  expect(projects.checkpointRequests.at(-1)?.proposal.selectedCharacter).toMatchObject({
+  expect(projects.checkpointRequests.at(-1)?.proposal.transform?.selectedCharacter).toMatchObject({
     characterId: 'project-field-host',
     characterLabel: 'Project Field Host',
   });

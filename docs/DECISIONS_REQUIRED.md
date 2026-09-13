@@ -10,7 +10,7 @@ until the decision is made.
 
 ---
 
-## D1 — Does a Project become a multi-clip composition workspace?
+## D1 — Does a Project become a multi-clip composition workspace? — **decided**
 
 **Question:** Is the target Project a workspace holding several source videos combined into one
 composition (the stated vision), or does the single-source, one-cut pipeline remain and the vision
@@ -26,9 +26,14 @@ two clips; option (c) solves parallel cuts, not composition. The audit found the
 retention machinery generalizes cleanly.
 **Consequences:** (a) = the roadmap as written; (b) = Phase 3+ removed, vision doc rewritten
 narrower; (c) = different Phase 3 with the deliverable-child migration plan.
-**Blocks:** Phase 3 design (Phases 1–2 proceed regardless). **Decide by:** end of Phase 2.
+**Decision (2026-09-12): (a), as recommended.** Recorded with the
+[slice 3.1 plan](roadmap/SLICE_3.1_COMPOSITION_MODEL_PLAN.md), whose snapshot v3 gives the domain a
+`composition` (ordered clips over media the Project holds, each with its own trim and level, plus
+one list of sequence-time subtitle cues) and demotes the AI selections to an optional `transform`.
+Nothing writes a composition yet: 3.2 widens the source model, 3.3 adds the write path, 4.1 the
+timeline.
 
-## D2 — Does saving an output complete a Project?
+## D2 — Does saving an output complete a Project? — **decided**
 
 **Question:** The database requires a Project's status to become `completed` on every output save
 (output commit validation), and saving clears the creative setup. Is "completed" a terminal state
@@ -39,9 +44,20 @@ contradicts it and confuses returning users.
 deliverable"; (b) keep round semantics.
 **Recommendation: (a).** The UI already says "Version saved — carry on"; the storage layer should
 agree with the copy.
-**Blocks:** Phase 3 schema work (snapshot v3). **Decide by:** Phase 3 design.
+**Decision (2026-09-12): (a), as recommended — `completed` is a derived milestone.** What the word
+means is "the current cut is saved": `deriveProjectStatus` returns it exactly when the snapshot's
+output pointer is the validated output, and the transition table lets it move back to `ready` the
+moment material state changes, which it always could. What slice 3.1 changed is who decides: the
+storage commit rule both persistence modes share no longer demands the word (it checks that the
+post-save status is the one the domain derives), so nothing in storage can turn the milestone into
+a terminal state. Two places still spell `completed` on purpose: the save-result contract, which
+states the same derivation for the response, and the derivation itself. Not changed, and recorded
+as follow-ups: the post-save reset of the transform (a product choice from 2026-08-24 with its own
+test and prose — whether a save should carry the setup forward is a question about what Save
+operates on, which becomes the composition in 4.3), and the UI-visible vocabulary `complete`
+(workflow phase) and `completed` (status).
 
-## D3 — Where does the composition live?
+## D3 — Where does the composition live? — **decided**
 
 **Question:** Store the composition (ordered clips, subtitle cues, audio settings) in the revision
 snapshot as schema v3, or in new normalized tables?
@@ -50,7 +66,14 @@ parity for free; (b) normalized `composition/clip/cue` tables.
 **Recommendation: (a).** The database auditor's assessment: the revision system is the strongest
 machinery in the codebase; normalized tables add joins and parity work with no querying need at
 single-operator scale. Revisit (b) only if per-cue querying or collaboration arrives.
-**Blocks:** Phase 3. **Decide by:** Phase 3 design.
+**Decision (2026-09-12): (a), as recommended — snapshot v3.** The composition is a field of the
+revision snapshot, so every arrangement change is a revision, every save has a producing revision,
+and both persistence modes get it through the one schema they already share. v1 and v2 rows are
+read through explicit maps (v1 → v2 → v3) that fabricate nothing; the Postgres check widened to
+`in (1, 2, 3)` in additive migration `0027`; the file library format is unchanged. The clip media a
+composition names is held by revision-scoped `clip` links, so the retention invariant holds from the
+first writer. Design, consequences and the forward statements Phase 3.2 and Phase 4 build on are in
+the [slice 3.1 plan](roadmap/SLICE_3.1_COMPOSITION_MODEL_PLAN.md).
 
 ## D4 — Subtitles: burn-in, sidecar, or both? — **decided**
 

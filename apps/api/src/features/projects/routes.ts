@@ -1,6 +1,7 @@
 import {
   attachProjectAssetRequestSchema,
   appendProjectRevisionRequestSchema,
+  PROJECT_STALE_CLIENT_MESSAGE,
   adoptProjectWorkingMediaRequestSchema,
   createProjectRequestSchema,
   detachProjectAssetResponseSchema,
@@ -284,7 +285,16 @@ export const registerProjectRoutes = (
     const params = projectParamsSchema.safeParse(request.params);
     const body = appendProjectRevisionRequestSchema.safeParse(request.body);
     if (!params.success || !body.success) {
-      throw new AppError(400, 'validation_error', 'Provide a valid semantic Project checkpoint.');
+      // A bundle that predates the current snapshot shape is told to reload, in its own words;
+      // every other invalid write keeps the generic answer.
+      const stale =
+        body.success === false &&
+        body.error.issues.some((issue) => issue.message === PROJECT_STALE_CLIENT_MESSAGE);
+      throw new AppError(
+        400,
+        'validation_error',
+        stale ? PROJECT_STALE_CLIENT_MESSAGE : 'Provide a valid semantic Project checkpoint.',
+      );
     }
     return sendMutation(
       reply,

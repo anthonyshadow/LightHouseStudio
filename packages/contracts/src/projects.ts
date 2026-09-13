@@ -8,8 +8,22 @@ import {
   savedVideoVersionSchema,
 } from './saved-videos';
 
-export const PROJECT_SNAPSHOT_SCHEMA_VERSION = 2 as const;
+/** Mirror the domain's snapshot versions by hand; the parity suite holds the two together. */
+export const PROJECT_SNAPSHOT_SCHEMA_VERSION = 3 as const;
+export const PREVIOUS_PROJECT_SNAPSHOT_SCHEMA_VERSION = 2 as const;
 export const LEGACY_PROJECT_SNAPSHOT_SCHEMA_VERSION = 1 as const;
+/**
+ * Every version a stored snapshot may carry and still be read: the write version plus the two
+ * explicit read maps below. The relational check constraint admits exactly this set.
+ */
+export const READABLE_PROJECT_SNAPSHOT_SCHEMA_VERSIONS = [
+  LEGACY_PROJECT_SNAPSHOT_SCHEMA_VERSION,
+  PREVIOUS_PROJECT_SNAPSHOT_SCHEMA_VERSION,
+  PROJECT_SNAPSHOT_SCHEMA_VERSION,
+] as const;
+/** What a stale bundle is told when its write cannot describe the current model. */
+export const PROJECT_STALE_CLIENT_MESSAGE =
+  'This tab is out of date and cannot describe this edit. Reload and try again.';
 export const PROJECT_STATUSES = [
   'draft',
   'ready',
@@ -28,6 +42,7 @@ export const PROJECT_ASSET_ROLES = [
   'job-output',
   'audio',
   'thumbnail',
+  'clip',
 ] as const;
 export const PROJECT_ASSET_KINDS = ['video', 'character', 'outfit', 'voice'] as const;
 export const PROJECT_REVISION_SOURCES = [
@@ -63,6 +78,10 @@ export const SUBTITLE_CUE_TEXT_MAX_LENGTH = 200;
 export const SUBTITLE_CUE_MINIMUM_DURATION_MS = 100;
 /** Mirrors the domain's VIDEO_EDIT_AUDIO_LEVEL_MAX by hand; the parity suite holds the two together. */
 export const VIDEO_EDIT_AUDIO_LEVEL_MAX = 100;
+/** Mirrors the domain's VIDEO_EDIT_MINIMUM_TRIM_MS by hand; the parity suite holds the two together. */
+export const VIDEO_EDIT_MINIMUM_TRIM_MS = 100;
+/** Mirrors the domain's COMPOSITION_CLIP_LIMIT by hand; the parity suite holds the two together. */
+export const COMPOSITION_CLIP_LIMIT = 100;
 /** Mirrors the domain's LOCAL_VOICE_EFFECT_IDS by hand; the parity suite holds the two together. */
 export const LOCAL_VOICE_EFFECT_IDS = ['warm-studio', 'clear-presenter', 'robot'] as const;
 
@@ -147,6 +166,51 @@ const subtitleCueSchema = z
   })
   .strict();
 
+/**
+ * One pass over a cue list for every per-list and per-cue rule. It runs on every snapshot read,
+ * for the single clip's list and for a composition's alike.
+ */
+const refineSubtitleCueList = (
+  cues: readonly z.infer<typeof subtitleCueSchema>[],
+  context: z.RefinementCtx,
+  path: readonly (string | number)[],
+): void => {
+  const seen = new Set<string>();
+  cues.forEach((cue, index) => {
+    if (cue.endMs - cue.startMs < SUBTITLE_CUE_MINIMUM_DURATION_MS) {
+      context.addIssue({
+        code: 'custom',
+        path: [...path, index, 'endMs'],
+        message: 'A subtitle must last at least a tenth of a second.',
+      });
+    }
+    if (seen.has(cue.id)) {
+      context.addIssue({
+        code: 'custom',
+        path: [...path, index, 'id'],
+        message: 'Each subtitle needs its own identifier.',
+      });
+    }
+    seen.add(cue.id);
+    const previous = cues[index - 1];
+    if (previous !== undefined && previous.startMs > cue.startMs) {
+      context.addIssue({
+        code: 'custom',
+        path: [...path, index, 'startMs'],
+        message: 'Subtitles must be listed in start order.',
+      });
+    }
+  });
+};
+
+/** A whole percentage of the source and a mute; no default here, the edit spec supplies its own. */
+const videoEditAudioSchema = z
+  .object({
+    level: z.number().int().min(0).max(VIDEO_EDIT_AUDIO_LEVEL_MAX),
+    muted: z.boolean(),
+  })
+  .strict();
+
 export const projectVideoEditSpecSchema = z
   .object({
     trim: z
@@ -192,13 +256,7 @@ export const projectVideoEditSpecSchema = z
      * source as recorded: full level, not muted. Last on purpose — the wire mirrors the domain's
      * key order, and equality elsewhere is a comparison of serialized snapshots.
      */
-    audio: z
-      .object({
-        level: z.number().int().min(0).max(VIDEO_EDIT_AUDIO_LEVEL_MAX),
-        muted: z.boolean(),
-      })
-      .strict()
-      .default({ level: VIDEO_EDIT_AUDIO_LEVEL_MAX, muted: false }),
+    audio: videoEditAudioSchema.default({ level: VIDEO_EDIT_AUDIO_LEVEL_MAX, muted: false }),
   })
   .strict()
   .superRefine((value, context) => {
@@ -219,41 +277,20 @@ export const projectVideoEditSpecSchema = z
         message: 'The normalized crop must remain inside the source frame.',
       });
     }
-    // One pass over the cues for every per-list and per-cue rule; this runs on every snapshot read.
-    const seen = new Set<string>();
-    value.subtitles.forEach((cue, index) => {
-      if (cue.endMs - cue.startMs < SUBTITLE_CUE_MINIMUM_DURATION_MS) {
-        context.addIssue({
-          code: 'custom',
-          path: ['subtitles', index, 'endMs'],
-          message: 'A subtitle must last at least a tenth of a second.',
-        });
-      }
-      if (seen.has(cue.id)) {
-        context.addIssue({
-          code: 'custom',
-          path: ['subtitles', index, 'id'],
-          message: 'Each subtitle needs its own identifier.',
-        });
-      }
-      seen.add(cue.id);
-      const previous = value.subtitles[index - 1];
-      if (previous !== undefined && previous.startMs > cue.startMs) {
-        context.addIssue({
-          code: 'custom',
-          path: ['subtitles', index, 'startMs'],
-          message: 'Subtitles must be listed in start order.',
-        });
-      }
-    });
+    refineSubtitleCueList(value.subtitles, context, ['subtitles']);
   });
 
 const projectExportSpecificationSchema = projectExportSpecificationValueSchema.nullable();
 
-const projectSnapshotSharedShape = {
+/** The media pointers every snapshot version shares; the arrangement sits after them in v3. */
+const projectSnapshotMediaShape = {
   sourceAssetId: z.uuid().nullable(),
   workingMedia: projectMediaReferenceSchema.nullable(),
   presentedMedia: projectMediaReferenceSchema.nullable(),
+} as const;
+
+/** The state every snapshot version shares after its version-specific fields. */
+const projectSnapshotStateShape = {
   liveMode: projectLiveModeMetadataSchema,
   localEdit: projectVideoEditSpecSchema.nullable(),
   exportSpecification: projectExportSpecificationSchema,
@@ -262,6 +299,34 @@ const projectSnapshotSharedShape = {
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 } as const;
+
+const projectSnapshotSharedShape = {
+  ...projectSnapshotMediaShape,
+  ...projectSnapshotStateShape,
+} as const;
+
+const refineSnapshotTimestamps = (
+  value: { readonly createdAt: string; readonly updatedAt: string },
+  context: z.RefinementCtx,
+): void => {
+  if (value.updatedAt < value.createdAt) {
+    context.addIssue({
+      code: 'custom',
+      path: ['updatedAt'],
+      message: 'A snapshot cannot be updated before it was created.',
+    });
+  }
+};
+
+const canonicalizeSnapshotTimestamps = <
+  Value extends { readonly createdAt: string; readonly updatedAt: string },
+>(
+  value: Value,
+): Value => ({
+  ...value,
+  createdAt: new Date(value.createdAt).toISOString(),
+  updatedAt: new Date(value.updatedAt).toISOString(),
+});
 
 const projectCharacterSelectionSchema = z
   .object({
@@ -320,72 +385,207 @@ const projectCreativeIntentSchema = z
   })
   .strict();
 
-const projectSnapshotV2Schema = z
+/**
+ * The optional AI attachment, in the domain's key order — load-bearing, because the stored
+ * snapshot and an incoming proposal are compared as JSON in both apps.
+ */
+const projectTransformShape = {
+  selectedCharacter: projectCharacterSelectionSchema,
+  selectedOutfit: projectOutfitSelectionSchema,
+  selectedVoice: projectVoiceSelectionSchema.nullable(),
+  visualTreatment: projectVisualTreatmentSchema,
+  creativeIntent: projectCreativeIntentSchema,
+} as const;
+
+const projectTransformObjectSchema = z.object(projectTransformShape).strict();
+
+type ProjectTransformValue = z.infer<typeof projectTransformObjectSchema>;
+
+/** Mirrors the domain's `projectTransformIsEmpty` by hand; the parity suite holds the two together. */
+const projectTransformIsEmpty = (value: ProjectTransformValue): boolean => {
+  const intent = value.creativeIntent;
+  return (
+    value.selectedCharacter === null &&
+    value.selectedOutfit === null &&
+    value.selectedVoice === null &&
+    value.visualTreatment.kind === 'none' &&
+    intent.promptId === null &&
+    intent.promptLabel === null &&
+    intent.recipeId === null &&
+    intent.recipeLabel === null &&
+    intent.userIntent === '' &&
+    intent.appliedPrompt === null &&
+    intent.referenceAssetId === null &&
+    intent.resourceRevision === null
+  );
+};
+
+const refineProjectTransform = (value: ProjectTransformValue, context: z.RefinementCtx): void => {
+  if (value.visualTreatment.kind === 'character-swap' && value.selectedCharacter === null) {
+    context.addIssue({
+      code: 'custom',
+      path: ['selectedCharacter'],
+      message: 'Character Swap requires a selected character.',
+    });
+  }
+  if (
+    value.visualTreatment.kind === 'virtual-try-on' &&
+    value.visualTreatment.inputKind === 'saved-outfit' &&
+    value.selectedOutfit === null
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['selectedOutfit'],
+      message: 'Saved-outfit Virtual Try-On requires a selected outfit.',
+    });
+  }
+  if (
+    value.selectedCharacter?.variantId !== null &&
+    value.selectedCharacter !== null &&
+    (value.selectedCharacter.variantLabel === null) !==
+      (value.selectedCharacter.variantRevision === null)
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['selectedCharacter', 'variantLabel'],
+      message: 'A Character Variant label and revision must be recorded together.',
+    });
+  }
+  if (
+    value.selectedCharacter?.variantId === null &&
+    (value.selectedCharacter.variantLabel !== null ||
+      value.selectedCharacter.variantRevision !== null)
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['selectedCharacter', 'variantId'],
+      message: 'Character Variant applied values require a Variant identifier.',
+    });
+  }
+};
+
+/**
+ * One instance for the snapshot and the proposal, so the stored value and the incoming write are
+ * canonical by construction. An all-empty transform folds to `null` rather than being refused: the
+ * post-save reset produces the empty object whenever no intent was typed, every persisted revision
+ * re-parses through this schema in both persistence modes, and the browser parses each staged
+ * proposal synchronously — a refusal would surface as a commit-time throw or a render-time error,
+ * never as the 400 it looks like.
+ */
+export const projectTransformSchema = projectTransformObjectSchema
+  .superRefine(refineProjectTransform)
+  .transform((value) => (projectTransformIsEmpty(value) ? null : value))
+  .nullable();
+
+const compositionClipSchema = z
   .object({
-    schemaVersion: z.literal(PROJECT_SNAPSHOT_SCHEMA_VERSION),
-    ...projectSnapshotSharedShape,
-    selectedCharacter: projectCharacterSelectionSchema,
-    selectedOutfit: projectOutfitSelectionSchema,
-    selectedVoice: projectVoiceSelectionSchema.nullable(),
-    visualTreatment: projectVisualTreatmentSchema,
-    creativeIntent: projectCreativeIntentSchema,
+    id: z.uuid(),
+    media: projectMediaReferenceSchema,
+    trim: z
+      .object({
+        startMs: z.number().finite().nonnegative(),
+        endMs: z.number().finite().positive(),
+      })
+      .strict(),
+    audio: videoEditAudioSchema,
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.updatedAt < value.createdAt) {
+    if (value.trim.endMs - value.trim.startMs < VIDEO_EDIT_MINIMUM_TRIM_MS) {
       context.addIssue({
         code: 'custom',
-        path: ['updatedAt'],
-        message: 'A snapshot cannot be updated before it was created.',
+        path: ['trim', 'endMs'],
+        message: 'A clip must keep at least a tenth of a second of its media.',
       });
     }
-    if (value.visualTreatment.kind === 'character-swap' && value.selectedCharacter === null) {
-      context.addIssue({
-        code: 'custom',
-        path: ['selectedCharacter'],
-        message: 'Character Swap requires a selected character.',
-      });
-    }
-    if (
-      value.visualTreatment.kind === 'virtual-try-on' &&
-      value.visualTreatment.inputKind === 'saved-outfit' &&
-      value.selectedOutfit === null
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['selectedOutfit'],
-        message: 'Saved-outfit Virtual Try-On requires a selected outfit.',
-      });
-    }
-    if (
-      value.selectedCharacter?.variantId !== null &&
-      value.selectedCharacter !== null &&
-      (value.selectedCharacter.variantLabel === null) !==
-        (value.selectedCharacter.variantRevision === null)
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['selectedCharacter', 'variantLabel'],
-        message: 'A Character Variant label and revision must be recorded together.',
-      });
-    }
-    if (
-      value.selectedCharacter?.variantId === null &&
-      (value.selectedCharacter.variantLabel !== null ||
-        value.selectedCharacter.variantRevision !== null)
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['selectedCharacter', 'variantId'],
-        message: 'Character Variant applied values require a Variant identifier.',
-      });
-    }
+  });
+
+/**
+ * An ordered sequence of clips over media the Project holds, with one list of cues in sequence
+ * time. Nothing defaults: a writer states the whole arrangement, so a bundle that predates a field
+ * can never erase it by omission.
+ */
+export const compositionSchema = z
+  .object({
+    clips: z.array(compositionClipSchema).min(1).max(COMPOSITION_CLIP_LIMIT).readonly(),
+    subtitles: z.array(subtitleCueSchema).max(SUBTITLE_CUE_LIMIT).readonly(),
   })
-  .transform((value) => ({
-    ...value,
-    createdAt: new Date(value.createdAt).toISOString(),
-    updatedAt: new Date(value.updatedAt).toISOString(),
-  }));
+  .strict()
+  .superRefine((value, context) => {
+    const seen = new Set<string>();
+    value.clips.forEach((clip, index) => {
+      if (seen.has(clip.id)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['clips', index, 'id'],
+          message: 'Each composition clip needs its own identifier.',
+        });
+      }
+      seen.add(clip.id);
+    });
+    refineSubtitleCueList(value.subtitles, context, ['subtitles']);
+  });
+
+const projectSnapshotV3Schema = z
+  .object({
+    schemaVersion: z.literal(PROJECT_SNAPSHOT_SCHEMA_VERSION),
+    ...projectSnapshotMediaShape,
+    composition: compositionSchema.nullable(),
+    transform: projectTransformSchema,
+    ...projectSnapshotStateShape,
+  })
+  .strict()
+  .superRefine(refineSnapshotTimestamps)
+  .transform(canonicalizeSnapshotTimestamps);
+
+/**
+ * Snapshot v2 — the write format until 2026-09-12: the five AI fields at the top level and no
+ * composition. Read only, through the map below.
+ *
+ * It carries the same refinements v3 does, even though the map re-parses as v3, because a union
+ * member's `.transform` throws rather than reporting: without them a v2 body that violates a
+ * cross-field rule would make `safeParse` throw instead of returning a failure, and the file
+ * library's envelope recovery reads through `safeParse`.
+ */
+const projectSnapshotV2Schema = z
+  .object({
+    schemaVersion: z.literal(PREVIOUS_PROJECT_SNAPSHOT_SCHEMA_VERSION),
+    ...projectSnapshotSharedShape,
+    ...projectTransformShape,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    refineSnapshotTimestamps(value, context);
+    refineProjectTransform(value, context);
+  });
+
+/**
+ * v2 → v3: the five fields regroup under `transform` (an empty one becoming `null`) and the
+ * composition is `null` — nothing is synthesised from the single cut, because an arrangement the
+ * operator never made would disagree with the working media, which is the rendered cut.
+ */
+export const migrateProjectSnapshotV2 = (previous: z.infer<typeof projectSnapshotV2Schema>) => {
+  const {
+    selectedCharacter,
+    selectedOutfit,
+    selectedVoice,
+    visualTreatment,
+    creativeIntent,
+    ...rest
+  } = previous;
+  return projectSnapshotV3Schema.parse({
+    ...rest,
+    schemaVersion: PROJECT_SNAPSHOT_SCHEMA_VERSION,
+    composition: null,
+    transform: {
+      selectedCharacter,
+      selectedOutfit,
+      selectedVoice,
+      visualTreatment,
+      creativeIntent,
+    },
+  });
+};
 
 /** Prompt 07 snapshots are accepted only through this explicit provenance-preserving read map. */
 export const legacyProjectSnapshotSchema = z
@@ -434,64 +634,71 @@ export const legacyProjectSnapshotSchema = z
   .strict();
 
 export const migrateLegacyProjectSnapshot = (legacy: z.infer<typeof legacyProjectSnapshotSchema>) =>
-  projectSnapshotV2Schema.parse({
-    ...legacy,
-    schemaVersion: PROJECT_SNAPSHOT_SCHEMA_VERSION,
-    selectedCharacter:
-      legacy.selectedCharacter === null
-        ? null
-        : {
-            ...legacy.selectedCharacter,
-            characterLabel: null,
-            characterRevision: null,
-            variantLabel: null,
-            variantRevision: null,
-            referenceAssetId: null,
-          },
-    selectedOutfit:
-      legacy.selectedOutfit === null
-        ? null
-        : {
-            ...legacy.selectedOutfit,
-            outfitLabel: null,
-            outfitRevision: null,
-            referenceAssetId: null,
-            inputKind: null,
-          },
-    selectedVoice:
-      legacy.selectedVoice === null
-        ? null
-        : legacy.selectedVoice.kind === 'local-effect'
-          ? { ...legacy.selectedVoice, effectRevision: null }
-          : { ...legacy.selectedVoice, resourceRevision: null },
-    visualTreatment:
-      legacy.visualTreatment.kind === 'none'
-        ? legacy.visualTreatment
-        : legacy.visualTreatment.kind === 'character-swap'
-          ? {
-              kind: 'character-swap' as const,
-              providerId: null,
-              outputResolution: null,
-            }
+  migrateProjectSnapshotV2(
+    projectSnapshotV2Schema.parse({
+      ...legacy,
+      schemaVersion: PREVIOUS_PROJECT_SNAPSHOT_SCHEMA_VERSION,
+      selectedCharacter:
+        legacy.selectedCharacter === null
+          ? null
           : {
-              kind: 'virtual-try-on' as const,
-              providerId: null,
-              outputResolution: null,
-              inputKind: null,
-              enhancePrompt: null,
+              ...legacy.selectedCharacter,
+              characterLabel: null,
+              characterRevision: null,
+              variantLabel: null,
+              variantRevision: null,
+              referenceAssetId: null,
             },
-    creativeIntent: {
-      ...legacy.creativeIntent,
-      promptLabel: null,
-      recipeLabel: null,
-      appliedPrompt: null,
-      referenceAssetId: null,
-      resourceRevision: null,
-    },
-  });
+      selectedOutfit:
+        legacy.selectedOutfit === null
+          ? null
+          : {
+              ...legacy.selectedOutfit,
+              outfitLabel: null,
+              outfitRevision: null,
+              referenceAssetId: null,
+              inputKind: null,
+            },
+      selectedVoice:
+        legacy.selectedVoice === null
+          ? null
+          : legacy.selectedVoice.kind === 'local-effect'
+            ? { ...legacy.selectedVoice, effectRevision: null }
+            : { ...legacy.selectedVoice, resourceRevision: null },
+      visualTreatment:
+        legacy.visualTreatment.kind === 'none'
+          ? legacy.visualTreatment
+          : legacy.visualTreatment.kind === 'character-swap'
+            ? {
+                kind: 'character-swap' as const,
+                providerId: null,
+                outputResolution: null,
+              }
+            : {
+                kind: 'virtual-try-on' as const,
+                providerId: null,
+                outputResolution: null,
+                inputKind: null,
+                enhancePrompt: null,
+              },
+      creativeIntent: {
+        ...legacy.creativeIntent,
+        promptLabel: null,
+        recipeLabel: null,
+        appliedPrompt: null,
+        referenceAssetId: null,
+        resourceRevision: null,
+      },
+    }),
+  );
 
+/**
+ * Every version a stored snapshot may carry, read as v3. Members are strict and the version
+ * literal routes the row, so a v2 body carrying a stray v3 key is refused rather than half-read.
+ */
 export const projectSnapshotSchema = z.union([
-  projectSnapshotV2Schema,
+  projectSnapshotV3Schema,
+  projectSnapshotV2Schema.transform(migrateProjectSnapshotV2),
   legacyProjectSnapshotSchema.transform(migrateLegacyProjectSnapshot),
 ]);
 
@@ -801,7 +1008,7 @@ const statesEveryDefaultedField = (value: unknown, context: z.RefinementCtx): vo
       context.addIssue({
         code: 'custom',
         path: [field],
-        message: 'This tab is out of date and cannot describe this edit. Reload and try again.',
+        message: PROJECT_STALE_CLIENT_MESSAGE,
       });
     }
   }
@@ -818,39 +1025,42 @@ const proposedVideoEditSpecSchema = z
   .superRefine(statesEveryDefaultedField)
   .pipe(projectVideoEditSpecSchema.nullable());
 
+const PRE_V3_PROPOSAL_KEYS = Object.keys(projectTransformShape);
+
+/**
+ * A bundle built before snapshot v3 still sends the five AI fields at the top level. The strict
+ * object below refuses that anyway; naming the reason lets the 400 say "reload" instead of a
+ * validation code.
+ */
+const refusesPreV3Proposal = (value: unknown, context: z.RefinementCtx): void => {
+  if (typeof value !== 'object' || value === null) return;
+  if (PRE_V3_PROPOSAL_KEYS.some((key) => key in value)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['transform'],
+      message: PROJECT_STALE_CLIENT_MESSAGE,
+    });
+  }
+};
+
+/**
+ * The checkpoint write: the snapshot's mutable creative part, in the snapshot's own shape. Server
+ * authority supplies the media pointers and the timestamps.
+ */
 export const projectSessionProposalSchema = z
-  .object({
-    workflowPhase: projectWorkflowPhaseSchema,
-    liveMode: projectLiveModeMetadataSchema,
-    selectedCharacter: projectCharacterSelectionSchema,
-    selectedOutfit: projectOutfitSelectionSchema,
-    selectedVoice: projectVoiceSelectionSchema.nullable(),
-    visualTreatment: projectVisualTreatmentSchema,
-    creativeIntent: projectCreativeIntentSchema,
-    localEdit: proposedVideoEditSpecSchema,
-    exportSpecification: projectExportSpecificationSchema,
-  })
-  .strict()
-  .superRefine((value, context) => {
-    if (value.visualTreatment.kind === 'character-swap' && value.selectedCharacter === null) {
-      context.addIssue({
-        code: 'custom',
-        path: ['selectedCharacter'],
-        message: 'Character Swap requires a selected character.',
-      });
-    }
-    if (
-      value.visualTreatment.kind === 'virtual-try-on' &&
-      value.visualTreatment.inputKind === 'saved-outfit' &&
-      value.selectedOutfit === null
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['selectedOutfit'],
-        message: 'Saved-outfit Virtual Try-On requires a selected outfit.',
-      });
-    }
-  });
+  .unknown()
+  .superRefine(refusesPreV3Proposal)
+  .pipe(
+    z
+      .object({
+        workflowPhase: projectWorkflowPhaseSchema,
+        liveMode: projectLiveModeMetadataSchema,
+        transform: projectTransformSchema,
+        localEdit: proposedVideoEditSpecSchema,
+        exportSpecification: projectExportSpecificationSchema,
+      })
+      .strict(),
+  );
 
 export const appendProjectRevisionRequestSchema = z
   .object({
@@ -1212,6 +1422,7 @@ export const projectSourceResponseSchema = z
   });
 
 export type ProjectSnapshotContract = z.infer<typeof projectSnapshotSchema>;
+export type ProjectTransformContract = NonNullable<z.infer<typeof projectTransformSchema>>;
 export type ProjectSessionProposalContract = z.infer<typeof projectSessionProposalSchema>;
 export type AppendProjectRevisionRequest = z.infer<typeof appendProjectRevisionRequestSchema>;
 export type ProjectStatusContract = z.infer<typeof projectStatusSchema>;

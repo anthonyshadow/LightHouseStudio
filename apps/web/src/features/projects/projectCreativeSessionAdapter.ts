@@ -1,5 +1,14 @@
-import type { ProjectCurrentResponse, ProjectSessionProposalContract } from '@studio/contracts';
-import { isSessionModeId, resolveCharacterVersion } from '@studio/domain';
+import type {
+  ProjectCurrentResponse,
+  ProjectSessionProposalContract,
+  ProjectTransformContract,
+} from '@studio/contracts';
+import {
+  isSessionModeId,
+  normalizeProjectTransform,
+  projectTransformOf,
+  resolveCharacterVersion,
+} from '@studio/domain';
 import type { RecipeSelection } from '../creative-assets/RecipeShelf.types';
 import type { CreativeAssetStore } from '../creative-assets/types';
 import type {
@@ -14,13 +23,7 @@ type ProjectSnapshot = ProjectCurrentResponse['revision']['snapshot'];
 
 export type ProjectCreativeProposal = Pick<
   ProjectSessionProposalContract,
-  | 'workflowPhase'
-  | 'liveMode'
-  | 'selectedCharacter'
-  | 'selectedOutfit'
-  | 'selectedVoice'
-  | 'visualTreatment'
-  | 'creativeIntent'
+  'workflowPhase' | 'liveMode' | 'transform'
 >;
 
 export interface ProjectCreativeAdapterInput {
@@ -63,10 +66,11 @@ const revisionMatches = (expected: string | null, current: string): boolean =>
 export const projectCreativeHydrationMetadata = (
   snapshot: ProjectSnapshot,
 ): ProjectCreativeHydrationMetadata => {
+  const transform = projectTransformOf(snapshot);
   const inferredMode =
-    snapshot.visualTreatment.kind === 'character-swap' || snapshot.selectedCharacter !== null
+    transform.visualTreatment.kind === 'character-swap' || transform.selectedCharacter !== null
       ? 'lucy-latest'
-      : snapshot.visualTreatment.kind === 'virtual-try-on' || snapshot.selectedOutfit !== null
+      : transform.visualTreatment.kind === 'virtual-try-on' || transform.selectedOutfit !== null
         ? 'lucy-vton-latest'
         : null;
   const storedMode = snapshot.liveMode?.modeId;
@@ -82,7 +86,7 @@ export const resolveProjectSavedVoiceResourceIssue = (
   snapshot: ProjectSnapshot,
   status: 'missing' | 'unavailable',
 ): ProjectCreativeResourceIssue | null => {
-  const voice = snapshot.selectedVoice;
+  const voice = projectTransformOf(snapshot).selectedVoice;
   if (voice?.kind !== 'saved-voice') return null;
   return {
     kind: 'voice',
@@ -99,7 +103,7 @@ const characterSelection = (
   activeRecipe: ActiveStudioRecipe,
   store: CreativeAssetStore,
   step: ExistingVideoStep | null,
-): ProjectCreativeProposal['selectedCharacter'] => {
+): ProjectTransformContract['selectedCharacter'] => {
   const stepVariant =
     step?.modelId === 'lucy-latest' && step.savedRecipeId
       ? (store.savedCharacterVariants.find((candidate) => candidate.id === step.savedRecipeId) ??
@@ -137,7 +141,7 @@ const outfitSelection = (
   activeRecipe: ActiveStudioRecipe,
   store: CreativeAssetStore,
   step: ExistingVideoStep | null,
-): ProjectCreativeProposal['selectedOutfit'] => {
+): ProjectTransformContract['selectedOutfit'] => {
   const outfitId =
     step?.modelId === 'lucy-vton-latest' && step.savedRecipeId
       ? step.savedRecipeId
@@ -160,7 +164,7 @@ const outfitSelection = (
 
 const voiceProposal = (
   selection: ExistingVideoVoiceSelection | null,
-): ProjectCreativeProposal['selectedVoice'] => {
+): ProjectTransformContract['selectedVoice'] => {
   if (selection === null) return null;
   return selection.kind === 'local'
     ? {
@@ -199,7 +203,7 @@ const voiceProposal = (
  */
 const visualSettings = (
   step: ExistingVideoStep | null,
-  settled: ProjectSnapshot['visualTreatment'],
+  settled: ProjectTransformContract['visualTreatment'],
   kind: 'character-swap' | 'virtual-try-on',
 ) => {
   const carried = settled.kind === kind ? settled : null;
@@ -221,8 +225,8 @@ const visualSettings = (
  * still re-derives rather than inheriting a decision made about something else.
  */
 const carriedInputKind = (
-  settled: ProjectSnapshot,
-  selectedOutfit: ProjectCreativeProposal['selectedOutfit'],
+  settled: ProjectTransformContract,
+  selectedOutfit: ProjectTransformContract['selectedOutfit'],
 ): 'prompt' | 'saved-outfit' | 'reference-image' | null =>
   settled.visualTreatment.kind === 'virtual-try-on' &&
   (settled.selectedOutfit?.outfitId ?? null) === (selectedOutfit?.outfitId ?? null)
@@ -232,10 +236,10 @@ const carriedInputKind = (
 const visualProposal = (
   draft: SessionDraft,
   step: ExistingVideoStep | null,
-  selectedCharacter: ProjectCreativeProposal['selectedCharacter'],
-  selectedOutfit: ProjectCreativeProposal['selectedOutfit'],
-  settled: ProjectSnapshot,
-): ProjectCreativeProposal['visualTreatment'] => {
+  selectedCharacter: ProjectTransformContract['selectedCharacter'],
+  selectedOutfit: ProjectTransformContract['selectedOutfit'],
+  settled: ProjectTransformContract,
+): ProjectTransformContract['visualTreatment'] => {
   const mode = step?.modelId ?? draft.mode;
   if (mode === 'lucy-latest') {
     return selectedCharacter === null
@@ -272,7 +276,7 @@ const creativeIntent = (
   activeRecipe: ActiveStudioRecipe,
   store: CreativeAssetStore,
   step: ExistingVideoStep | null,
-): ProjectCreativeProposal['creativeIntent'] => {
+): ProjectTransformContract['creativeIntent'] => {
   /*
    * An override, never the reference itself. Every reader — the workspace's hydration below, the
    * Studio session edge, and the API that picks the image a submission actually sends — resolves
@@ -406,7 +410,7 @@ export const createProjectCreativeProposal = ({
     visualStep,
     selectedCharacter,
     selectedOutfit,
-    settled ?? current.revision.snapshot,
+    projectTransformOf(settled ?? current.revision.snapshot),
   );
   const hasCreativeState = draft.mode !== 'local' || visualStep !== null || voiceSelection !== null;
   return {
@@ -419,11 +423,15 @@ export const createProjectCreativeProposal = ({
       captureFormat: capturePreferences.aspectRatio === '16:9' ? 'landscape' : 'portrait',
       audioSource: draft.mode === 'local' ? 'local-microphone' : 'model-output',
     },
-    selectedCharacter,
-    selectedOutfit,
-    selectedVoice: voiceProposal(voiceSelection),
-    visualTreatment,
-    creativeIntent: creativeIntent(draft, activeRecipe, store, visualStep),
+    // Canonical on the way out: a Studio with nothing chosen proposes no transform at all, which
+    // is what the Project stores, so a settled session and its own proposal compare equal.
+    transform: normalizeProjectTransform({
+      selectedCharacter,
+      selectedOutfit,
+      selectedVoice: voiceProposal(voiceSelection),
+      visualTreatment,
+      creativeIntent: creativeIntent(draft, activeRecipe, store, visualStep),
+    }),
   };
 };
 
@@ -432,7 +440,8 @@ export const resolveProjectCreativeResourceIssues = (
   store: CreativeAssetStore,
 ): readonly ProjectCreativeResourceIssue[] => {
   const issues: ProjectCreativeResourceIssue[] = [];
-  const selectedCharacter = snapshot.selectedCharacter;
+  const transform = projectTransformOf(snapshot);
+  const selectedCharacter = transform.selectedCharacter;
   if (selectedCharacter !== null) {
     const character = store.savedCharacterPrompts.find(
       (candidate) => candidate.id === selectedCharacter.characterId,
@@ -478,7 +487,7 @@ export const resolveProjectCreativeResourceIssues = (
     }
   }
 
-  const selectedOutfit = snapshot.selectedOutfit;
+  const selectedOutfit = transform.selectedOutfit;
   if (selectedOutfit !== null) {
     const outfit = store.savedPrompts.find(
       (candidate) =>
@@ -502,10 +511,10 @@ export const resolveProjectCreativeResourceIssues = (
     }
   }
 
-  const promptId = snapshot.creativeIntent.promptId;
+  const promptId = transform.creativeIntent.promptId;
   if (promptId !== null && promptId !== selectedOutfit?.outfitId) {
     const prompt = store.savedPrompts.find((candidate) => candidate.id === promptId);
-    const label = snapshot.creativeIntent.promptLabel ?? 'Previously selected Prompt';
+    const label = transform.creativeIntent.promptLabel ?? 'Previously selected Prompt';
     if (!prompt) {
       issues.push({
         kind: 'prompt',
@@ -513,7 +522,7 @@ export const resolveProjectCreativeResourceIssues = (
         reason: 'missing',
         message: `${label} is no longer available in this workspace. Its exact prompt is still saved in the Project.`,
       });
-    } else if (!revisionMatches(snapshot.creativeIntent.resourceRevision, prompt.updatedAt)) {
+    } else if (!revisionMatches(transform.creativeIntent.resourceRevision, prompt.updatedAt)) {
       issues.push({
         kind: 'prompt',
         historicalLabel: label,
@@ -532,7 +541,8 @@ export const projectCreativeHydrationSelection = (
   store: CreativeAssetStore,
 ): RecipeSelection | null => {
   if (resolveProjectCreativeResourceIssues(snapshot, store).length > 0) return null;
-  const selectedCharacter = snapshot.selectedCharacter;
+  const transform = projectTransformOf(snapshot);
+  const selectedCharacter = transform.selectedCharacter;
   if (selectedCharacter !== null) {
     const character = store.savedCharacterPrompts.find(
       (candidate) => candidate.id === selectedCharacter.characterId,
@@ -546,10 +556,10 @@ export const projectCreativeHydrationSelection = (
     if (!character || !resolved) return null;
     return {
       origin: 'character-prompt',
-      prompt: snapshot.creativeIntent.appliedPrompt ?? resolved.prompt,
+      prompt: transform.creativeIntent.appliedPrompt ?? resolved.prompt,
       modelModeId: 'lucy-latest',
       referenceImageAssetId:
-        snapshot.creativeIntent.referenceAssetId ?? selectedCharacter.referenceAssetId,
+        transform.creativeIntent.referenceAssetId ?? selectedCharacter.referenceAssetId,
       assetId: character.id,
       ...(selectedCharacter.variantId
         ? { savedCharacterVariantId: selectedCharacter.variantId }
@@ -562,20 +572,20 @@ export const projectCreativeHydrationSelection = (
       ...(character.builderDraft ? { builderDraft: character.builderDraft } : {}),
     };
   }
-  const selectedOutfit = snapshot.selectedOutfit;
+  const selectedOutfit = transform.selectedOutfit;
   if (selectedOutfit !== null) {
     const outfit = store.savedPrompts.find((candidate) => candidate.id === selectedOutfit.outfitId);
     if (!outfit) return null;
     return {
       origin: 'saved-prompt',
-      prompt: snapshot.creativeIntent.appliedPrompt ?? outfit.prompt,
+      prompt: transform.creativeIntent.appliedPrompt ?? outfit.prompt,
       modelModeId: 'lucy-vton-latest',
       referenceImageAssetId:
-        snapshot.creativeIntent.referenceAssetId ?? selectedOutfit.referenceAssetId,
+        transform.creativeIntent.referenceAssetId ?? selectedOutfit.referenceAssetId,
       vtonInputKind: selectedOutfit.inputKind ?? outfit.vtonInputKind,
       enhancePrompt:
-        snapshot.visualTreatment.kind === 'virtual-try-on'
-          ? (snapshot.visualTreatment.enhancePrompt ?? outfit.enhancePrompt)
+        transform.visualTreatment.kind === 'virtual-try-on'
+          ? (transform.visualTreatment.enhancePrompt ?? outfit.enhancePrompt)
           : outfit.enhancePrompt,
       assetId: outfit.id,
     };

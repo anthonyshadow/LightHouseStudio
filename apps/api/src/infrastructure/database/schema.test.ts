@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { getTableConfig, type AnyPgTable } from 'drizzle-orm/pg-core';
+import { getTableConfig, PgDialect, type AnyPgTable } from 'drizzle-orm/pg-core';
+import { READABLE_PROJECT_SNAPSHOT_SCHEMA_VERSIONS } from '@studio/contracts';
 import {
   assetStatus,
   assetStorageProvider,
@@ -98,6 +99,22 @@ describe('Drizzle persistence schema', () => {
       'project_revisions_project_number_unique',
     );
     expect(getTableConfig(projectRevisions).uniqueConstraints).toHaveLength(1);
+    // The column and the contract's read maps state the same set of readable snapshot versions,
+    // and only one of them is enforced by the database. Rendering the constraint and building the
+    // expectation from the constant holds them together: adding a version to the contract without
+    // widening the check — or widening the check past what can actually be read — fails here
+    // rather than at the first insert of a row the other half does not admit.
+    const snapshotVersionCheck = getTableConfig(projectRevisions).checks.find(
+      ({ name }) => name === 'project_revisions_snapshot_version_supported',
+    );
+    expect(snapshotVersionCheck).toBeDefined();
+    const renderedSnapshotVersionCheck = new PgDialect().sqlToQuery(
+      snapshotVersionCheck!.value,
+    ).sql;
+    expect(renderedSnapshotVersionCheck).toContain('"snapshot_schema_version"');
+    expect(renderedSnapshotVersionCheck.replaceAll(/\s/gu, '')).toContain(
+      `in(${READABLE_PROJECT_SNAPSHOT_SCHEMA_VERSIONS.join(',')})`,
+    );
     expect(
       [videoVersions, projectAssets, projectVersionReferences, projectJobs, projectOutputs].flatMap(
         (table) => getTableConfig(table).indexes.map(({ config }) => config.name),
@@ -187,8 +204,9 @@ describe('Drizzle persistence schema', () => {
       'job-output',
       'audio',
       'thumbnail',
+      'clip',
     ]);
-    expect(projectVersionReferenceRole.enumValues).toEqual(['working', 'presented']);
+    expect(projectVersionReferenceRole.enumValues).toEqual(['working', 'presented', 'clip']);
     expect(projectRevisionAuthorKind.enumValues).toEqual(['user', 'system', 'migration']);
     expect(projectRevisionSource.enumValues).toEqual([
       'create',

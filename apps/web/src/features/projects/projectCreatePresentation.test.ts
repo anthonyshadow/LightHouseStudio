@@ -1,4 +1,5 @@
 import type { ProjectCurrentResponse, ProjectProcessingAttempt } from '@studio/contracts';
+import { EMPTY_PROJECT_TRANSFORM } from '@studio/domain';
 import { describe, expect, it } from 'vitest';
 import {
   effectiveCreativeSnapshot,
@@ -13,25 +14,13 @@ type Snapshot = ProjectCurrentResponse['revision']['snapshot'];
 const now = '2026-08-14T12:00:00.000Z';
 
 const snapshot = (overrides: Partial<Snapshot> = {}): Snapshot => ({
-  schemaVersion: 2,
+  schemaVersion: 3,
   sourceAssetId: '79b94c02-d268-4201-a05b-1f3baa0caed1',
   workingMedia: null,
   presentedMedia: null,
-  selectedCharacter: null,
-  selectedOutfit: null,
-  selectedVoice: null,
-  visualTreatment: { kind: 'none' },
+  composition: null,
+  transform: null,
   liveMode: null,
-  creativeIntent: {
-    promptId: null,
-    promptLabel: null,
-    recipeId: null,
-    recipeLabel: null,
-    userIntent: '',
-    appliedPrompt: null,
-    referenceAssetId: null,
-    resourceRevision: null,
-  },
   localEdit: null,
   exportSpecification: null,
   lastSuccessfulOutput: null,
@@ -97,25 +86,25 @@ describe('effectiveCreativeSnapshot', () => {
     const merged = effectiveCreativeSnapshot(snapshot(), {
       workflowPhase: 'creative',
       liveMode: null,
-      selectedCharacter: {
-        characterId: 'a',
-        characterLabel: 'Ada',
-        characterRevision: now,
-        variantId: null,
-        variantLabel: null,
-        variantRevision: null,
-        referenceAssetId: null,
+      transform: {
+        ...EMPTY_PROJECT_TRANSFORM,
+        selectedCharacter: {
+          characterId: 'a',
+          characterLabel: 'Ada',
+          characterRevision: now,
+          variantId: null,
+          variantLabel: null,
+          variantRevision: null,
+          referenceAssetId: null,
+        },
+        visualTreatment: { kind: 'character-swap', providerId: null, outputResolution: null },
       },
-      selectedOutfit: null,
-      selectedVoice: null,
-      visualTreatment: { kind: 'character-swap', providerId: null, outputResolution: null },
-      creativeIntent: snapshot().creativeIntent,
       localEdit: null,
       exportSpecification: null,
     });
 
-    expect(merged.selectedCharacter?.characterLabel).toBe('Ada');
-    expect(merged.visualTreatment.kind).toBe('character-swap');
+    expect(merged.transform?.selectedCharacter?.characterLabel).toBe('Ada');
+    expect(merged.transform?.visualTreatment.kind).toBe('character-swap');
     // Everything the proposal does not carry is left exactly as the Project has it.
     expect(merged.sourceAssetId).toBe(snapshot().sourceAssetId);
   });
@@ -141,21 +130,24 @@ describe('projectCreateLaunchers', () => {
     const chosen = projectCreateLaunchers(
       launcherInput({
         snapshot: snapshot({
-          selectedCharacter: {
-            characterId: 'a',
-            characterLabel: 'Ada',
-            characterRevision: now,
-            variantId: 'v',
-            variantLabel: 'Evening',
-            variantRevision: now,
-            referenceAssetId: null,
-          },
-          selectedOutfit: {
-            outfitId: 'o',
-            outfitLabel: 'Red jacket',
-            outfitRevision: now,
-            referenceAssetId: null,
-            inputKind: 'saved-outfit',
+          transform: {
+            ...EMPTY_PROJECT_TRANSFORM,
+            selectedCharacter: {
+              characterId: 'a',
+              characterLabel: 'Ada',
+              characterRevision: now,
+              variantId: 'v',
+              variantLabel: 'Evening',
+              variantRevision: now,
+              referenceAssetId: null,
+            },
+            selectedOutfit: {
+              outfitId: 'o',
+              outfitLabel: 'Red jacket',
+              outfitRevision: now,
+              referenceAssetId: null,
+              inputKind: 'saved-outfit',
+            },
           },
         }),
       }),

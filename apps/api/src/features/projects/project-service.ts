@@ -46,14 +46,12 @@ const sessionProposalMatches = (
   current: ProjectCurrentRead,
   proposal: AppendProjectRevisionRequest['proposal'],
 ): boolean =>
+  // The proposal schema's shape, in its key order: both sides are canonical, so the stored
+  // transform (null when empty) and the proposed one compare as the same text.
   JSON.stringify({
     workflowPhase: current.revision.snapshot.workflowPhase,
     liveMode: current.revision.snapshot.liveMode,
-    selectedCharacter: current.revision.snapshot.selectedCharacter,
-    selectedOutfit: current.revision.snapshot.selectedOutfit,
-    selectedVoice: current.revision.snapshot.selectedVoice,
-    visualTreatment: current.revision.snapshot.visualTreatment,
-    creativeIntent: current.revision.snapshot.creativeIntent,
+    transform: current.revision.snapshot.transform,
     localEdit: current.revision.snapshot.localEdit,
     exportSpecification: current.revision.snapshot.exportSpecification,
   }) === JSON.stringify(proposal);

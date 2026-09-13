@@ -45,7 +45,8 @@ recorded there.
   validated local edit, and both CAS tokens. Server authority preserves immutable source/current
   media references and supplies timestamps. Exact semantic replay converges without another
   revision, while a different stale write conflicts. No Project IndexedDB store is activated.
-- Project working-media adoption uses additive migration `0018`, which admits snapshot v2 and adds
+- Project working-media adoption uses additive migration `0018`, which admitted snapshot v2 (v3 is
+  admitted by `0027`, below) and adds
   one owner-scoped operation receipt/adoption row tied to the exact Project revision and retained
   media asset or Saved Video Version. Local renders are durably stored, checksummed, inspected, and
   attached in the revision transaction. Exact retained media is reused without copying bytes.
@@ -123,6 +124,23 @@ recorded there.
   revision written before it reads back unchanged and no migration ships. A write that omits either
   defaulted field is refused rather than defaulted, because a client that predates a field must not
   overwrite what it never knew about.
+- Snapshot v3 (slice 3.1, 2026-09-12) is the write format: the five AI fields regroup under one
+  nullable `transform` (an all-empty transform is stored as `null`), `composition` is added (`null`
+  until the composition write path lands), and everything else is unchanged. Stored v2 rows are
+  read through an explicit v2→v3 map and v1 rows through v1→v2→v3, both provenance-preserving and
+  pinned by property tests; the rows themselves are not rewritten. Additive migration `0027`
+  widens the `project_revisions` check from `in (1, 2)` to `in (1, 2, 3)` (a DROP + ADD of the same
+  constraint, validating existing rows under a lock the widening cannot fail) and adds `clip` to
+  the `project_asset_role` and `project_version_reference_role` enums, so a composition's media is
+  held by revision-scoped links like the working pointers. No backfill, no data statement, no
+  down-migration. **Rollback boundary differs by mode:** Postgres keeps a v2 row as v2 until its
+  Project is next written, so a rollback there loses only the Projects that were touched. File mode
+  serialises the owner's whole library on every write, so the first write of any one Project
+  rewrites every Project and every revision in that owner's file as v3 — the library format stays
+  7, author and source are untouched and no `migration` revision is fabricated, but there is no
+  per-Project boundary: after one write, that owner's file needs the v3 read map. The deploy order is API first, then reload the browser: an old bundle refuses a v3
+  response on the GET, and a new bundle's checkpoint is refused by an old API. A checkpoint sent by
+  a bundle that predates v3 is answered with a 400 that says to reload.
 - AI usage ledger (slice 2.5, 2026-09-06) added the `ai_usage_ledger` table and its
   `ai_usage_outcome` enum (migration `0025`, additive, no backfill): one row per paid video
   submission, keyed by owner and app job id, holding the operation kind, the provider name, the

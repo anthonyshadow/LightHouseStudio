@@ -3,9 +3,9 @@ import {
   projectMediaReferenceSchema,
   projectOutputReferenceSchema,
   projectSnapshotSchema,
+  READABLE_PROJECT_SNAPSHOT_SCHEMA_VERSIONS,
 } from '@studio/contracts';
 import {
-  PROJECT_SNAPSHOT_SCHEMA_VERSION,
   type Project,
   type ProjectOutputReference,
   type ProjectAggregate,
@@ -55,8 +55,13 @@ const toRevisionAuthor = (row: ProjectRevisionRow): ProjectRevisionAuthor => {
   }
 };
 
+/** The versions the check constraint admits, stated once by the contract beside its read maps. */
+const readableSnapshotVersions: ReadonlySet<number> = new Set(
+  READABLE_PROJECT_SNAPSHOT_SCHEMA_VERSIONS,
+);
+
 export const parseSnapshot = (schemaVersion: number, snapshot: unknown): ProjectSnapshot => {
-  if (schemaVersion !== 1 && schemaVersion !== PROJECT_SNAPSHOT_SCHEMA_VERSION) {
+  if (!readableSnapshotVersions.has(schemaVersion)) {
     throw new ProjectPersistenceError(
       'invalid-aggregate',
       'The stored Project snapshot version is unsupported.',
@@ -338,22 +343,25 @@ export const projectValues = (
   updatedAt: toIsoTimestamp(project.updatedAt),
 });
 
-export const revisionValues = (
-  revision: ProjectRevision,
-): typeof projectRevisions.$inferInsert => ({
-  id: revision.id,
-  projectId: revision.projectId,
-  ownerUserId: revision.ownerUserId,
-  revisionNumber: revision.revisionNumber,
-  parentRevisionId: revision.parentRevisionId,
-  parentRevisionNumber: revision.parentRevisionNumber,
-  snapshotSchemaVersion: revision.snapshot.schemaVersion,
-  snapshot: projectSnapshotSchema.parse(revision.snapshot),
-  authorKind: revision.author.kind,
-  authorId: revision.author.authorId,
-  source: revision.source,
-  createdAt: toIsoTimestamp(revision.createdAt),
-});
+export const revisionValues = (revision: ProjectRevision): typeof projectRevisions.$inferInsert => {
+  // The column is derived from the parsed value, so the version the row claims and the JSON it
+  // holds cannot disagree.
+  const snapshot = projectSnapshotSchema.parse(revision.snapshot);
+  return {
+    id: revision.id,
+    projectId: revision.projectId,
+    ownerUserId: revision.ownerUserId,
+    revisionNumber: revision.revisionNumber,
+    parentRevisionId: revision.parentRevisionId,
+    parentRevisionNumber: revision.parentRevisionNumber,
+    snapshotSchemaVersion: snapshot.schemaVersion,
+    snapshot,
+    authorKind: revision.author.kind,
+    authorId: revision.author.authorId,
+    source: revision.source,
+    createdAt: toIsoTimestamp(revision.createdAt),
+  };
+};
 
 export const assetLinkValues = (link: ProjectAssetLink): typeof projectAssets.$inferInsert => ({
   projectId: link.projectId,

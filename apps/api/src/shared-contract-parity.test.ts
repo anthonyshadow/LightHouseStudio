@@ -4,6 +4,12 @@ import { SAVED_VIDEO_VERSION_LIMIT } from './features/saved-videos/saved-video-r
 import {
   CAMPAIGN_STATUSES as CONTRACT_CAMPAIGN_STATUSES,
   CHARACTER_REFERENCE_FRAMINGS,
+  COMPOSITION_CLIP_LIMIT as CONTRACT_COMPOSITION_CLIP_LIMIT,
+  LEGACY_PROJECT_SNAPSHOT_SCHEMA_VERSION as CONTRACT_LEGACY_PROJECT_SNAPSHOT_SCHEMA_VERSION,
+  PREVIOUS_PROJECT_SNAPSHOT_SCHEMA_VERSION as CONTRACT_PREVIOUS_PROJECT_SNAPSHOT_SCHEMA_VERSION,
+  PROJECT_SNAPSHOT_SCHEMA_VERSION as CONTRACT_PROJECT_SNAPSHOT_SCHEMA_VERSION,
+  projectTransformSchema,
+  VIDEO_EDIT_MINIMUM_TRIM_MS as CONTRACT_VIDEO_EDIT_MINIMUM_TRIM_MS,
   LOCAL_VOICE_EFFECT_IDS as CONTRACT_LOCAL_VOICE_EFFECT_IDS,
   PROJECT_ASSET_KINDS as CONTRACT_PROJECT_ASSET_KINDS,
   PROJECT_ASSET_ROLES as CONTRACT_PROJECT_ASSET_ROLES,
@@ -39,6 +45,13 @@ import {
   AI_USAGE_OUTCOMES,
   CAMPAIGN_STATUSES,
   CHARACTER_REFERENCE_PROMPT_FRAMINGS,
+  COMPOSITION_CLIP_LIMIT,
+  EMPTY_PROJECT_TRANSFORM,
+  LEGACY_PROJECT_SNAPSHOT_SCHEMA_VERSION,
+  PREVIOUS_PROJECT_SNAPSHOT_SCHEMA_VERSION,
+  PROJECT_SNAPSHOT_SCHEMA_VERSION,
+  projectTransformIsEmpty,
+  VIDEO_EDIT_MINIMUM_TRIM_MS,
   IMAGE_MIME_TYPES,
   LOCAL_VOICE_EFFECT_IDS,
   MAX_IMAGE_BYTES,
@@ -171,6 +184,49 @@ describe('independent domain and wire value sets', () => {
    * because it records what came back from the provider rather than where an operation sits in its
    * lifecycle — the stored status enum keeps in-flight members the ledger has no use for.
    */
+});
+
+describe('snapshot v3 parity', () => {
+  it('keeps the snapshot versions, the clip limit and the trim minimum in parity', () => {
+    expect(CONTRACT_PROJECT_SNAPSHOT_SCHEMA_VERSION).toBe(PROJECT_SNAPSHOT_SCHEMA_VERSION);
+    expect(CONTRACT_PREVIOUS_PROJECT_SNAPSHOT_SCHEMA_VERSION).toBe(
+      PREVIOUS_PROJECT_SNAPSHOT_SCHEMA_VERSION,
+    );
+    expect(CONTRACT_LEGACY_PROJECT_SNAPSHOT_SCHEMA_VERSION).toBe(
+      LEGACY_PROJECT_SNAPSHOT_SCHEMA_VERSION,
+    );
+    expect(CONTRACT_COMPOSITION_CLIP_LIMIT).toBe(COMPOSITION_CLIP_LIMIT);
+    expect(CONTRACT_VIDEO_EDIT_MINIMUM_TRIM_MS).toBe(VIDEO_EDIT_MINIMUM_TRIM_MS);
+  });
+
+  /*
+   * Six JSON.stringify equalities compare a stored transform with a proposed one, so the domain's
+   * literal and the contract's parsed value must agree on key order and on what "empty" means.
+   */
+  it('keeps the transform key order and emptiness rule in parity', () => {
+    const configured = {
+      ...EMPTY_PROJECT_TRANSFORM,
+      selectedVoice: {
+        kind: 'local-effect' as const,
+        effectId: 'warm-studio' as const,
+        effectRevision: 'builtin-v1' as const,
+      },
+    };
+    expect(Object.keys(projectTransformSchema.parse(configured)!)).toEqual(
+      Object.keys(EMPTY_PROJECT_TRANSFORM),
+    );
+    expect(JSON.stringify(projectTransformSchema.parse(configured))).toBe(
+      JSON.stringify(configured),
+    );
+    expect(projectTransformIsEmpty(EMPTY_PROJECT_TRANSFORM)).toBe(true);
+    expect(projectTransformSchema.parse(EMPTY_PROJECT_TRANSFORM)).toBeNull();
+    const intentOnly = {
+      ...EMPTY_PROJECT_TRANSFORM,
+      creativeIntent: { ...EMPTY_PROJECT_TRANSFORM.creativeIntent, userIntent: ' ' },
+    };
+    expect(projectTransformIsEmpty(intentOnly)).toBe(false);
+    expect(projectTransformSchema.parse(intentOnly)).not.toBeNull();
+  });
 });
 
 it('mirrors the audio level ceiling between the contract and the domain', () => {

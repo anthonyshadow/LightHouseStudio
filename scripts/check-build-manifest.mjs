@@ -118,7 +118,13 @@ export const BUILD_CLOSURE_BUDGETS = {
   // source picker now routes through the converting intake instead of uploading raw, and each extra
   // placement says when its crop would cut a caption region the cut uses. Both are the acceptance
   // criteria failing in the product rather than in a test, so this is the fix costing bytes.
-  'src/studio/StudioApp.tsx': 1_092_000,
+  // Raised from 1_092_000 on 2026-09-12 for slice 3.1 (snapshot v3), measured 1_091_682 →
+  // 1_092_103: 421 bytes, all of it the domain's transform helpers, which every Project surface now
+  // reads its creative setup through instead of five fields it read directly. The composition rules
+  // are in the same barrel and cost nothing here — nothing on a Studio route calls them yet — and
+  // the arrangement's own editor is Phase 4, behind the lazy editor chunk this closure already
+  // excludes.
+  'src/studio/StudioApp.tsx': 1_093_000,
 };
 
 /**

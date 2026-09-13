@@ -1,4 +1,5 @@
 import type { ProjectCurrentResponse, ProjectSessionProposalContract } from '@studio/contracts';
+import { EMPTY_PROJECT_TRANSFORM } from '@studio/domain';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProjectApiConflictError } from './projectsApi';
 import { ProjectSessionController } from './projectSessionController';
@@ -32,25 +33,13 @@ const currentProject = (
     parentRevisionId: null,
     parentRevisionNumber: null,
     snapshot: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       sourceAssetId: null,
       workingMedia: null,
       presentedMedia: null,
-      selectedCharacter: null,
-      selectedOutfit: null,
-      selectedVoice: null,
-      visualTreatment: { kind: 'none' },
+      composition: null,
+      transform: null,
       liveMode: null,
-      creativeIntent: {
-        promptId: null,
-        promptLabel: null,
-        recipeId: null,
-        recipeLabel: null,
-        userIntent: '',
-        appliedPrompt: null,
-        referenceAssetId: null,
-        resourceRevision: null,
-      },
       localEdit: null,
       exportSpecification: null,
       lastSuccessfulOutput: null,
@@ -130,20 +119,7 @@ describe('ProjectSessionController', () => {
         captureFormat: 'portrait',
         audioSource: 'local-microphone',
       },
-      selectedCharacter: null,
-      selectedOutfit: null,
-      selectedVoice: null,
-      visualTreatment: { kind: 'none' },
-      creativeIntent: {
-        promptId: null,
-        promptLabel: null,
-        recipeId: null,
-        recipeLabel: null,
-        userIntent: '',
-        appliedPrompt: null,
-        referenceAssetId: null,
-        resourceRevision: null,
-      },
+      transform: null,
       localEdit: null,
       exportSpecification: null,
     });
@@ -209,10 +185,13 @@ describe('ProjectSessionController', () => {
 
     // One change the operator did ask for makes the whole proposal schedulable again.
     controller.propose({
-      selectedVoice: {
-        kind: 'local-effect',
-        effectId: 'warm-studio',
-        effectRevision: 'builtin-v1',
+      transform: {
+        ...EMPTY_PROJECT_TRANSFORM,
+        selectedVoice: {
+          kind: 'local-effect',
+          effectId: 'warm-studio',
+          effectRevision: 'builtin-v1',
+        },
       },
     });
     await vi.advanceTimersByTimeAsync(50);

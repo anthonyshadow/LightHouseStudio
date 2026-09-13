@@ -1,4 +1,5 @@
 import { videoCharacterSwapProviderIdSchema } from '@studio/contracts';
+import { projectTransformOf } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   fetchReferenceImageMetadata,
@@ -35,27 +36,16 @@ type ProjectCreativeCheckpointState = Readonly<{
 }>;
 
 /**
- * The creative fields an operator actually picks.
+ * The creative choices an operator actually picks: the transform, read raw.
  *
  * Deliberately not the whole proposal: `liveMode` and `workflowPhase` are context that
  * `createProjectCreativeProposal` always restates — a fresh Project has no `liveMode` at all — so
  * comparing on them would make merely opening a Project look like a change. They still ride along
- * with a real one.
+ * with a real one. Raw, never the empty view: both sides are canonical (`null` when nothing is
+ * configured), and this is a comparison.
  */
-const creativeChoices = (value: {
-  readonly selectedCharacter: unknown;
-  readonly selectedOutfit: unknown;
-  readonly selectedVoice: unknown;
-  readonly visualTreatment: unknown;
-  readonly creativeIntent: unknown;
-}): string =>
-  JSON.stringify([
-    value.selectedCharacter,
-    value.selectedOutfit,
-    value.selectedVoice,
-    value.visualTreatment,
-    value.creativeIntent,
-  ]);
+const creativeChoices = (value: { readonly transform: unknown }): string =>
+  JSON.stringify(value.transform);
 
 /** What the Studio was holding when the revision a saved output produced landed. */
 type EndedCreativeRound = Readonly<{
@@ -85,11 +75,7 @@ const creativeHydrationKey = (projectId: string, snapshot: ProjectSessionPort['c
     ? null
     : JSON.stringify({
         projectId,
-        selectedCharacter: snapshot.revision.snapshot.selectedCharacter,
-        selectedOutfit: snapshot.revision.snapshot.selectedOutfit,
-        selectedVoice: snapshot.revision.snapshot.selectedVoice,
-        visualTreatment: snapshot.revision.snapshot.visualTreatment,
-        creativeIntent: snapshot.revision.snapshot.creativeIntent,
+        transform: snapshot.revision.snapshot.transform,
         liveMode: snapshot.revision.snapshot.liveMode,
       });
 
@@ -142,8 +128,8 @@ export const useProjectCreativeSessionAdapter = ({
     () => (snapshot === null ? null : effectiveCreativeSnapshot(snapshot, pendingProposal)),
     [pendingProposal, snapshot],
   );
-  const savedVoice =
-    snapshot?.selectedVoice?.kind === 'saved-voice' ? snapshot.selectedVoice : null;
+  const settledVoice = snapshot === null ? null : projectTransformOf(snapshot).selectedVoice;
+  const savedVoice = settledVoice?.kind === 'saved-voice' ? settledVoice : null;
   const savedVoiceId = savedVoice?.voiceId ?? null;
   const savedVoiceKey =
     projectId !== null && current !== null && savedVoice !== null
@@ -241,8 +227,9 @@ export const useProjectCreativeSessionAdapter = ({
           return;
         }
 
+        const transform = projectTransformOf(snapshot);
         const appliedPrompt =
-          snapshot.creativeIntent.appliedPrompt ?? snapshot.creativeIntent.userIntent;
+          transform.creativeIntent.appliedPrompt ?? transform.creativeIntent.userIntent;
         const mode = hydration.mode;
         if (mode === 'local') {
           studioSession.selectMode('local');
@@ -252,9 +239,9 @@ export const useProjectCreativeSessionAdapter = ({
 
         try {
           const referenceAssetId =
-            snapshot.creativeIntent.referenceAssetId ??
-            snapshot.selectedCharacter?.referenceAssetId ??
-            snapshot.selectedOutfit?.referenceAssetId ??
+            transform.creativeIntent.referenceAssetId ??
+            transform.selectedCharacter?.referenceAssetId ??
+            transform.selectedOutfit?.referenceAssetId ??
             null;
           const referenceImage = referenceAssetId
             ? await (async () => {
@@ -271,8 +258,8 @@ export const useProjectCreativeSessionAdapter = ({
             prompt: appliedPrompt,
             referenceImage,
             enhance:
-              snapshot.visualTreatment.kind === 'virtual-try-on'
-                ? (snapshot.visualTreatment.enhancePrompt ?? false)
+              transform.visualTreatment.kind === 'virtual-try-on'
+                ? (transform.visualTreatment.enhancePrompt ?? false)
                 : false,
           });
           if (resourceIssues.length > 0) {
@@ -287,8 +274,8 @@ export const useProjectCreativeSessionAdapter = ({
             prompt: appliedPrompt,
             referenceImage: null,
             enhance:
-              snapshot.visualTreatment.kind === 'virtual-try-on'
-                ? (snapshot.visualTreatment.enhancePrompt ?? false)
+              transform.visualTreatment.kind === 'virtual-try-on'
+                ? (transform.visualTreatment.enhancePrompt ?? false)
                 : false,
           });
           setMessage(
@@ -366,8 +353,10 @@ export const useProjectCreativeSessionAdapter = ({
 
   useEffect(() => {
     if (projectId === null || effectiveSnapshot === null) return;
+    const effectiveTransform = projectTransformOf(effectiveSnapshot);
     const needsExistingVideoControls =
-      effectiveSnapshot.visualTreatment.kind !== 'none' || effectiveSnapshot.selectedVoice !== null;
+      effectiveTransform.visualTreatment.kind !== 'none' ||
+      effectiveTransform.selectedVoice !== null;
     if (
       !needsExistingVideoControls ||
       existingVideo.selection !== null ||
@@ -384,13 +373,19 @@ export const useProjectCreativeSessionAdapter = ({
 
   useEffect(() => {
     if (projectId === null || effectiveSnapshot === null) return;
+    const effectiveTransform = projectTransformOf(effectiveSnapshot);
+    // The four fields this effect actually writes into the step, never the whole transform: the
+    // intent text changes on every keystroke the ambient capture stages, and re-running on those
+    // would rewrite the step's prompt from the snapshot while the operator is typing into it.
+    const { selectedCharacter, selectedOutfit, selectedVoice, visualTreatment } =
+      effectiveTransform;
     const configKey = JSON.stringify({
       projectId,
       revisionId: current?.revision.id,
-      visualTreatment: effectiveSnapshot.visualTreatment,
-      selectedCharacter: effectiveSnapshot.selectedCharacter,
-      selectedOutfit: effectiveSnapshot.selectedOutfit,
-      selectedVoice: effectiveSnapshot.selectedVoice,
+      selectedCharacter,
+      selectedOutfit,
+      selectedVoice,
+      visualTreatment,
       savedVoiceRelationship:
         savedVoiceKey !== null && savedVoiceRelationship.key === savedVoiceKey
           ? savedVoiceRelationship.status
@@ -404,7 +399,7 @@ export const useProjectCreativeSessionAdapter = ({
     });
     if (existingVideoConfigurationKeyRef.current === configKey) return;
 
-    const voice = effectiveSnapshot.selectedVoice;
+    const voice = effectiveTransform.selectedVoice;
     if (voice?.kind === 'local-effect') {
       existingVideo.selectLocalVoice(voice.effectId, localVoiceName(voice.effectId));
     } else if (voice?.kind === 'saved-voice') {
@@ -420,7 +415,7 @@ export const useProjectCreativeSessionAdapter = ({
       existingVideo.clearVoice();
     }
 
-    const visual = effectiveSnapshot.visualTreatment;
+    const visual = effectiveTransform.visualTreatment;
     if (visual.kind === 'none' || existingVideo.selection === null) {
       existingVideoConfigurationKeyRef.current = configKey;
       return;
@@ -438,13 +433,13 @@ export const useProjectCreativeSessionAdapter = ({
       savedRecipeId:
         visual.kind === 'character-swap'
           ? // A variant is its own saved recipe; sending the parent id would silently drop it.
-            (effectiveSnapshot.selectedCharacter?.variantId ??
-            effectiveSnapshot.selectedCharacter?.characterId ??
+            (effectiveTransform.selectedCharacter?.variantId ??
+            effectiveTransform.selectedCharacter?.characterId ??
             null)
-          : (effectiveSnapshot.selectedOutfit?.outfitId ?? null),
+          : (effectiveTransform.selectedOutfit?.outfitId ?? null),
       prompt:
-        effectiveSnapshot.creativeIntent.appliedPrompt ??
-        effectiveSnapshot.creativeIntent.userIntent,
+        effectiveTransform.creativeIntent.appliedPrompt ??
+        effectiveTransform.creativeIntent.userIntent,
       enhancePrompt: visual.kind === 'virtual-try-on' ? (visual.enhancePrompt ?? false) : false,
       referenceImage: studioSession.draft.referenceImage?.file ?? null,
       inputKind:
@@ -454,8 +449,8 @@ export const useProjectCreativeSessionAdapter = ({
             (studioSession.draft.referenceImage ? 'reference-image' : 'prompt')),
       ...(parsedProvider.success ? { provider: parsedProvider.data } : {}),
       ...(visual.outputResolution ? { outputResolution: visual.outputResolution } : {}),
-      characterName: effectiveSnapshot.selectedCharacter?.characterLabel ?? null,
-      characterVariantName: effectiveSnapshot.selectedCharacter?.variantLabel ?? null,
+      characterName: effectiveTransform.selectedCharacter?.characterLabel ?? null,
+      characterVariantName: effectiveTransform.selectedCharacter?.variantLabel ?? null,
     });
     existingVideoConfigurationKeyRef.current = configKey;
   }, [

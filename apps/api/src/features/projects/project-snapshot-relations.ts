@@ -6,15 +6,21 @@ import type {
   ProjectSnapshot,
   ProjectVersionReferenceLink,
 } from '@studio/domain';
+import { projectTransformOf } from '@studio/domain';
 export { projectMediaReferencesEqual } from '@studio/domain';
 
-/** What a Project holds right now, with the pointers it has not set dropped. */
+/**
+ * What a Project holds right now, with the pointers it has not set dropped: the current cut, and
+ * every piece of media its composition arranges.
+ */
 export const projectHeldMedia = (
-  snapshot: Pick<ProjectSnapshot, 'workingMedia' | 'presentedMedia'>,
+  snapshot: Pick<ProjectSnapshot, 'workingMedia' | 'presentedMedia' | 'composition'>,
 ): readonly ProjectMediaReference[] =>
-  [snapshot.workingMedia, snapshot.presentedMedia].filter(
-    (reference): reference is ProjectMediaReference => reference !== null,
-  );
+  [
+    snapshot.workingMedia,
+    snapshot.presentedMedia,
+    ...(snapshot.composition?.clips.map((clip) => clip.media) ?? []),
+  ].filter((reference): reference is ProjectMediaReference => reference !== null);
 
 /**
  * The Saved Video Version that best represents a Project right now, or nothing.
@@ -46,10 +52,16 @@ export const projectAssetLinksForRevision = (
   if (revision.snapshot.presentedMedia?.kind === 'asset') {
     references.push({ assetId: revision.snapshot.presentedMedia.assetId, role: 'presented' });
   }
+  // A clip's media is held by the revision that arranges it, so retention keeps its bytes for
+  // as long as the arrangement is history — the same guarantee the working pointers carry.
+  for (const clip of revision.snapshot.composition?.clips ?? []) {
+    if (clip.media.kind === 'asset') references.push({ assetId: clip.media.assetId, role: 'clip' });
+  }
+  const transform = projectTransformOf(revision.snapshot);
   for (const assetId of [
-    revision.snapshot.selectedCharacter?.referenceAssetId,
-    revision.snapshot.selectedOutfit?.referenceAssetId,
-    revision.snapshot.creativeIntent.referenceAssetId,
+    transform.selectedCharacter?.referenceAssetId,
+    transform.selectedOutfit?.referenceAssetId,
+    transform.creativeIntent.referenceAssetId,
   ]) {
     if (assetId !== null && assetId !== undefined) references.push({ assetId, role: 'reference' });
   }
@@ -72,11 +84,17 @@ export const projectVersionReferenceLinksForRevision = (
   revision: ProjectRevision,
 ): readonly ProjectVersionReferenceLink[] => {
   const links: ProjectVersionReferenceLink[] = [];
+  const seen = new Set<string>();
   for (const [role, reference] of [
     ['working', revision.snapshot.workingMedia],
     ['presented', revision.snapshot.presentedMedia],
+    ...(revision.snapshot.composition?.clips.map((clip) => ['clip', clip.media] as const) ?? []),
   ] as const) {
     if (reference?.kind !== 'saved-video-version') continue;
+    // Two clips over the same Version are one used-by relation, which is also the row's key.
+    const key = `${role}:${reference.savedVideoId}:${reference.videoVersionId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
     links.push({
       projectId: revision.projectId,
       ownerUserId: revision.ownerUserId,

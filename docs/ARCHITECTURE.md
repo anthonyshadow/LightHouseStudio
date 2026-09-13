@@ -20,7 +20,7 @@ qualifications:
   version CAS, and non-cascading Project membership.
 - Project has domain rules, contracts, local and relational authority, authenticated lifecycle and
   source/working-media APIs, and browser lifecycle/source UI. A source is immutable while attached
-  and explicitly removable, which never deletes a revision, output Version, or retained bytes. Snapshot v2 is
+  and explicitly removable, which never deletes a revision, output Version, or retained bytes. Snapshot v3 (since slice 3.1) is
   video-oriented by design; durable source and current working-media resume plus explicit creative
   checkpoints are implemented. Project-bound Character Swap/VTO now use the backend admission,
   recovery, and durable result-retention authority through visible Start/status/retry UX. Project
@@ -645,8 +645,10 @@ references resolved only from the current owner's namespaced IndexedDB and grant
 access. Visible Videos are summary-resolved in one bounded query; Characters and Outfits use one
 owner-scoped browser snapshot and Voices use one existing saved-library query.
 
-Every Project starts with an immutable revision 1, including an empty named Project. Snapshot V2
-stores validated creative intent and durable IDs: source and working/presented media, exact applied
+Every Project starts with an immutable revision 1, including an empty named Project. Snapshot v3
+(v2 until 2026-09-12) stores validated creative intent and durable IDs — the AI selections under
+one nullable `transform`, a `composition` that is `null` until the composition write path lands —
+and: source and working/presented media, exact applied
 Character/Variant and Outfit labels/revisions/reference IDs, Voice settings, one Character Swap or
 VTO choice, relevant live metadata, prompt/recipe labels and applied prompt/revision, the validated
 `VideoEditSpec`, export specification, last output, and workflow phase. The explicit V1 read
@@ -673,14 +675,15 @@ the used-by relationship does not claim Project production and does not select a
 target. Authenticated metadata and byte-range/HEAD content routes expose only normalized metadata
 and a controlled relative content URL, never storage keys, paths, checksums, or provider bodies.
 
-Snapshot V2 remains deliberately video-specific: its local edit type and MP4 export specification
-are not a generic multi-format asset contract. Supporting images, graphics, or another content type
+Snapshot v3 remains deliberately video-specific: its local edit type, composition and MP4 export
+specification are not a generic multi-format asset contract. Supporting images, graphics, or another content type
 requires a new validated snapshot version or a separately owned workflow payload, plus migration
 and unknown-version behavior; documentation terminology alone cannot broaden this schema safely.
 
 `projects.version` is the aggregate compare-and-swap token. Revision append also compares the
 current revision number, locks the Project, verifies the linear parent, strictly parses/canonicalizes
-snapshot v2, and validates exact same-owner ready assets and active Saved Video Versions. Direct
+snapshot v3 (reading stored v1 and v2 rows through explicit maps), and validates exact same-owner
+ready assets and active Saved Video Versions. Direct
 asset and used-by Version links are revision-scoped. Job links keep one immutable initiating
 revision; output links keep one immutable producing revision per Video Version. Later reuse is a
 used-by relation, not another producer. Exact operation replay is idempotent, guarded by operation keys and stored

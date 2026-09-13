@@ -10,8 +10,8 @@ boundary at the time of the decision. Subsequent Prompt 03–13 work preserved t
 ownership, CAS, immutable-revision, normalized-lineage, retention, and non-cascading decisions while
 adding the following compatible current behavior:
 
-- snapshot v2 is the write format; snapshot v1 remains an explicit read migration that never
-  fabricates applied creative provenance;
+- snapshot v3 is the write format (v2 until 2026-09-12); snapshots v1 and v2 remain explicit read
+  migrations that never fabricate applied creative provenance;
 - an optional, separately owned Campaign aggregate groups zero or more Projects through an
   owner-constrained nullable relationship;
 - authenticated lifecycle, source, working-media, processing, output, and bounded-history routes

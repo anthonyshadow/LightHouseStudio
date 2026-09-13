@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import type { ProjectCurrentResponse, ProjectProcessingAttempt } from '@studio/contracts';
+import { EMPTY_PROJECT_TRANSFORM } from '@studio/domain';
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -41,25 +42,13 @@ const current = (
     parentRevisionId: null,
     parentRevisionNumber: null,
     snapshot: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       sourceAssetId,
       workingMedia: sourceAssetId === null ? null : { kind: 'asset', assetId: sourceAssetId },
       presentedMedia: sourceAssetId === null ? null : { kind: 'asset', assetId: sourceAssetId },
-      selectedCharacter: null,
-      selectedOutfit: null,
-      selectedVoice: null,
-      visualTreatment: { kind: 'none' },
+      composition: null,
+      transform: null,
       liveMode: null,
-      creativeIntent: {
-        promptId: null,
-        promptLabel: null,
-        recipeId: null,
-        recipeLabel: null,
-        userIntent: '',
-        appliedPrompt: null,
-        referenceAssetId: null,
-        resourceRevision: null,
-      },
       localEdit: null,
       exportSpecification: null,
       lastSuccessfulOutput: null,
@@ -214,14 +203,17 @@ describe('ProjectCreateTaskPanel', () => {
           ...current().revision,
           snapshot: {
             ...current().revision.snapshot,
-            selectedCharacter: {
-              characterId: 'a',
-              characterLabel: 'Ada',
-              characterRevision: now,
-              variantId: null,
-              variantLabel: null,
-              variantRevision: null,
-              referenceAssetId: null,
+            transform: {
+              ...EMPTY_PROJECT_TRANSFORM,
+              selectedCharacter: {
+                characterId: 'a',
+                characterLabel: 'Ada',
+                characterRevision: now,
+                variantId: null,
+                variantLabel: null,
+                variantRevision: null,
+                referenceAssetId: null,
+              },
             },
           },
         },
@@ -253,19 +245,19 @@ describe('ProjectCreateTaskPanel', () => {
         proposal: {
           workflowPhase: 'creative',
           liveMode: null,
-          selectedCharacter: {
-            characterId: 'a',
-            characterLabel: 'Just chosen',
-            characterRevision: now,
-            variantId: null,
-            variantLabel: null,
-            variantRevision: null,
-            referenceAssetId: null,
+          transform: {
+            ...EMPTY_PROJECT_TRANSFORM,
+            selectedCharacter: {
+              characterId: 'a',
+              characterLabel: 'Just chosen',
+              characterRevision: now,
+              variantId: null,
+              variantLabel: null,
+              variantRevision: null,
+              referenceAssetId: null,
+            },
+            visualTreatment: { kind: 'character-swap', providerId: null, outputResolution: null },
           },
-          selectedOutfit: null,
-          selectedVoice: null,
-          visualTreatment: { kind: 'character-swap', providerId: null, outputResolution: null },
-          creativeIntent: current().revision.snapshot.creativeIntent,
           localEdit: null,
           exportSpecification: null,
         },
