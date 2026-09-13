@@ -57,11 +57,12 @@ slice 3.2. D1–D3 are decided in [Decisions required](../DECISIONS_REQUIRED.md)
 Original video brought into a Project by upload, camera recording, or explicit reuse of a Library
 video Version. Sources are immutable once accepted: editing never alters them, and removing a
 source from a Project keeps its bytes as long as any history references them.
-_Status: implemented, capped at exactly one source per Project. Since slice 3.2's expand stage
-(2026-09-13) the cap is no longer a database key — `project_sources` is keyed by the media a Project
-holds, `(project_id, asset_id)` — but a second acceptance is still refused by the domain rule, both
-repositories and the source service, so the observable rule is unchanged. The target model allows
-several sources per Project._
+_Status: **implemented for several sources per Project** since slice 3.2 (2026-09-13). A source is
+identified by the media it holds, so a Project holds each piece of media once, and it may hold up to
+`PROJECT_SOURCE_LIMIT` (100) of them. One of them is the Project's **original** — the one the
+revision snapshot names — and the single-source surfaces still read that one: `POST /source` refuses
+a second acceptance and `GET /source` describes the original, unchanged. Taking on more material goes
+through the sources collection instead. No surface offers it yet: the Media area is slice 3.4._
 
 ### Asset
 

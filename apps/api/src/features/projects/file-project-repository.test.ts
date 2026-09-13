@@ -335,7 +335,7 @@ describe('FileProjectRepository', () => {
     ).rejects.toThrow();
   });
 
-  it('migrates v1 Project metadata to v7 without inventing Campaign membership or source', async () => {
+  it('migrates v1 Project metadata to v8 without inventing Campaign membership or source', async () => {
     const service = new ProjectService(new FileProjectRepository(directory));
     const created = await service.create(ownerUserId, randomUUID(), 'Legacy standalone');
     if (!created.ok) throw new Error('Expected a Project create.');
@@ -363,17 +363,19 @@ describe('FileProjectRepository', () => {
     const migrated = JSON.parse(await readFile(paths.primary, 'utf8')) as {
       schemaVersion: number;
       campaigns: unknown[];
+      projects?: Array<{ sources?: unknown }>;
     };
     expect(migrated).toMatchObject({
-      schemaVersion: 7,
+      schemaVersion: 8,
       assetMemberships: [],
       campaigns: [],
       processingJobs: [],
       outputReceipts: [],
     });
-    expect(
-      (migrated as { projects?: Array<{ source?: unknown }> }).projects?.[0]?.source,
-    ).toBeNull();
+    // The single `source` field is gone: what a Project holds is the collection, and a migrated
+    // Project that held nothing holds an empty one.
+    expect(migrated.projects?.[0]?.sources).toEqual([]);
+    expect(migrated.projects?.[0]).not.toHaveProperty('source');
   });
 
   it('resolves list posters from each Project\u2019s own current revision, preferring what is presented', async () => {
@@ -560,10 +562,10 @@ describe('FileProjectRepository', () => {
       { pageSize: 24 },
     );
     expect(reopened?.memberships.map(({ id }) => id)).toEqual(membershipIds);
-    expect(JSON.parse(await readFile(paths.primary, 'utf8'))).toMatchObject({ schemaVersion: 7 });
+    expect(JSON.parse(await readFile(paths.primary, 'utf8'))).toMatchObject({ schemaVersion: 8 });
   });
 
-  it('migrates v2 Campaign/Project metadata to v7 with explicit empty source/adoptions', async () => {
+  it('migrates v2 Campaign/Project metadata to v8 with an empty source collection and adoptions', async () => {
     const service = new ProjectService(new FileProjectRepository(directory));
     const created = await service.create(ownerUserId, randomUUID(), 'Prompt 05 Project');
     if (!created.ok) throw new Error('Expected a Project create.');
@@ -587,16 +589,16 @@ describe('FileProjectRepository', () => {
     });
     const migrated = JSON.parse(await readFile(paths.primary, 'utf8')) as {
       schemaVersion: number;
-      projects: Array<{ source: unknown }>;
+      projects: Array<{ sources: unknown }>;
     };
-    expect(migrated.schemaVersion).toBe(7);
-    expect(migrated.projects[0]?.source).toBeNull();
+    expect(migrated.schemaVersion).toBe(8);
+    expect(migrated.projects[0]?.sources).toEqual([]);
     expect(
       (migrated.projects[0] as { workingMediaAdoptions?: unknown }).workingMediaAdoptions,
     ).toEqual([]);
   });
 
-  it('migrates v3 snapshot v1 records to v7/snapshot v3 without fabricating applied values', async () => {
+  it('migrates v3 snapshot v1 records to v8/snapshot v3 without fabricating applied values', async () => {
     const service = new ProjectService(new FileProjectRepository(directory));
     const created = await service.create(ownerUserId, randomUUID(), 'Prompt 07 Project');
     if (!created.ok) throw new Error('Expected a Project create.');
@@ -663,7 +665,7 @@ describe('FileProjectRepository', () => {
         revisions: Array<{ snapshot: { schemaVersion: number } }>;
       }>;
     };
-    expect(migrated.schemaVersion).toBe(7);
+    expect(migrated.schemaVersion).toBe(8);
     expect(migrated.projects[0]?.workingMediaAdoptions).toEqual([]);
     expect(migrated.projects[0]?.revisions[0]?.snapshot.schemaVersion).toBe(3);
   });
@@ -723,7 +725,7 @@ describe('FileProjectRepository', () => {
       schemaVersion: number;
       projects: Array<{ revisions: Array<{ snapshot: { schemaVersion: number } }> }>;
     };
-    expect(afterRead).toMatchObject({ schemaVersion: 7 });
+    expect(afterRead).toMatchObject({ schemaVersion: 8 });
     // A read is a read: the migration happened in memory, and the row on disk is still the v2 one
     // this case put there. Only the write below is allowed to change it.
     expect(afterRead.projects[0]!.revisions.map(({ snapshot }) => snapshot.schemaVersion)).toEqual([
@@ -755,7 +757,7 @@ describe('FileProjectRepository', () => {
   });
 
   it.each([4, 5] as const)(
-    'migrates v%s Project metadata to v7 once and reopens idempotently',
+    'migrates v%s Project metadata to v8 once and reopens idempotently',
     async (schemaVersion) => {
       const operationKey = randomUUID();
       const service = new ProjectService(new FileProjectRepository(directory));
@@ -793,10 +795,10 @@ describe('FileProjectRepository', () => {
         }>;
       };
       expect(migrated).toMatchObject({
-        schemaVersion: 7,
+        schemaVersion: 8,
         assetMemberships: [],
         outputReceipts: [],
-        projects: [{ source: null, workingMediaAdoptions: [], outputLinks: [] }],
+        projects: [{ sources: [], workingMediaAdoptions: [], outputLinks: [] }],
       });
 
       const reopened = new ProjectService(new FileProjectRepository(directory));
@@ -871,13 +873,13 @@ describe('FileProjectRepository', () => {
       await expect(readFile(paths.journal, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
       const recoveredSerialized = await readFile(paths.primary, 'utf8');
       expect(JSON.parse(recoveredSerialized)).toMatchObject({
-        schemaVersion: 7,
+        schemaVersion: 8,
         assetMemberships: [],
         campaigns: [],
         processingJobs: [],
         outputReceipts: [],
         createReceipts: [{ operationKey }],
-        projects: [{ source: null, workingMediaAdoptions: [], outputLinks: [] }],
+        projects: [{ sources: [], workingMediaAdoptions: [], outputLinks: [] }],
       });
 
       const reopened = new ProjectService(new FileProjectRepository(directory));

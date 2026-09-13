@@ -73,10 +73,15 @@ provider work.
     **Conflict**, and safe failure. A Project becomes resumable only after durable byte storage or
     exact Version verification, server inspection, checksum/owner validation, and atomic source
     revision acceptance. A failed/unaccepted staging attempt can be replaced.
-11. A Project's source is immutable _while it is attached_: a second acceptance conflicts rather
-    than overwriting it. **Remove original video** detaches it explicitly, returning the Project to the
-    Source step as a `draft` with its creative setup — Character, Outfit, Voice, prompt, treatment,
-    local edit — intact, and clearing only the derived working and presented media. Removal is
+11. A Project's **original** is immutable while it is attached: a second acceptance of the original
+    conflicts rather than overwriting it. A Project may hold more material beside it (slice 3.2); each
+    piece is held once, up to a hundred, and taking one on moves neither the original nor what the
+    stage is showing. Letting go of a held piece leaves the rest; letting go of the original while
+    others are held is refused until one of them is made the original, and no surface offers that yet.
+    **Remove original video** detaches explicitly, returning the Project to the Source step as a
+    `draft` with its creative setup — Character, Outfit, Voice, prompt, treatment — intact, and
+    clearing the derived working and presented media, the arrangement, the local edit and the
+    retained output pointer along with the material they described. Removal is
     refused while a provider attempt is unresolved and on an archived or deleted Project, and the
     reason is stated rather than left to guesswork. It never deletes the video, an earlier revision,
     a saved output Version, or retained bytes: historical source lineage keeps protecting them.

@@ -102,6 +102,11 @@ const directUploadRoutes: readonly Route[] = [
 const projectSourceRoutes: readonly Route[] = [
   'GET /api/projects/:projectId/source',
   'GET /api/projects/:projectId/source/content',
+  'GET /api/projects/:projectId/sources',
+  'GET /api/projects/:projectId/sources/:sourceAssetId/content',
+  'POST /api/projects/:projectId/sources',
+  'POST /api/projects/:projectId/sources/reuse',
+  'POST /api/projects/:projectId/sources/:sourceAssetId/remove',
   'GET /api/projects/:projectId/working-media',
   'GET /api/projects/:projectId/working-media/:revisionId/content',
   'POST /api/projects/:projectId/source',

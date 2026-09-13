@@ -668,3 +668,149 @@ acceptance, so the collection has exactly one member everywhere.
   `acceptSource` writes one for every accepted source. §5 Q4 stands: covering every source is a
   change to `deriveProjectAssetMemberships` under a new migration id, since this one's receipt is
   permanent.
+
+## 8. Verify and switch (prompt 30), 2026-09-13
+
+### 8.1 The gate
+
+`db:verify-sources`, extended to the owners and byte facts §3.9 asked for, over the development
+database:
+
+```json
+{
+  "projects": 3,
+  "projectsHoldingSources": 2,
+  "sourcesHeldByTombstonedProjects": 49,
+  "storedSources": 51,
+  "foreignOwnerSources": 0,
+  "sourcesWithNoAsset": 0,
+  "sourcesWhoseByteFactsDrifted": 0,
+  "collectionsLargerThanOne": 0,
+  "divergences": 0
+}
+```
+
+Byte facts are the half that could actually have drifted: `project_sources` copies the asset's mime
+type, size and checksum at acceptance so a later read need not reopen it, and nothing had re-checked
+those copies since. A collection read hands them to a client per source, so a stale copy would stop
+being a curiosity. Same-owner is a composite foreign key, so that count says out loud what the schema
+already guarantees. The script now exits non-zero on any of the four.
+
+### 8.2 What switched
+
+**File mode is where the read authority actually moved.** The stored aggregate's single `source` is
+gone, replaced by `sources`, at library schema **v8**; `parseLibrary` lifts a v7 document on read and
+`.strict()` makes the old field's removal part of the lift rather than a leftover. The single-source
+reads now resolve the same way the relational store does — the row the current revision's pointer
+names — so `getCurrentWithSource` and `getSource` are derived views over the collection in both
+stores rather than two different rules. The file store also gained the library-level
+source-operation-key uniqueness it never had, the analogue of
+`project_sources_owner_operation_unique`; one source per Project had made a linear scan equivalent to
+it.
+
+**One invariant, in both stores and on the wire:** a Project that holds material names one piece of
+it as the original. Material behind a pointer that names none of it would be unreachable and
+unremovable. The converse is allowed and happens — a duplicated Project carries the snapshot pointer
+without the rows, and its reads 404 until it is given material of its own. A first pass forbade that
+too and the duplicate-parity test caught it.
+
+**New domain rules rather than flags.** `addProjectSource` appends a revision carrying nothing but
+the new timestamp: taking on material is an inventory act, and what the Project is showing, what it
+last produced and which phase it is in do not move. `removeProjectSourceById` has three cases and
+only the middle one is new — the last source defers to `removeProjectSource`, the original with
+others held is refused, and anything else prunes the clips that named it. Two conflict kinds carry
+those refusals (`source-limit`, `primary-source`) rather than repurposing `immutable-source`, which
+still means exactly what it meant.
+
+**Five endpoints beside the legacy five**, which keep their exact contract:
+`GET|POST /api/projects/:projectId/sources`, `POST /sources/reuse`,
+`POST /sources/:sourceAssetId/remove`, `GET /sources/:sourceAssetId/content`. A source is addressed
+by the media it holds, which is its key, already public through the snapshot's `sourceAssetId`, and
+the shape working media already uses for per-item content.
+
+**The replay lookup widened** from the source the snapshot names to every source the Project holds.
+Left alone, a retried second acceptance would have been told `immutable-source` instead of the 200
+its first attempt already earned.
+
+`PROJECT_SOURCE_LIMIT` is 100, matching `COMPOSITION_CLIP_LIMIT` because a clip can only name media
+the Project holds. The domain refuses on the count its caller read and the repository refuses on the
+count under the lock that writes the row — the cheap-first-refusal pattern `removeProjectSource`
+already uses for unresolved provider work, not two owners of one rule.
+
+### 8.3 Evidence
+
+- `vitest run apps/api packages`: 1,103 passed, 16 skipped. Postgres integration on a throwaway
+  database: 7 passed, including a case that adds a second source through the writer, lists both,
+  detaches and checks what each still retains.
+- The service test walks the whole shape in file mode: add, replay, list, legacy `GET /source`
+  unchanged, legacy `POST /source` still refusing, per-source content, the primary refusal, removal
+  of a held source, convergence on one already gone, and the last source detaching wholesale.
+- The route test does the same over HTTP in one Project, and asserts the list leaks neither
+  `checksum` nor `operationKey`.
+- `typecheck`, `lint`, `format:check`, `check:docs`, `check:script-references`,
+  `check:retired-program` clean.
+
+### 8.4 What this stage did not establish
+
+- **No surface adds a second source.** Every multi-source path is proved by tests; `apps/web` is
+  untouched, by design — slice 3.4 owns the Media area, the capture bridge and
+  `AddVideoToProjectDialog`'s browser-side refusal, which will otherwise keep refusing what the API
+  now allows.
+- **The original cannot be changed.** Removing it while other material is held is refused rather
+  than promoting a sibling, because choosing which one becomes the original is a question for a
+  surface that can ask. Until 3.4 exists, a Project that holds several can only shed them from the
+  bottom.
+- **The file-mode rollback boundary is now closed.** v8 is written on the first write after this
+  deploys, and a v7 build cannot read it (§3.8). Relational rollback stays open until something
+  writes a second source.
+- **Composition pruning is written but unreachable.** `removeProjectSourceById` prunes the clips that
+  named the departing media, and no code path can produce a clip yet (§1.6), so that branch has unit
+  coverage only.
+
+### 8.5 What the review changed
+
+Four reviews over the diff; five of their findings were defects rather than preferences.
+
+**File mode was not retaining an additional source's bytes.** The expand stage removed the file-mode
+retention arm as unreachable (§7.2) and said the matching arm "arrives with the stored collection in
+slice 3.2's switch stage". This is that stage, the collection arrived, and the arm did not — leaving
+a comment that claimed otherwise. Reachable without any UI: borrow a Library Version as extra
+material through `POST /sources/reuse`, delete that Video, and its bytes go, because nothing links a
+held source to a revision. Restored, with the assertion that would have caught it — the held source
+is retained while nothing links it.
+
+**`mode` was a flag carrying what the data already said.** It threaded routes → service → both
+repositories, and hid two defects. Borrowing the same Version twice under different keys reached the
+primary key as a `23505` and surfaced as a 500; and `POST /sources` could never take a Project's
+first source, because the flag said "additional" before anything looked. Both dissolve once the
+repositories read the revision — a revision that points the Project's original at what is being
+accepted is taking a first source — and the service picks its rule from what the Project holds. What
+is genuinely endpoint-specific, the legacy contract's refusal of an occupied Project, stayed at the
+legacy entry point as `refuseWhenOccupied`. The duplicate now has its own refusal,
+`source-already-held`, instead of a unique violation.
+
+**The byte path was reading the whole collection.** `contentById` called `listSources` — every held
+source plus the revision snapshot — on an endpoint a player hits once per seek. At the two limits
+that is megabytes per range request. It is a point lookup now, `getSourceById`, and the byte open
+runs beside it rather than after it, since the asset id is the route's own parameter.
+
+**Two endpoints disagreed about the same removal.** `POST /sources/:id/remove` refused to let go of
+the original while other material was held; `POST /source/remove` did it silently and took the rest
+with it — contradicting the clause this slice wrote into feature-behavior 17. The legacy removal now
+goes through the same rule, so the refusal is the Project's and not the endpoint's.
+
+**A test asserted nothing.** `expect(collection.sources).not.toContain('checksum')` compares array
+elements to a string and can never fail; it reads as proof that the collection response does not leak
+the stored checksum and was proving nothing. It asserts on the body, as its neighbour does.
+
+Also applied: the saved-video lineage rule moved onto the source object so the collection item
+inherits it rather than restating it; the v7 lift moved off `storedAggregateSchema` so `.strict()`
+still refuses a stray `source` on a write; `assertReadyAssets` kept its link parameter and took the
+extra asset explicitly; CAS moved above the semantic guards in `removeProjectSourceById` so one stale
+request gets one answer; the service's primary cross-checks went, now that both stores resolve the
+primary by that equality; and the file-mode replay scan stopped allocating a wrapper per held source.
+
+Recorded and not done: `listSources` repeats the project and revision rows once per source, which
+only the list genuinely needs; `GET /sources` parses its response twice, as the legacy pair already
+does; and adding a source re-links every clip in the arrangement, because a revision carries the
+whole snapshot. All three are bounded by the same limits and none is a defect.

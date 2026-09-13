@@ -1,13 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import {
+  projectSourceListResponseSchema,
   projectSourceResponseSchema,
+  type ProjectSourceListResponse,
   type InspectedVideo,
   type ProjectSourceResponse,
 } from '@studio/contracts';
 import {
   acceptProjectSource,
+  addProjectSource,
   ProjectRuleError,
-  removeProjectSource,
+  removeProjectSourceById,
   type ProjectConflict,
   type ProjectMediaReference,
   type ProjectSourceKind,
@@ -39,6 +42,8 @@ export type ProjectSourceMutationResult =
   | { readonly ok: false; readonly conflict: ProjectConflict };
 
 interface UploadSourceInput {
+  /** The legacy endpoints refuse a Project that already holds material; the collection does not. */
+  readonly refuseWhenOccupied: boolean;
   readonly ownerUserId: string;
   readonly projectId: string;
   readonly operationKey: string;
@@ -50,6 +55,14 @@ interface UploadSourceInput {
   readonly filename: string;
 }
 
+interface RemoveSourceByIdInput {
+  readonly ownerUserId: string;
+  readonly projectId: string;
+  readonly assetId: string;
+  readonly expectedVersion: number;
+  readonly expectedRevisionNumber: number;
+}
+
 interface RemoveSourceInput {
   readonly ownerUserId: string;
   readonly projectId: string;
@@ -58,6 +71,7 @@ interface RemoveSourceInput {
 }
 
 interface ReuseSourceInput {
+  readonly refuseWhenOccupied: boolean;
   readonly ownerUserId: string;
   readonly projectId: string;
   readonly operationKey: string;
@@ -70,29 +84,55 @@ interface ReuseSourceInput {
 const sourceContentUrl = (projectId: string): string =>
   `/api/projects/${encodeURIComponent(projectId)}/source/content`;
 
+const heldSourceContentUrl = (projectId: string, assetId: string): string =>
+  `/api/projects/${encodeURIComponent(projectId)}/sources/${encodeURIComponent(assetId)}/content`;
+
+/**
+ * What a source tells a client about its media, and nothing else.
+ *
+ * An allowlist rather than a spread: `operationKey`, `requestFingerprint`, `checksumSha256` and the
+ * owner are stored beside these and belong to nobody outside the server. Both responses publish the
+ * same facts, so they read them from one place.
+ */
+const sourceFacts = (source: ProjectSourceRecord) => ({
+  kind: source.kind,
+  savedVideoId: source.savedVideoId,
+  videoVersionId: source.videoVersionId,
+  mimeType: source.mimeType,
+  filename: source.filename,
+  sizeBytes: source.sizeBytes,
+  container: source.container,
+  videoCodec: source.videoCodec,
+  audioCodec: source.audioCodec,
+  durationMs: source.durationMs,
+  width: source.width,
+  height: source.height,
+  hasAudio: source.hasAudio,
+  acceptedAt: source.acceptedAt,
+});
+
+const sourceListResponse = (
+  current: ProjectCurrentRead,
+  sources: readonly ProjectSourceRecord[],
+): ProjectSourceListResponse =>
+  projectSourceListResponseSchema.parse({
+    ...publicProjectCurrent(current),
+    sources: sources.map((source) => ({
+      ...sourceFacts(source),
+      assetId: source.assetId,
+      acceptedRevisionId: source.acceptedRevisionId,
+      acceptedRevisionNumber: source.acceptedRevisionNumber,
+      contentUrl: heldSourceContentUrl(source.projectId, source.assetId),
+    })),
+  });
+
 const sourceResponse = (
   current: ProjectCurrentRead,
   source: ProjectSourceRecord,
 ): ProjectSourceResponse =>
   projectSourceResponseSchema.parse({
     ...publicProjectCurrent(current),
-    source: {
-      kind: source.kind,
-      savedVideoId: source.savedVideoId,
-      videoVersionId: source.videoVersionId,
-      mimeType: source.mimeType,
-      filename: source.filename,
-      sizeBytes: source.sizeBytes,
-      container: source.container,
-      videoCodec: source.videoCodec,
-      audioCodec: source.audioCodec,
-      durationMs: source.durationMs,
-      width: source.width,
-      height: source.height,
-      hasAudio: source.hasAudio,
-      acceptedAt: source.acceptedAt,
-      contentUrl: sourceContentUrl(source.projectId),
-    },
+    source: { ...sourceFacts(source), contentUrl: sourceContentUrl(source.projectId) },
   });
 
 const versionMediaReference = (
@@ -175,6 +215,7 @@ export class ProjectSourceService {
         conflictMessage: 'That source operation was already used for different media.',
         commit: (manifest) =>
           this.#accept({
+            refuseWhenOccupied: input.refuseWhenOccupied,
             ownerUserId: input.ownerUserId,
             projectId: input.projectId,
             operationKey: input.operationKey,
@@ -219,6 +260,7 @@ export class ProjectSourceService {
         );
       }
       return this.#accept({
+        refuseWhenOccupied: input.refuseWhenOccupied,
         ownerUserId: input.ownerUserId,
         projectId: input.projectId,
         operationKey: input.operationKey,
@@ -260,42 +302,49 @@ export class ProjectSourceService {
     readonly mediaReference: ProjectMediaReference;
     readonly inspected: InspectedVideo;
     readonly manifest: AssetReadHandle['manifest'];
+    readonly refuseWhenOccupied: boolean;
   }): Promise<ProjectSourceMutationResult> {
-    const projectRead = await this.projects.getCurrentWithSource(
-      input.ownerUserId,
-      input.projectId,
-    );
+    const projectRead = await this.projects.listSources(input.ownerUserId, input.projectId);
     if (projectRead === null) throw new AppError(404, 'not_found', 'That Project is unavailable.');
-    const { current, source: existingSource } = projectRead;
-    if (existingSource !== null) {
-      if (
-        existingSource.operationKey === input.operationKey &&
-        existingSource.requestFingerprint === input.requestFingerprint
-      ) {
-        return {
-          ok: true,
-          response: sourceResponse(current, existingSource),
-          replayed: true,
-        };
-      }
+    const { current, sources } = projectRead;
+    // Replay is decided across everything the Project holds, not against one of them. Looking only
+    // at the source the snapshot names would answer a retried second acceptance with
+    // `immutable-source` instead of the 200 its first attempt already earned.
+    const replayed = sources.find(
+      (held) =>
+        held.operationKey === input.operationKey &&
+        held.requestFingerprint === input.requestFingerprint,
+    );
+    if (replayed !== undefined) {
+      return { ok: true, response: sourceResponse(current, replayed), replayed: true };
+    }
+    // The legacy endpoint's whole contract: a Project that already holds material refuses another
+    // through it. Everything below is the same act either way.
+    if (input.refuseWhenOccupied && sources.length > 0) {
       return {
         ok: false,
         conflict: { kind: 'immutable-source', projectId: input.projectId },
       };
     }
+    const aggregate = projectAggregateForCurrent(current);
+    const context = { now: this.#now().toISOString(), createId: this.#createId };
+    const expected = {
+      expectedProjectVersion: input.expectedVersion,
+      expectedRevisionNumber: input.expectedRevisionNumber,
+      author: { kind: 'user' as const, authorId: input.ownerUserId },
+    };
     let accepted;
     try {
-      accepted = acceptProjectSource(
-        projectAggregateForCurrent(current),
-        {
-          expectedProjectVersion: input.expectedVersion,
-          expectedRevisionNumber: input.expectedRevisionNumber,
-          assetId: input.assetId,
-          mediaReference: input.mediaReference,
-          author: { kind: 'user', authorId: input.ownerUserId },
-        },
-        { now: this.#now().toISOString(), createId: this.#createId },
-      );
+      // A Project with no material is taking its original; one that has some is taking on more.
+      // The endpoint does not decide that, and neither does a flag — what the Project holds does.
+      accepted =
+        sources.length === 0
+          ? acceptProjectSource(
+              aggregate,
+              { ...expected, assetId: input.assetId, mediaReference: input.mediaReference },
+              context,
+            )
+          : addProjectSource(aggregate, { ...expected, heldSourceCount: sources.length }, context);
     } catch (error) {
       if (error instanceof ProjectRuleError) {
         throw new AppError(409, 'conflict', error.message);
@@ -369,16 +418,51 @@ export class ProjectSourceService {
     if (source === null && current.revision.snapshot.sourceAssetId === null) {
       return { ok: true, current: publicProjectCurrent(current) };
     }
-    if (source === null || current.revision.snapshot.sourceAssetId !== source.assetId) {
+    if (source === null) {
       throw new AppError(404, 'not_found', 'This Project does not have an accepted source.');
+    }
+    /*
+     * Through the same rule the per-source removal uses, naming the original.
+     *
+     * "Remove original video" on a Project holding nothing else is what it always was. On one that
+     * holds more, the rule refuses rather than quietly taking the rest with it — the alternative is
+     * a control labelled for one video discarding several, which is the kind of thing the canon
+     * describes as a Project losing material it was never asked to lose.
+     */
+    return this.removeById({ ...input, assetId: source.assetId });
+  }
+
+  async list(ownerUserId: string, projectId: string): Promise<ProjectSourceListResponse> {
+    const projectRead = await this.projects.listSources(ownerUserId, projectId);
+    if (projectRead === null) {
+      throw new AppError(404, 'not_found', 'That Project is unavailable.');
+    }
+    return sourceListResponse(projectRead.current, projectRead.sources);
+  }
+
+  /**
+   * Lets go of one named source.
+   *
+   * Carries no operation key for the same reason the legacy removal does not: removing a source the
+   * Project no longer holds is the requested end state, so a replay after a lost response converges
+   * on current authority instead of reporting a version conflict at a source that is already gone.
+   */
+  async removeById(input: RemoveSourceByIdInput): Promise<ProjectServiceMutationResult> {
+    const projectRead = await this.projects.listSources(input.ownerUserId, input.projectId);
+    if (projectRead === null) throw new AppError(404, 'not_found', 'That Project is unavailable.');
+    const { current, sources } = projectRead;
+    if (!sources.some(({ assetId }) => assetId === input.assetId)) {
+      return { ok: true, current: publicProjectCurrent(current) };
     }
     let removed;
     try {
-      removed = removeProjectSource(
+      removed = removeProjectSourceById(
         projectAggregateForCurrent(current),
         {
           expectedProjectVersion: input.expectedVersion,
           expectedRevisionNumber: input.expectedRevisionNumber,
+          assetId: input.assetId,
+          heldSourceCount: sources.length,
           author: { kind: 'user', authorId: input.ownerUserId },
         },
         { now: this.#now().toISOString(), createId: this.#createId },
@@ -399,7 +483,7 @@ export class ProjectSourceService {
       nextProject: removed.value.project,
       revision,
       assetLinks: projectAssetLinksForRevision(revision),
-      removedAssetId: source.assetId,
+      removedAssetId: input.assetId,
     });
     if (persisted.kind === 'not-found') {
       throw new AppError(404, 'not_found', 'That Project is unavailable.');
@@ -408,13 +492,38 @@ export class ProjectSourceService {
     return { ok: true, current: publicProjectCurrent(persisted.current) };
   }
 
+  /** The bytes of one named source, whether or not it is the one the snapshot points at. */
+  async contentById(
+    ownerUserId: string,
+    projectId: string,
+    assetId: string,
+  ): Promise<{ readonly source: ProjectSourceRecord; readonly asset: AssetReadHandle }> {
+    // A player asks for one source's bytes many times over, so this resolves the one row rather
+    // than the Project's whole material — and the asset id is the route's own parameter, so opening
+    // the bytes does not wait on the lookup that authorises them.
+    const [source, asset] = await Promise.all([
+      this.projects.getSourceById(ownerUserId, projectId, assetId),
+      this.bytes.open(ownerUserId, assetId),
+    ]);
+    if (source === null) {
+      throw new AppError(404, 'not_found', 'This Project does not hold that source.');
+    }
+    if (asset === null) {
+      throw new AppError(404, 'asset_missing', 'The Project source file is unavailable.');
+    }
+    return { source, asset };
+  }
+
   async get(ownerUserId: string, projectId: string): Promise<ProjectSourceResponse> {
     const projectRead = await this.projects.getCurrentWithSource(ownerUserId, projectId);
     if (projectRead === null) {
       throw new AppError(404, 'not_found', 'That Project is unavailable.');
     }
     const { current, source } = projectRead;
-    if (source === null || current.revision.snapshot.sourceAssetId !== source.assetId) {
+    // Both stores resolve this by the snapshot pointer, so a source that came back is the original
+    // by construction; what remains to answer is a Project that holds none — including a duplicate,
+    // which carries the pointer without the material.
+    if (source === null) {
       throw new AppError(404, 'not_found', 'This Project does not have an accepted source.');
     }
     if ((await this.bytes.open(ownerUserId, source.assetId)) === null) {

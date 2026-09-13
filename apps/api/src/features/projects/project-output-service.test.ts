@@ -83,6 +83,7 @@ describe('ProjectOutputService local composite authority', () => {
       inspect: () => Promise.resolve(inspected),
       projectRetention: projects,
     }).upload({
+      refuseWhenOccupied: true,
       ownerUserId,
       projectId: created.current.project.id,
       operationKey,

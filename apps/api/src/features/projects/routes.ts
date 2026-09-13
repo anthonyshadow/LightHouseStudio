@@ -18,6 +18,8 @@ import {
   projectOutputHistoryResponseSchema,
   projectOperationKeySchema,
   projectOutputVersionParamsSchema,
+  projectSourceListResponseSchema,
+  projectSourceParamsSchema,
   projectSourceResponseSchema,
   projectSourceUploadMetadataSchema,
   projectWorkingMediaParamsSchema,
@@ -104,6 +106,12 @@ const conflictMessage = (conflict: ProjectConflict): string => {
       return 'Choose an active Campaign you can access, or detach the Project.';
     case 'immutable-source':
       return 'This Project already has a source. Remove the current source before choosing another.';
+    case 'source-limit':
+      return `A Project can hold ${conflict.limit} videos. Remove one before adding another.`;
+    case 'primary-source':
+      return 'This is the original the Project works from. Remove the other videos first.';
+    case 'source-already-held':
+      return 'This Project already has that video.';
     case 'saved-video-version':
       return 'The selected Saved Video changed. Confirm its current Version before adding another.';
   }
@@ -332,6 +340,7 @@ export const registerProjectRoutes = (
           return sendReplayableMutation(
             reply,
             await sourceService.upload({
+              refuseWhenOccupied: true,
               ownerUserId: ownerUserIdForRequest(request),
               projectId: params.data.projectId,
               operationKey: operationKey.data,
@@ -361,6 +370,7 @@ export const registerProjectRoutes = (
       return sendReplayableMutation(
         reply,
         await sourceService.reuseSavedVideo({
+          refuseWhenOccupied: true,
           ownerUserId: ownerUserIdForRequest(request),
           projectId: params.data.projectId,
           operationKey: operationKey.data,
@@ -391,6 +401,119 @@ export const registerProjectRoutes = (
       return projectSourceResponseSchema.parse(
         await sourceService.get(ownerUserIdForRequest(request), params.data.projectId),
       );
+    });
+
+    /*
+     * The collection beside the legacy five.
+     *
+     * The legacy endpoints keep their exact contract — they describe the source the snapshot names,
+     * and `POST /source` still refuses a second one — because a browser that predates this change is
+     * still entitled to the answers it was built for. These are what a surface uses once it can show
+     * a Project's material as the several things it may be.
+     */
+    app.get('/api/projects/:projectId/sources', async (request) => {
+      const params = projectParamsSchema.safeParse(request.params);
+      if (!params.success) throw new AppError(400, 'validation_error', 'Choose a valid Project.');
+      return projectSourceListResponseSchema.parse(
+        await sourceService.list(ownerUserIdForRequest(request), params.data.projectId),
+      );
+    });
+
+    app.post(
+      '/api/projects/:projectId/sources',
+      {
+        bodyLimit: VIDEO_RESULT_MAX_BYTES,
+        bodyParser: 'spooled',
+        acceptedContentTypes: VIDEO_INPUT_MIME_TYPES,
+        unsupportedMediaType: {
+          statusCode: 400,
+          message: 'Upload an MP4, QuickTime, or WebM Project source.',
+        },
+        payloadTooLargeMessage: 'The Project source must be 300 MB or smaller.',
+      },
+      async (request, reply) => {
+        const params = projectParamsSchema.safeParse(request.params);
+        const operationKey = projectOperationKeySchema.safeParse(
+          requestHeader(request, 'idempotency-key'),
+        );
+        const upload = isSpooledUpload(request.body) ? request.body : null;
+        try {
+          const metadata = sourceUploadMetadata(request);
+          if (!params.success || !operationKey.success || upload === null) {
+            throw new AppError(400, 'validation_error', 'Provide a valid Project source upload.');
+          }
+          return sendReplayableMutation(
+            reply,
+            await sourceService.upload({
+              refuseWhenOccupied: false,
+              ownerUserId: ownerUserIdForRequest(request),
+              projectId: params.data.projectId,
+              operationKey: operationKey.data,
+              expectedVersion: metadata.expectedVersion,
+              expectedRevisionNumber: metadata.expectedRevisionNumber,
+              kind: metadata.kind,
+              sourcePath: upload.path,
+              checksumSha256: upload.checksumSha256,
+              filename: metadata.filename,
+            }),
+          );
+        } finally {
+          await upload?.cleanup().catch(() => undefined);
+        }
+      },
+    );
+
+    app.post('/api/projects/:projectId/sources/reuse', async (request, reply) => {
+      const params = projectParamsSchema.safeParse(request.params);
+      const operationKey = projectOperationKeySchema.safeParse(
+        requestHeader(request, 'idempotency-key'),
+      );
+      const body = reuseProjectSourceRequestSchema.safeParse(request.body);
+      if (!params.success || !operationKey.success || !body.success) {
+        throw new AppError(400, 'validation_error', 'Choose a valid exact Saved Video Version.');
+      }
+      return sendReplayableMutation(
+        reply,
+        await sourceService.reuseSavedVideo({
+          refuseWhenOccupied: false,
+          ownerUserId: ownerUserIdForRequest(request),
+          projectId: params.data.projectId,
+          operationKey: operationKey.data,
+          ...body.data,
+        }),
+      );
+    });
+
+    app.post('/api/projects/:projectId/sources/:sourceAssetId/remove', async (request, reply) => {
+      const params = projectSourceParamsSchema.safeParse(request.params);
+      const body = removeProjectSourceRequestSchema.safeParse(request.body);
+      if (!params.success || !body.success) {
+        throw new AppError(400, 'validation_error', 'Provide a valid Project source and version.');
+      }
+      return sendMutation(
+        reply,
+        await sourceService.removeById({
+          ownerUserId: ownerUserIdForRequest(request),
+          projectId: params.data.projectId,
+          assetId: params.data.sourceAssetId,
+          ...body.data,
+        }),
+      );
+    });
+
+    app.get('/api/projects/:projectId/sources/:sourceAssetId/content', async (request, reply) => {
+      const params = projectSourceParamsSchema.safeParse(request.params);
+      if (!params.success) throw new AppError(400, 'validation_error', 'Choose a valid source.');
+      const result = await sourceService.contentById(
+        ownerUserIdForRequest(request),
+        params.data.projectId,
+        params.data.sourceAssetId,
+      );
+      return sendRangedAsset(request, reply, {
+        asset: result.asset,
+        mimeType: result.source.mimeType,
+        filename: result.source.filename,
+      });
     });
 
     app.get('/api/projects/:projectId/source/content', async (request, reply) => {

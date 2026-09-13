@@ -173,6 +173,14 @@ export const storedProjectProcessingAttemptSchema = z
     }
   });
 
+/**
+ * The stored shape's version. Version 8 replaced the single `source` field with the `sources`
+ * collection; every earlier version is lifted on read by the cascade below. One constant because a
+ * bump touches the library envelope, the journal, the empty library and every prepared write, and
+ * missing one of those is how a store stops being readable.
+ */
+export const PROJECT_LIBRARY_SCHEMA_VERSION = 8;
+
 export const storedProjectSourceSchema = z
   .object({
     projectId: projectIdSchema,
@@ -280,6 +288,21 @@ export const storedProjectWorkingMediaSchema = z
     }
   });
 
+/**
+ * Lifts a stored aggregate from the single `source` field to the `sources` collection.
+ *
+ * Every version arm below parses its projects through `storedAggregateSchema`, so doing the lift
+ * here rather than in the cascade covers all of them at once — and `.strict()` means the old field
+ * has to go rather than linger beside the collection, which is the point: one place says what
+ * material a Project holds.
+ */
+const liftSourceCollection = (value: unknown): unknown => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return value;
+  if (!('source' in value)) return value;
+  const { source, ...aggregate } = value as Record<string, unknown>;
+  return source === null || source === undefined ? aggregate : { ...aggregate, sources: [source] };
+};
+
 export const storedAggregateSchema = z
   .object({
     project: storedProjectSchema,
@@ -288,7 +311,7 @@ export const storedAggregateSchema = z
     versionReferenceLinks: z.array(storedVersionReferenceLinkSchema),
     jobLinks: z.array(storedJobLinkSchema),
     outputLinks: z.array(storedOutputLinkSchema),
-    source: storedProjectSourceSchema.nullable().default(null),
+    sources: z.array(storedProjectSourceSchema).default([]),
     workingMediaAdoptions: z.array(storedProjectWorkingMediaSchema).default([]),
     renditions: z.array(storedProjectRenditionSchema).default([]),
   })
@@ -309,19 +332,34 @@ export const storedAggregateSchema = z
       !aggregate.jobLinks.every(owned) ||
       !aggregate.outputLinks.every(owned) ||
       !aggregate.workingMediaAdoptions.every(owned) ||
-      !aggregate.renditions.every(owned)
+      !aggregate.renditions.every(owned) ||
+      !aggregate.sources.every(owned)
     ) {
       context.addIssue({
         code: 'custom',
         message: 'Stored Project ownership or revision is invalid.',
       });
     }
+    const currentSourceAssetId =
+      aggregate.revisions.find(({ id }) => id === project.currentRevisionId)?.snapshot
+        .sourceAssetId ?? null;
+    const heldAssetIds = new Set(aggregate.sources.map(({ assetId }) => assetId));
     if (
-      aggregate.source !== null &&
-      (!owned(aggregate.source) ||
-        aggregate.source.assetId !==
-          aggregate.revisions.find(({ id }) => id === aggregate.source?.acceptedRevisionId)
-            ?.snapshot.sourceAssetId)
+      heldAssetIds.size !== aggregate.sources.length ||
+      aggregate.sources.some(
+        ({ acceptedRevisionId, acceptedRevisionNumber }) =>
+          !aggregate.revisions.some(
+            ({ id, revisionNumber }) =>
+              id === acceptedRevisionId && revisionNumber === acceptedRevisionNumber,
+          ),
+      ) ||
+      // A Project that holds material names one piece of it as the original, because that pointer is
+      // what every single-source read resolves through — material behind a pointer that names none
+      // of it would be unreachable and unremovable. The converse is allowed and happens: a Project
+      // duplicated from another carries the pointer without the rows, and reads 404 until it is
+      // given material of its own.
+      (aggregate.sources.length > 0 &&
+        (currentSourceAssetId === null || !heldAssetIds.has(currentSourceAssetId)))
     ) {
       context.addIssue({ code: 'custom', message: 'Stored Project source is inconsistent.' });
     }
@@ -363,6 +401,16 @@ export const storedAggregateSchema = z
       });
     }
   });
+
+/**
+ * The same aggregate, read from a document written before version 8.
+ *
+ * Only the migration arms below use it. Keeping the lift off `storedAggregateSchema` leaves the
+ * write path with `.strict()` still refusing a stray `source`, rather than silently swallowing
+ * one — which is what makes the old field's removal a fact about the stored shape and not just an
+ * intention.
+ */
+const legacyStoredAggregateSchema = z.preprocess(liftSourceCollection, storedAggregateSchema);
 
 export const storedCampaignSchema = z
   .object({
@@ -428,7 +476,7 @@ export const projectOutputReceiptSchema = z
 
 export const librarySchema = z
   .object({
-    schemaVersion: z.literal(7),
+    schemaVersion: z.literal(PROJECT_LIBRARY_SCHEMA_VERSION),
     ownerUserId: ownerIdSchema,
     revision: z.number().int().nonnegative(),
     campaigns: z.array(storedCampaignSchema),
@@ -452,6 +500,9 @@ export const librarySchema = z
     const processingOperationIds = library.processingJobs.map(({ operationId }) => operationId);
     const outputOperationIds = library.outputReceipts.map(({ operationId }) => operationId);
     const membershipIds = library.assetMemberships.map(({ id }) => id);
+    const sourceOperationKeys = library.projects.flatMap(({ sources }) =>
+      sources.map(({ operationKey }) => operationKey),
+    );
     const membershipKeys = library.assetMemberships.map(
       ({ projectId, kind, resourceId }) => `${projectId}:${kind}:${resourceId}`,
     );
@@ -467,7 +518,11 @@ export const librarySchema = z
       new Set(processingOperationIds).size !== processingOperationIds.length ||
       new Set(outputOperationIds).size !== outputOperationIds.length ||
       new Set(membershipIds).size !== membershipIds.length ||
-      new Set(membershipKeys).size !== membershipKeys.length;
+      new Set(membershipKeys).size !== membershipKeys.length ||
+      // The file-mode analogue of `project_sources_owner_operation_unique`. It was absent while one
+      // source per Project made a linear scan equivalent to it; with a collection it is the only
+      // thing standing between a replayed acceptance and two sources sharing one receipt.
+      new Set(sourceOperationKeys).size !== sourceOperationKeys.length;
 
     const hasForeignOwnerRecords =
       library.campaigns.some(({ ownerUserId }) => ownerUserId !== library.ownerUserId) ||
@@ -541,13 +596,28 @@ export const librarySchema = z
 
 export type ProjectLibrary = z.infer<typeof librarySchema>;
 
+const versionSevenLibraryEnvelopeSchema = z
+  .object({
+    schemaVersion: z.literal(7),
+    ownerUserId: ownerIdSchema,
+    revision: z.number().int().nonnegative(),
+    campaigns: z.array(storedCampaignSchema),
+    projects: z.array(legacyStoredAggregateSchema),
+    assetMemberships: z.array(storedProjectAssetMembershipSchema),
+    processingJobs: z.array(storedProjectProcessingAttemptSchema),
+    createReceipts: z.array(createReceiptSchema),
+    campaignCreateReceipts: z.array(campaignCreateReceiptSchema),
+    outputReceipts: z.array(projectOutputReceiptSchema),
+  })
+  .strict();
+
 const versionSixLibraryEnvelopeSchema = z
   .object({
     schemaVersion: z.literal(6),
     ownerUserId: ownerIdSchema,
     revision: z.number().int().nonnegative(),
     campaigns: z.array(storedCampaignSchema),
-    projects: z.array(storedAggregateSchema),
+    projects: z.array(legacyStoredAggregateSchema),
     processingJobs: z.array(storedProjectProcessingAttemptSchema),
     createReceipts: z.array(createReceiptSchema),
     campaignCreateReceipts: z.array(campaignCreateReceiptSchema),
@@ -583,13 +653,26 @@ export const parseLibrary = (
 ): { readonly library: ProjectLibrary; readonly migrated: boolean } => {
   const current = librarySchema.safeParse(value);
   if (current.success) return { library: current.data, migrated: false };
+  // v7 differs from v8 only in how a Project says what material it holds, and `storedAggregateSchema`
+  // has already lifted that by the time this arm sees the projects — so the envelope is re-stamped
+  // and nothing else moves.
+  const versionSeven = versionSevenLibraryEnvelopeSchema.safeParse(value);
+  if (versionSeven.success) {
+    return {
+      migrated: true,
+      library: librarySchema.parse({
+        ...versionSeven.data,
+        schemaVersion: PROJECT_LIBRARY_SCHEMA_VERSION,
+      }),
+    };
+  }
   const versionSix = versionSixLibraryEnvelopeSchema.safeParse(value);
   if (versionSix.success) {
     return {
       migrated: true,
       library: librarySchema.parse({
         ...versionSix.data,
-        schemaVersion: 7,
+        schemaVersion: PROJECT_LIBRARY_SCHEMA_VERSION,
         assetMemberships: versionSix.data.projects.flatMap(deriveProjectAssetMemberships),
       }),
     };
@@ -600,10 +683,12 @@ export const parseLibrary = (
       migrated: true,
       library: librarySchema.parse({
         ...previous.data,
-        schemaVersion: 7,
-        projects: previous.data.projects.map((aggregate) => storedAggregateSchema.parse(aggregate)),
+        schemaVersion: PROJECT_LIBRARY_SCHEMA_VERSION,
+        projects: previous.data.projects.map((aggregate) =>
+          legacyStoredAggregateSchema.parse(aggregate),
+        ),
         assetMemberships: previous.data.projects.flatMap((aggregate) =>
-          deriveProjectAssetMemberships(storedAggregateSchema.parse(aggregate)),
+          deriveProjectAssetMemberships(legacyStoredAggregateSchema.parse(aggregate)),
         ),
         processingJobs: previous.data.processingJobs ?? [],
         outputReceipts: [],
@@ -616,7 +701,7 @@ export const parseLibrary = (
       .object({ project: z.record(z.string(), z.unknown()) })
       .passthrough()
       .parse(aggregateValue);
-    return storedAggregateSchema.parse({
+    return legacyStoredAggregateSchema.parse({
       ...(aggregateValue as object),
       project: { ...aggregate.project, campaignId: null },
     });
@@ -624,7 +709,7 @@ export const parseLibrary = (
   return {
     migrated: true,
     library: librarySchema.parse({
-      schemaVersion: 7,
+      schemaVersion: PROJECT_LIBRARY_SCHEMA_VERSION,
       ownerUserId: legacy.ownerUserId,
       revision: legacy.revision,
       campaigns: [],
@@ -640,7 +725,7 @@ export const parseLibrary = (
 
 export const journalSchema = z
   .object({
-    schemaVersion: z.literal(7),
+    schemaVersion: z.literal(PROJECT_LIBRARY_SCHEMA_VERSION),
     ownerUserId: ownerIdSchema,
     transactionId: z.uuid(),
     state: z.literal('prepared'),
@@ -734,11 +819,15 @@ export const journalSchema = z
         );
         break;
       case 'project-source-accept':
-        consistent = metadata.projects.some(
-          ({ source }) =>
-            source?.projectId === operation.projectId &&
-            source.operationKey === operation.operationKey &&
-            source.requestFingerprint === operation.requestFingerprint,
+        // Matched on the operation key, not on the Project: a Project may hold several sources, and
+        // only one of them is the acceptance this journal entry was prepared for.
+        consistent = metadata.projects.some(({ sources }) =>
+          sources.some(
+            (source) =>
+              source.projectId === operation.projectId &&
+              source.operationKey === operation.operationKey &&
+              source.requestFingerprint === operation.requestFingerprint,
+          ),
         );
         break;
       case 'project-working-media-adopt':
@@ -834,14 +923,14 @@ export const parseJournal = (value: unknown): z.infer<typeof journalSchema> => {
   if (previous.success) {
     return journalSchema.parse({
       ...previous.data,
-      schemaVersion: 7,
+      schemaVersion: PROJECT_LIBRARY_SCHEMA_VERSION,
       writes: { metadata: parseLibrary(previous.data.writes.metadata).library },
     });
   }
   const legacy = legacyJournalSchema.parse(value);
   const metadata = parseLibrary(legacy.writes.projectMetadata).library;
   return journalSchema.parse({
-    schemaVersion: 7,
+    schemaVersion: PROJECT_LIBRARY_SCHEMA_VERSION,
     ownerUserId: legacy.ownerUserId,
     transactionId: legacy.transactionId,
     state: legacy.state,
@@ -852,7 +941,7 @@ export const parseJournal = (value: unknown): z.infer<typeof journalSchema> => {
 };
 
 export const emptyLibrary = (ownerUserId: string): ProjectLibrary => ({
-  schemaVersion: 7,
+  schemaVersion: PROJECT_LIBRARY_SCHEMA_VERSION,
   ownerUserId: ownerIdSchema.parse(ownerUserId),
   revision: 0,
   campaigns: [],

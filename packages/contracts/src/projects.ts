@@ -864,6 +864,15 @@ export const projectConflictSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('immutable-source'), projectId: projectIdSchema }).strict(),
   z
     .object({
+      kind: z.literal('source-limit'),
+      projectId: projectIdSchema,
+      limit: z.number().int().positive(),
+    })
+    .strict(),
+  z.object({ kind: z.literal('primary-source'), projectId: projectIdSchema }).strict(),
+  z.object({ kind: z.literal('source-already-held'), projectId: projectIdSchema }).strict(),
+  z
+    .object({
       kind: z.literal('saved-video-version'),
       savedVideoId: z.uuid(),
       expectedVersionId: z.uuid(),
@@ -981,6 +990,10 @@ export const projectOutputHistoryResponseSchema = z
   .strict();
 export const projectWorkingMediaParamsSchema = z
   .object({ projectId: projectIdSchema, revisionId: projectRevisionIdSchema })
+  .strict();
+/** A source is addressed by the media the Project holds; that pair is its key. */
+export const projectSourceParamsSchema = z
+  .object({ projectId: projectIdSchema, sourceAssetId: z.uuid() })
   .strict();
 export const projectsQuerySchema = z
   .object({
@@ -1439,18 +1452,22 @@ export const projectSourceResponseSchema = z
             /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/source\/content$/u,
           ),
       })
-      .strict(),
+      .strict()
+      // On the source object rather than the response, the way `projectWorkingMediaSchema` states
+      // the same rule about the same media — so the collection item inherits it by extension and
+      // one kind of lineage cannot be exact on one read and complete on the other.
+      .superRefine((source, context) => {
+        const reused = source.kind === 'saved-video-version';
+        if (reused !== (source.savedVideoId !== null && source.videoVersionId !== null)) {
+          context.addIssue({
+            code: 'custom',
+            message: 'Saved Video source lineage must be exact and complete.',
+          });
+        }
+      }),
   })
   .strict()
   .superRefine((value, context) => {
-    const reused = value.source.kind === 'saved-video-version';
-    if (reused !== (value.source.savedVideoId !== null && value.source.videoVersionId !== null)) {
-      context.addIssue({
-        code: 'custom',
-        path: ['source'],
-        message: 'Saved Video source lineage must be exact and complete.',
-      });
-    }
     if (
       value.revision.projectId !== value.project.id ||
       value.revision.id !== value.project.currentRevisionId ||
@@ -1462,6 +1479,81 @@ export const projectSourceResponseSchema = z
         code: 'custom',
         path: ['revision'],
         message: 'Project source responses must describe the exact current accepted revision.',
+      });
+    }
+  });
+
+/** Mirrors the domain's PROJECT_SOURCE_LIMIT by hand; the parity suite holds the two together. */
+export const PROJECT_SOURCE_LIMIT = 100;
+
+/**
+ * One member of a Project's source collection.
+ *
+ * The byte facts are taken from the single-source response rather than restated, so the two shapes
+ * cannot drift; what the collection adds is which media each one is — the key a Project addresses a
+ * source by — and a content URL that names it. `assetId` is already public for the primary, through
+ * the snapshot's `sourceAssetId`, and working media exposes its own the same way.
+ */
+export const projectSourceCollectionItemSchema = projectSourceResponseSchema.shape.source
+  .safeExtend({
+    assetId: z.uuid(),
+    acceptedRevisionId: projectRevisionIdSchema,
+    acceptedRevisionNumber: z.number().int().positive(),
+    contentUrl: z
+      .string()
+      .regex(
+        /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/sources\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/content$/u,
+      ),
+  })
+  .strict();
+
+export const projectSourceListResponseSchema = z
+  .object({
+    project: projectSchema,
+    revision: projectRevisionSchema,
+    sources: z.array(projectSourceCollectionItemSchema).max(PROJECT_SOURCE_LIMIT),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.revision.projectId !== value.project.id ||
+      value.revision.id !== value.project.currentRevisionId ||
+      value.revision.revisionNumber !== value.project.currentRevisionNumber
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['revision'],
+        message: 'Project source lists must describe the exact current revision.',
+      });
+    }
+    const addressed = new Set(value.sources.map(({ assetId }) => assetId));
+    if (addressed.size !== value.sources.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['sources'],
+        message: 'A Project holds each piece of source media once.',
+      });
+    }
+    for (const [index, source] of value.sources.entries()) {
+      if (
+        source.contentUrl !== `/api/projects/${value.project.id}/sources/${source.assetId}/content`
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['sources', index],
+          message: 'Each source must be addressed by the media the Project holds.',
+        });
+      }
+    }
+    // A Project that holds material names one piece of it as the original, because that pointer is
+    // what every single-source read resolves through. A Project that holds none may still carry the
+    // pointer: duplicating one copies its snapshot without its material.
+    const primary = value.revision.snapshot.sourceAssetId;
+    if (value.sources.length > 0 && (primary === null || !addressed.has(primary))) {
+      context.addIssue({
+        code: 'custom',
+        path: ['sources'],
+        message: 'A Project holds its original among its sources.',
       });
     }
   });
@@ -1496,6 +1588,8 @@ export type ProjectSourceUploadMetadata = z.infer<typeof projectSourceUploadMeta
 export type ReuseProjectSourceRequest = z.infer<typeof reuseProjectSourceRequestSchema>;
 export type RemoveProjectSourceRequest = z.infer<typeof removeProjectSourceRequestSchema>;
 export type ProjectSourceResponse = z.infer<typeof projectSourceResponseSchema>;
+export type ProjectSourceCollectionItem = z.infer<typeof projectSourceCollectionItemSchema>;
+export type ProjectSourceListResponse = z.infer<typeof projectSourceListResponseSchema>;
 export type ProjectWorkingMediaUploadMetadata = z.infer<
   typeof projectWorkingMediaUploadMetadataSchema
 >;

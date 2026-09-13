@@ -20,7 +20,7 @@ import type {
   ProjectTransform,
   ProjectWorkflowPhase,
 } from './types';
-import { PROJECT_EXPORT_ASPECTS } from './types';
+import { PROJECT_EXPORT_ASPECTS, PROJECT_SOURCE_LIMIT } from './types';
 import type { Composition } from '../composition';
 import { CompositionRuleError, validateComposition } from '../composition';
 import {
@@ -36,6 +36,7 @@ import {
 } from '../video-editing';
 import { requireIsoTimestamp, requireOpaqueId, stripControlCharacters } from '../common/identity';
 import { requireMediaReferenceIds } from './media-reference';
+import { projectMediaReferencesEqual } from './relations';
 import { normalizeWhitespace } from '../common/text';
 import type { ProjectProcessingJobStatus } from '../video-processing/types';
 import { projectProcessingNeedsAttention } from '../video-processing/rules';
@@ -976,6 +977,25 @@ export const projectConflicts = {
     kind: 'campaign-membership',
     projectId,
   }),
+  sourceLimit: (
+    projectId: string,
+  ): Extract<ProjectConflict, { readonly kind: 'source-limit' }> => ({
+    kind: 'source-limit',
+    projectId,
+    limit: PROJECT_SOURCE_LIMIT,
+  }),
+  primarySource: (
+    projectId: string,
+  ): Extract<ProjectConflict, { readonly kind: 'primary-source' }> => ({
+    kind: 'primary-source',
+    projectId,
+  }),
+  sourceAlreadyHeld: (
+    projectId: string,
+  ): Extract<ProjectConflict, { readonly kind: 'source-already-held' }> => ({
+    kind: 'source-already-held',
+    projectId,
+  }),
   immutableSource: (
     projectId: string,
   ): Extract<ProjectConflict, { readonly kind: 'immutable-source' }> => ({
@@ -1535,6 +1555,162 @@ export const removeProjectSource = (
         sourceStatus: 'none',
         currentAttempt: { status: 'none' },
         validatedLastSuccessfulOutput: null,
+      },
+    },
+    { ...context, now },
+  );
+};
+
+/**
+ * The arrangement with every clip over one piece of media taken out.
+ *
+ * Returns `null` when nothing is left to arrange rather than an empty sequence, because a
+ * composition with no clips is not a valid composition — the same shape a Project has before anyone
+ * arranges anything. Subtitle cues are sequence-time and survive the cut they no longer sit over;
+ * re-timing them is the timeline's job, not this one's.
+ */
+const compositionWithoutMedia = (
+  composition: Composition | null,
+  media: ProjectMediaReference,
+): Composition | null => {
+  if (composition === null) return null;
+  const clips = composition.clips.filter((clip) => !projectMediaReferencesEqual(clip.media, media));
+  return clips.length === 0 ? null : { ...composition, clips };
+};
+
+export interface AddProjectSourceInput {
+  readonly expectedProjectVersion: number;
+  readonly expectedRevisionNumber: number;
+  /**
+   * How many sources the Project already holds, read under the same lock that will write this one.
+   * Membership is relational, so the count is a caller-supplied fact exactly as `sourceStatus` is;
+   * what the limit should be is the rule's to own.
+   */
+  readonly heldSourceCount: number;
+  readonly author: ProjectRevisionAuthor;
+}
+
+/**
+ * Takes on more original material beside the one the Project already has.
+ *
+ * Deliberately not a mode on `acceptProjectSource`: that call also points `workingMedia` and
+ * `presentedMedia` at what it accepted, drops the retained output and sends the Project back to the
+ * creative phase, all of which are right for the first source and wrong for the next one. Taking on
+ * more material is an inventory act, not an editorial one — what the Project is currently showing
+ * does not change, and neither does what it last produced.
+ *
+ * A revision is appended all the same, carrying nothing but the new timestamp. The stored source has
+ * to name a revision of its own Project, and a caller that passed stale CAS tokens deserves to be
+ * told the Project moved rather than to have the material appear under a version it never saw.
+ */
+export const addProjectSource = (
+  aggregate: ProjectAggregate,
+  input: AddProjectSourceInput,
+  context: ProjectMutationContext,
+): ProjectMutationResult<ProjectAggregate> => {
+  const { project } = aggregate;
+  const currentRevision = aggregate.revisions.find(({ id }) => id === project.currentRevisionId);
+  if (currentRevision === undefined) {
+    throw new ProjectRuleError('invalid-snapshot', 'The current project revision is missing.');
+  }
+  if (currentRevision.snapshot.sourceAssetId === null) {
+    throw new ProjectRuleError(
+      'invalid-transition',
+      'A Project takes on its first source through acceptance, not addition.',
+    );
+  }
+  if (input.heldSourceCount >= PROJECT_SOURCE_LIMIT) {
+    return { ok: false, conflict: projectConflicts.sourceLimit(project.id) };
+  }
+  const now = requireTimestamp(context.now);
+  return appendProjectRevision(
+    aggregate,
+    {
+      expectedProjectVersion: input.expectedProjectVersion,
+      expectedRevisionNumber: input.expectedRevisionNumber,
+      snapshot: { ...currentRevision.snapshot, updatedAt: now },
+      author: input.author,
+      source: 'user-edit',
+      facts: {
+        sourceStatus: 'ready',
+        currentAttempt: { status: 'none' },
+        validatedLastSuccessfulOutput: currentRevision.snapshot.lastSuccessfulOutput,
+      },
+    },
+    { ...context, now },
+  );
+};
+
+export interface RemoveProjectSourceByIdInput {
+  readonly expectedProjectVersion: number;
+  readonly expectedRevisionNumber: number;
+  /** The held source to let go of, named by the media it holds. */
+  readonly assetId: string;
+  readonly heldSourceCount: number;
+  readonly author: ProjectRevisionAuthor;
+}
+
+/**
+ * Lets go of one named piece of material.
+ *
+ * Three cases, and only the middle one is new. Letting go of the last source is the same act as
+ * `removeProjectSource` and defers to it, so a Media area never has to know which control to offer.
+ * Letting go of the one the snapshot points at while others are held is refused: something has to
+ * become the Project's original, and choosing which is a question for whoever can ask the operator —
+ * slice 3.4 — not a default this rule should invent. Anything else is inventory: the arrangement
+ * loses the clips that named the departing media, and nothing else moves.
+ */
+export const removeProjectSourceById = (
+  aggregate: ProjectAggregate,
+  input: RemoveProjectSourceByIdInput,
+  context: ProjectMutationContext,
+): ProjectMutationResult<ProjectAggregate> => {
+  const { project } = aggregate;
+  const currentRevision = aggregate.revisions.find(({ id }) => id === project.currentRevisionId);
+  if (currentRevision === undefined) {
+    throw new ProjectRuleError('invalid-snapshot', 'The current project revision is missing.');
+  }
+  const assetId = requireId(input.assetId, 'Source asset');
+  // CAS before the semantic guards, as `removeProjectSource` does, so the same stale request gets
+  // the same answer whichever of the three cases it lands in.
+  if (project.version !== input.expectedProjectVersion) {
+    return projectVersionConflict(project, input.expectedProjectVersion);
+  }
+  if (project.currentRevisionNumber !== input.expectedRevisionNumber) {
+    return {
+      ok: false,
+      conflict: projectConflicts.revision(
+        project.id,
+        input.expectedRevisionNumber,
+        project.currentRevisionNumber,
+      ),
+    };
+  }
+  if (currentRevision.snapshot.sourceAssetId === assetId) {
+    return input.heldSourceCount <= 1
+      ? removeProjectSource(aggregate, input, context)
+      : { ok: false, conflict: projectConflicts.primarySource(project.id) };
+  }
+  const now = requireTimestamp(context.now);
+  return appendProjectRevision(
+    aggregate,
+    {
+      expectedProjectVersion: input.expectedProjectVersion,
+      expectedRevisionNumber: input.expectedRevisionNumber,
+      snapshot: {
+        ...currentRevision.snapshot,
+        composition: compositionWithoutMedia(currentRevision.snapshot.composition, {
+          kind: 'asset',
+          assetId,
+        }),
+        updatedAt: now,
+      },
+      author: input.author,
+      source: 'user-edit',
+      facts: {
+        sourceStatus: 'ready',
+        currentAttempt: { status: 'none' },
+        validatedLastSuccessfulOutput: currentRevision.snapshot.lastSuccessfulOutput,
       },
     },
     { ...context, now },

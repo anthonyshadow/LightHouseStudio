@@ -59,9 +59,12 @@ describe('ProjectSourceService local authority', () => {
 
   // `createId` is the only axis that varies: tests appending more than one revision need distinct
   // ids, the rest pin the revision id so they can assert on it.
-  const sourceService = (createId: () => string = () => sourceRevisionId) =>
+  const sourceService = (
+    createId: () => string = () => sourceRevisionId,
+    now: string = acceptedAt,
+  ) =>
     new ProjectSourceService(projects, savedVideos, bytes, {
-      now: () => new Date(acceptedAt),
+      now: () => new Date(now),
       createId,
       inspect: () => Promise.resolve(inspected),
       projectRetention: projects,
@@ -80,6 +83,7 @@ describe('ProjectSourceService local authority', () => {
       expectedVersion: 1,
       expectedRevisionNumber: 1,
       kind: 'uploaded' as const,
+      refuseWhenOccupied: true,
       sourcePath,
       checksumSha256,
       filename: '../launch source?.mp4',
@@ -154,6 +158,7 @@ describe('ProjectSourceService local authority', () => {
     });
 
     const accepted = await sourceService().upload({
+      refuseWhenOccupied: true,
       ownerUserId,
       projectId: current.project.id,
       operationKey,
@@ -186,6 +191,7 @@ describe('ProjectSourceService local authority', () => {
       expectedVersion: 1,
       expectedRevisionNumber: 1,
       kind: 'uploaded' as const,
+      refuseWhenOccupied: true,
       sourcePath,
       checksumSha256,
       filename: 'wrong.mp4',
@@ -260,6 +266,7 @@ describe('ProjectSourceService local authority', () => {
     });
 
     const accepted = await sourceService().upload({
+      refuseWhenOccupied: true,
       ownerUserId,
       projectId: current.project.id,
       operationKey: randomUUID(),
@@ -315,6 +322,7 @@ describe('ProjectSourceService local authority', () => {
       expectedVersion: 1,
       expectedRevisionNumber: 1,
       kind: 'recorded' as const,
+      refuseWhenOccupied: true,
       sourcePath,
       checksumSha256,
       filename: 'finalized-recording.mp4',
@@ -351,6 +359,7 @@ describe('ProjectSourceService local authority', () => {
 
     await expect(
       service.upload({
+        refuseWhenOccupied: true,
         ownerUserId: otherOwnerUserId,
         projectId: current.project.id,
         operationKey,
@@ -390,6 +399,7 @@ describe('ProjectSourceService local authority', () => {
     const countBefore = (await readdir(path.join(directory, 'media', 'v1', 'assets'))).length;
 
     const accepted = await sourceService().reuseSavedVideo({
+      refuseWhenOccupied: true,
       ownerUserId,
       projectId: project.project.id,
       operationKey: randomUUID(),
@@ -422,10 +432,28 @@ describe('ProjectSourceService local authority', () => {
     });
     expect((await readdir(path.join(directory, 'media', 'v1', 'assets'))).length).toBe(countBefore);
 
+    // Borrowing the same Version again is the one way the same media can arrive twice: its asset is
+    // the Version's, not one derived per request. A fresh key makes it a different request rather
+    // than a replay, so it is refused by name instead of colliding with the key the collection is
+    // built on.
+    await expect(
+      sourceService().reuseSavedVideo({
+        refuseWhenOccupied: false,
+        ownerUserId,
+        projectId: project.project.id,
+        operationKey: randomUUID(),
+        expectedVersion: 2,
+        expectedRevisionNumber: 2,
+        savedVideoId: saved.id,
+        videoVersionId: saved.currentVersion.id,
+      }),
+    ).resolves.toMatchObject({ ok: false, conflict: { kind: 'source-already-held' } });
+
     const unavailableProject = await createProject('Unavailable Version Project');
     await savedVideos.markMissing(ownerUserId, saved.id, acceptedAt);
     await expect(
       sourceService().reuseSavedVideo({
+        refuseWhenOccupied: true,
         ownerUserId,
         projectId: unavailableProject.project.id,
         operationKey: randomUUID(),
@@ -438,5 +466,147 @@ describe('ProjectSourceService local authority', () => {
 
     await savedVideoService.delete(ownerUserId, saved.id);
     expect(await bytes.exists(ownerUserId, assetId)).toBe(true);
+  });
+
+  it('holds several sources, names one of them the original, and lets go of them one at a time', async () => {
+    const current = await createProject('Several sources');
+    const service = uniqueRevisionSourceService();
+    // Accepted a minute apart, so "oldest acceptance first" is an ordering and not a tie broken by
+    // whichever asset id sorts lower.
+    const laterService = sourceService(randomUUID, '2026-08-12T12:01:00.000Z');
+    const firstKey = randomUUID();
+    const firstAssetId = projectUploadAssetId(ownerUserId, firstKey);
+    const accepted = await service.upload({
+      refuseWhenOccupied: true,
+      ownerUserId,
+      projectId: current.project.id,
+      operationKey: firstKey,
+      expectedVersion: 1,
+      expectedRevisionNumber: 1,
+      kind: 'uploaded',
+      sourcePath,
+      checksumSha256,
+      filename: 'first.mp4',
+    });
+    if (!accepted.ok) throw new Error('Expected the first source to be accepted.');
+
+    const secondKey = randomUUID();
+    const secondAssetId = projectUploadAssetId(ownerUserId, secondKey);
+    const additional = {
+      refuseWhenOccupied: false,
+      ownerUserId,
+      projectId: current.project.id,
+      operationKey: secondKey,
+      expectedVersion: 2,
+      expectedRevisionNumber: 2,
+      kind: 'uploaded' as const,
+      sourcePath,
+      checksumSha256,
+      filename: 'second.mp4',
+    };
+    const added = await laterService.upload(additional);
+    expect(added).toMatchObject({ ok: true, replayed: false });
+
+    // Taking on more material is an inventory act: what the Project is showing does not move.
+    if (!added.ok) throw new Error('Expected the second source to be accepted.');
+    expect(added.response.revision.snapshot).toMatchObject({
+      sourceAssetId: firstAssetId,
+      workingMedia: { kind: 'asset', assetId: firstAssetId },
+      presentedMedia: { kind: 'asset', assetId: firstAssetId },
+    });
+
+    await expect(service.list(ownerUserId, current.project.id)).resolves.toMatchObject({
+      sources: [
+        { assetId: firstAssetId, filename: 'first.mp4' },
+        { assetId: secondAssetId, filename: 'second.mp4' },
+      ],
+    });
+
+    // A retried second acceptance replays rather than colliding with the source the snapshot names.
+    await expect(laterService.upload(additional)).resolves.toMatchObject({
+      ok: true,
+      replayed: true,
+    });
+
+    // The legacy endpoints keep describing the one the snapshot names, and still refuse another.
+    await expect(service.get(ownerUserId, current.project.id)).resolves.toMatchObject({
+      source: { filename: 'first.mp4' },
+    });
+    await expect(
+      service.upload({ ...additional, refuseWhenOccupied: true, operationKey: randomUUID() }),
+    ).resolves.toMatchObject({ ok: false, conflict: { kind: 'immutable-source' } });
+
+    // Both sets of bytes are reachable, each under its own address.
+    await expect(
+      service.contentById(ownerUserId, current.project.id, secondAssetId),
+    ).resolves.toMatchObject({ source: { filename: 'second.mp4' } });
+
+    // Nothing links the held source to a revision — taking material on names nothing new — so the
+    // only thing that can be keeping its bytes is the Project holding it.
+    await expect(projects.retainsAsset(ownerUserId, secondAssetId)).resolves.toBe(true);
+
+    // "Remove original video" answers the same way the per-source removal does, so a control named
+    // for one video cannot quietly discard the rest.
+    await expect(
+      service.remove({
+        ownerUserId,
+        projectId: current.project.id,
+        expectedVersion: 3,
+        expectedRevisionNumber: 3,
+      }),
+    ).resolves.toMatchObject({ ok: false, conflict: { kind: 'primary-source' } });
+
+    // Letting go of the original while others are held needs someone to choose a new one.
+    await expect(
+      service.removeById({
+        ownerUserId,
+        projectId: current.project.id,
+        assetId: firstAssetId,
+        expectedVersion: 3,
+        expectedRevisionNumber: 3,
+      }),
+    ).resolves.toMatchObject({ ok: false, conflict: { kind: 'primary-source' } });
+
+    await expect(
+      service.removeById({
+        ownerUserId,
+        projectId: current.project.id,
+        assetId: secondAssetId,
+        expectedVersion: 3,
+        expectedRevisionNumber: 3,
+      }),
+    ).resolves.toMatchObject({ ok: true });
+    await expect(service.list(ownerUserId, current.project.id)).resolves.toMatchObject({
+      sources: [{ assetId: firstAssetId }],
+    });
+
+    // Removing what the Project no longer holds converges instead of conflicting, which is what
+    // lets the command carry no operation key.
+    await expect(
+      service.removeById({
+        ownerUserId,
+        projectId: current.project.id,
+        assetId: secondAssetId,
+        expectedVersion: 1,
+        expectedRevisionNumber: 1,
+      }),
+    ).resolves.toMatchObject({ ok: true });
+
+    // The last one goes the way the legacy removal does, so a surface never has to choose a verb.
+    await expect(
+      service.removeById({
+        ownerUserId,
+        projectId: current.project.id,
+        assetId: firstAssetId,
+        expectedVersion: 4,
+        expectedRevisionNumber: 4,
+      }),
+    ).resolves.toMatchObject({
+      ok: true,
+      current: { revision: { snapshot: { sourceAssetId: null, workingMedia: null } } },
+    });
+    await expect(service.list(ownerUserId, current.project.id)).resolves.toMatchObject({
+      sources: [],
+    });
   });
 });

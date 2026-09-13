@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   acceptProjectSource,
+  addProjectSource,
+  removeProjectSourceById,
+  PROJECT_SOURCE_LIMIT,
   adoptProjectWorkingMedia,
   appendProjectRevision,
   archiveProject,
@@ -2041,5 +2044,200 @@ describe('burned captions across every export placement', () => {
     for (const aspect of PROJECT_EXPORT_ASPECTS) {
       expect(() => cutRegions(aspect, landscape)).not.toThrow();
     }
+  });
+
+  it('takes on more material without moving the cut, and prunes only what leaves', () => {
+    const projectId = '2f1e2f0c-1b96-4a6a-9a24-49c1f3d0a1d4';
+    const ownerUserId = 'b9f3e0a8-6d07-4d9e-8d92-8b7c5a2e93f0';
+    const firstAssetId = 'd1f0b9c4-4a5e-4d2b-9a1c-6f2e8b0d7a35';
+    const extraAssetId = '8c4b6a12-7e3d-4f59-90ab-2d1c5e7f4b08';
+    const created = createProject(
+      {
+        id: projectId,
+        ownerUserId,
+        title: 'Several',
+        snapshot: createEmptyProjectSnapshot(now),
+        author: { kind: 'user', authorId: ownerUserId },
+        facts: emptyFacts,
+      },
+      { now, createId: () => firstRevisionId },
+    );
+    const accepted = acceptProjectSource(
+      created,
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        assetId: firstAssetId,
+        mediaReference: { kind: 'asset', assetId: firstAssetId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    if (!accepted.ok) throw new Error('Expected the first source to be accepted.');
+
+    const added = addProjectSource(
+      accepted.value,
+      {
+        expectedProjectVersion: 2,
+        expectedRevisionNumber: 2,
+        heldSourceCount: 1,
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => '6c9a0b2f-7d51-4c84-9f36-0b1e4d8a5c73' },
+    );
+    // Nothing but the clock moves: taking material on is not an edit.
+    expect(added).toMatchObject({
+      ok: true,
+      value: {
+        revisions: [
+          {},
+          {},
+          {
+            snapshot: {
+              sourceAssetId: firstAssetId,
+              workingMedia: { kind: 'asset', assetId: firstAssetId },
+              presentedMedia: { kind: 'asset', assetId: firstAssetId },
+              workflowPhase: 'creative',
+              updatedAt: latest,
+            },
+          },
+        ],
+      },
+    });
+    if (!added.ok) throw new Error('Expected the additional source.');
+
+    // A Project takes its first source through acceptance; addition has nothing to sit beside.
+    expect(() =>
+      addProjectSource(
+        created,
+        {
+          expectedProjectVersion: 1,
+          expectedRevisionNumber: 1,
+          heldSourceCount: 0,
+          author: { kind: 'user', authorId: ownerUserId },
+        },
+        { now: later, createId: () => secondRevisionId },
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        message: 'A Project takes on its first source through acceptance, not addition.',
+      }),
+    );
+
+    expect(
+      addProjectSource(
+        accepted.value,
+        {
+          expectedProjectVersion: 2,
+          expectedRevisionNumber: 2,
+          heldSourceCount: PROJECT_SOURCE_LIMIT,
+          author: { kind: 'user', authorId: ownerUserId },
+        },
+        { now: latest, createId: () => secondRevisionId },
+      ),
+    ).toMatchObject({
+      ok: false,
+      conflict: { kind: 'source-limit', projectId, limit: PROJECT_SOURCE_LIMIT },
+    });
+
+    // An arrangement over both pieces of material; letting one go prunes only its clips.
+    const arranged = appendProjectRevision(
+      added.value,
+      {
+        expectedProjectVersion: 3,
+        expectedRevisionNumber: 3,
+        snapshot: {
+          ...added.value.revisions.at(-1)!.snapshot,
+          composition: {
+            clips: [
+              {
+                id: 'ec2c2f2a-9a4a-4a75-8f0a-31f7d1f0b0c1',
+                media: { kind: 'asset', assetId: firstAssetId },
+                trim: { startMs: 0, endMs: 4_000 },
+                audio: { level: 100, muted: false },
+              },
+              {
+                id: 'f3a1d4b6-0c58-4e2f-b7d9-5a8c1e6b9042',
+                media: { kind: 'asset', assetId: extraAssetId },
+                trim: { startMs: 0, endMs: 2_000 },
+                audio: { level: 100, muted: false },
+              },
+            ],
+            subtitles: [],
+          },
+          updatedAt: latest,
+        },
+        author: { kind: 'user', authorId: ownerUserId },
+        source: 'user-edit',
+        facts: readyFacts,
+      },
+      { now: latest, createId: () => '1a0d9f3c-6b27-4e18-8c5a-7f2b0e4d9163' },
+    );
+    if (!arranged.ok) throw new Error('Expected the arrangement.');
+
+    const pruned = removeProjectSourceById(
+      arranged.value,
+      {
+        expectedProjectVersion: 4,
+        expectedRevisionNumber: 4,
+        assetId: extraAssetId,
+        heldSourceCount: 2,
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => '54b7e0a1-2f9c-4d63-8a15-9e3c7b0d2f48' },
+    );
+    expect(pruned).toMatchObject({
+      ok: true,
+      value: {
+        revisions: [
+          {},
+          {},
+          {},
+          {},
+          {
+            snapshot: {
+              sourceAssetId: firstAssetId,
+              composition: { clips: [{ media: { assetId: firstAssetId } }] },
+            },
+          },
+        ],
+      },
+    });
+    if (!pruned.ok) throw new Error('Expected the prune.');
+    expect(pruned.value.revisions.at(-1)!.snapshot.composition?.clips).toHaveLength(1);
+
+    // Letting go of the original while other material is held needs someone to choose a new one.
+    expect(
+      removeProjectSourceById(
+        arranged.value,
+        {
+          expectedProjectVersion: 4,
+          expectedRevisionNumber: 4,
+          assetId: firstAssetId,
+          heldSourceCount: 2,
+          author: { kind: 'user', authorId: ownerUserId },
+        },
+        { now: latest, createId: () => secondRevisionId },
+      ),
+    ).toMatchObject({ ok: false, conflict: { kind: 'primary-source', projectId } });
+
+    // The last piece goes the way the legacy removal does, arrangement and all.
+    const detached = removeProjectSourceById(
+      arranged.value,
+      {
+        expectedProjectVersion: 4,
+        expectedRevisionNumber: 4,
+        assetId: firstAssetId,
+        heldSourceCount: 1,
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => '7d2f1b93-4a0e-4c57-9b86-3e1a5d0c8f24' },
+    );
+    expect(detached).toMatchObject({
+      ok: true,
+      value: {
+        revisions: [{}, {}, {}, {}, { snapshot: { sourceAssetId: null, composition: null } }],
+      },
+    });
   });
 });

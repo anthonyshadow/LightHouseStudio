@@ -7,7 +7,7 @@
  * what the collection contains, and reports the counts prompt 30 has to act on before the read
  * authority moves.
  *
- * It issues one SELECT and nothing else. `db:verify-sources` pins `LIGHTFRAME_ENV=development`, so
+ * It reads and never writes. `db:verify-sources` pins `LIGHTFRAME_ENV=development`, so
  * it reads whatever `DATABASE_URL` that environment names; verifying a deployed database needs its
  * own pinned entry, which prompt 30 adds when it has one to verify.
  *
@@ -21,6 +21,7 @@ import { parseEnvironment } from '../src/config/environment.js';
 import { createPostgresDatabase } from '../src/infrastructure/database/client.js';
 import { currentRevisionMatch } from '../src/infrastructure/database/project-repository.js';
 import {
+  mediaAssets,
   projectRevisions,
   projectSources,
   projects,
@@ -78,6 +79,33 @@ try {
     )
     .where(sql`${projects.deletedAt} is not null`);
 
+  /*
+   * Owners and byte facts, over every stored source including tombstoned Projects'.
+   *
+   * Same-owner is a composite foreign key, so a row that disagreed could not exist — the check earns
+   * its place by saying so out loud rather than by expecting a hit. The byte facts are the part that
+   * can actually drift: `project_sources` copies the asset's mime type, size and checksum at
+   * acceptance so a later read need not reopen the asset, and nothing has re-checked those copies
+   * since. A collection read hands them to a client per source, so a stale copy stops being a
+   * curiosity and starts being what the browser is told about media it is about to play.
+   */
+  const [facts] = await connection.db
+    .select({
+      total: sql<number>`count(*)::int`,
+      foreignOwner: sql<number>`count(*) filter (where ${projects.ownerUserId} <> ${projectSources.ownerUserId})::int`,
+      missingAsset: sql<number>`count(*) filter (where ${mediaAssets.id} is null)::int`,
+      byteFactMismatch: sql<number>`count(*) filter (where ${mediaAssets.id} is not null and (${mediaAssets.mimeType} <> ${projectSources.mimeType} or ${mediaAssets.sizeBytes} <> ${projectSources.sizeBytes} or ${mediaAssets.checksumSha256} <> ${projectSources.checksumSha256}))::int`,
+    })
+    .from(projectSources)
+    .innerJoin(projects, eq(projects.id, projectSources.projectId))
+    .leftJoin(
+      mediaAssets,
+      and(
+        eq(mediaAssets.id, projectSources.assetId),
+        eq(mediaAssets.ownerUserId, projectSources.ownerUserId),
+      ),
+    );
+
   const held = new Map<string, { primary: string | null; assets: string[] }>();
   for (const row of rows) {
     const entry = held.get(row.projectId) ?? { primary: row.primaryAssetId, assets: [] };
@@ -110,6 +138,10 @@ try {
         projects: held.size,
         projectsHoldingSources: withSources,
         sourcesHeldByTombstonedProjects: tombstoned?.heldSources ?? 0,
+        storedSources: facts?.total ?? 0,
+        foreignOwnerSources: facts?.foreignOwner ?? 0,
+        sourcesWithNoAsset: facts?.missingAsset ?? 0,
+        sourcesWhoseByteFactsDrifted: facts?.byteFactMismatch ?? 0,
         collectionsLargerThanOne,
         divergences: divergences.length,
         detail: divergences.slice(0, 20),
@@ -118,7 +150,12 @@ try {
       2,
     ),
   );
-  if (divergences.length > 0) process.exitCode = 1;
+  const clean =
+    divergences.length === 0 &&
+    (facts?.foreignOwner ?? 0) === 0 &&
+    (facts?.missingAsset ?? 0) === 0 &&
+    (facts?.byteFactMismatch ?? 0) === 0;
+  if (!clean) process.exitCode = 1;
 } finally {
   await connection.close();
 }
