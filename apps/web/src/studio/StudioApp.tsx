@@ -197,6 +197,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     projectId: activeProjectId,
     recordingLifecycle: recording.lifecycle,
     recordingOriginal: recording.original,
+    recordingPresented: recording.presented,
     presentSource: publishStageSource,
     clearSource: recording.discard,
   });
@@ -582,6 +583,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     projectWorkingMedia,
     projectSourceActivity: activeProjectSourceActivity,
     projectWorkingMediaActivity: activeProjectWorkingMediaActivity,
+    hasUnclaimedTake: project.unclaimedTake,
     discardSavedVideoWork,
     discardPendingAdoption,
     closeOverlay,
@@ -797,9 +799,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
         recordingOrFinalizing={work.recordingOrFinalizing}
         videoRenderingActive={work.videoRenderingActive}
         hasTemporaryTake={work.hasTemporaryTake}
-        hasUnclaimedTake={
-          ownedRecordingArtifact(recording.presented) !== null && !project.presentedByProject
-        }
+        hasUnclaimedTake={work.hasUnclaimedTake}
         hasUnsavedTake={work.hasTemporaryTake && savedVideo.presentedHasUnsavedChanges}
         voiceProcessingActive={work.voiceProcessingActive}
         creativeWorkDirty={work.creativeWorkDirty}

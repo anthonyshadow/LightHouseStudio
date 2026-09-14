@@ -13,7 +13,9 @@ import {
   retryProjectProcessing,
   submitProjectProcessing,
 } from './projectProcessingApi';
-import { getProject } from './projectsApi';
+// From the narrow module rather than the barrel: this controller is the shell's, and the
+// barrel would put every Project call in every authenticated route's static closure.
+import { getProject } from './projectAuthorityApi';
 import {
   projectProcessingBusy,
   type ProjectProcessingCommandPhase,

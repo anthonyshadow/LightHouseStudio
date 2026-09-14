@@ -80,6 +80,9 @@ const renderBridge = (ports: BridgePorts, initial: Partial<BridgeProps> = {}) =>
         projectId,
         recordingLifecycle: lifecycle,
         recordingOriginal: original,
+        // The stage shows whatever the recorder last published, which for these cases is the
+        // original itself; the bridge only ever compares its id.
+        recordingPresented: original,
         ...ports,
       }),
     { initialProps: props },
@@ -273,5 +276,27 @@ describe('useStudioProjectBridge', () => {
     );
 
     expect(hook.result.current.recordingCandidate).toBeNull();
+  });
+
+  it('stops offering a take the Project has claimed, and stops calling it unclaimed', () => {
+    const take = { ...presentedProjectMedia, id: 'claimed-take-1', objectUrl: 'blob:claimed' };
+    const { result } = renderBridge(
+      { presentSource: vi.fn(), clearSource: vi.fn(() => true) },
+      { lifecycle: 'recorded', original: take },
+    );
+
+    expect(result.current.recordingCandidate).not.toBeNull();
+    expect(result.current.unclaimedTake).toBe(true);
+
+    act(() => result.current.sourceRuntime.claim(firstProjectId, take.id));
+
+    /*
+     * Nothing in the capture graph can say this: a take stays `recorded` through every
+     * re-presentation, and storing it in a Project's collection touches neither the recorder nor
+     * the stage. Left unsaid, the control offered the same recording again — a second asset for the
+     * same bytes — and every exit from the workspace asked to discard a video already on the server.
+     */
+    expect(result.current.recordingCandidate).toBeNull();
+    expect(result.current.unclaimedTake).toBe(false);
   });
 });

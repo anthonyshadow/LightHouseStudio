@@ -1,10 +1,13 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectCurrentResponse } from '@studio/contracts';
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, ConfirmationDialog, StatusNotice } from '../../ui';
-import { PROJECT_RECORDING_TAKE_IN_PROGRESS_NOTICE } from '../take-review/takeRefusalNotices';
 import { PROJECT_MEDIA_REMOVAL_REASSURANCE } from './projectProcessingPresentation';
-import type { ProjectRecordingLaunchRefusal } from './projectRecordingLaunch';
+import {
+  RECORDING_UNSUPPORTED_NOTICE,
+  useProjectRecordingControl,
+  type ProjectRecordingLaunchRefusal,
+} from './projectRecordingLaunch';
 import { emptyProjectStyles } from './ProjectRouteSurface.styles';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
 import {
@@ -13,6 +16,7 @@ import {
   useProjectVideoIntake,
 } from './useProjectVideoIntake';
 import {
+  busyProjectSourceActivity,
   useProjectSourceController,
   type ProjectSourceActivity,
   type ProjectSourcePhase,
@@ -89,45 +93,10 @@ const projectSourceNotice = (
   }
 };
 
-/*
- * Why the Record control is off, said before it is pressed rather than after — a browser that
- * cannot capture is not a condition the operator can wait out, so it names the two controls beside
- * it that do work. Nothing answers this from a press: the same fact that would refuse the launch
- * has already disabled the button.
- */
-const RECORDING_UNSUPPORTED_NOTICE =
-  'This browser cannot record video. Upload a video or use a saved one instead.';
-
-/**
- * What a Record press says when it started nothing, and only while that is still true.
- *
- * A refusal names a condition the runtime is in rather than an event that happened, so it is read
- * against that condition on every render instead of being latched by the press: the sentence
- * arrives with the busy Record control as the take the launch refused for lands in this surface's
- * props, and it leaves with it. Latched, it outlived finalization and was still on screen beside
- * the "Use finalized recording" button that replaces Record once the take is ready — telling the
- * operator to finish a take they had just finished.
- *
- * A member added here has to say both halves before it can reach the screen, which is the point of
- * the switch: a refusal with no sentence, or with no condition to hold it up, will not compile.
- */
-const recordingRefusalNotice = (
-  refusal: ProjectRecordingLaunchRefusal | null,
-  recordingActive: boolean,
-): string | null => {
-  switch (refusal) {
-    case 'take-in-progress':
-      // The one prop that carries it: the workspace sets this for a take being captured and for one
-      // still finalizing alike, which is exactly the span this sentence is true for.
-      return recordingActive ? PROJECT_RECORDING_TAKE_IN_PROGRESS_NOTICE : null;
-    case null:
-      return null;
-  }
-};
-
 export const ProjectSourceSection = ({
   current,
   runtime,
+  stageHoldsSource,
   recordingCandidate,
   recordingActive = false,
   recordingSupported = true,
@@ -138,6 +107,11 @@ export const ProjectSourceSection = ({
 }: {
   readonly current: ProjectCurrentResponse;
   readonly runtime: ProjectSourceRuntime;
+  /**
+   * Whether the stage is still showing this Project's media, where the caller can see. Absent for
+   * a surface mounted away from the capture graph, which never takes the stage away either.
+   */
+  readonly stageHoldsSource?: boolean | undefined;
   readonly recordingCandidate?: ProjectRecordingCandidate | null | undefined;
   readonly recordingActive?: boolean | undefined;
   /**
@@ -163,10 +137,6 @@ export const ProjectSourceSection = ({
   const removeTriggerRef = useRef<HTMLButtonElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
-  const recordingUnsupportedId = useId();
-  const [recordingRefusal, setRecordingRefusal] = useState<ProjectRecordingLaunchRefusal | null>(
-    null,
-  );
   // Relayed rather than passed straight through, so the intake below can be reported as the work
   // it is; the controller stays the only author of everything else in an activity.
   const [controllerActivity, setControllerActivity] = useState<ProjectSourceActivity | null>(null);
@@ -176,6 +146,7 @@ export const ProjectSourceSection = ({
     runtime,
     setControllerActivity,
     onCurrentChange,
+    stageHoldsSource,
   );
   const { upload } = controller;
   const acceptIntake = useCallback(
@@ -199,7 +170,7 @@ export const ProjectSourceSection = ({
    */
   const reportedActivity = useMemo<ProjectSourceActivity | null>(() => {
     if (controllerActivity === null || intake.phase === null) return controllerActivity;
-    return { ...controllerActivity, phase: 'preparing', busy: true, abort: intake.cancel };
+    return busyProjectSourceActivity(controllerActivity, intake.cancel);
   }, [controllerActivity, intake.cancel, intake.phase]);
 
   useEffect(() => {
@@ -210,19 +181,15 @@ export const ProjectSourceSection = ({
   // the caller offered a way to one, the control names where recording actually happens.
   const detached = runtime.kind === 'detached';
   /*
-   * The one refusal this section can see coming, so the control is off with the reason attached
-   * rather than live and dead — the treatment every other Record control in the product gets, and
-   * the reason the launch never has to answer for an unsupported browser. Read only where a launch
-   * is offered: elsewhere the button is already off, and "this browser" would be the wrong reason.
+   * The control is off with the reason attached rather than live and dead — the treatment every
+   * other Record control in the product gets, and the reason the launch never has to answer for an
+   * unsupported browser.
    */
-  const recordingUnsupported = onStartRecording !== undefined && !recordingSupported;
-  // One write, because the launch answers before this returns: an earlier press's refusal is
-  // replaced by this press's, whatever that is, and `null` is how a press that started something
-  // clears it.
-  const startRecording = () => {
-    setRecordingRefusal(onStartRecording?.() ?? null);
-  };
-  const recordingRefusalMessage = recordingRefusalNotice(recordingRefusal, recordingActive);
+  const record = useProjectRecordingControl({
+    onStartRecording,
+    recordingActive,
+    recordingSupported,
+  });
   /*
    * One notice, with the intake speaking first while it has something to say: its wait is the only
    * thing happening, and a refusal from here supersedes whatever the last attempt at the server
@@ -320,11 +287,11 @@ export const ProjectSourceSection = ({
               ) : (
                 <Button
                   disabled={
-                    controlsDisabled || onStartRecording === undefined || recordingUnsupported
+                    controlsDisabled || onStartRecording === undefined || record.unsupported
                   }
                   busy={recordingActive}
-                  aria-describedby={recordingUnsupported ? recordingUnsupportedId : undefined}
-                  onClick={startRecording}
+                  aria-describedby={record.describedById}
+                  onClick={record.press}
                 >
                   {detached && onStartRecording !== undefined
                     ? 'Record in the workspace'
@@ -341,12 +308,12 @@ export const ProjectSourceSection = ({
               >
                 Use a saved video
               </Button>
-              {recordingUnsupported ? (
-                <small id={recordingUnsupportedId}>{RECORDING_UNSUPPORTED_NOTICE}</small>
+              {record.unsupported ? (
+                <small id={record.unsupportedId}>{RECORDING_UNSUPPORTED_NOTICE}</small>
               ) : null}
-              {recordingRefusalMessage ? (
+              {record.refusalMessage ? (
                 <StatusNotice role="alert" tone="warning">
-                  {recordingRefusalMessage}
+                  {record.refusalMessage}
                 </StatusNotice>
               ) : null}
               {detached ? (

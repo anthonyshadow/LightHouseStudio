@@ -6,8 +6,12 @@ import { useNavigate } from 'react-router';
 import { projectWorkspacePath } from '../../app/paths';
 import { Button, OverlayPanel, StatusNotice } from '../../ui';
 import { safeProjectError } from './ProjectDialogs';
-import { addSavedVideoAsProjectSource, listProjectSources } from './projectsApi';
-import { reconcileProject, useProjectList } from './useProjectsController';
+import {
+  addSavedVideoAsProjectSource,
+  listProjectSources,
+  projectHoldsSavedVideoVersion,
+} from './projectsApi';
+import { reconcileProject, reconcileProjectMedia, useProjectList } from './useProjectsController';
 import { useStableOperationKey } from './useStableOperationKey';
 import { PROJECT_ADD_VIDEO_ACTION_LABEL } from './projectProcessingPresentation';
 
@@ -45,12 +49,7 @@ export const AddVideoToProjectDialog = ({
        * a retry after a lost answer converge instead of storing the same video twice.
        */
       const held = await listProjectSources(project.id);
-      if (
-        held.sources.some(
-          (source) =>
-            source.savedVideoId === video.id && source.videoVersionId === video.currentVersion.id,
-        )
-      ) {
+      if (projectHoldsSavedVideoVersion(held.sources, video)) {
         finish(project.id);
         return;
       }
@@ -78,6 +77,7 @@ export const AddVideoToProjectDialog = ({
         savedVideoId: video.id,
         videoVersionId: video.currentVersion.id,
       });
+      await reconcileProjectMedia(queryClient, project.id);
       await reconcileProject(queryClient, {
         project: response.project,
         revision: response.revision,

@@ -1,10 +1,6 @@
 import {
-  attachProjectAssetResponseSchema,
-  detachProjectAssetResponseSchema,
-  projectConflictResponseSchema,
   projectCurrentResponseSchema,
   projectHistoryResponseSchema,
-  projectAssetsResponseSchema,
   projectOutputHistoryResponseSchema,
   projectRenditionUploadResponseSchema,
   projectSourceListResponseSchema,
@@ -13,16 +9,14 @@ import {
   projectWorkingMediaResponseSchema,
   projectsResponseSchema,
   type AdoptProjectWorkingMediaRequest,
-  type AttachProjectAssetRequest,
   type AppendProjectRevisionRequest,
-  type ProjectConflictContract,
   type ProjectCurrentResponse,
-  type ProjectAssetsResponse,
   type ProjectHistoryResponse,
   type ProjectOutputHistoryResponse,
   type ProjectPreviewContract,
   type ProjectExportSpecificationValue,
   type ProjectRenditionUploadResponse,
+  type ProjectSourceCollectionItem,
   type ProjectSourceListResponse,
   type ProjectSourceResponse,
   type SaveProjectOutputRequest,
@@ -32,12 +26,8 @@ import {
   type ListTotal,
 } from '@studio/contracts';
 import { VIDEO_RESULT_MAX_BYTES } from '@studio/contracts';
-import {
-  ApiClientError,
-  invalidApiResponse,
-  requestJson,
-  type ApiErrorPayloadParser,
-} from '../../adapters/api-client/apiClient';
+import { ApiClientError, requestJson } from '../../adapters/api-client/apiClient';
+import { invalidProjectResponse, parseProjectConflict } from './projectAuthorityApi';
 import { apiFetch } from '../../adapters/api-client/transport';
 import { readBoundedBlob } from '../../adapters/api-client/readBoundedBlob';
 
@@ -50,30 +40,12 @@ export interface ProjectsPage {
   readonly total: ListTotal;
 }
 
-export class ProjectApiConflictError extends ApiClientError {
-  readonly conflict: ProjectConflictContract;
-
-  constructor(message: string, conflict: ProjectConflictContract) {
-    super(message, 409, 'conflict');
-    this.name = 'ProjectApiConflictError';
-    this.conflict = conflict;
-  }
-}
-
-const parseProjectConflict: ApiErrorPayloadParser = (payload, status) => {
-  if (status !== 409) return null;
-  const parsed = projectConflictResponseSchema.safeParse(payload);
-  return parsed.success
-    ? new ProjectApiConflictError(parsed.data.error.message, parsed.data.conflict)
-    : null;
-};
-
-const invalidProjectResponse = invalidApiResponse(
-  'The Project response was invalid.',
-  'invalid-response',
-);
-
 const jsonHeaders = { Accept: 'application/json', 'Content-Type': 'application/json' } as const;
+
+// Re-exported so every caller keeps one import site for the Project HTTP surface; the shell's own
+// static closure reaches only the module below, which is the point of it being a module.
+export { getProject, ProjectApiConflictError } from './projectAuthorityApi';
+export { attachProjectAsset, detachProjectAsset, listProjectAssets } from './projectAssetsApi';
 
 export const listProjects = (
   input: Pick<ProjectsQuery, 'lifecycle' | 'pageSize'> & {
@@ -144,75 +116,6 @@ export const duplicateProject = (
     projectCurrentResponseSchema,
     invalidProjectResponse,
     parseProjectConflict,
-  );
-
-export const getProject = (
-  projectId: string,
-  signal?: AbortSignal,
-): Promise<ProjectCurrentResponse> =>
-  requestJson(
-    `/api/projects/${encodeURIComponent(projectId)}`,
-    {
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
-      ...(signal ? { signal } : {}),
-    },
-    projectCurrentResponseSchema,
-    invalidProjectResponse,
-  );
-
-export const listProjectAssets = (input: {
-  readonly projectId: string;
-  readonly kind?: AttachProjectAssetRequest['kind'];
-  readonly cursor?: string;
-  readonly pageSize?: number;
-  readonly signal?: AbortSignal;
-}): Promise<ProjectAssetsResponse> => {
-  const query = new URLSearchParams({ pageSize: String(input.pageSize ?? 24) });
-  if (input.kind) query.set('kind', input.kind);
-  if (input.cursor) query.set('cursor', input.cursor);
-  return requestJson(
-    `/api/projects/${encodeURIComponent(input.projectId)}/assets?${query.toString()}`,
-    {
-      cache: 'no-store',
-      headers: { Accept: 'application/json' },
-      ...(input.signal ? { signal: input.signal } : {}),
-    },
-    projectAssetsResponseSchema,
-    invalidProjectResponse,
-  );
-};
-
-export const attachProjectAsset = (
-  projectId: string,
-  input: AttachProjectAssetRequest,
-  signal?: AbortSignal,
-) =>
-  requestJson(
-    `/api/projects/${encodeURIComponent(projectId)}/assets`,
-    {
-      method: 'POST',
-      cache: 'no-store',
-      headers: jsonHeaders,
-      body: JSON.stringify(input),
-      ...(signal ? { signal } : {}),
-    },
-    attachProjectAssetResponseSchema,
-    invalidProjectResponse,
-  );
-
-export const detachProjectAsset = (projectId: string, membershipId: string, signal?: AbortSignal) =>
-  requestJson(
-    `/api/projects/${encodeURIComponent(projectId)}/assets/${encodeURIComponent(membershipId)}`,
-    {
-      method: 'DELETE',
-      cache: 'no-store',
-      headers: jsonHeaders,
-      body: '{}',
-      ...(signal ? { signal } : {}),
-    },
-    detachProjectAssetResponseSchema,
-    invalidProjectResponse,
   );
 
 export const checkpointProject = (
@@ -465,6 +368,23 @@ export const listProjectSources = (
     projectSourcePath(projectId, 'sources'),
     projectSourceListResponseSchema,
     signal,
+  );
+
+/**
+ * Whether a Project already works from this exact Saved Video Version.
+ *
+ * The question both paths into the collection have to ask: the Videos library's dialog asks it as a
+ * preflight, so a retry after a lost answer converges instead of storing the same video twice, and
+ * the Media area asks it as a before-and-after, so a failure at a Version already held is not read
+ * as an acceptance. One spelling, because the two disagreeing is the bug it exists to prevent.
+ */
+export const projectHoldsSavedVideoVersion = (
+  sources: readonly ProjectSourceCollectionItem[],
+  video: { readonly id: string; readonly currentVersion: { readonly id: string } },
+): boolean =>
+  sources.some(
+    (source) =>
+      source.savedVideoId === video.id && source.videoVersionId === video.currentVersion.id,
   );
 
 /** The ranged bytes of one piece of a Project's media, whether or not it is the original. */

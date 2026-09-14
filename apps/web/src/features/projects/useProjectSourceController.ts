@@ -13,7 +13,7 @@ import type {
   TakeMetadata,
 } from '../recording/types';
 import { currentCutOf, type CurrentCut } from './useProjectCurrentCut';
-import { projectQueryKeys, reconcileProject } from './useProjectsController';
+import { projectQueryKeys, reconcileProject, reconcileProjectMedia } from './useProjectsController';
 import { useStableOperationKey } from './useStableOperationKey';
 import {
   getProject,
@@ -44,6 +44,24 @@ export interface ProjectSourceActivity {
 }
 
 /**
+ * The same activity, said as work in flight, for a caller that has its own wait to fold in.
+ *
+ * Two surfaces hold a Project's media and the shell reads one record, so a busy Media area has to
+ * be reported through the original video's activity. `preparing` is the phase this product already
+ * shows for "your video is being made ready", and the abort is whichever wait can still be called
+ * off — the caller's own first, since it is the one the caller knows is running.
+ */
+export const busyProjectSourceActivity = (
+  activity: ProjectSourceActivity,
+  abort: (() => void) | null,
+): ProjectSourceActivity => ({
+  ...activity,
+  phase: 'preparing',
+  busy: true,
+  abort: abort ?? activity.abort,
+});
+
+/**
  * Whether this surface owns live media, stated rather than inferred.
  *
  * `detached` deliberately carries no methods, so no surface can hold a runtime that absorbs
@@ -57,6 +75,13 @@ export type ProjectSourceRuntime =
       readonly kind: 'stage';
       readonly present: (projectId: string, input: PresentStageSourceInput) => void;
       readonly clear: (projectId: string) => void;
+      /**
+       * Says this Project has taken the stage's take on, so nothing goes on offering it and
+       * nothing goes on asking to discard it. The capture graph cannot work this out: a take stays
+       * `recorded` through every re-presentation, and storing it in the collection touches neither
+       * the recorder nor the stage.
+       */
+      readonly claim: (projectId: string, artifactId: string) => void;
     }
   | { readonly kind: 'detached' };
 
@@ -196,6 +221,12 @@ export const useProjectSourceController = (
   runtime: ProjectSourceRuntime,
   onActivityChange?: (activity: ProjectSourceActivity) => void,
   onCurrentChange?: (current: ProjectCurrentResponse) => void,
+  /**
+   * Whether the stage is still showing this Project's media, where the caller can see. `undefined`
+   * means nobody is watching — a surface away from the capture graph — and the marker below is then
+   * left alone, which is the behaviour every such surface has always had.
+   */
+  stageHoldsSource?: boolean,
 ) => {
   const queryClient = useQueryClient();
   // 'idle' even with a source attached: `effectivePhase` below owns the idle→hydrating rule.
@@ -206,6 +237,8 @@ export const useProjectSourceController = (
   const operation = useStableOperationKey();
   const generationRef = useRef(0);
   const hydratedMediaRef = useRef<string | null>(null);
+  /** Bumped when the stage gave this Project's media up, to ask the hydration below for it again. */
+  const [rehydrations, setRehydrations] = useState(0);
   const mountedRef = useRef(true);
 
   // Narrowed and bound once. Every call below targets this Project's stage, and a detached surface
@@ -311,6 +344,29 @@ export const useProjectSourceController = (
     };
   }, [clearStage]);
 
+  /*
+   * Releases the hydration marker when the stage stops showing this Project's media.
+   *
+   * The marker exists so re-renders do not re-present what is already on screen, and until a
+   * Project could be recorded into twice, nothing else could take the stage away. A capture can:
+   * `launchProjectCapture` discards the presentation directly, and if the operator abandons the
+   * camera — or it refuses to start — no take ever arrives to replace it. Without this the
+   * workspace sat on an empty stage, still reading "Original video ready", until it was unmounted
+   * and remounted.
+   *
+   * Three conditions, and the last two are what keep it from firing on its own tail: hydration
+   * *itself* begins by clearing the stage, so `stageHoldsSource` goes false in the middle of every
+   * hydration. Releasing there would abort the fetch in flight and start it again. A settled phase
+   * with no request outstanding is the only moment the marker can be stale rather than pending.
+   * The re-run is asked for by a counter rather than by this boolean, for the same reason.
+   */
+  useEffect(() => {
+    if (stageHoldsSource !== false || phase !== 'saved') return;
+    if (controllerRef.current !== null || hydratedMediaRef.current === null) return;
+    hydratedMediaRef.current = null;
+    setRehydrations((count) => count + 1);
+  }, [phase, stageHoldsSource]);
+
   useEffect(() => {
     if (current.revision.snapshot.sourceAssetId === null) {
       hydratedMediaRef.current = null;
@@ -352,6 +408,8 @@ export const useProjectSourceController = (
     presentCurrent,
     projectId,
     onCurrentChange,
+    // Re-runs the hydration once the effect above has released the marker.
+    rehydrations,
   ]);
 
   const finishAcceptance = useCallback(
@@ -368,6 +426,8 @@ export const useProjectSourceController = (
       const mediaIdentity = JSON.stringify(response.revision.snapshot.presentedMedia);
       hydratedMediaRef.current = mediaIdentity;
       onCurrentChange?.({ project: response.project, revision: response.revision });
+      // What this Project holds has changed, and the Media area reads a cache of its own.
+      void reconcileProjectMedia(queryClient, projectId);
       await reconcileProject(queryClient, {
         project: response.project,
         revision: response.revision,
@@ -391,7 +451,7 @@ export const useProjectSourceController = (
       setMessage(null);
       setPhase('saved');
     },
-    [onCurrentChange, operation, presentAccepted, presentOnStage, queryClient],
+    [onCurrentChange, operation, presentAccepted, presentOnStage, projectId, queryClient],
   );
 
   const finishRemoval = useCallback(
@@ -406,10 +466,11 @@ export const useProjectSourceController = (
       setSource(null);
       setMessage(null);
       setPhase('idle');
+      void reconcileProjectMedia(queryClient, projectId);
       await reconcileProject(queryClient, next);
       onCurrentChange?.(next);
     },
-    [clearStage, onCurrentChange, operation, queryClient],
+    [clearStage, onCurrentChange, operation, projectId, queryClient],
   );
 
   /**

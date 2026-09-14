@@ -212,7 +212,19 @@ real-stack e2e.
   Named here rather than done: it moves stage hydration, which this slice deliberately did not.
 - **The blocked-reason matrix is still pairwise.** Four writers of Project revisions guard each
   other by hand in three idioms; slice 3.4 added the fifth clause to two of them. One
-  `activeRevisionWriter` derived in the workspace would collapse all of it.
+  `activeRevisionWriter` derived in the workspace would collapse all of it, and would also give the
+  merged activity in §7.4 an owner that is not one producer impersonating another.
+- **Nothing declares whose media is on the stage.** Three components keep a private copy of artifact
+  ids and compare them — the bridge's `presentedArtifactId`, the source controller's
+  `hydratedMediaRef`, and the guard's composition of three booleans. The deeper move is to stamp the
+  artifact where it is committed (`useRecording`'s two entries into `recorded`) with whether it is a
+  capture or a presentation, which would retire `presentedByProject`, `stageHoldsSource` and the
+  `claim` channel together.
+- **The collection endpoints answer in the single-source shape.** `POST /sources` returns
+  `projectSourceResponseSchema`, which has no `assetId` and forces the primary's `contentUrl`, so
+  the accepted source's identity is discarded at the boundary and the browser rebuilds the answer by
+  diffing the collection. Answering with `projectSourceCollectionItemSchema` would retire the whole
+  `landed`/`before`/`loaded` apparatus in §7.4.
 
 ## 7. What was built, and what the review changed
 
@@ -274,3 +286,46 @@ drift into a defect); shared test fixtures across four suites (real duplication,
 well outside this diff); a `VideoPreviewRow` component (shape alone is not a reason to abstract);
 `staleTime` on the attachments query (an optimisation with a staleness trade this slice did not
 ask for); and the three structural findings now recorded as follow-ups in §6.
+
+### 7.4 What the code review changed
+
+A full-recall review of `eb12f77d` found fifteen defects, fourteen of them correctness. All are
+fixed in the same branch; the four that mattered most were in the reconciliation this slice wrote.
+
+**Three ways the product asserted something untrue.** `landed` asked whether the collection held
+something rather than whether it had _changed_, so a failed upload was announced as added to any
+Project that already held anything, and a failed re-pick of a Version already held was announced as
+added too. Both predicates are now differences against what was held before the request, and the
+controller refuses to conclude anything when the collection was never read — which is also why Add
+is now withheld until it has been. The third: a cancel asserted "nothing moved" without asking,
+when a cancel stops this browser waiting and does not reach a server that may have committed the
+moment before. It now reconciles like every other unknown answer, and no longer resets the
+idempotency key, which was inviting the retry that stores a second copy.
+
+**Two controls that could not work.** "Remove original video" stayed live in exactly the state this
+slice makes ordinary — the domain refuses it while other media is held — so the only way to learn
+was a round trip that always failed; the workspace now reads the domain's own
+`projectOriginalIsRemovable` before the press. And a capture launched in a Project with media could
+leave the stage blank for good, because the source controller's hydration marker had no way to hear
+that something else had taken the stage.
+
+**Two facts that never settled.** A take adopted through the Media area stayed "unclaimed" forever,
+so every navigation out of the workspace asked to discard a video already on the server; the claim
+now goes through the stage runtime to the bridge, which is the one place that can tell a capture
+from media the Project put there. And logout and session expiry still read the broad take fact this
+slice had just proved wrong — they read the narrow one now, so logging out of a Project whose video
+is merely on the stage no longer offers to discard it.
+
+The rest: the Media area's in-flight work was invisible to the exit guard and excluded its own
+multi-minute conversion; two acts could overlap because the busy flag was raised after an awaited
+checkpoint; "Record more" swallowed the one refusal it is meant to speak for, and the
+unsupported-capture explanation had become unreachable for every Project with an original; add and
+remove shared one failure message, so a failed removal said the video could not be added; focus fell
+to the document body after removing a row; a stale intake refusal outranked a removal's own outcome;
+and the removal dialog ignored a block that arrived while it was open.
+
+The cleanup pass that followed found one regression in the fixes themselves — invalidating the media
+collection from `reconcileProject` meant every creative autosave refetched up to a hundred rows, and
+the hydration effect could abort and restart its own fetch — plus four duplications worth one owner
+each: the Record control's state, the busy-activity shape, the held-Version predicate, and the
+original-removal rule, which now lives in the domain beside the rule that enforces it.

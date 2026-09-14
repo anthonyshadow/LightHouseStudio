@@ -81,24 +81,27 @@ export const BUILD_CLOSURE_BUDGETS = {
   // copy each outcome needs. The tick, the reconciler and the ledger stores are server-side and
   // add nothing here. `FORBIDDEN_CLOSURE_DEPENDENCIES` still passes.
   //
-  // Raised from 750_000 on 2026-09-13, and the entry has to record a miss before it records a
-  // slice. A clean build at `e8d0890d` — slice 3.2's read-authority switch — measures 750_547, so
-  // that ceiling was already 547 bytes red when it landed. It was reported green because this check
-  // reads whatever `apps/web/dist` happens to hold and nothing had rebuilt it: `0f819c9e` and
-  // `245aa415` both measure 749_092, which is the number the stale manifest was still answering
-  // with. The cost is the sources collection's contract — the collection item, its list response
-  // and their refinements — which is in this closure because every authenticated route parses
-  // Project responses through it.
+  // 2026-09-13, and the entry has to record a miss before it records a slice. A clean build at
+  // `e8d0890d` — slice 3.2's read-authority switch — measures 750_547, so the 750_000 ceiling was
+  // already 547 bytes red when it landed. It was reported green because this check reads whatever
+  // `apps/web/dist` holds and nothing had rebuilt it: `0f819c9e` and `245aa415` both measure
+  // 749_092, which is the number the stale manifest was still answering with. The cost was the
+  // sources collection's contract — the collection item, its list response and their refinements —
+  // which is in this closure because every authenticated route parses Project responses through it.
   //
-  // On top of that, slice 3.4 (the workspace Media area) measures 750_547 → 750_866: the four
-  // collection calls in `projectsApi`, which the shell carries whole because it owns durable
-  // Project processing (`useShellServices` → `useProjectProcessingController` → `projectsApi`).
-  // The Media area itself, its controller, the picker's attached-first grouping and the blocked-
-  // change copy are all behind lazy routes and cost nothing here. 253 bytes of the first
-  // measurement were recovered before this number moved, by giving the two source reads one
-  // request builder and the two detachments another. `FORBIDDEN_CLOSURE_DEPENDENCIES` still
-  // passes, so the capture graph has not followed the Record control into the shell.
-  'src/app/shell/AuthenticatedShell.tsx': 751_000,
+  // Slice 3.4 (the workspace Media area) then took it to 750_866, and its review round to 750_999 —
+  // one byte of headroom, which is not a budget. Rather than raise it a third time, the structural
+  // cause the ledger had already named got fixed: `projectsApi.ts` was in this closure entirely,
+  // for two imports. The shell owns durable Project processing, which needs `getProject`, and its
+  // creation launcher reads the membership list — so every source, working-media, output and
+  // rendition call was paid for on the Dashboard, on Assets and on every Project list. Those two
+  // are now `projectAuthorityApi.ts` and `projectAssetsApi.ts`, `projectsApi` re-exports them so no
+  // caller moved, and `projectsApi` has left this closure: 750_999 → 744_988.
+  //
+  // **Lowered** from 750_000 to 746_000, below where slice 3.2 found it, so the next module that
+  // wanders in fails the build instead of eating the recovery. `FORBIDDEN_CLOSURE_DEPENDENCIES`
+  // still passes, so the capture graph has not followed the Record control into the shell.
+  'src/app/shell/AuthenticatedShell.tsx': 746_000,
   // Shell plus capture graph, which is what a Studio route costs. Looser, because a Studio route is
   // where media code belongs; `FORBIDDEN_CLOSURE_DEPENDENCIES` is what keeps it from leaking out.
   //
@@ -144,13 +147,16 @@ export const BUILD_CLOSURE_BUDGETS = {
   // excludes. It peaked at 1_092_103 before the slice's cleanup pass, which collapsed three
   // enumerations of a revision's held media into one and gave the read maps a single validation
   // owner.
-  // Raised from 1_093_000 on 2026-09-13, carrying the shell's two entries above. Slice 3.2's switch
-  // stage put this closure at 1_093_398 — 398 red, unnoticed for the same stale-manifest reason —
-  // and slice 3.4 measures 1_093_398 → 1_094_416. A Studio route pays for the collection contract
-  // and the four collection calls exactly as every other authenticated route does; what is local to
-  // this closure is smaller than either: the launch guard lost a condition, the bridge renders the
-  // artifact id it already tracked, and the exit guard reads that instead of the proxy it replaced.
-  'src/studio/StudioApp.tsx': 1_095_000,
+  // Raised from 1_093_000 on 2026-09-13, carrying the shell's entry above. Slice 3.2's switch stage
+  // put this closure at 1_093_398 — 398 red, unnoticed for the same stale-manifest reason — and
+  // slice 3.4 with its review round measures 1_093_398 → 1_095_110. A Studio route pays for the
+  // collection contract and the four collection calls exactly as every other authenticated route
+  // does; what is local to this closure is smaller: the launch guard lost a condition, the bridge
+  // renders the artifact id it already tracked, and the exit guard reads one claimed-take fact
+  // instead of composing three. The last 300 bytes are the shell split above, which this closure
+  // does not benefit from — a Studio route renders the Project surfaces and so reaches all three
+  // modules either way, and pays their split overhead instead.
+  'src/studio/StudioApp.tsx': 1_096_000,
 };
 
 /**

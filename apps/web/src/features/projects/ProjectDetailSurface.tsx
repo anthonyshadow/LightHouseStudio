@@ -23,6 +23,11 @@ export interface ProjectRouteSurfaceProps {
   readonly createRuntime?: ProjectCreateRuntime;
   readonly sourceRuntime?: ProjectSourceRuntime;
   readonly recordingCandidate?: ProjectRecordingCandidate | null;
+  /**
+   * Whether the stage is still showing this Project's media. A capture takes it away without the
+   * source controller hearing about it, and only this says when to put it back.
+   */
+  readonly stageHoldsSource?: boolean;
   readonly recordingActive?: boolean;
   /**
    * Whether the browser behind `onStartRecording` can capture. Only a caller that owns the capture
@@ -50,6 +55,7 @@ export const ProjectDetailSurface = ({
   workspaceMode = false,
   sourceRuntime = detachedSourceRuntime,
   recordingCandidate,
+  stageHoldsSource,
   recordingActive,
   recordingSupported,
   onStartRecording,
@@ -113,6 +119,7 @@ export const ProjectDetailSurface = ({
         onWorkingMediaActivityChange={onWorkingMediaActivityChange}
         sourceRuntime={sourceRuntime}
         recordingCandidate={recordingCandidate}
+        stageHoldsSource={stageHoldsSource}
         recordingActive={recordingActive}
         recordingSupported={recordingSupported}
         onStartRecording={onStartRecording}

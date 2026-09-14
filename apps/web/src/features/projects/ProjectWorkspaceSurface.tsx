@@ -1,6 +1,7 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectCurrentResponse } from '@studio/contracts';
-import { useCallback, useState, type KeyboardEvent } from 'react';
+import { projectOriginalIsRemovable } from '@studio/domain';
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { projectPath, projectWorkspacePath } from '../../app/paths';
 import { useRouteBack } from '../../app/useRouteBack';
@@ -13,7 +14,7 @@ import { ProjectHistorySection } from './ProjectHistorySection';
 import { ProjectOutputSaveSection } from './ProjectOutputSaveSection';
 import { saveTaskPanelStyles } from './ProjectOutputSaveSection.styles';
 import { dialogActionsStyles } from './ProjectRouteSurface.styles';
-import { ProjectMediaSection } from './ProjectMediaSection';
+import { ProjectMediaSection, type ProjectMediaActivity } from './ProjectMediaSection';
 import { ProjectSourceSection, type ProjectRecordingCandidate } from './ProjectSourceSection';
 import { projectStatusLabel } from './projectStatusPresentation';
 import {
@@ -32,7 +33,11 @@ import {
 } from './ProjectWorkflowProgress';
 import type { ProjectProcessingController } from './useProjectProcessingController';
 import type { useProjectSession } from './useProjectSession';
-import type { ProjectSourceActivity, ProjectSourceRuntime } from './useProjectSourceController';
+import {
+  busyProjectSourceActivity,
+  type ProjectSourceActivity,
+  type ProjectSourceRuntime,
+} from './useProjectSourceController';
 
 export type ProjectWorkspaceTask = ProjectWorkflowStepId;
 
@@ -131,6 +136,7 @@ interface ProjectWorkspaceSurfaceProps {
     ((activity: ProjectWorkingMediaActivity) => void) | undefined;
   readonly sourceRuntime: ProjectSourceRuntime;
   readonly recordingCandidate?: ProjectRecordingCandidate | null | undefined;
+  readonly stageHoldsSource?: boolean | undefined;
   readonly recordingActive?: boolean | undefined;
   readonly recordingSupported?: boolean | undefined;
   /** Answers a refusal, or nothing, so the section holding the button can speak for a dead press. */
@@ -147,6 +153,7 @@ export const ProjectWorkspaceSurface = ({
   onWorkingMediaActivityChange,
   sourceRuntime,
   recordingCandidate,
+  stageHoldsSource,
   recordingActive,
   recordingSupported,
   onStartRecording,
@@ -163,14 +170,28 @@ export const ProjectWorkspaceSurface = ({
   const [sourceActivity, setSourceActivity] = useState<ProjectSourceActivity | null>(null);
   const [workingMediaActivity, setWorkingMediaActivity] =
     useState<ProjectWorkingMediaActivity | null>(null);
-  const [mediaBusy, setMediaBusy] = useState(false);
-  const handleSourceActivity = useCallback(
-    (activity: ProjectSourceActivity) => {
-      setSourceActivity(activity);
-      onSourceActivityChange?.(activity);
-    },
-    [onSourceActivityChange],
+  const [mediaActivity, setMediaActivity] = useState<ProjectMediaActivity | null>(null);
+  const mediaBusy = mediaActivity?.busy ?? false;
+  /*
+   * One report upward for both surfaces that hold this Project's media.
+   *
+   * The shell's exit guard, logout and expiry read a single activity, and until the Media area
+   * existed a single section produced it. Reporting only the original-video section's own work
+   * meant a multi-minute conversion or a 300 MB upload started in the Media area was invisible to
+   * all three: leaving discarded it without asking. Memoised on the facts rather than on the media
+   * record, so the shell's own "same work as last time" bail-out still fires while one runs.
+   */
+  const mediaAbort = mediaActivity?.abort ?? null;
+  const reportedSourceActivity = useMemo(
+    () =>
+      sourceActivity === null || !mediaBusy
+        ? sourceActivity
+        : busyProjectSourceActivity(sourceActivity, mediaAbort),
+    [mediaAbort, mediaBusy, sourceActivity],
   );
+  useEffect(() => {
+    if (reportedSourceActivity !== null) onSourceActivityChange?.(reportedSourceActivity);
+  }, [onSourceActivityChange, reportedSourceActivity]);
   const handleWorkingMediaActivity = useCallback(
     (activity: ProjectWorkingMediaActivity) => {
       setWorkingMediaActivity(activity);
@@ -219,13 +240,25 @@ export const ProjectWorkspaceSurface = ({
   // Deliberately not gated on `recordingActive`: that stays true for the whole live workspace,
   // not just while a take is capturing, so gating on it would disable removal permanently.
   // Capture writes no Project revision, and the server's CAS settles any genuine race.
-  const sourceRemovalBlockedReason =
-    projectProcessingBlockedReason(processing?.attempt, 'source-removal') ??
-    (workingMediaActivity?.busy
-      ? 'Finish updating the current cut before removing the original video.'
-      : mediaBusy
-        ? 'Finish the change to this Project’s media before removing the original video.'
-        : undefined);
+  /*
+   * Why the original cannot be let go of right now. First condition wins, so the standing refusal
+   * is stated before any passing one — and it is the domain's own rule, read through
+   * `projectOriginalIsRemovable` rather than restated here, because a browser that disagrees with
+   * it offers a confirmation that can only ever fail.
+   */
+  const sourceRemovalBlockedReason = ((): string | undefined => {
+    const attempt = projectProcessingBlockedReason(processing?.attempt, 'source-removal');
+    if (attempt !== undefined) return attempt;
+    if (!projectOriginalIsRemovable(mediaActivity?.held ?? 0)) {
+      return 'This Project works from other videos too. Remove them below first, or keep this one as the original.';
+    }
+    if (workingMediaActivity?.busy) {
+      return 'Finish updating the current cut before removing the original video.';
+    }
+    if (mediaBusy)
+      return 'Finish the change to this Project’s media before removing the original video.';
+    return undefined;
+  })();
   /*
    * The same hazard from the other side: adding or removing media appends a revision, so it moves
    * the compare-and-set out from under anything else still writing one. The run overlay already
@@ -335,12 +368,13 @@ export const ProjectWorkspaceSurface = ({
               key={`source-${current.project.id}`}
               current={current}
               runtime={sourceRuntime}
+              stageHoldsSource={stageHoldsSource}
               recordingCandidate={recordingCandidate}
               recordingActive={recordingActive}
               recordingSupported={recordingSupported}
               removalBlockedReason={sourceRemovalBlockedReason}
               onStartRecording={onStartRecording}
-              onActivityChange={handleSourceActivity}
+              onActivityChange={setSourceActivity}
               onCurrentChange={session.acceptCurrent}
             />
             {/*
@@ -358,8 +392,9 @@ export const ProjectWorkspaceSurface = ({
                 recordingActive={recordingActive}
                 recordingSupported={recordingSupported}
                 changeBlockedReason={mediaChangeBlockedReason}
+                runtime={sourceRuntime}
                 onStartRecording={onStartRecording}
-                onBusyChange={setMediaBusy}
+                onActivityChange={setMediaActivity}
               />
             )}
           </section>

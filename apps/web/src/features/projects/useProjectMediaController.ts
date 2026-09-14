@@ -13,44 +13,41 @@ import {
   addSavedVideoAsProjectSource,
   listProjectSources,
   ProjectApiConflictError,
+  projectHoldsSavedVideoVersion,
   removeProjectSourceById,
   type ProjectRevisionExpectation,
 } from './projectsApi';
 import type { ProjectSessionPort } from './useProjectSession';
-import { projectQueryKeys } from './useProjectsController';
+import { projectQueryKeys, reconcileProjectMedia } from './useProjectsController';
 import { useStableOperationKey } from './useStableOperationKey';
 
 export type ProjectMediaPhase =
   'idle' | 'adding' | 'removing' | 'added' | 'removed' | 'conflict' | 'error';
 
+/** Which act a terminal phase belongs to, so a failure is described as the thing that failed. */
+export type ProjectMediaAct = 'add' | 'remove';
+
+/** What a failure this browser cannot read says, which the act decides rather than each caller. */
+const FAILURE_MESSAGE: Record<ProjectMediaAct, string> = {
+  add: 'That video could not be added safely.',
+  remove: 'That video could not be removed safely.',
+};
+
 /**
- * Everything a Project holds to work from, and the four ways the operator changes it.
+ * Everything a Project holds to work from, and the three ways the operator changes it.
  *
  * Deliberately not `useProjectSourceController`: that one owns the *original* — the stage it
  * hydrates, the legacy contract that refuses a second acceptance, and the media the snapshot
  * points at. This owns the collection beside it, which has no stage of its own and whose
  * acceptance the server sizes from what the Project already holds.
  */
-export const useProjectMediaController = (
-  projectId: string,
-  session: ProjectSessionPort,
-  onBusyChange?: (busy: boolean) => void,
-) => {
+export const useProjectMediaController = (projectId: string, session: ProjectSessionPort) => {
   const queryClient = useQueryClient();
   const operation = useStableOperationKey();
   const controllerRef = useRef<AbortController | null>(null);
   const [phase, setPhase] = useState<ProjectMediaPhase>('idle');
+  const [act, setAct] = useState<ProjectMediaAct>('add');
   const [message, setMessage] = useState<string | null>(null);
-  /*
-   * The takes this Project has already taken on, by artifact id.
-   *
-   * Re-presenting a take returns the recorder's lifecycle to `recorded`, so nothing in the capture
-   * graph says "this one has already been added" and the control would keep offering it. Adding it
-   * again really would store a second copy: a Project upload's asset id derives from its operation
-   * key rather than from the bytes, so the duplicate is a different asset and the held-media check
-   * cannot see it.
-   */
-  const [addedTakes, setAddedTakes] = useState<readonly string[]>([]);
   const sourcesQuery = useMemo(
     () => ({
       queryKey: projectQueryKeys.sources(projectId),
@@ -63,16 +60,18 @@ export const useProjectMediaController = (
   const sources = query.data?.sources ?? [];
   const busy = phase === 'adding' || phase === 'removing';
 
-  const reportActivity = useCallback(
-    (nextBusy: boolean) => onBusyChange?.(nextBusy),
-    [onBusyChange],
-  );
-
-  /** What the collection held before an act started, read from the cache rather than a render. */
-  const heldSourceCount = useCallback(
-    () =>
+  /**
+   * What the collection held before an act started, or `null` when this browser does not know.
+   *
+   * The distinction is the whole of the reconciliation below. Collapsing "not loaded" into "held
+   * nothing" made every failed upload look like it had landed, because any non-empty collection is
+   * larger than zero — so a Project that already held three videos would report a fourth as added
+   * when the request had stored nothing.
+   */
+  const heldSourcesBefore = useCallback(
+    (): readonly ProjectSourceCollectionItem[] | null =>
       queryClient.getQueryData<ProjectSourceListResponse>(projectQueryKeys.sources(projectId))
-        ?.sources.length ?? 0,
+        ?.sources ?? null,
     [projectId, queryClient],
   );
 
@@ -82,35 +81,19 @@ export const useProjectMediaController = (
   );
 
   /**
-   * Publishes server authority the acting request produced, so the next compare-and-set is made
-   * against the revision this one appended rather than the one it replaced.
-   *
-   * `acceptCurrent` is the only publication needed: the session controller reconciles the Project
-   * lists through it. `sourcesFresh` is the recovery path saying the collection has just been read
-   * from the server, so invalidating would fetch the same bytes a second time.
-   */
-  const publish = useCallback(
-    async (current: Parameters<ProjectSessionPort['acceptCurrent']>[0], sourcesFresh: boolean) => {
-      session.acceptCurrent(current);
-      if (!sourcesFresh) {
-        await queryClient.invalidateQueries({ queryKey: projectQueryKeys.sources(projectId) });
-      }
-    },
-    [projectId, queryClient, session],
-  );
-
-  /**
    * Runs one change to the collection against the session's freshest authority.
    *
    * `landed` is what makes an unknown acceptance reconcilable rather than repeatable. A request
-   * that fails without a conflict may still have been applied — the answer, not the act, is what
-   * went missing — and a second attempt would carry a different compare-and-set, so it would mint a
-   * different operation key and store the same video twice. Asking the collection what it holds is
-   * the cheaper and truer question.
+   * whose answer went missing — a failure without a conflict, or a cancel the operator pressed
+   * after the bytes were already sent — may still have been applied, and a second attempt would
+   * carry a different compare-and-set, so it would mint a different operation key and store the
+   * same video twice. Asking the collection what it holds is the cheaper and truer question, and
+   * it is asked as a *difference* against what was held before rather than as a state: "this
+   * Version is present" is already true when the operator re-picks one the Project has.
    */
   const run = useCallback(
     async (input: {
-      readonly phase: 'adding' | 'removing';
+      readonly act: ProjectMediaAct;
       readonly busyMessage: string;
       /**
        * What this request is, for the idempotency key, merged with the compare-and-set below.
@@ -123,82 +106,106 @@ export const useProjectMediaController = (
         operationKey: string,
         signal: AbortSignal,
       ) => Promise<ProjectCurrentResponse>;
-      /**
-       * Whether the collection now shows this act as done, for an answer that went missing.
-       * `heldBefore` is the count as it stood before the request, because an upload has no
-       * identity of its own until the server answers with one.
-       */
+      /** Whether the collection now shows this act as done that did not show it before. */
       readonly landed: (
         held: readonly ProjectSourceCollectionItem[],
-        heldBefore: number,
+        before: readonly ProjectSourceCollectionItem[],
       ) => boolean;
       readonly settledMessage: string;
-      readonly onSettled?: () => void;
+      readonly onSettled?: (() => void) | undefined;
     }): Promise<boolean> => {
-      if (!(await session.flush())) {
-        setPhase('conflict');
-        setMessage('Save or discard your pending Project changes before changing its media.');
-        return false;
-      }
-      const current = session.getCurrent();
-      if (current === null) return false;
-      // The one pair that has to be identical between the key and the request it names.
-      const expected: ProjectRevisionExpectation = {
-        expectedVersion: current.project.version,
-        expectedRevisionNumber: current.project.currentRevisionNumber,
-      };
-      const heldBefore = heldSourceCount();
       const controller = new AbortController();
       controllerRef.current?.abort('project-media-replaced');
       controllerRef.current = controller;
-      setPhase(input.phase);
+      /*
+       * Raised before the flush, not after. `flush` is a real checkpoint round trip whenever the
+       * session holds a pending proposal, and every control that closes this door reads `busy` —
+       * so a second press during that window used to enter here too, abort this one, and have this
+       * one's own cleanup report the section idle while the survivor was still in flight.
+       */
+      setAct(input.act);
+      setPhase(input.act === 'add' ? 'adding' : 'removing');
       setMessage(input.busyMessage);
-      reportActivity(true);
-      const settle = async (next: ProjectCurrentResponse, sourcesFresh: boolean) => {
-        await publish(next, sourcesFresh);
-        if (input.fingerprint) operation.reset();
-        setPhase(input.phase === 'adding' ? 'added' : 'removed');
-        setMessage(input.settledMessage);
-        input.onSettled?.();
-      };
+      const before = heldSourcesBefore();
       try {
-        const operationKey = input.fingerprint
-          ? operation.keyFor(JSON.stringify({ ...input.fingerprint, ...expected }))
-          : '';
-        await settle(await input.request(expected, operationKey, controller.signal), false);
-        return true;
-      } catch (error) {
-        if (controller.signal.aborted) {
-          setPhase('idle');
-          setMessage('That change was cancelled. Nothing in this Project moved.');
+        if (!(await session.flush())) {
+          setPhase('conflict');
+          setMessage('Save or discard your pending Project changes before changing its media.');
           return false;
         }
-        if (!(error instanceof ProjectApiConflictError)) {
+        const current = session.getCurrent();
+        if (current === null) {
+          setPhase('idle');
+          setMessage(null);
+          return false;
+        }
+        // The one pair that has to be identical between the key and the request it names.
+        const expected: ProjectRevisionExpectation = {
+          expectedVersion: current.project.version,
+          expectedRevisionNumber: current.project.currentRevisionNumber,
+        };
+        const settle = (next: ProjectCurrentResponse, sourcesFresh = false) => {
+          // `acceptCurrent` publishes the new authority and reconciles the Project lists through
+          // the session controller; the collection is its own act, and `sourcesFresh` is the
+          // reconcile path saying it has just been read — invalidating there would read it twice.
+          session.acceptCurrent(next);
+          if (!sourcesFresh) void reconcileProjectMedia(queryClient, projectId);
+          if (input.fingerprint) operation.reset();
+          setPhase(input.act === 'add' ? 'added' : 'removed');
+          setMessage(input.settledMessage);
+          input.onSettled?.();
+        };
+        /*
+         * Whether the act happened anyway, for an answer this browser never received. Answers
+         * `false` rather than guessing when the collection was never loaded, because "held
+         * nothing" and "do not know" are different facts and only one of them is a difference.
+         */
+        const reconcile = async (): Promise<boolean> => {
+          if (before === null) return false;
           try {
             const reconciled = await refetchSources();
-            if (input.landed(reconciled.sources, heldBefore)) {
-              await settle(reconciled, true);
-              return true;
-            }
+            if (!input.landed(reconciled.sources, before)) return false;
+            settle(reconciled, true);
+            return true;
           } catch {
-            // The collection could not be re-read either; the failure below is the honest answer.
+            // The collection could not be re-read either; the caller's failure is the honest one.
+            return false;
           }
+        };
+        try {
+          const operationKey = input.fingerprint
+            ? operation.keyFor(JSON.stringify({ ...input.fingerprint, ...expected }))
+            : '';
+          settle(await input.request(expected, operationKey, controller.signal));
+          return true;
+        } catch (error) {
+          /*
+           * A conflict is the server's own answer and needs no reconciling. Everything else — a
+           * failure, and a cancel alike — is an answer this browser never received: a cancel stops
+           * it waiting, it does not reach the server, which may have committed the moment before.
+           */
+          const conflicted = error instanceof ProjectApiConflictError;
+          if (!conflicted && (await reconcile())) return true;
+          if (controller.signal.aborted) {
+            setPhase('idle');
+            setMessage('That change was cancelled. Nothing in this Project changed.');
+            return false;
+          }
+          setPhase(conflicted ? 'conflict' : 'error');
+          setMessage(apiErrorMessage(error, FAILURE_MESSAGE[input.act]));
+          return false;
         }
-        setPhase(error instanceof ProjectApiConflictError ? 'conflict' : 'error');
-        setMessage(apiErrorMessage(error, 'That video could not be added safely.'));
-        return false;
       } finally {
         if (controllerRef.current === controller) controllerRef.current = null;
-        reportActivity(false);
       }
     },
-    [heldSourceCount, operation, publish, refetchSources, reportActivity, session],
+    [heldSourcesBefore, operation, projectId, queryClient, refetchSources, session],
   );
 
   const addUpload = useCallback(
-    (file: File, kind: 'uploaded' | 'recorded', takeArtifactId?: string) =>
+    (file: File, kind: 'uploaded' | 'recorded', onAdded?: () => void) =>
       run({
-        phase: 'adding',
+        act: 'add',
         busyMessage:
           kind === 'recorded'
             ? 'Adding your recording to this Project.'
@@ -214,11 +221,9 @@ export const useProjectMediaController = (
           addProjectSourceUpload({ projectId, file, kind, operationKey, ...expected, signal }),
         // The count is the only fact an upload has before the server names its asset; nothing else
         // in this browser can be adding media while this one holds the busy flag.
-        landed: (held, heldBefore) => held.length > heldBefore,
+        landed: (held, before) => held.length > before.length,
         settledMessage: `“${file.name}” is now part of this Project.`,
-        ...(takeArtifactId === undefined
-          ? {}
-          : { onSettled: () => setAddedTakes((taken) => [...taken, takeArtifactId]) }),
+        onSettled: onAdded,
       }),
     [projectId, run],
   );
@@ -226,7 +231,7 @@ export const useProjectMediaController = (
   const addSavedVideo = useCallback(
     (video: SavedVideoSummary) =>
       run({
-        phase: 'adding',
+        act: 'add',
         busyMessage: 'Checking that version and adding it to this Project.',
         fingerprint: {
           kind: 'saved-video-version',
@@ -242,11 +247,14 @@ export const useProjectMediaController = (
             ...expected,
             signal,
           }),
-        landed: (held) =>
-          held.some(
-            (source) =>
-              source.savedVideoId === video.id && source.videoVersionId === video.currentVersion.id,
-          ),
+        /*
+         * A difference, not a presence. The Project may already hold this exact Version — the
+         * server refuses that outright — so asking only "is it here" would report a refusal, or
+         * any other failure at a Version already held, as an acceptance.
+         */
+        landed: (held, before) =>
+          projectHoldsSavedVideoVersion(held, video) &&
+          !projectHoldsSavedVideoVersion(before, video),
         settledMessage: `“${video.title}” is now part of this Project. That video is not changed.`,
       }),
     [projectId, run],
@@ -255,39 +263,40 @@ export const useProjectMediaController = (
   const remove = useCallback(
     (source: ProjectSourceCollectionItem) =>
       run({
-        phase: 'removing',
+        act: 'remove',
         busyMessage: 'Removing that video from this Project.',
         request: (expected, _operationKey, signal) =>
           removeProjectSourceById({ projectId, assetId: source.assetId, ...expected, signal }),
+        // Removal converges, so its end state is its answer: the Project no longer holds it.
         landed: (held) => !held.some(({ assetId }) => assetId === source.assetId),
         settledMessage: `“${source.filename}” is no longer part of this Project. The video itself is kept.`,
       }),
     [projectId, run],
   );
 
+  /**
+   * Stops this browser waiting. Deliberately does not reset the operation key: the request may
+   * already have been accepted, and the key is what lets the same attempt replay rather than mint
+   * a second one against a version the first attempt moved.
+   */
   const cancel = useCallback(() => {
     controllerRef.current?.abort('project-media-cancelled');
     controllerRef.current = null;
-    operation.reset();
-  }, [operation]);
-
-  /** Whether this finalized take has already been taken on, so it is offered exactly once. */
-  const takeAlreadyAdded = useCallback(
-    (artifactId: string) => addedTakes.includes(artifactId),
-    [addedTakes],
-  );
+  }, []);
 
   return {
     query,
     sources,
     phase,
+    act,
     message,
     busy,
+    /** Whether the collection is known at all; nothing may be added against an unknown one. */
+    loaded: query.data !== undefined,
     atLimit: sources.length >= PROJECT_SOURCE_LIMIT,
     addUpload,
     addSavedVideo,
     remove,
     cancel,
-    takeAlreadyAdded,
   } as const;
 };

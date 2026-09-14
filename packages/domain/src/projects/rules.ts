@@ -1660,6 +1660,16 @@ export interface RemoveProjectSourceByIdInput {
  * slice 3.4 — not a default this rule should invent. Anything else is inventory: the arrangement
  * loses the clips that named the departing media, and nothing else moves.
  */
+/**
+ * Whether a Project's original may be let go of at all.
+ *
+ * Exported because a surface has to say this *before* the press rather than discover it from a
+ * refusal: the control that removes the original is offered next to the media that makes it
+ * refusable, so a browser without this rule offers a confirmation that can only ever fail.
+ */
+export const projectOriginalIsRemovable = (heldSourceCount: number): boolean =>
+  heldSourceCount <= 1;
+
 export const removeProjectSourceById = (
   aggregate: ProjectAggregate,
   input: RemoveProjectSourceByIdInput,
@@ -1687,7 +1697,7 @@ export const removeProjectSourceById = (
     };
   }
   if (currentRevision.snapshot.sourceAssetId === assetId) {
-    return input.heldSourceCount <= 1
+    return projectOriginalIsRemovable(input.heldSourceCount)
       ? removeProjectSource(aggregate, input, context)
       : { ok: false, conflict: projectConflicts.primarySource(project.id) };
   }

@@ -116,6 +116,8 @@ const setup = ({
   // anything for `discardTemporaryWork` to refuse to let go of.
   const take = ownedTakeArtifact();
   const options: LifecycleOptions = {
+    // A take the runtime holds and no Project has taken on — what these cases are about.
+    hasUnclaimedTake: true,
     registry: { cleanup: coordinator, report: collaborators.report },
     creativeLocks: noCreativeLocks,
     session: sessionDouble(collaborators.stopCamera),
