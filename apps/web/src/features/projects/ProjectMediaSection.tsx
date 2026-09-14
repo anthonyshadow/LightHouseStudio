@@ -2,7 +2,7 @@ import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import type { ProjectCurrentResponse, ProjectSourceCollectionItem } from '@studio/contracts';
 import { PROJECT_SOURCE_LIMIT } from '@studio/contracts';
 import { formatDuration } from '@studio/domain';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { savedVideoThumbnailUrl } from '../../adapters/api-client/savedVideosApi';
 import { Button, ConfirmationDialog, StatusNotice } from '../../ui';
 import type { NoticeTone } from '../../ui/primitives/StatusNotice';
@@ -12,7 +12,11 @@ import { ProjectAssetThumbnail } from './ProjectAssetThumbnail';
 import type { ProjectRecordingCandidate } from './ProjectSourceSection';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
 import { PROJECT_MEDIA_REMOVAL_REASSURANCE } from './projectProcessingPresentation';
-import type { ProjectRecordingLaunchRefusal } from './projectRecordingLaunch';
+import {
+  RECORDING_UNSUPPORTED_NOTICE,
+  useProjectRecordingControl,
+  type ProjectRecordingLaunchRefusal,
+} from './projectRecordingLaunch';
 import { projectSourceContentUrl } from './projectsApi';
 import type { ProjectSessionPort } from './useProjectSession';
 import {
@@ -20,7 +24,12 @@ import {
   videoRowListStyles,
   videoRowPreviewStyles,
 } from './projectVideoRow.styles';
-import { useProjectMediaController, type ProjectMediaPhase } from './useProjectMediaController';
+import {
+  useProjectMediaController,
+  type ProjectMediaAct,
+  type ProjectMediaPhase,
+} from './useProjectMediaController';
+import type { ProjectSourceRuntime } from './useProjectSourceController';
 import {
   PROJECT_VIDEO_FILE_ACCEPT,
   projectVideoIntakeNotice,
@@ -99,7 +108,9 @@ interface ProjectMediaNotice {
   readonly tone: NoticeTone;
 }
 
-const mediaNotice = (phase: ProjectMediaPhase): ProjectMediaNotice => {
+// `act` is carried through the terminal states because one phase serves both: a removal that failed
+// used to be announced as a video that could not be added, over a dialog saying the opposite.
+const mediaNotice = (phase: ProjectMediaPhase, act: ProjectMediaAct): ProjectMediaNotice => {
   switch (phase) {
     case 'idle':
       return { title: 'Nothing changed', tone: 'neutral' };
@@ -114,7 +125,7 @@ const mediaNotice = (phase: ProjectMediaPhase): ProjectMediaNotice => {
     case 'conflict':
       return { title: 'Conflict', tone: 'warning' };
     case 'error':
-      return { title: 'Video not added', tone: 'danger' };
+      return { title: act === 'add' ? 'Video not added' : 'Video not removed', tone: 'danger' };
   }
 };
 
@@ -122,6 +133,20 @@ const mediaNotice = (phase: ProjectMediaPhase): ProjectMediaNotice => {
 interface ProjectMediaNoticeOnScreen extends ProjectMediaNotice {
   readonly body: string;
   readonly onCancel: (() => void) | undefined;
+}
+
+/**
+ * What this Project's media is doing, for the surfaces that outlive the section.
+ *
+ * `busy` covers the intake as well as the request: converting a phone clip is minutes of the
+ * operator's work, and reported idle it looked like nothing in flight — so leaving discarded it
+ * without asking, and a sibling act could move the Project out from under it. `held` is here
+ * because the one control that has to know how much media a Project has is in another section.
+ */
+export interface ProjectMediaActivity {
+  readonly busy: boolean;
+  readonly held: number;
+  readonly abort: (() => void) | null;
 }
 
 /**
@@ -141,8 +166,9 @@ export const ProjectMediaSection = ({
   recordingActive = false,
   recordingSupported = true,
   changeBlockedReason,
+  runtime,
   onStartRecording,
-  onBusyChange,
+  onActivityChange,
 }: {
   readonly current: ProjectCurrentResponse;
   readonly session: ProjectSessionPort;
@@ -152,19 +178,28 @@ export const ProjectMediaSection = ({
   readonly recordingSupported?: boolean | undefined;
   /** Why this Project's media cannot change right now, or nothing when it can. */
   readonly changeBlockedReason?: string | undefined;
+  /**
+   * The stage, so a take this Project takes on can be marked as claimed. A detached surface has
+   * none, and also has no take to claim.
+   */
+  readonly runtime: ProjectSourceRuntime;
   readonly onStartRecording?: (() => ProjectRecordingLaunchRefusal | null) | undefined;
-  /** Whether a change to this Project's media is in flight, for the siblings that must wait. */
-  readonly onBusyChange?: ((busy: boolean) => void) | undefined;
+  readonly onActivityChange?: ((activity: ProjectMediaActivity) => void) | undefined;
 }) => {
   const theme = useTheme();
   const projectId = current.project.id;
   const inputRef = useRef<HTMLInputElement>(null);
   const pickerTriggerRef = useRef<HTMLButtonElement>(null);
-  const removeTriggerRef = useRef<HTMLButtonElement>(null);
+  /*
+   * Focus comes back to the heading, not to the row's own Remove button: a confirmed removal
+   * unmounts that row, and returning focus to a detached node drops it to the document body, so
+   * the next Tab restarted at the top of the shell.
+   */
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [previewAssetId, setPreviewAssetId] = useState<string | null>(null);
   const [removing, setRemoving] = useState<ProjectSourceCollectionItem | null>(null);
-  const controller = useProjectMediaController(projectId, session, onBusyChange);
+  const controller = useProjectMediaController(projectId, session);
   const { addUpload } = controller;
   const acceptIntake = useCallback(
     (file: File) => {
@@ -174,6 +209,12 @@ export const ProjectMediaSection = ({
   );
   const intake = useProjectVideoIntake(acceptIntake);
   const originalAssetId = current.revision.snapshot.sourceAssetId;
+  const stage = runtime.kind === 'stage' ? runtime : null;
+  const record = useProjectRecordingControl({
+    onStartRecording,
+    recordingActive,
+    recordingSupported,
+  });
   // One idea of busy for the section: converting the operator's file is their video being made
   // ready just as much as the upload that follows it, and offering a second one mid-conversion
   // would discard the first silently.
@@ -186,11 +227,30 @@ export const ProjectMediaSection = ({
   const previewCss = videoRowPreviewStyles(theme);
   const rowActionsCss = { display: 'flex', gap: theme.space.xs } as const;
   const blocked = archived || changeBlockedReason !== undefined;
-  const addDisabled = blocked || busy || controller.atLimit;
-  const take =
-    recordingCandidate?.ready && !controller.takeAlreadyAdded(recordingCandidate.artifactId)
-      ? recordingCandidate
-      : null;
+  // `loaded` is load-bearing, not defensive: an add made against a collection this browser has
+  // never read cannot be reconciled afterwards, because there is no "before" to compare with.
+  const addDisabled = blocked || busy || !controller.loaded || controller.atLimit;
+  const take = recordingCandidate?.ready ? recordingCandidate : null;
+  /*
+   * What the surfaces that outlive this section are told. Rebuilt only when one of its three facts
+   * moves, so the effect below reports a change rather than a render.
+   */
+  const activity = useMemo<ProjectMediaActivity>(
+    () => ({
+      busy,
+      held: controller.sources.length,
+      abort: intake.phase !== null ? intake.cancel : controller.busy ? controller.cancel : null,
+    }),
+    [
+      busy,
+      controller.busy,
+      controller.cancel,
+      controller.sources.length,
+      intake.cancel,
+      intake.phase,
+    ],
+  );
+  useEffect(() => onActivityChange?.(activity), [activity, onActivityChange]);
   /*
    * One notice, with the intake speaking first while it has something to say: its wait is the only
    * thing happening, and a refusal from here supersedes whatever the last attempt at the server
@@ -206,7 +266,7 @@ export const ProjectMediaSection = ({
     }
     if (controller.message === null) return null;
     return {
-      ...mediaNotice(controller.phase),
+      ...mediaNotice(controller.phase, controller.act),
       body: controller.message,
       onCancel: controller.phase === 'adding' ? controller.cancel : undefined,
     };
@@ -215,7 +275,9 @@ export const ProjectMediaSection = ({
   return (
     <>
       <section css={sectionStyles(theme)} aria-labelledby="project-media-heading">
-        <h3 id="project-media-heading">Media in this Project</h3>
+        <h3 id="project-media-heading" ref={headingRef} tabIndex={-1}>
+          Media in this Project
+        </h3>
         <p>
           Everything this Project works from. One of them is its original video; the rest are extra
           footage you can preview here and remove at any time. Adding media never starts paid AI
@@ -281,13 +343,7 @@ export const ProjectMediaSection = ({
                           data-project-media-action="remove"
                           disabled={blocked || busy}
                           aria-label={`Remove ${source.filename} from this Project`}
-                          onClick={(event) => {
-                            // The row that opened the dialog is the row focus comes back to, and
-                            // rows come and go — so the trigger is recorded from the press rather
-                            // than held by a ref this section would have to keep one of per row.
-                            removeTriggerRef.current = event.currentTarget;
-                            setRemoving(source);
-                          }}
+                          onClick={() => setRemoving(source)}
                         >
                           Remove
                         </Button>
@@ -346,16 +402,22 @@ export const ProjectMediaSection = ({
               onClick={() => {
                 // A take supersedes a file the intake refused, and the refusal goes with it.
                 intake.dismiss();
-                void controller.addUpload(take.file, 'recorded', take.artifactId);
+                void controller.addUpload(take.file, 'recorded', () =>
+                  // Claimed only once the server has it. Nothing else can work this out: the take
+                  // stays `recorded` on the stage, so it would go on being offered, and the exit
+                  // guard would go on asking to discard a video the Project already holds.
+                  stage?.claim(projectId, take.artifactId),
+                );
               }}
             >
               Add this recording
             </Button>
           ) : (
             <Button
-              disabled={addDisabled || onStartRecording === undefined || !recordingSupported}
+              disabled={addDisabled || onStartRecording === undefined || record.unsupported}
               busy={recordingActive}
-              onClick={() => void onStartRecording?.()}
+              aria-describedby={record.describedById}
+              onClick={record.press}
             >
               Record more
             </Button>
@@ -366,6 +428,14 @@ export const ProjectMediaSection = ({
           <Button ref={pickerTriggerRef} disabled={addDisabled} onClick={() => setPickerOpen(true)}>
             Add from your videos
           </Button>
+          {record.unsupported ? (
+            <small id={record.unsupportedId}>{RECORDING_UNSUPPORTED_NOTICE}</small>
+          ) : null}
+          {record.refusalMessage ? (
+            <StatusNotice role="alert" tone="warning">
+              {record.refusalMessage}
+            </StatusNotice>
+          ) : null}
         </div>
 
         {changeBlockedReason === undefined ? null : (
@@ -389,20 +459,30 @@ export const ProjectMediaSection = ({
           title="Remove this video"
           description="It stays in your library and in this Project’s history."
           body={
-            <p>
-              {`Remove “${removing.filename}” from this Project? ${PROJECT_MEDIA_REMOVAL_REASSURANCE}`}
-            </p>
+            <>
+              <p>
+                {`Remove “${removing.filename}” from this Project? ${PROJECT_MEDIA_REMOVAL_REASSURANCE}`}
+              </p>
+              {changeBlockedReason === undefined ? null : <p>{changeBlockedReason}</p>}
+            </>
           }
           confirmLabel="Remove from Project"
           cancelLabel="Cancel"
           danger
           busy={controller.busy}
-          {...(controller.phase === 'conflict' || controller.phase === 'error'
+          // A block can arrive while this is open — a provider attempt resolving behind it — and
+          // the controls underneath disable without the confirm hearing about it.
+          confirmDisabled={blocked}
+          {...(controller.act === 'remove' &&
+          (controller.phase === 'conflict' || controller.phase === 'error')
             ? { alert: controller.message ?? undefined, alertTitle: 'Video not removed' }
             : {})}
-          returnFocusRef={removeTriggerRef}
+          returnFocusRef={headingRef}
           onCancel={() => setRemoving(null)}
           onConfirm={() => {
+            // A removal supersedes a file the intake refused, the way the other two acts do;
+            // without it the stale refusal outranked this act's own outcome.
+            intake.dismiss();
             void controller.remove(removing).then((removed) => {
               if (removed) setRemoving(null);
             });

@@ -15,6 +15,12 @@ import type { SessionCleanupCoordinator } from '../../orchestration/lifecycle/Se
  */
 export interface StudioRuntimeWork {
   readonly hasTemporaryTake: boolean;
+  /**
+   * A take on the stage that nothing has taken on — the half of `hasTemporaryTake` that leaving
+   * would actually lose. The broad one is true for a Project source streamed from its own content
+   * route, which is the steady state of every Project with a video and is durable on the server.
+   */
+  readonly hasUnclaimedTake: boolean;
   readonly voiceProcessingActive: boolean;
   readonly creativeWorkDirty: boolean;
   /** True while a take is recording or finalizing, or a provider holds an accepted submission. */
@@ -26,6 +32,7 @@ export interface StudioRuntimeWork {
 /** What the shell reports while no Studio runtime is mounted: nothing transient is being held. */
 const NO_STUDIO_RUNTIME_WORK: StudioRuntimeWork = Object.freeze({
   hasTemporaryTake: false,
+  hasUnclaimedTake: false,
   voiceProcessingActive: false,
   creativeWorkDirty: false,
   recordingOrFinalizing: false,
@@ -66,9 +73,14 @@ export const NO_STUDIO_RUNTIME_STATUS: StudioRuntimeStatus = Object.freeze({
   creativeLocks: NO_STUDIO_CREATIVE_LOCKS,
 });
 
-/** Work the operator can be asked to discard. */
+/**
+ * Work the operator can be asked to discard.
+ *
+ * The narrow take fact, not the broad one: logging out of a Project whose video is simply on the
+ * stage offered to discard bytes the server already holds and nothing was about to lose.
+ */
 export const hasDiscardableStudioWork = (work: StudioRuntimeWork): boolean =>
-  work.hasTemporaryTake ||
+  work.hasUnclaimedTake ||
   work.voiceProcessingActive ||
   work.creativeWorkDirty ||
   (work.projectSourceActivity?.busy ?? false);

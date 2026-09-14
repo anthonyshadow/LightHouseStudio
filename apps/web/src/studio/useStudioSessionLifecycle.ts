@@ -36,6 +36,8 @@ interface UseStudioSessionLifecycleOptions {
   readonly projectWorkingMedia: ReturnType<typeof useProjectWorkingMediaController>;
   readonly projectSourceActivity: ProjectSourceActivity | null;
   readonly projectWorkingMediaActivity: ProjectWorkingMediaActivity | null;
+  /** The stage holds a take nothing has taken on; see `StudioRuntimeWork.hasUnclaimedTake`. */
+  readonly hasUnclaimedTake: boolean;
   readonly discardSavedVideoWork: () => void;
   readonly discardPendingAdoption: () => void;
   readonly closeOverlay: ReturnType<typeof useStudioOverlayController>['close'];
@@ -67,6 +69,7 @@ export const useStudioSessionLifecycle = ({
   projectWorkingMedia,
   projectSourceActivity,
   projectWorkingMediaActivity,
+  hasUnclaimedTake,
   discardSavedVideoWork,
   discardPendingAdoption,
   closeOverlay,
@@ -128,6 +131,7 @@ export const useStudioSessionLifecycle = ({
   const work = useMemo<StudioRuntimeWork>(
     () => ({
       hasTemporaryTake,
+      hasUnclaimedTake,
       voiceProcessingActive,
       creativeWorkDirty,
       recordingOrFinalizing,
@@ -137,6 +141,7 @@ export const useStudioSessionLifecycle = ({
     [
       creativeWorkDirty,
       hasTemporaryTake,
+      hasUnclaimedTake,
       projectSourceActivity,
       recordingOrFinalizing,
       videoRenderingActive,

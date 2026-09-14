@@ -5,7 +5,9 @@ import {
   useQueryClient,
   type QueryClient,
 } from '@tanstack/react-query';
-import { attachProjectAsset, detachProjectAsset, listProjectAssets } from './projectsApi';
+// From the narrow module rather than the barrel: the shell's creation launcher mounts this, and
+// the barrel would put every Project media call in every authenticated route's static closure.
+import { attachProjectAsset, detachProjectAsset, listProjectAssets } from './projectAssetsApi';
 
 const PAGE_SIZE = 24;
 

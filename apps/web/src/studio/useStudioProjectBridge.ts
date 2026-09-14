@@ -16,6 +16,8 @@ interface UseStudioProjectBridgeOptions {
   readonly projectId: string | null;
   readonly recordingLifecycle: RecordingLifecycle;
   readonly recordingOriginal: PresentedRecordingArtifact | null;
+  /** What the stage is actually showing, which is what leaving would lose or keep. */
+  readonly recordingPresented: PresentedRecordingArtifact | null;
   readonly presentSource: (input: Parameters<ProjectStageSourceRuntime['present']>[1]) => void;
   /** Answers whether the stage is now clear; `false` means a take is still finalizing. */
   readonly clearSource: () => boolean;
@@ -25,6 +27,7 @@ export const useStudioProjectBridge = ({
   projectId,
   recordingLifecycle,
   recordingOriginal,
+  recordingPresented,
   presentSource,
   clearSource,
 }: UseStudioProjectBridgeOptions) => {
@@ -46,6 +49,15 @@ export const useStudioProjectBridge = ({
    * `present` below, and a take from the camera never does.
    */
   const [presentedArtifactId, setPresentedArtifactId] = useState<string | null>(null);
+  /**
+   * The take a Project has taken on, which the capture graph cannot say for itself.
+   *
+   * Re-presenting a take returns the recorder's lifecycle to `recorded`, so a finished take looks
+   * unclaimed forever — the control that offers it would keep offering it, and the exit guard would
+   * keep asking to discard a video already stored on the server. One slot is enough: only one take
+   * is on the stage at a time, and recording another replaces it.
+   */
+  const [claimedArtifactId, setClaimedArtifactId] = useState<string | null>(null);
   /** A clear this port accepted and the runtime refused, still owed to whoever asked for it. */
   const clearOwedRef = useRef(false);
   const presentSourceRef = useRef(presentSource);
@@ -111,6 +123,10 @@ export const useStudioProjectBridge = ({
         }
         releaseStage();
       },
+      claim: (candidateProjectId, artifactId) => {
+        if (projectIdRef.current !== candidateProjectId) return;
+        setClaimedArtifactId(artifactId);
+      },
     }),
     [releaseStage],
   );
@@ -156,7 +172,7 @@ export const useStudioProjectBridge = ({
     // A URL-backed presentation is already the accepted source and is never a candidate.
     const owned =
       recordingLifecycle === 'recorded' ? ownedRecordingArtifact(recordingOriginal) : null;
-    if (!owned) return null;
+    if (!owned || owned.id === claimedArtifactId) return null;
     return {
       file: new File([owned.media], owned.filename, {
         type: owned.mimeType,
@@ -165,20 +181,37 @@ export const useStudioProjectBridge = ({
       artifactId: owned.id,
       ready: true,
     };
-  }, [recordingLifecycle, recordingOriginal]);
+  }, [claimedArtifactId, recordingLifecycle, recordingOriginal]);
 
+  const presentedId = recordingPresented?.id ?? null;
   /**
-   * Whether the stage is showing media this Project put there, rather than a take it has not taken
-   * on. What tells the two apart is which door the artifact came through: the Project's own media
-   * — hydrated, accepted, or adopted as the current cut — is published through `present` above, and
-   * a capture reaches the stage from the recorder. Bytes alone cannot answer it, because a source
-   * just uploaded from this browser is owned bytes *and* already durable on the server.
+   * Whether the stage is still showing media this Project put there.
+   *
+   * The source controller marks media as hydrated once it reaches the stage and will not present it
+   * twice, so when a capture takes the stage away nothing tells it to put the media back — and a
+   * capture the operator abandons, or a camera that refuses to start, left the workspace looking at
+   * nothing while still reading "Original video ready".
    */
-  const presentedByProject =
-    presentedArtifactId !== null && presentedArtifactId === (recordingOriginal?.id ?? null);
+  const presentedByProject = presentedId !== null && presentedId === presentedArtifactId;
+  /**
+   * Whether the stage holds a take nobody has taken on — the one thing leaving would actually lose.
+   *
+   * Three facts, and all three are needed. Owned bytes, because a Project source streamed from its
+   * own content route is not this browser's to lose. Not put there by this Project, because a
+   * source *uploaded* from this browser is owned bytes **and** already durable on the server — and
+   * which door the artifact came through is the only thing that separates them: the Project's own
+   * media is published through `present` above, and a capture reaches the stage from the recorder.
+   * And not already claimed, because adopting a take into the collection changes nothing the
+   * capture graph can see.
+   */
+  const unclaimedTake =
+    ownedRecordingArtifact(recordingPresented) !== null &&
+    !presentedByProject &&
+    presentedId !== claimedArtifactId;
 
   return {
     sourceRuntime,
+    unclaimedTake,
     presentedByProject,
     sourceActivity: activeSourceActivity,
     workingMediaActivity: activeWorkingMediaActivity,

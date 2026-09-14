@@ -20,7 +20,8 @@ import type { ProjectRouteSurfaceProps } from '../features/projects/ProjectRoute
 import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 import type { StudioHeaderDestination } from './StudioHeader';
 import type * as SavedVideosApiModule from '../adapters/api-client/savedVideosApi';
-import type * as ProjectsApiModule from '../features/projects/projectsApi';
+import type * as ProjectAssetsApiModule from '../features/projects/projectAssetsApi';
+import type * as ProjectAuthorityApiModule from '../features/projects/projectAuthorityApi';
 
 type WorkspaceHarnessProps = {
   state: CreativeWorkspaceState;
@@ -345,13 +346,20 @@ vi.mock('../features/saved-videos/useSaveVideo', () => ({
   }),
 }));
 
-vi.mock('../features/projects/projectsApi', async (importOriginal) => {
-  const actual = await importOriginal<typeof ProjectsApiModule>();
-  return {
-    ...actual,
-    getProject: harness.getProject,
-    attachProjectAsset: harness.attachProjectAsset,
-  };
+/*
+ * Two modules, because the shell's own reads live apart from the Project media calls: `getProject`
+ * is in `projectAuthorityApi` and the membership calls in `projectAssetsApi`, so that an
+ * authenticated route does not carry every Project endpoint. `projectsApi` re-exports both, so a
+ * mock of the barrel alone would be bypassed by the consumers that import the narrow ones.
+ */
+vi.mock('../features/projects/projectAuthorityApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof ProjectAuthorityApiModule>();
+  return { ...actual, getProject: harness.getProject };
+});
+
+vi.mock('../features/projects/projectAssetsApi', async (importOriginal) => {
+  const actual = await importOriginal<typeof ProjectAssetsApiModule>();
+  return { ...actual, attachProjectAsset: harness.attachProjectAsset };
 });
 
 vi.mock('../features/live-stage', () => ({
@@ -1254,7 +1262,9 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('holds an expiring session open to say what an unsaved take loses', async () => {
-    harness.recording.presented = { id: 'expiring-take' };
+    // Owned bytes, because that is what an unsaved take is: the shell offers to discard work this
+    // browser would lose, and a presented artifact with nothing behind it loses nothing.
+    harness.recording.presented = { id: 'expiring-take', media: new Blob(['take']) };
     renderStudio();
 
     fireEvent(window, new Event('lightframe:authentication-required'));

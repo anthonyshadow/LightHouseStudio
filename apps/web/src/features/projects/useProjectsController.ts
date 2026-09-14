@@ -69,6 +69,19 @@ export const reconcileProject = async (
   return current;
 };
 
+/**
+ * The single owner of "what this Project holds has changed".
+ *
+ * Deliberately separate from `reconcileProject`, which runs on every *authority refresh* — the
+ * session controller publishes through it on hydration, on every checkpoint save and on every
+ * conflict reload, none of which can move media. Folding this in there refetched the whole
+ * collection after every creative autosave. Five acts change what a Project holds: accepting or
+ * removing the original, adding or removing anything beside it, and adding one from the Videos
+ * library. Each calls this, and only this cache knew about any of them before.
+ */
+export const reconcileProjectMedia = (queryClient: QueryClient, projectId: string): Promise<void> =>
+  queryClient.invalidateQueries({ queryKey: projectQueryKeys.sources(projectId) });
+
 const lifecycleForProject = (project: ProjectContract): 'active' | 'archived' =>
   project.archivedAt === null ? 'active' : 'archived';
 

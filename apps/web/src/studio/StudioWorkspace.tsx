@@ -345,6 +345,7 @@ export const StudioWorkspace = ({
             {...(projectCreateRuntime ? { createRuntime: projectCreateRuntime } : {})}
             processing={projectProcessing}
             sourceRuntime={project.sourceRuntime}
+            stageHoldsSource={project.presentedByProject}
             recordingCandidate={project.recordingCandidate}
             recordingActive={
               recordingActive || finalizingStartedAt !== null || finalizingStream !== null

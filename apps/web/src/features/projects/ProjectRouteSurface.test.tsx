@@ -295,6 +295,37 @@ const acceptedSourceResponse = (): ProjectSourceResponse => ({
   },
 });
 
+const extraSourceAssetId = '0f0e2d69-bb32-4f0a-9d3c-2a4c5f9c81aa';
+
+/** What `GET /sources` answers for an accepted Project holding `assetIds`, original first. */
+const sourceListResponse = (assetIds: readonly string[]) => {
+  const accepted = acceptedProject();
+  return {
+    project: accepted.project,
+    revision: accepted.revision,
+    sources: assetIds.map((assetId) => ({
+      kind: 'uploaded' as const,
+      savedVideoId: null,
+      videoVersionId: null,
+      assetId,
+      acceptedRevisionId: secondActiveId,
+      acceptedRevisionNumber: 2,
+      mimeType: 'video/mp4' as const,
+      filename: `${assetId.slice(0, 4)}.mp4`,
+      sizeBytes: 4,
+      container: 'mp4' as const,
+      videoCodec: 'avc' as const,
+      audioCodec: null,
+      durationMs: 1_000,
+      width: 640,
+      height: 360,
+      hasAudio: false,
+      acceptedAt: now,
+      contentUrl: `/api/projects/${activeId}/sources/${assetId}/content`,
+    })),
+  };
+};
+
 /** The reads a mounted Project route makes for itself, whichever surface a case is actually after. */
 const installProjectRouteHandlers = () => {
   mockApiServer.use(
@@ -1000,7 +1031,7 @@ describe('Project route surface', () => {
       ),
     );
     const { router } = renderProjects(`/projects/${activeId}`, {
-      sourceRuntime: { kind: 'stage', present, clear: vi.fn() },
+      sourceRuntime: { kind: 'stage', present, clear: vi.fn(), claim: vi.fn() },
     });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Use as the original video' }));
@@ -1115,7 +1146,7 @@ describe('Project route surface', () => {
       ),
     );
     const { router } = renderProjects(`/projects/${activeId}`, {
-      sourceRuntime: { kind: 'stage', present, clear: vi.fn() },
+      sourceRuntime: { kind: 'stage', present, clear: vi.fn(), claim: vi.fn() },
     });
 
     await userEvent.click(await screen.findByRole('button', { name: 'Use as the current cut' }));
@@ -1762,7 +1793,7 @@ describe('Project route surface', () => {
       ),
     );
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { kind: 'stage', present, clear },
+      sourceRuntime: { kind: 'stage', present, clear, claim: vi.fn() },
     });
 
     expect(await screen.findByText(/Loading this Project.s original video/u)).toBeVisible();
@@ -1815,7 +1846,7 @@ describe('Project route surface', () => {
     );
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { kind: 'stage', present, clear },
+      sourceRuntime: { kind: 'stage', present, clear, claim: vi.fn() },
     });
 
     await waitFor(() => expect(present).toHaveBeenCalledOnce());
@@ -1865,7 +1896,7 @@ describe('Project route surface', () => {
     );
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { kind: 'stage', present: vi.fn(), clear: vi.fn() },
+      sourceRuntime: { kind: 'stage', present: vi.fn(), clear: vi.fn(), claim: vi.fn() },
     });
 
     await user.click(await screen.findByRole('button', { name: 'Remove original video' }));
@@ -1918,7 +1949,7 @@ describe('Project route surface', () => {
     );
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { kind: 'stage', present, clear },
+      sourceRuntime: { kind: 'stage', present, clear, claim: vi.fn() },
       recordingCandidate: { file, artifactId: 'take-artifact-1', ready: true },
       onSourceActivityChange: (activity) => activities.push(activity),
     });
@@ -1956,7 +1987,7 @@ describe('Project route surface', () => {
         <>
           <ProjectRouteSurface
             workspaceMode
-            sourceRuntime={{ kind: 'stage', present: vi.fn(), clear: vi.fn() }}
+            sourceRuntime={{ kind: 'stage', present: vi.fn(), clear: vi.fn(), claim: vi.fn() }}
             recordingActive={recordingActive}
             onStartRecording={startRecording}
           />
@@ -2009,7 +2040,7 @@ describe('Project route surface', () => {
     );
     const startRecording = vi.fn((): ProjectRecordingLaunchRefusal | null => null);
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { kind: 'stage', present: vi.fn(), clear: vi.fn() },
+      sourceRuntime: { kind: 'stage', present: vi.fn(), clear: vi.fn(), claim: vi.fn() },
       recordingSupported: false,
       onStartRecording: startRecording,
     });
@@ -2066,7 +2097,7 @@ describe('Project route surface', () => {
     );
     const inputClick = vi.spyOn(HTMLInputElement.prototype, 'click');
     const view = renderProjects(`/projects/${activeId}/workspace`, {
-      sourceRuntime: { kind: 'stage', present, clear },
+      sourceRuntime: { kind: 'stage', present, clear, claim: vi.fn() },
     });
     const user = userEvent.setup();
 
@@ -2157,7 +2188,7 @@ describe('Project route surface', () => {
     );
     const user = userEvent.setup();
     renderProjects(`/projects/${activeId}/workspace?task=source`, {
-      sourceRuntime: { kind: 'stage', present, clear },
+      sourceRuntime: { kind: 'stage', present, clear, claim: vi.fn() },
     });
 
     await user.click(await screen.findByRole('button', { name: 'Use a saved video' }));
@@ -2415,5 +2446,92 @@ describe('Project route surface', () => {
     expect(alert).toHaveTextContent('Project saving unavailable.');
     await user.click(within(alert).getByRole('button', { name: 'Discard local changes' }));
     expect(await screen.findByText(/^Autosaved ·/u)).toBeVisible();
+  });
+
+  it('withholds removing the original while the Project works from other videos too', async () => {
+    /*
+     * The domain refuses it — `removeProjectSourceById` answers `primary-source` whenever the
+     * Project holds more than one — so a live control here could only ever produce a round trip
+     * that failed. `removalBlockedReason` exists to say that before the press, and this is the
+     * state the Media area makes ordinary.
+     */
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(acceptedProject())),
+      http.get(`*/api/projects/${activeId}/source`, () =>
+        HttpResponse.json(acceptedSourceResponse()),
+      ),
+      http.get(`*/api/projects/${activeId}/sources`, () =>
+        HttpResponse.json(sourceListResponse([sourceAssetId, extraSourceAssetId])),
+      ),
+    );
+    installProjectRouteHandlers();
+    const user = userEvent.setup();
+    renderProjects(`/projects/${activeId}/workspace?task=source`);
+
+    const remove = await screen.findByRole('button', { name: 'Remove original video' });
+    await user.click(remove);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Remove original video' });
+    expect(within(dialog).getByText(/This Project works from other videos too/u)).toBeVisible();
+    expect(
+      within(dialog).getByRole('button', { name: 'Remove and choose another' }),
+    ).toBeDisabled();
+  });
+
+  it('puts the Project back on the stage when a capture takes it away and leaves nothing', async () => {
+    /*
+     * The source controller marks media as hydrated once it reaches the stage and will not present
+     * it twice. A capture discards that presentation directly, so an abandoned one — or a camera
+     * that refuses to start — used to leave the workspace on an empty stage, still reading
+     * "Original video ready", until it was unmounted and remounted.
+     */
+    mockApiServer.use(
+      http.get(`*/api/projects/${activeId}`, () => HttpResponse.json(acceptedProject())),
+      http.get(`*/api/projects/${activeId}/source`, () =>
+        HttpResponse.json(acceptedSourceResponse()),
+      ),
+      http.get(`*/api/projects/${activeId}/sources`, () =>
+        HttpResponse.json(sourceListResponse([sourceAssetId])),
+      ),
+      http.get(`*/api/projects/${activeId}/source/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([1, 2, 3, 4]).buffer, {
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+        }),
+      ),
+    );
+    installProjectRouteHandlers();
+    const present = vi.fn<ProjectStageSourceRuntime['present']>();
+    const StageThatCanBeTaken = () => {
+      const [holds, setHolds] = useState(true);
+      return (
+        <>
+          <ProjectRouteSurface
+            workspaceMode
+            sourceRuntime={{ kind: 'stage', present, clear: vi.fn(), claim: vi.fn() }}
+            stageHoldsSource={holds}
+          />
+          <button type="button" onClick={() => setHolds(false)}>
+            Take the stage
+          </button>
+        </>
+      );
+    };
+    const router = createMemoryRouter([{ path: '/projects/*', element: <StageThatCanBeTaken /> }], {
+      initialEntries: [`/projects/${activeId}/workspace?task=source`],
+    });
+    render(
+      <StudioDesignProvider>
+        <RemoteStateTestProvider>
+          <RouterProvider router={router} />
+        </RemoteStateTestProvider>
+      </StudioDesignProvider>,
+    );
+
+    expect(await screen.findByRole('heading', { name: 'Original video ready' })).toBeVisible();
+    await waitFor(() => expect(present).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Take the stage' }));
+
+    await waitFor(() => expect(present).toHaveBeenCalledTimes(2));
   });
 });

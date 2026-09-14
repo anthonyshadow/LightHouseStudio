@@ -10,13 +10,20 @@ import type {
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HttpResponse, http } from 'msw';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import { jsonScenario } from '../../test/msw/handlers';
 import { mockApiServer } from '../../test/msw/server';
 import { StudioDesignProvider } from '../../ui';
 import { ProjectMediaSection } from './ProjectMediaSection';
-import type { ProjectRecordingCandidate } from './ProjectSourceSection';
+import { PROJECT_RECORDING_TAKE_IN_PROGRESS_NOTICE } from '../take-review/takeRefusalNotices';
+import {
+  RECORDING_UNSUPPORTED_NOTICE,
+  type ProjectRecordingLaunchRefusal,
+} from './projectRecordingLaunch';
+import { detachedSourceRuntime, type ProjectRecordingCandidate } from './ProjectSourceSection';
+import type { ProjectStageSourceRuntime } from './useProjectSourceController';
 import type { ProjectSessionPort } from './useProjectSession';
 
 const ids = {
@@ -193,7 +200,10 @@ const renderSection = (
     readonly archived?: boolean;
     readonly recordingCandidate?: ProjectRecordingCandidate | null;
     readonly changeBlockedReason?: string;
-    readonly onStartRecording?: () => null;
+    readonly onStartRecording?: () => ProjectRecordingLaunchRefusal | null;
+    readonly runtime?: ProjectStageSourceRuntime;
+    readonly recordingActive?: boolean;
+    readonly recordingSupported?: boolean;
   } = {},
 ) => {
   const session = options.session ?? createSession();
@@ -203,8 +213,11 @@ const renderSection = (
         <ProjectMediaSection
           current={current()}
           session={session}
+          runtime={options.runtime ?? detachedSourceRuntime}
           archived={options.archived ?? false}
           recordingCandidate={options.recordingCandidate ?? null}
+          recordingActive={options.recordingActive ?? false}
+          recordingSupported={options.recordingSupported ?? true}
           {...(options.changeBlockedReason === undefined
             ? {}
             : { changeBlockedReason: options.changeBlockedReason })}
@@ -391,15 +404,10 @@ describe('ProjectMediaSection', () => {
     await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(1));
   });
 
-  it('offers a finalized take once, and names where a Record press goes', async () => {
+  it('claims a finalized take on the stage once the server has it', async () => {
     installSources([source(ids.original)]);
-    const startRecording = vi.fn(() => null);
+    const claim = vi.fn();
     const file = new File(['take'], 'take.webm', { type: 'video/webm', lastModified: 1 });
-    const candidate: ProjectRecordingCandidate = {
-      file,
-      artifactId: 'take-artifact-1',
-      ready: true,
-    };
     let accepts = 0;
     mockApiServer.use(
       http.post(`*/api/projects/${ids.project}/sources`, () => {
@@ -407,19 +415,156 @@ describe('ProjectMediaSection', () => {
         return HttpResponse.json(accepted(), { status: 201 });
       }),
     );
-    renderSection({ recordingCandidate: candidate, onStartRecording: startRecording });
+    renderSection({
+      recordingCandidate: { file, artifactId: 'take-artifact-1', ready: true },
+      runtime: { kind: 'stage', present: vi.fn(), clear: vi.fn(), claim },
+    });
     const user = userEvent.setup();
 
     await user.click(await screen.findByRole('button', { name: 'Add this recording' }));
     await waitFor(() => expect(accepts).toBe(1));
 
     /*
-     * Re-presenting a take leaves the recorder's lifecycle on `recorded`, so the candidate is still
-     * here after it has been taken on. Offering it again would store the same recording twice, with
-     * a different asset id, because a Project upload's asset is derived from its operation key.
+     * The capture graph cannot work this out for itself: a take stays `recorded` through every
+     * re-presentation, so without the claim it would go on being offered — storing the same
+     * recording twice, under a different asset, because a Project upload's asset id comes from its
+     * operation key rather than from the bytes — and the exit guard would go on asking to discard a
+     * video the Project already holds. Claimed only after the server answers.
      */
-    expect(await screen.findByRole('button', { name: 'Record more' })).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Add this recording' })).not.toBeInTheDocument();
+    await waitFor(() => expect(claim).toHaveBeenCalledWith(ids.project, 'take-artifact-1'));
+  });
+
+  it('says why a Record press started nothing, instead of swallowing the refusal', async () => {
+    installSources([source(ids.original)]);
+    /*
+     * The press can only land in a commit where Record is still live — that is, before the take it
+     * is refused for is visible here — and the sentence belongs to the span after it. So the take
+     * arrives between the two halves, the way the runtime delivers it.
+     */
+    const Harness = () => {
+      const [recordingActive, setRecordingActive] = useState(false);
+      return (
+        <>
+          <ProjectMediaSection
+            current={current()}
+            session={createSession()}
+            runtime={detachedSourceRuntime}
+            archived={false}
+            recordingCandidate={null}
+            recordingActive={recordingActive}
+            onStartRecording={() => {
+              setRecordingActive(true);
+              return 'take-in-progress';
+            }}
+          />
+        </>
+      );
+    };
+    render(
+      <StudioDesignProvider>
+        <RemoteStateTestProvider>
+          <Harness />
+        </RemoteStateTestProvider>
+      </StudioDesignProvider>,
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Record more' }));
+
+    expect(await screen.findByText(PROJECT_RECORDING_TAKE_IN_PROGRESS_NOTICE)).toBeVisible();
+  });
+
+  it('explains a Record control a browser that cannot capture has turned off', async () => {
+    installSources([source(ids.original)]);
+    renderSection({ onStartRecording: () => null, recordingSupported: false });
+
+    const record = await screen.findByRole('button', { name: 'Record more' });
+    expect(record).toBeDisabled();
+    // The reason used to live in the original-video section, which stops rendering its controls
+    // once a Project has one — taking the explanation away from the only Record still on screen.
+    expect(screen.getByText(RECORDING_UNSUPPORTED_NOTICE)).toBeVisible();
+    expect(record).toHaveAttribute('aria-describedby');
+  });
+
+  it('reports a failed add as failed, even when the Project already holds other media', async () => {
+    /*
+     * The reconciliation asks whether the collection *changed*, not whether it holds anything. Read
+     * as a state it said yes to every non-empty Project, so a request that stored nothing was
+     * announced as "is now part of this Project" — and the operator had no reason to try again.
+     */
+    installSources([source(ids.original), source(ids.extra)]);
+    mockApiServer.use(
+      http.post(`*/api/projects/${ids.project}/sources`, () =>
+        HttpResponse.json({ error: { message: 'no' } }, { status: 500 }),
+      ),
+    );
+    const file = new File(['take'], 'take.webm', { type: 'video/webm', lastModified: 1 });
+    renderSection({ recordingCandidate: { file, artifactId: 'take-artifact-1', ready: true } });
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
+    await user.click(screen.getByRole('button', { name: 'Add this recording' }));
+
+    expect(await screen.findByText('Video not added')).toBeVisible();
+    expect(screen.queryByText(/is now part of this Project/u)).not.toBeInTheDocument();
+  });
+
+  it('reports a failed re-pick as failed, rather than as the copy already held', async () => {
+    const held = source(ids.extra, {
+      kind: 'saved-video-version',
+      savedVideoId: ids.video,
+      videoVersionId: ids.version,
+    });
+    installSources([source(ids.original), held]);
+    mockApiServer.use(
+      jsonScenario('GET', '/api/videos', {
+        body: {
+          videos: [savedVideo()],
+          nextCursor: null,
+          total: 1,
+          facets: { characterNames: [], formats: ['landscape'] },
+        },
+      }),
+      http.post(`*/api/projects/${ids.project}/sources/reuse`, () =>
+        HttpResponse.json({ error: { message: 'gone' } }, { status: 404 }),
+      ),
+    );
+    renderSection();
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'Add from your videos' }));
+    await user.click(await screen.findByRole('button', { name: /Retained master/u }));
+
+    // The pair was already present before the request, so "it is here" proves nothing about it.
+    expect(await screen.findByText('Video not added')).toBeVisible();
+  });
+
+  it('asks the collection whether a cancelled change happened anyway', async () => {
+    const authority = list([source(ids.original)]);
+    let added = false;
+    mockApiServer.use(
+      http.get(`*/api/projects/${ids.project}/sources`, () =>
+        HttpResponse.json(added ? list([source(ids.original), source(ids.extra)]) : authority),
+      ),
+      // The server commits and the operator stops waiting before the answer arrives.
+      http.post(`*/api/projects/${ids.project}/sources`, async () => {
+        added = true;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        return HttpResponse.json(accepted(), { status: 201 });
+      }),
+    );
+    const file = new File(['take'], 'take.webm', { type: 'video/webm', lastModified: 1 });
+    renderSection({ recordingCandidate: { file, artifactId: 'take-artifact-1', ready: true } });
+    const user = userEvent.setup();
+
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(1));
+    await user.click(screen.getByRole('button', { name: 'Add this recording' }));
+    await user.click(await screen.findByRole('button', { name: 'Cancel' }));
+
+    // Asserting "nothing moved" would have been a lie, and the retry it invites stores a second
+    // copy: the key is reset only once something is known to have been accepted.
+    expect(await screen.findByText(/is now part of this Project/u)).toBeVisible();
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(2));
   });
 
   it('withholds every way in while the Project is archived or its media cannot change', async () => {

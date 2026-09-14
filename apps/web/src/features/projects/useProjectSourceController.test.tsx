@@ -158,7 +158,7 @@ const adoptedWorkingResponse = (projectId: string): ProjectWorkingMediaResponse 
 const runtime = () => {
   const present = vi.fn<ProjectStageSourceRuntime['present']>();
   const clear = vi.fn<ProjectStageSourceRuntime['clear']>();
-  return { kind: 'stage', present, clear } satisfies ProjectStageSourceRuntime;
+  return { kind: 'stage', present, clear, claim: vi.fn() } satisfies ProjectStageSourceRuntime;
 };
 
 afterEach(() => {
@@ -436,6 +436,7 @@ describe('useProjectSourceController', () => {
       kind: 'stage',
       present: vi.fn(() => events.push('present')),
       clear: vi.fn(() => events.push('clear')),
+      claim: vi.fn(),
     };
     const hook = renderHook(
       () => {
