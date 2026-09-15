@@ -22,7 +22,7 @@ export const ProjectCompositionSurface = ({
   readonly archived: boolean;
   readonly onClose: () => void;
 }) => {
-  const media = useProjectClipMediaCatalogue(current, true);
+  const media = useProjectClipMediaCatalogue(current);
   return (
     <CompositionSurface
       current={current}

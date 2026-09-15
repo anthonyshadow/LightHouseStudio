@@ -1,9 +1,14 @@
 import { requireOpaqueId } from '../common/identity';
 import type { VideoEditAudio } from '../video-editing/types';
-import { VIDEO_EDIT_MINIMUM_TRIM_MS, normalizeVideoEditAudio } from '../video-editing/rules';
+import {
+  DEFAULT_VIDEO_EDIT_AUDIO,
+  VIDEO_EDIT_MINIMUM_TRIM_MS,
+  normalizeVideoEditAudio,
+} from '../video-editing/rules';
 import { subtitleCuesEqual } from '../video-editing/subtitles';
 import { CompositionRuleError, normalizeComposition } from './rules';
 import { projectMediaReferencesEqual } from '../projects/relations';
+import type { ProjectMediaReference } from '../projects/media-reference';
 import { compositionPlacementAt, clipMediaMsAt } from './sequence';
 import {
   COMPOSITION_CLIP_LIMIT,
@@ -48,6 +53,30 @@ export const appendClip = (composition: Composition, clip: CompositionClip): Com
   }
   return withClips(composition, [...composition.clips, clip]);
 };
+
+/**
+ * The first arrangement over one piece of media, trimmed to the whole of it.
+ *
+ * A Project holds media long before anyone arranges it, so the first clip is made rather than found.
+ * It lives here because it is the only composition this product mints, and a clip assembled in a
+ * component would be the one clip no rule shapes: the trim floor, the audio default and the id check
+ * all have one owner, and this is how a surface reaches them without restating any of them.
+ */
+export const compositionOverMedia = (
+  media: ProjectMediaReference,
+  durationMs: number,
+  createId: () => string,
+): Composition =>
+  appendClip(
+    { clips: [], subtitles: [] },
+    {
+      id: createId(),
+      media,
+      // Normalized on the way in, so a media record with no duration still yields a storable clip.
+      trim: { startMs: 0, endMs: Math.max(durationMs, VIDEO_EDIT_MINIMUM_TRIM_MS) },
+      audio: DEFAULT_VIDEO_EDIT_AUDIO,
+    },
+  );
 
 /**
  * The arrangement without one clip, or `null` when that was the last of them.

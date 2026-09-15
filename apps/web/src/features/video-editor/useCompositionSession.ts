@@ -1,7 +1,7 @@
 import type { ProjectCurrentResponse } from '@studio/contracts';
 import {
-  compositionDurationMs,
-  compositionPlacementAt,
+  VIDEO_EDIT_HISTORY_LIMIT,
+  compositionOverMedia,
   compositionPlacements,
   compositionSplitRefusal,
   compositionsEqual,
@@ -11,16 +11,13 @@ import {
   setClipTrim,
   splitCompositionAt,
   type Composition,
-  type CompositionClip,
   type CompositionPlacement,
+  type ProjectMediaReference,
   type CompositionSplitRefusal,
   type VideoEditAudio,
 } from '@studio/domain';
 import { useCallback, useMemo, useState } from 'react';
 import type { ProjectSessionPort } from '../projects/useProjectSession';
-
-/** As many steps back as the single-clip editor keeps, and for the same reason: enough to undo a session. */
-const COMPOSITION_HISTORY_LIMIT = 50;
 
 interface CompositionHistory {
   readonly past: readonly (Composition | null)[];
@@ -52,18 +49,34 @@ export const useCompositionSession = (
   const [history, setHistory] = useState<CompositionHistory>(EMPTY_HISTORY);
   const [selectedClipId, setSelectedClipId] = useState<string | null>(null);
   const [playheadMs, setPlayheadMs] = useState(0);
+  /**
+   * A continuous gesture in flight — a slider being dragged — with the arrangement it started from.
+   *
+   * Held here rather than staged per input event, which is what a range control fires. Staged, one
+   * drag of a trim handle proposed sixty arrangements a second, each one re-validating the whole
+   * proposal, and pushed sixty undo entries — filling the history with tenth-of-a-second steps and
+   * putting the arrangement the operator started from out of reach. This is the shape `EditRange`
+   * was written for and the single-clip editor already uses: preview while it moves, one entry when
+   * it lands.
+   */
+  const [gesture, setGesture] = useState<{
+    readonly start: Composition;
+    readonly value: Composition;
+  } | null>(null);
 
   /*
-   * The pending proposal first, then the settled snapshot. A staged arrangement is what the
-   * operator is looking at, and reading the snapshot alone would make every gesture appear to
-   * revert until the autosave landed.
+   * The gesture in flight first, then the pending proposal, then the settled snapshot. A staged
+   * arrangement is what the operator is looking at, and reading the snapshot alone would make every
+   * gesture appear to revert until the autosave landed.
    */
-  const composition = session.proposal?.composition ?? current.revision.snapshot.composition;
+  const stored = session.proposal?.composition ?? current.revision.snapshot.composition;
+  const composition = gesture?.value ?? stored;
   const placements = useMemo<readonly CompositionPlacement[]>(
     () => (composition === null ? [] : compositionPlacements(composition)),
     [composition],
   );
-  const durationMs = composition === null ? 0 : compositionDurationMs(composition);
+  // The prefix sum's last edge is the sequence length; re-reducing the clips would be a second pass.
+  const durationMs = placements.at(-1)?.endMs ?? 0;
 
   /** Staged, not written: the session owns the write, its compare-and-set and its interval. */
   const stage = useCallback(
@@ -71,7 +84,7 @@ export const useCompositionSession = (
       if (next !== null && previous !== null && compositionsEqual(next, previous)) return false;
       if (!session.propose({ composition: next })) return false;
       setHistory(({ past }) => ({
-        past: [...past, previous].slice(-COMPOSITION_HISTORY_LIMIT),
+        past: [...past, previous].slice(-VIDEO_EDIT_HISTORY_LIMIT),
         future: [],
       }));
       return true;
@@ -87,16 +100,40 @@ export const useCompositionSession = (
    * offered. Refusing keeps a bug in the editor from taking the operator's click out of the app.
    */
   const edit = useCallback(
-    (gesture: (held: Composition) => Composition | null): boolean => {
+    (change: (held: Composition) => Composition | null): boolean => {
       if (composition === null) return false;
       try {
-        return stage(gesture(composition), composition);
+        const next = change(composition);
+        // Mid-gesture the arrangement is previewed, not staged: one proposal and one undo entry are
+        // owed when it lands. A gesture never un-arranges, so `null` there is a refusal.
+        if (gesture !== null) {
+          if (next === null) return false;
+          setGesture((held) => (held === null ? held : { ...held, value: next }));
+          return true;
+        }
+        return stage(next, composition);
       } catch {
         return false;
       }
     },
-    [composition, stage],
+    [composition, gesture, stage],
   );
+
+  /** Opens a continuous gesture, remembering what it is changing away from. */
+  const beginGesture = useCallback(() => {
+    if (composition === null) return;
+    setGesture((held) => held ?? { start: composition, value: composition });
+  }, [composition]);
+
+  /** Closes it, staging the whole drag as one change and one undo entry — or nothing, if it moved back. */
+  const endGesture = useCallback(() => {
+    setGesture((held) => {
+      if (held !== null && !compositionsEqual(held.value, held.start)) {
+        stage(held.value, held.start);
+      }
+      return null;
+    });
+  }, [stage]);
 
   const selectedClip = useMemo(
     () => placements.find(({ clip }) => clip.id === selectedClipId) ?? null,
@@ -123,9 +160,9 @@ export const useCompositionSession = (
    * they asked for.
    */
   const arrange = useCallback(
-    (clip: CompositionClip): boolean =>
-      composition !== null ? false : stage({ clips: [clip], subtitles: [] }, null),
-    [composition, stage],
+    (media: ProjectMediaReference, durationMs: number): boolean =>
+      composition !== null ? false : stage(compositionOverMedia(media, durationMs, createId), null),
+    [composition, createId, stage],
   );
 
   const move = useCallback(
@@ -167,7 +204,7 @@ export const useCompositionSession = (
       if (!session.propose({ composition: previous })) return { past, future };
       return {
         past: past.slice(0, -1),
-        future: [composition, ...future].slice(0, COMPOSITION_HISTORY_LIMIT),
+        future: [composition, ...future].slice(0, VIDEO_EDIT_HISTORY_LIMIT),
       };
     });
   }, [composition, session]);
@@ -177,7 +214,7 @@ export const useCompositionSession = (
       const [next, ...rest] = future;
       if (next === undefined) return { past, future };
       if (!session.propose({ composition: next })) return { past, future };
-      return { past: [...past, composition].slice(-COMPOSITION_HISTORY_LIMIT), future: rest };
+      return { past: [...past, composition].slice(-VIDEO_EDIT_HISTORY_LIMIT), future: rest };
     });
   }, [composition, session]);
 
@@ -192,15 +229,13 @@ export const useCompositionSession = (
     durationMs,
     playheadMs,
     seek,
-    /** What the playhead is over, which is what the preview shows and what a split would cut. */
-    placementAtPlayhead:
-      composition === null ? null : compositionPlacementAt(composition, playheadMs),
-    selectedClipId,
     selectedClip,
     select: setSelectedClipId,
     splitRefusal,
     split,
     arrange,
+    beginGesture,
+    endGesture,
     move,
     remove,
     trim,

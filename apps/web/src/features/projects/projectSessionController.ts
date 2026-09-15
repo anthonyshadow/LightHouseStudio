@@ -1,4 +1,5 @@
 import {
+  projectSessionProposalOf,
   projectSessionProposalSchema,
   type ProjectCurrentResponse,
   type ProjectSessionProposalContract,
@@ -32,18 +33,12 @@ export interface ProjectSessionDependencies {
 }
 
 /**
- * The proposal a settled Project would send back: the snapshot's mutable creative part, in the
- * contract's key order — `proposalsMatch` compares serialized text, and the stored transform is
+ * The proposal a settled Project would send back: the snapshot's mutable creative part, in the key
+ * order the contract owns — `proposalsMatch` compares serialized text, and the stored transform is
  * read raw so that `null` never meets an empty view across the comparison.
  */
-const proposalFromCurrent = (current: ProjectCurrentResponse): ProjectSessionProposalContract => ({
-  workflowPhase: current.revision.snapshot.workflowPhase,
-  liveMode: current.revision.snapshot.liveMode,
-  transform: current.revision.snapshot.transform,
-  localEdit: current.revision.snapshot.localEdit,
-  exportSpecification: current.revision.snapshot.exportSpecification,
-  composition: current.revision.snapshot.composition,
-});
+const proposalFromCurrent = (current: ProjectCurrentResponse): ProjectSessionProposalContract =>
+  projectSessionProposalOf(current.revision.snapshot);
 
 const proposalsMatch = (
   left: ProjectSessionProposalContract,

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   projectCurrentResponseSchema,
+  projectSessionProposalOf,
   projectsResponseSchema,
   type AppendProjectRevisionRequest,
   type DuplicateProjectRequest,
@@ -46,16 +47,10 @@ const sessionProposalMatches = (
   current: ProjectCurrentRead,
   proposal: AppendProjectRevisionRequest['proposal'],
 ): boolean =>
-  // The proposal schema's shape, in its key order: both sides are canonical, so the stored
-  // transform (null when empty) and the proposed one compare as the same text.
-  JSON.stringify({
-    workflowPhase: current.revision.snapshot.workflowPhase,
-    liveMode: current.revision.snapshot.liveMode,
-    transform: current.revision.snapshot.transform,
-    localEdit: current.revision.snapshot.localEdit,
-    exportSpecification: current.revision.snapshot.exportSpecification,
-    composition: current.revision.snapshot.composition,
-  }) === JSON.stringify(proposal);
+  // The proposal schema's shape, in its key order, from the one owner of it: both sides are
+  // canonical, so the stored transform (null when empty) and the proposed one compare as the same
+  // text — and a field added to the contract cannot be forgotten here.
+  JSON.stringify(projectSessionProposalOf(current.revision.snapshot)) === JSON.stringify(proposal);
 
 const publicProject = (project: Project): ProjectContract => ({
   id: project.id,

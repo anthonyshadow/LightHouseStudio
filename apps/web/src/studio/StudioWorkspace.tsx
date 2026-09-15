@@ -185,15 +185,22 @@ export const StudioWorkspace = ({
   } = takeReview;
   const videoEditing = videoEditor.phase !== 'closed';
   const [arranging, setArranging] = useState(false);
-  const arrangingSession = arranging ? (project.session ?? null) : null;
-  const arrangingCurrent = arrangingSession?.current ?? null;
+  /*
+   * The arrangement, or nothing — one value rather than a session and a current that have to be
+   * re-checked against each other at the branch. There is nothing to arrange until the session has
+   * an authority, so the two facts are never usefully apart.
+   */
+  const arrangement =
+    arranging && project.session?.current != null
+      ? { session: project.session, current: project.session.current }
+      : null;
   /*
    * Both editors take the whole surface, and the grid already knows how: `data-video-edit-active`
    * collapses it to one column and hides the Project route behind it. An arrangement needs exactly
    * that — a clip strip does not fit beside a stage — so it says the same thing rather than teaching
    * the grid a second word for it.
    */
-  const editorActive = videoEditing || arrangingCurrent !== null;
+  const editorActive = videoEditing || arrangement !== null;
   // The stage takes the settings column back whenever the docked panel is not actually open. Only
   // the standalone capture layout has one: the Project workspace and the editor own their columns.
   const captureSettingsCollapsed =
@@ -305,12 +312,12 @@ export const StudioWorkspace = ({
                 : {})}
             />
           </Suspense>
-        ) : arrangingCurrent !== null && arrangingSession !== null ? (
+        ) : arrangement !== null ? (
           <Suspense fallback={deferredWorkspaceFallback}>
             <ProjectCompositionSurface
-              current={arrangingCurrent}
-              session={arrangingSession}
-              archived={arrangingCurrent.project.status === 'archived'}
+              current={arrangement.current}
+              session={arrangement.session}
+              archived={arrangement.current.project.status === 'archived'}
               onClose={() => setArranging(false)}
             />
           </Suspense>

@@ -41,3 +41,13 @@ export interface Composition {
   readonly clips: readonly CompositionClip[];
   readonly subtitles: readonly SubtitleCue[];
 }
+
+/**
+ * The length a clip contributes to the sequence: its trimmed span, never its media's own length.
+ *
+ * Beside the type rather than with the sequence arithmetic that uses it most, because the snapshot's
+ * own duration rule needs it too — and a validator reaching it through the editor's module would put
+ * the whole arrangement editor on the path of every route that parses a Project.
+ */
+export const compositionClipDurationMs = (clip: CompositionClip): number =>
+  clip.trim.endMs - clip.trim.startMs;

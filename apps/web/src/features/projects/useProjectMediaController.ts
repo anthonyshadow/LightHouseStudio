@@ -81,11 +81,15 @@ export const useProjectHeldSourceCount = (projectId: string, enabled: boolean): 
  */
 export const useProjectClipMediaCatalogue = (
   current: ProjectCurrentResponse,
-  enabled: boolean,
 ): ReadonlyMap<string, ProjectClipMedia> => {
   const projectId = current.project.id;
-  const query = useQuery({ ...sourcesQueryOptions(projectId), enabled });
-  const presentedCut = useProjectCurrentCut(current, enabled);
+  const query = useQuery(sourcesQueryOptions(projectId));
+  // Asked for only where the revision presents something: with nothing to describe, the read is a
+  // round trip whose answer this catalogue would discard.
+  const presentedCut = useProjectCurrentCut(
+    current,
+    current.revision.snapshot.presentedMedia !== null,
+  );
   const sources = query.data?.sources;
   const presentedMedia = current.revision.snapshot.presentedMedia;
   return useMemo(

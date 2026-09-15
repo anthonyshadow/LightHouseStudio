@@ -12,8 +12,12 @@ import {
   SUBTITLE_CUE_TEXT_MAX_LENGTH,
   normalizeSubtitleCues,
 } from '../video-editing/subtitles';
-import { compositionClipDurationMs } from './sequence';
-import { COMPOSITION_CLIP_LIMIT, type Composition, type CompositionClip } from './types';
+import {
+  COMPOSITION_CLIP_LIMIT,
+  compositionClipDurationMs,
+  type Composition,
+  type CompositionClip,
+} from './types';
 
 export class CompositionRuleError extends Error {
   constructor(message: string) {

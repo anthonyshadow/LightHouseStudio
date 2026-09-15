@@ -1,17 +1,21 @@
+import { projectMediaReferenceKey } from './media-reference';
 import type { ProjectExportSpecification, ProjectMediaReference } from './types';
 
+/**
+ * Whether two references name the same media.
+ *
+ * Defined as the key comparison rather than beside it: a reference's identity had two encodings the
+ * moment `projectMediaReferenceKey` existed, and two encodings of one idea drift — a third variant
+ * added to one and not the other would make a catalogue lookup and this disagree about one pair.
+ * Null handling stays here, because a key has nothing to say about an absent reference.
+ */
 export const projectMediaReferencesEqual = (
   left: ProjectMediaReference | null,
   right: ProjectMediaReference | null,
-): boolean => {
-  if (left === null || right === null) return left === right;
-  if (left.kind === 'asset') return right.kind === 'asset' && left.assetId === right.assetId;
-  return (
-    right.kind === 'saved-video-version' &&
-    left.savedVideoId === right.savedVideoId &&
-    left.videoVersionId === right.videoVersionId
-  );
-};
+): boolean =>
+  left === null || right === null
+    ? left === right
+    : projectMediaReferenceKey(left) === projectMediaReferenceKey(right);
 
 /**
  * Whether two placements would produce the same bytes.

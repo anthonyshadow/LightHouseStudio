@@ -400,14 +400,18 @@ exactly what the Project produces today. Opening the editor still writes nothing
 
 ### 9.3 The bundle budgets, raised with the reason
 
-Both ceilings went red and were raised: shell 745_003 → 748_264 (budget 749_000), Studio
-1_095_125 → 1_099_037 (budget 1_100_000). The cause is structural, not a stray import:
-`@studio/domain` builds to a single `dist/index.js`, so Rollup assigns that whole module to the one
-shared chunk every route loads, and any export the app uses anywhere is emitted there — including
-operations only the lazily loaded editor calls. Narrowing the barrel import in `projects/rules.ts`
-was tried and changed nothing for exactly that reason. The real fix is emitting the domain as split
-chunks, which is a package build change and would give back more than the 3_261 bytes recorded here.
-The full ledger entry is in `scripts/check-build-manifest.mjs`.
+Both ceilings went red and were raised: shell 745_003 → 748_710 (budget 749_000), Studio
+1_095_125 → 1_099_531 (budget 1_100_000). The cause is the barrel edge, verified rather than
+assumed: `apps/web/vite.config.ts` aliases `@studio/domain` to its **source**, unused exports are
+shaken out, but `@studio/domain` → `composition/index.ts` → `export * from './operations'` puts the
+arrangement's clip operations in the module graph of every file that imports the domain barrel, and
+chunk assignment follows that graph rather than the tree-shaken binding set. So operations only the
+lazy editor calls land in the shared chunk every route loads. Two recoveries were tried and measured
+at zero — narrowing the barrel import in `projects/rules.ts`, and moving `compositionClipDurationMs`
+to the leaf so the snapshot validator stops reaching `sequence.ts`. The fix that would work is a
+chunk rule (`manualChunks`, or a domain subpath the editor imports instead of the barrel), which is
+a build-config change and not this slice's. The full ledger entry is in
+`scripts/check-build-manifest.mjs`.
 
 ### 9.4 Deliberately not done
 

@@ -1,4 +1,5 @@
-import type { Composition, CompositionClip } from './types';
+import { clamp } from '../video-editing/clamp';
+import { compositionClipDurationMs, type Composition, type CompositionClip } from './types';
 
 /**
  * Where the clips sit on the stitched timeline, and how to get between the two clocks.
@@ -14,10 +15,6 @@ import type { Composition, CompositionClip } from './types';
  * answers "may this be stored", and nothing here is a rule about storage. This answers "what is on
  * screen at this instant", which only an editor asks.
  */
-
-/** The length a clip contributes to the sequence: its trimmed span, never its media's own length. */
-export const compositionClipDurationMs = (clip: CompositionClip): number =>
-  clip.trim.endMs - clip.trim.startMs;
 
 /** One clip's span on the stitched timeline. `endMs` is exclusive, the way the lookup below reads it. */
 export interface CompositionPlacement {
@@ -76,10 +73,6 @@ export const compositionPlacementAt = (
  * about a neighbour, and answering with a media time outside the trim would seek a `<video>` to
  * frames the operator has cut away.
  */
-export const clipMediaMsAt = (placement: CompositionPlacement, sequenceMs: number): number => {
-  const offsetMs = Math.min(
-    Math.max(sequenceMs - placement.startMs, 0),
-    placement.endMs - placement.startMs,
-  );
-  return placement.clip.trim.startMs + offsetMs;
-};
+export const clipMediaMsAt = (placement: CompositionPlacement, sequenceMs: number): number =>
+  placement.clip.trim.startMs +
+  clamp(sequenceMs - placement.startMs, 0, placement.endMs - placement.startMs);

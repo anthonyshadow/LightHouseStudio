@@ -103,23 +103,30 @@ export const BUILD_CLOSURE_BUDGETS = {
   // still passes, so the capture graph has not followed the Record control into the shell.
   //
   // Raised from 746_000 to 749_000 on 2026-09-14 for slice 4.1 (the arrangement editor), measured
-  // 745_003 -> 748_264. The lowered ceiling did exactly what it was lowered for: it failed the
-  // build rather than absorbing this. The cause is structural rather than a stray import.
-  // `@studio/domain` builds to a single `dist/index.js`, so Rollup assigns that whole module to one
-  // chunk — the shared one every route already loads — and any export the app uses anywhere is
-  // emitted there. The arrangement's clip operations and sequence arithmetic are used only by the
-  // lazily loaded editor, and are paid for on the Dashboard regardless.
+  // 745_003 -> 748_710. The lowered ceiling did exactly what it was lowered for: it failed the
+  // build rather than absorbing this.
   //
-  // What was tried first, and did not work: narrowing `projects/rules.ts` from the composition
-  // barrel to `composition/rules` and `composition/types` (no change — the single-module build
-  // makes barrel narrowing irrelevant to chunking), and trimming the new domain code itself, which
-  // recovered less than the honest `projectMediaReferencesEqual` reuse cost and is not worth
-  // degrading the code for. The real fix is emitting `@studio/domain` as split chunks so a lazily
-  // used export lands in the lazy chunk; that is a package build change, not this slice's, and it
-  // would give back more than the 3_261 bytes recorded here.
+  // The cause, verified rather than assumed — an earlier draft of this entry blamed
+  // `@studio/domain` being built to a single `dist/index.js`, which is simply not what the web
+  // build consumes: `apps/web/vite.config.ts` aliases `@studio/domain` to
+  // `packages/domain/src/index.ts`, so Rollup sees the domain's individual source modules. Unused
+  // exports *are* shaken out of them (`validateComposition`'s message is in no chunk). What is not
+  // shaken is a module whose exports something does use: the barrel chain
+  // `@studio/domain` -> `composition/index.ts` -> `export * from './operations'` puts the
+  // arrangement's clip operations in the module graph of every file that imports the domain barrel,
+  // and chunk assignment follows that graph rather than the tree-shaken binding set. So operations
+  // only the lazily loaded editor calls are emitted into the shared chunk every route loads, and
+  // the Dashboard pays for them.
   //
-  // 749_000 rather than a round number above it, so the headroom stays under a kilobyte and the
-  // next arrival fails the same way this one did.
+  // Two recoveries were tried and measured at zero, and are recorded so they are not tried again:
+  // narrowing `projects/rules.ts` off the composition barrel, and moving `compositionClipDurationMs`
+  // to `composition/types.ts` so the snapshot validator no longer reaches `sequence.ts`. Neither
+  // moves a byte, because neither changes the barrel edge above. The fix that would work is a chunk
+  // rule — a `manualChunks` entry, or a domain subpath entry the editor imports instead of the
+  // barrel — which is a build-config change and not a slice's to make in passing.
+  //
+  // 749_000 rather than a round number above it, so the headroom stays in the hundreds and the next
+  // arrival fails the same way this one did.
   'src/app/shell/AuthenticatedShell.tsx': 749_000,
   // Shell plus capture graph, which is what a Studio route costs. Looser, because a Studio route is
   // where media code belongs; `FORBIDDEN_CLOSURE_DEPENDENCIES` is what keeps it from leaking out.
@@ -177,10 +184,10 @@ export const BUILD_CLOSURE_BUDGETS = {
   // modules either way, and pays their split overhead instead.
   //
   // Raised from 1_096_000 to 1_100_000 on 2026-09-14 for slice 4.1, measured 1_095_125 ->
-  // 1_099_037. It carries the shell's entry above for the same structural reason — the single
-  // `@studio/domain` module — plus what is genuinely local to a Studio route: the arrangement is
-  // reached from here, so this closure also pays the `lazy()` boundary and the props that reach it.
-  // The editor surface itself is lazily loaded and is *not* in this number.
+  // 1_099_531. It carries the shell's entry above for the same reason — the domain barrel edge
+  // described there — plus what is genuinely local to a Studio route: the arrangement is reached
+  // from here, so this closure also pays the `lazy()` boundary and the props that reach it. The
+  // editor surface itself is lazily loaded and is *not* in this number.
   'src/studio/StudioApp.tsx': 1_100_000,
 };
 

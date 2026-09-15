@@ -1085,6 +1085,8 @@ const proposedVideoEditSpecSchema = z
 const PRE_V3_PROPOSAL_KEYS = Object.keys(projectTransformShape);
 
 /**
+ * Whether this proposal's shape is older than this server, in either of the two ways it can be.
+ *
  * A bundle built before snapshot v3 still sends the five AI fields at the top level. The strict
  * object below refuses that anyway; naming the reason lets the 400 say "reload" instead of a
  * validation code.
@@ -1095,12 +1097,22 @@ const PRE_V3_PROPOSAL_KEYS = Object.keys(projectTransformShape);
  * arrangement out with it, because the proposal replaces the snapshot's creative part wholesale.
  * Refusing costs that tab a reload; defaulting would cost it the composition.
  */
-const refusesPreV3Proposal = (value: unknown, context: z.RefinementCtx): void => {
+const refusesStaleProposalShape = (value: unknown, context: z.RefinementCtx): void => {
   if (typeof value !== 'object' || value === null) return;
-  if (PRE_V3_PROPOSAL_KEYS.some((key) => key in value) || !('composition' in value)) {
+  // Each stale shape reports at the field that identifies it, so the 400 points at the actual
+  // difference rather than at whichever field the first rule happened to be written for.
+  if (PRE_V3_PROPOSAL_KEYS.some((key) => key in value)) {
     context.addIssue({
       code: 'custom',
       path: ['transform'],
+      params: STALE_CLIENT_ISSUE,
+      message: PROJECT_STALE_CLIENT_MESSAGE,
+    });
+  }
+  if (!('composition' in value)) {
+    context.addIssue({
+      code: 'custom',
+      path: ['composition'],
       params: STALE_CLIENT_ISSUE,
       message: PROJECT_STALE_CLIENT_MESSAGE,
     });
@@ -1113,7 +1125,7 @@ const refusesPreV3Proposal = (value: unknown, context: z.RefinementCtx): void =>
  */
 export const projectSessionProposalSchema = z
   .unknown()
-  .superRefine(refusesPreV3Proposal)
+  .superRefine(refusesStaleProposalShape)
   .pipe(
     z
       .object({
@@ -1132,6 +1144,27 @@ export const projectSessionProposalSchema = z
       })
       .strict(),
   );
+
+/**
+ * The proposal a settled Project would send back, in the one key order that matters.
+ *
+ * Three places used to spell this order by hand — the schema above, the server's convergence check
+ * and the browser's session controller — and all three compare it as serialized text, so a field
+ * added to two of them passes every test and silently stops every checkpoint from converging. The
+ * order now has one owner and the other two ask for it. The parameter is structural, so a snapshot
+ * from either side (which carries more fields than this) is accepted without either app depending
+ * on the other.
+ */
+export const projectSessionProposalOf = (
+  snapshot: ProjectSessionProposalContract,
+): ProjectSessionProposalContract => ({
+  workflowPhase: snapshot.workflowPhase,
+  liveMode: snapshot.liveMode,
+  transform: snapshot.transform,
+  localEdit: snapshot.localEdit,
+  exportSpecification: snapshot.exportSpecification,
+  composition: snapshot.composition,
+});
 
 export const appendProjectRevisionRequestSchema = z
   .object({

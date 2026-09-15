@@ -9,6 +9,7 @@ import {
   projectConflictResponseSchema,
   projectCurrentResponseSchema,
   projectHistoryResponseSchema,
+  projectSessionProposalOf,
   projectSessionProposalSchema,
   projectVideoEditSpecSchema,
   projectOutputHistoryResponseSchema,
@@ -936,6 +937,17 @@ describe('Project snapshot contract', () => {
 });
 
 describe('projectSessionProposalSchema', () => {
+  /** What a snapshot carries beyond the proposal, so the projection is seen to drop it. */
+  const extraSnapshotFields = {
+    schemaVersion: 3 as const,
+    sourceAssetId: null,
+    workingMedia: null,
+    presentedMedia: null,
+    lastSuccessfulOutput: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+  };
+
   const proposal = (localEdit: unknown) => ({
     workflowPhase: 'review' as const,
     liveMode: null,
@@ -969,6 +981,19 @@ describe('projectSessionProposalSchema', () => {
       localEdit: { subtitles: [] },
     });
     expect(projectSessionProposalSchema.parse(proposal(null)).localEdit).toBeNull();
+  });
+
+  it('projects a snapshot into the same key order the schema parses into', () => {
+    /*
+     * The pair that actually has to agree. Both the server's convergence check and the browser's
+     * session controller compare this as serialized text, so an order that differs from the parsed
+     * shape by one field stops every checkpoint converging — silently, and for every Project, not
+     * just arranged ones. One owner now produces it; this is what holds that owner to the schema.
+     */
+    const parsed = projectSessionProposalSchema.parse(proposal(null));
+    const projected = projectSessionProposalOf({ ...parsed, ...extraSnapshotFields });
+    expect(Object.keys(projected)).toEqual(Object.keys(parsed));
+    expect(JSON.stringify(projected)).toBe(JSON.stringify(parsed));
   });
 
   it('tells a bundle that cannot describe an arrangement to reload, rather than defaulting it', () => {

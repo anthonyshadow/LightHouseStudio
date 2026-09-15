@@ -21,9 +21,9 @@ import type {
   ProjectWorkflowPhase,
 } from './types';
 import { PROJECT_EXPORT_ASPECTS, PROJECT_SOURCE_LIMIT } from './types';
-// The two composition modules this needs by name, not the barrel. The barrel also carries the
-// editor's clip operations, and a Project rule reaching them through it puts the whole arrangement
-// editor in the static closure of every authenticated route that validates a snapshot.
+// By name rather than through the barrel — for readability, not for bytes. The barrel edge does
+// put the editor's clip operations in every authenticated route's chunk, but narrowing here was
+// measured and moves nothing; the ledger in `scripts/check-build-manifest.mjs` records why.
 import type { Composition } from '../composition/types';
 import { CompositionRuleError, validateComposition } from '../composition/rules';
 import {

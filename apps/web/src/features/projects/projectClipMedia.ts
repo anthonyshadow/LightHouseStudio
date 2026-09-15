@@ -49,7 +49,9 @@ export const projectClipMediaCatalogue = (
   // Last, so the presented cut wins where it is also a held source: same media, and the cut is the
   // description the stage is already using.
   if (presented.reference !== null && presented.cut !== null) {
-    catalogue.set(projectMediaReferenceKey(presented.reference), currentCutOf(presented.cut));
+    // Set as it came: it is already the cut's own projection, and re-making it would hand the
+    // surface a copy that compares unequal to the one the cache holds.
+    catalogue.set(projectMediaReferenceKey(presented.reference), presented.cut);
   }
   return catalogue;
 };

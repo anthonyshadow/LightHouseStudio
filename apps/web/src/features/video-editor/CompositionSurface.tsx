@@ -1,7 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectCurrentResponse } from '@studio/contracts';
 import {
-  DEFAULT_VIDEO_EDIT_AUDIO,
   VIDEO_EDIT_AUDIO_LEVEL_MAX,
   VIDEO_EDIT_MINIMUM_TRIM_MS,
   clipMediaMsAt,
@@ -71,8 +70,8 @@ export const CompositionSurface = ({
   const theme = useTheme();
   // One minter for the surface and the session, so a test that pins ids pins all of them.
   const mintId = useMemo(() => createId ?? (() => crypto.randomUUID()), [createId]);
-  const composition = useCompositionSession(session, current, mintId);
   const {
+    composition: arrangement,
     placements,
     durationMs,
     playheadMs,
@@ -81,11 +80,23 @@ export const CompositionSurface = ({
     select,
     splitRefusal,
     split,
+    arrange,
+    beginGesture,
+    endGesture,
     move,
     remove,
     trim,
     audio,
-  } = composition;
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useCompositionSession(session, current, mintId);
+  // Hoisted above the rows: Emotion serialises each of these on every call and the strip runs to
+  // `COMPOSITION_CLIP_LIMIT`, so a selected boolean is two objects rather than one per clip.
+  const captionCss = clipStripCaptionStyles(theme);
+  const tileCss = clipTileStyles(theme, false);
+  const selectedTileCss = clipTileStyles(theme, true);
   const stripRef = useRef<HTMLUListElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   /* The clip a reorder should hand focus back to, held in a ref: the effect below has to run
@@ -169,7 +180,7 @@ export const CompositionSurface = ({
     }
   }, [playheadMs, selectedClip, selectedMedia]);
 
-  if (composition.composition === null) {
+  if (arrangement === null) {
     /*
      * A Project holds media long before anyone arranges it, so the first clip is made here rather
      * than found. It stands over the cut the revision presents — the video the Project is already
@@ -180,7 +191,7 @@ export const CompositionSurface = ({
     const presentedMedia = presented === null ? null : clipMediaOf(media, presented);
     return (
       <section css={compositionSurfaceStyles(theme)} data-composition-surface>
-        <header css={clipStripCaptionStyles(theme)}>
+        <header css={captionCss}>
           <h2>Arrange</h2>
           <Button variant="quiet" onClick={onClose}>
             Back to the Project
@@ -200,17 +211,7 @@ export const CompositionSurface = ({
               <Button
                 variant="primary"
                 disabled={blocked}
-                onClick={() =>
-                  composition.arrange({
-                    id: mintId(),
-                    media: presented,
-                    trim: {
-                      startMs: 0,
-                      endMs: Math.max(presentedMedia.durationMs, VIDEO_EDIT_MINIMUM_TRIM_MS),
-                    },
-                    audio: DEFAULT_VIDEO_EDIT_AUDIO,
-                  })
-                }
+                onClick={() => arrange(presented, presentedMedia.durationMs)}
               >
                 Arrange this video
               </Button>
@@ -223,7 +224,7 @@ export const CompositionSurface = ({
 
   return (
     <section css={compositionSurfaceStyles(theme)} data-composition-surface>
-      <header css={clipStripCaptionStyles(theme)}>
+      <header css={captionCss}>
         <h2>Arrange</h2>
         <span>
           {`${placements.length} ${placements.length === 1 ? 'clip' : 'clips'} · ${formatVideoEditTimelineTime(durationMs)}`}
@@ -254,7 +255,7 @@ export const CompositionSurface = ({
                 data-unresolved={held === null}
                 // Roving tabindex: one stop for the whole strip, and the arrows move within it.
                 tabIndex={selected ? 0 : -1}
-                css={clipTileStyles(theme, selected)}
+                css={selected ? selectedTileCss : tileCss}
                 onClick={() => selectPlacement(placement)}
                 onKeyDown={(event) => onStripKeyDown(event, placement)}
               >
@@ -271,7 +272,7 @@ export const CompositionSurface = ({
         })}
       </ul>
 
-      <div css={clipStripCaptionStyles(theme)}>
+      <div css={captionCss}>
         <Button
           disabled={blocked || splitRefusal !== null}
           onClick={split}
@@ -279,10 +280,10 @@ export const CompositionSurface = ({
         >
           Split at playhead
         </Button>
-        <Button variant="quiet" disabled={!composition.canUndo} onClick={composition.undo}>
+        <Button variant="quiet" disabled={!canUndo} onClick={undo}>
           Undo
         </Button>
-        <Button variant="quiet" disabled={!composition.canRedo} onClick={composition.redo}>
+        <Button variant="quiet" disabled={!canRedo} onClick={redo}>
           Redo
         </Button>
       </div>
@@ -365,11 +366,11 @@ export const CompositionSurface = ({
                 )}
                 step={10}
                 format={formatVideoEditTimelineTime}
-                onStart={() => undefined}
+                onStart={beginGesture}
                 onChange={(value) =>
                   trim(selectedClip.clip.id, selectedClip.clip.trim.startMs, value)
                 }
-                onCommit={() => undefined}
+                onCommit={endGesture}
               />
               <EditRange
                 label="Clip volume"
@@ -378,11 +379,11 @@ export const CompositionSurface = ({
                 maximum={VIDEO_EDIT_AUDIO_LEVEL_MAX}
                 step={1}
                 format={(value) => `${value}%`}
-                onStart={() => undefined}
+                onStart={beginGesture}
                 onChange={(level) =>
                   audio(selectedClip.clip.id, { ...selectedClip.clip.audio, level })
                 }
-                onCommit={() => undefined}
+                onCommit={endGesture}
               />
               <Button
                 variant="quiet"
@@ -396,7 +397,7 @@ export const CompositionSurface = ({
               >
                 {selectedClip.clip.audio.muted ? 'Unmute this clip' : 'Mute this clip'}
               </Button>
-              <div css={clipStripCaptionStyles(theme)}>
+              <div css={captionCss}>
                 <Button
                   variant="quiet"
                   disabled={blocked || selectedClip.index === 0}
