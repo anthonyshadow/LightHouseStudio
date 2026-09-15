@@ -34,6 +34,42 @@ const FAILURE_MESSAGE: Record<ProjectMediaAct, string> = {
 };
 
 /**
+ * Where one act got to and what to say about it, written as a unit.
+ *
+ * The three moved together at every transition and only ever made sense together: a phase from one
+ * act beside the noun of another is what made a failed removal announce itself as a video that
+ * could not be added. Held apart, that pairing was an invariant maintained by hand at six call
+ * sites; held together it is the only thing the type can express.
+ */
+interface ProjectMediaStatus {
+  readonly phase: ProjectMediaPhase;
+  readonly act: ProjectMediaAct;
+  readonly message: string | null;
+}
+
+const IDLE_STATUS: ProjectMediaStatus = { phase: 'idle', act: 'add', message: null };
+
+/** The one read of a Project's collection, so every observer of it shares a fetch and a cache. */
+const sourcesQueryOptions = (projectId: string) => ({
+  queryKey: projectQueryKeys.sources(projectId),
+  queryFn: ({ signal }: { readonly signal: AbortSignal }) => listProjectSources(projectId, signal),
+});
+
+/**
+ * How much media a Project holds, for a surface that needs the count without owning the acts.
+ *
+ * The one control that has to know — "Remove original video", in the section next door — used to
+ * read it out of the Media area's activity report: a count relayed up through a parent's state, so
+ * it arrived a render late, travelled mixed into a record about work in flight, and was absent
+ * entirely whenever that section was unmounted. Reading the same cache entry costs no second fetch
+ * and puts the number where the rule is applied.
+ */
+export const useProjectHeldSourceCount = (projectId: string, enabled: boolean): number => {
+  const query = useQuery({ ...sourcesQueryOptions(projectId), enabled });
+  return query.data?.sources.length ?? 0;
+};
+
+/**
  * Everything a Project holds to work from, and the three ways the operator changes it.
  *
  * Deliberately not `useProjectSourceController`: that one owns the *original* — the stage it
@@ -45,20 +81,11 @@ export const useProjectMediaController = (projectId: string, session: ProjectSes
   const queryClient = useQueryClient();
   const operation = useStableOperationKey();
   const controllerRef = useRef<AbortController | null>(null);
-  const [phase, setPhase] = useState<ProjectMediaPhase>('idle');
-  const [act, setAct] = useState<ProjectMediaAct>('add');
-  const [message, setMessage] = useState<string | null>(null);
-  const sourcesQuery = useMemo(
-    () => ({
-      queryKey: projectQueryKeys.sources(projectId),
-      queryFn: ({ signal }: { readonly signal: AbortSignal }) =>
-        listProjectSources(projectId, signal),
-    }),
-    [projectId],
-  );
+  const [status, setStatus] = useState<ProjectMediaStatus>(IDLE_STATUS);
+  const sourcesQuery = useMemo(() => sourcesQueryOptions(projectId), [projectId]);
   const query = useQuery(sourcesQuery);
   const sources = query.data?.sources ?? [];
-  const busy = phase === 'adding' || phase === 'removing';
+  const busy = status.phase === 'adding' || status.phase === 'removing';
 
   /**
    * What the collection held before an act started, or `null` when this browser does not know.
@@ -117,26 +144,29 @@ export const useProjectMediaController = (projectId: string, session: ProjectSes
       const controller = new AbortController();
       controllerRef.current?.abort('project-media-replaced');
       controllerRef.current = controller;
+      // Every phase reached below belongs to this act, so it is stamped once here rather than
+      // remembered by each transition — which is how the two came apart in the first place.
+      const report = (phase: ProjectMediaPhase, message: string | null) =>
+        setStatus({ phase, act: input.act, message });
       /*
        * Raised before the flush, not after. `flush` is a real checkpoint round trip whenever the
        * session holds a pending proposal, and every control that closes this door reads `busy` —
        * so a second press during that window used to enter here too, abort this one, and have this
        * one's own cleanup report the section idle while the survivor was still in flight.
        */
-      setAct(input.act);
-      setPhase(input.act === 'add' ? 'adding' : 'removing');
-      setMessage(input.busyMessage);
+      report(input.act === 'add' ? 'adding' : 'removing', input.busyMessage);
       const before = heldSourcesBefore();
       try {
         if (!(await session.flush())) {
-          setPhase('conflict');
-          setMessage('Save or discard your pending Project changes before changing its media.');
+          report(
+            'conflict',
+            'Save or discard your pending Project changes before changing its media.',
+          );
           return false;
         }
         const current = session.getCurrent();
         if (current === null) {
-          setPhase('idle');
-          setMessage(null);
+          report('idle', null);
           return false;
         }
         // The one pair that has to be identical between the key and the request it names.
@@ -151,8 +181,7 @@ export const useProjectMediaController = (projectId: string, session: ProjectSes
           session.acceptCurrent(next);
           if (!sourcesFresh) void reconcileProjectMedia(queryClient, projectId);
           if (input.fingerprint) operation.reset();
-          setPhase(input.act === 'add' ? 'added' : 'removed');
-          setMessage(input.settledMessage);
+          report(input.act === 'add' ? 'added' : 'removed', input.settledMessage);
           input.onSettled?.();
         };
         /*
@@ -187,12 +216,13 @@ export const useProjectMediaController = (projectId: string, session: ProjectSes
           const conflicted = error instanceof ProjectApiConflictError;
           if (!conflicted && (await reconcile())) return true;
           if (controller.signal.aborted) {
-            setPhase('idle');
-            setMessage('That change was cancelled. Nothing in this Project changed.');
+            report('idle', 'That change was cancelled. Nothing in this Project changed.');
             return false;
           }
-          setPhase(conflicted ? 'conflict' : 'error');
-          setMessage(apiErrorMessage(error, FAILURE_MESSAGE[input.act]));
+          report(
+            conflicted ? 'conflict' : 'error',
+            apiErrorMessage(error, FAILURE_MESSAGE[input.act]),
+          );
           return false;
         }
       } finally {
@@ -287,9 +317,9 @@ export const useProjectMediaController = (projectId: string, session: ProjectSes
   return {
     query,
     sources,
-    phase,
-    act,
-    message,
+    phase: status.phase,
+    act: status.act,
+    message: status.message,
     busy,
     /** Whether the collection is known at all; nothing may be added against an unknown one. */
     loaded: query.data !== undefined,

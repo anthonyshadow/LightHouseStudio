@@ -3,8 +3,8 @@ import type { ProjectCurrentResponse } from '@studio/contracts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, ConfirmationDialog, StatusNotice } from '../../ui';
 import { PROJECT_MEDIA_REMOVAL_REASSURANCE } from './projectProcessingPresentation';
+import { ProjectRecordingNotices } from './ProjectRecordingNotices';
 import {
-  RECORDING_UNSUPPORTED_NOTICE,
   useProjectRecordingControl,
   type ProjectRecordingLaunchRefusal,
 } from './projectRecordingLaunch';
@@ -308,14 +308,7 @@ export const ProjectSourceSection = ({
               >
                 Use a saved video
               </Button>
-              {record.unsupported ? (
-                <small id={record.unsupportedId}>{RECORDING_UNSUPPORTED_NOTICE}</small>
-              ) : null}
-              {record.refusalMessage ? (
-                <StatusNotice role="alert" tone="warning">
-                  {record.refusalMessage}
-                </StatusNotice>
-              ) : null}
+              <ProjectRecordingNotices record={record} />
               {detached ? (
                 <small>Choosing here opens the workspace, where you can watch it.</small>
               ) : null}

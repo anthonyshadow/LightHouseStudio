@@ -87,9 +87,13 @@ export const useProjectRecordingControl = ({
   const unsupported = onStartRecording !== undefined && !recordingSupported;
   return {
     unsupported,
-    /** The explanation's id while there is one, so the control can point at it and not at air. */
+    /**
+     * The explanation's id while there is one, so the control can point at it and not at air.
+     *
+     * One field rather than the id and a flag: the id is the explanation's, and there is no
+     * explanation to carry one when the browser can record. Its presence is the condition.
+     */
     describedById: unsupported ? unsupportedId : undefined,
-    unsupportedId,
     refusalMessage: recordingRefusalNotice(refusal, recordingActive),
     // One write, because the launch answers before this returns: an earlier press's refusal is
     // replaced by this press's, whatever that is, and `null` is how a press that started something
@@ -97,3 +101,6 @@ export const useProjectRecordingControl = ({
     press: () => setRefusal(onStartRecording?.() ?? null),
   } as const;
 };
+
+/** What the hook above answers, for the component that renders the sentences it may owe. */
+export type ProjectRecordingControl = ReturnType<typeof useProjectRecordingControl>;

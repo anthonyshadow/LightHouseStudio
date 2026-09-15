@@ -31,6 +31,7 @@ import {
   entryTaskForSnapshot,
   type ProjectWorkflowStepId,
 } from './ProjectWorkflowProgress';
+import { useProjectHeldSourceCount } from './useProjectMediaController';
 import type { ProjectProcessingController } from './useProjectProcessingController';
 import type { useProjectSession } from './useProjectSession';
 import {
@@ -172,6 +173,13 @@ export const ProjectWorkspaceSurface = ({
     useState<ProjectWorkingMediaActivity | null>(null);
   const [mediaActivity, setMediaActivity] = useState<ProjectMediaActivity | null>(null);
   const mediaBusy = mediaActivity?.busy ?? false;
+  // The collection the Media area works on, observed here too rather than relayed up out of it:
+  // the control below applies a domain rule to the count, and the two share one cache entry. Read
+  // only where that section exists, so a Project with no original still asks for nothing.
+  const heldSourceCount = useProjectHeldSourceCount(
+    current.project.id,
+    current.revision.snapshot.sourceAssetId !== null,
+  );
   /*
    * One report upward for both surfaces that hold this Project's media.
    *
@@ -249,7 +257,7 @@ export const ProjectWorkspaceSurface = ({
   const sourceRemovalBlockedReason = ((): string | undefined => {
     const attempt = projectProcessingBlockedReason(processing?.attempt, 'source-removal');
     if (attempt !== undefined) return attempt;
-    if (!projectOriginalIsRemovable(mediaActivity?.held ?? 0)) {
+    if (!projectOriginalIsRemovable(heldSourceCount)) {
       return 'This Project works from other videos too. Remove them below first, or keep this one as the original.';
     }
     if (workingMediaActivity?.busy) {

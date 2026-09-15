@@ -329,3 +329,47 @@ collection from `reconcileProject` meant every creative autosave refetched up to
 the hydration effect could abort and restart its own fetch — plus four duplications worth one owner
 each: the Record control's state, the busy-activity shape, the held-Version predicate, and the
 original-removal rule, which now lives in the domain beside the rule that enforces it.
+
+### 7.5 What the second cleanup pass changed
+
+A `/simplify` over the fix commit took seven changes and declined six. The declines are recorded
+with their evidence, because four of them were argued convincingly and are still wrong.
+
+**Taken.** The media controller's `phase`, `act` and `message` were three states written together
+at six call sites and separable only into nonsense — a phase from one act beside the noun of
+another is the drift `act` was added to prevent — so they are one `ProjectMediaStatus`, stamped by
+a single `report` per transition. The Record control's markup was still duplicated after its state
+was given one owner, and the duplicated half was the `aria-describedby` wiring that tells a screen
+reader why the control is off; it is a `ProjectRecordingNotices` component now, and the hook
+publishes one id rather than an id and a flag. The failure title was spelled in two places that are
+read together and had already disagreed on `conflict`. The held-media count rode the Media area's
+activity record up into a parent's state so the section next door could apply a domain rule to it —
+arriving a render late, and not at all while that section was unmounted; both surfaces observe the
+same cache entry through `useProjectHeldSourceCount` instead, and `ProjectMediaActivity` is about
+work in flight again. `projectsApi` re-exported three asset calls nothing imported, keeping alive
+the module edge the split was made to cut. The add dialog awaited two disjoint invalidations in
+series, delaying its own navigation. And an activity effect handed React its callback's return
+value as a cleanup.
+
+**Declined.** Putting the presented media's identity on the stage runtime is the right shape — it
+would delete the hydration marker, the rehydration counter and the `stageHoldsSource` prop threaded
+through four layers — but `mediaArtifactMetadata` mints a fresh `crypto.randomUUID()` per
+presentation, so it needs a stable media-derived artifact id first, and that reaches into the
+recorder and take review. Dropping `phase` from `ProjectSourceActivity` was argued as a lie in a
+dead field; it is asserted in two suites and travels in the record the shell reads.
+`projectHoldsSavedVideoVersion` takes a contracts type and the domain is contracts-free, so moving
+it there buys a mapper for one predicate. Making `run` call `ensureQueryData` would make the
+unknown-collection case impossible rather than merely disabled, but it puts a fetch inside the act
+and reopens reconciliation this commit had just settled. A shared `projectApiErrors` module would
+draw the api seam at ownership instead of at bundle closure, but both ceilings now sit within a
+thousand bytes and that change wants its own measurement. The third hand-rolled
+`ProjectSourceCollectionItem` fixture is worth a shared one, but two of the three predate this diff.
+
+**Recorded, not acted on.** The release effect fires when `stageHoldsSource` goes false, which a
+Record press does immediately — the capture discards the presentation before any camera starts — so
+a Project with an original re-reads and re-presents its media on every press, not only on a capture
+the operator abandons. The re-presentation is deliberate and covered
+(`ProjectRouteSurface.test.tsx`, "puts the Project back on the stage when a capture takes it away
+and leaves nothing"); whether the live preview masks the re-presented media, and what the two round
+trips cost on a slow connection, is unmeasured. It is the same mechanism as the first decline above
+and should be settled with it.
