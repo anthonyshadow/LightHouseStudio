@@ -241,7 +241,10 @@ carries `{id, media, trim, audio}` and `Composition` carries the subtitle list, 
 per clip, subtitles are per sequence, and crop, rotation, flips, lighting and filters have no home in
 an arrangement at all. Giving them one is a domain and contract change of its own, not a UI slice.
 4.2 Stitched rendering: worker renders clip sequences (mediabunny concatenation) with
-normalization policy for mixed resolutions/framerates; accurate stitched preview.
+normalization policy for mixed resolutions/framerates; accurate stitched preview. The audio half
+of that policy exists ahead of the slice (2026-09-15) — the target rule and a per-clip conforming
+stage, proven against the encoder guard that refuses a second format outright — and 4.2 wires them
+into the concat loop; see [the mixed-audio plan](SLICE_4.2_MIXED_AUDIO_PLAN.md).
 4.3 Composition save/export: the composition is what Save operates on; variant sets from 2.3
 apply to it.
 4.4 Pipeline convergence: standalone Studio becomes a thin entry to the durable engine ("make

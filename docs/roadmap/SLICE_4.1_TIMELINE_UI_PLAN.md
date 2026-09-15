@@ -325,6 +325,9 @@ Per the Standing rules ("otherwise choose the narrowest conservative interpretat
    `numberOfChannels` or `sampleRate` between incoming samples, and that guard runs _before_ the
    resample branch. An implementation that assumes `transform.sampleRate` handles mixed audio will
    throw mid-encode on the first mixed pair, after the video has been paid for.
+   Fixed ahead of 4.2 on 2026-09-15 — the target rule in the domain and a per-clip conforming
+   stage in the browser adapter, proven against the real guard; see
+   [`SLICE_4.2_MIXED_AUDIO_PLAN.md`](SLICE_4.2_MIXED_AUDIO_PLAN.md).
 
 ---
 

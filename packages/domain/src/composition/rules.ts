@@ -26,9 +26,12 @@ export class CompositionRuleError extends Error {
   }
 }
 
-const fail = (message: string): never => {
+/** The one way a composition rule refuses; the sibling modules share it rather than restating it. */
+export const failComposition = (message: string): never => {
   throw new CompositionRuleError(message);
 };
+
+const fail = failComposition;
 
 /**
  * The timeline composition cues are normalized against. Deliberately unbounded: clamping cues to

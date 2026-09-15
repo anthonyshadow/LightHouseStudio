@@ -6,7 +6,7 @@ import {
   normalizeVideoEditAudio,
 } from '../video-editing/rules';
 import { subtitleCuesEqual } from '../video-editing/subtitles';
-import { CompositionRuleError, normalizeComposition } from './rules';
+import { failComposition, normalizeComposition } from './rules';
 import { projectMediaReferencesEqual } from '../projects/relations';
 import type { ProjectMediaReference } from '../projects/media-reference';
 import { compositionPlacementAt, clipMediaMsAt } from './sequence';
@@ -30,9 +30,7 @@ import {
  * new half will carry rather than reaching for `crypto`.
  */
 
-const fail = (message: string): never => {
-  throw new CompositionRuleError(message);
-};
+const fail = failComposition;
 
 /** A clip the operator points at, or a refusal naming why that clip is not there. */
 const clipIndexOf = (composition: Composition, clipId: string): number => {

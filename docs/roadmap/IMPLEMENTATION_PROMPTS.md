@@ -369,9 +369,20 @@ capture-bridge tests; e2e add-second-source journey (real stack).
 > For prompt 34 specifically: mediabunny's `AudioEncoderWrapper.add` **throws** on any change of
 > `numberOfChannels` or `sampleRate` between incoming samples, and that guard runs before the
 > resample branch — so `transform.sampleRate` does not handle mixed audio, and an implementation
-> that assumes it does will throw mid-encode after the video has been paid for. The normalization
-> policy 34 is told was "decided in 32's plan" is **not** decided: it was designed, adversarially
-> reviewed, and cut from 4.1's scope as 4.2's own work.
+> that assumes it does will throw mid-encode after the video has been paid for. **The audio half's
+> rule and stage exist ahead of 34** (2026-09-15), proven against the real encoder guard but not yet
+> wired to a render: the target rule is `compositionAudioTarget` and the fallback is
+> `COMPOSITION_AUDIO_FALLBACK_TARGET`, both in `packages/domain/src/composition/audio.ts`; the
+> per-clip conforming stage is `createAudioSampleConformer` in
+> `apps/web/src/adapters/media-processing/audioSampleConformer.ts`. Audit, design and record in
+> [`SLICE_4.2_MIXED_AUDIO_PLAN.md`](SLICE_4.2_MIXED_AUDIO_PLAN.md). What 34 owes: feed each clip
+> through its own conformer into one `AudioSampleSource`, never decoded samples directly; place each
+> clip in **frames** via `compositionAudioFrames`, with the next clip's offset being the sum of the
+> budgets before it; **probe the chosen target with `canEncodeAudio` before any paid work** and fall
+> back to `COMPOSITION_AUDIO_FALLBACK_TARGET` on refusal — the library's own fallback is unreachable
+> on this path; and surface `clipAudioConformance` as the notice for a clip that was resampled or
+> folded. The **video** half of the normalization policy (resolution, frame rate) is still not
+> decided: it was designed, adversarially reviewed, and cut from 4.1's scope as 4.2's own work.
 
 **32 (A) — Timeline UI: audit.** Standard audit-and-plan for slice 4.1 (edit-1, web-7). Inspect
 the editor stack (`VideoEditWorkspace/Timeline/StagePreview`, `useVideoEditSession`), the v3
@@ -386,7 +397,7 @@ tests, visual cases for the new surface.
 
 **34 (B) — Stitched rendering.** Implement slice 4.2: the worker renders ordered clip sequences
 (mediabunny concatenation) with an explicit normalization policy for mixed
-resolution/framerate/codec (decided in 32's plan); stitched preview is accurate; progress and
+resolution/framerate/codec (the audio half is fixed and proven ahead of this prompt — see the note above; the video half is decided in 34's own plan); stitched preview is accurate; progress and
 cancellation per render; memory bounded. Apply Standing rules + Media checklist. Tests: worker
 concat tests incl. mixed-fixture normalization and cancellation; render-budget measurements
 recorded in the report.

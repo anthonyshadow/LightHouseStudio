@@ -121,6 +121,10 @@ The retained suite protects:
 - local video-edit normalization/history, worker progress/cancellation/stale-result handling,
   offset-aware output limits, persistent-stage preview, keyboard crop, atomic source replacement,
   downstream Voice sidecars, and pre-provider aspect gating;
+- mixed-source audio conformance for a stitched output — the target rule, per-clip resampling and
+  remixing with a continuous seam, and contiguous timestamps — proven against the real mediabunny
+  encoder guard through a WAV/PCM output in Node rather than a mock, alongside the case that pins
+  the guard itself;
 - upload and primary local-record adoption into the editor; discoverable Character Swap, Virtual
   Try On, and Voice; Original/Result synchronization; strict visual-before-voice ordering;
   latest-result cleanup; and post-generation MP4 validation;
