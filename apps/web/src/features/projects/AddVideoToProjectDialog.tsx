@@ -77,11 +77,15 @@ export const AddVideoToProjectDialog = ({
         savedVideoId: video.id,
         videoVersionId: video.currentVersion.id,
       });
-      await reconcileProjectMedia(queryClient, project.id);
-      await reconcileProject(queryClient, {
-        project: response.project,
-        revision: response.revision,
-      });
+      // Two disjoint cache prefixes with no ordering between them. Awaited in series, the
+      // collection's refetch held up the Projects list's — and then the navigate — for nothing.
+      await Promise.all([
+        reconcileProjectMedia(queryClient, project.id),
+        reconcileProject(queryClient, {
+          project: response.project,
+          revision: response.revision,
+        }),
+      ]);
       operation.reset();
       finish(project.id);
     } catch (caught) {

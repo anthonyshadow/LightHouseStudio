@@ -12,8 +12,8 @@ import { ProjectAssetThumbnail } from './ProjectAssetThumbnail';
 import type { ProjectRecordingCandidate } from './ProjectSourceSection';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
 import { PROJECT_MEDIA_REMOVAL_REASSURANCE } from './projectProcessingPresentation';
+import { ProjectRecordingNotices } from './ProjectRecordingNotices';
 import {
-  RECORDING_UNSUPPORTED_NOTICE,
   useProjectRecordingControl,
   type ProjectRecordingLaunchRefusal,
 } from './projectRecordingLaunch';
@@ -108,6 +108,18 @@ interface ProjectMediaNotice {
   readonly tone: NoticeTone;
 }
 
+/**
+ * What a failure is called, by the act that failed.
+ *
+ * One spelling, because the notice and the removal dialog both name it and are read together: they
+ * were written separately and had already drifted, which is the same drift in miniature as the one
+ * `act` exists to prevent.
+ */
+const FAILURE_TITLE: Record<ProjectMediaAct, string> = {
+  add: 'Video not added',
+  remove: 'Video not removed',
+};
+
 // `act` is carried through the terminal states because one phase serves both: a removal that failed
 // used to be announced as a video that could not be added, over a dialog saying the opposite.
 const mediaNotice = (phase: ProjectMediaPhase, act: ProjectMediaAct): ProjectMediaNotice => {
@@ -125,7 +137,7 @@ const mediaNotice = (phase: ProjectMediaPhase, act: ProjectMediaAct): ProjectMed
     case 'conflict':
       return { title: 'Conflict', tone: 'warning' };
     case 'error':
-      return { title: act === 'add' ? 'Video not added' : 'Video not removed', tone: 'danger' };
+      return { title: FAILURE_TITLE[act], tone: 'danger' };
   }
 };
 
@@ -140,12 +152,12 @@ interface ProjectMediaNoticeOnScreen extends ProjectMediaNotice {
  *
  * `busy` covers the intake as well as the request: converting a phone clip is minutes of the
  * operator's work, and reported idle it looked like nothing in flight — so leaving discarded it
- * without asking, and a sibling act could move the Project out from under it. `held` is here
- * because the one control that has to know how much media a Project has is in another section.
+ * without asking, and a sibling act could move the Project out from under it. Work in flight only:
+ * a surface that needs to know how much media a Project holds reads the collection itself, through
+ * {@link useProjectHeldSourceCount}.
  */
 export interface ProjectMediaActivity {
   readonly busy: boolean;
-  readonly held: number;
   readonly abort: (() => void) | null;
 }
 
@@ -232,25 +244,19 @@ export const ProjectMediaSection = ({
   const addDisabled = blocked || busy || !controller.loaded || controller.atLimit;
   const take = recordingCandidate?.ready ? recordingCandidate : null;
   /*
-   * What the surfaces that outlive this section are told. Rebuilt only when one of its three facts
+   * What the surfaces that outlive this section are told. Rebuilt only when one of its two facts
    * moves, so the effect below reports a change rather than a render.
    */
   const activity = useMemo<ProjectMediaActivity>(
     () => ({
       busy,
-      held: controller.sources.length,
       abort: intake.phase !== null ? intake.cancel : controller.busy ? controller.cancel : null,
     }),
-    [
-      busy,
-      controller.busy,
-      controller.cancel,
-      controller.sources.length,
-      intake.cancel,
-      intake.phase,
-    ],
+    [busy, controller.busy, controller.cancel, intake.cancel, intake.phase],
   );
-  useEffect(() => onActivityChange?.(activity), [activity, onActivityChange]);
+  useEffect(() => {
+    onActivityChange?.(activity);
+  }, [activity, onActivityChange]);
   /*
    * One notice, with the intake speaking first while it has something to say: its wait is the only
    * thing happening, and a refusal from here supersedes whatever the last attempt at the server
@@ -428,14 +434,7 @@ export const ProjectMediaSection = ({
           <Button ref={pickerTriggerRef} disabled={addDisabled} onClick={() => setPickerOpen(true)}>
             Add from your videos
           </Button>
-          {record.unsupported ? (
-            <small id={record.unsupportedId}>{RECORDING_UNSUPPORTED_NOTICE}</small>
-          ) : null}
-          {record.refusalMessage ? (
-            <StatusNotice role="alert" tone="warning">
-              {record.refusalMessage}
-            </StatusNotice>
-          ) : null}
+          <ProjectRecordingNotices record={record} />
         </div>
 
         {changeBlockedReason === undefined ? null : (
@@ -475,7 +474,7 @@ export const ProjectMediaSection = ({
           confirmDisabled={blocked}
           {...(controller.act === 'remove' &&
           (controller.phase === 'conflict' || controller.phase === 'error')
-            ? { alert: controller.message ?? undefined, alertTitle: 'Video not removed' }
+            ? { alert: controller.message ?? undefined, alertTitle: FAILURE_TITLE[controller.act] }
             : {})}
           returnFocusRef={headingRef}
           onCancel={() => setRemoving(null)}

@@ -65,10 +65,10 @@ export const busyProjectSourceActivity = (
  * Whether this surface owns live media, stated rather than inferred.
  *
  * `detached` deliberately carries no methods, so no surface can hold a runtime that absorbs
- * `present` and `clear` into no-ops and call them as though a stage were there. The controller
- * below narrows once, because it is the one caller that legitimately runs on both. The remedy for
- * "you cannot record here" is route knowledge, which belongs to the surface that mounted the
- * section, not here.
+ * `present` and `clear` into no-ops and call them as though a stage were there. Narrowing is what
+ * that costs, and the two callers that legitimately run on both pay it once each: the controller
+ * below, and the Media area for `claim`. The remedy for "you cannot record here" is route
+ * knowledge, which belongs to the surface that mounted the section, not here.
  */
 export type ProjectSourceRuntime =
   | {

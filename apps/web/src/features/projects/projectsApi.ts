@@ -45,7 +45,6 @@ const jsonHeaders = { Accept: 'application/json', 'Content-Type': 'application/j
 // Re-exported so every caller keeps one import site for the Project HTTP surface; the shell's own
 // static closure reaches only the module below, which is the point of it being a module.
 export { getProject, ProjectApiConflictError } from './projectAuthorityApi';
-export { attachProjectAsset, detachProjectAsset, listProjectAssets } from './projectAssetsApi';
 
 export const listProjects = (
   input: Pick<ProjectsQuery, 'lifecycle' | 'pageSize'> & {
