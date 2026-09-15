@@ -233,8 +233,13 @@ and one AI pipeline whose outputs always land durably in the Project.
 **Problem:** GAP-2 UI half (edit-1, web-7), GAP-4 (prov-1, prod-3, DC-9), prod-4 (workspace
 frozen during runs), D5, D6-build.
 **Scope (slices):**
-4.1 Timeline UI: multi-clip timeline over the composition model; split-at-playhead; drag reorder;
-per-clip trim; the existing single-clip tools become per-clip tools.
+4.1 Timeline UI: multi-clip timeline over the composition model; split-at-playhead; reorder;
+per-clip trim and audio. **Amended 2026-09-14**, on the evidence in
+[the slice 4.1 plan](SLICE_4.1_TIMELINE_UI_PLAN.md): this line used to end "the existing single-clip
+tools become per-clip tools", which the model built in slice 3.1 cannot express. `CompositionClip`
+carries `{id, media, trim, audio}` and `Composition` carries the subtitle list, so trim and audio are
+per clip, subtitles are per sequence, and crop, rotation, flips, lighting and filters have no home in
+an arrangement at all. Giving them one is a domain and contract change of its own, not a UI slice.
 4.2 Stitched rendering: worker renders clip sequences (mediabunny concatenation) with
 normalization policy for mixed resolutions/framerates; accurate stitched preview.
 4.3 Composition save/export: the composition is what Save operates on; variant sets from 2.3

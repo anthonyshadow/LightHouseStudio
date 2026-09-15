@@ -17,6 +17,8 @@ import {
   removeProjectSourceById,
   type ProjectRevisionExpectation,
 } from './projectsApi';
+import { projectClipMediaCatalogue, type ProjectClipMedia } from './projectClipMedia';
+import { useProjectCurrentCut } from './useProjectCurrentCut';
 import type { ProjectSessionPort } from './useProjectSession';
 import { projectQueryKeys, reconcileProjectMedia } from './useProjectsController';
 import { useStableOperationKey } from './useStableOperationKey';
@@ -67,6 +69,33 @@ const sourcesQueryOptions = (projectId: string) => ({
 export const useProjectHeldSourceCount = (projectId: string, enabled: boolean): number => {
   const query = useQuery({ ...sourcesQueryOptions(projectId), enabled });
   return query.data?.sources.length ?? 0;
+};
+
+/**
+ * Everything an arrangement's clips may stand over, resolved and keyed.
+ *
+ * Two reads rather than one, because a Project's media has two homes: the collection it holds, and
+ * the cut the current revision presents — which is a render or an adopted result the collection has
+ * never held, and which is exactly what the first arrangement is seeded over. Both observe caches
+ * that other surfaces already fill, so opening the arrangement usually costs no request at all.
+ */
+export const useProjectClipMediaCatalogue = (
+  current: ProjectCurrentResponse,
+  enabled: boolean,
+): ReadonlyMap<string, ProjectClipMedia> => {
+  const projectId = current.project.id;
+  const query = useQuery({ ...sourcesQueryOptions(projectId), enabled });
+  const presentedCut = useProjectCurrentCut(current, enabled);
+  const sources = query.data?.sources;
+  const presentedMedia = current.revision.snapshot.presentedMedia;
+  return useMemo(
+    () =>
+      projectClipMediaCatalogue(sources ?? [], {
+        reference: presentedMedia,
+        cut: presentedCut,
+      }),
+    [presentedCut, presentedMedia, sources],
+  );
 };
 
 /**

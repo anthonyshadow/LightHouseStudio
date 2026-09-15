@@ -37,6 +37,11 @@ export interface ProjectRouteSurfaceProps {
   readonly recordingSupported?: boolean;
   /** Answers a refusal, or nothing, so the section holding the button can speak for a dead press. */
   readonly onStartRecording?: () => ProjectRecordingLaunchRefusal | null;
+  /**
+   * Opens the arrangement editor. Only a caller that owns the surface it takes over can offer it,
+   * so where this is absent the workspace shows no way in — the same rule `onStartRecording` follows.
+   */
+  readonly onArrangeComposition?: () => void;
   readonly onSourceActivityChange?: (activity: ProjectSourceActivity) => void;
   readonly onWorkingMediaActivityChange?: (activity: ProjectWorkingMediaActivity) => void;
   readonly onSessionChange?: (session: ProjectSessionPort | null) => void;
@@ -59,6 +64,7 @@ export const ProjectDetailSurface = ({
   recordingActive,
   recordingSupported,
   onStartRecording,
+  onArrangeComposition,
   onSourceActivityChange,
   onWorkingMediaActivityChange,
   onSessionChange,
@@ -123,6 +129,7 @@ export const ProjectDetailSurface = ({
         recordingActive={recordingActive}
         recordingSupported={recordingSupported}
         onStartRecording={onStartRecording}
+        onArrangeComposition={onArrangeComposition}
         createRuntime={createRuntime}
         processing={processing}
         ownerUserId={ownerUserId}

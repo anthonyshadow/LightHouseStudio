@@ -261,6 +261,7 @@ describe('ProjectCreateTaskPanel', () => {
           },
           localEdit: null,
           exportSpecification: null,
+          composition: null,
         },
       },
     });

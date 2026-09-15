@@ -12,9 +12,15 @@ export const COMPOSITION_CLIP_LIMIT = 100;
 export type CompositionClipTrim = Readonly<{ startMs: number; endMs: number }>;
 
 /**
- * A reference into media the Project holds — a source, an adopted result or a borrowed Library
- * Version — occupying one position in the sequence. It copies no bytes; a split makes two
- * references, one keeping the id.
+ * A reference into media the Project holds — a source, the cut it currently works from, or a
+ * borrowed Library Version — occupying one position in the sequence. It copies no bytes; a split
+ * makes two references, the left one keeping the id.
+ *
+ * "An adopted result" is deliberately narrower than it reads: the source collection addresses every
+ * source, and the working-media read addresses the *current* adoption, but an adoption an earlier
+ * revision made has no read at all (`GET /working-media` takes no revision). A clip over one of
+ * those is unresolvable, and the editor says so rather than pretending. Widening that is a server
+ * change, not a clip-model one.
  */
 export interface CompositionClip {
   /** App-generated UUID: the editor's selection key. */

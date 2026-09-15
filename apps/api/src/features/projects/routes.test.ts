@@ -21,6 +21,7 @@ const emptyCreativeProposal = {
   transform: null,
   localEdit: null,
   exportSpecification: null,
+  composition: null,
 };
 
 describe('Project lifecycle routes', () => {
@@ -1050,6 +1051,7 @@ describe('Project lifecycle routes', () => {
           transform: unknown;
           localEdit: unknown;
           exportSpecification: unknown;
+          composition: unknown;
           lastSuccessfulOutput: { savedVideoId: string; videoVersionId: string };
         };
       };
@@ -1076,6 +1078,7 @@ describe('Project lifecycle routes', () => {
           transform: postSaveSnapshot.transform,
           localEdit: postSaveSnapshot.localEdit,
           exportSpecification: postSaveSnapshot.exportSpecification,
+          composition: postSaveSnapshot.composition,
         },
       },
     });
@@ -1350,10 +1353,10 @@ describe('Project lifecycle routes', () => {
       };
     }>(source);
 
-    // Nothing in the product writes a composition yet — the session proposal carries the creative
-    // fields and deliberately has no arrangement field until the editor can build one — so the
-    // arrangement is placed on the stored library the way its writer will, and a second app over
-    // the same directory reads it back. Everything after that is the ordinary save path.
+    // Placed on the stored library rather than proposed, so this case still covers a Project
+    // arranged by something other than this bundle — a revision written before the proposal
+    // carried `composition`, or by a peer. A second app over the same directory reads it back, and
+    // everything after that is the ordinary save path.
     const projectsDirectory = path.join(directory, 'metadata', 'v1', 'projects');
     const libraryFile = (await readdir(projectsDirectory)).find((entry) =>
       /^[a-f0-9]{64}\.json$/u.test(entry),
@@ -1424,11 +1427,14 @@ describe('Project lifecycle routes', () => {
               effectRevision: 'builtin-v1',
             },
           },
+          composition,
         },
       },
     });
     expect(treated.statusCode).toBe(200);
-    // A checkpoint states the creative half; the arrangement it says nothing about carries forward.
+    // The proposal states the arrangement as well as the creative half, so a tab echoes the one it
+    // can see and a creative edit leaves it exactly as it was. Stating it is what lets the editor
+    // change it; the compare-and-set above is what stops a stale tab restating an older one.
     expect(treated.json()).toMatchObject({ revision: { snapshot: { composition } } });
     const treatedBody = json<{
       project: { version: number };
@@ -1483,6 +1489,7 @@ describe('Project lifecycle routes', () => {
           transform: unknown;
           localEdit: unknown;
           exportSpecification: unknown;
+          composition: unknown;
           lastSuccessfulOutput: { savedVideoId: string; videoVersionId: string };
         };
       };
@@ -1500,6 +1507,7 @@ describe('Project lifecycle routes', () => {
           transform: savedBody.revision.snapshot.transform,
           localEdit: savedBody.revision.snapshot.localEdit,
           exportSpecification: savedBody.revision.snapshot.exportSpecification,
+          composition: savedBody.revision.snapshot.composition,
         },
       },
     });

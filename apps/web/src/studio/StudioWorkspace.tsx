@@ -1,7 +1,7 @@
 import { useTheme } from '@emotion/react';
 import type { MediaPersistence } from '@studio/contracts';
 import type { CreativeAssetStore } from '@studio/domain';
-import { lazy, Suspense, useRef, type ReactNode, type RefObject } from 'react';
+import { lazy, Suspense, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { BrowserCapabilities } from '../application/types';
 import { CaptureSettingsPanel, RecordingAction, RecordingControls } from '../features/recording';
 import { ownedRecordingArtifact } from '../features/recording/types';
@@ -34,6 +34,13 @@ const VideoEditWorkspace = lazy(() =>
 const ProjectRouteSurface = lazy(() =>
   import('../features/projects/ProjectRouteSurface').then((module) => ({
     default: module.ProjectRouteSurface,
+  })),
+);
+// Split off like the editor beside it: arranging is a place the operator goes, not something every
+// authenticated route carries.
+const ProjectCompositionSurface = lazy(() =>
+  import('../features/video-editor/ProjectCompositionSurface').then((module) => ({
+    default: module.ProjectCompositionSurface,
   })),
 );
 
@@ -177,10 +184,20 @@ export const StudioWorkspace = ({
     finishTake,
   } = takeReview;
   const videoEditing = videoEditor.phase !== 'closed';
+  const [arranging, setArranging] = useState(false);
+  const arrangingSession = arranging ? (project.session ?? null) : null;
+  const arrangingCurrent = arrangingSession?.current ?? null;
+  /*
+   * Both editors take the whole surface, and the grid already knows how: `data-video-edit-active`
+   * collapses it to one column and hides the Project route behind it. An arrangement needs exactly
+   * that — a clip strip does not fit beside a stage — so it says the same thing rather than teaching
+   * the grid a second word for it.
+   */
+  const editorActive = videoEditing || arrangingCurrent !== null;
   // The stage takes the settings column back whenever the docked panel is not actually open. Only
   // the standalone capture layout has one: the Project workspace and the editor own their columns.
   const captureSettingsCollapsed =
-    desktopStudioLayout && !projectContextActive && !videoEditing && !captureSettingsExpanded;
+    desktopStudioLayout && !projectContextActive && !editorActive && !captureSettingsExpanded;
   const captureIssues = cameraAvailabilityNotices({
     permissionState: session.capturePreferences.cameraPermissionState,
     devicesState: session.capturePreferences.devicesState,
@@ -192,7 +209,7 @@ export const StudioWorkspace = ({
       <div
         ref={fullscreenWorkspaceRef}
         css={stageColumnStyles(theme)}
-        data-video-edit-active={videoEditing ? 'true' : 'false'}
+        data-video-edit-active={editorActive ? 'true' : 'false'}
         data-project-context={projectContextActive ? 'true' : undefined}
         data-capture-settings={captureSettingsCollapsed ? 'collapsed' : undefined}
       >
@@ -288,6 +305,15 @@ export const StudioWorkspace = ({
                 : {})}
             />
           </Suspense>
+        ) : arrangingCurrent !== null && arrangingSession !== null ? (
+          <Suspense fallback={deferredWorkspaceFallback}>
+            <ProjectCompositionSurface
+              current={arrangingCurrent}
+              session={arrangingSession}
+              archived={arrangingCurrent.project.status === 'archived'}
+              onClose={() => setArranging(false)}
+            />
+          </Suspense>
         ) : projectContextActive ? (
           creativeWorkspace
         ) : (
@@ -352,6 +378,7 @@ export const StudioWorkspace = ({
             }
             recordingSupported={captureSupported}
             onStartRecording={onStartProjectRecording}
+            onArrangeComposition={() => setArranging(true)}
             onSourceActivityChange={project.handleSourceActivity}
             onWorkingMediaActivityChange={project.handleWorkingMediaActivity}
             onSessionChange={onProjectSessionChange}

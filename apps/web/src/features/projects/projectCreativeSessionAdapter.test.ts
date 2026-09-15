@@ -224,6 +224,7 @@ describe('Project creative session adapter', () => {
         ...proposal,
         localEdit: null,
         exportSpecification: null,
+        composition: null,
       }).success,
     ).toBe(true);
   });
@@ -256,6 +257,7 @@ describe('Project creative session adapter', () => {
         ...proposal,
         localEdit: null,
         exportSpecification: null,
+        composition: null,
       }).success,
     ).toBe(true);
   });
@@ -280,6 +282,7 @@ describe('Project creative session adapter', () => {
         ...proposal,
         localEdit: null,
         exportSpecification: null,
+        composition: null,
       }).success,
     ).toBe(true);
   });

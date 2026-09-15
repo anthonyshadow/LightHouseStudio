@@ -42,6 +42,7 @@ const proposalFromCurrent = (current: ProjectCurrentResponse): ProjectSessionPro
   transform: current.revision.snapshot.transform,
   localEdit: current.revision.snapshot.localEdit,
   exportSpecification: current.revision.snapshot.exportSpecification,
+  composition: current.revision.snapshot.composition,
 });
 
 const proposalsMatch = (
@@ -132,10 +133,27 @@ export class ProjectSessionController {
   ): boolean => {
     const current = this.#snapshot.current;
     if (current === null || this.#disposed) return false;
-    const desired = projectSessionProposalSchema.parse({
+    /*
+     * Checked rather than thrown. Every caller stages from an event handler, so a refusal used to
+     * be an exception escaping a click — and the contract is deliberately stricter than the domain
+     * that produced the value (`z.uuid()` against `requireOpaqueId`, and a clip cap the normalizer
+     * does not repair). Refusing the stage leaves the last good proposal exactly where it was,
+     * which is the same answer the other two guards above give.
+     */
+    const parsed = projectSessionProposalSchema.safeParse({
       ...(this.#desired ?? proposalFromCurrent(current)),
       ...proposal,
     });
+    if (!parsed.success) {
+      // Said rather than swallowed. A refusal here is this browser's own bug, but the operator is
+      // the one whose change did not land, and a control that reports nothing is the dead end.
+      this.#update({
+        phase: 'error',
+        message: 'That change could not be saved safely. Your Project is unchanged.',
+      });
+      return false;
+    }
+    const desired = parsed.data;
     this.#desired = desired;
     if (options.autosave !== false) this.#autosaveRequested = true;
     if (!this.#hasLocalProposal()) {

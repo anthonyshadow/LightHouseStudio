@@ -374,6 +374,7 @@ describe('Projects API adapter', () => {
       transform: null,
       localEdit: null,
       exportSpecification: null,
+      composition: null,
     } as const;
 
     await expect(

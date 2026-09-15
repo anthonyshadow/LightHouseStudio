@@ -54,6 +54,7 @@ const sessionProposalMatches = (
     transform: current.revision.snapshot.transform,
     localEdit: current.revision.snapshot.localEdit,
     exportSpecification: current.revision.snapshot.exportSpecification,
+    composition: current.revision.snapshot.composition,
   }) === JSON.stringify(proposal);
 
 const publicProject = (project: Project): ProjectContract => ({

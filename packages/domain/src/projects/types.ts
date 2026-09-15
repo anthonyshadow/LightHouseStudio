@@ -4,6 +4,7 @@ import type { VideoEditSpec } from '../video-editing';
 import type { ProjectMediaReference } from './media-reference';
 
 export type { ProjectMediaReference } from './media-reference';
+export { projectMediaReferenceKey } from './media-reference';
 
 /** The version every snapshot is written at. Older versions are read through explicit maps. */
 export const PROJECT_SNAPSHOT_SCHEMA_VERSION = 3 as const;

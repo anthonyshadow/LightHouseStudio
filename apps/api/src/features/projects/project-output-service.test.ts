@@ -883,6 +883,7 @@ describe('ProjectOutputService local composite authority', () => {
         transform: adoptedSnapshot.transform,
         localEdit: adoptedSnapshot.localEdit,
         exportSpecification: adoptedSnapshot.exportSpecification,
+        composition: adoptedSnapshot.composition,
       },
     });
     if (!checkpointed.ok) throw new Error('Expected Project checkpoint.');

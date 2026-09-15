@@ -32,3 +32,16 @@ export const requireMediaReferenceIds = (
   requireOpaqueId(reference.savedVideoId, `${labelPrefix} Saved Video`, onInvalid);
   requireOpaqueId(reference.videoVersionId, `${labelPrefix} Video Version`, onInvalid);
 };
+
+/**
+ * One string that stands for a reference, so media can be looked up in a map.
+ *
+ * The two variants are told apart by their prefix rather than by their ids alone: an asset id and a
+ * Saved Video id are both UUIDs, and a catalogue keyed on the bare id would let one answer for the
+ * other. `projectMediaReferencesEqual` stays the answer wherever two references are compared
+ * directly; this is only for the lookup that comparison cannot do in constant time.
+ */
+export const projectMediaReferenceKey = (reference: ProjectMediaReference): string =>
+  reference.kind === 'asset'
+    ? `asset:${reference.assetId}`
+    : `saved-video-version:${reference.savedVideoId}:${reference.videoVersionId}`;

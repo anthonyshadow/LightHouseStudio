@@ -12,6 +12,7 @@ import {
   SUBTITLE_CUE_TEXT_MAX_LENGTH,
   normalizeSubtitleCues,
 } from '../video-editing/subtitles';
+import { compositionClipDurationMs } from './sequence';
 import { COMPOSITION_CLIP_LIMIT, type Composition, type CompositionClip } from './types';
 
 export class CompositionRuleError extends Error {
@@ -130,4 +131,4 @@ export const normalizeComposition = (composition: Composition): Composition => {
 
 /** The length of the stitched output — the timeline the cues are anchored to. */
 export const compositionDurationMs = (composition: Composition): number =>
-  composition.clips.reduce((total, clip) => total + (clip.trim.endMs - clip.trim.startMs), 0);
+  composition.clips.reduce((total, clip) => total + compositionClipDurationMs(clip), 0);

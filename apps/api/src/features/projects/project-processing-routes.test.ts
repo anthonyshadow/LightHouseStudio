@@ -101,6 +101,7 @@ const proposal = (prompt: string) => ({
   },
   localEdit: null,
   exportSpecification: null,
+  composition: null,
 });
 
 describe('Project processing route authority', () => {

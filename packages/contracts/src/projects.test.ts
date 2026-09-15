@@ -558,6 +558,7 @@ describe('Project snapshot contract', () => {
           transform: snapshot.transform,
           localEdit: snapshot.localEdit,
           exportSpecification: snapshot.exportSpecification,
+          composition: snapshot.composition,
         },
       }),
     ).toMatchObject({
@@ -577,6 +578,7 @@ describe('Project snapshot contract', () => {
           transform: snapshot.transform,
           localEdit: snapshot.localEdit,
           exportSpecification: null,
+          composition: null,
           workingMedia: { kind: 'asset', assetId },
         },
       }).success,
@@ -940,6 +942,7 @@ describe('projectSessionProposalSchema', () => {
     transform: null,
     localEdit,
     exportSpecification: null,
+    composition: null,
   });
 
   const spec = {
@@ -968,18 +971,36 @@ describe('projectSessionProposalSchema', () => {
     expect(projectSessionProposalSchema.parse(proposal(null)).localEdit).toBeNull();
   });
 
+  it('tells a bundle that cannot describe an arrangement to reload, rather than defaulting it', () => {
+    /*
+     * Absence is refused, not defaulted. A proposal replaces the snapshot's creative part wholesale,
+     * so a tab left open from before the arrangement existed would check a creative field in and
+     * take the operator's whole composition out with it. A reload costs that tab nothing it has.
+     */
+    const { composition, ...withoutComposition } = proposal(null);
+    expect(composition).toBeNull();
+    const result = projectSessionProposalSchema.safeParse(withoutComposition);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.message)).toContain(
+      PROJECT_STALE_CLIENT_MESSAGE,
+    );
+  });
+
   it('keeps the proposal in the snapshot shape, with an empty transform folded to null', () => {
     const parsed = projectSessionProposalSchema.parse({
       ...proposal(null),
       transform: emptyTransform(),
     });
     expect(parsed.transform).toBeNull();
+    // The wire order, pinned: `sessionProposalMatches` and `proposalFromCurrent` compare this as
+    // serialized text, so a field inserted anywhere but the end silently breaks replay convergence.
     expect(Object.keys(parsed)).toEqual([
       'workflowPhase',
       'liveMode',
       'transform',
       'localEdit',
       'exportSpecification',
+      'composition',
     ]);
     const configured = projectSessionProposalSchema.parse({
       ...proposal(null),

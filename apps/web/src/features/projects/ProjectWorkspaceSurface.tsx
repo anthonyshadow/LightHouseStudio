@@ -142,6 +142,8 @@ interface ProjectWorkspaceSurfaceProps {
   readonly recordingSupported?: boolean | undefined;
   /** Answers a refusal, or nothing, so the section holding the button can speak for a dead press. */
   readonly onStartRecording?: (() => ProjectRecordingLaunchRefusal | null) | undefined;
+  /** Opens the arrangement editor, where a caller owns a surface for it to take over. */
+  readonly onArrangeComposition?: (() => void) | undefined;
   readonly createRuntime?: ProjectCreateRuntime | undefined;
   readonly processing?: ProjectProcessingController | undefined;
   readonly ownerUserId?: string | undefined;
@@ -158,6 +160,7 @@ export const ProjectWorkspaceSurface = ({
   recordingActive,
   recordingSupported,
   onStartRecording,
+  onArrangeComposition,
   createRuntime,
   processing,
   ownerUserId,
@@ -319,6 +322,16 @@ export const ProjectWorkspaceSurface = ({
           <span data-workspace-project-status>{projectStatusLabel(project.status)}</span>
         </div>
         <ProjectWorkflowProgress snapshot={current.revision.snapshot} variant="masthead" />
+        {/*
+          Offered only where a caller owns a surface the arrangement can take over — the workspace
+          route does, the standalone Project page does not — and only once the Project has media to
+          arrange, since the editor's own empty state is the last thing a Project with no video needs.
+        */}
+        {onArrangeComposition !== undefined && current.revision.snapshot.presentedMedia !== null ? (
+          <Button data-project-arrange onClick={onArrangeComposition}>
+            {current.revision.snapshot.composition === null ? 'Arrange' : 'Edit arrangement'}
+          </Button>
+        ) : null}
         <span
           role="status"
           aria-live="polite"

@@ -1088,10 +1088,16 @@ const PRE_V3_PROPOSAL_KEYS = Object.keys(projectTransformShape);
  * A bundle built before snapshot v3 still sends the five AI fields at the top level. The strict
  * object below refuses that anyway; naming the reason lets the 400 say "reload" instead of a
  * validation code.
+ *
+ * A bundle built before the arrangement is stale the other way: it omits `composition` entirely.
+ * That one is refused rather than defaulted, and the difference matters — a default would let a
+ * tab left open from yesterday check a creative field in and silently take the operator's whole
+ * arrangement out with it, because the proposal replaces the snapshot's creative part wholesale.
+ * Refusing costs that tab a reload; defaulting would cost it the composition.
  */
 const refusesPreV3Proposal = (value: unknown, context: z.RefinementCtx): void => {
   if (typeof value !== 'object' || value === null) return;
-  if (PRE_V3_PROPOSAL_KEYS.some((key) => key in value)) {
+  if (PRE_V3_PROPOSAL_KEYS.some((key) => key in value) || !('composition' in value)) {
     context.addIssue({
       code: 'custom',
       path: ['transform'],
@@ -1116,6 +1122,13 @@ export const projectSessionProposalSchema = z
         transform: projectTransformSchema,
         localEdit: proposedVideoEditSpecSchema,
         exportSpecification: projectExportSpecificationSchema,
+        /**
+         * Last on purpose, like `VideoEditSpec.audio`: every field above it predates it, and the
+         * three places that spell this order — here, `sessionProposalMatches` and
+         * `proposalFromCurrent` — compare as serialized text, so appending is the one edit that
+         * cannot silently re-order one of them against the other two.
+         */
+        composition: compositionSchema.nullable(),
       })
       .strict(),
   );

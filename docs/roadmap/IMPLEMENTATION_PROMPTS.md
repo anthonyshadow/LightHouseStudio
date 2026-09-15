@@ -357,6 +357,22 @@ capture-bridge tests; e2e add-second-source journey (real stack).
 
 ## Phase 4 — The composition editor and one pipeline
 
+> **Prompts 32 and 33 have run** — on 2026-09-14, on the operator's instruction to audit and plan,
+> then to proceed on the recommendations. The plan, the five decisions taken, what was built and what
+> was deliberately left out are in [`SLICE_4.1_TIMELINE_UI_PLAN.md`](SLICE_4.1_TIMELINE_UI_PLAN.md).
+> Two things the audit found are worth carrying forward before 34 runs. Slice 3.1 built the
+> composition model but **nothing could write one** — the session proposal had no arrangement field —
+> so 4.1 absorbed that write path, which no slice had been given. And slice 4.1's roadmap line has
+> been amended: `CompositionClip` cannot express crop, rotation, flips, lighting or filters, so "the
+> existing single-clip tools become per-clip tools" was never buildable as written.
+>
+> For prompt 34 specifically: mediabunny's `AudioEncoderWrapper.add` **throws** on any change of
+> `numberOfChannels` or `sampleRate` between incoming samples, and that guard runs before the
+> resample branch — so `transform.sampleRate` does not handle mixed audio, and an implementation
+> that assumes it does will throw mid-encode after the video has been paid for. The normalization
+> policy 34 is told was "decided in 32's plan" is **not** decided: it was designed, adversarially
+> reviewed, and cut from 4.1's scope as 4.2's own work.
+
 **32 (A) — Timeline UI: audit.** Standard audit-and-plan for slice 4.1 (edit-1, web-7). Inspect
 the editor stack (`VideoEditWorkspace/Timeline/StagePreview`, `useVideoEditSession`), the v3
 composition model, and the worker request shape. Design for approval: timeline data flow

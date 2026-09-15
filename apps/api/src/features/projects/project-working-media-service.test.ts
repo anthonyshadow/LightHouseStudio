@@ -196,6 +196,7 @@ describe('ProjectWorkingMediaService local authority', () => {
         },
         localEdit: snapshot.localEdit,
         exportSpecification: snapshot.exportSpecification,
+        composition: snapshot.composition,
       },
     });
     expect(checkpointed).toMatchObject({

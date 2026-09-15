@@ -18,6 +18,7 @@ const emptyCreativeProposal = {
   transform: null,
   localEdit: null,
   exportSpecification: null,
+  composition: null,
 };
 
 const metadataPaths = (directory: string, ownerId: string) => {

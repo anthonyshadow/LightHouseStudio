@@ -102,6 +102,7 @@ describe('effectiveCreativeSnapshot', () => {
       },
       localEdit: null,
       exportSpecification: null,
+      composition: null,
     });
 
     expect(merged.transform?.selectedCharacter?.characterLabel).toBe('Ada');

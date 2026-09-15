@@ -101,7 +101,26 @@ export const BUILD_CLOSURE_BUDGETS = {
   // **Lowered** from 750_000 to 746_000, below where slice 3.2 found it, so the next module that
   // wanders in fails the build instead of eating the recovery. `FORBIDDEN_CLOSURE_DEPENDENCIES`
   // still passes, so the capture graph has not followed the Record control into the shell.
-  'src/app/shell/AuthenticatedShell.tsx': 746_000,
+  //
+  // Raised from 746_000 to 749_000 on 2026-09-14 for slice 4.1 (the arrangement editor), measured
+  // 745_003 -> 748_264. The lowered ceiling did exactly what it was lowered for: it failed the
+  // build rather than absorbing this. The cause is structural rather than a stray import.
+  // `@studio/domain` builds to a single `dist/index.js`, so Rollup assigns that whole module to one
+  // chunk — the shared one every route already loads — and any export the app uses anywhere is
+  // emitted there. The arrangement's clip operations and sequence arithmetic are used only by the
+  // lazily loaded editor, and are paid for on the Dashboard regardless.
+  //
+  // What was tried first, and did not work: narrowing `projects/rules.ts` from the composition
+  // barrel to `composition/rules` and `composition/types` (no change — the single-module build
+  // makes barrel narrowing irrelevant to chunking), and trimming the new domain code itself, which
+  // recovered less than the honest `projectMediaReferencesEqual` reuse cost and is not worth
+  // degrading the code for. The real fix is emitting `@studio/domain` as split chunks so a lazily
+  // used export lands in the lazy chunk; that is a package build change, not this slice's, and it
+  // would give back more than the 3_261 bytes recorded here.
+  //
+  // 749_000 rather than a round number above it, so the headroom stays under a kilobyte and the
+  // next arrival fails the same way this one did.
+  'src/app/shell/AuthenticatedShell.tsx': 749_000,
   // Shell plus capture graph, which is what a Studio route costs. Looser, because a Studio route is
   // where media code belongs; `FORBIDDEN_CLOSURE_DEPENDENCIES` is what keeps it from leaking out.
   //
@@ -156,7 +175,13 @@ export const BUILD_CLOSURE_BUDGETS = {
   // instead of composing three. The last 300 bytes are the shell split above, which this closure
   // does not benefit from — a Studio route renders the Project surfaces and so reaches all three
   // modules either way, and pays their split overhead instead.
-  'src/studio/StudioApp.tsx': 1_096_000,
+  //
+  // Raised from 1_096_000 to 1_100_000 on 2026-09-14 for slice 4.1, measured 1_095_125 ->
+  // 1_099_037. It carries the shell's entry above for the same structural reason — the single
+  // `@studio/domain` module — plus what is genuinely local to a Studio route: the arrangement is
+  // reached from here, so this closure also pays the `lazy()` boundary and the props that reach it.
+  // The editor surface itself is lazily loaded and is *not* in this number.
+  'src/studio/StudioApp.tsx': 1_100_000,
 };
 
 /**

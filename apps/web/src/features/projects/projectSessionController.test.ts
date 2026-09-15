@@ -122,6 +122,7 @@ describe('ProjectSessionController', () => {
       transform: null,
       localEdit: null,
       exportSpecification: null,
+      composition: null,
     });
     expect(controller.getSnapshot()).toMatchObject({ phase: 'saved', hasLocalProposal: false });
   });

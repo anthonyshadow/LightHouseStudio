@@ -21,8 +21,11 @@ import type {
   ProjectWorkflowPhase,
 } from './types';
 import { PROJECT_EXPORT_ASPECTS, PROJECT_SOURCE_LIMIT } from './types';
-import type { Composition } from '../composition';
-import { CompositionRuleError, validateComposition } from '../composition';
+// The two composition modules this needs by name, not the barrel. The barrel also carries the
+// editor's clip operations, and a Project rule reaching them through it puts the whole arrangement
+// editor in the static closure of every authenticated route that validates a snapshot.
+import type { Composition } from '../composition/types';
+import { CompositionRuleError, validateComposition } from '../composition/rules';
 import {
   EMPTY_PROJECT_TRANSFORM,
   normalizeProjectTransform,

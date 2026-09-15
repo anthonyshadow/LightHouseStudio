@@ -539,6 +539,7 @@ describe('ProjectHistorySection', () => {
         transform: snapshot.transform,
         localEdit: snapshot.localEdit,
         exportSpecification: snapshot.exportSpecification,
+        composition: snapshot.composition,
       },
       hasLocalProposal: true,
       message: null,
