@@ -155,6 +155,10 @@ the Project — the user continues editing and later saves supersede.
 conflicts (another tab) surface a reapply/discard choice; interrupted uploads resume; interrupted
 AI work reconciles on return; a crashed browser loses at most the unsaved in-memory take, and the
 UI says exactly what is at risk before any destructive step.
+_Today (2026-09-16, [verified](../audits/PHASE_4_COMPOSITION_VERIFICATION.md)): an arrangement
+autosaves and reopens correctly, but the stamp lives on the Project masthead, which the arrangement
+editor hides while it holds the stage — so on the one surface that builds an arrangement, the save
+state, the conflict choice and the save-failure path are all invisible._
 
 ## 14. Reopening work
 
@@ -176,6 +180,12 @@ downloads are exact bytes, ranged, and resumable.
 Archived section.
 **System:** archived work is read-only but fully viewable; deletion exists only behind archive,
 confirms, and never destroys bytes that retained history references.
+_Today (2026-09-16, [verified](../audits/PHASE_4_COMPOSITION_VERIFICATION.md)): archiving works and
+an archived Project stays fully viewable, including its arrangement. **Restoring does not.** A
+Project holding any media — a source, a working cut, a presented cut or a saved output — is refused
+with "This Project needs current media facts before it can be restored", over a dialog that calls it
+empty and a retry that hits the same guard. Archiving is one-way for every Project that has ever
+held a video._
 
 ## 17. Error and processing recovery
 

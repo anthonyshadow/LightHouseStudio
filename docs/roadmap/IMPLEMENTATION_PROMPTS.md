@@ -413,6 +413,23 @@ cancellation per render; memory bounded. Apply Standing rules + Media checklist.
 concat tests incl. mixed-fixture normalization and cancellation; render-budget measurements
 recorded in the report.
 
+> **Prompt 35 has run — and the gate did not pass.** On 2026-09-16, at head `0aea1955`. The
+> evidence per item, the method, the gates run and the follow-ups filed are in
+> [`PHASE_4_COMPOSITION_VERIFICATION.md`](../audits/PHASE_4_COMPOSITION_VERIFICATION.md). Nine of
+> fourteen checks pass: a two-source, three-clip arrangement is built, split, reordered, levelled,
+> rendered, previewed and reopened in the running product. Five fail. Three are slice 4.3's
+> scheduled scope — Save and the export variants never see the arrangement, and the product says
+> nothing about it, so a measured save of a 2.00 s arrangement produced a 1,000 ms video. One is
+> unowned: no control anywhere authors a caption on an arrangement, though the model carries the
+> cues and the renderer burns them. One is outside composition altogether and was found on the way:
+> **an archived Project that holds any media cannot be restored** — the refusal is a dead end with
+> a retry that can never succeed, and it affects every Project in the product. Per the sequence
+> integrity note below, the sequence pauses here: prompt 36 should not run until at least the
+> restore defect has an owner and 4.3 is scheduled against the save gap.
+>
+> The vision's core workflow lists ten items, not eleven; this prompt's "3, 6–11" was read as the
+> vision's 3 and 6–10, which is what its own concrete list enumerates.
+
 **35 (C) — Composition end-to-end verification.** Verify the vision's target items 3, 6–11
 without AI in the running product: two-clip stitch, split, reorder, captions across the cut,
 audio level, preview, save, reopen, export variants. Run the real-stack e2e composition journey.
