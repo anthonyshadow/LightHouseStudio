@@ -6,6 +6,7 @@ import {
 } from '../features/recording/types';
 import type { ProjectRecordingCandidate } from '../features/projects/ProjectRouteSurface';
 import type { ProjectWorkingMediaActivity } from '../features/projects/ProjectWorkingMediaSection';
+import type { CompositionRenderActivity } from '../features/video-editor/ProjectCompositionSurface';
 import type {
   ProjectSourceActivity,
   ProjectStageSourceRuntime,
@@ -65,6 +66,8 @@ export const useStudioProjectBridge = ({
   const [sourceActivity, setSourceActivity] = useState<ProjectSourceActivity | null>(null);
   const [workingMediaActivity, setWorkingMediaActivity] =
     useState<ProjectWorkingMediaActivity | null>(null);
+  const [compositionRenderActivity, setCompositionRenderActivity] =
+    useState<CompositionRenderActivity | null>(null);
   const [session, setSession] = useState<ProjectSessionPort | null>(null);
 
   useLayoutEffect(() => {
@@ -162,9 +165,17 @@ export const useStudioProjectBridge = ({
     if (projectIdRef.current === activity.projectId) setWorkingMediaActivity(activity);
   }, []);
 
+  // Its own channel, not the working-media one: the Media area stays mounted behind the arrangement
+  // and reports through that, so sharing it would let either clobber the other.
+  const handleCompositionRenderActivity = useCallback((activity: CompositionRenderActivity) => {
+    if (projectIdRef.current === activity.projectId) setCompositionRenderActivity(activity);
+  }, []);
+
   const activeSourceActivity = sourceActivity?.projectId === projectId ? sourceActivity : null;
   const activeWorkingMediaActivity =
     workingMediaActivity?.projectId === projectId ? workingMediaActivity : null;
+  const activeCompositionRenderActivity =
+    compositionRenderActivity?.projectId === projectId ? compositionRenderActivity : null;
   const activeSession = session?.projectId === projectId ? session : null;
 
   const recordingCandidate = useMemo<ProjectRecordingCandidate | null>(() => {
@@ -215,10 +226,12 @@ export const useStudioProjectBridge = ({
     presentedByProject,
     sourceActivity: activeSourceActivity,
     workingMediaActivity: activeWorkingMediaActivity,
+    compositionRenderActivity: activeCompositionRenderActivity,
     session: activeSession,
     recordingCandidate,
     handleSourceActivity,
     handleWorkingMediaActivity,
+    handleCompositionRenderActivity,
     handleSession: setSession,
   } as const;
 };

@@ -214,6 +214,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
   );
   const activeProjectSourceActivity = project.sourceActivity;
   const activeProjectWorkingMediaActivity = project.workingMediaActivity;
+  const activeProjectCompositionRenderActivity = project.compositionRenderActivity;
   const activeProjectSession = project.session;
   const existingVideo = useExistingVideoWorkflow({
     recording,
@@ -583,6 +584,7 @@ export const StudioApp = ({ services, runtimeRegistry, sessionEnding }: StudioAp
     projectWorkingMedia,
     projectSourceActivity: activeProjectSourceActivity,
     projectWorkingMediaActivity: activeProjectWorkingMediaActivity,
+    projectCompositionRenderActivity: activeProjectCompositionRenderActivity,
     hasUnclaimedTake: project.unclaimedTake,
     discardSavedVideoWork,
     discardPendingAdoption,

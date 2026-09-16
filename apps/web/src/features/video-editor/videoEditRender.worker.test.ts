@@ -171,8 +171,88 @@ const loadWorker = async () => {
 afterEach(() => {
   vi.doUnmock('mediabunny');
   vi.doUnmock('./videoEditShader');
+  vi.doUnmock('./stitchComposition');
   vi.resetModules();
   vi.unstubAllGlobals();
+});
+
+/**
+ * A stand-in for the concat loop that hands the worker's hooks to the test: it posts a plan, waits
+ * to be released, then writes one byte. The loop itself has its own suite; this is the worker's
+ * protocol around it.
+ */
+const stubStitch = (options: { readonly disposedOnCancel?: boolean } = {}) => {
+  let release: (() => void) | undefined;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const cancel = vi.fn();
+  let hooks:
+    | {
+        throwIfCanceled: () => void;
+        onCancel: (next: () => void) => void;
+        onPlan: (plan: unknown) => void;
+        onProgress: (fraction: number) => void;
+        target: { write: (data: Uint8Array, position: number) => void };
+      }
+    | undefined;
+  class StitchRefusal extends Error {}
+  const stitchComposition = vi.fn(
+    async (_runtime: unknown, _request: unknown, given: NonNullable<typeof hooks>) => {
+      hooks = given;
+      given.onCancel(cancel);
+      given.onPlan({
+        durationMs: 1_000,
+        video: { target: { width: 2, height: 2 }, clips: ['kept'] },
+        audio: null,
+      });
+      given.onProgress(0.5);
+      await released;
+      // A cancel that landed while a read was in flight surfaces as the library's own refusal.
+      if (options.disposedOnCancel && cancel.mock.calls.length > 0) {
+        throw Object.assign(new Error('Input has been disposed.'), { name: 'InputDisposedError' });
+      }
+      given.throwIfCanceled();
+      // The stream target the worker built writes into its bounded accumulator.
+      const writer = (
+        given.target as unknown as {
+          _writable: WritableStream<{ data: Uint8Array; position: number }>;
+        }
+      )._writable?.getWriter();
+      if (writer) {
+        await writer.write({ data: new Uint8Array([1]), position: 0 });
+        await writer.close();
+      }
+      return { mimeType: 'video/mp4' };
+    },
+  );
+  vi.doMock('./stitchComposition', () => ({ stitchComposition, StitchRefusal }));
+  return { stitchComposition, cancel, release: () => release?.(), hooks: () => hooks };
+};
+
+const compositionRequest = (operationId: number): VideoEditWorkerRequest => ({
+  type: 'render-composition',
+  operationId,
+  composition: {
+    clips: [
+      {
+        id: '00000000-0000-4000-8000-000000000001',
+        media: { kind: 'asset', assetId: '79b94c02-d268-4201-a05b-1f3baa0caed1' },
+        trim: { startMs: 0, endMs: 1_000 },
+        audio: { level: 100, muted: false },
+      },
+    ],
+    subtitles: [],
+  },
+  media: [
+    {
+      url: 'https://studio.test/api/projects/p/sources/a/content',
+      mimeType: 'video/mp4',
+      filename: 'a.mp4',
+      width: 2,
+      height: 2,
+    },
+  ],
 });
 
 describe('videoEditRender worker runtime', () => {
@@ -390,5 +470,152 @@ describe('videoEditRender worker runtime', () => {
     expect(canvases.size).toBe(1);
     expect([...canvases][0]).toMatchObject({ width: 1_280, height: 720 });
     expect(runtime.renderer.render).toHaveBeenCalledTimes(6);
+  });
+
+  describe('render-composition', () => {
+    it('routes the arrangement through the concat loop and posts its plan, progress and file', async () => {
+      const stitch = stubStitch();
+      // The real StreamTarget is what the worker hands the loop; the stub writes through it.
+      vi.doMock('mediabunny', () => ({
+        StreamTarget: class {
+          constructor(readonly _writable: WritableStream<{ data: Uint8Array; position: number }>) {}
+        },
+      }));
+      const worker = await loadWorker();
+
+      worker.send(compositionRequest(51));
+      await vi.waitFor(() => expect(stitch.stitchComposition).toHaveBeenCalledTimes(1));
+      expect(worker.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'plan', operationId: 51 }),
+      );
+      expect(worker.postMessage).toHaveBeenCalledWith({
+        type: 'progress',
+        operationId: 51,
+        progress: 0.5,
+      });
+      stitch.release();
+      await vi.waitFor(() =>
+        expect(worker.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'complete', operationId: 51, mimeType: 'video/mp4' }),
+        ),
+      );
+    });
+
+    it('cancels mid-arrangement exactly once, tearing the loop down and never completing', async () => {
+      const stitch = stubStitch();
+      vi.doMock('mediabunny', () => ({
+        StreamTarget: class {
+          constructor(readonly _writable: WritableStream<{ data: Uint8Array; position: number }>) {}
+        },
+      }));
+      const worker = await loadWorker();
+
+      worker.send(compositionRequest(53));
+      await vi.waitFor(() => expect(stitch.stitchComposition).toHaveBeenCalledTimes(1));
+      worker.send({ type: 'cancel', operationId: 53 });
+      worker.send({ type: 'cancel', operationId: 53 });
+      expect(worker.postMessage).toHaveBeenCalledWith({ type: 'canceled', operationId: 53 });
+      // The loop's own teardown ran through the worker's one cancel slot.
+      expect(stitch.cancel).toHaveBeenCalledTimes(1);
+      stitch.release();
+      await vi.waitFor(() =>
+        expect(stitch.stitchComposition.mock.settledResults[0]?.type).toBe('rejected'),
+      );
+      // Let the worker's own finally run: nothing after the cancel, no error for the cancel itself.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const posted = worker.postMessage.mock.calls.map(([message]) => message.type);
+      expect(posted.filter((type) => type === 'canceled')).toHaveLength(1);
+      expect(posted).not.toContain('complete');
+      expect(posted).not.toContain('error');
+      // And the slot is free again: the next arrangement renders rather than being refused.
+      worker.send(compositionRequest(54));
+      await vi.waitFor(() => expect(stitch.stitchComposition).toHaveBeenCalledTimes(2));
+      expect(worker.postMessage).not.toHaveBeenCalledWith({
+        type: 'error',
+        operationId: 54,
+        message: 'Another local video render is already active.',
+      });
+      await vi.waitFor(() =>
+        expect(worker.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'complete', operationId: 54 }),
+        ),
+      );
+    });
+
+    it('treats a read refused by a disposed input after a cancel as the cancel, not a failure', async () => {
+      const stitch = stubStitch({ disposedOnCancel: true });
+      vi.doMock('mediabunny', () => ({
+        StreamTarget: class {
+          constructor(readonly _writable: WritableStream<{ data: Uint8Array; position: number }>) {}
+        },
+      }));
+      const worker = await loadWorker();
+
+      worker.send(compositionRequest(55));
+      await vi.waitFor(() => expect(stitch.stitchComposition).toHaveBeenCalledTimes(1));
+      worker.send({ type: 'cancel', operationId: 55 });
+      stitch.release();
+      await vi.waitFor(() =>
+        expect(stitch.stitchComposition.mock.settledResults[0]?.type).toBe('rejected'),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const posted = worker.postMessage.mock.calls.map(([message]) => message.type);
+      expect(posted.filter((type) => type === 'canceled')).toHaveLength(1);
+      expect(posted).not.toContain('complete');
+      expect(posted).not.toContain('error');
+    });
+
+    it('refuses a second render while an arrangement is rendering, and passes a refusal through', async () => {
+      const stitch = stubStitch();
+      vi.doMock('mediabunny', () => ({
+        StreamTarget: class {
+          constructor(readonly _writable: WritableStream<{ data: Uint8Array; position: number }>) {}
+        },
+      }));
+      const worker = await loadWorker();
+
+      worker.send(compositionRequest(57));
+      await vi.waitFor(() => expect(stitch.stitchComposition).toHaveBeenCalledTimes(1));
+      worker.send(renderRequest(58));
+      expect(worker.postMessage).toHaveBeenCalledWith({
+        type: 'error',
+        operationId: 58,
+        message: 'Another local video render is already active.',
+      });
+      stitch.release();
+      await vi.waitFor(() =>
+        expect(worker.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'complete', operationId: 57 }),
+        ),
+      );
+    });
+
+    it('surfaces a refusal worded for the operator, and normalizes any other failure', async () => {
+      class StitchRefusal extends Error {}
+      const stitchComposition = vi
+        .fn()
+        .mockRejectedValueOnce(new StitchRefusal('“a.mp4” has no video track.'))
+        .mockRejectedValueOnce(new Error('decoder detail the operator must not see'));
+      vi.doMock('./stitchComposition', () => ({ stitchComposition, StitchRefusal }));
+      vi.doMock('mediabunny', () => ({ StreamTarget: class {} }));
+      const worker = await loadWorker();
+
+      worker.send(compositionRequest(61));
+      await vi.waitFor(() =>
+        expect(worker.postMessage).toHaveBeenCalledWith({
+          type: 'error',
+          operationId: 61,
+          message: '“a.mp4” has no video track.',
+        }),
+      );
+      worker.send(compositionRequest(62));
+      await vi.waitFor(() =>
+        expect(worker.postMessage).toHaveBeenCalledWith({
+          type: 'error',
+          operationId: 62,
+          message: 'The browser could not render this edit. The current video remains unchanged.',
+        }),
+      );
+    });
   });
 });

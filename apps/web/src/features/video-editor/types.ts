@@ -1,4 +1,12 @@
-import type { SubtitleCue, VideoEditSpec } from '@studio/domain';
+import type {
+  ClipAudioConformance,
+  ClipVideoConformance,
+  Composition,
+  CompositionAudioTarget,
+  CompositionVideoTarget,
+  SubtitleCue,
+  VideoEditSpec,
+} from '@studio/domain';
 import type { RecordingArtifact, UploadedTakeMetadata } from '../recording/types';
 
 export type VideoEditTool =
@@ -57,7 +65,44 @@ export type VideoEditStagePreviewContract = Readonly<{
   onCropCommit: () => void;
 }>;
 
+/**
+ * Where one clip's bytes are and what frame they have — the media record's own facts, index-aligned
+ * with the arrangement's clips. The worker streams each clip by HTTP ranges from `url`, so an
+ * arrangement of a hundred clips never holds a hundred files. Sound is not described here: the
+ * worker reads each clip's audio track itself, which is the only place its format is known.
+ */
+export type CompositionRenderMedia = Readonly<{
+  /** Absolute and same-origin: a worker resolves nothing against a page. */
+  url: string;
+  mimeType: string;
+  /** Named in refusals, so an operator knows which clip to remove or mute. */
+  filename: string;
+  width: number;
+  height: number;
+}>;
+
+/**
+ * What the render decided before it paid for anything: the one frame every clip is drawn into and
+ * what that does to each clip, and the same for sound — or `null` when no clip contributes any.
+ */
+export type CompositionRenderPlan = Readonly<{
+  durationMs: number;
+  video: Readonly<{ target: CompositionVideoTarget; clips: readonly ClipVideoConformance[] }>;
+  audio: Readonly<{
+    target: CompositionAudioTarget;
+    /** The clips' own rate could not be encoded, so the domain's fallback format was used. */
+    fellBack: boolean;
+    clips: readonly ClipAudioConformance[];
+  }> | null;
+}>;
+
 export type VideoEditWorkerRequest =
+  | Readonly<{
+      type: 'render-composition';
+      operationId: number;
+      composition: Composition;
+      media: readonly CompositionRenderMedia[];
+    }>
   | Readonly<{
       type: 'render';
       operationId: number;
@@ -77,6 +122,7 @@ export type VideoEditWorkerRequest =
   | Readonly<{ type: 'cancel'; operationId: number }>;
 
 export type VideoEditWorkerResponse =
+  | Readonly<{ type: 'plan'; operationId: number; plan: CompositionRenderPlan }>
   | Readonly<{ type: 'progress'; operationId: number; progress: number }>
   | Readonly<{
       type: 'complete';

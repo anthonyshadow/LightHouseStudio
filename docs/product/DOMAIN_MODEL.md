@@ -47,10 +47,11 @@ owns its source media references, its revision history, its processing jobs, its
 the links to its saved outputs. It is resumable: closing the browser and returning restores exact
 state. Projects can be renamed, duplicated (by reference, no bytes copied), moved between
 Campaigns, archived, restored, and — after archiving — tombstoned.
-_Status: implemented as a **single-video** workspace (one immutable source, one current cut).
-Since slice 3.1 (2026-09-12) the revision snapshot is version 3 and can hold a composition and an
-optional AI `transform`; no surface writes a composition yet, and several sources arrive with
-slice 3.2. D1–D3 are decided in [Decisions required](../DECISIONS_REQUIRED.md)._
+_Status: implemented as a workspace over one original plus a collection of further sources (slice
+3.2), with one current cut. Since slice 3.1 (2026-09-12) the revision snapshot is version 3 and can
+hold a composition and an optional AI `transform`; since slice 4.1 (2026-09-14) the arrangement
+editor writes one, and since slice 4.2 (2026-09-15) it renders one. D1–D3 are decided in
+[Decisions required](../DECISIONS_REQUIRED.md)._
 
 ### Source media
 
@@ -109,26 +110,34 @@ accepted transformation with no client watching it._
 The arrangement that turns a Project's material into one deliverable: an ordered sequence of clips,
 plus subtitle tracks and audio settings that apply across the sequence. The composition — not any
 single source — is what the user previews, refines, saves, and exports.
-_Status: **modelled, not yet written.** Since slice 3.1 (2026-09-12) the revision snapshot (v3)
-carries `composition: Composition | null` — ordered clips over media the Project holds, each with a
-trim in its own media time and its own level, plus one list of subtitle cues in sequence time — with
-its rules in `packages/domain/src/composition` and its media held by revision-scoped `clip` links
-(D3). It is `null` on every Project today: the current cut, with its `localEdit`, stands in until
-the composition write path (3.3) and the timeline (4.1) land._
+_Status: **written and rendered, not yet saved.** Since slice 3.1 (2026-09-12) the revision
+snapshot (v3) carries `composition: Composition | null` — ordered clips over media the Project
+holds, each with a trim in its own media time and its own level, plus one list of subtitle cues in
+sequence time — with its rules in `packages/domain/src/composition` and its media held by
+revision-scoped `clip` links (D3). Since slice 4.1 (2026-09-14) the arrangement editor writes it
+through the Project session, seeded as one clip over the current cut; since slice 4.2 (2026-09-15)
+**Render arrangement** produces the stitched file and plays it as the preview, under one
+normalization policy (the largest clip's frame, each clip's own frame timing, the widest sound; see
+[the slice 4.2 plan](../roadmap/SLICE_4.2_STITCHED_RENDERING_PLAN.md)). Save still operates on the
+current cut (4.3), and a clip can be added from the Project's other media only once a control for
+it exists._
 
 ### Timeline
 
 The editing surface that displays and manipulates the composition: clip order, per-clip trims,
 split points, subtitle cues over time. "Timeline" names UI; "composition" names the data.
-_Status: a single-clip timeline (trim handles, frame stepping) exists; the multi-clip timeline is
-target work._
+_Status: two surfaces. The single-clip editor's timeline (trim handles, frame stepping, a cue
+lane) and, since slice 4.1, the arrangement editor's clip strip — select, split at the playhead,
+reorder, trim and level per clip — with the rendered arrangement as its preview since slice 4.2._
 
 ### Clip
 
 A reference into source media with in/out trim points, occupying a position in the composition. A
 clip does not copy bytes; splitting a clip creates two references.
-_Status: modelled in snapshot v3 (`CompositionClip`: id, media reference, trim, audio level);
-no surface creates one yet (single-clip editing only)._
+_Status: modelled in snapshot v3 (`CompositionClip`: id, media reference, trim, audio level).
+The arrangement editor makes them — the first over the current cut, the rest by splitting — and
+the stitched render draws each into the arrangement's one frame; a control that adds a clip from
+the Project's other media is the gap the slice 4.2 plan names first._
 
 ### Subtitle track / subtitle cue
 

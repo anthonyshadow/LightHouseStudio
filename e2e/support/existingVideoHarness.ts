@@ -23,6 +23,7 @@ export const loadH264VideoFixture = async (): Promise<Buffer> => {
 // imports, while the suites that cannot import Playwright reach the same reader directly.
 export {
   loadDecodableH264VideoFixture,
+  loadDeterministicRecordingFixture,
   loadPhoneHevcVideoFixture,
   loadPortraitH264VideoFixture,
 } from '../fixtures/videoFixtures';

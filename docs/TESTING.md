@@ -125,6 +125,17 @@ The retained suite protects:
   remixing with a continuous seam, and contiguous timestamps — proven against the real mediabunny
   encoder guard through a WAV/PCM output in Node rather than a mock, alongside the case that pins
   the guard itself;
+- the stitched render itself: the video half of the normalization policy (largest frame, evened;
+  fit labels) and the media-to-sequence clock in the domain; the concat loop against a fake
+  runtime — strictly increasing frames held to each cut, a key frame per clip, the black fill and
+  contain fit into one canvas, cues across a cut in sequence time, audio placed in whole frames from
+  the sequence edges with head gaps stated as silence, muted and silent clips, the fallback probe,
+  refusals before paid work, cancel mid-clip with every input disposed, one input open across a
+  hundred clips, progress once per percent — plus the worker's routing, plan and cancel protocol,
+  the client, the render hook's file lifecycle and the surface's states; and in Chromium the real
+  fixtures — 1280x720, 1080x1920 at 6 fps and 320x180 with AAC — rendered through the render client
+  into one file whose frame, length, sound, bars and burned-in cue are read back with WebCodecs,
+  printing the render budget on every run (`e2e/stitched-render.spec.ts`);
 - upload and primary local-record adoption into the editor; discoverable Character Swap, Virtual
   Try On, and Voice; Original/Result synchronization; strict visual-before-voice ordering;
   latest-result cleanup; and post-generation MP4 validation;
@@ -249,7 +260,9 @@ The retained suite protects:
   login, a Project created through the running API, a source uploaded as real bytes, an on-device
   render adopted as the current cut, a save that produces a real Video, and a download served from
   where the server stored it — asserted against the server's own output history and Video record,
-  not a simulator's. Every other browser journey drives an in-page simulator on purpose: simulators
+  not a simulator's. A third journey there arranges an uploaded source, splits it, renders the
+  arrangement through the surface and reads the file back with the page's decoder, printing its
+  phase timings. Every other browser journey drives an in-page simulator on purpose: simulators
   are how a lost response, a never-settling provider or a mid-upload disconnect is injected, and
   they stay for that. They cannot prove the server honours its own contract, because each one _is_
   the contract restated; this journey is where that proof lives. The provider-free

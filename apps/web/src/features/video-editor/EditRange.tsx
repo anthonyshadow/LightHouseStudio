@@ -13,6 +13,8 @@ export type EditRangeProps = Readonly<{
   onStart: () => void;
   onChange: (value: number) => void;
   onCommit: () => void;
+  /** Shown but not movable — while a render is reading the value it would change. */
+  disabled?: boolean | undefined;
 }>;
 
 /**
@@ -29,6 +31,7 @@ export const EditRange = ({
   onStart,
   onChange,
   onCommit,
+  disabled = false,
 }: EditRangeProps) => {
   const theme = useTheme();
   return (
@@ -44,8 +47,13 @@ export const EditRange = ({
         step={step}
         value={value}
         aria-label={label}
-        onPointerDown={onStart}
+        disabled={disabled}
+        // Only the openers are gated: a disabled control still receives pointer events, and a
+        // transaction opened on one would never be closed. The closers stay live so a gesture
+        // that was open when the control became disabled can still land.
+        onPointerDown={disabled ? undefined : onStart}
         onKeyDown={(event) => {
+          if (disabled) return;
           if (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End') {
             onStart();
           }

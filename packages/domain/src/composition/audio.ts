@@ -1,4 +1,4 @@
-import { failComposition } from './rules';
+import { failComposition, requirePositiveWholeNumber } from './rules';
 
 /**
  * The audio half of a stitched output's format, decided once for the whole arrangement.
@@ -42,11 +42,6 @@ export const COMPOSITION_AUDIO_FALLBACK_TARGET: CompositionAudioTarget = {
   numberOfChannels: 2,
 };
 
-const requirePositiveInteger = (value: number, label: string): number =>
-  Number.isInteger(value) && value > 0
-    ? value
-    : failComposition(`A clip's audio ${label} must be a positive whole number.`);
-
 /**
  * One format for the whole output, or `null` when no clip carries audio at all.
  *
@@ -63,10 +58,13 @@ export const compositionAudioTarget = (
   let numberOfChannels = 0;
   for (const profile of profiles) {
     if (profile === null) continue;
-    sampleRate = Math.max(sampleRate, requirePositiveInteger(profile.sampleRate, 'sample rate'));
+    sampleRate = Math.max(
+      sampleRate,
+      requirePositiveWholeNumber(profile.sampleRate, 'audio sample rate'),
+    );
     numberOfChannels = Math.max(
       numberOfChannels,
-      requirePositiveInteger(profile.numberOfChannels, 'channel count'),
+      requirePositiveWholeNumber(profile.numberOfChannels, 'audio channel count'),
     );
   }
   return sampleRate === 0
@@ -86,14 +84,18 @@ export const compositionAudioFrames = (durationMs: number, sampleRate: number): 
   if (!Number.isFinite(durationMs) || durationMs < 0) {
     failComposition('A span of the sequence must be a non-negative number of milliseconds.');
   }
-  return Math.round((durationMs * requirePositiveInteger(sampleRate, 'sample rate')) / 1_000);
+  return Math.round(
+    (durationMs * requirePositiveWholeNumber(sampleRate, 'audio sample rate')) / 1_000,
+  );
 };
 
 /**
  * What conforming does to one clip, in the words a notice will need.
  *
- * `silence` is a clip with no audio track: it still occupies its span of the output, and the
- * timeline owes it frames of nothing so the clips after it land where they should.
+ * `silence` is a clip that contributes no sound — no audio track, or muted: it still occupies its
+ * span of the output, and the timeline owes it frames of nothing so the clips after it land where
+ * they should. A muted clip is also left out of the target decision, since nothing of its own
+ * format reaches the output.
  */
 export type ClipAudioConformance =
   'kept' | 'resampled' | 'remixed' | 'resampled-and-remixed' | 'silence';

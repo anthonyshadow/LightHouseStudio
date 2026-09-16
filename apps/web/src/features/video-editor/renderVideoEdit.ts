@@ -1,5 +1,9 @@
 import type { VideoEditSpec } from '@studio/domain';
-import type { VideoEditWorkerRequest, VideoEditWorkerResponse } from './types';
+import {
+  VIDEO_EDIT_RENDER_UNSUPPORTED_MESSAGE,
+  runVideoEditWorker,
+  type VideoEditWorkerOutcome,
+} from './videoEditWorkerClient';
 import { videoEditExportSupported } from './videoEditSupport';
 
 export type RenderVideoEditInput = Readonly<{
@@ -20,9 +24,7 @@ export type RenderVideoEditInput = Readonly<{
   onProgress: (progress: number) => void;
 }>;
 
-export type RenderVideoEditResult = Readonly<{ blob: Blob; mimeType: 'video/mp4' }>;
-
-let nextOperationId = 0;
+export type RenderVideoEditResult = VideoEditWorkerOutcome;
 
 export const renderVideoEdit = async ({
   source,
@@ -39,58 +41,11 @@ export const renderVideoEdit = async ({
   // the time anyone renders it costs nothing. Asking the weaker presence-only version here would
   // let a browser that cannot encode get all the way to a worker before finding out.
   if (!(await videoEditExportSupported())) {
-    throw new Error('This browser cannot render local video edits without blocking the Studio.');
+    throw new Error(VIDEO_EDIT_RENDER_UNSUPPORTED_MESSAGE);
   }
-  const operationId = ++nextOperationId;
-  const worker = new Worker(new URL('./videoEditRender.worker.ts', import.meta.url), {
-    type: 'module',
-  });
-  return new Promise((resolve, reject) => {
-    let settled = false;
-    let cancellationTimer: number | null = null;
-    const finish = (callback: () => void) => {
-      if (settled) return;
-      settled = true;
-      signal.removeEventListener('abort', cancel);
-      if (cancellationTimer !== null) window.clearTimeout(cancellationTimer);
-      worker.terminate();
-      callback();
-    };
-    const cancel = () => {
-      const message: VideoEditWorkerRequest = { type: 'cancel', operationId };
-      worker.postMessage(message);
-      cancellationTimer = window.setTimeout(() => {
-        finish(() => reject(new DOMException('Video rendering was canceled.', 'AbortError')));
-      }, 2_000);
-    };
-    worker.onmessage = (event: MessageEvent<VideoEditWorkerResponse>) => {
-      const message = event.data;
-      if (message.operationId !== operationId) return;
-      if (message.type === 'progress') {
-        onProgress(Math.max(0, Math.min(1, message.progress)));
-        return;
-      }
-      if (message.type === 'complete') {
-        finish(() => resolve({ blob: message.blob, mimeType: message.mimeType }));
-        return;
-      }
-      if (message.type === 'canceled') {
-        finish(() => reject(new DOMException('Video rendering was canceled.', 'AbortError')));
-        return;
-      }
-      finish(() => reject(new Error(message.message)));
-    };
-    worker.onerror = () => {
-      finish(() => reject(new Error('The local video-rendering worker stopped unexpectedly.')));
-    };
-    signal.addEventListener('abort', cancel, { once: true });
-    if (signal.aborted) {
-      cancel();
-      return;
-    }
-    const message: VideoEditWorkerRequest = {
+  return runVideoEditWorker(
+    {
       type: 'render',
-      operationId,
       source,
       spec,
       sourceWidth,
@@ -98,7 +53,8 @@ export const renderVideoEdit = async ({
       requireAudio,
       targetResolution,
       includeAudio,
-    };
-    worker.postMessage(message);
-  });
+    },
+    signal,
+    { onProgress },
+  );
 };

@@ -80,6 +80,14 @@ neutral over already-rendered bytes so prior changes are not applied twice. The 
 many subtitles were burned in and that changing them means editing again from a cut that does not
 carry them: burned text is pixels, the same way every baked edit is.
 
+### The arrangement's render
+
+Since slice 4.2 the same worker also renders a Project's arrangement — several clips into one
+file, through a loop beside the single-clip conversion rather than a parameter on it. That surface,
+its states and its normalization policy are described in
+[Project arrangement](20-project-arrangement.md); what it shares with this editor is the worker,
+its cancel protocol, the subtitle rasterizer, the output ceiling and the validator.
+
 ### Placement exports
 
 Choosing a placement at a save step reuses this worker rather than adding a second render path. The

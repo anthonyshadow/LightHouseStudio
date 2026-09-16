@@ -12,6 +12,7 @@ import {
   compositionsEqual,
   moveClip,
   removeClip,
+  sequenceMsAt,
   setClipAudio,
   setClipTrim,
   splitCompositionAt,
@@ -80,6 +81,24 @@ describe('composition sequence arithmetic', () => {
     // An instant outside the placement clamps rather than seeking frames the operator cut away.
     expect(clipMediaMsAt(second!, 0)).toBe(1_000);
     expect(clipMediaMsAt(second!, 99_999)).toBe(3_500);
+  });
+
+  it('reads a media instant back on the sequence clock, which is where a rendered frame lands', () => {
+    const [first, second] = compositionPlacements(composition());
+    expect(sequenceMsAt(second!, 1_500)).toBe(4_500);
+    expect(sequenceMsAt(first!, 2_222)).toBe(2_222);
+    // Inverse of clipMediaMsAt inside the trim, including a cut that is not a whole millisecond.
+    const uneven = compositionPlacements(
+      composition({
+        clips: [clip(1, { trim: { startMs: 0, endMs: 1_001 / 3 } }), clip(2)],
+      }),
+    );
+    expect(sequenceMsAt(uneven[1]!, clipMediaMsAt(uneven[1]!, 1_234.5))).toBeCloseTo(1_234.5, 9);
+    // The trim's own end is the placement's end, which is exactly the next clip's start.
+    expect(sequenceMsAt(uneven[0]!, 1_001 / 3)).toBe(uneven[1]!.startMs);
+    // Outside the trim it clamps, the way its inverse refuses to seek frames the operator cut away.
+    expect(sequenceMsAt(second!, 0)).toBe(4_000);
+    expect(sequenceMsAt(second!, 99_999)).toBe(6_500);
   });
 });
 

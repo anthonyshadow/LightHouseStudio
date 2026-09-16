@@ -35,6 +35,7 @@ future features current.
 | Save, browse, version, and reload local videos                     | [Videos in Assets](15-saved-video-gallery.md)                                  |
 | Reuse saved characters, outfits, voices, and videos                | [Libraries](16-saved-creative-libraries.md)                                    |
 | Create, resume, process, and save one Project video                | [Project lifecycle and immutable source](17-empty-project-lifecycle.md)        |
+| Arrange a Project's video into clips and render the arrangement    | [Project arrangement](20-project-arrangement.md)                               |
 | Organize Projects with optional Campaigns                          | [Campaign organization](18-campaign-organization.md)                           |
 
 ## Shared runtime rules

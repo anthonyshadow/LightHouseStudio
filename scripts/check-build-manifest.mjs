@@ -188,7 +188,21 @@ export const BUILD_CLOSURE_BUDGETS = {
   // described there — plus what is genuinely local to a Studio route: the arrangement is reached
   // from here, so this closure also pays the `lazy()` boundary and the props that reach it. The
   // editor surface itself is lazily loaded and is *not* in this number.
-  'src/studio/StudioApp.tsx': 1_100_000,
+  //
+  // Raised from 1_100_000 to 1_101_000 on 2026-09-15 for slice 4.2 (stitched rendering), measured
+  // 1_099_536 -> 1_100_130; the shell moved 748_716 -> 748_788, seventy-two bytes for the one rule
+  // the stage column gained (it steps aside while an arrangement is being edited), which sits in
+  // a chunk both closures share. The rest is local to a Studio route, as it should be: the worker
+  // runner that the single-clip render already paid for (`renderVideoEdit.ts`, in this closure)
+  // was extracted so the arrangement render could share it, and it learned one more message — the
+  // plan a stitched render posts before any paid work — plus the props that report an arrangement
+  // render up to the exit guard. The concat loop, the render hook and the surface are all in the
+  // lazy arrangement chunk, and the new domain module for the video half of the normalization
+  // policy is consumed only by the worker, which is built outside this manifest graph — so it
+  // costs neither closure a byte. 1_101_000 rather than a round number above it, for the same
+  // reason as the shell's: the headroom stays in the hundreds and the next arrival fails the same
+  // way this one did.
+  'src/studio/StudioApp.tsx': 1_101_000,
 };
 
 /**
@@ -215,6 +229,7 @@ export const FORBIDDEN_CLOSURE_DEPENDENCIES = {
     ...PROVIDER_AND_MEDIA_ONLY,
     /useExistingVideoWorkflow/u,
     /videoEditShader/u,
+    /stitchComposition/u,
     /TakeReviewActions/u,
     /recording-|\/recording\b/u,
   ],

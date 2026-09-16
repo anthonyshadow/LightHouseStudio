@@ -38,7 +38,8 @@ export const DEFAULT_VIDEO_EDIT_AUDIO: VideoEditAudio = {
   muted: false,
 };
 
-const evenDimension = (value: number): number => Math.max(2, Math.floor(value / 2) * 2);
+/** The even size an H.264 encoder accepts, never below the two pixels a frame needs. */
+export const evenDimension = (value: number): number => Math.max(2, Math.floor(value / 2) * 2);
 
 export const createDefaultVideoEditSpec = (durationMs: number): VideoEditSpec => ({
   trim: { startMs: 0, endMs: Math.max(VIDEO_EDIT_MINIMUM_TRIM_MS, durationMs) },

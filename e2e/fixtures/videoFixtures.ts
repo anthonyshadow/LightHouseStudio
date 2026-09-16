@@ -17,6 +17,10 @@ const loadBase64VideoFixture = async (filename: string): Promise<Buffer> => {
 export const loadDecodableH264VideoFixture = async (): Promise<Buffer> =>
   loadBase64VideoFixture('decodable-h264-video.base64');
 
+/** 320x180 H.264 with AAC — the one committed clip that carries sound. */
+export const loadDeterministicRecordingFixture = async (): Promise<Buffer> =>
+  loadBase64VideoFixture('deterministic-recording-mp4.base64');
+
 /** 1080x1920 H.264, video only — the portrait source a 9:16 cut and its placement set start from. */
 export const loadPortraitH264VideoFixture = async (): Promise<Buffer> =>
   loadBase64VideoFixture('portrait-h264-video.base64');

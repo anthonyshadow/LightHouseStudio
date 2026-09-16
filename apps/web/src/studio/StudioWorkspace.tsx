@@ -217,6 +217,9 @@ export const StudioWorkspace = ({
         ref={fullscreenWorkspaceRef}
         css={stageColumnStyles(theme)}
         data-video-edit-active={editorActive ? 'true' : 'false'}
+        // The arrangement brings its own preview, so the stage steps aside rather than sitting
+        // under it; the single-clip editor keeps the stage because the stage *is* its preview.
+        data-arranging={arrangement !== null ? 'true' : undefined}
         data-project-context={projectContextActive ? 'true' : undefined}
         data-capture-settings={captureSettingsCollapsed ? 'collapsed' : undefined}
       >
@@ -319,6 +322,7 @@ export const StudioWorkspace = ({
               session={arrangement.session}
               archived={arrangement.current.project.status === 'archived'}
               onClose={() => setArranging(false)}
+              onRenderActivityChange={project.handleCompositionRenderActivity}
             />
           </Suspense>
         ) : projectContextActive ? (

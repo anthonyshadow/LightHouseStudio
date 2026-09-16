@@ -19,8 +19,9 @@ import { loadPortraitH264VideoFixture } from './support/existingVideoHarness';
  * adopt a captioned on-device render as the current cut, save that cut for three placements at
  * once, read the pixels of all three back, and download the bytes the server kept. The second: take
  * a Project from one video to two through the Media area, stream the second one back from its own
- * content route, and let it go again. Every external host is blocked and reported, so a regression
- * that started contacting one fails here too.
+ * content route, and let it go again. The third: arrange a Project's video, split it, render the
+ * arrangement through the surface and read the file back. Every external host is blocked and
+ * reported, so a regression that started contacting one fails here too.
  */
 
 const ORIGIN_FALLBACK = 'http://127.0.0.1:4173';
@@ -565,6 +566,118 @@ test('a Project takes on a second video, previews it, and lets it go again throu
     expect(blocked.requests).toEqual([]);
     expect(blocked.webSockets).toEqual([]);
   } finally {
+    await removeResidue(page.request, origin, residue).catch((error: unknown) => {
+      console.warn(`Real-stack residue was not removed: ${String(error)}`);
+    });
+  }
+});
+
+test('an arrangement renders through the Project surface on the running API, and the file reads back', async ({
+  page,
+  baseURL,
+}) => {
+  /*
+   * One upload and one stitched render of two clips split from one source, no save: the phase
+   * timings this prints are the budget. Until an arrangement can take a clip from a second piece
+   * of media, this is the product's own path to a stitched render; the mixed-format render is
+   * measured at the module level in `stitched-render.spec.ts`.
+   */
+  test.setTimeout(240_000);
+  const clock = phaseClock();
+  const origin = new URL(baseURL ?? ORIGIN_FALLBACK).origin;
+  const residue: Residue = {
+    title: `Real-stack arrangement ${Date.now()}`,
+    projectId: null,
+    savedVideoId: null,
+    renditionAssetIds: [],
+  };
+  const blocked = await blockExternalHosts(page);
+  // A second of portrait video: long enough to split in two and keep both halves. The committed
+  // clip that carries sound is a fifth of a second, so the audio path is proven at the module
+  // level in `stitched-render.spec.ts` rather than here.
+  const fixture = await loadPortraitH264VideoFixture();
+
+  try {
+    const projectId = await createProject(page, residue);
+    await page.goto(`/projects/${projectId}/workspace`);
+    await expect(page.getByRole('heading', { name: 'No original video yet' })).toBeVisible();
+    await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
+      name: 'arranged-source.mp4',
+      mimeType: 'video/mp4',
+      buffer: fixture,
+    });
+    await expect(page.getByRole('heading', { name: 'Original video ready' })).toBeVisible({
+      timeout: 60_000,
+    });
+    clock.mark('upload source');
+
+    // Arrange it as one clip, then cut it in two at the middle.
+    await page.getByRole('button', { name: 'Arrange', exact: true }).click();
+    await page.getByRole('button', { name: 'Arrange this video' }).click();
+    const strip = page.getByRole('listbox', { name: 'Clips in this arrangement' });
+    await expect(strip.getByRole('option')).toHaveCount(1);
+    const playhead = page.getByRole('slider', { name: 'Playhead' });
+    const durationMs = Number(await playhead.getAttribute('max'));
+    expect(durationMs).toBeGreaterThan(200);
+    await playhead.fill(String(Math.round(durationMs / 20) * 10));
+    await page.getByRole('button', { name: 'Split at playhead' }).click();
+    await expect(strip.getByRole('option')).toHaveCount(2);
+    // The arrangement is autosaved through the Project session like any other change; the
+    // surface hides the Project route (and its autosave stamp) while it has the stage, so the
+    // server is asked directly whether the two clips arrived.
+    await expect
+      .poll(
+        async () => {
+          const project = await page.request.get(`/api/projects/${projectId}`);
+          if (!project.ok()) return null;
+          const body = (await project.json()) as {
+            readonly revision?: {
+              readonly snapshot?: { readonly composition?: { readonly clips: unknown[] } | null };
+            };
+          };
+          return body.revision?.snapshot?.composition?.clips.length ?? null;
+        },
+        { timeout: 60_000 },
+      )
+      .toBe(2);
+    clock.mark('arrange and split');
+
+    // Render it, through the same worker the editor uses, and wait for the file to be on show.
+    await page.getByRole('button', { name: 'Render arrangement' }).click();
+    const caption = page.getByText(/^Rendered from 2 clips/u);
+    await expect(caption).toBeVisible({ timeout: 120_000 });
+    clock.mark('stitched render');
+    await expect(caption).toHaveText(/1080×1920/u);
+    const player = page.getByLabel('Preview of Rendered arrangement');
+    const renderedUrl = await player.evaluate((video: HTMLVideoElement) => video.src);
+    expect(renderedUrl.startsWith('blob:')).toBe(true);
+    // The file itself, read with the page's own decoder: the frame the plan promised, with pixels.
+    const frame = await readRenderedFrameInk(
+      page,
+      renderedUrl,
+      { caption: { fromRatio: 0.55, toRatio: 1 }, control: { fromRatio: 0.02, toRatio: 0.45 } },
+      DEFAULT_INK_THRESHOLDS,
+    );
+    expect(frame.width).toBe(1_080);
+    expect(frame.height).toBe(1_920);
+    // The clip is the frame: no bar above the picture, and the fixture's own flat tone throughout.
+    expect(frame.control.dark).toBe(0);
+    expect(frame.control.bright).toBe(0);
+    const bytes = await page.evaluate(
+      async (url) => (await (await fetch(url)).blob()).size,
+      renderedUrl,
+    );
+    expect(bytes).toBeGreaterThan(0);
+    clock.mark('read back');
+
+    // Nothing was written: the render is a preview, and the Project's cut is what it was.
+    const workingMedia = await page.request.get(`/api/projects/${projectId}/working-media`);
+    expect(workingMedia.status()).toBe(404);
+
+    expect(blocked.requests).toEqual([]);
+    expect(blocked.webSockets).toEqual([]);
+  } finally {
+    console.log(`Real-stack arrangement phase timings: ${clock.report()}`);
     await removeResidue(page.request, origin, residue).catch((error: unknown) => {
       console.warn(`Real-stack residue was not removed: ${String(error)}`);
     });

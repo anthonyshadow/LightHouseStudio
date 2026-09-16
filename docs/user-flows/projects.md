@@ -213,7 +213,7 @@ recording and preview happen in place.
 **Layout** — a masthead (Overview breadcrumb, title, status, a compact `ProjectWorkflowProgress`
 strip, and an ambient live `Autosaved · <time>` / `Autosaving…` / `Unsaved changes` indicator) plus
 a four-tab inspector: **Source · Create · Save · History**. Only `Conflict` and `Not autosaved`
-become prominent notices. The tabs are a proper ARIA tablist with arrow/Home/End keyboard support.
+become prominent notices. The tabs are a proper ARIA tablist with arrow/Home/End keyboard support. Once the Project presents a video, the masthead also carries **Arrange** (or **Edit arrangement**), which opens the arrangement editor over the stage; see [Project arrangement](feature-behavior/20-project-arrangement.md).
 
 The masthead strip is the compact `variant="masthead"` of the same component the overview uses, and
 the tablist derives its four tasks from the same `PROJECT_WORKFLOW_STEPS` list, so progress and

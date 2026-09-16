@@ -648,6 +648,9 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
   '& > [data-media-stage-layout]': { gridColumn: 1, gridRow: 1 },
   '& > [data-studio-tool-rail]': { gridColumn: 1, gridRow: 2 },
   '& > [data-capture-controls]': { gridColumn: 1, gridRow: 3 },
+  // While the arrangement editor has the column it spans every cell, and the stage under it would
+  // only take the pointer: the arrangement previews through its own player, not the stage.
+  '&[data-arranging="true"] > [data-media-stage-layout]': { display: 'none' },
   '&:fullscreen': {
     display: 'block',
     padding: 0,

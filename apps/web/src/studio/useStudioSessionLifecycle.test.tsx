@@ -92,11 +92,14 @@ interface SetupOptions {
   readonly discards?: boolean;
   /** Held open where a case needs to watch the teardown wait on the existing-video cleanup. */
   readonly workflowCleanup?: () => Promise<void>;
+  /** An arrangement render in flight in the Project surface. */
+  readonly compositionRenderActivity?: { projectId: string; busy: boolean } | null;
 }
 
 const setup = ({
   discards = true,
   workflowCleanup = () => Promise.resolve(),
+  compositionRenderActivity = null,
 }: SetupOptions = {}) => {
   const collaborators = {
     discard: vi.fn(() => discards),
@@ -137,6 +140,7 @@ const setup = ({
     projectWorkingMedia: projectWorkingMediaDouble(),
     projectSourceActivity: null,
     projectWorkingMediaActivity: null,
+    projectCompositionRenderActivity: compositionRenderActivity,
     discardSavedVideoWork: collaborators.discardSavedVideoWork,
     discardPendingAdoption: collaborators.discardPendingAdoption,
     closeOverlay: collaborators.closeOverlay,
@@ -211,6 +215,15 @@ describe('useStudioSessionLifecycle', () => {
     // with no per-task rescue, so stopping here would skip `release-media` and leave the camera
     // running after logout or expiry.
     expect(context.stopCamera).toHaveBeenCalledOnce();
+  });
+
+  it('reports an arrangement render as video rendering, so leaving and logout are held like the editor', () => {
+    const context = setup({
+      compositionRenderActivity: { projectId: 'project-1', busy: true },
+    });
+    expect(context.hook.result.current.work.videoRenderingActive).toBe(true);
+    const idle = setup({ compositionRenderActivity: { projectId: 'project-1', busy: false } });
+    expect(idle.hook.result.current.work.videoRenderingActive).toBe(false);
   });
 
   it('reports the take it is holding, and reports nothing once the runtime is gone', () => {

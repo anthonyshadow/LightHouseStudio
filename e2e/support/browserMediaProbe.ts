@@ -85,15 +85,24 @@ type ProbeVideoTrack = Readonly<{
   getCodec: () => Promise<string | null>;
   getDecoderConfig: () => Promise<VideoDecoderConfig | null>;
   getFirstTimestamp: () => Promise<number>;
+  getDisplayWidth: () => Promise<number>;
+  getDisplayHeight: () => Promise<number>;
 }>;
 
-type ProbeInput = Readonly<{
+type ProbeAudioTrack = Readonly<{
+  getSampleRate: () => Promise<number>;
+  getNumberOfChannels: () => Promise<number>;
+}>;
+
+export type ProbeInput = Readonly<{
   getPrimaryVideoTrack: () => Promise<ProbeVideoTrack | null>;
+  getPrimaryAudioTrack: () => Promise<ProbeAudioTrack | null>;
+  computeDuration: () => Promise<number>;
   dispose: () => void;
 }>;
 
-/** Only the four names the probes below use, so the page-side code stays typed without a cast. */
-type MediaReader = Readonly<{
+/** Only the names the probes use, so the page-side code stays typed without a cast. */
+export type MediaReader = Readonly<{
   ALL_FORMATS: unknown;
   BlobSource: new (blob: Blob) => object;
   Input: new (options: { readonly formats: unknown; readonly source: object }) => ProbeInput;
@@ -102,7 +111,7 @@ type MediaReader = Readonly<{
   }>;
 }>;
 
-type ReaderWindow = typeof window & { __lightframeMediaReader?: MediaReader };
+export type ReaderWindow = typeof window & { __lightframeMediaReader?: MediaReader };
 
 /** Whether one page's current document is holding the reader. */
 type ReaderState = { holding: boolean };
@@ -137,7 +146,7 @@ const readerStateOf = (page: Page): ReaderState => {
  * The bundle is an ES module whose exports have to be named to be reachable; awaiting a dynamic
  * import of its blob URL both names them and gives a completion to wait on.
  */
-const installMediaReader = async (page: Page): Promise<void> => {
+export const installMediaReader = async (page: Page): Promise<void> => {
   const state = readerStateOf(page);
   if (state.holding) return;
   const bundle = await mediabunnyBundle();
@@ -182,10 +191,12 @@ export const readRenderedFrameInk = async (
   mediaUrl: string,
   bands: Readonly<{ caption: FrameBand; control: FrameBand }>,
   thresholds: InkThresholds,
+  /** Which frame to read, in seconds; the first frame when omitted. */
+  atSeconds: number | null = null,
 ): Promise<FrameInk> => {
   await installMediaReader(page);
   return page.evaluate(
-    async ({ url, bandRatios, limits }) => {
+    async ({ url, bandRatios, limits, at }) => {
       const reader = (window as ReaderWindow).__lightframeMediaReader;
       if (!reader) throw new Error('The page media reader was not installed.');
       const response = await fetch(url);
@@ -200,7 +211,7 @@ export const readRenderedFrameInk = async (
         const track = await input.getPrimaryVideoTrack();
         if (!track) throw new Error('The rendered output holds no video track.');
         const sink = new reader.CanvasSink(track);
-        const decoded = await sink.getCanvas(await track.getFirstTimestamp());
+        const decoded = await sink.getCanvas(at ?? (await track.getFirstTimestamp()));
         if (!decoded) throw new Error('The rendered output decoded no frame.');
         const { canvas } = decoded;
         // Each canvas kind declares its own `getContext` overloads; calling through the union
@@ -234,7 +245,7 @@ export const readRenderedFrameInk = async (
         input.dispose();
       }
     },
-    { url: mediaUrl, bandRatios: bands, limits: thresholds },
+    { url: mediaUrl, bandRatios: bands, limits: thresholds, at: atSeconds },
   );
 };
 

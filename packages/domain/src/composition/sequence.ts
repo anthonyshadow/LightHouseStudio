@@ -13,7 +13,8 @@ import { compositionClipDurationMs, type Composition, type CompositionClip } fro
  *
  * Kept apart from `rules.ts` because that module is the snapshot's validator and normalizer — it
  * answers "may this be stored", and nothing here is a rule about storage. This answers "what is on
- * screen at this instant", which only an editor asks.
+ * screen at this instant", which only an editor asks — and, through `sequenceMsAt`, "when does this
+ * frame land in the output", which only a render asks.
  */
 
 /** One clip's span on the stitched timeline. `endMs` is exclusive, the way the lookup below reads it. */
@@ -76,3 +77,18 @@ export const compositionPlacementAt = (
 export const clipMediaMsAt = (placement: CompositionPlacement, sequenceMs: number): number =>
   placement.clip.trim.startMs +
   clamp(sequenceMs - placement.startMs, 0, placement.endMs - placement.startMs);
+
+/**
+ * A media instant of the placed clip, read on the sequence clock — the clock every output frame is
+ * stamped with and every cue is looked up on.
+ *
+ * This is the frame-rate half of the stitched output's normalization policy, stated as the function
+ * the render calls per frame: a frame lands in the output at its own source instant re-based onto
+ * the sequence, so each clip keeps its own frame timing and no frame is dropped or duplicated.
+ * Clamped to the trim like its inverse; the trim's own end maps to the placement's end, which is the
+ * next clip's start, so a clip's last frame is held exactly to the cut.
+ */
+export const sequenceMsAt = (placement: CompositionPlacement, mediaMs: number): number =>
+  placement.startMs +
+  clamp(mediaMs, placement.clip.trim.startMs, placement.clip.trim.endMs) -
+  placement.clip.trim.startMs;

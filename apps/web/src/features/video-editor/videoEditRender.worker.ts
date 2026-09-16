@@ -7,7 +7,9 @@ import {
   type VideoEditSpec,
 } from '@studio/domain';
 import { ensureAacEncodingSupport } from '../../adapters/media-processing/aacEncoding';
-import type { AudioSample, ConversionAudioOptions } from 'mediabunny';
+import { scaledAudioSample } from '../../adapters/media-processing/audioSampleConformer';
+import type { AudioSample, ConversionAudioOptions, StreamTarget } from 'mediabunny';
+import { StitchRefusal, stitchComposition } from './stitchComposition';
 import { createSubtitleOverlaySync } from './subtitleRasterizer';
 import type { VideoEditWorkerRequest, VideoEditWorkerResponse } from './types';
 import {
@@ -20,7 +22,8 @@ import { createVideoEditFrameRenderer } from './videoEditShader';
  * A per-sample multiply, in float so the arithmetic is exact and clipping is impossible below
  * unity. The library owns both samples — it disposes the one it hands in once this returns, and
  * the one returned once it has been encoded — so nothing here closes anything. At unity no hook
- * is installed at all, which keeps the untouched path byte-identical to what it was.
+ * is installed at all, which keeps the untouched path byte-identical to what it was. The multiply
+ * itself is the adapter's, shared with the stitched render, so a mute is exact zeros on both paths.
  */
 const audioGainProcessing = (
   gain: number,
@@ -29,19 +32,8 @@ const audioGainProcessing = (
   gain === 1
     ? {}
     : {
-        process: (sample) => {
-          const frames = sample.numberOfFrames * sample.numberOfChannels;
-          const data = new Float32Array(frames);
-          sample.copyTo(data, { planeIndex: 0, format: 'f32' });
-          for (let index = 0; index < frames; index += 1) data[index]! *= gain;
-          return new Sample({
-            data,
-            format: 'f32',
-            numberOfChannels: sample.numberOfChannels,
-            sampleRate: sample.sampleRate,
-            timestamp: sample.timestamp,
-          });
-        },
+        process: (sample) =>
+          scaledAudioSample(Sample, sample, { frameOffset: 0, gain, timestamp: sample.timestamp }),
       };
 
 let activeOperationId: number | null = null;
@@ -63,9 +55,25 @@ const safeMessage = (error: unknown): string => {
   if (error instanceof DOMException && error.name === 'AbortError') {
     return 'The local video render was canceled.';
   }
+  // Worded for the operator already; everything else is replaced rather than surfaced.
+  if (error instanceof StitchRefusal) return error.message;
   if (error instanceof Error && /300 MB/u.test(error.message)) return error.message;
   return 'The browser could not render this edit. The current video remains unchanged.';
 };
+
+/** The bounded accumulator as a chunked stream target, which both renders write through. */
+const accumulatorTarget = (
+  StreamTargetClass: typeof StreamTarget,
+  writer: VideoEditChunkAccumulator,
+): StreamTarget =>
+  new StreamTargetClass(
+    new WritableStream({
+      write(chunk: { data: Uint8Array; position: number }) {
+        writer.write(chunk.data, chunk.position);
+      },
+    }),
+    { chunked: true, chunkSize: VIDEO_EDIT_OUTPUT_BLOCK_BYTES },
+  );
 
 const render = async (
   request: Extract<VideoEditWorkerRequest, { type: 'render' }>,
@@ -151,18 +159,9 @@ const render = async (
       () => new OffscreenCanvas(outputSize.width, outputSize.height),
       (overlay) => frameRenderer.setOverlay(overlay),
     );
-    const writable = new WritableStream({
-      write(chunk: { data: Uint8Array; position: number }) {
-        writer.write(chunk.data, chunk.position);
-      },
-    });
-    const target = new StreamTarget(writable, {
-      chunked: true,
-      chunkSize: VIDEO_EDIT_OUTPUT_BLOCK_BYTES,
-    });
     const output = new Output({
       format: new Mp4OutputFormat({ fastStart: false }),
-      target,
+      target: accumulatorTarget(StreamTarget, writer),
     });
     const conversion = await Conversion.init({
       input: mediaInput,
@@ -252,6 +251,66 @@ const render = async (
   }
 };
 
+/**
+ * The stitched render: the same operation, cancel and disposal contract as `render`, around the
+ * concat loop instead of a `Conversion`. The loop registers what a cancel must tear down before it
+ * opens anything, so a cancel that lands while a clip is being read aborts that read rather than
+ * waiting for the next frame.
+ */
+const renderComposition = async (
+  request: Extract<VideoEditWorkerRequest, { type: 'render-composition' }>,
+): Promise<void> => {
+  activeOperationId = request.operationId;
+  const writer = new VideoEditChunkAccumulator();
+  const throwIfCanceled = (): void => {
+    if (canceledOperationId === request.operationId) {
+      throw new DOMException('The local video render was canceled.', 'AbortError');
+    }
+  };
+  const live = (): boolean =>
+    activeOperationId === request.operationId && canceledOperationId !== request.operationId;
+  try {
+    const runtime = await import('mediabunny');
+    throwIfCanceled();
+    const { mimeType } = await stitchComposition(runtime, request, {
+      target: accumulatorTarget(runtime.StreamTarget, writer),
+      throwIfCanceled,
+      onCancel: (cancel) => {
+        activeConversion = {
+          cancel: () => {
+            cancel();
+            return Promise.resolve();
+          },
+        };
+        // A cancel that arrived while the runtime was loading is honoured now, not never.
+        if (canceledOperationId === request.operationId) cancel();
+      },
+      onPlan: (plan) => {
+        if (live()) respond({ type: 'plan', operationId: request.operationId, plan });
+      },
+      onProgress: (progress) => {
+        if (live()) respond({ type: 'progress', operationId: request.operationId, progress });
+      },
+    });
+    throwIfCanceled();
+    if (activeOperationId !== request.operationId) return;
+    const blob = writer.toBlob(mimeType);
+    if (blob.size <= 0) throw new Error('The stitched output was empty.');
+    respond({ type: 'complete', operationId: request.operationId, blob, mimeType: 'video/mp4' });
+  } catch (error) {
+    if (live()) {
+      respond({ type: 'error', operationId: request.operationId, message: safeMessage(error) });
+    }
+  } finally {
+    writer.clear();
+    if (activeOperationId === request.operationId) {
+      activeOperationId = null;
+      activeConversion = null;
+      if (canceledOperationId === request.operationId) canceledOperationId = null;
+    }
+  }
+};
+
 workerScope.addEventListener('message', (event) => {
   // Dedicated-worker messages arrive through the worker's private MessagePort, whose
   // MessageEvent origin is empty. Reject any event that does not match that channel contract.
@@ -271,6 +330,10 @@ workerScope.addEventListener('message', (event) => {
       operationId: request.operationId,
       message: 'Another local video render is already active.',
     });
+    return;
+  }
+  if (request.type === 'render-composition') {
+    void renderComposition(request);
     return;
   }
   void render(request);

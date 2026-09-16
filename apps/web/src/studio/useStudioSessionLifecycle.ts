@@ -8,6 +8,7 @@ import {
 import type { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import type { ProjectSourceActivity } from '../features/projects/useProjectSourceController';
 import type { ProjectWorkingMediaActivity } from '../features/projects/ProjectWorkingMediaSection';
+import type { CompositionRenderActivity } from '../features/video-editor/ProjectCompositionSurface';
 import type { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
 import { isVideoEditBusy } from '../features/video-editor/types';
 import type { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
@@ -36,6 +37,8 @@ interface UseStudioSessionLifecycleOptions {
   readonly projectWorkingMedia: ReturnType<typeof useProjectWorkingMediaController>;
   readonly projectSourceActivity: ProjectSourceActivity | null;
   readonly projectWorkingMediaActivity: ProjectWorkingMediaActivity | null;
+  /** An arrangement rendering in the Project surface — a local worker like the editor's. */
+  readonly projectCompositionRenderActivity: CompositionRenderActivity | null;
   /** The stage holds a take nothing has taken on; see `StudioRuntimeWork.hasUnclaimedTake`. */
   readonly hasUnclaimedTake: boolean;
   readonly discardSavedVideoWork: () => void;
@@ -69,6 +72,7 @@ export const useStudioSessionLifecycle = ({
   projectWorkingMedia,
   projectSourceActivity,
   projectWorkingMediaActivity,
+  projectCompositionRenderActivity,
   hasUnclaimedTake,
   discardSavedVideoWork,
   discardPendingAdoption,
@@ -112,7 +116,8 @@ export const useStudioSessionLifecycle = ({
   const videoRenderingActive =
     isVideoEditBusy(videoEditor.phase) ||
     projectWorkingMedia.busy ||
-    (projectWorkingMediaActivity?.busy ?? false);
+    (projectWorkingMediaActivity?.busy ?? false) ||
+    (projectCompositionRenderActivity?.busy ?? false);
 
   const cleanupTemporaryState = useCallback(async () => {
     const cleanup = existingVideo.cleanup();

@@ -383,6 +383,16 @@ capture-bridge tests; e2e add-second-source journey (real stack).
 > on this path; and surface `clipAudioConformance` as the notice for a clip that was resampled or
 > folded. The **video** half of the normalization policy (resolution, frame rate) is still not
 > decided: it was designed, adversarially reviewed, and cut from 4.1's scope as 4.2's own work.
+>
+> **Prompt 34 has run** — on 2026-09-15, on the operator's instruction to audit, plan and implement
+> in one pass; the audit, the decisions taken, the loop's design, the measured render budget and the
+> record are in [`SLICE_4.2_STITCHED_RENDERING_PLAN.md`](SLICE_4.2_STITCHED_RENDERING_PLAN.md). The
+> video half is decided there: the largest clip's frame, evened, with every clip fitted inside it
+> over black; each clip's own frame timing carried onto the sequence clock; codec not a target
+> dimension. The accurate stitched preview is the rendered file itself, played in the arrangement
+> editor. One gap is recorded for whoever runs next, before prompt 35: **no control adds a clip from
+> the Project's other media**, so in the product every arrangement is splits of one video and a
+> mixed-format arrangement is reached only by the worker tests and the Chromium fixture render.
 
 **32 (A) — Timeline UI: audit.** Standard audit-and-plan for slice 4.1 (edit-1, web-7). Inspect
 the editor stack (`VideoEditWorkspace/Timeline/StagePreview`, `useVideoEditSession`), the v3

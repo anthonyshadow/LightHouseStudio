@@ -263,32 +263,65 @@ export const createAudioSampleConformer = (
 };
 
 /**
- * The frames a clip with no audio owes the timeline, so the clips after it land where they should.
+ * The frames a clip that contributes no sound owes the timeline — no audio track, or muted — so
+ * the clips after it land where they should.
  *
  * Explicit rather than left to the encoder's gap-filler: that pads only gaps of 64 frames or more,
  * measured by rounding, and a silent clip is not a gap in the arrangement — it is media of a known
- * length, placed like any other. Chunked to a second so a long silent clip is not one allocation.
+ * length, placed like any other. Produced a second at a time, and lazily: a ten-minute muted clip
+ * at 48 kHz stereo is 230 MB of zeros, and the encoder only ever needs the second in its hand. The
+ * placement is checked before the first chunk exists, so a bad span is refused at the call.
  */
 export const silentAudioSamples = (
   Sample: typeof AudioSample,
   target: CompositionAudioTarget,
   placement: AudioClipPlacement,
-): readonly AudioSample[] => {
+): Iterable<AudioSample> => {
   requireTarget(target);
   const offsetFrames = requireWholeFrames(placement.offsetFrames, 'offset');
   const frames = requireWholeFrames(placement.frameBudget, 'frame budget');
-  const samples: AudioSample[] = [];
-  for (let start = 0; start < frames; start += target.sampleRate) {
-    const count = Math.min(target.sampleRate, frames - start);
-    samples.push(
-      new Sample({
-        data: new Float32Array(count * target.numberOfChannels),
-        format: 'f32',
-        numberOfChannels: target.numberOfChannels,
-        sampleRate: target.sampleRate,
-        timestamp: (offsetFrames + start) / target.sampleRate,
-      }),
-    );
+  return {
+    *[Symbol.iterator]() {
+      for (let start = 0; start < frames; start += target.sampleRate) {
+        const count = Math.min(target.sampleRate, frames - start);
+        yield new Sample({
+          data: new Float32Array(count * target.numberOfChannels),
+          format: 'f32',
+          numberOfChannels: target.numberOfChannels,
+          sampleRate: target.sampleRate,
+          timestamp: (offsetFrames + start) / target.sampleRate,
+        });
+      }
+    },
+  };
+};
+
+/**
+ * A decoded sample's frames from an offset, at a level, as a fresh interleaved `f32` sample.
+ *
+ * One owner of copy, trim and gain: the single-clip render's level hook and the stitched render's
+ * head trim both need exactly this, and two multiplies drifting apart is how a mute stops being
+ * exact zeros in one path. The buffer is always fresh, never a view: the library hands a sample's
+ * whole underlying buffer to the encoder, so a subarray with an offset would encode the wrong
+ * frames without an error. A whole-sample copy at unity is the caller's to avoid.
+ */
+export const scaledAudioSample = (
+  Sample: typeof AudioSample,
+  sample: AudioSample,
+  options: { readonly frameOffset: number; readonly gain: number; readonly timestamp: number },
+): AudioSample => {
+  const { frameOffset, gain, timestamp } = options;
+  if (!Number.isInteger(frameOffset) || frameOffset < 0 || frameOffset >= sample.numberOfFrames) {
+    throw new Error('A sample can only be read from a frame it holds.');
   }
-  return samples;
+  const data = new Float32Array((sample.numberOfFrames - frameOffset) * sample.numberOfChannels);
+  sample.copyTo(data, { planeIndex: 0, format: 'f32', frameOffset });
+  if (gain !== 1) for (let index = 0; index < data.length; index += 1) data[index]! *= gain;
+  return new Sample({
+    data,
+    format: 'f32',
+    numberOfChannels: sample.numberOfChannels,
+    sampleRate: sample.sampleRate,
+    timestamp,
+  });
 };

@@ -33,6 +33,12 @@ export const failComposition = (message: string): never => {
 
 const fail = failComposition;
 
+/** A positive whole number, or the composition's refusal naming what was wrong. */
+export const requirePositiveWholeNumber = (value: number, label: string): number =>
+  Number.isInteger(value) && value > 0
+    ? value
+    : fail(`A clip's ${label} must be a positive whole number.`);
+
 /**
  * The timeline composition cues are normalized against. Deliberately unbounded: clamping cues to
  * the sum of the trims would truncate every trailing cue the moment an upstream clip is shortened,

@@ -16,7 +16,9 @@ video, and it is not the same in every file here. The loaders in
 | `phone-hevc-video.base64`            | QuickTime (`qt  `) | HEVC Main (`hvc1`)                  | 1080x1920 | 2,253 |
 
 The first two predate this note and their generating commands were never recorded; do not infer one
-from the rows above. The last two were produced by the commands below.
+from the rows above. The last two were produced by the commands below. Lengths, as the page's own
+reader measures them: the decodable clip is 1.0 s, the deterministic recording 0.2 s — too short to
+split into two clips of the editor's 100 ms minimum — and the portrait and phone clips 1.0 s each.
 
 ## Regenerating `portrait-h264-video.base64` and `phone-hevc-video.base64`
 

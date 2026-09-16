@@ -10,6 +10,7 @@ import {
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   createAudioSampleConformer,
+  scaledAudioSample,
   silentAudioSamples,
   type AudioSampleConformer,
 } from './audioSampleConformer';
@@ -294,7 +295,7 @@ describe('createAudioSampleConformer', () => {
 
 describe('silentAudioSamples', () => {
   it('chunks a silent clip by the second and stamps each chunk in sequence', () => {
-    const samples = silentAudioSamples(AudioSample, target, at(3 * 48_000, 48_000 * 2 + 10));
+    const samples = [...silentAudioSamples(AudioSample, target, at(3 * 48_000, 48_000 * 2 + 10))];
     created.push(...samples);
     expect(samples.map((sample) => sample.numberOfFrames)).toEqual([48_000, 48_000, 10]);
     expect(samples.map((sample) => sample.timestamp)).toEqual([3, 4, 5]);
@@ -302,9 +303,79 @@ describe('silentAudioSamples', () => {
   });
 
   it('refuses a span that is not whole frames rather than letting the library say so', () => {
+    // At the call, not at the first chunk: the span is checked before anything is produced.
     expect(() => silentAudioSamples(AudioSample, target, at(0, 1_601.6))).toThrow(
       /whole number of frames/u,
     );
+  });
+
+  it('produces nothing until asked, so a long silent clip is never one allocation', () => {
+    let constructed = 0;
+    class CountingSample extends AudioSample {
+      constructor(init: ConstructorParameters<typeof AudioSample>[0]) {
+        super(init);
+        constructed += 1;
+      }
+    }
+    const silence = silentAudioSamples(CountingSample, target, at(0, 48_000 * 600));
+    expect(constructed).toBe(0);
+    // Taking one element stops the generator after it; nothing beyond the first second exists.
+    const [first] = silence;
+    created.push(first!);
+    expect(constructed).toBe(1);
+    expect(first!.numberOfFrames).toBe(48_000);
+  });
+});
+
+describe('scaledAudioSample', () => {
+  const frames = [
+    [0.5, -0.5],
+    [0.25, -0.25],
+    [1, -1],
+    [0.125, -0.125],
+  ];
+
+  it('reads a sample from an offset into a fresh buffer, leaving the source as it was', () => {
+    const source = interleaved(frames, 48_000, 2);
+    const trimmed = scaledAudioSample(AudioSample, source, {
+      frameOffset: 1,
+      gain: 1,
+      timestamp: 2.5,
+    });
+    expect(framesOf(trimmed)).toEqual(frames.slice(1));
+    expect(trimmed.timestamp).toBe(2.5);
+    expect(trimmed.sampleRate).toBe(48_000);
+    expect(framesOf(source)).toEqual(frames);
+  });
+
+  it('applies the level to every value, and a mute is exact zeros', () => {
+    const halved = scaledAudioSample(AudioSample, interleaved(frames, 48_000), {
+      frameOffset: 0,
+      gain: 0.5,
+      timestamp: 0,
+    });
+    expect(framesOf(halved)).toEqual(frames.map((frame) => frame.map((value) => value / 2)));
+    const muted = scaledAudioSample(AudioSample, interleaved(frames, 48_000), {
+      frameOffset: 0,
+      gain: 0,
+      timestamp: 0,
+    });
+    // A negative sample times zero is negative zero, which is still silence.
+    expect(
+      framesOf(muted)
+        .flat()
+        .every((value) => value === 0),
+    ).toBe(true);
+  });
+
+  it('refuses an offset past the frames it holds rather than letting the library say so', () => {
+    const source = interleaved(frames, 48_000);
+    expect(() =>
+      scaledAudioSample(AudioSample, source, { frameOffset: 4, gain: 1, timestamp: 0 }),
+    ).toThrow(/a frame it holds/u);
+    expect(() =>
+      scaledAudioSample(AudioSample, source, { frameOffset: 0.5, gain: 1, timestamp: 0 }),
+    ).toThrow(/a frame it holds/u);
   });
 });
 
@@ -327,10 +398,19 @@ describe('the fix, end to end against the same encoder', () => {
       { frames: sine(4_410, 44_100), rate: 44_100, spanMs: 100 },
     ];
     let offsetFrames = 0;
-    for (const clip of clips) {
+    for (const [index, clip] of clips.entries()) {
       const budget = compositionAudioFrames(clip.spanMs, chosen.sampleRate);
       const conformer = createAudioSampleConformer(AudioSample, chosen, at(offsetFrames, budget));
-      for (const emitted of conformAll(conformer, [interleaved(clip.frames, clip.rate)])) {
+      // The second clip's decoded sample starts 100 frames before its trim, the way a decoder's
+      // first sample does; the worker trims it by that offset before the conformer sees it, and
+      // the clip still lands on its budget.
+      const decoded = interleaved(clip.frames, clip.rate);
+      const pushed =
+        index === 1
+          ? scaledAudioSample(AudioSample, decoded, { frameOffset: 100, gain: 0.5, timestamp: 0 })
+          : decoded;
+      if (pushed !== decoded) created.push(pushed);
+      for (const emitted of conformAll(conformer, [pushed])) {
         await source.add(emitted);
         emitted.close();
       }

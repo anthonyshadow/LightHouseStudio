@@ -160,3 +160,16 @@ notice 34's surface owes an operator whose clip was resampled or folded.
   say only whether an output keeps audio at all. It is stated as such in the constant's comment.
 - Placement in frames, not seconds. A frame budget makes "clips meet exactly" a property of integer
   arithmetic; an offset in seconds made it a property of two clocks agreeing.
+
+---
+
+## 5. Amended when the render landed (2026-09-15)
+
+Slice 4.2's concat loop ([plan and record](SLICE_4.2_STITCHED_RENDERING_PLAN.md)) is the consumer
+§2.3 named, and wiring it changed two small things here. `silentAudioSamples` now produces its
+chunks lazily behind an `Iterable` — a ten-minute muted clip is 230 MB of zeros, and the encoder
+only ever needs the second in its hand; the placement is still checked at the call. `silence` now
+also covers a **muted** clip, which the loop neither decodes nor lets raise the target: nothing of
+its own format reaches the output, so nothing of it belongs in the decision. `scaledAudioSample`
+was added beside the conformer as the one owner of copy, head trim and level, used by the loop and
+by the single-clip render's level hook alike.
