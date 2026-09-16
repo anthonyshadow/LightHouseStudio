@@ -2,10 +2,11 @@
 
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ProjectCurrentResponse, ProjectSessionProposalContract } from '@studio/contracts';
-import { projectMediaReferenceKey, type Composition } from '@studio/domain';
+import type { Composition } from '@studio/domain';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
-import type { ProjectClipMedia, ProjectClipMediaEntry } from '../projects/projectClipMedia';
+import { clipMediaEntryFixture, clipMediaFixture } from '../../test/compositionFixtures';
+import type { ProjectClipMediaEntry } from '../projects/projectClipMedia';
 import type { ProjectSessionPort } from '../projects/useProjectSession';
 import { CompositionSurface } from './CompositionSurface';
 import type * as RenderCompositionModule from './renderComposition';
@@ -97,15 +98,8 @@ const assetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
 const otherAssetId = 'c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f';
 const clipId = (index: number) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`;
 
-const clipMedia = (filename: string, durationMs: number): ProjectClipMedia => ({
-  contentUrl: `/api/projects/${projectId}/sources/${assetId}/content`,
-  mimeType: 'video/mp4',
-  filename,
-  width: 1_920,
-  height: 1_080,
-  durationMs,
-  hasAudio: true,
-});
+const clipMedia = (filename: string, durationMs: number) =>
+  clipMediaFixture(projectId, assetId, filename, { durationMs });
 
 /** Two clips: [0, 4000) over one asset and [4000, 6500) over another. */
 const composition = (): Composition => ({
@@ -127,11 +121,9 @@ const composition = (): Composition => ({
 });
 
 /** The Project's media, in the order it lists it: the two the clips stand over. */
-const entry = (reference: { kind: 'asset'; assetId: string }, held: ProjectClipMedia) =>
-  [projectMediaReferenceKey(reference), { reference, media: held }] as const;
 const media = new Map<string, ProjectClipMediaEntry>([
-  entry({ kind: 'asset', assetId }, clipMedia('opening.mp4', 12_000)),
-  entry({ kind: 'asset', assetId: otherAssetId }, clipMedia('closing.mp4', 9_000)),
+  clipMediaEntryFixture({ kind: 'asset', assetId }, clipMedia('opening.mp4', 12_000)),
+  clipMediaEntryFixture({ kind: 'asset', assetId: otherAssetId }, clipMedia('closing.mp4', 9_000)),
 ]);
 
 const current = (
@@ -346,7 +338,6 @@ describe('CompositionSurface', () => {
     // nothing is said there yet — a live region written under `aria-hidden` is written to no one.
     expect(screen.queryByText(/^Added “closing\.mp4”/u)).toBeNull();
     // A second press while the panel is still leaving is not a second clip.
-    expect(rows[1]).toBeDisabled();
     fireEvent.click(rows[1]!);
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 

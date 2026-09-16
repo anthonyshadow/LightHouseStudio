@@ -290,11 +290,9 @@ export const VoiceLibrary = ({
         setPlaying={preview.setPlaying}
         reportPlaybackError={preview.reportPlaybackError}
       />
-      <VisuallyHidden>
-        <span role="status" aria-live="polite" aria-atomic="true">
-          {library.announcement}
-        </span>
-      </VisuallyHidden>
+      {/* Derived, not said: an identical string means nothing changed, so React's own skip is
+          right here and the count a said announcement needs would be wrong. */}
+      <VisuallyHidden role="status">{library.announcement}</VisuallyHidden>
 
       <div css={resultsStyles(theme)}>
         {disabled && unavailableReason ? (

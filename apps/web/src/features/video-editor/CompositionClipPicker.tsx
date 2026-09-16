@@ -97,14 +97,7 @@ export const CompositionClipPicker = ({
           const { filename, width, height, durationMs, hasAudio } = entry.media;
           return (
             <li key={key}>
-              <Button
-                variant="secondary"
-                css={rowCss}
-                // Pressable only while open: the panel stays on screen through its exit, and a
-                // second press there would be a second clip.
-                disabled={!open}
-                onClick={() => onChoose(entry)}
-              >
+              <Button variant="secondary" css={rowCss} onClick={() => onChoose(entry)}>
                 <span>{filename}</span>
                 <small>
                   {`${width}×${height} · ${formatVideoEditTimelineTime(durationMs)} · ${hasAudio ? 'with sound' : 'no sound'}`}

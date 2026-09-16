@@ -529,20 +529,30 @@ opened one input at a time and read metadata once per URL.
   return target when it has closed, so the surface hands it an object whose `current` is the new
   tile when there is one and the control otherwise. Without that, the one add that fills the
   arrangement — after which the control is disabled — would have dropped focus on the page.
-- **The surface's live region never was one.** `VisuallyHidden` takes a `role` and drops any other
-  attribute, so the `aria-live` written on it in 4.1 announced nothing: not a reorder, not a
-  removal, not the render starting. It is `role="status"` now, and the text is remounted on every
-  announcement so the same words twice are heard twice. Making it live also made two sentences
+- **The surface's live region never was one.** `VisuallyHidden` took a `role` and dropped every
+  other attribute, so the `aria-live` written on it in 4.1 announced nothing: not a reorder, not a
+  removal, not the render starting. The primitive forwards every `span` attribute now, which also
+  lets the two surfaces that had nested a second `span` inside it — the voice library and the
+  character builder — say what they mean directly. Making the region live also made two sentences
   double up with elements that were already speaking — the progress region says the render has
-  started, and the failure notice is an alert — so the region now says only that the render is
-  ready. And the add's own sentence is held until the panel has gone: while a panel is closing the
-  page behind it is still `inert` and `aria-hidden`, so `OverlayPanel` gained `onExited`, called
-  once its isolation is lifted and focus is back, and that is when the add is said.
-- **One choice per opening.** The panel stays on screen, and pressable, through its exit
-  transition, so a double-click on a row was two clips — and at the limit, a first add that landed
-  followed by a refusal that said the arrangement was unchanged. The rows are disabled the moment
-  the panel is told to close, which is the picker's own fact to hold; `OverlayPanel` now says in
-  its own words that it stays interactive while exiting, so the next caller need not rediscover it.
+  started, and the failure notice is an alert — so the region says only that the render is ready.
+  And the add's own sentence is held until the panel has gone: while a panel is closing the page
+  behind it is still `inert` and `aria-hidden`, so `OverlayPanel` gained `onExited`, called once
+  its isolation is lifted and focus is back, and that is when the add is said.
+- **A said announcement is a shared thing now.** A live region is announced when it changes, and
+  React writes nothing when the same string is rendered twice, so "Clip removed from the
+  arrangement." twice in a row would have been heard once. `useAnnouncement` and
+  `AnnouncementRegion` own that count and the region it remounts; the character builder, which had
+  the same exposure, uses them too. A _derived_ announcement — "12 voices shown" — deliberately
+  does not: an identical string there means nothing happened, and React's own skip is correct.
+  They live outside the `ui` barrel, reached by path like `Skeleton`, because only lazily loaded
+  surfaces announce anything and the shell imports that barrel.
+- **One choice per opening, enforced by the panel.** `OverlayPanel` stays on screen for the whole
+  of its exit animation, so a control that both closed it and acted could be pressed twice: here
+  that was a double-click on a row adding two clips, and at the limit a first add that landed
+  followed by a refusal claiming the arrangement was unchanged. It was a bug in one caller and a
+  trap laid for the other forty, so the panel closes it — `inert` while exiting, with capture
+  guards for the engines that do not implement it — and no caller disables its own controls.
 - **A failed read says so.** The catalogue reports `loading`, `failed` or `ready`, with a retry
   that asks again for whichever read failed; the panel shows the failure with **Retry** rather
   than "nothing to add" about a Project whose videos it could not list.
@@ -580,12 +590,18 @@ band inside the third clip; the inspector says "Shown with bars" for it. On the 
 (the §8.1 machine): upload two sources 3.6 s, arrange, split and add 1.8 s, stitched render
 1.0 s, read back 0.1 s, 6.5 s in all.
 
-**Left for later, deliberately.** `VisuallyHidden` still drops every prop but `role`, so
-`aria-live` on it is a silent no-op that the type checker does not catch — two other surfaces work
-around it by nesting their own `span`. Widening the primitive is additive and small, but it is a
-shared-primitive change with no caller in this slice that needs it. The same goes for making
-`OverlayPanel` inert while it exits, which would remove the need for a picker to disable its own
-rows but reaches every one of its callers; the docblock now states the trap instead.
+**The bundle ledger moved.** Both primitive repairs are in the shell closure by definition — the
+shell renders the overlays and imports the `ui` barrel — so its budget rose from 749_000 to
+750_000, measured 748_964 -> 749_131, with a dated entry. What was recoverable was recovered
+first, and it was the recovery the ledger already named: exporting the announcement primitive from
+the `ui` barrel cost 852 bytes, and reaching it by path costs nothing.
+
+**Seen, not only asserted.** The surface was driven on the isolated stack and captured at each
+step: the panel with both videos and their frames, lengths, sound and clip counts; the strip after
+the add with the new clip selected; the rendered arrangement with "renders at 1080×1920" and the
+bars notice under the 16:9 clip; and the same panel at 390 px, where it is a bottom sheet. The
+live region held "Added “landscape-source.mp4” as clip 3 of 3." and focus sat on the new clip's
+tile, both read out of the running page rather than out of jsdom.
 
 **Tests.** Domain: the factory (whole of the media, the floor, the id check, appended it
 validates) and the predicate. `projectClipMedia.test.ts`: order, the presented cut overriding a

@@ -127,7 +127,23 @@ export const BUILD_CLOSURE_BUDGETS = {
   //
   // 749_000 rather than a round number above it, so the headroom stays in the hundreds and the next
   // arrival fails the same way this one did.
-  'src/app/shell/AuthenticatedShell.tsx': 749_000,
+  //
+  // Raised from 749_000 to 750_000 on 2026-09-16, measured 748_964 -> 749_131. Two shared
+  // primitives learned something every caller had been working around. `OverlayPanel` now refuses
+  // input while it animates out — `inert` plus capture guards for the engines that do not
+  // implement it — because it stays on screen for 220 ms after it is told to close, so a control
+  // that both closed it and acted could be pressed twice; that was a real bug in one caller and a
+  // trap laid for the other forty. And `VisuallyHidden` forwards every `span` attribute instead of
+  // dropping all but `role`, which had made `aria-live` on it a silent no-op that neither the type
+  // checker nor a test could catch. Both are in this closure by definition: the shell renders the
+  // overlays and imports the `ui` barrel.
+  //
+  // What was recoverable was recovered first, and it is the recovery this ledger already named:
+  // the new `announcement` primitive — the live region and the count that makes a repeat of a
+  // sentence audible — is *not* exported from the `ui` barrel, because only lazily loaded surfaces
+  // announce anything and the shell imports that barrel. Reached by its path, the way `Skeleton`
+  // and `LoadingPlaceholder` are, it costs this closure nothing; exported, it cost 852 bytes.
+  'src/app/shell/AuthenticatedShell.tsx': 750_000,
   // Shell plus capture graph, which is what a Studio route costs. Looser, because a Studio route is
   // where media code belongs; `FORBIDDEN_CLOSURE_DEPENDENCIES` is what keeps it from leaking out.
   //

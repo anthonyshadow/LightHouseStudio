@@ -411,6 +411,41 @@ describe('OverlayPanel', () => {
     expect(screen.getByRole('button', { name: 'Close panel' })).not.toHaveFocus();
   });
 
+  it('takes no input while it is leaving, so a control that closes it cannot act twice', async () => {
+    const onAction = vi.fn();
+    const Closing = () => {
+      const [open, setOpen] = useState(true);
+      return (
+        <StudioDesignProvider>
+          <OverlayPanel open={open} title="Studio tools" onClose={() => setOpen(false)}>
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                onAction();
+              }}
+            >
+              Choose this
+            </button>
+          </OverlayPanel>
+        </StudioDesignProvider>
+      );
+    };
+    render(<Closing />);
+    const choice = await screen.findByRole('button', { name: 'Choose this' });
+    fireEvent.click(choice);
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    // Still on screen, animating out — and inert, so a second press does nothing.
+    const panel = screen.getByRole('dialog');
+    expect(panel).toHaveAttribute('inert');
+    fireEvent.click(choice);
+    fireEvent.keyDown(choice, { key: 'Enter' });
+    expect(onAction).toHaveBeenCalledTimes(1);
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
   it('says when it has left — after the page is audible again and focus is back', async () => {
     const seen: string[] = [];
     const onExited = vi.fn(() => {

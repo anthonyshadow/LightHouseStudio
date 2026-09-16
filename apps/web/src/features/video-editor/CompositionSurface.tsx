@@ -18,6 +18,7 @@ import {
   type ReactNode,
 } from 'react';
 import { Button, StatusNotice, VisuallyHidden } from '../../ui';
+import { AnnouncementRegion, useAnnouncement } from '../../ui/primitives/announcement';
 import {
   clipMediaOf,
   type ProjectClipMedia,
@@ -228,12 +229,7 @@ export const CompositionSurface = ({
    * after the strip re-renders, and writing state there would cascade a second render for a value
    * nothing paints. */
   const focusClipIdRef = useRef<string | null>(null);
-  /*
-   * What the live region says, with a count beside it: React writes nothing to the DOM when the
-   * same string is set twice, and a screen reader announces a live region only when it changes —
-   * so the text is remounted on every announcement, and "Clip removed" twice is heard twice.
-   */
-  const [announced, setAnnounced] = useState({ text: '', nonce: 0 });
+  const { announcement, announce } = useAnnouncement();
   const [playbackFailed, setPlaybackFailed] = useState(false);
   const [pickingClip, setPickingClip] = useState(false);
   /**
@@ -247,10 +243,6 @@ export const CompositionSurface = ({
     readonly clipId: string | null;
     readonly notice: string;
   } | null>(null);
-  const announce = useCallback(
-    (text: string) => setAnnounced((held) => ({ text, nonce: held.nonce + 1 })),
-    [],
-  );
   /** The strip's tile for a clip, which is the focusable thing a clip id names. */
   const clipTile = useCallback(
     (clipId: string): HTMLElement | null =>
@@ -801,10 +793,8 @@ export const CompositionSurface = ({
         onChoose={chooseClip}
       />
 
-      {/* `status` is what makes these live; an `aria-live` attribute on the primitive is dropped. */}
-      <VisuallyHidden role="status">
-        <span key={announced.nonce}>{announced.text}</span>
-      </VisuallyHidden>
+      <AnnouncementRegion announcement={announcement} />
+      {/* Derived from the phase rather than said, so it needs no count of its own. */}
       <VisuallyHidden role="status">{renderAnnouncement}</VisuallyHidden>
     </section>
   );

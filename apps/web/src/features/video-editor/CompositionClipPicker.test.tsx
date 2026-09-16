@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { projectMediaReferenceKey, type Composition } from '@studio/domain';
+import type { Composition } from '@studio/domain';
 import { createRef } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
-import type { ProjectClipMedia, ProjectClipMediaEntry } from '../projects/projectClipMedia';
+import { clipMediaEntryFixture, clipMediaFixture } from '../../test/compositionFixtures';
+import type { ProjectClipMediaEntry } from '../projects/projectClipMedia';
 import { CompositionClipPicker } from './CompositionClipPicker';
 
 afterEach(cleanup);
@@ -14,22 +15,11 @@ const assetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
 const otherAssetId = 'c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f';
 const projectId = '3f1c9e2a-6d4b-4f8a-9c21-5b7e0d8a4c11';
 
-const held = (filename: string, overrides: Partial<ProjectClipMedia> = {}): ProjectClipMedia => ({
-  contentUrl: `/api/projects/${projectId}/sources/${assetId}/content`,
-  mimeType: 'video/mp4',
-  filename,
-  width: 1_920,
-  height: 1_080,
-  durationMs: 12_000,
-  hasAudio: true,
-  ...overrides,
-});
+const held = (filename: string, overrides: Parameters<typeof clipMediaFixture>[3] = {}) =>
+  clipMediaFixture(projectId, assetId, filename, overrides);
 
-const entry = (reference: { kind: 'asset'; assetId: string }, media: ProjectClipMedia) =>
-  [projectMediaReferenceKey(reference), { reference, media }] as const;
-
-const opening = entry({ kind: 'asset', assetId }, held('opening.mp4'));
-const closing = entry(
+const opening = clipMediaEntryFixture({ kind: 'asset', assetId }, held('opening.mp4'));
+const closing = clipMediaEntryFixture(
   { kind: 'asset', assetId: otherAssetId },
   held('closing.mp4', { width: 1_080, height: 1_920, durationMs: 4_500, hasAudio: false }),
 );
@@ -125,9 +115,8 @@ describe('CompositionClipPicker', () => {
   it('stops taking choices the moment it is told to close, while it is still on screen', () => {
     const { onChoose, rerender } = renderPicker(new Map([opening, closing]));
     rerender(new Map([opening, closing]), 'ready', false);
-    // Still present through the exit transition, but no longer pressable.
+    // Still present through the exit transition; the panel itself refuses the press.
     const row = screen.getByRole('button', { name: /^closing\.mp4/u });
-    expect(row).toBeDisabled();
     fireEvent.click(row);
     expect(onChoose).not.toHaveBeenCalled();
   });

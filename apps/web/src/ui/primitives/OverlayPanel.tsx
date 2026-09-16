@@ -80,11 +80,10 @@ export interface OverlayPanelProps {
 /**
  * How long the panel stays mounted after it is told to close, so it can animate out.
  *
- * It is also fully interactive for that long, and the page behind it stays `inert` and
- * `aria-hidden`: a control that both closes the panel and acts can be pressed twice, and anything
- * a caller says on the surface behind — a live region, say — is said where nothing can hear it.
- * Guard such a control (`disabled` while closing), and use {@link OverlayPanelProps.onExited} for
- * whatever has to wait until the page is back.
+ * Through that window it is on screen but finished: it takes no input (see the `inert` and the
+ * capture guards below), and the page behind it is still `inert` and `aria-hidden`, so anything a
+ * caller says there — a live region, say — is said where nothing can hear it. Use
+ * {@link OverlayPanelProps.onExited} for whatever has to wait until the page is back.
  */
 const OVERLAY_EXIT_DURATION_MS = 220;
 
@@ -285,6 +284,25 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
     event.stopPropagation();
   };
 
+  /*
+   * Nothing inside a panel that is leaving may still act.
+   *
+   * A panel is on screen for the whole of its exit animation, so a control that both closes it and
+   * does something — a row in a picker, a chooser that starts paid work — could be pressed a
+   * second time after the first press had already taken effect. That was a bug found in one
+   * caller, and it was a trap laid for every caller; the panel closes it here so no caller has to
+   * disable its own controls. `inert` is the whole answer where it is implemented — pointer,
+   * keyboard, focus and assistive technology in one attribute — and these capture guards are what
+   * make the same promise hold in an engine that does not implement it, the test environment
+   * included.
+   */
+  const exiting = phase === 'exiting';
+  const swallowWhileExiting = (event: React.SyntheticEvent) => {
+    if (!exiting) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
   return createPortal(
     <div
       ref={backdropRef}
@@ -311,6 +329,10 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
+        inert={exiting}
+        onClickCapture={swallowWhileExiting}
+        onPointerDownCapture={swallowWhileExiting}
+        onKeyDownCapture={swallowWhileExiting}
         css={panelStyles(theme, placement, size, height, phase, centered)}
       >
         <header css={headerStyles(theme, Boolean(headerActions))}>

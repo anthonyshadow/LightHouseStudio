@@ -6,7 +6,8 @@ import type {
   VisualProfile,
 } from '@studio/domain';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Button, VisuallyHidden, NO_BROWSER_SUGGESTIONS } from '../../ui';
+import { Button, NO_BROWSER_SUGGESTIONS } from '../../ui';
+import { AnnouncementRegion, useAnnouncement } from '../../ui/primitives/announcement';
 import {
   CHARACTER_STARTERS,
   CUSTOM_OPTION_ID,
@@ -117,7 +118,8 @@ export const CharacterBuilderForm = ({
   const theme = useTheme();
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
   const previousStepRef = useRef(activeStep);
-  const [presentationAnnouncement, setPresentationAnnouncement] = useState('');
+  const { announcement: presentationAnnouncement, announce: announcePresentation } =
+    useAnnouncement();
   const [presentationCustomOpen, setPresentationCustomOpen] = useState(false);
   const gender = genderFromDesign(design);
   const profile = getVisualProfile(gender);
@@ -151,7 +153,7 @@ export const CharacterBuilderForm = ({
         gender: choice,
       },
     });
-    setPresentationAnnouncement(announcement);
+    announcePresentation(announcement);
   };
 
   const selectGender = (nextProfile: VisualProfile) => {
@@ -209,11 +211,7 @@ export const CharacterBuilderForm = ({
 
   return (
     <div css={builderLayoutStyles(theme)}>
-      <VisuallyHidden>
-        <span role="status" aria-live="polite" aria-atomic="true">
-          {presentationAnnouncement}
-        </span>
-      </VisuallyHidden>
+      <AnnouncementRegion announcement={presentationAnnouncement} />
 
       <nav aria-label="Character builder steps" css={stepNavigationStyles(theme)}>
         {STEPS.map((step) => {
